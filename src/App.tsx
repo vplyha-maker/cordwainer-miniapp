@@ -15,13 +15,34 @@ export default function App() {
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
-    if (tg) {
-      tg.ready()
-      tg.expand()
+    if (!tg) return
+
+    tg.ready()
+    tg.expand()
+
+    // Применяем тему Telegram
+    const applyTheme = () => {
+      const isDark = tg.colorScheme === 'dark'
+      document.documentElement.classList.toggle('dark', isDark)
+
       try {
-        tg.setHeaderColor('#F8F4EE')
-        tg.setBackgroundColor('#F8F4EE')
+        if (isDark) {
+          tg.setHeaderColor('#1C1A18')
+          tg.setBackgroundColor('#1C1A18')
+        } else {
+          tg.setHeaderColor('#F8F4EE')
+          tg.setBackgroundColor('#F8F4EE')
+        }
       } catch {}
+    }
+
+    applyTheme()
+
+    // Слушаем смену темы
+    tg.onEvent('themeChanged', applyTheme)
+
+    return () => {
+      tg.offEvent('themeChanged', applyTheme)
     }
   }, [])
 
@@ -35,4 +56,4 @@ export default function App() {
       )}
     </div>
   )
-          }
+ }
