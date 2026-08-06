@@ -104,108 +104,89 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         {/* CTA BUTTON */}
         <motion.button
           onClick={onStart}
-          whileHover={{ scale: 1.015 }}
-          whileTap={{ scale: 0.98 }}
-          initial={{ opacity: 0, y: 20 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.985, y: 2 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="relative overflow-hidden w-full h-[66px] rounded-[24px] mb-4"
+          className="relative overflow-hidden w-full h-[68px] rounded-[24px] mb-4"
           style={{
-            background: 'linear-gradient(180deg,#F8F3EB 0%,#EFE5D7 100%)',
-            border: '1px solid rgba(255,255,255,.55)',
-            boxShadow: '0 18px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 6px rgba(160,120,70,.12)',
+            background: 'linear-gradient(180deg,#F7F2EA 0%,#EEE4D5 100%)',
+            border: '1px solid rgba(214,179,126,.28)',
+            boxShadow: `
+              0 12px 30px rgba(0,0,0,.20),
+              inset 0 1px 0 rgba(255,255,255,.95),
+              inset 0 -2px 6px rgba(180,140,90,.10)
+            `,
           }}
         >
-          {/* Мягкий золотой блик */}
-          <motion.button
-  onClick={onStart}
-  whileHover={{ scale: 1.01 }}
-  whileTap={{ scale: 0.985, y: 2 }}
-  initial={{ opacity: 0, y: 14 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.15 }}
-  className="relative overflow-hidden w-full h-[68px] rounded-[24px] mb-4"
-  style={{
-    background:
-      "linear-gradient(180deg,#F7F2EA 0%,#EEE4D5 100%)",
-    border: "1px solid rgba(214,179,126,.28)",
-    boxShadow: `
-      0 12px 30px rgba(0,0,0,.20),
-      inset 0 1px 0 rgba(255,255,255,.95),
-      inset 0 -2px 6px rgba(180,140,90,.10)
-    `,
-  }}
->
-  {/* Световой блик */}
-  <motion.div
-    className="absolute inset-y-0 -left-24 w-24"
-    animate={{
-      x: [-60, 420],
-    }}
-    transition={{
-      repeat: Infinity,
-      repeatDelay: 2,
-      duration: 2.8,
-      ease: "easeInOut",
-    }}
-    style={{
-      background:
-        "linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent)",
-      transform: "skewX(-18deg)",
-      filter: "blur(4px)",
-    }}
-  />
+          {/* Световой блик */}
+          <motion.div
+            className="absolute inset-y-0 -left-24 w-24"
+            animate={{
+              x: [-60, 420],
+            }}
+            transition={{
+              repeat: Infinity,
+              repeatDelay: 2,
+              duration: 2.8,
+              ease: 'easeInOut',
+            }}
+            style={{
+              background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent)',
+              transform: 'skewX(-18deg)',
+              filter: 'blur(4px)',
+            }}
+          />
 
-  <div className="relative h-full flex items-center justify-between px-6">
+          <div className="relative h-full flex items-center justify-between px-6">
+            {/* Текст */}
+            <div className="flex flex-col text-left">
+              <span
+                className="uppercase"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '.28em',
+                  color: '#8E6B48',
+                  fontWeight: 600,
+                }}
+              >
+                ISSUE 01
+              </span>
 
-    {/* Текст */}
-    <div className="flex flex-col text-left">
-      <span
-        className="uppercase"
-        style={{
-          fontSize: 10,
-          letterSpacing: ".28em",
-          color: "#8E6B48",
-          fontWeight: 600,
-        }}
-      >
-        ISSUE 01
-      </span>
+              <span
+                style={{
+                  marginTop: 6,
+                  fontSize: 19,
+                  fontWeight: 700,
+                  color: '#1A1612',
+                  lineHeight: 1.1,
+                }}
+              >
+                Начать обучение
+              </span>
+            </div>
 
-      <span
-        style={{
-          marginTop: 6,
-          fontSize: 19,
-          fontWeight: 700,
-          color: "#1A1612",
-          lineHeight: 1.1,
-        }}
-      >
-        Начать обучение
-      </span>
-    </div>
-
-    {/* Стрелка */}
-    <motion.div
-      animate={{
-        x: [0, 5, 0],
-      }}
-      transition={{
-        duration: 1.4,
-        repeat: Infinity,
-        ease: "easeInOut",
-      }}
-      style={{
-        fontSize: 26,
-        color: "#8E6B48",
-        textShadow: "0 0 10px rgba(216,163,92,.18)",
-      }}
-    >
-      →
-    </motion.div>
-
-  </div>
-</motion.button>
+            {/* Стрелка */}
+            <motion.div
+              animate={{
+                x: [0, 5, 0],
+              }}
+              transition={{
+                duration: 1.4,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+              style={{
+                fontSize: 26,
+                color: '#8E6B48',
+                textShadow: '0 0 10px rgba(216,163,92,.18)',
+              }}
+            >
+              →
+            </motion.div>
+          </div>
+        </motion.button>
 
         {/* FAVORITES */}
         <motion.div
