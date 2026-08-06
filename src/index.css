@@ -21,6 +21,24 @@
   --shadow-elevated: 0 12px 40px -8px rgb(0 0 0 / 0.12), 0 4px 16px -4px rgb(0 0 0 / 0.06);
 }
 
+/* ===== ТЁМНАЯ ТЕМА ===== */
+.dark {
+  --color-cream: #1C1A18;
+  --color-cream-dark: #2A2724;
+  --color-ink: #F5F0E8;
+  --color-ink-soft: #E8E0D5;
+  --color-charcoal: #D4CBC0;
+  --color-warm-gray: #A89F94;
+  --color-muted: #8A8178;
+  --color-accent: #C4A484;
+  --color-accent-light: #8B5E3C;
+  --color-gold: #D4B44A;
+  --color-burgundy: #A84D5C;
+  --color-surface: #25221F;
+  --shadow-soft: 0 4px 24px -4px rgb(0 0 0 / 0.35), 0 2px 8px -2px rgb(0 0 0 / 0.25);
+  --shadow-elevated: 0 12px 40px -8px rgb(0 0 0 / 0.5), 0 4px 16px -4px rgb(0 0 0 / 0.35);
+}
+
 @layer base {
   html, body, #root { height: 100%; margin: 0; padding: 0; }
   body {
@@ -29,6 +47,7 @@
     color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 }
 
@@ -38,4 +57,4 @@
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
-    }
+}
