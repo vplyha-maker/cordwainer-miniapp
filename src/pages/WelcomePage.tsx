@@ -2,60 +2,64 @@ import { motion } from 'framer-motion'
 
 export function WelcomePage() {
   return (
-    <div className="relative min-h-full overflow-hidden">
+    <div className="relative h-[100dvh] overflow-hidden flex flex-col">
+      {/* Фон */}
       <div className="absolute inset-0 bg-gradient-to-b from-cream via-cream to-cream-dark pointer-events-none" />
-      <div className="absolute top-0 right-0 w-72 h-72 bg-accent-light/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-      <div className="absolute bottom-24 left-0 w-56 h-56 bg-gold/8 rounded-full blur-3xl -translate-x-1/4" />
+      <div className="absolute top-0 right-0 w-56 h-56 bg-accent-light/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
 
-      <div className="relative z-10 flex flex-col min-h-full px-5 pt-5 pb-7">
+      <div className="relative z-10 flex flex-col h-full px-4 pt-3 pb-4">
+        
+        {/* Верхняя строка */}
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55 }}
-          className="flex items-center justify-between mb-5"
+          transition={{ duration: 0.4 }}
+          className="flex items-center justify-between mb-3 shrink-0"
         >
-          <span className="text-[10px] tracking-[0.18em] uppercase text-muted font-medium">
+          <span className="text-[9px] tracking-[0.16em] uppercase text-muted font-medium">
             Issue 01 · 2026
           </span>
-          <span className="text-[10px] tracking-[0.14em] uppercase text-muted">
+          <span className="text-[9px] tracking-[0.12em] uppercase text-muted">
             Design · Create · Elevate
           </span>
         </motion.div>
 
+        {/* Заголовок */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.08 }}
-          className="mb-6"
+          transition={{ duration: 0.5, delay: 0.05 }}
+          className="mb-3 shrink-0"
         >
-          <h1 className="font-display text-[2.6rem] leading-[0.92] tracking-tight text-ink font-semibold">
+          <h1 className="font-display text-[2.1rem] leading-[0.95] tracking-tight text-ink font-semibold">
             Cordwainer
           </h1>
-          <p className="mt-2.5 text-[13.5px] text-warm-gray leading-relaxed max-w-[260px]">
+          <p className="mt-1.5 text-[12.5px] text-warm-gray leading-snug">
             Энциклопедия сапожного ремесла.<br />
             Наука. Эстетика. Мастерство.
           </p>
         </motion.div>
 
+        {/* Картинка — занимает оставшееся место, но не больше нужного */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.97, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: 0.15 }}
-          className="relative mb-6 rounded-2xl overflow-hidden shadow-[var(--shadow-elevated)] bg-surface ring-1 ring-black/5"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="relative flex-1 min-h-0 mb-3 rounded-2xl overflow-hidden shadow-[var(--shadow-elevated)] bg-surface ring-1 ring-black/5"
         >
           <img
             src="/hero-cover.png"
-            alt="Cordwainer — The Art of Color in Footwear"
-            className="w-full h-auto object-cover block"
-            style={{ aspectRatio: '3/4' }}
+            alt="Cordwainer"
+            className="w-full h-full object-cover object-center"
           />
         </motion.div>
 
+        {/* Три категории */}
         <motion.div
-          initial={{ opacity: 0, y: 14 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.3 }}
-          className="grid grid-cols-3 gap-2.5 mb-7"
+          transition={{ duration: 0.45, delay: 0.2 }}
+          className="grid grid-cols-3 gap-2 mb-3 shrink-0"
         >
           {[
             { label: 'Материалы', sub: 'Кожа · Замша' },
@@ -64,33 +68,38 @@ export function WelcomePage() {
           ].map((item, i) => (
             <div
               key={i}
-              className="rounded-xl bg-surface/90 border border-cream-dark/50 px-2.5 py-2.5 text-center shadow-[var(--shadow-soft)]"
+              className="rounded-xl bg-surface border border-cream-dark/60 px-2 py-2 text-center shadow-[var(--shadow-soft)]"
             >
-              <div className="text-[11px] font-semibold text-ink tracking-wide">{item.label}</div>
-              <div className="mt-0.5 text-[9px] text-muted leading-tight">{item.sub}</div>
+              <div className="text-[11px] font-semibold text-ink tracking-wide leading-tight">
+                {item.label}
+              </div>
+              <div className="mt-0.5 text-[9px] text-muted leading-tight">
+                {item.sub}
+              </div>
             </div>
           ))}
         </motion.div>
 
+        {/* Кнопка — всегда внизу, без скролла */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-auto"
+          transition={{ duration: 0.4, delay: 0.28 }}
+          className="shrink-0"
         >
           <button
-            className="w-full h-[52px] rounded-[var(--radius-button)] bg-ink text-cream font-medium text-[15px] tracking-wide
+            className="w-full h-[48px] rounded-[var(--radius-button)] bg-ink text-cream font-medium text-[14.5px] tracking-wide
                        active:scale-[0.985] transition-all duration-150
-                       shadow-[0_10px_28px_-8px_rgba(26,26,26,0.4)]
-                       flex items-center justify-center gap-2.5"
+                       shadow-[0_8px_24px_-6px_rgba(26,26,26,0.35)]
+                       flex items-center justify-center gap-2"
           >
             <span>Начать изучение</span>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </button>
-          <p className="mt-3.5 text-center text-[11px] text-muted leading-snug">
-            Профессиональный справочник<br />для мастеров и дизайнеров обуви
+          <p className="mt-2 text-center text-[10px] text-muted leading-snug">
+            Профессиональный справочник для мастеров
           </p>
         </motion.div>
       </div>
