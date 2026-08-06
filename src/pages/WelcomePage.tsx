@@ -101,102 +101,77 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
           ))}
         </motion.div>
 
+        {/* CTA BUTTON */}
         <motion.button
-          initial={{ opacity: 0, y: 10 }}
+          onClick={onStart}
+          whileHover={{ scale: 1.015 }}
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          onClick={onStart}
-          className="w-full h-[46px] rounded-2xl font-medium text-[14px] tracking-wide active:scale-[0.98] transition-transform flex items-center justify-center gap-2 mb-3.5"
+          className="relative overflow-hidden w-full h-[66px] rounded-[24px] mb-4"
           style={{
-            background: '#F5F1EB',
-            color: '#1A1612',
-            boxShadow: '0 4px 20px rgba(245, 241, 235, 0.12)',
+            background: 'linear-gradient(180deg,#F8F3EB 0%,#EFE5D7 100%)',
+            border: '1px solid rgba(255,255,255,.55)',
+            boxShadow: '0 18px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 6px rgba(160,120,70,.12)',
           }}
         >
-          <span>Начать изучение</span>
-          <span>→</span>
-        </motion.button>
-
-        <motion.div
-        <motion.button
-    onClick={onStart}
-    whileHover={{ scale: 1.015 }}
-    whileTap={{ scale: 0.98 }}
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: 0.15 }}
-    className="relative overflow-hidden w-full h-[66px] rounded-[24px] mb-4"
-    style={{
-        background:
-            "linear-gradient(180deg,#F8F3EB 0%,#EFE5D7 100%)",
-        border: "1px solid rgba(255,255,255,.55)",
-        boxShadow:
-            "0 18px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 6px rgba(160,120,70,.12)",
-    }}
->
-    {/* мягкий золотой блик */}
-    <motion.div
-        animate={{
-            x: ["-120%", "140%"],
-        }}
-        transition={{
-            repeat: Infinity,
-            duration: 3.8,
-            ease: "linear",
-        }}
-        className="absolute inset-y-0 w-24"
-        style={{
-            background:
-                "linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent)",
-            transform: "skewX(-18deg)",
-        }}
-    />
-
-    <div className="relative h-full flex items-center justify-between px-6">
-
-        <div className="flex items-center gap-4">
-
-            <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{
-                    background:
-                        "linear-gradient(180deg,#D8A35C,#C88A38)",
-                    color: "#fff",
-                    boxShadow:
-                        "0 6px 18px rgba(216,163,92,.45)",
-                }}
-            >
-                📖
-            </div>
-
-            <div className="text-left">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-[#8C7255]">
-                    Добро пожаловать
-                </div>
-
-                <div className="text-[18px] font-semibold text-[#1B1713]">
-                    Начать обучение
-                </div>
-            </div>
-
-        </div>
-
-        <motion.div
+          {/* Мягкий золотой блик */}
+          <motion.div
             animate={{
-                x: [0, 5, 0],
+              x: ['-120%', '140%'],
             }}
             transition={{
+              repeat: Infinity,
+              duration: 3.8,
+              ease: 'linear',
+            }}
+            className="absolute inset-y-0 w-24"
+            style={{
+              background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent)',
+              transform: 'skewX(-18deg)',
+            }}
+          />
+
+          <div className="relative h-full flex items-center justify-between px-6">
+            <div className="flex items-center gap-4">
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(180deg,#D8A35C,#C88A38)',
+                  color: '#fff',
+                  boxShadow: '0 6px 18px rgba(216,163,92,.45)',
+                }}
+              >
+                📖
+              </div>
+
+              <div className="text-left">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#8C7255]">
+                  Добро пожаловать
+                </div>
+                <div className="text-[18px] font-semibold text-[#1B1713]">
+                  Начать обучение
+                </div>
+              </div>
+            </div>
+
+            <motion.div
+              animate={{
+                x: [0, 5, 0],
+              }}
+              transition={{
                 repeat: Infinity,
                 duration: 1.6,
-            }}
-            className="text-[#6F4B2A] text-2xl"
-        >
-            →
-        </motion.div>
-      </div>
-</motion.button>
-          
+              }}
+              className="text-[#6F4B2A] text-2xl"
+            >
+              →
+            </motion.div>
+          </div>
+        </motion.button>
 
+        {/* FAVORITES */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -206,7 +181,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             <span className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0]">
               Избранное
             </span>
-            <span className="text-[11px] text-[#D8A35C]">Смотреть все</span>
+            <span className="text-[11px] text-[#D8A35C] cursor-pointer">Смотреть все</span>
           </div>
           <div className="flex gap-2">
             {['🪵', '🎨', '👞'].map((emoji, i) => (
