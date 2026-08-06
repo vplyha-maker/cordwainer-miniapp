@@ -116,18 +116,19 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
       <div className="relative z-10 px-4 -mt-6">
 
 <motion.div
-  initial={{ opacity: 0, y: 24 }}
-  animate={{ opacity: 1, y: 0 }}
-  exit={{
+  initial={{
     opacity: 0,
-    y: -20,
+    scale: 1.04,
+  }}
+  animate={{
+    opacity: 1,
+    scale: 1,
   }}
   transition={{
-    delay: 0.15,
-    duration: 0.6,
+    duration: 0.8,
     ease: [0.22, 1, 0.36, 1],
   }}
-  className="grid grid-cols-3 gap-2 mb-4"
+  className="relative min-h-[100dvh] bg-[#151210] text-[#F5F1EB] pb-[100px]"
 >
   {[
     { title: 'Материалы', sub: 'Кожа · Замша\nПодошвы', accent: '#D8A35C' },
