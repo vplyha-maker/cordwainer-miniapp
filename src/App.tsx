@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 
-
 declare global {
   interface Window {
     Telegram?: { WebApp: any }
@@ -47,7 +46,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="min-h-full bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
+    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
       <AnimatePresence mode="wait">
         {screen === 'welcome' ? (
           <WelcomePage
