@@ -118,45 +118,84 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         </motion.button>
 
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-2xl p-3 flex items-center gap-3 mb-4"
-          style={{
-            background: 'rgba(39, 33, 29, 0.82)',
-            border: '1px solid rgba(198, 164, 122, 0.2)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-          }}
-        >
-          <div className="flex-1 min-w-0">
-            <div className="text-[9px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-0.5">
-              Продолжить обучение
-            </div>
-            <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-2">
-              Конструкция Goodyear Welt
-            </div>
-            <div className="h-1 rounded-full bg-[#1D1815] overflow-hidden">
-              <div
-                className="h-full rounded-full"
+        <motion.button
+    onClick={onStart}
+    whileHover={{ scale: 1.015 }}
+    whileTap={{ scale: 0.98 }}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.15 }}
+    className="relative overflow-hidden w-full h-[66px] rounded-[24px] mb-4"
+    style={{
+        background:
+            "linear-gradient(180deg,#F8F3EB 0%,#EFE5D7 100%)",
+        border: "1px solid rgba(255,255,255,.55)",
+        boxShadow:
+            "0 18px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 6px rgba(160,120,70,.12)",
+    }}
+>
+    {/* мягкий золотой блик */}
+    <motion.div
+        animate={{
+            x: ["-120%", "140%"],
+        }}
+        transition={{
+            repeat: Infinity,
+            duration: 3.8,
+            ease: "linear",
+        }}
+        className="absolute inset-y-0 w-24"
+        style={{
+            background:
+                "linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent)",
+            transform: "skewX(-18deg)",
+        }}
+    />
+
+    <div className="relative h-full flex items-center justify-between px-6">
+
+        <div className="flex items-center gap-4">
+
+            <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
                 style={{
-                  width: '66%',
-                  background: 'linear-gradient(90deg, #D8A35C, #F3C27A)',
-                  boxShadow: '0 0 8px rgba(243, 194, 122, 0.4)',
+                    background:
+                        "linear-gradient(180deg,#D8A35C,#C88A38)",
+                    color: "#fff",
+                    boxShadow:
+                        "0 6px 18px rgba(216,163,92,.45)",
                 }}
-              />
+            >
+                📖
             </div>
-          </div>
-          <div
-            className="w-14 h-14 rounded-xl shrink-0 flex items-center justify-center text-2xl"
-            style={{
-              background: '#312923',
-              border: '1px solid rgba(198, 164, 122, 0.2)',
+
+            <div className="text-left">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-[#8C7255]">
+                    Добро пожаловать
+                </div>
+
+                <div className="text-[18px] font-semibold text-[#1B1713]">
+                    Начать обучение
+                </div>
+            </div>
+
+        </div>
+
+        <motion.div
+            animate={{
+                x: [0, 5, 0],
             }}
-          >
-            👞
-          </div>
+            transition={{
+                repeat: Infinity,
+                duration: 1.6,
+            }}
+            className="text-[#6F4B2A] text-2xl"
+        >
+            →
         </motion.div>
+      </div>
+</motion.button>
+          
 
         <motion.div
           initial={{ opacity: 0, y: 10 }}
