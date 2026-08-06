@@ -25,7 +25,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             duration: 0.7,
             ease: [0.22, 1, 0.36, 1],
           }}
-          style={{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}
+          style={{ transform: 'translateZ(0)' }}
         >
           <img
             src="/hero-cover.png"
@@ -94,7 +94,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         <div className="relative z-30 px-4 -mt-6">
           
           {/* CATEGORIES GRID */}
-          <div className="grid grid-cols-3 gap-2.5 mb-5">
+          <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
             {[
               { title: 'Материалы', sub: 'Кожа · Замша\nПодошвы', accent: '#D8A35C' },
               { title: 'Цвета', sub: 'Колористика\nПатина', accent: '#A78BFA' },
@@ -108,18 +108,15 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                   delay: 0.15 + index * 0.06,
                   duration: 0.4,
                 }}
-                whileTap={{ scale: 0.88 }}
-                // ИСПРАВЛЕНИЕ 1: Жесткая высота h-[130px] не даст iOS сломать сетку
-                className="relative rounded-[16px] p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer h-[130px] w-full" 
+                whileTap={{ scale: 0.88 }} // Анимация снова работает!
+                // ИСПРАВЛЕНИЕ: Убрали жесткую высоту, вернули h-full. Кнопки снова компактные.
+                className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full"
                 style={{
-                  // ИСПРАВЛЕНИЕ 2: Градиент фона + внутреннее свечение (inset shadow) вместо глючного border-image. 
-                  // Это дает идеальное скругление и эффект градиентной рамки сверху и по бокам.
+                  // Убрал жесткий transform, чтобы не ломать Framer Motion
                   background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
                   boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
                   backdropFilter: 'blur(10px)',
                   WebkitBackdropFilter: 'blur(10px)',
-                  transform: 'translateZ(0)', // Помогает iOS лучше рендерить блюр
-                  WebkitTransform: 'translateZ(0)'
                 }}
               >
                 <div
@@ -227,11 +224,13 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                 <motion.div
                   key={i}
                   whileTap={{ scale: 0.88 }}
-                  className="w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer"
+                  // ИСПРАВЛЕНИЕ: Кнопки избранного теперь тоже с градиентом
+                  className="relative w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer overflow-hidden"
                   style={{
-                    background: '#27211D',
-                    border: '1px solid rgba(198,164,122,.2)',
-                    boxShadow: '0 6px 18px rgba(0,0,0,.25)',
+                    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+                    boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
                   }}
                 >
                   {emoji}
@@ -240,10 +239,13 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
 
               <motion.div
                 whileTap={{ scale: 0.88 }}
-                className="w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer"
+                // ИСПРАВЛЕНИЕ: Кнопка "+12" с таким же градиентом
+                className="relative w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer overflow-hidden"
                 style={{
-                  background: 'rgba(39,33,29,.85)',
-                  border: '1px solid rgba(198,164,122,.2)',
+                  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+                  boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
                 }}
               >
                 +12
