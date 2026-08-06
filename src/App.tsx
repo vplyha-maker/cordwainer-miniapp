@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { WelcomePage } from './pages/WelcomePage'
+import { HomePage } from './pages/HomePage'
 
 declare global {
   interface Window {
@@ -7,7 +8,11 @@ declare global {
   }
 }
 
+type Screen = 'welcome' | 'home'
+
 export default function App() {
+  const [screen, setScreen] = useState<Screen>('welcome')
+
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
@@ -22,7 +27,12 @@ export default function App() {
 
   return (
     <div className="min-h-full bg-cream text-ink font-body tg-safe">
-      <WelcomePage />
+      {screen === 'welcome' && (
+        <WelcomePage onStart={() => setScreen('home')} />
+      )}
+      {screen === 'home' && (
+        <HomePage onBack={() => setScreen('welcome')} />
+      )}
     </div>
   )
-}
+          }
