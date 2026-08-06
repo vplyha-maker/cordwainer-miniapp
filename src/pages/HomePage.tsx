@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { SectionCard } from '../components/ui/SectionCard'
+import { SectionCard } from '../components/SectionCard'
 
 type HomePageProps = {
   onBack?: () => void
