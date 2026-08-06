@@ -5,6 +5,14 @@ type HomePageProps = {
   onBack?: () => void
 }
 
+// Выносим стиль градиентной карточки в переменную, чтобы легко применять ко всем блокам
+const cardStyle = {
+  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+  boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+}
+
 const LEARNING = [
   {
     id: 'materials',
@@ -12,7 +20,11 @@ const LEARNING = [
     subtitle: 'Кожа, замша, подошвы и др.',
     count: '245 статей',
     accent: '#D8A35C',
-    icon: '🪵',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
+      </svg>
+    ),
   },
   {
     id: 'colors',
@@ -20,7 +32,15 @@ const LEARNING = [
     subtitle: 'Психология цвета, патина',
     count: '128 статей',
     accent: '#A78BFA',
-    icon: '🎨',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="6.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
+        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+      </svg>
+    ),
   },
   {
     id: 'styles',
@@ -28,184 +48,239 @@ const LEARNING = [
     subtitle: 'Классика, женские, уличные',
     count: '186 статей',
     accent: '#60A5FA',
-    icon: '👞',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
+        <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
+        <path d="M 14 11.5 L 9 15" />
+      </svg>
+    ),
   },
   {
-    id: 'constructions',
-    title: 'Конструкции',
-    subtitle: 'Крепление, каркас, гидро',
+    id: 'sizes',
+    title: 'Размеры, ортопедия', // Переименовано
+    subtitle: 'Колодки, подъем, стопа', 
     count: '97 статей',
     accent: '#34D399',
-    icon: '🏗️',
+    icon: (
+      // Иконка измерительной рулетки
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19.875 6.27L17.73 4.125a2.25 2.25 0 00-3.18 0L3.375 15.3a2.25 2.25 0 000 3.18l2.145 2.145a2.25 2.25 0 003.18 0l11.175-11.175a2.25 2.25 0 000-3.18z" />
+        <path d="M14.5 5.5l4 4M10.5 9.5l4 4M6.5 13.5l4 4" />
+      </svg>
+    ),
   },
 ]
 
 const TOOLS = [
-  { id: 'calc', title: 'Калькуляторы', subtitle: '12 инструментов', accent: '#F59E0B', icon: '🧮' },
-  { id: 'helper', title: 'Экспресс-помощник', subtitle: '23 инструмента', accent: '#F472B6', icon: '⚡' },
-  { id: 'glossary', title: 'Глоссарий', subtitle: '342 термина', accent: '#38BDF8', icon: '📖' },
+  { 
+    id: 'calc', 
+    title: 'Калькуляторы', 
+    subtitle: '12 инструментов', 
+    accent: '#F59E0B', 
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="3" />
+        <path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 18v.01M12 18v.01M8 18v.01M16 10v.01M12 10v.01M8 10v.01" />
+      </svg>
+    ) 
+  },
+  { 
+    id: 'blog', 
+    title: 'Блог', // Переименовано
+    subtitle: 'Новые статьи', 
+    accent: '#F472B6', 
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
+        <path d="M7 7h10M7 11h10M7 15h6" />
+      </svg>
+    ) 
+  },
+  { 
+    id: 'glossary', 
+    title: 'Глоссарий', 
+    subtitle: '342 термина', 
+    accent: '#38BDF8', 
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+      </svg>
+    ) 
+  },
 ]
 
 export function HomePage({ onBack }: HomePageProps) {
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden">
+    <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
       
-      {/* Главный анимируемый контейнер */}
+      {/* СТАТИЧНАЯ ШАПКА: Зафиксирована сверху, больше не прячется при скролле */}
+      <div className="px-4 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
+        <motion.h1 
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="font-display text-[1.65rem] leading-none text-[#F5F1EB]"
+        >
+          Меню
+        </motion.h1>
+        {onBack && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={onBack}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[#B9ACA0] active:scale-90 transition-transform overflow-hidden cursor-pointer"
+            style={cardStyle} // Применили градиентный фон к кнопке Назад
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </motion.button>
+        )}
+      </div>
+
+      {/* АНИМИРУЕМЫЙ КОНТЕНТ (Теперь скроллится только эта часть, без артефактов) */}
       <motion.div 
-        // ВАЖНО: Заменили scale на мягкий сдвиг по Y. При exit — просто затухание.
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0 }} // Никаких scale или y при выходе! Это уберет артефакты.
+        exit={{ opacity: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="flex-1 flex flex-col min-h-0"
-        style={{ willChange: 'opacity, transform' }} // Более безопасный метод для Android, чем translateZ
+        // Убрали willChange, добавили overscroll-none для предотвращения артефактов при рывках
+        className="flex-1 px-4 overflow-y-auto pb-[110px] overscroll-none"
       >
-        <div className="flex-1 px-4 pt-3 pb-[110px] overflow-y-auto">
-          
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between mb-4"
+        {/* Search */}
+        <div className="mb-4">
+          <div 
+            className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
+            style={cardStyle}
           >
-            <h1 className="font-display text-[1.65rem] leading-none text-[var(--color-ink)]">
-              Меню
-            </h1>
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="w-9 h-9 rounded-full glass flex items-center justify-center text-[var(--color-muted)] active:scale-95 transition-transform"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-            )}
-          </motion.div>
-
-          {/* Search */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04 }}
-            className="mb-4"
-          >
-            <div className="glass rounded-2xl px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted)] shrink-0">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M20 20l-3.5-3.5" />
-              </svg>
-              <span className="text-[12.5px] text-[var(--color-muted)] truncate">
-                Поиск по материалам, конструкциям...
-              </span>
-            </div>
-          </motion.div>
-
-          {/* Обучение */}
-          <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--color-muted)] mb-2 px-0.5">
-            Обучение
-          </p>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {LEARNING.map((item, i) => (
-              <motion.button
-                key={item.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.06 + i * 0.03 }}
-                className="glass rounded-2xl p-3 text-left active:scale-[0.98] transition-transform flex flex-col"
-                // Убрали translateZ(0), чтобы не перегружать память Android
-              >
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-base mb-2"
-                  style={{ background: `${item.accent}22`, color: item.accent }}
-                >
-                  {item.icon}
-                </div>
-                <div className="text-[13px] font-semibold leading-tight mb-0.5">
-                  {item.title}
-                </div>
-                <div className="text-[10px] text-[var(--color-muted)] leading-snug mb-1">
-                  {item.subtitle}
-                </div>
-                <div className="mt-auto text-[9px] text-[var(--color-muted)] opacity-80 pt-1">
-                  {item.count}
-                </div>
-              </motion.button>
-            ))}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[#B9ACA0] shrink-0">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+            <span className="text-[12.5px] text-[#B9ACA0] truncate">
+              Поиск по материалам, конструкциям...
+            </span>
           </div>
-
-          {/* Инструменты */}
-          <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--color-muted)] mb-2 px-0.5">
-            Инструменты
-          </p>
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {TOOLS.map((item, i) => (
-              <motion.button
-                key={item.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18 + i * 0.03 }}
-                className="glass rounded-2xl p-2.5 text-left active:scale-[0.98] transition-transform flex flex-col"
-              >
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm mb-1.5"
-                  style={{ background: `${item.accent}22`, color: item.accent }}
-                >
-                  {item.icon}
-                </div>
-                <div className="text-[11px] font-semibold leading-tight mb-0.5">
-                  {item.title}
-                </div>
-                <div className="text-[9px] text-[var(--color-muted)] leading-snug">
-                  {item.subtitle}
-                </div>
-              </motion.button>
-            ))}
-          </div>
-
-          {/* Избранное */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.28 }}
-            className="glass rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-3 cursor-pointer active:scale-[0.98] transition-transform"
-          >
-            <div className="w-8 h-8 rounded-xl bg-[var(--color-accent)]/15 flex items-center justify-center text-[var(--color-accent)] text-sm shrink-0">
-              ★
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold">Избранное</div>
-              <div className="text-[10px] text-[var(--color-muted)]">Сохранённые статьи</div>
-            </div>
-            <div className="flex -space-x-1.5 shrink-0">
-              <div className="w-6 h-6 rounded-full bg-[#8B5E3C]/50 border-2 border-[var(--color-bg)]" />
-              <div className="w-6 h-6 rounded-full bg-[#A78BFA]/50 border-2 border-[var(--color-bg)]" />
-              <div className="w-6 h-6 rounded-full bg-[#60A5FA]/50 border-2 border-[var(--color-bg)]" />
-              <div className="w-6 h-6 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-bg)] flex items-center justify-center text-[8px] text-[var(--color-muted)]">
-                +12
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Цитата */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.32 }}
-            className="glass rounded-2xl p-3.5"
-          >
-            <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-soft)] italic">
-              «Мастерство — в деталях. Знание — в опыте.»
-            </p>
-            <p className="mt-1.5 text-[11px] text-[var(--color-accent)] font-display">
-              Cordwainer
-            </p>
-          </motion.div>
-          
         </div>
+
+        {/* Обучение */}
+        <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
+          Обучение
+        </p>
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {LEARNING.map((item, i) => (
+            <motion.button
+              key={item.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.06 + i * 0.03 }}
+              className="relative rounded-2xl p-3 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer"
+              style={cardStyle}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0"
+                style={{ 
+                  background: `${item.accent}20`, 
+                  color: item.accent,
+                  boxShadow: `0 0 16px ${item.accent}30`,
+                }}
+              >
+                {item.icon}
+              </div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">
+                {item.title}
+              </div>
+              <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">
+                {item.subtitle}
+              </div>
+              <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">
+                {item.count}
+              </div>
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Инструменты */}
+        <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
+          Инструменты
+        </p>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {TOOLS.map((item, i) => (
+            <motion.button
+              key={item.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18 + i * 0.03 }}
+              className="relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
+              style={cardStyle}
+            >
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 shrink-0"
+                style={{ 
+                  background: `${item.accent}20`, 
+                  color: item.accent,
+                  boxShadow: `0 0 14px ${item.accent}30`,
+                }}
+              >
+                {item.icon}
+              </div>
+              <div className="text-[11px] font-semibold text-[#F5F1EB] leading-tight mb-0.5 mt-auto">
+                {item.title}
+              </div>
+              <div className="text-[9px] text-[#B9ACA0] leading-snug mt-1">
+                {item.subtitle}
+              </div>
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Избранное */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28 }}
+          className="relative rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
+          style={cardStyle}
+        >
+          <div className="w-8 h-8 rounded-xl bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-sm shrink-0">
+            ★
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold text-[#F5F1EB]">Избранное</div>
+            <div className="text-[10px] text-[#B9ACA0]">Сохранённые статьи</div>
+          </div>
+          <div className="flex -space-x-1.5 shrink-0">
+            <div className="w-6 h-6 rounded-full bg-[#8B5E3C] border-2 border-[#151210]" />
+            <div className="w-6 h-6 rounded-full bg-[#A78BFA] border-2 border-[#151210]" />
+            <div className="w-6 h-6 rounded-full bg-[#60A5FA] border-2 border-[#151210]" />
+            <div className="w-6 h-6 rounded-full bg-[#27211D] border-2 border-[#151210] flex items-center justify-center text-[8px] text-[#B9ACA0]">
+              +12
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Цитата */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32 }}
+          className="relative rounded-2xl p-4 overflow-hidden"
+          style={cardStyle}
+        >
+          <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">
+            «Мастерство — в деталях. Знание — в опыте.»
+          </p>
+          <p className="mt-2 text-[11px] text-[#D8A35C] font-display">
+            Cordwainer
+          </p>
+        </motion.div>
+        
       </motion.div>
 
-      <BottomDock active="search" />
+      {/* ФИКСИРОВАННЫЙ DOCK */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
+        <BottomDock active="search" />
+      </div>
     </div>
   )
 }
