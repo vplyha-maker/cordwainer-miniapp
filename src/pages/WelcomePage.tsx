@@ -7,7 +7,6 @@ type WelcomePageProps = {
 
 export function WelcomePage({ onStart }: WelcomePageProps) {
   return (
-    // ИСПРАВЛЕНИЕ: Увеличили pb-[140px], чтобы Dock не перекрывал контент
     <div className="relative min-h-[100dvh] bg-[#151210] text-[#F5F1EB] pb-[140px] overflow-x-hidden">
       
       {/* АНИМИРУЕМЫЙ КОНТЕНТ */}
@@ -26,7 +25,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             duration: 0.7,
             ease: [0.22, 1, 0.36, 1],
           }}
-          style={{ transform: 'translateZ(0)' }}
+          style={{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }}
         >
           <img
             src="/hero-cover.png"
@@ -34,7 +33,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
           />
 
-          {/* ИСПРАВЛЕНИЕ: Добавлен pointer-events-none, чтобы градиент не блокировал клики по кнопкам */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -43,7 +41,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             }}
           />
 
-          {/* Кнопка с лупой оставлена как есть, добавлена анимация нажатия (active:scale-95) */}
           <div className="absolute top-3 left-4 right-4 z-20 flex items-start justify-between">
             <div>
               <h1
@@ -60,7 +57,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               </p>
             </div>
 
-            <button className="w-9 h-9 rounded-full bg-[#1D1815]/70 border border-[#C6A47A]/25 flex items-center justify-center text-[#F5F1EB] backdrop-blur-sm active:scale-95 transition-transform cursor-pointer">
+            <button className="w-9 h-9 rounded-full bg-[#1D1815]/70 border border-[#C6A47A]/25 flex items-center justify-center text-[#F5F1EB] backdrop-blur-sm active:scale-90 transition-transform cursor-pointer">
               <svg
                 width="15"
                 height="15"
@@ -111,22 +108,22 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                   delay: 0.15 + index * 0.06,
                   duration: 0.4,
                 }}
-                whileTap={{ scale: 0.95 }} // Пружинка при нажатии
-                className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer"
+                whileTap={{ scale: 0.88 }}
+                // ИСПРАВЛЕНИЕ 1: Жесткая высота h-[130px] не даст iOS сломать сетку
+                className="relative rounded-[16px] p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer h-[130px] w-full" 
                 style={{
-                  // ИСПРАВЛЕНИЕ: Плавный градиент для фона. Низ карточки растворяется в фоне страницы
-                  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 30%, rgba(21,18,16,0.1) 100%)',
-                  // ИСПРАВЛЕНИЕ: Градиентная рамка (сверху видна, снизу полностью прозрачная)
-                  borderImage: 'linear-gradient(to bottom, rgba(198,164,122,0.35), rgba(198,164,122,0)) 1',
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
+                  // ИСПРАВЛЕНИЕ 2: Градиент фона + внутреннее свечение (inset shadow) вместо глючного border-image. 
+                  // Это дает идеальное скругление и эффект градиентной рамки сверху и по бокам.
+                  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+                  boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
                   backdropFilter: 'blur(10px)',
                   WebkitBackdropFilter: 'blur(10px)',
-                  boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+                  transform: 'translateZ(0)', // Помогает iOS лучше рендерить блюр
+                  WebkitTransform: 'translateZ(0)'
                 }}
               >
                 <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 text-sm relative z-10"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 text-sm relative z-10 shrink-0"
                   style={{
                     background: `${item.accent}20`,
                     color: item.accent,
@@ -136,12 +133,12 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                   ●
                 </div>
 
-                <div className="relative z-10">
+                <div className="relative z-10 flex-1 flex flex-col justify-end">
                   <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB] whitespace-pre-line">
                     {item.title}
                   </div>
 
-                  <div className="text-[9px] mt-1 leading-snug text-[#B9ACA0] whitespace-pre-line">
+                  <div className="text-[9px] mt-1.5 leading-snug text-[#B9ACA0] whitespace-pre-line">
                     {item.sub}
                   </div>
                 </div>
@@ -158,7 +155,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               delay: 0.35,
               duration: 0.5,
             }}
-            whileTap={{ scale: 0.96 }}
+            whileTap={{ scale: 0.94 }}
             className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-5 cursor-pointer"
             style={{
               background: 'linear-gradient(180deg,#F8F3EB 0%,#ECE1D0 100%)',
@@ -167,7 +164,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               transform: 'translateZ(0)',
             }}
           >
-            {/* Оптимизированный блик */}
             <motion.div
               className="absolute inset-y-0 w-32 pointer-events-none"
               animate={{ x: ['-120%', '350%'] }}
@@ -230,7 +226,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               {['🪵', '🎨', '👞'].map((emoji, i) => (
                 <motion.div
                   key={i}
-                  whileTap={{ scale: 0.92 }}
+                  whileTap={{ scale: 0.88 }}
                   className="w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer"
                   style={{
                     background: '#27211D',
@@ -243,7 +239,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               ))}
 
               <motion.div
-                whileTap={{ scale: 0.92 }}
+                whileTap={{ scale: 0.88 }}
                 className="w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer"
                 style={{
                   background: 'rgba(39,33,29,.85)',
@@ -257,8 +253,10 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         </div>
       </motion.div>
 
-      {/* АБСОЛЮТНО СТАБИЛЬНЫЙ DOCK */}
-      <BottomDock active="search" />
+      {/* ФИКСИРОВАННЫЙ DOCK */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
+        <BottomDock active="search" />
+      </div>
     </div>
   )
 }
