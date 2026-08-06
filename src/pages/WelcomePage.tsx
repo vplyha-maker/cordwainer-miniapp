@@ -1,6 +1,10 @@
 import { motion } from 'framer-motion'
 
-export function WelcomePage() {
+type WelcomePageProps = {
+  onStart?: () => void
+}
+
+export function WelcomePage({ onStart }: WelcomePageProps) {
   return (
     <div className="relative h-[100dvh] overflow-hidden flex flex-col">
       {/* Фон */}
@@ -40,7 +44,7 @@ export function WelcomePage() {
           </p>
         </motion.div>
 
-        {/* Картинка — занимает оставшееся место, но не больше нужного */}
+        {/* Картинка */}
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -80,7 +84,7 @@ export function WelcomePage() {
           ))}
         </motion.div>
 
-        {/* Кнопка — всегда внизу, без скролла */}
+        {/* Кнопка */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -88,6 +92,7 @@ export function WelcomePage() {
           className="shrink-0"
         >
           <button
+            onClick={onStart}
             className="w-full h-[48px] rounded-[var(--radius-button)] bg-ink text-cream font-medium text-[14.5px] tracking-wide
                        active:scale-[0.985] transition-all duration-150
                        shadow-[0_8px_24px_-6px_rgba(26,26,26,0.35)]
@@ -105,4 +110,4 @@ export function WelcomePage() {
       </div>
     </div>
   )
-        }
+            }
