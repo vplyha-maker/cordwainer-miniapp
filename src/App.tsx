@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
-import { AnimatePresence } from 'framer-motion'
+
 
 declare global {
   interface Window {
