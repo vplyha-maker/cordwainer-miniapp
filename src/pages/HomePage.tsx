@@ -48,19 +48,18 @@ const TOOLS = [
 
 export function HomePage({ onBack }: HomePageProps) {
   return (
-    // СТАТИЧНЫЙ КОРЕНЬ: Защищает BottomDock и скролл от багов позиционирования
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden">
       
-      {/* АНИМИРУЕМЫЙ КОНТЕНТ (только то, что должно появляться/исчезать) */}
+      {/* Главный анимируемый контейнер */}
       <motion.div 
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 1.04 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        // ВАЖНО: Заменили scale на мягкий сдвиг по Y. При exit — просто затухание.
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }} // Никаких scale или y при выходе! Это уберет артефакты.
+        transition={{ duration: 0.35, ease: 'easeOut' }}
         className="flex-1 flex flex-col min-h-0"
-        style={{ transform: 'translateZ(0)' }} // Принудительное аппаратное ускорение для Android
+        style={{ willChange: 'opacity, transform' }} // Более безопасный метод для Android, чем translateZ
       >
-        {/* Контейнер со скроллом */}
         <div className="flex-1 px-4 pt-3 pb-[110px] overflow-y-auto">
           
           {/* Header */}
@@ -114,7 +113,7 @@ export function HomePage({ onBack }: HomePageProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.06 + i * 0.03 }}
                 className="glass rounded-2xl p-3 text-left active:scale-[0.98] transition-transform flex flex-col"
-                style={{ transform: 'translateZ(0)' }} // Ускоряем каждый элемент списка
+                // Убрали translateZ(0), чтобы не перегружать память Android
               >
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-base mb-2"
@@ -147,7 +146,6 @@ export function HomePage({ onBack }: HomePageProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.18 + i * 0.03 }}
                 className="glass rounded-2xl p-2.5 text-left active:scale-[0.98] transition-transform flex flex-col"
-                style={{ transform: 'translateZ(0)' }}
               >
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-sm mb-1.5"
@@ -171,7 +169,6 @@ export function HomePage({ onBack }: HomePageProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.28 }}
             className="glass rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-3 cursor-pointer active:scale-[0.98] transition-transform"
-            style={{ transform: 'translateZ(0)' }}
           >
             <div className="w-8 h-8 rounded-xl bg-[var(--color-accent)]/15 flex items-center justify-center text-[var(--color-accent)] text-sm shrink-0">
               ★
@@ -196,7 +193,6 @@ export function HomePage({ onBack }: HomePageProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.32 }}
             className="glass rounded-2xl p-3.5"
-            style={{ transform: 'translateZ(0)' }}
           >
             <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-soft)] italic">
               «Мастерство — в деталях. Знание — в опыте.»
@@ -209,9 +205,7 @@ export function HomePage({ onBack }: HomePageProps) {
         </div>
       </motion.div>
 
-      {/* АБСОЛЮТНО СТАБИЛЬНЫЙ DOCK */}
       <BottomDock active="search" />
-      
     </div>
   )
 }
