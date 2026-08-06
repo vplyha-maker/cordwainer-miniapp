@@ -1,4 +1,6 @@
+import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
+
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 
@@ -45,12 +47,19 @@ export default function App() {
 
   return (
     <div className="min-h-full bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
-      {screen === 'welcome' && (
-        <WelcomePage onStart={() => setScreen('home')} />
-      )}
-      {screen === 'home' && (
-        <HomePage onBack={() => setScreen('welcome')} />
-      )}
+      <AnimatePresence mode="wait">
+        {screen === 'welcome' ? (
+          <WelcomePage
+            key="welcome"
+            onStart={() => setScreen('home')}
+          />
+        ) : (
+          <HomePage
+            key="home"
+            onBack={() => setScreen('welcome')}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
