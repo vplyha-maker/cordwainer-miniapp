@@ -48,20 +48,19 @@ const TOOLS = [
 
 export function HomePage({ onBack }: HomePageProps) {
   return (
-    <div className="relative min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-28">
-      <div className="px-4 pt-4">
+    <div className="relative min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)]">
+      {/* Контент со скроллом, снизу место под Dock */}
+      <div className="px-4 pt-3 pb-[110px] overflow-y-auto max-h-[100dvh]">
         
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-5"
+          className="flex items-center justify-between mb-4"
         >
-          <div>
-            <h1 className="font-display text-[1.75rem] leading-none text-[var(--color-ink)]">
-              Меню
-            </h1>
-          </div>
+          <h1 className="font-display text-[1.65rem] leading-none text-[var(--color-ink)]">
+            Меню
+          </h1>
           {onBack && (
             <button
               onClick={onBack}
@@ -78,47 +77,46 @@ export function HomePage({ onBack }: HomePageProps) {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="mb-5"
+          transition={{ delay: 0.04 }}
+          className="mb-4"
         >
-          <div className="glass rounded-2xl px-4 py-3 flex items-center gap-3">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted)]">
+          <div className="glass rounded-2xl px-3.5 py-2.5 flex items-center gap-2.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted)] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
-            <span className="text-[13px] text-[var(--color-muted)]">
-              Поиск по материалам, конструкциям, терминам...
+            <span className="text-[12.5px] text-[var(--color-muted)] truncate">
+              Поиск по материалам, конструкциям...
             </span>
           </div>
         </motion.div>
 
         {/* Обучение */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted)] mb-2.5 px-0.5">
+        <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--color-muted)] mb-2 px-0.5">
           Обучение
         </p>
-        <div className="grid grid-cols-2 gap-2.5 mb-5">
+        <div className="grid grid-cols-2 gap-2 mb-4">
           {LEARNING.map((item, i) => (
             <motion.button
               key={item.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 + i * 0.04 }}
-              className="glass rounded-2xl p-3.5 text-left active:scale-[0.98] transition-transform"
-              style={{ boxShadow: 'var(--shadow-card)' }}
+              transition={{ delay: 0.06 + i * 0.03 }}
+              className="glass rounded-2xl p-3 text-left active:scale-[0.98] transition-transform"
             >
               <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-lg mb-2.5"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-base mb-2"
                 style={{ background: `${item.accent}22`, color: item.accent }}
               >
                 {item.icon}
               </div>
-              <div className="text-[14px] font-semibold leading-tight mb-0.5">
+              <div className="text-[13px] font-semibold leading-tight mb-0.5">
                 {item.title}
               </div>
-              <div className="text-[11px] text-[var(--color-muted)] leading-snug mb-1.5">
+              <div className="text-[10px] text-[var(--color-muted)] leading-snug mb-1">
                 {item.subtitle}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)] opacity-80">
+              <div className="text-[9px] text-[var(--color-muted)] opacity-80">
                 {item.count}
               </div>
             </motion.button>
@@ -126,28 +124,28 @@ export function HomePage({ onBack }: HomePageProps) {
         </div>
 
         {/* Инструменты */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted)] mb-2.5 px-0.5">
+        <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--color-muted)] mb-2 px-0.5">
           Инструменты
         </p>
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-4">
           {TOOLS.map((item, i) => (
             <motion.button
               key={item.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + i * 0.04 }}
-              className="glass rounded-2xl p-3 text-left active:scale-[0.98] transition-transform"
+              transition={{ delay: 0.18 + i * 0.03 }}
+              className="glass rounded-2xl p-2.5 text-left active:scale-[0.98] transition-transform"
             >
               <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-base mb-2"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-sm mb-1.5"
                 style={{ background: `${item.accent}22`, color: item.accent }}
               >
                 {item.icon}
               </div>
-              <div className="text-[12px] font-semibold leading-tight mb-0.5">
+              <div className="text-[11px] font-semibold leading-tight mb-0.5">
                 {item.title}
               </div>
-              <div className="text-[10px] text-[var(--color-muted)]">
+              <div className="text-[9px] text-[var(--color-muted)] leading-snug">
                 {item.subtitle}
               </div>
             </motion.button>
@@ -156,23 +154,23 @@ export function HomePage({ onBack }: HomePageProps) {
 
         {/* Избранное */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.32 }}
-          className="glass rounded-2xl px-4 py-3.5 flex items-center gap-3 mb-5"
+          transition={{ delay: 0.28 }}
+          className="glass rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-3"
         >
-          <div className="w-9 h-9 rounded-xl bg-[var(--color-accent)]/15 flex items-center justify-center text-[var(--color-accent)]">
+          <div className="w-8 h-8 rounded-xl bg-[var(--color-accent)]/15 flex items-center justify-center text-[var(--color-accent)] text-sm">
             ★
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-semibold">Избранное</div>
-            <div className="text-[11px] text-[var(--color-muted)]">Сохранённые статьи и материалы</div>
+            <div className="text-[13px] font-semibold">Избранное</div>
+            <div className="text-[10px] text-[var(--color-muted)]">Сохранённые статьи</div>
           </div>
-          <div className="flex -space-x-2">
-            <div className="w-7 h-7 rounded-full bg-[#8B5E3C]/40 border-2 border-[var(--color-surface)]" />
-            <div className="w-7 h-7 rounded-full bg-[#A78BFA]/40 border-2 border-[var(--color-surface)]" />
-            <div className="w-7 h-7 rounded-full bg-[#60A5FA]/40 border-2 border-[var(--color-surface)]" />
-            <div className="w-7 h-7 rounded-full bg-[var(--color-surface-2)] border-2 border-[var(--color-surface)] flex items-center justify-center text-[9px] text-[var(--color-muted)]">
+          <div className="flex -space-x-1.5">
+            <div className="w-6 h-6 rounded-full bg-[#8B5E3C]/50 border-2 border-[var(--color-surface)]" />
+            <div className="w-6 h-6 rounded-full bg-[#A78BFA]/50 border-2 border-[var(--color-surface)]" />
+            <div className="w-6 h-6 rounded-full bg-[#60A5FA]/50 border-2 border-[var(--color-surface)]" />
+            <div className="w-6 h-6 rounded-full bg-[var(--color-surface-2)] border-2 border-[var(--color-surface)] flex items-center justify-center text-[8px] text-[var(--color-muted)]">
               +12
             </div>
           </div>
@@ -180,15 +178,15 @@ export function HomePage({ onBack }: HomePageProps) {
 
         {/* Цитата */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.38 }}
-          className="glass rounded-2xl p-4 mb-2"
+          transition={{ delay: 0.32 }}
+          className="glass rounded-2xl p-3.5"
         >
-          <p className="text-[13px] leading-relaxed text-[var(--color-ink-soft)] italic">
+          <p className="text-[12.5px] leading-relaxed text-[var(--color-ink-soft)] italic">
             «Мастерство — в деталях. Знание — в опыте.»
           </p>
-          <p className="mt-2 text-[11px] text-[var(--color-accent)] font-display">
+          <p className="mt-1.5 text-[11px] text-[var(--color-accent)] font-display">
             Cordwainer
           </p>
         </motion.div>
