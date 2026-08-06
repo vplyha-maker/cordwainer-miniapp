@@ -93,12 +93,48 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         {/* CONTENT */}
         <div className="relative z-30 px-4 -mt-6">
           
-          {/* CATEGORIES GRID */}
+          {/* CATEGORIES GRID С НОВЫМИ ИКОНКАМИ */}
           <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
             {[
-              { title: 'Материалы', sub: 'Кожа · Замша\nПодошвы', accent: '#D8A35C' },
-              { title: 'Цвета', sub: 'Колористика\nПатина', accent: '#A78BFA' },
-              { title: 'Фасоны\nи силуэты', sub: 'Классика\nУличные', accent: '#60A5FA' },
+              { 
+                title: 'Материалы', 
+                sub: 'Кожа · Замша\nПодошвы', 
+                accent: '#D8A35C',
+                // Иконка: Шкура/Кожа
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
+                  </svg>
+                )
+              },
+              { 
+                title: 'Цвета', 
+                sub: 'Колористика\nПатина', 
+                accent: '#A78BFA',
+                // Иконка: Палитра художника
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
+                    <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
+                    <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+                    <circle cx="6.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
+                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+                  </svg>
+                )
+              },
+              { 
+                title: 'Фасоны\nи силуэты', 
+                sub: 'Классика\nУличные', 
+                accent: '#60A5FA',
+                // Иконка: Классический туфель
+                icon: (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
+                    <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
+                    <path d="M 14 11.5 L 9 15" />
+                  </svg>
+                )
+              },
             ].map((item, index) => (
               <motion.button
                 key={item.title}
@@ -108,26 +144,25 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                   delay: 0.15 + index * 0.06,
                   duration: 0.4,
                 }}
-                whileTap={{ scale: 0.88 }} // Анимация снова работает!
-                // ИСПРАВЛЕНИЕ: Убрали жесткую высоту, вернули h-full. Кнопки снова компактные.
+                whileTap={{ scale: 0.88 }}
                 className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full"
                 style={{
-                  // Убрал жесткий transform, чтобы не ломать Framer Motion
                   background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
                   boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
                   backdropFilter: 'blur(10px)',
                   WebkitBackdropFilter: 'blur(10px)',
                 }}
               >
+                {/* Слегка увеличенный контейнер для новых иконок */}
                 <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 text-sm relative z-10 shrink-0"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
                   style={{
                     background: `${item.accent}20`,
                     color: item.accent,
-                    boxShadow: `0 0 14px ${item.accent}35`,
+                    boxShadow: `0 0 16px ${item.accent}40`,
                   }}
                 >
-                  ●
+                  {item.icon}
                 </div>
 
                 <div className="relative z-10 flex-1 flex flex-col justify-end">
@@ -148,10 +183,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             onClick={onStart}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: 0.35,
-              duration: 0.5,
-            }}
+            transition={{ delay: 0.35, duration: 0.5 }}
             whileTap={{ scale: 0.94 }}
             className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-5 cursor-pointer"
             style={{
@@ -224,7 +256,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                 <motion.div
                   key={i}
                   whileTap={{ scale: 0.88 }}
-                  // ИСПРАВЛЕНИЕ: Кнопки избранного теперь тоже с градиентом
                   className="relative w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer overflow-hidden"
                   style={{
                     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
@@ -239,7 +270,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
 
               <motion.div
                 whileTap={{ scale: 0.88 }}
-                // ИСПРАВЛЕНИЕ: Кнопка "+12" с таким же градиентом
                 className="relative w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer overflow-hidden"
                 style={{
                   background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
