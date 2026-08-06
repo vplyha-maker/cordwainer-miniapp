@@ -20,25 +20,22 @@ export default function App() {
     tg.ready()
     tg.expand()
 
-    // Применяем тему Telegram
     const applyTheme = () => {
       const isDark = tg.colorScheme === 'dark'
       document.documentElement.classList.toggle('dark', isDark)
 
       try {
         if (isDark) {
-          tg.setHeaderColor('#1C1A18')
-          tg.setBackgroundColor('#1C1A18')
+          tg.setHeaderColor('#151210')
+          tg.setBackgroundColor('#151210')
         } else {
-          tg.setHeaderColor('#F8F4EE')
-          tg.setBackgroundColor('#F8F4EE')
+          tg.setHeaderColor('#F5F1EA')
+          tg.setBackgroundColor('#F5F1EA')
         }
       } catch {}
     }
 
     applyTheme()
-
-    // Слушаем смену темы
     tg.onEvent('themeChanged', applyTheme)
 
     return () => {
@@ -47,7 +44,7 @@ export default function App() {
   }, [])
 
   return (
-    <div className="min-h-full bg-cream text-ink font-body tg-safe">
+    <div className="min-h-full bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
       {screen === 'welcome' && (
         <WelcomePage onStart={() => setScreen('home')} />
       )}
@@ -56,4 +53,4 @@ export default function App() {
       )}
     </div>
   )
- }
+}
