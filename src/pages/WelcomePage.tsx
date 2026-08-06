@@ -7,57 +7,51 @@ type WelcomePageProps = {
 
 export function WelcomePage({ onStart }: WelcomePageProps) {
   return (
-    <div className="relative min-h-[100dvh] bg-[#151210] text-[#F5F1EB] pb-[140px] overflow-x-hidden">
+    <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
       
-      {/* АНИМИРУЕМЫЙ КОНТЕНТ */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative z-10"
-      >
-        {/* HERO */}
-        <motion.div
-          className="relative h-[48vh] min-h-[300px] max-h-[420px]"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.7,
-            ease: [0.22, 1, 0.36, 1],
+      {/* СТАТИЧНАЯ HERO-ШАПКА (Зафиксирована сверху) */}
+      <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] overflow-hidden z-20">
+        <img
+          src="/hero-cover.png"
+          alt="Cordwainer"
+          className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
+        />
+
+        {/* Плавный градиент-затухание внизу шапки к цвету фона */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(21,18,16,.20) 0%, rgba(21,18,16,.50) 60%, #151210 100%)',
           }}
-          style={{ transform: 'translateZ(0)' }}
-        >
-          <img
-            src="/hero-cover.png"
-            alt="Cordwainer"
-            className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
-          />
+        />
 
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                'linear-gradient(to bottom, rgba(21,18,16,.15) 0%, rgba(21,18,16,.40) 50%, #151210 100%)',
-            }}
-          />
-
-          <div className="absolute top-3 left-4 right-4 z-20 flex items-start justify-between">
+        {/* Контент шапки: Заголовок, подпись и кнопка поиска */}
+        <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
+          <div className="flex items-start justify-between">
             <div>
-              <h1
+              <motion.h1
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
                 className="font-display text-[2.35rem] leading-[0.9] text-[#F5F1EB]"
                 style={{
-                  textShadow: '0 2px 20px rgba(0,0,0,.5)',
+                  textShadow: '0 2px 20px rgba(0,0,0,.6)',
                 }}
               >
                 Cordwainer
-              </h1>
+              </motion.h1>
 
-              <p className="mt-1.5 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="mt-1.5 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]"
+              >
                 Энциклопедия обувного мастерства
-              </p>
+              </motion.p>
             </div>
 
-            <button className="w-9 h-9 rounded-full bg-[#1D1815]/70 border border-[#C6A47A]/25 flex items-center justify-center text-[#F5F1EB] backdrop-blur-sm active:scale-90 transition-transform cursor-pointer">
+            <button className="w-9 h-9 rounded-full bg-[#1D1815]/70 border border-[#C6A47A]/25 flex items-center justify-center text-[#F5F1EB] backdrop-blur-sm active:scale-90 transition-transform cursor-pointer shrink-0">
               <svg
                 width="15"
                 height="15"
@@ -72,13 +66,8 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
             </button>
           </div>
 
-          <motion.div
-            initial={{ y: 15, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.25, duration: 0.5 }}
-            className="absolute bottom-14 left-4 z-20 pointer-events-none"
-          >
-            <p className="text-[9px] tracking-[0.2em] uppercase text-[#B9ACA0]/80 mb-3">
+          <div className="pointer-events-none pb-2">
+            <p className="text-[9px] tracking-[0.2em] uppercase text-[#B9ACA0]/80 mb-2">
               Issue 01 · 2026
             </p>
 
@@ -87,190 +76,178 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               <span>Форма как язык.</span>
               <span>Мастерство как опыт.</span>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
+      </div>
 
-        {/* CONTENT */}
-        <div className="relative z-30 px-4 -mt-6">
-          
-          {/* CATEGORIES GRID С НОВЫМИ ИКОНКАМИ */}
-          <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
-            {[
-              { 
-                title: 'Материалы', 
-                sub: 'Кожа · Замша\nПодошвы', 
-                accent: '#D8A35C',
-                // Иконка: Шкура/Кожа
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
-                  </svg>
-                )
-              },
-              { 
-                title: 'Цвета', 
-                sub: 'Колористика\nПатина', 
-                accent: '#A78BFA',
-                // Иконка: Палитра художника
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
-                    <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
-                    <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
-                    <circle cx="6.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
-                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-                  </svg>
-                )
-              },
-              { 
-                title: 'Фасоны\nи силуэты', 
-                sub: 'Классика\nУличные', 
-                accent: '#60A5FA',
-                // Иконка: Классический туфель
-                icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
-                    <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
-                    <path d="M 14 11.5 L 9 15" />
-                  </svg>
-                )
-              },
-            ].map((item, index) => (
-              <motion.button
-                key={item.title}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: 0.15 + index * 0.06,
-                  duration: 0.4,
-                }}
-                whileTap={{ scale: 0.88 }}
-                className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full"
+      {/* АНИМИРУЕМЫЙ СКРОЛЛ-КОНТЕНТ (Прокручивается под шапкой) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3"
+      >
+        {/* CATEGORIES GRID */}
+        <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
+          {[
+            { 
+              title: 'Материалы', 
+              sub: 'Кожа · Замша\nПодошвы', 
+              accent: '#D8A35C',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
+                </svg>
+              )
+            },
+            { 
+              title: 'Цвета', 
+              sub: 'Колористика\nПатина', 
+              accent: '#A78BFA',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="6.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+                </svg>
+              )
+            },
+            { 
+              title: 'Фасоны\nи силуэты', 
+              sub: 'Классика\nУличные', 
+              accent: '#60A5FA',
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
+                  <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
+                  <path d="M 14 11.5 L 9 15" />
+                </svg>
+              )
+            },
+          ].map((item, index) => (
+            <motion.button
+              key={item.title}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: 0.15 + index * 0.06,
+                duration: 0.4,
+              }}
+              whileTap={{ scale: 0.88 }}
+              className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full"
+              style={{
+                background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+              }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
                 style={{
-                  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-                  boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
+                  background: `${item.accent}20`,
+                  color: item.accent,
+                  boxShadow: `0 0 16px ${item.accent}40`,
                 }}
               >
-                {/* Слегка увеличенный контейнер для новых иконок */}
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
-                  style={{
-                    background: `${item.accent}20`,
-                    color: item.accent,
-                    boxShadow: `0 0 16px ${item.accent}40`,
-                  }}
-                >
-                  {item.icon}
-                </div>
-
-                <div className="relative z-10 flex-1 flex flex-col justify-end">
-                  <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB] whitespace-pre-line">
-                    {item.title}
-                  </div>
-
-                  <div className="text-[9px] mt-1.5 leading-snug text-[#B9ACA0] whitespace-pre-line">
-                    {item.sub}
-                  </div>
-                </div>
-              </motion.button>
-            ))}
-          </div>
-
-          {/* ISSUE 01 CTA */}
-          <motion.button
-            onClick={onStart}
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.5 }}
-            whileTap={{ scale: 0.94 }}
-            className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-5 cursor-pointer"
-            style={{
-              background: 'linear-gradient(180deg,#F8F3EB 0%,#ECE1D0 100%)',
-              border: '1px solid rgba(214,179,126,.30)',
-              boxShadow: '0 14px 36px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.95)',
-              transform: 'translateZ(0)',
-            }}
-          >
-            <motion.div
-              className="absolute inset-y-0 w-32 pointer-events-none"
-              animate={{ x: ['-120%', '350%'] }}
-              transition={{
-                repeat: Infinity,
-                duration: 3.2,
-                repeatDelay: 1.8,
-                ease: 'easeInOut',
-              }}
-              style={{
-                background:
-                  'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 15%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0) 85%, transparent 100%)',
-                transform: 'skewX(-20deg)',
-              }}
-            />
-
-            <div className="relative h-full flex items-center justify-between px-6">
-              <div className="flex flex-col text-left">
-                <span
-                  className="uppercase"
-                  style={{ fontSize: 10, letterSpacing: '.30em', color: '#8F6A42', fontWeight: 700 }}
-                >
-                  ISSUE 01
-                </span>
-
-                <span
-                  style={{ marginTop: 6, fontSize: 20, fontWeight: 700, color: '#1A1612' }}
-                >
-                  Начать обучение
-                </span>
+                {item.icon}
               </div>
 
-              <motion.div
-                animate={{ x: [0, 6, 0] }}
-                transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
-                style={{ fontSize: 28, color: '#8F6A42' }}
-              >
-                →
-              </motion.div>
-            </div>
-          </motion.button>
+              <div className="relative z-10 flex-1 flex flex-col justify-end">
+                <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB] whitespace-pre-line">
+                  {item.title}
+                </div>
 
-          {/* FAVORITES */}
+                <div className="text-[9px] mt-1.5 leading-snug text-[#B9ACA0] whitespace-pre-line">
+                  {item.sub}
+                </div>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+
+        {/* ISSUE 01 CTA */}
+        <motion.button
+          onClick={onStart}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.5 }}
+          whileTap={{ scale: 0.94 }}
+          className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-5 cursor-pointer"
+          style={{
+            background: 'linear-gradient(180deg,#F8F3EB 0%,#ECE1D0 100%)',
+            border: '1px solid rgba(214,179,126,.30)',
+            boxShadow: '0 14px 36px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.95)',
+            transform: 'translateZ(0)',
+          }}
+        >
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45, duration: 0.5 }}
-          >
-            <div className="flex items-center justify-between mb-2 px-0.5">
-              <span className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0]">
-                Избранное
+            className="absolute inset-y-0 w-32 pointer-events-none"
+            animate={{ x: ['-120%', '350%'] }}
+            transition={{
+              repeat: Infinity,
+              duration: 3.2,
+              repeatDelay: 1.8,
+              ease: 'easeInOut',
+            }}
+            style={{
+              background:
+                'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 15%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0) 85%, transparent 100%)',
+              transform: 'skewX(-20deg)',
+            }}
+          />
+
+          <div className="relative h-full flex items-center justify-between px-6">
+            <div className="flex flex-col text-left">
+              <span
+                className="uppercase"
+                style={{ fontSize: 10, letterSpacing: '.30em', color: '#8F6A42', fontWeight: 700 }}
+              >
+                ISSUE 01
               </span>
 
-              <button className="text-[11px] text-[#D8A35C] active:opacity-70 cursor-pointer">
-                Смотреть все
-              </button>
+              <span
+                style={{ marginTop: 6, fontSize: 20, fontWeight: 700, color: '#1A1612' }}
+              >
+                Начать обучение
+              </span>
             </div>
 
-            <div className="flex gap-2">
-              {['🪵', '🎨', '👞'].map((emoji, i) => (
-                <motion.div
-                  key={i}
-                  whileTap={{ scale: 0.88 }}
-                  className="relative w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer overflow-hidden"
-                  style={{
-                    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-                    boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                  }}
-                >
-                  {emoji}
-                </motion.div>
-              ))}
+            <motion.div
+              animate={{ x: [0, 6, 0] }}
+              transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+              style={{ fontSize: 28, color: '#8F6A42' }}
+            >
+              →
+            </motion.div>
+          </div>
+        </motion.button>
 
+        {/* FAVORITES */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.5 }}
+          className="mb-2"
+        >
+          <div className="flex items-center justify-between mb-2 px-0.5">
+            <span className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0]">
+              Избранное
+            </span>
+
+            <button className="text-[11px] text-[#D8A35C] active:opacity-70 cursor-pointer">
+              Смотреть все
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            {['🪵', '🎨', '👞'].map((emoji, i) => (
               <motion.div
+                key={i}
                 whileTap={{ scale: 0.88 }}
-                className="relative w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer overflow-hidden"
+                className="relative w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer overflow-hidden"
                 style={{
                   background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
                   boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
@@ -278,11 +255,24 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                   WebkitBackdropFilter: 'blur(10px)',
                 }}
               >
-                +12
+                {emoji}
               </motion.div>
-            </div>
-          </motion.div>
-        </div>
+            ))}
+
+            <motion.div
+              whileTap={{ scale: 0.88 }}
+              className="relative w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer overflow-hidden"
+              style={{
+                background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+              }}
+            >
+              +12
+            </motion.div>
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* ФИКСИРОВАННЫЙ DOCK */}
