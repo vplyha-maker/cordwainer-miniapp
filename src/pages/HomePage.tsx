@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
+import { BLOG_ARTICLES } from '../data/blog'
 import type { Lang } from '../App'
 
 type HomePageProps = {
   onBack?: () => void
+  onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
 }
@@ -15,7 +17,9 @@ const cardStyle = {
   WebkitBackdropFilter: 'blur(10px)',
 }
 
-export function HomePage({ onBack, lang, setLang }: HomePageProps) {
+export function HomePage({ onBack, onOpenBlog, lang, setLang }: HomePageProps) {
+  const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
+
   const t = {
     ru: {
       menu: 'Меню',
@@ -37,12 +41,13 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
       calc: 'Калькуляторы',
       calcSub: '12 инструментов',
       blog: 'Блог',
-      blogSub: 'Новые статьи',
+      blogSub: hasNewBlog ? 'Новая статья' : 'Статьи мастерской',
       glossary: 'Глоссарий',
       glossarySub: '342 термина',
       favorites: 'Избранное',
       favoritesSub: 'Сохранённые статьи',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
+      newBadge: 'NEW',
     },
     uk: {
       menu: 'Меню',
@@ -64,12 +69,13 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
       calc: 'Калькулятори',
       calcSub: '12 інструментів',
       blog: 'Блог',
-      blogSub: 'Нові статті',
+      blogSub: hasNewBlog ? 'Нова стаття' : 'Статті майстерні',
       glossary: 'Глосарій',
       glossarySub: '342 терміни',
       favorites: 'Обране',
       favoritesSub: 'Збережені статті',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
+      newBadge: 'NEW',
     },
   }[lang]
 
@@ -171,7 +177,6 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
-      {/* Header */}
       <div className="px-4 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
         <motion.h1
           initial={{ opacity: 0, x: -10 }}
@@ -182,7 +187,6 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
         </motion.h1>
 
         <div className="flex items-center gap-1.5">
-          {/* RU / UA */}
           <button
             onClick={() => setLang('ru')}
             className="w-9 h-9 rounded-full border flex items-center justify-center text-[10px] font-bold tracking-wide active:scale-90 transition-transform cursor-pointer"
@@ -224,14 +228,12 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
         </div>
       </div>
 
-      {/* Content */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
         className="flex-1 px-4 overflow-y-auto pb-[110px] overscroll-none"
       >
-        {/* Search */}
         <div className="mb-4">
           <div
             className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
@@ -241,13 +243,10 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
-            <span className="text-[12.5px] text-[#B9ACA0] truncate">
-              {t.search}
-            </span>
+            <span className="text-[12.5px] text-[#B9ACA0] truncate">{t.search}</span>
           </div>
         </div>
 
-        {/* Learning */}
         <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
           {t.learning}
         </p>
@@ -271,54 +270,63 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
               >
                 {item.icon}
               </div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">
-                {item.title}
-              </div>
-              <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">
-                {item.subtitle}
-              </div>
-              <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">
-                {item.count}
-              </div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">{item.title}</div>
+              <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">{item.subtitle}</div>
+              <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">{item.count}</div>
             </motion.button>
           ))}
         </div>
 
-        {/* Tools */}
         <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
           {t.tools}
         </p>
         <div className="grid grid-cols-3 gap-2 mb-5">
-          {TOOLS.map((item, i) => (
-            <motion.button
-              key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.18 + i * 0.03 }}
-              className="relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
-              style={cardStyle}
-            >
-              <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 shrink-0"
-                style={{
-                  background: `${item.accent}20`,
-                  color: item.accent,
-                  boxShadow: `0 0 14px ${item.accent}30`,
-                }}
+          {TOOLS.map((item, i) => {
+            const isBlog = item.id === 'blog'
+            return (
+              <motion.button
+                key={item.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 + i * 0.03 }}
+                onClick={isBlog ? onOpenBlog : undefined}
+                className="relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
+                style={cardStyle}
               >
-                {item.icon}
-              </div>
-              <div className="text-[11px] font-semibold text-[#F5F1EB] leading-tight mb-0.5 mt-auto">
-                {item.title}
-              </div>
-              <div className="text-[9px] text-[#B9ACA0] leading-snug mt-1">
-                {item.subtitle}
-              </div>
-            </motion.button>
-          ))}
+                {isBlog && hasNewBlog && (
+                  <motion.div
+                    className="absolute inset-0 rounded-2xl pointer-events-none"
+                    animate={{ opacity: [0.12, 0.35, 0.12] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{
+                      boxShadow: 'inset 0 0 0 1px rgba(244,114,182,0.5), 0 0 16px rgba(244,114,182,0.2)',
+                    }}
+                  />
+                )}
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 shrink-0 relative z-10"
+                  style={{
+                    background: `${item.accent}20`,
+                    color: item.accent,
+                    boxShadow: `0 0 14px ${item.accent}30`,
+                  }}
+                >
+                  {item.icon}
+                </div>
+                <div className="text-[11px] font-semibold text-[#F5F1EB] leading-tight mb-0.5 mt-auto relative z-10 flex items-center gap-1">
+                  {item.title}
+                  {isBlog && hasNewBlog && (
+                    <span className="text-[8px] font-bold text-[#F472B6]">•</span>
+                  )}
+                </div>
+                <div className="text-[9px] text-[#B9ACA0] leading-snug mt-1 relative z-10">
+                  {item.subtitle}
+                </div>
+              </motion.button>
+            )
+          })}
         </div>
 
-        {/* Favorites */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -343,7 +351,6 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
           </div>
         </motion.div>
 
-        {/* Quote */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -351,12 +358,8 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
           className="relative rounded-2xl p-4 overflow-hidden"
           style={cardStyle}
         >
-          <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">
-            {t.quote}
-          </p>
-          <p className="mt-2 text-[11px] text-[#D8A35C] font-display">
-            Cordwainer
-          </p>
+          <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">{t.quote}</p>
+          <p className="mt-2 text-[11px] text-[#D8A35C] font-display">Cordwainer</p>
         </motion.div>
       </motion.div>
 
@@ -365,4 +368,4 @@ export function HomePage({ onBack, lang, setLang }: HomePageProps) {
       </div>
     </div>
   )
-}
+    }
