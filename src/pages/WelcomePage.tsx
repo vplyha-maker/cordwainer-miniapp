@@ -6,6 +6,7 @@ type WelcomePageProps = {
   onStart?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
+  favorites: string[] //
 }
 
 export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
