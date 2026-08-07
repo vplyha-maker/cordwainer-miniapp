@@ -368,4 +368,4 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang }: HomePageProps) {
       </div>
     </div>
   )
-    }
+}
