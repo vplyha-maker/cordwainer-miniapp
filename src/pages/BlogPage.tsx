@@ -42,78 +42,81 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
   }[lang]
 
   const cardStyle = {
-    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.2) 100%)',
     boxShadow:
-      'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+      'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.3)',
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
-      {/* HERO */}
-      <div className="relative shrink-0 h-[48vh] min-h-[280px] max-h-[400px] overflow-hidden">
+    <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden justify-between">
+      {/* BACKGROUND HERO IMAGE */}
+      <div className="absolute inset-0 z-0 h-[65vh] overflow-hidden pointer-events-none">
         <img
           src="/blog-hero.png"
           alt="PRO Обувь"
-          className="absolute inset-0 w-full h-full object-cover object-center"
+          className="w-full h-full object-cover object-center"
         />
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(to bottom, rgba(21,18,16,0.2) 0%, rgba(21,18,16,0.55) 55%, #151210 100%)',
+              'linear-gradient(to bottom, rgba(21,18,16,0.15) 0%, rgba(21,18,16,0.65) 55%, #151210 100%)',
           }}
         />
+      </div>
 
-        <button
-          onClick={onBack}
-          className="absolute top-4 left-4 z-20 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
-          style={{
-            background: 'rgba(29,24,21,0.75)',
-            border: '1px solid rgba(198,164,122,0.3)',
-            backdropFilter: 'blur(12px)',
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5F1EB" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
+      {/* TOP BACK BUTTON */}
+      <button
+        onClick={onBack}
+        className="absolute top-4 left-4 z-20 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+        style={{
+          background: 'rgba(29,24,21,0.75)',
+          border: '1px solid rgba(198,164,122,0.3)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5F1EB" strokeWidth="2">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
 
-        <div className="absolute bottom-6 left-4 right-4 z-10">
+      {/* BOTTOM CONTENT AREA */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+        className="relative z-10 flex-1 flex flex-col justify-end px-4 pb-6 pt-16"
+      >
+        {/* TITLE BLOCK (НАЗВАНИЕ И ОПИСАНИЕ НАД КНОПКАМИ) */}
+        <div className="mb-5">
           <p className="text-[9px] tracking-[0.22em] uppercase text-[#D8A35C] font-semibold mb-1">
             {t.subtitle}
           </p>
           <h1
             className="font-display text-[2.2rem] leading-tight text-[#F5F1EB] tracking-wide"
-            style={{ textShadow: '0 2px 20px rgba(0,0,0,0.7)' }}
+            style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
           >
             {t.title}
           </h1>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-[#B9ACA0] max-w-[90%]">
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-[#B9ACA0] max-w-[92%]">
             {t.tagline}
           </p>
         </div>
-      </div>
 
-      {/* BUTTONS GRID */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12, duration: 0.4 }}
-        className="flex-1 px-4 pt-2 overflow-y-auto pb-8 -mt-2 relative z-10 flex flex-col justify-between"
-      >
+        {/* BUTTONS GRID (ПРЯМОУГОЛЬНЫЕ КАРТОЧКИ) */}
         <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
           {/* Читать */}
           <motion.button
-            whileTap={{ scale: 0.92 }}
-            className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full min-h-[110px]"
+            whileTap={{ scale: 0.94 }}
+            className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
             style={cardStyle}
             onClick={() => console.log('read articles')}
           >
             {hasNew && (
               <motion.div
-                className="absolute inset-0 rounded-2xl pointer-events-none"
+                className="absolute inset-0 rounded-xl pointer-events-none"
                 animate={{ opacity: [0.15, 0.4, 0.15] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                 style={{
@@ -122,14 +125,14 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
               />
             )}
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0 relative z-10"
+              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
               style={{
                 background: 'rgba(216,163,92,0.18)',
                 color: '#D8A35C',
                 boxShadow: '0 0 12px rgba(216,163,92,0.3)',
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
               </svg>
             </div>
@@ -138,7 +141,7 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
                 <span className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{t.read}</span>
                 {hasNew && (
                   <span
-                    className="text-[8px] font-bold uppercase px-1 py-0.2 rounded-md"
+                    className="text-[7.5px] font-bold uppercase px-1 py-0.2 rounded"
                     style={{
                       background: 'rgba(216,163,92,0.2)',
                       color: '#D8A35C',
@@ -154,20 +157,20 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
 
           {/* Связаться */}
           <motion.button
-            whileTap={{ scale: 0.92 }}
-            className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full min-h-[110px]"
+            whileTap={{ scale: 0.94 }}
+            className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
             style={cardStyle}
             onClick={() => console.log('contact')}
           >
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0 relative z-10"
+              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
               style={{
                 background: 'rgba(96,165,250,0.18)',
                 color: '#60A5FA',
                 boxShadow: '0 0 12px rgba(96,165,250,0.25)',
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </div>
@@ -179,13 +182,13 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
 
           {/* В избранное */}
           <motion.button
-            whileTap={{ scale: 0.92 }}
-            className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full min-h-[110px]"
+            whileTap={{ scale: 0.94 }}
+            className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
             style={cardStyle}
             onClick={() => onAddFavorite?.()}
           >
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0 relative z-10 text-base"
+              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10 text-sm"
               style={{
                 background: 'rgba(244,114,182,0.18)',
                 color: '#F472B6',
@@ -204,7 +207,7 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
         {/* НАЗАД В МЕНЮ */}
         <button
           onClick={onBack}
-          className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-3 active:scale-95 transition-all cursor-pointer"
+          className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-2 active:scale-95 transition-all cursor-pointer"
         >
           {t.back}
         </button>
