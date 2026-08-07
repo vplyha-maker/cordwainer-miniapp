@@ -41,10 +41,12 @@ export default function App() {
     } catch {}
   }
 
-  const addFavorite = (id: string) => {
+  // Функция переключения (добавление / удаление)
+  const toggleFavorite = (id: string) => {
     setFavorites((prev) => {
-      if (prev.includes(id)) return prev
-      const next = [...prev, id]
+      const next = prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
       try {
         localStorage.setItem('cordwainer_favorites', JSON.stringify(next))
       } catch {}
@@ -101,6 +103,7 @@ export default function App() {
             onOpenBlog={() => setScreen('blog')}
             lang={lang}
             setLang={handleSetLang}
+            favorites={favorites}
           />
         )}
         {screen === 'blog' && (
@@ -108,7 +111,8 @@ export default function App() {
             key="blog"
             onBack={() => setScreen('home')}
             lang={lang}
-            onAddFavorite={() => addFavorite('blog-orvard')}
+            isFavorite={favorites.includes('blog-orvard')}
+            onToggleFavorite={() => toggleFavorite('blog-orvard')}
           />
         )}
       </AnimatePresence>
