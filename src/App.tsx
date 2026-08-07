@@ -41,8 +41,13 @@ export default function App() {
     } catch {}
   }
 
-  // Функция переключения (добавление / удаление)
+  // Функция переключения (добавление / удаление) с тактильным откликом
   const toggleFavorite = (id: string) => {
+    try {
+      // Легкая вибрация при клике (нативный Telegram Haptic)
+      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
+    } catch {}
+
     setFavorites((prev) => {
       const next = prev.includes(id)
         ? prev.filter((item) => item !== id)
@@ -91,6 +96,7 @@ export default function App() {
           <WelcomePage
             key="welcome"
             onStart={() => setScreen('home')}
+            onOpenBlog={() => setScreen('blog')} // Добавлено: передаем функцию открытия блога
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -103,7 +109,7 @@ export default function App() {
             onOpenBlog={() => setScreen('blog')}
             lang={lang}
             setLang={handleSetLang}
-            favorites={favorites}
+            favorites={favorites} // Добавлено: передаем избранное в меню
           />
         )}
         {screen === 'blog' && (
