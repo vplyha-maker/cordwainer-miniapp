@@ -4,12 +4,29 @@ import type { Lang } from '../App'
 
 type WelcomePageProps = {
   onStart?: () => void
+  onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
-  favorites: string[] //
+  favorites?: string[]
 }
 
-export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
+const getFavoriteIcon = (id?: string) => {
+  if (!id) return null
+  switch (id) {
+    case 'blog-orvard':
+      return '📖'
+    case 'materials':
+      return '🪵'
+    case 'colors':
+      return '🎨'
+    case 'styles':
+      return '👞'
+    default:
+      return '★'
+  }
+}
+
+export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [] }: WelcomePageProps) {
   const t = {
     ru: {
       tagline: 'Энциклопедия обувного мастерства',
@@ -262,6 +279,7 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           </div>
         </motion.button>
 
+        {/* БЛОК ИЗБРАННОЕ (РОВНО 4 СЛОТА) */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -276,34 +294,37 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
               {t.seeAll}
             </button>
           </div>
-          <div className="flex gap-2">
-            {['🪵', '🎨', '👞'].map((emoji, i) => (
-              <motion.div
-                key={i}
-                whileTap={{ scale: 0.88 }}
-                className="relative w-14 h-14 rounded-xl flex items-center justify-center text-xl shrink-0 cursor-pointer overflow-hidden"
-                style={{
-                  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-                  boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                }}
-              >
-                {emoji}
-              </motion.div>
-            ))}
-            <motion.div
-              whileTap={{ scale: 0.88 }}
-              className="relative w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer overflow-hidden"
-              style={{
-                background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-              }}
-            >
-              +12
-            </motion.div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {[0, 1, 2, 3].map((index) => {
+              const itemId = favorites[index]
+              const icon = getFavoriteIcon(itemId)
+
+              return (
+                <motion.div
+                  key={index}
+                  onClick={() => {
+                    if (itemId === 'blog-orvard' && onOpenBlog) {
+                      onOpenBlog()
+                    }
+                  }}
+                  whileTap={itemId ? { scale: 0.88 } : undefined}
+                  className={`relative aspect-square rounded-xl flex items-center justify-center text-xl overflow-hidden ${itemId ? 'cursor-pointer' : ''}`}
+                  style={{
+                    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+                    boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                  }}
+                >
+                  {itemId ? (
+                    <span>{icon}</span>
+                  ) : (
+                    <span className="text-[16px] font-light text-[#B9ACA0]/30">+</span>
+                  )}
+                </motion.div>
+              )
+            })}
           </div>
         </motion.div>
       </motion.div>
