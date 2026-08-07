@@ -54,7 +54,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     WebkitBackdropFilter: 'blur(10px)',
   }
 
-  // Динамические стили для кнопки избранного
   const favIconColor = isFavorite ? '#F5F1EB' : '#F472B6'
   const favIconBg = isFavorite ? '#F472B6' : 'rgba(244,114,182,0.18)'
   const favBoxShadow = isFavorite ? '0 0 16px rgba(244,114,182,0.6)' : '0 0 12px rgba(244,114,182,0.25)'
@@ -117,7 +116,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
         {/* BUTTONS GRID */}
         <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
-          {/* Читать */}
           <motion.button
             whileTap={{ scale: 0.94 }}
             className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
@@ -153,7 +151,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             </div>
           </motion.button>
 
-          {/* Связаться */}
           <motion.button
             whileTap={{ scale: 0.94 }}
             className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
