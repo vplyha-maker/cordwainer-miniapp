@@ -1,16 +1,14 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
-
-type Lang = 'ru' | 'uk'
+import type { Lang } from '../App'
 
 type WelcomePageProps = {
   onStart?: () => void
+  lang: Lang
+  setLang: (lang: Lang) => void
 }
 
-export function WelcomePage({ onStart }: WelcomePageProps) {
-  const [lang, setLang] = useState<Lang>('ru')
-
+export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
   const t = {
     ru: {
       tagline: 'Энциклопедия обувного мастерства',
@@ -85,15 +83,12 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
-      
-      {/* HERO */}
       <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] overflow-hidden z-20">
         <img
           src="/hero-cover.png"
           alt="Cordwainer"
           className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
         />
-
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -101,7 +96,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               'linear-gradient(to bottom, rgba(21,18,16,.20) 0%, rgba(21,18,16,.50) 60%, #151210 100%)',
           }}
         />
-
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
           <div className="flex items-start justify-between">
             <div>
@@ -113,7 +107,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               >
                 Cordwainer
               </motion.h1>
-
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -124,7 +117,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               </motion.p>
             </div>
 
-            {/* Лупа + RU + UA */}
             <div className="flex flex-col items-center gap-1.5 shrink-0">
               <button className="w-9 h-9 rounded-full bg-[#1D1815]/70 border border-[#C6A47A]/25 flex items-center justify-center text-[#F5F1EB] backdrop-blur-sm active:scale-90 transition-transform cursor-pointer">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -174,14 +166,12 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         </div>
       </div>
 
-      {/* SCROLL CONTENT */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3"
       >
-        {/* CATEGORIES */}
         <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
           {categories.map((item, index) => (
             <motion.button
@@ -208,7 +198,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               >
                 {item.icon}
               </div>
-
               <div className="relative z-10 flex-1 flex flex-col justify-end">
                 <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB] whitespace-pre-line">
                   {item.title}
@@ -221,7 +210,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
           ))}
         </div>
 
-        {/* CTA */}
         <motion.button
           onClick={onStart}
           initial={{ opacity: 0, y: 18 }}
@@ -251,7 +239,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               transform: 'skewX(-20deg)',
             }}
           />
-
           <div className="relative h-full flex items-center justify-between px-6">
             <div className="flex flex-col text-left">
               <span
@@ -274,7 +261,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
           </div>
         </motion.button>
 
-        {/* FAVORITES */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -289,7 +275,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
               {t.seeAll}
             </button>
           </div>
-
           <div className="flex gap-2">
             {['🪵', '🎨', '👞'].map((emoji, i) => (
               <motion.div
@@ -306,7 +291,6 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
                 {emoji}
               </motion.div>
             ))}
-
             <motion.div
               whileTap={{ scale: 0.88 }}
               className="relative w-14 h-14 rounded-xl flex items-center justify-center text-[12px] font-medium text-[#B9ACA0] shrink-0 cursor-pointer overflow-hidden"
@@ -323,9 +307,8 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         </motion.div>
       </motion.div>
 
-      {/* DOCK */}
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
-        <BottomDock active="search" />
+        <BottomDock active="search" lang={lang} />
       </div>
     </div>
   )
