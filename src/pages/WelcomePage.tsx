@@ -1,32 +1,19 @@
 import { motion } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
-import type { Lang } from '../App'
+import type { Lang, FavoriteItem } from '../App'
 
 type WelcomePageProps = {
   onStart?: () => void
   onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
-  favorites?: string[]
-}
-
-const getFavoriteIcon = (id?: string) => {
-  if (!id) return null
-  switch (id) {
-    case 'blog-orvard':
-      return '📖'
-    case 'materials':
-      return '🪵'
-    case 'colors':
-      return '🎨'
-    case 'styles':
-      return '👞'
-    default:
-      return '★'
-  }
+  favorites?: FavoriteItem[]
 }
 
 export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [] }: WelcomePageProps) {
+  // ДОБАВЛЕНО: Фильтруем только блоговые записи для этой страницы
+  const blogFavorites = favorites.filter((f) => f.type === 'blog')
+
   const t = {
     ru: {
       tagline: 'Энциклопедия обувного мастерства',
@@ -279,7 +266,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           </div>
         </motion.button>
 
-        {/* БЛОК ИЗБРАННОЕ (РОВНО 4 СЛОТА) */}
+        {/* БЛОК ИЗБРАННОЕ (РОВНО 4 СЛОТА ДЛЯ БЛОГА) */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -297,22 +284,21 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
           <div className="grid grid-cols-4 gap-2">
             {[0, 1, 2, 3].map((index) => {
-              const itemId = favorites[index]
-              const icon = getFavoriteIcon(itemId)
+              // ОБНОВЛЕНО: Берем элементы только с типом 'blog'
+              const item = blogFavorites[index]
 
               return (
                 <motion.div
                   key={index}
                   onClick={() => {
-                    // Логика перехода
-                    if (itemId === 'blog-orvard' && onOpenBlog) {
-                      onOpenBlog() // Открываем блог, если кликнули на него
-                    } else if (!itemId && onStart) {
+                    if (item?.id === 'blog-orvard' && onOpenBlog) {
+                      onOpenBlog()
+                    } else if (!item && onStart) {
                       onStart() // Если слот пустой, открываем меню для поиска
                     }
                   }}
-                  whileTap={itemId ? { scale: 0.88 } : { scale: 0.95 }}
-                  className={`relative aspect-square rounded-xl flex items-center justify-center text-xl overflow-hidden cursor-pointer`}
+                  whileTap={item ? { scale: 0.88 } : { scale: 0.95 }}
+                  className={`relative aspect-square rounded-xl flex items-center justify-center overflow-hidden cursor-pointer`}
                   style={{
                     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
                     boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
@@ -320,8 +306,13 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                     WebkitBackdropFilter: 'blur(10px)',
                   }}
                 >
-                  {itemId ? (
-                    <span>{icon}</span>
+                  {/* ОБНОВЛЕНО: Заменяем эмодзи на PNG картинку, вписанную в кнопку (object-cover) */}
+                  {item ? (
+                    <img 
+                      src={item.imagePng} 
+                      alt={item.id} 
+                      className="w-full h-full object-cover" 
+                    />
                   ) : (
                     <span className="text-[16px] font-light text-[#B9ACA0]/30">+</span>
                   )}
