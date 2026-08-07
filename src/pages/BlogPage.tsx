@@ -217,4 +217,4 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
       </motion.div>
     </div>
   )
-    }
+}
