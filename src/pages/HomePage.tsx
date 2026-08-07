@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import { BLOG_ARTICLES } from '../data/blog'
-import type { Lang } from '../App'
+import type { Lang, FavoriteItem } from '../App'
 
 type HomePageProps = {
   onBack?: () => void
   onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
-  favorites?: string[] // Добавлено
+  favorites?: FavoriteItem[] // ОБНОВЛЕНО: Ожидаем массив объектов
 }
 
 const cardStyle = {
@@ -18,19 +18,11 @@ const cardStyle = {
   WebkitBackdropFilter: 'blur(10px)',
 }
 
-// Помощник для стилей кружочков
-const getFavStyle = (id: string) => {
-  switch (id) {
-    case 'blog-orvard': return { bg: '#F472B6', char: '📖' }
-    case 'materials': return { bg: '#D8A35C', char: '🪵' }
-    case 'colors': return { bg: '#A78BFA', char: '🎨' }
-    case 'styles': return { bg: '#60A5FA', char: '👞' }
-    default: return { bg: '#27211D', char: '★' }
-  }
-}
-
 export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
+  
+  // ДОБАВЛЕНО: Фильтруем только статьи для меню HomePage
+  const articleFavorites = favorites.filter((f) => f.type === 'article')
 
   const t = {
     ru: {
@@ -354,25 +346,21 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: 
             <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
           </div>
           
-          {/* Динамическое отображение иконок избранного (без хардкода +12) */}
+          {/* ОБНОВЛЕНО: Динамическое отображение PNG-иконок избранного (только статьи) */}
           <div className="flex -space-x-1.5 shrink-0">
-            {favorites.length === 0 && (
+            {articleFavorites.length === 0 && (
               <div className="w-6 h-6 rounded-full bg-[#27211D] border-2 border-[#151210] flex items-center justify-center text-[12px] text-[#B9ACA0]/50 pb-0.5">
                 +
               </div>
             )}
-            {favorites.slice(0, 4).map((id, idx) => {
-              const style = getFavStyle(id)
-              return (
-                <div
-                  key={idx}
-                  className="w-6 h-6 rounded-full border-2 border-[#151210] flex items-center justify-center text-[10px]"
-                  style={{ backgroundColor: style.bg }}
-                >
-                  {style.char}
-                </div>
-              )
-            })}
+            {articleFavorites.slice(0, 4).map((item, idx) => (
+              <div
+                key={idx}
+                className="w-6 h-6 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D]"
+              >
+                <img src={item.imagePng} alt={item.id} className="w-full h-full object-cover" />
+              </div>
+            ))}
           </div>
         </motion.div>
 
