@@ -14,12 +14,12 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
 
   const t = {
     ru: {
-      title: 'Орвард Орто',
-      subtitle: 'Мастерская ортопедической обуви',
-      tagline: 'Производство на заказ для всей семьи',
+      title: 'PRO Обувь',
+      subtitle: 'БЛОГ И СТАТЬИ',
+      tagline: 'Изнанка обувной индустрии. Дизайн, технологии и секреты производства',
       read: 'Читать',
       readSub: count === 0 ? 'Статьи скоро появятся' : `${count} ${count === 1 ? 'статья' : count < 5 ? 'статьи' : 'статей'}`,
-      newBadge: 'Новая статья',
+      newBadge: 'NEW',
       contact: 'Связаться',
       contactSub: 'Написать в мастерскую',
       favorite: 'В избранное',
@@ -27,12 +27,12 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
       back: 'Назад в меню',
     },
     uk: {
-      title: 'Орвард Орто',
-      subtitle: 'Майстерня ортопедичного взуття',
-      tagline: 'Виробництво на замовлення для всієї родини',
+      title: 'PRO Взуття',
+      subtitle: 'БЛОГ ТА СТАТТІ',
+      tagline: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
       read: 'Читати',
       readSub: count === 0 ? 'Статті зʼявляться незабаром' : `${count} ${count === 1 ? 'стаття' : count < 5 ? 'статті' : 'статей'}`,
-      newBadge: 'Нова стаття',
+      newBadge: 'NEW',
       contact: "Звʼязатися",
       contactSub: 'Написати в майстерню',
       favorite: 'В обране',
@@ -55,7 +55,7 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
       <div className="relative shrink-0 h-[48vh] min-h-[280px] max-h-[400px] overflow-hidden">
         <img
           src="/blog-hero.png"
-          alt="Орвард Орто"
+          alt="PRO Обувь"
           className="absolute inset-0 w-full h-full object-cover object-center"
         />
         <div
@@ -68,7 +68,7 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
 
         <button
           onClick={onBack}
-          className="absolute top-4 left-4 z-20 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+          className="absolute top-4 left-4 z-20 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
           style={{
             background: 'rgba(29,24,21,0.75)',
             border: '1px solid rgba(198,164,122,0.3)',
@@ -80,32 +80,34 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
           </svg>
         </button>
 
-        <div className="absolute bottom-8 left-4 right-4 z-10">
-          <p className="text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0] mb-1.5">
+        <div className="absolute bottom-6 left-4 right-4 z-10">
+          <p className="text-[9px] tracking-[0.22em] uppercase text-[#D8A35C] font-semibold mb-1">
             {t.subtitle}
           </p>
           <h1
-            className="font-display text-[2rem] leading-tight text-[#F5F1EB]"
-            style={{ textShadow: '0 2px 16px rgba(0,0,0,0.5)' }}
+            className="font-display text-[2.2rem] leading-tight text-[#F5F1EB] tracking-wide"
+            style={{ textShadow: '0 2px 20px rgba(0,0,0,0.7)' }}
           >
             {t.title}
           </h1>
-          <p className="mt-1.5 text-[12px] text-[#B9ACA0]">{t.tagline}</p>
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-[#B9ACA0] max-w-[90%]">
+            {t.tagline}
+          </p>
         </div>
       </div>
 
-      {/* BUTTONS */}
+      {/* BUTTONS GRID */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12, duration: 0.4 }}
-        className="flex-1 px-4 pt-2 overflow-y-auto pb-8 -mt-2 relative z-10"
+        className="flex-1 px-4 pt-2 overflow-y-auto pb-8 -mt-2 relative z-10 flex flex-col justify-between"
       >
-        <div className="flex flex-col gap-2.5 mb-4">
+        <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
           {/* Читать */}
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            className="relative w-full rounded-2xl px-4 py-3.5 text-left flex items-center gap-3 overflow-hidden"
+            whileTap={{ scale: 0.92 }}
+            className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full min-h-[110px]"
             style={cardStyle}
             onClick={() => console.log('read articles')}
           >
@@ -120,7 +122,7 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
               />
             )}
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0 relative z-10"
               style={{
                 background: 'rgba(216,163,92,0.18)',
                 color: '#D8A35C',
@@ -131,12 +133,12 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
               </svg>
             </div>
-            <div className="min-w-0 flex-1 relative z-10">
-              <div className="flex items-center gap-2">
-                <span className="text-[14px] font-semibold text-[#F5F1EB]">{t.read}</span>
+            <div className="relative z-10 flex-1 flex flex-col justify-end">
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{t.read}</span>
                 {hasNew && (
                   <span
-                    className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
+                    className="text-[8px] font-bold uppercase px-1 py-0.2 rounded-md"
                     style={{
                       background: 'rgba(216,163,92,0.2)',
                       color: '#D8A35C',
@@ -146,22 +148,19 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-[#B9ACA0] mt-0.5">{t.readSub}</div>
+              <div className="text-[9px] text-[#B9ACA0] mt-1 leading-snug">{t.readSub}</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
           </motion.button>
 
           {/* Связаться */}
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            className="w-full rounded-2xl px-4 py-3.5 text-left flex items-center gap-3"
+            whileTap={{ scale: 0.92 }}
+            className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full min-h-[110px]"
             style={cardStyle}
             onClick={() => console.log('contact')}
           >
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0 relative z-10"
               style={{
                 background: 'rgba(96,165,250,0.18)',
                 color: '#60A5FA',
@@ -172,24 +171,21 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-semibold text-[#F5F1EB]">{t.contact}</div>
-              <div className="text-[11px] text-[#B9ACA0] mt-0.5">{t.contactSub}</div>
+            <div className="relative z-10 flex-1 flex flex-col justify-end">
+              <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{t.contact}</div>
+              <div className="text-[9px] text-[#B9ACA0] mt-1 leading-snug">{t.contactSub}</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
           </motion.button>
 
           {/* В избранное */}
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            className="w-full rounded-2xl px-4 py-3.5 text-left flex items-center gap-3"
+            whileTap={{ scale: 0.92 }}
+            className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full min-h-[110px]"
             style={cardStyle}
             onClick={() => onAddFavorite?.()}
           >
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0 relative z-10 text-base"
               style={{
                 background: 'rgba(244,114,182,0.18)',
                 color: '#F472B6',
@@ -198,19 +194,17 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
             >
               ★
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-semibold text-[#F5F1EB]">{t.favorite}</div>
-              <div className="text-[11px] text-[#B9ACA0] mt-0.5">{t.favoriteSub}</div>
+            <div className="relative z-10 flex-1 flex flex-col justify-end">
+              <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{t.favorite}</div>
+              <div className="text-[9px] text-[#B9ACA0] mt-1 leading-snug">{t.favoriteSub}</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
           </motion.button>
         </div>
 
+        {/* НАЗАД В МЕНЮ */}
         <button
           onClick={onBack}
-          className="w-full text-center text-[12px] text-[#B9ACA0] py-2"
+          className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-3 active:scale-95 transition-all cursor-pointer"
         >
           {t.back}
         </button>
