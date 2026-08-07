@@ -8,6 +8,7 @@ type HomePageProps = {
   onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
+  favorites?: string[] // Добавлено
 }
 
 const cardStyle = {
@@ -17,7 +18,18 @@ const cardStyle = {
   WebkitBackdropFilter: 'blur(10px)',
 }
 
-export function HomePage({ onBack, onOpenBlog, lang, setLang }: HomePageProps) {
+// Помощник для стилей кружочков
+const getFavStyle = (id: string) => {
+  switch (id) {
+    case 'blog-orvard': return { bg: '#F472B6', char: '📖' }
+    case 'materials': return { bg: '#D8A35C', char: '🪵' }
+    case 'colors': return { bg: '#A78BFA', char: '🎨' }
+    case 'styles': return { bg: '#60A5FA', char: '👞' }
+    default: return { bg: '#27211D', char: '★' }
+  }
+}
+
+export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
 
   const t = {
@@ -341,13 +353,26 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang }: HomePageProps) {
             <div className="text-[13px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
             <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
           </div>
+          
+          {/* Динамическое отображение иконок избранного (без хардкода +12) */}
           <div className="flex -space-x-1.5 shrink-0">
-            <div className="w-6 h-6 rounded-full bg-[#8B5E3C] border-2 border-[#151210]" />
-            <div className="w-6 h-6 rounded-full bg-[#A78BFA] border-2 border-[#151210]" />
-            <div className="w-6 h-6 rounded-full bg-[#60A5FA] border-2 border-[#151210]" />
-            <div className="w-6 h-6 rounded-full bg-[#27211D] border-2 border-[#151210] flex items-center justify-center text-[8px] text-[#B9ACA0]">
-              +12
-            </div>
+            {favorites.length === 0 && (
+              <div className="w-6 h-6 rounded-full bg-[#27211D] border-2 border-[#151210] flex items-center justify-center text-[12px] text-[#B9ACA0]/50 pb-0.5">
+                +
+              </div>
+            )}
+            {favorites.slice(0, 4).map((id, idx) => {
+              const style = getFavStyle(id)
+              return (
+                <div
+                  key={idx}
+                  className="w-6 h-6 rounded-full border-2 border-[#151210] flex items-center justify-center text-[10px]"
+                  style={{ backgroundColor: style.bg }}
+                >
+                  {style.char}
+                </div>
+              )
+            })}
           </div>
         </motion.div>
 
