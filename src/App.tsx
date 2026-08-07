@@ -11,8 +11,17 @@ declare global {
   }
 }
 
-type Screen = 'welcome' | 'home' | 'blog'
+export type Screen = 'welcome' | 'home' | 'blog'
 export type Lang = 'ru' | 'uk'
+
+// ДОБАВЛЕНО: Масштабируемая структура типов избранного
+export type FavoriteType = 'blog' | 'article'
+
+export interface FavoriteItem {
+  id: string
+  type: FavoriteType
+  imagePng: string // Путь к картинке вместо эмодзи
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('welcome')
@@ -25,10 +34,23 @@ export default function App() {
     }
   })
 
-  const [favorites, setFavorites] = useState<string[]>(() => {
+  // ДОБАВЛЕНО: Теперь храним массив объектов FavoriteItem
+  const [favorites, setFavorites] = useState<FavoriteItem[]>(() => {
     try {
       const saved = localStorage.getItem('cordwainer_favorites')
-      return saved ? JSON.parse(saved) : []
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // БЕЗОПАСНОСТЬ: Миграция старых данных (строк) в новые объекты, чтобы приложение не падало
+        if (parsed.length > 0 && typeof parsed[0] === 'string') {
+          return parsed.map((id: string) => ({
+            id,
+            type: id.includes('blog') ? 'blog' : 'article',
+            imagePng: id.includes('blog') ? '/blog-hero.png' : `/${id}.png` // Автоподстановка
+          }))
+        }
+        return parsed
+      }
+      return []
     } catch {
       return []
     }
@@ -41,17 +63,17 @@ export default function App() {
     } catch {}
   }
 
-  // Функция переключения (добавление / удаление) с тактильным откликом
-  const toggleFavorite = (id: string) => {
+  // ОБНОВЛЕНО: Функция принимает объект целиком
+  const toggleFavorite = (item: FavoriteItem) => {
     try {
-      // Легкая вибрация при клике (нативный Telegram Haptic)
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
     } catch {}
 
     setFavorites((prev) => {
-      const next = prev.includes(id)
-        ? prev.filter((item) => item !== id)
-        : [...prev, id]
+      const exists = prev.some((fav) => fav.id === item.id)
+      const next = exists
+        ? prev.filter((fav) => fav.id !== item.id)
+        : [...prev, item]
       try {
         localStorage.setItem('cordwainer_favorites', JSON.stringify(next))
       } catch {}
@@ -96,7 +118,7 @@ export default function App() {
           <WelcomePage
             key="welcome"
             onStart={() => setScreen('home')}
-            onOpenBlog={() => setScreen('blog')} // Добавлено: передаем функцию открытия блога
+            onOpenBlog={() => setScreen('blog')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -109,7 +131,7 @@ export default function App() {
             onOpenBlog={() => setScreen('blog')}
             lang={lang}
             setLang={handleSetLang}
-            favorites={favorites} // Добавлено: передаем избранное в меню
+            favorites={favorites}
           />
         )}
         {screen === 'blog' && (
@@ -117,8 +139,16 @@ export default function App() {
             key="blog"
             onBack={() => setScreen('home')}
             lang={lang}
-            isFavorite={favorites.includes('blog-orvard')}
-            onToggleFavorite={() => toggleFavorite('blog-orvard')}
+            // ОБНОВЛЕНО: Проверяем наличие по id
+            isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
+            // ОБНОВЛЕНО: Передаем готовый объект со всеми параметрами (на будущее)
+            onToggleFavorite={() =>
+              toggleFavorite({
+                id: 'blog-orvard',
+                type: 'blog',
+                imagePng: '/blog-hero.png', // Используем обложку блога в качестве иконки
+              })
+            }
           />
         )}
       </AnimatePresence>
