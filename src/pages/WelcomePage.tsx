@@ -304,12 +304,15 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 <motion.div
                   key={index}
                   onClick={() => {
+                    // Логика перехода
                     if (itemId === 'blog-orvard' && onOpenBlog) {
-                      onOpenBlog()
+                      onOpenBlog() // Открываем блог, если кликнули на него
+                    } else if (!itemId && onStart) {
+                      onStart() // Если слот пустой, открываем меню для поиска
                     }
                   }}
-                  whileTap={itemId ? { scale: 0.88 } : undefined}
-                  className={`relative aspect-square rounded-xl flex items-center justify-center text-xl overflow-hidden ${itemId ? 'cursor-pointer' : ''}`}
+                  whileTap={itemId ? { scale: 0.88 } : { scale: 0.95 }}
+                  className={`relative aspect-square rounded-xl flex items-center justify-center text-xl overflow-hidden cursor-pointer`}
                   style={{
                     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
                     boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
