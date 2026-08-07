@@ -5,10 +5,11 @@ import type { Lang } from '../App'
 type BlogPageProps = {
   onBack?: () => void
   lang: Lang
-  onAddFavorite?: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
 }
 
-export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
+export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }: BlogPageProps) {
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
 
@@ -22,8 +23,10 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
       newBadge: 'NEW',
       contact: 'Связаться',
       contactSub: 'Написать в мастерскую',
-      favorite: 'В избранное',
-      favoriteSub: 'Сохранить на главной',
+      favoriteAdd: 'В избранное',
+      favoriteAddSub: 'Сохранить на главной',
+      favoriteRemove: 'В избранном',
+      favoriteRemoveSub: 'Убрать с главной',
       back: 'Назад в меню',
     },
     uk: {
@@ -35,8 +38,10 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
       newBadge: 'NEW',
       contact: "Звʼязатися",
       contactSub: 'Написати в майстерню',
-      favorite: 'В обране',
-      favoriteSub: 'Зберегти на головній',
+      favoriteAdd: 'В обране',
+      favoriteAddSub: 'Зберегти на головній',
+      favoriteRemove: 'В обраному',
+      favoriteRemoveSub: 'Видалити з головної',
       back: 'Назад до меню',
     },
   }[lang]
@@ -48,6 +53,11 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
   }
+
+  // Динамические стили для кнопки избранного
+  const favIconColor = isFavorite ? '#F5F1EB' : '#F472B6'
+  const favIconBg = isFavorite ? '#F472B6' : 'rgba(244,114,182,0.18)'
+  const favBoxShadow = isFavorite ? '0 0 16px rgba(244,114,182,0.6)' : '0 0 12px rgba(244,114,182,0.25)'
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden justify-between">
@@ -89,7 +99,7 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
         transition={{ delay: 0.1, duration: 0.4 }}
         className="relative z-10 flex-1 flex flex-col justify-end px-4 pb-6 pt-16"
       >
-        {/* TITLE BLOCK (НАЗВАНИЕ И ОПИСАНИЕ НАД КНОПКАМИ) */}
+        {/* TITLE BLOCK */}
         <div className="mb-5">
           <p className="text-[9px] tracking-[0.22em] uppercase text-[#D8A35C] font-semibold mb-1">
             {t.subtitle}
@@ -105,14 +115,13 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
           </p>
         </div>
 
-        {/* BUTTONS GRID (ПРЯМОУГОЛЬНЫЕ КАРТОЧКИ) */}
+        {/* BUTTONS GRID */}
         <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
           {/* Читать */}
           <motion.button
             whileTap={{ scale: 0.94 }}
             className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
             style={cardStyle}
-            onClick={() => console.log('read articles')}
           >
             {hasNew && (
               <motion.div
@@ -139,17 +148,6 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
             <div className="relative z-10 flex-1 flex flex-col justify-end">
               <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{t.read}</span>
-                {hasNew && (
-                  <span
-                    className="text-[7.5px] font-bold uppercase px-1 py-0.2 rounded"
-                    style={{
-                      background: 'rgba(216,163,92,0.2)',
-                      color: '#D8A35C',
-                    }}
-                  >
-                    {t.newBadge}
-                  </span>
-                )}
               </div>
               <div className="text-[9px] text-[#B9ACA0] mt-1 leading-snug">{t.readSub}</div>
             </div>
@@ -160,7 +158,6 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
             whileTap={{ scale: 0.94 }}
             className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
             style={cardStyle}
-            onClick={() => console.log('contact')}
           >
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
@@ -180,26 +177,26 @@ export function BlogPage({ onBack, lang, onAddFavorite }: BlogPageProps) {
             </div>
           </motion.button>
 
-          {/* В избранное */}
+          {/* В избранное (Динамическая кнопка) */}
           <motion.button
             whileTap={{ scale: 0.94 }}
             className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
             style={cardStyle}
-            onClick={() => onAddFavorite?.()}
+            onClick={() => onToggleFavorite?.()}
           >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10 text-sm"
-              style={{
-                background: 'rgba(244,114,182,0.18)',
-                color: '#F472B6',
-                boxShadow: '0 0 12px rgba(244,114,182,0.25)',
-              }}
+            <motion.div
+              animate={{ backgroundColor: favIconBg, color: favIconColor, boxShadow: favBoxShadow }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10 text-sm transition-colors"
             >
               ★
-            </div>
+            </motion.div>
             <div className="relative z-10 flex-1 flex flex-col justify-end">
-              <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{t.favorite}</div>
-              <div className="text-[9px] text-[#B9ACA0] mt-1 leading-snug">{t.favoriteSub}</div>
+              <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">
+                {isFavorite ? t.favoriteRemove : t.favoriteAdd}
+              </div>
+              <div className="text-[9px] mt-1 leading-snug" style={{ color: isFavorite ? '#F472B6' : '#B9ACA0' }}>
+                {isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub}
+              </div>
             </div>
           </motion.button>
         </div>
