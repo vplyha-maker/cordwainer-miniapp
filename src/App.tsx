@@ -1,104 +1,127 @@
-import React, { useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import WelcomePage from './pages/WelcomePage';
-import HomePage from './pages/HomePage';
-import BlogPage from './pages/BlogPage';
+import { AnimatePresence } from 'framer-motion'
+import { useEffect, useState } from 'react'
 
-// Структура данных для Блога (содержит PNG картинку)
-export interface BlogItem {
-  id: string;
-  title: { ru: string; ua: string };
-  imgSrc: string; 
+import { WelcomePage } from './pages/WelcomePage'
+import { HomePage } from './pages/HomePage'
+import { BlogPage } from './pages/BlogPage'
+
+declare global {
+  interface Window {
+    Telegram?: { WebApp: any }
+  }
 }
 
-// Структура данных для Материалов
-export interface MaterialItem {
-  id: string;
-  title: { ru: string; ua: string };
-}
+type Screen = 'welcome' | 'home' | 'blog'
+export type Lang = 'ru' | 'uk'
 
 export default function App() {
-  const [screen, setScreen] = useState('welcome');
-  const [lang, setLang] = useState<'ru' | 'ua'>('ru');
-
-  // Независимое состояние для Блога
-  const [favoriteBlogs, setFavoriteBlogs] = useState<BlogItem[]>(() => {
+  const [screen, setScreen] = useState<Screen>('welcome')
+  const [lang, setLang] = useState<Lang>(() => {
     try {
-      const saved = localStorage.getItem('favoriteBlogs');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem('cordwainer_lang')
+      return saved === 'uk' ? 'uk' : 'ru'
     } catch {
-      return [];
+      return 'ru'
     }
-  });
+  })
 
-  // Независимое состояние для Материалов
-  const [favoriteMaterials, setFavoriteMaterials] = useState<MaterialItem[]>(() => {
+  const [favorites, setFavorites] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('favoriteMaterials');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem('cordwainer_favorites')
+      return saved ? JSON.parse(saved) : []
     } catch {
-      return [];
+      return []
     }
-  });
+  })
 
-  // Сохранение в localStorage
+  const handleSetLang = (next: Lang) => {
+    setLang(next)
+    try {
+      localStorage.setItem('cordwainer_lang', next)
+    } catch {}
+  }
+
+  // Функция переключения (добавление / удаление) с тактильным откликом
+  const toggleFavorite = (id: string) => {
+    try {
+      // Легкая вибрация при клике (нативный Telegram Haptic)
+      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
+    } catch {}
+
+    setFavorites((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
+      try {
+        localStorage.setItem('cordwainer_favorites', JSON.stringify(next))
+      } catch {}
+      return next
+    })
+  }
+
   useEffect(() => {
-    localStorage.setItem('favoriteBlogs', JSON.stringify(favoriteBlogs));
-  }, [favoriteBlogs]);
+    const tg = window.Telegram?.WebApp
+    if (!tg) return
 
-  useEffect(() => {
-    localStorage.setItem('favoriteMaterials', JSON.stringify(favoriteMaterials));
-  }, [favoriteMaterials]);
+    tg.ready()
+    tg.expand()
 
-  // Обработчик для Блога (WelcomePage)
-  const toggleFavoriteBlog = (blog: BlogItem) => {
-    setFavoriteBlogs(prev => {
-      const exists = prev.some(b => b.id === blog.id);
-      if (exists) return prev.filter(b => b.id !== blog.id);
-      return [...prev, blog];
-    });
-  };
+    const applyTheme = () => {
+      const isDark = tg.colorScheme === 'dark'
+      document.documentElement.classList.toggle('dark', isDark)
 
-  // Обработчик для Материалов (HomePage)
-  const toggleFavoriteMaterial = (material: MaterialItem) => {
-    setFavoriteMaterials(prev => {
-      const exists = prev.some(m => m.id === material.id);
-      if (exists) return prev.filter(m => m.id !== material.id);
-      return [...prev, material];
-    });
-  };
+      try {
+        if (isDark) {
+          tg.setHeaderColor('#151210')
+          tg.setBackgroundColor('#151210')
+        } else {
+          tg.setHeaderColor('#F5F1EA')
+          tg.setBackgroundColor('#F5F1EA')
+        }
+      } catch {}
+    }
+
+    applyTheme()
+    tg.onEvent('themeChanged', applyTheme)
+
+    return () => {
+      tg.offEvent('themeChanged', applyTheme)
+    }
+  }, [])
 
   return (
-    <div className="w-full min-h-screen bg-gray-900 text-white overflow-hidden">
+    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
       <AnimatePresence mode="wait">
         {screen === 'welcome' && (
-          <WelcomePage 
-            key="welcome" 
-            setScreen={setScreen} 
-            lang={lang} 
-            setLang={setLang}
-            favoriteBlogs={favoriteBlogs} 
+          <WelcomePage
+            key="welcome"
+            onStart={() => setScreen('home')}
+            onOpenBlog={() => setScreen('blog')} // Добавлено: передаем функцию открытия блога
+            lang={lang}
+            setLang={handleSetLang}
+            favorites={favorites}
           />
         )}
         {screen === 'home' && (
-          <HomePage 
-            key="home" 
-            setScreen={setScreen} 
-            lang={lang} 
-            favoriteMaterials={favoriteMaterials} 
-            toggleFavoriteMaterial={toggleFavoriteMaterial}
+          <HomePage
+            key="home"
+            onBack={() => setScreen('welcome')}
+            onOpenBlog={() => setScreen('blog')}
+            lang={lang}
+            setLang={handleSetLang}
+            favorites={favorites} // Добавлено: передаем избранное в меню
           />
         )}
         {screen === 'blog' && (
-          <BlogPage 
-            key="blog" 
-            setScreen={setScreen} 
-            lang={lang} 
-            favoriteBlogs={favoriteBlogs} 
-            toggleFavoriteBlog={toggleFavoriteBlog} 
+          <BlogPage
+            key="blog"
+            onBack={() => setScreen('home')}
+            lang={lang}
+            isFavorite={favorites.includes('blog-orvard')}
+            onToggleFavorite={() => toggleFavorite('blog-orvard')}
           />
         )}
       </AnimatePresence>
     </div>
-  );
+  )
 }
