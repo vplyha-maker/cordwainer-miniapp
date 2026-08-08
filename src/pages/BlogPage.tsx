@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BLOG_ARTICLES } from '../data/blog'
+import { ARTICLE_CONTENTS } from '../data/articleContents' // Добавили импорт контента
 import type { Lang } from '../App'
 
 type BlogPageProps = {
@@ -10,12 +11,15 @@ type BlogPageProps = {
   onToggleFavorite?: () => void
 }
 
-type ViewState = 'cover' | 'journal'
+// Добавили третье состояние 'article'
+type ViewState = 'cover' | 'journal' | 'article'
 
 export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }: BlogPageProps) {
   const [view, setView] = useState<ViewState>('cover')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
+  // Состояние для открытой статьи
+  const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
@@ -88,18 +92,25 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     const tag = lang === 'ru' ? article.tagRu : article.tagUk
     
     const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
-    // Для украинского фильтра мы сравниваем тег напрямую, так как id в t.filters совпадают с tagUk/tagRu
     const matchesFilter = activeFilter === 'all' || tag === activeFilter
     
     return matchesSearch && matchesFilter
   })
 
+  // Данные активной статьи для экрана 'article'
+  const activeArticle = activeArticleId ? BLOG_ARTICLES.find(a => a.id === activeArticleId) : null
+  const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
+
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
       
-      {/* Кнопка НАЗАД */}
+      {/* Умная кнопка НАЗАД */}
       <button
-        onClick={() => (view === 'journal' ? setView('cover') : onBack?.())}
+        onClick={() => {
+          if (view === 'article') setView('journal')
+          else if (view === 'journal') setView('cover')
+          else onBack?.()
+        }}
         className="absolute top-4 left-4 z-50 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
         style={{
           background: 'rgba(29,24,21,0.75)',
@@ -253,6 +264,11 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
                       whileTap={{ scale: 0.98 }}
+                      // ДОБАВЛЕН КЛИК ДЛЯ ОТКРЫТИЯ СТАТЬИ
+                      onClick={() => {
+                        setActiveArticleId(article.id)
+                        setView('article')
+                      }}
                       className="relative rounded-2xl p-4 overflow-hidden cursor-pointer"
                       style={cardStyle}
                     >
@@ -289,6 +305,55 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                     Ничего не найдено
                   </div>
                 )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ================= ЧИТАЛКА (ЭКРАН СТАТЬИ) ================= */}
+        {view === 'article' && activeArticle && content && (
+          <motion.div
+            key="article"
+            initial={{ opacity: 0, x: 20 }} // Выезжает справа
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }} // Уезжает обратно вправо
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 flex flex-col z-30 bg-[#151210] overflow-y-auto overflow-x-hidden"
+          >
+            {/* Большая обложка статьи */}
+            <div className="relative w-full h-[40vh] shrink-0">
+              <img 
+                src={activeArticle.cover || '/blog-hero.png'} 
+                alt="cover" 
+                className="w-full h-full object-cover" 
+              />
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(21,18,16,0.1) 0%, #151210 100%)' }} />
+              
+              {/* Тег и время чтения поверх обложки */}
+              <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                 <span className="text-[10px] tracking-[0.1em] uppercase text-[#D8A35C] bg-[#D8A35C]/20 backdrop-blur-md px-2 py-1 rounded-md border border-[#D8A35C]/30">
+                    {lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk}
+                 </span>
+                 <span className="text-[10px] text-[#B9ACA0] bg-black/40 backdrop-blur-md px-2 py-1 rounded-md">
+                   {lang === 'ru' ? activeArticle.readTimeRu : activeArticle.readTimeUk}
+                 </span>
+              </div>
+            </div>
+
+            {/* Текст статьи */}
+            <div className="px-5 py-6 pb-20">
+              <h1 className="font-display text-[1.8rem] leading-tight text-[#F5F1EB] mb-6">
+                {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
+              </h1>
+              
+              {/* Сам контент из файла articleContents.tsx */}
+              <div className="article-content">
+                {content[lang]}
+              </div>
+
+              {/* Дата публикации */}
+              <div className="mt-10 pt-6 border-t border-[#2A231D] text-[11px] text-[#B9ACA0]/60">
+                {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
               </div>
             </div>
           </motion.div>
