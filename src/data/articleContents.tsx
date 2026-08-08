@@ -10,77 +10,95 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
   
   'orthopedic-fear': {
     ru: (
-      <div className="space-y-6 text-[14px] leading-relaxed text-[#B9ACA0]">
-        <p className="text-[#F5F1EB] font-medium text-[16px] leading-snug">
+      <div className="flex flex-col gap-10 text-[16px] leading-[1.6] text-[#CFC4B9] font-normal">
+        {/* Лид-абзац (введение) */}
+        <p className="text-[#F5F1EB] font-medium text-[18px] leading-[1.4]">
           Почему мы до сих пор боимся слова «ортопедическая»? Разбираем стереотипы о комфортной обуви, лингвистические ловушки маркетинга и причины, по которым бренды до сих пор прячут правильные колодки за гигантскими кроссовками и авторским дизайном.
         </p>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Призрак аптечной полки</h3>
+        {/* Секция 1 */}
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Призрак аптечной полки
+          </h3>
           <p>
             Если провести слепой опрос и попросить человека мгновенно визуализировать слово «ортопедический», ассоциативный ряд будет почти мгновенным и крайне жестоким: больничный коридор, бежевый пластик, громоздкая кожзам-конструкция с грубыми ремешками, витрина специализированной аптеки и стойкий запах антисептика.
           </p>
-          <p className="mt-3">
+          <p>
             Десятилетиями слово «ортопедия» ассоциировалось исключительно с медициной, травмами, реабилитацией и, что самое страшное для индустрии моды, с глубокой старостью. Оно звучало как диагноз. Купить «ортопедическую обувь» означало публично расписаться в том, что твоя молодость осталась позади, а тело дало сбой. Этот стигматизированный образ въелся настолько, что само слово продолжает вызывать эстетическое отторжение. Мы хотим быть здоровыми, но категорически не хотим выглядеть пациентами.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Маркетинговый языковой камуфляж</h3>
+        {/* Секция 2 */}
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Маркетинговый языковой камуфляж
+          </h3>
           <p>
             Продуктовые дизайнеры и маркетологи прекрасно осведомлены об этой фобии. Внутри индустрии образовался целый словарь эвфемизмов, призванный продавать анатомическую правильность, не произнося роковое «О-слово». Вместо этого в рекламе задействуют изящную терминологию:
           </p>
-          <ul className="list-disc pl-5 mt-3 space-y-2 text-[#D3C8BE]">
+          <ul className="list-disc pl-6 space-y-3 text-[#CFC4B9]">
             <li><strong className="text-[#F5F1EB] font-medium">Anatomical fit</strong> (Анатомическая посадка) — звучит научно, но без больничного контекста.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Ergonomic sole</strong> (Эргономичная подошва) — намекает на высокие технологии и премиальность.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Arch support</strong> (Поддержка свода стопы) — акцентирует внимание на заботе и спорте.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Barefoot-concept</strong> (Концепция босоногой ходьбы) — отсылает к натуропатии и велнесу.</li>
           </ul>
-          <p className="mt-3">
+          <p>
             Бренды идут на любые ухищрения, лишь бы развести свой продукт с эстетикой медицинской техники.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Эстетика против анатомии</h3>
+        {/* Секция 3 */}
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Эстетика против анатомии
+          </h3>
           <p>
             Европейская fashion-индустрия веками формировалась вокруг идеи сжатия и трансформации стопы. Узкие носы, высокие каблуки, жесткие задники — мода диктовала силуэт, далекий от анатомии. Обувь была маркером статуса: если стопа зажата в узкую лодочку, значит, тебе не нужно заниматься физическим трудом.
           </p>
-          <p className="mt-3">
+          <p>
             Медицинская ортопедия тем временем решала задачи спасения разрушенных суставов, не думая о визуальной привлекательности. Так возникла ложная дихотомия: либо красиво и больно, либо уродливо и удобно.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Тихая революция: От Birkenstock до Balenciaga</h3>
+        {/* Секция 4 */}
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Тихая революция: От Birkenstock до Balenciaga
+          </h3>
           <p>
             Перелом начался со сдвига в культуре потребления. Первый прорыв совершил бренд Birkenstock. Культура нормкора легализовала «папину обувь», и выяснилось, что правильная ортопедическая чашка может стать элементом стиля. Затем наступила эра <em>ugly sneakers</em>. Широкий носок (toe box) и сложная амортизация перекочевали в повседневный гардероб.
           </p>
         </div>
 
-        <div className="bg-[#1A1817] p-5 rounded-xl border border-[#2A2624]">
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-3 uppercase tracking-wide">В чем разница?</h3>
-          <div className="space-y-4">
-            <div>
-              <strong className="text-[#F5F1EB] font-medium block mb-1">1. Настоящая ортопедическая обувь</strong>
-              <p>Медицинское изделие по слепку или рецепту врача. Предназначена для коррекции тяжелых патологий. Ее задача — терапия, а не эстетика.</p>
-            </div>
-            <div>
-              <strong className="text-[#F5F1EB] font-medium block mb-1">2. Анатомически правильная обувь</strong>
-              <p>Это то, чем должна быть любая обувь: правильная колодка по форме стопы, формованная стелька, стабильный задник и адекватный перепад (drop 4-10 мм). Из-за засилья плоских кед эта норма стала восприниматься как спец-опция.</p>
-            </div>
+        {/* Врезка / Важный блок */}
+        <div className="bg-[#1A1817] p-6 rounded-2xl border border-[#2A2624] flex flex-col gap-5">
+          <h3 className="text-[#F5F1EB] font-semibold text-[18px] uppercase tracking-wider text-center mb-1">
+            В чем разница?
+          </h3>
+          <div className="flex flex-col gap-2">
+            <strong className="text-[#F5F1EB] text-[17px] font-medium">1. Настоящая ортопедическая обувь</strong>
+            <p className="text-[15px]">Медицинское изделие по слепку или рецепту врача. Предназначена для коррекции тяжелых патологий. Ее задача — терапия, а не эстетика.</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <strong className="text-[#F5F1EB] text-[17px] font-medium">2. Анатомически правильная обувь</strong>
+            <p className="text-[15px]">Это то, чем должна быть любая обувь: правильная колодка по форме стопы, формованная стелька, стабильный задник и адекватный перепад (drop 4-10 мм). Из-за засилья плоских кед эта норма стала восприниматься как спец-опция.</p>
           </div>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Партизанский подход брендов</h3>
+        {/* Секция 5 */}
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Партизанский подход брендов
+          </h3>
           <p>
             Разработка анатомической колодки — это дорого. Производители премиум-сегмента инвестируют в эргономику, но прячут ее. Вы покупаете стильные дерби или челси, но чувствуете себя в них как в беговых кроссовках.
           </p>
         </div>
 
-        <div className="pt-2">
-          <p className="text-[#F5F1EB] font-medium italic">
+        {/* Заключение */}
+        <div className="pt-4 pb-8 border-t border-[#2A2624]/50">
+          <p className="text-[#F5F1EB] text-[17px] leading-[1.6] font-medium italic">
             Наш страх перед словом «ортопедическая» — это устаревший зажим. Настоящий люкс сегодня — это возможность пройти 15 000 шагов и не вспомнить о суставах. Правильная колодка — это не медицинское назначение. Это уважение к собственной анатомии.
           </p>
         </div>
@@ -88,77 +106,88 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
     ),
     
     uk: (
-      <div className="space-y-6 text-[14px] leading-relaxed text-[#B9ACA0]">
-        <p className="text-[#F5F1EB] font-medium text-[16px] leading-snug">
+      <div className="flex flex-col gap-10 text-[16px] leading-[1.6] text-[#CFC4B9] font-normal">
+        {/* По аналогии с русской версией применяем те же классы */}
+        <p className="text-[#F5F1EB] font-medium text-[18px] leading-[1.4]">
           Чому ми досі боїмося слова «ортопедичне»? Розбираємо стереотипи про комфортне взуття, лінгвістичні пастки маркетингу та причини, через які бренди досі ховають правильні колодки за гігантськими кросівками та авторським дизайном.
         </p>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Привид аптечної полиці</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Привид аптечної полиці
+          </h3>
           <p>
             Якщо провести сліпе опитування і попросити людину миттєво візуалізувати слово «ортопедичний», асоціативний ряд буде майже миттєвим і вкрай жорстоким: лікарняний коридор, бежевий пластик, громіздка конструкція зі шкірозамінника з грубими ремінцями, вітрина спеціалізованої аптеки та стійкий запах антисептика.
           </p>
-          <p className="mt-3">
+          <p>
             Десятиліттями слово «ортопедія» асоціювалося виключно з медициною, травмами, реабілітацією і, що найстрашніше для індустрії моди, з глибокою старістю. Воно звучало як діагноз. Купити «ортопедичне взуття» означало публічно розписатися в тому, що твоя молодість залишилася позаду, а тіло дало збій. Цей стигматизований образ в'ївся настільки, що саме слово продовжує викликати естетичне відторгнення. Ми хочемо бути здоровими, але категорично не хочемо виглядати пацієнтами.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Маркетинговий мовний камуфляж</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Маркетинговий мовний камуфляж
+          </h3>
           <p>
             Продуктові дизайнери та маркетологи чудово знають про цю фобію. Всередині індустрії утворився цілий словник евфемізмів, покликаний продавати анатомічну правильність, не вимовляючи фатальне «О-слово». Натомість у рекламі задіюють витончену термінологію:
           </p>
-          <ul className="list-disc pl-5 mt-3 space-y-2 text-[#D3C8BE]">
+          <ul className="list-disc pl-6 space-y-3 text-[#CFC4B9]">
             <li><strong className="text-[#F5F1EB] font-medium">Anatomical fit</strong> (Анатомічна посадка) — звучить науково, але без лікарняного контексту.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Ergonomic sole</strong> (Ергономічна підошва) — натякає на високі технології та преміальність.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Arch support</strong> (Підтримка склепіння стопи) — акцентує увагу на турботі та спорті.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Barefoot-concept</strong> (Концепція босоногої ходьби) — відсилає до натуропатії та велнесу.</li>
           </ul>
-          <p className="mt-3">
+          <p>
             Бренди йдуть на будь-які хитрощі, аби лише розвести свій продукт з естетикою медичної техніки.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Естетика проти анатомії</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Естетика проти анатомії
+          </h3>
           <p>
             Європейська fashion-індустрія століттями формувалася навколо ідеї стиснення та трансформації стопи. Вузькі носи, високі підбори, жорсткі задники — мода диктувала силует, далекий від анатомії. Взуття було маркером статусу: якщо стопа затиснута у вузький човник, значить, тобі не потрібно займатися фізичною працею.
           </p>
-          <p className="mt-3">
+          <p>
             Медична ортопедія тим часом вирішувала завдання порятунку зруйнованих суглобів, не думаючи про візуальну привабливість. Так виникла хибна дихотомія: або красиво і боляче, або потворно і зручно.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Тиха революція: Від Birkenstock до Balenciaga</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Тиха революція: Від Birkenstock до Balenciaga
+          </h3>
           <p>
             Перелом почався зі зсуву в культурі споживання. Перший прорив здійснив бренд Birkenstock. Культура нормкору легалізувала «татове взуття», і з'ясувалося, що правильна ортопедична чашка може стати елементом стилю. Потім настала ера <em>ugly sneakers</em>. Широкий носок (toe box) та складна амортизація перекочували у повсякденний гардероб.
           </p>
         </div>
 
-        <div className="bg-[#1A1817] p-5 rounded-xl border border-[#2A2624]">
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-3 uppercase tracking-wide">У чому різниця?</h3>
-          <div className="space-y-4">
-            <div>
-              <strong className="text-[#F5F1EB] font-medium block mb-1">1. Справжнє ортопедичне взуття</strong>
-              <p>Медичний виріб за зліпком або рецептом лікаря. Призначене для корекції важких патологій. Його завдання — терапія, а не естетика.</p>
-            </div>
-            <div>
-              <strong className="text-[#F5F1EB] font-medium block mb-1">2. Анатомічно правильне взуття</strong>
-              <p>Це те, чим має бути будь-яке взуття: правильна колодка за формою стопи, формована устілка, стабільний задник і адекватний перепад (drop 4-10 мм). Через засилля плоских кедів ця норма стала сприйматися як спец-опція.</p>
-            </div>
+        <div className="bg-[#1A1817] p-6 rounded-2xl border border-[#2A2624] flex flex-col gap-5">
+          <h3 className="text-[#F5F1EB] font-semibold text-[18px] uppercase tracking-wider text-center mb-1">
+            У чому різниця?
+          </h3>
+          <div className="flex flex-col gap-2">
+            <strong className="text-[#F5F1EB] text-[17px] font-medium">1. Справжнє ортопедичне взуття</strong>
+            <p className="text-[15px]">Медичний виріб за зліпком або рецептом лікаря. Призначене для корекції важких патологій. Його завдання — терапія, а не естетика.</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <strong className="text-[#F5F1EB] text-[17px] font-medium">2. Анатомічно правильне взуття</strong>
+            <p className="text-[15px]">Це те, чим має бути будь-яке взуття: правильна колодка за формою стопи, формована устілка, стабільний задник і адекватний перепад (drop 4-10 мм). Через засилля плоских кедів ця норма стала сприйматися як спец-опція.</p>
           </div>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Партизанський підхід брендів</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Партизанський підхід брендів
+          </h3>
           <p>
             Розробка анатомічної колодки — це дорого. Виробники преміум-сегмента інвестують в ергономіку, але ховають її. Ви купуєте стильні дербі або челсі, але відчуваєте себе в них як у бігових кросівках.
           </p>
         </div>
 
-        <div className="pt-2">
-          <p className="text-[#F5F1EB] font-medium italic">
+        <div className="pt-4 pb-8 border-t border-[#2A2624]/50">
+          <p className="text-[#F5F1EB] text-[17px] leading-[1.6] font-medium italic">
             Наш страх перед словом «ортопедичне» — це застарілий затиск. Справжній люкс сьогодні — це можливість пройти 15 000 кроків і не згадати про суглоби. Правильна колодка — це не медичне призначення. Це повага до власної анатомії.
           </p>
         </div>
@@ -168,49 +197,58 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
 
   'shoe-storytelling': {
     ru: (
-      <div className="space-y-6 text-[14px] leading-relaxed text-[#B9ACA0]">
-        <p className="text-[#F5F1EB] font-medium text-[16px] leading-snug">
+      <div className="flex flex-col gap-10 text-[16px] leading-[1.6] text-[#CFC4B9] font-normal">
+        
+        <p className="text-[#F5F1EB] font-medium text-[18px] leading-[1.4]">
           Что сегодня продает обувь — дизайн или история? Как сторителлинг победил функциональность, и почему кроссовки с правильной легендой стоят в 10 раз дороже своих безымянных аналогов.
         </p>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Эпоха базового комфорта</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Эпоха базового комфорта
+          </h3>
           <p>
             Если посмотреть на рекламу обуви полувековой давности, она будет удивительно прагматичной. Бренды продавали физические характеристики: непромокаемость кожи, долговечность швов, мягкость стельки. Обувь была утилитарным инструментом для защиты ног.
           </p>
-          <p className="mt-3">
+          <p>
             Сегодня ситуация изменилась. Производство качественной, удобной обуви перестало быть уникальным — базовый комфорт стал «гигиеническим минимумом». Когда конкуренция на уровне «кто сошьет крепче» закончилась, брендам пришлось завоевывать наше воображение.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Рождение кроссовочного нарратива</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Рождение кроссовочного нарратива
+          </h3>
           <p>
             Точкой невозврата стал 1985 год и выход Air Jordan 1. Когда НБА запретила Майклу Джордану выходить в них на паркет из-за регламента формы, бренд превратил это в гениальную историю. Слоган <em>«НБА запретила их, но не может запретить вам носить их»</em> превратил кроссовки в манифест бунта. Люди покупали не полиуретан, а причастность к величию и свободе.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Экономика хайпа и коллабораций</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Экономика хайпа и коллабораций
+          </h3>
           <p>
             Сегодня дизайн привлекает внимание, но ценник в тысячи долларов на ресейле оправдывает только история. Когда релиз создается с Трэвисом Скоттом или Dior, срабатывают три фактора:
           </p>
-          <ul className="list-disc pl-5 mt-3 space-y-2 text-[#D3C8BE]">
+          <ul className="list-disc pl-6 space-y-3 text-[#CFC4B9]">
             <li><strong className="text-[#F5F1EB] font-medium">Искусственный дефицит</strong> (FOMO) — лимитированный тираж подогревает ажиотаж.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Символический капитал</strong> — обувь впитывает ауру артиста или люксового бренда.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Инвестиционная ценность</strong> — редкие пары воспринимаются как ценные активы.</li>
           </ul>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Наследие против трендов: магия ностальгии</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Наследие против трендов: магия ностальгии
+          </h3>
           <p>
             Классические бренды используют нарратив наследия (heritage). Dr. Martens продают дух панк-рока 70-х, Converse — бунтарство гранжа и Курта Кобейна, а New Balance монетизировали образ «папиных кроссовок» как символ интеллектуального минимализма. Мы платим за возможность примерить проверенную временем идентичность.
           </p>
         </div>
 
-        <div className="pt-2">
-          <p className="text-[#F5F1EB] font-medium italic">
+        <div className="pt-4 pb-8 border-t border-[#2A2624]/50">
+          <p className="text-[#F5F1EB] text-[17px] leading-[1.6] font-medium italic">
             Обувь в XXI веке стала социальным паспортом. Мы покупаем не просто пару на сезон — мы покупаем версии самих себя, а сторителлинг брендов дает нам нужные слова, чтобы эту версию озвучить.
           </p>
         </div>
@@ -218,49 +256,58 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
     ),
     
     uk: (
-      <div className="space-y-6 text-[14px] leading-relaxed text-[#B9ACA0]">
-        <p className="text-[#F5F1EB] font-medium text-[16px] leading-snug">
+      <div className="flex flex-col gap-10 text-[16px] leading-[1.6] text-[#CFC4B9] font-normal">
+        
+        <p className="text-[#F5F1EB] font-medium text-[18px] leading-[1.4]">
           Що сьогодні продає взуття — дизайн чи історія? Як сторітеллинг переміг функціональність, і чому кросівки з правильною легендою коштують у 10 разів дорожче за свої безіменні аналоги.
         </p>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Епоха базового комфорту</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Епоха базового комфорту
+          </h3>
           <p>
             Якщо подивитися на рекламу взуття піввікової давнини, вона була напрочуд прагматичною. Бренди продавали фізичні характеристики: непромокальність шкіри, довговічність швів, м'якість устілки. Взуття було утилітарним інструментом для захисту ніг.
           </p>
-          <p className="mt-3">
+          <p>
             Сьогодні ситуація змінилася. Виробництво якісного, зручного взуття перестало бути унікальним — базовий комфорт став «гігієнічним мінімумом». Коли конкуренція на рівні «хто сорочку міцніше пошиє» закінчилася, брендам довелося завойовувати нашу уяву.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Народження кросівкового наративу</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Народження кросівкового наративу
+          </h3>
           <p>
             Точкою неповернення став 1985 рік і вихід Air Jordan 1. Коли НБА заборонила Майклу Джордану виходити в них на паркет через регламент форми, бренд перетворив це на геніальну історію. Слоган <em>«НБА заборонила їх, але не може заборонити вам носити їх»</em> перетворив кросівки на маніфест бунту. Люди купували не поліуретан, а причетність до величі та свободи.
           </p>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Економіка хайпу та колаборацій</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Економіка хайпу та колаборацій
+          </h3>
           <p>
             Сьогодні дизайн привертає увагу, але цінник у тисячі доларів на ресейлі виправдовує лише історія. Коли реліз створюється з Тревісом Скоттом чи Dior, спрацьовують три фактори:
           </p>
-          <ul className="list-disc pl-5 mt-3 space-y-2 text-[#D3C8BE]">
+          <ul className="list-disc pl-6 space-y-3 text-[#CFC4B9]">
             <li><strong className="text-[#F5F1EB] font-medium">Штучний дефіцит</strong> (FOMO) — лімітований тираж підігріває ажіотаж.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Символічний капітал</strong> — взуття вбирає ауру артиста чи люксового бренду.</li>
             <li><strong className="text-[#F5F1EB] font-medium">Інвестиційна цінність</strong> — рідкісні пари сприймаються як цінні активи.</li>
           </ul>
         </div>
 
-        <div>
-          <h3 className="text-[#F5F1EB] font-medium text-[15px] mb-2 uppercase tracking-wide">Спадщина проти трендів: магія ностальгії</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-[#F5F1EB] font-semibold text-[20px] mb-1 tracking-tight">
+            Спадщина проти трендів: магія ностальгії
+          </h3>
           <p>
             Класичні бренди використовують наратив спадщини (heritage). Dr. Martens продають дух панк-року 70-х, Converse — бунтарство гранжу і Курта Кобейна, а New Balance монетизували образ «татових кросівок» як символ інтелектуального мінімалізму. Ми платимо за можливість приміряти перевірену часом ідентичність.
           </p>
         </div>
 
-        <div className="pt-2">
-          <p className="text-[#F5F1EB] font-medium italic">
+        <div className="pt-4 pb-8 border-t border-[#2A2624]/50">
+          <p className="text-[#F5F1EB] text-[17px] leading-[1.6] font-medium italic">
             Взуття у XXI столітті стало соціальним паспортом. Ми купуємо не просто пару на сезон — ми купуємо версії самих себе, а сторітеллинг брендів дає нам потрібні слова, щоб цю версію озвучити.
           </p>
         </div>
