@@ -195,7 +195,7 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
     )
   },
 
-  'shoe-storytelling': {
+  'design-vs-story': {
     ru: (
       <div className="flex flex-col gap-10 text-[16px] leading-[1.6] text-[#CFC4B9] font-normal">
         
