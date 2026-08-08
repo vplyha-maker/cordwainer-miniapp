@@ -260,51 +260,57 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto px-5 pt-20 pb-10"
           >
-            <div className="flex flex-col items-center text-center mt-6 mb-10">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.2) 0%, rgba(96,165,250,0.05) 100%)', boxShadow: 'inset 0 1px 0 rgba(96,165,250,0.4), 0 8px 24px rgba(0,0,0,0.4)' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="1.5">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10 9 9 9 8 9" />
-                </svg>
+            {/* Концепция Лебедева: жесткая типографика, никаких абстрактных иконок */}
+            <div className="flex flex-col mt-4 mb-10 border-t border-[#3A332D] pt-8">
+              <div className="flex items-center text-[10px] font-mono tracking-[0.2em] uppercase text-[#B9ACA0] mb-4">
+                <span className="bg-[#60A5FA] text-[#151210] px-2 py-0.5 font-bold mr-3">INFO</span>
+                {t.collabSubtitle}
               </div>
-              <p className="text-[10px] tracking-[0.2em] uppercase text-[#60A5FA] font-semibold mb-2">{t.collabSubtitle}</p>
-              <h2 className="font-display text-[2rem] leading-tight text-[#F5F1EB] mb-4">{t.collabTitle}</h2>
-              <p className="text-[13px] leading-relaxed text-[#B9ACA0] max-w-xs">{t.collabText}</p>
+              <h2 className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter text-[#F5F1EB] mb-5">
+                {t.collabTitle}
+              </h2>
+              <p className="text-[13px] leading-relaxed text-[#B9ACA0] max-w-sm">
+                {t.collabText}
+              </p>
             </div>
 
             {/* Карточка контактов */}
-            <div className="rounded-2xl p-5 w-full flex flex-col items-center" style={cardStyle}>
-              <span className="text-[10px] text-[#B9ACA0] uppercase tracking-wider mb-2">{t.collabEmailLabel}</span>
-              <span className="text-[1.3rem] font-medium text-[#F5F1EB] mb-6 tracking-wide">cordwain@tuta.io</span>
+            <div className="rounded-2xl p-5 w-full flex flex-col" style={cardStyle}>
+              <span className="text-[10px] text-[#B9ACA0] uppercase font-bold tracking-widest mb-1">{t.collabEmailLabel}</span>
+              <span className="text-[1.4rem] font-medium text-[#F5F1EB] mb-6 tracking-wide">cordwain@tuta.io</span>
               
-              <div className="grid grid-cols-2 gap-3 w-full">
+              <div className="grid grid-cols-2 gap-3 w-full mt-auto">
                 <button
                   onClick={handleCopyEmail}
-                  className="py-3 rounded-xl text-[13px] font-medium transition-colors flex items-center justify-center gap-2"
+                  className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
                   style={{
-                    backgroundColor: emailCopied ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.05)',
+                    backgroundColor: emailCopied ? 'rgba(96,165,250,0.15)' : 'transparent',
                     color: emailCopied ? '#60A5FA' : '#F5F1EB',
-                    border: `1px solid ${emailCopied ? 'rgba(96,165,250,0.3)' : 'rgba(255,255,255,0.1)'}`
+                    border: `1px solid ${emailCopied ? 'rgba(96,165,250,0.3)' : 'rgba(185,172,160,0.3)'}`
                   }}
                 >
-                  {emailCopied ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                  )}
                   {emailCopied ? t.copiedBtn : t.copyBtn}
                 </button>
                 
+                {/* Исправленная кнопка для Telegram WebApp */}
                 <a
                   href="mailto:cordwain@tuta.io"
-                  onClick={() => triggerHaptic()}
-                  className="py-3 rounded-xl text-[13px] font-medium transition-colors flex items-center justify-center gap-2 text-[#151210]"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    triggerHaptic();
+                    
+                    const mailUrl = 'mailto:cordwain@tuta.io';
+                    const tg = (window as any).Telegram?.WebApp;
+                    
+                    if (tg?.openLink) {
+                      tg.openLink(mailUrl);
+                    } else {
+                      window.location.href = mailUrl;
+                    }
+                  }}
+                  className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 text-[#151210]"
                   style={{ backgroundColor: '#D8A35C' }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                   {t.mailBtn}
                 </a>
               </div>
@@ -444,10 +450,10 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(21,18,16,0.1) 0%, #151210 100%)' }} />
               
               <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                 <span className="text-[10px] tracking-[0.1em] uppercase text-[#D8A35C] bg-[#D8A35C]/20 backdrop-blur-md px-2 py-1 rounded-md border border-[#D8A35C]/30">
+                 <span className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#151210] bg-[#D8A35C] px-2 py-1 rounded-sm">
                     {lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk}
                  </span>
-                 <span className="text-[10px] text-[#B9ACA0] bg-black/40 backdrop-blur-md px-2 py-1 rounded-md">
+                 <span className="text-[10px] text-[#B9ACA0] bg-black/50 backdrop-blur-md px-2 py-1 rounded-sm">
                    {lang === 'ru' ? activeArticle.readTimeRu : activeArticle.readTimeUk}
                  </span>
               </div>
