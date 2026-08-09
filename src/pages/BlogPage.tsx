@@ -101,7 +101,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     const tg = getWebApp()
 
     const appUrl = 'https://t.me/YourBotName/app'
-    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
+    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
     const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
 
     if (tg?.openTelegramLink) {
