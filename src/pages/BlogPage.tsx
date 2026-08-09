@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Markdown from 'react-markdown'
 import { BLOG_ARTICLES } from '../data/blog'
 import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
@@ -292,7 +293,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                   {emailCopied ? t.copiedBtn : t.copyBtn}
                 </button>
                 
-                {/* Исправленная кнопка для Telegram WebApp */}
                 <a
                   href="mailto:cordwain@tuta.io"
                   onClick={(e) => {
@@ -431,7 +431,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= ЧИТАЛКА (ЭКРАН СТАТЬИ) ================= */}
+        {/* ================= ЧИТАЛКА (ЭКРАН СТАТЬИ С MARKDOWN) ================= */}
         {view === 'article' && activeArticle && content && (
           <motion.div
             key="article"
@@ -464,8 +464,24 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
               </h1>
               
+              {/* === ЗДЕСЬ РАБОТАЕТ MARKDOWN === */}
               <div className="article-content">
-                {content[lang]}
+                <Markdown
+                  components={{
+                    p: ({ node, ...props }: any) => <p className="text-[14px] leading-relaxed text-[#B9ACA0] mb-4" {...props} />,
+                    h2: ({ node, ...props }: any) => <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4" {...props} />,
+                    h3: ({ node, ...props }: any) => <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3" {...props} />,
+                    ul: ({ node, ...props }: any) => <ul className="list-disc pl-5 mb-4 text-[14px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
+                    ol: ({ node, ...props }: any) => <ol className="list-decimal pl-5 mb-4 text-[14px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
+                    strong: ({ node, ...props }: any) => <strong className="font-semibold text-[#F5F1EB]" {...props} />,
+                    blockquote: ({ node, ...props }: any) => (
+                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-1 my-5 text-[13px] italic text-[#B9ACA0]/90 bg-[#D8A35C]/5 rounded-r-lg" {...props} />
+                    ),
+                    a: ({ node, ...props }: any) => <a className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4" {...props} />
+                  }}
+                >
+                  {content[lang]}
+                </Markdown>
               </div>
 
               <div className="mt-10 pt-6 border-t border-[#2A231D] text-[11px] text-[#B9ACA0]/60">
