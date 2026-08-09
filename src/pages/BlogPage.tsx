@@ -649,13 +649,15 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                         {children}
                       </a>
                     ),
-                    // === КАРТИНКИ В ТЕКСТЕ СТАТЬИ ===
+                    // === КАРТИНКИ В ТЕКСТЕ СТАТЬИ (без обрезки + лёгкий фон) ===
                     img: ({ node, ...props }) => (
-                      <img
-                        className="w-full rounded-xl my-6 object-cover max-h-[420px]"
-                        loading="lazy"
-                        {...props}
-                      />
+                      <div className="my-6 w-full flex justify-center rounded-xl bg-[#1D1815]/60 p-2">
+                        <img
+                          className="max-w-full max-h-[360px] w-auto h-auto object-contain rounded-lg"
+                          loading="lazy"
+                          {...props}
+                        />
+                      </div>
                     ),
                   }}
                 >
