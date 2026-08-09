@@ -4,7 +4,7 @@ import Markdown from 'react-markdown'
 import { BLOG_ARTICLES } from '../data/blog'
 import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
-import AboutProject from '../components/AboutProject' 
+import AboutProject from '../components/AboutProject'
 
 type BlogPageProps = {
   onBack?: () => void
@@ -15,7 +15,6 @@ type BlogPageProps = {
 
 type ViewState = 'cover' | 'journal' | 'article' | 'collaboration' | 'about'
 
-// Вспомогательная функция для безопасного доступа к Telegram WebApp
 const getWebApp = () => {
   if (typeof window !== 'undefined') {
     return (window as any).Telegram?.WebApp
@@ -23,7 +22,6 @@ const getWebApp = () => {
   return null
 }
 
-// Вспомогательная функция для правильного склонения слов
 const getPlural = (count: number, forms: [string, string, string]) => {
   const cases = [2, 0, 1, 1, 1, 2]
   return forms[
@@ -46,14 +44,12 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
 
-  // Сбрасываем скролл при открытии статьи
   useEffect(() => {
     if (view === 'article' && articleScrollRef.current) {
       articleScrollRef.current.scrollTo(0, 0)
     }
   }, [view, activeArticleId])
 
-  // Очистка таймера копирования при размонтировании
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) {
@@ -62,7 +58,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }, [])
 
-  // Надёжный тактильный отклик для Telegram WebApp и браузеров
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
     const tg = getWebApp()
     if (tg?.HapticFeedback) {
@@ -72,7 +67,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }
 
-  // Пуленепробиваемое копирование
   const handleCopyEmail = async () => {
     triggerHaptic('medium')
     const email = 'cordwain@tuta.io'
@@ -91,7 +85,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         document.execCommand('copy')
         textArea.remove()
       }
-      
+
       setEmailCopied(true)
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current)
@@ -102,7 +96,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }
 
-  // Нативный шеринг для Telegram
   const handleShareArticle = (title: string, tag: string) => {
     triggerHaptic('medium')
     const tg = getWebApp()
@@ -220,7 +213,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
-      {/* Умная кнопка НАЗАД */}
       <button
         type="button"
         aria-label="Go back"
@@ -245,7 +237,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       </button>
 
       <AnimatePresence mode="wait">
-        {/* ================= ОБЛОЖКА ================= */}
         {view === 'cover' && (
           <motion.div
             key="cover"
@@ -283,7 +274,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               </div>
 
               <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
-                {/* Читать */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -322,7 +312,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                   </div>
                 </motion.button>
 
-                {/* Сотрудничество */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -351,7 +340,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                   </div>
                 </motion.button>
 
-                {/* В избранное */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -402,7 +390,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= ЦИФРОВАЯ ВИЗИТКА ================= */}
         {view === 'collaboration' && (
           <motion.div
             key="collaboration"
@@ -461,7 +448,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= О ПРОЕКТЕ ================= */}
         {view === 'about' && (
           <motion.div
             key="about"
@@ -471,11 +457,13 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             transition={{ duration: 0.5 }}
             className="absolute inset-0 z-50 bg-black"
           >
-            <AboutProject lang={lang} />
+            <AboutProject
+              lang={lang}
+              onClose={() => setView('collaboration')}
+            />
           </motion.div>
         )}
 
-        {/* ================= ЖУРНАЛ ================= */}
         {view === 'journal' && (
           <motion.div
             key="journal"
@@ -591,7 +579,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= ЧИТАЛКА ================= */}
         {view === 'article' && activeArticle && content && (
           <motion.div
             key="article"
