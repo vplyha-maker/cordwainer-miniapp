@@ -14,34 +14,6 @@ type BlogPageProps = {
 
 type ViewState = 'cover' | 'journal' | 'article' | 'collaboration'
 
-export function BlogPage({ onBack, lang, isFavorite = falseЯ внимательно переписал твой компонент, исправив синтаксические ошибки, оптимизировав работу с Telegram WebApp и устранив потенциальные предупреждения React.
-
-### Что именно было улучшено:
-1. **Синтаксис:** Исправлена опечатка с заглавной буквы в `import` на первой строке.
-2. **Telegram WebApp:** Добавлена вспомогательная функция `getWebApp()`, чтобы не дублировать `(window as any).Telegram?.WebApp` в каждой функции. Это делает код чище и безопаснее.
-3. **Правильное склонение:** Улучшена логика для слов «статья/статті» (теперь корректно работает для чисел больше 20, например «21 статья», а не «21 статей»).
-4. **Безопасный Markdown:** В `react-markdown` пропсы теперь прокидываются через `({ node, ...props })` с удалением системного `node` (чтобы React не выдавал ошибки о попадании невалидных атрибутов в DOM).
-5. **Типизация и форматирование:** Код приведен к единому стилю, убраны лишние отступы, типизация сделана более строгой.
-
-### Обновленный код:
-
-```tsx
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import Markdown from 'react-markdown'
-import { BLOG_ARTICLES } from '../data/blog'
-import { ARTICLE_CONTENTS } from '../data/articleContents'
-import type { Lang } from '../App'
-
-type BlogPageProps = {
-  onBack?: () => void
-  lang: Lang
-  isFavorite?: boolean
-  onToggleFavorite?: () => void
-}
-
-type ViewState = 'cover' | 'journal' | 'article' | 'collaboration'
-
 // Вспомогательная функция для безопасного доступа к Telegram WebApp
 const getWebApp = () => {
   if (typeof window !== 'undefined') {
@@ -54,8 +26,8 @@ const getWebApp = () => {
 const getPlural = (count: number, forms: [string, string, string]) => {
   const cases = [2, 0, 1, 1, 1, 2]
   return forms[
-    count % 100 > 4 && count % 100 < 20 
-      ? 2 
+    count % 100 > 4 && count % 100 < 20
+      ? 2
       : cases[count % 10 < 5 ? count % 10 : 5]
   ]
 }
@@ -79,7 +51,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }, [view, activeArticleId])
 
-  // Надежный тактильный отклик для Telegram WebApp и браузеров
+  // Надёжный тактильный отклик для Telegram WebApp и браузеров
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
     const tg = getWebApp()
     if (tg?.HapticFeedback) {
@@ -93,15 +65,15 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
   const handleCopyEmail = async () => {
     triggerHaptic('medium')
     const email = 'cordwain@tuta.io'
-    
+
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(email)
       } else {
-        const textArea = document.createElement("textarea")
+        const textArea = document.createElement('textarea')
         textArea.value = email
-        textArea.style.position = "absolute"
-        textArea.style.left = "-999999px"
+        textArea.style.position = 'absolute'
+        textArea.style.left = '-999999px'
         document.body.appendChild(textArea)
         textArea.focus()
         textArea.select()
@@ -120,10 +92,10 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     triggerHaptic('medium')
     const tg = getWebApp()
     // Укажи здесь реальный URL твоего бота/приложения
-    const appUrl = '[https://t.me/YourBotName/app](https://t.me/YourBotName/app)' 
-    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
-    const shareUrl = `[https://t.me/share/url?url=$](https://t.me/share/url?url=$){encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
-    
+    const appUrl = 'https://t.me/YourBotName/app'
+    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
+
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
     } else {
@@ -163,7 +135,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         readBtn: 'Читать',
         collabTitle: 'Сотрудничество',
         collabSubtitle: 'ЦИФРОВАЯ ВИЗИТКА',
-        collabText: 'Мы всегда открыты для профессионального диалога. Разработка концептов, B2B-партнерство, коллаборации или новые идеи в сфере обувного дизайна и производства.',
+        collabText:
+          'Мы всегда открыты для профессионального диалога. Разработка концептов, B2B-партнерство, коллаборации или новые идеи в сфере обувного дизайна и производства.',
         collabEmailLabel: 'Прямая связь',
         copyBtn: 'Скопировать',
         copiedBtn: 'Скопировано!',
@@ -176,7 +149,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         tagline: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
         read: 'Читати',
         readSub: count === 0 ? 'Статті зʼявляться незабаром' : `${count} ${ukPlural}`,
-        contact: "Співпраця",
+        contact: 'Співпраця',
         contactSub: 'Запропонувати ідею',
         favoriteAdd: 'В обране',
         favoriteAddSub: 'Зберегти на головній',
@@ -184,7 +157,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         favoriteRemoveSub: 'Видалити з головної',
         backToMenu: 'Назад до меню',
         journalTitle: 'Журнал',
-        journalDesc: 'Роздуми про індустрію, людей, дизайн, виробництво та все, що відбувається навколо взуття.',
+        journalDesc:
+          'Роздуми про індустрію, людей, дизайн, виробництво та все, що відбувається навколо взуття.',
         searchPlaceholder: 'Знайти статтю...',
         fresh: 'СВІЖЕ',
         filters: [
@@ -197,7 +171,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         readBtn: 'Читати',
         collabTitle: 'Співпраця',
         collabSubtitle: 'ЦИФРОВА ВІЗИТКА',
-        collabText: 'Ми завжди відкриті до професійного діалогу. Розробка концептів, B2B-партнерство, колаборації або нові ідеї у сфері взуттєвого дизайну та виробництва.',
+        collabText:
+          'Ми завжди відкриті до професійного діалогу. Розробка концептів, B2B-партнерство, колаборації або нові ідеї у сфері взуттєвого дизайну та виробництва.',
         collabEmailLabel: 'Прямий звʼязок',
         copyBtn: 'Скопіювати',
         copiedBtn: 'Скопійовано!',
@@ -209,7 +184,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
   const cardStyle = {
     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.2) 100%)',
-    boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.3)',
+    boxShadow:
+      'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.3)',
     backdropFilter: 'blur(10px)',
     WebkitBackdropFilter: 'blur(10px)',
   }
@@ -222,12 +198,11 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     return matchesSearch && matchesFilter
   })
 
-  const activeArticle = activeArticleId ? BLOG_ARTICLES.find(a => a.id === activeArticleId) : null
+  const activeArticle = activeArticleId ? BLOG_ARTICLES.find((a) => a.id === activeArticleId) : null
   const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
-      
       {/* Умная кнопка НАЗАД */}
       <button
         aria-label="Go back"
@@ -253,7 +228,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       <AnimatePresence mode="wait">
         {/* ================= ОБЛОЖКА ================= */}
         {view === 'cover' && (
-          <motion.div 
+          <motion.div
             key="cover"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -263,25 +238,60 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           >
             <div className="absolute inset-0 z-0 h-[65vh] overflow-hidden pointer-events-none">
               <img src="/blog-hero.png" alt="PRO" className="w-full h-full object-cover object-center" />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(21,18,16,0.15) 0%, rgba(21,18,16,0.65) 55%, #151210 100%)' }} />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    'linear-gradient(to bottom, rgba(21,18,16,0.15) 0%, rgba(21,18,16,0.65) 55%, #151210 100%)',
+                }}
+              />
             </div>
 
             <div className="relative z-10 flex-1 flex flex-col justify-end px-4 pb-6 pt-16">
               <div className="mb-5">
-                <p className="text-[9px] tracking-[0.22em] uppercase text-[#D8A35C] font-semibold mb-1">{t.subtitle}</p>
-                <h1 className="font-display text-[2.2rem] leading-tight text-[#F5F1EB] tracking-wide" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}>
+                <p className="text-[9px] tracking-[0.22em] uppercase text-[#D8A35C] font-semibold mb-1">
+                  {t.subtitle}
+                </p>
+                <h1
+                  className="font-display text-[2.2rem] leading-tight text-[#F5F1EB] tracking-wide"
+                  style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                >
                   {t.title}
                 </h1>
-                <p className="mt-1.5 text-[11.5px] leading-relaxed text-[#B9ACA0] max-w-[92%]">{t.tagline}</p>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-[#B9ACA0] max-w-[92%]">
+                  {t.tagline}
+                </p>
               </div>
 
               <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
                 {/* Читать */}
-                <motion.button onClick={() => { triggerHaptic(); setView('journal'); }} whileTap={{ scale: 0.94 }} className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]" style={cardStyle}>
+                <motion.button
+                  onClick={() => {
+                    triggerHaptic()
+                    setView('journal')
+                  }}
+                  whileTap={{ scale: 0.94 }}
+                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
+                  style={cardStyle}
+                >
                   {hasNew && (
-                    <motion.div className="absolute inset-0 rounded-xl pointer-events-none" animate={{ opacity: [0.15, 0.4, 0.15] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} style={{ boxShadow: 'inset 0 0 0 1px rgba(216,163,92,0.5), 0 0 20px rgba(216,163,92,0.15)' }} />
+                    <motion.div
+                      className="absolute inset-0 rounded-xl pointer-events-none"
+                      animate={{ opacity: [0.15, 0.4, 0.15] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                      style={{
+                        boxShadow: 'inset 0 0 0 1px rgba(216,163,92,0.5), 0 0 20px rgba(216,163,92,0.15)',
+                      }}
+                    />
                   )}
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10" style={{ background: 'rgba(216,163,92,0.18)', color: '#D8A35C', boxShadow: '0 0 12px rgba(216,163,92,0.3)' }}>
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
+                    style={{
+                      background: 'rgba(216,163,92,0.18)',
+                      color: '#D8A35C',
+                      boxShadow: '0 0 12px rgba(216,163,92,0.3)',
+                    }}
+                  >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
                     </svg>
@@ -293,8 +303,23 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </motion.button>
 
                 {/* Сотрудничество */}
-                <motion.button onClick={() => { triggerHaptic(); setView('collaboration'); }} whileTap={{ scale: 0.94 }} className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]" style={cardStyle}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10" style={{ background: 'rgba(96,165,250,0.18)', color: '#60A5FA', boxShadow: '0 0 12px rgba(96,165,250,0.25)' }}>
+                <motion.button
+                  onClick={() => {
+                    triggerHaptic()
+                    setView('collaboration')
+                  }}
+                  whileTap={{ scale: 0.94 }}
+                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
+                  style={cardStyle}
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
+                    style={{
+                      background: 'rgba(96,165,250,0.18)',
+                      color: '#60A5FA',
+                      boxShadow: '0 0 12px rgba(96,165,250,0.25)',
+                    }}
+                  >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
@@ -306,18 +331,48 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </motion.button>
 
                 {/* В избранное */}
-                <motion.button onClick={() => { triggerHaptic(); onToggleFavorite?.(); }} whileTap={{ scale: 0.94 }} className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]" style={cardStyle}>
-                  <motion.div animate={{ backgroundColor: isFavorite ? '#F472B6' : 'rgba(244,114,182,0.18)', color: isFavorite ? '#F5F1EB' : '#F472B6', boxShadow: isFavorite ? '0 0 16px rgba(244,114,182,0.6)' : '0 0 12px rgba(244,114,182,0.25)' }} className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10 text-sm transition-colors">
+                <motion.button
+                  onClick={() => {
+                    triggerHaptic()
+                    onToggleFavorite?.()
+                  }}
+                  whileTap={{ scale: 0.94 }}
+                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px]"
+                  style={cardStyle}
+                >
+                  <motion.div
+                    animate={{
+                      backgroundColor: isFavorite ? '#F472B6' : 'rgba(244,114,182,0.18)',
+                      color: isFavorite ? '#F5F1EB' : '#F472B6',
+                      boxShadow: isFavorite
+                        ? '0 0 16px rgba(244,114,182,0.6)'
+                        : '0 0 12px rgba(244,114,182,0.25)',
+                    }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10 text-sm transition-colors"
+                  >
                     ★
                   </motion.div>
                   <div className="relative z-10 flex-1 flex flex-col justify-end">
-                    <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">{isFavorite ? t.favoriteRemove : t.favoriteAdd}</div>
-                    <div className="text-[9px] mt-1 leading-snug" style={{ color: isFavorite ? '#F472B6' : '#B9ACA0' }}>{isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub}</div>
+                    <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB]">
+                      {isFavorite ? t.favoriteRemove : t.favoriteAdd}
+                    </div>
+                    <div
+                      className="text-[9px] mt-1 leading-snug"
+                      style={{ color: isFavorite ? '#F472B6' : '#B9ACA0' }}
+                    >
+                      {isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub}
+                    </div>
                   </div>
                 </motion.button>
               </div>
 
-              <button onClick={() => { triggerHaptic('light'); onBack?.(); }} className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-2 active:scale-95 transition-all cursor-pointer">
+              <button
+                onClick={() => {
+                  triggerHaptic('light')
+                  onBack?.()
+                }}
+                className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-2 active:scale-95 transition-all cursor-pointer"
+              >
                 {t.backToMenu}
               </button>
             </div>
@@ -342,15 +397,17 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               <h2 className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter text-[#F5F1EB] mb-5">
                 {t.collabTitle}
               </h2>
-              <p className="text-[13px] leading-relaxed text-[#B9ACA0] max-w-sm">
-                {t.collabText}
-              </p>
+              <p className="text-[13px] leading-relaxed text-[#B9ACA0] max-w-sm">{t.collabText}</p>
             </div>
 
             <div className="rounded-2xl p-5 w-full flex flex-col" style={cardStyle}>
-              <span className="text-[10px] text-[#B9ACA0] uppercase font-bold tracking-widest mb-1">{t.collabEmailLabel}</span>
-              <span className="text-[1.4rem] font-medium text-[#F5F1EB] mb-6 tracking-wide">cordwain@tuta.io</span>
-              
+              <span className="text-[10px] text-[#B9ACA0] uppercase font-bold tracking-widest mb-1">
+                {t.collabEmailLabel}
+              </span>
+              <span className="text-[1.4rem] font-medium text-[#F5F1EB] mb-6 tracking-wide">
+                cordwain@tuta.io
+              </span>
+
               <div className="grid grid-cols-2 gap-3 w-full mt-auto">
                 <button
                   onClick={handleCopyEmail}
@@ -358,12 +415,12 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                   style={{
                     backgroundColor: emailCopied ? 'rgba(96,165,250,0.15)' : 'transparent',
                     color: emailCopied ? '#60A5FA' : '#F5F1EB',
-                    border: `1px solid ${emailCopied ? 'rgba(96,165,250,0.3)' : 'rgba(185,172,160,0.3)'}`
+                    border: `1px solid ${emailCopied ? 'rgba(96,165,250,0.3)' : 'rgba(185,172,160,0.3)'}`,
                   }}
                 >
                   {emailCopied ? t.copiedBtn : t.copyBtn}
                 </button>
-                
+
                 <a
                   href="mailto:cordwain@tuta.io"
                   onClick={(e) => {
@@ -371,7 +428,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                     triggerHaptic('medium')
                     const mailUrl = 'mailto:cordwain@tuta.io'
                     const tg = getWebApp()
-                    
+
                     if (tg?.openLink) {
                       tg.openLink(mailUrl)
                     } else {
@@ -390,7 +447,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
         {/* ================= ЖУРНАЛ ================= */}
         {view === 'journal' && (
-          <motion.div 
+          <motion.div
             key="journal"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -422,12 +479,16 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 {t.filters.map((filter) => (
                   <button
                     key={filter.id}
-                    onClick={() => { triggerHaptic(); setActiveFilter(filter.id); }}
+                    onClick={() => {
+                      triggerHaptic()
+                      setActiveFilter(filter.id)
+                    }}
                     className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border"
                     style={{
                       background: activeFilter === filter.id ? 'rgba(216,163,92,0.15)' : 'transparent',
                       color: activeFilter === filter.id ? '#D8A35C' : '#B9ACA0',
-                      borderColor: activeFilter === filter.id ? 'rgba(216,163,92,0.3)' : 'rgba(185,172,160,0.2)',
+                      borderColor:
+                        activeFilter === filter.id ? 'rgba(216,163,92,0.3)' : 'rgba(185,172,160,0.2)',
                     }}
                   >
                     {filter.label}
@@ -440,7 +501,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               <p className="text-[10px] tracking-[0.14em] uppercase text-[#D8A35C] mb-3 font-semibold">
                 {searchQuery ? 'Результаты' : t.fresh}
               </p>
-              
+
               <div className="flex flex-col gap-3">
                 {filteredArticles.map((article, i) => {
                   const title = lang === 'ru' ? article.titleRu : article.titleUk
@@ -474,17 +535,17 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                           <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />
                         )}
                       </div>
-                      
+
                       <h3 className="text-[15px] font-semibold leading-snug text-[#F5F1EB] mb-1.5">
                         {title}
                       </h3>
-                      
+
                       <p className="text-[11.5px] text-[#B9ACA0]/80 leading-relaxed line-clamp-2 mb-3">
                         {excerpt}
                       </p>
-                      
+
                       <div className="flex items-center text-[11px] text-[#D8A35C] font-medium group">
-                        {t.readBtn} 
+                        {t.readBtn}
                         <span className="ml-1 opacity-70 group-hover:translate-x-1 transition-transform">→</span>
                       </div>
                     </motion.div>
@@ -492,9 +553,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 })}
 
                 {filteredArticles.length === 0 && (
-                  <div className="text-center text-[#B9ACA0] text-[13px] py-10">
-                    Ничего не найдено
-                  </div>
+                  <div className="text-center text-[#B9ACA0] text-[13px] py-10">Ничего не найдено</div>
                 )}
               </div>
             </div>
@@ -513,20 +572,25 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             className="absolute inset-0 flex flex-col z-30 bg-[#151210] overflow-y-auto overflow-x-hidden"
           >
             <div className="relative w-full h-[40vh] shrink-0">
-              <img 
-                src={activeArticle.cover || '/blog-hero.png'} 
-                alt="cover" 
-                className="w-full h-full object-cover" 
+              <img
+                src={activeArticle.cover || '/blog-hero.png'}
+                alt="cover"
+                className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(21,18,16,0.1) 0%, #151210 100%)' }} />
-              
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: 'linear-gradient(to bottom, rgba(21,18,16,0.1) 0%, #151210 100%)',
+                }}
+              />
+
               <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                 <span className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#151210] bg-[#D8A35C] px-2 py-1 rounded-sm">
-                    {lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk}
-                 </span>
-                 <span className="text-[10px] text-[#B9ACA0] bg-black/50 backdrop-blur-md px-2 py-1 rounded-sm">
-                   {lang === 'ru' ? activeArticle.readTimeRu : activeArticle.readTimeUk}
-                 </span>
+                <span className="text-[10px] font-bold tracking-[0.1em] uppercase text-[#151210] bg-[#D8A35C] px-2 py-1 rounded-sm">
+                  {lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk}
+                </span>
+                <span className="text-[10px] text-[#B9ACA0] bg-black/50 backdrop-blur-md px-2 py-1 rounded-sm">
+                  {lang === 'ru' ? activeArticle.readTimeRu : activeArticle.readTimeUk}
+                </span>
               </div>
             </div>
 
@@ -534,10 +598,12 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               <h1 className="font-display text-[1.8rem] leading-tight text-[#F5F1EB] mb-6">
                 {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
               </h1>
-              
+
               {/* === РЕНДЕР MARKDOWN С ЧИСТЫМИ ПРОПСАМИ === */}
               <div className="article-content">
-                <Markdown ({ ...props components="{{" node, p:> (
+                <Markdown
+                  components={{
+                    p: ({ node, ...props }) => (
                       <p className="text-[14.5px] leading-relaxed text-[#B9ACA0] mb-4" {...props} />
                     ),
                     h2: ({ node, ...props }) => (
@@ -547,17 +613,26 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                       <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3" {...props} />
                     ),
                     ul: ({ node, ...props }) => (
-                      <ul className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />
+                      <ul
+                        className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]"
+                        {...props}
+                      />
                     ),
                     ol: ({ node, ...props }) => (
-                      <ol className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />
+                      <ol
+                        className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]"
+                        {...props}
+                      />
                     ),
                     li: ({ node, ...props }) => <li className="pl-1" {...props} />,
                     strong: ({ node, ...props }) => (
                       <strong className="font-semibold text-[#E5DCD3]" {...props} />
                     ),
                     blockquote: ({ node, ...props }) => (
-                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg" {...props} />
+                      <blockquote
+                        className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg"
+                        {...props}
+                      />
                     ),
                     a: ({ node, href, children, ...props }) => (
                       <a
@@ -579,12 +654,14 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 <div className="text-[11px] text-[#B9ACA0]/60">
                   {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
                 </div>
-                
+
                 <button
-                  onClick={() => handleShareArticle(
-                    lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk,
-                    lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk
-                  )}
+                  onClick={() =>
+                    handleShareArticle(
+                      lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk,
+                      lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk
+                    )
+                  }
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D1815] text-[#D8A35C] text-[11px] font-semibold uppercase tracking-wider active:scale-95 transition-transform"
                   style={{ border: '1px solid rgba(216,163,92,0.2)' }}
                 >
@@ -597,12 +674,12 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </button>
               </div>
             </div>
-            
+
             {/* Дополнительный отступ снизу для комфортного скролла */}
-            <div className="h-10 shrink-0"></div>
+            <div className="h-10 shrink-0" />
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   )
-}
+  }
