@@ -38,7 +38,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     tagUk: 'МАРКЕТИНГ',
     readTimeRu: '5 мин',
     readTimeUk: '5 хв',
-    cover: '/covers/story.png',
+    cover: 'Air.jpg',
     isNew: false,
     createdAt: '2026-08-05',
   },
