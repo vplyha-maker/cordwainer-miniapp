@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Markdown from 'react-markdown'
 import { BLOG_ARTICLES } from '../data/blog'
@@ -19,34 +19,41 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
-  
   const [emailCopied, setEmailCopied] = useState(false)
+
+  const articleScrollRef = useRef<HTMLDivElement>(null)
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
 
+  // Сбрасываем скролл при открытии статьи
+  useEffect(() => {
+    if (view === 'article' && articleScrollRef.current) {
+      articleScrollRef.current.scrollTo(0, 0)
+    }
+  }, [view, activeArticleId])
+
   // Надежный тактильный отклик для Telegram WebApp и браузеров
-  const triggerHaptic = () => {
+  const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
     if (typeof window !== 'undefined') {
-      const tg = (window as any).Telegram?.WebApp;
+      const tg = (window as any).Telegram?.WebApp
       if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred('light');
+        tg.HapticFeedback.impactOccurred(style)
       } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(40);
+        navigator.vibrate(style === 'light' ? 20 : 40)
       }
     }
   }
 
-  // Пуленепробиваемое копирование (работает во всех WebViews)
+  // Пуленепробиваемое копирование
   const handleCopyEmail = async () => {
-    triggerHaptic()
+    triggerHaptic('medium')
     const email = 'cordwain@tuta.io'
     
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(email)
       } else {
-        // Fallback для старых/встроенных браузеров
         const textArea = document.createElement("textarea")
         textArea.value = email
         textArea.style.position = "absolute"
@@ -64,7 +71,23 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }
 
-  const t = {
+  // Нативный шеринг для Telegram
+  const handleShareArticle = (title: string, tag: string) => {
+    triggerHaptic('medium')
+    const tg = (window as any).Telegram?.WebApp
+    // Замените на URL вашего бота/приложения
+    const appUrl = 'https://t.me/YourBotName/app' 
+    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
+    
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(shareUrl)
+    } else {
+      window.open(shareUrl, '_blank')
+    }
+  }
+
+  const t = useMemo(() => ({
     ru: {
       title: 'PRO Обувь',
       subtitle: 'БЛОГ И СТАТЬИ',
@@ -97,6 +120,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       copyBtn: 'Скопировать',
       copiedBtn: 'Скопировано!',
       mailBtn: 'Написать письмо',
+      shareBtn: 'Поделиться',
     },
     uk: {
       title: 'PRO Взуття',
@@ -130,8 +154,9 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       copyBtn: 'Скопіювати',
       copiedBtn: 'Скопійовано!',
       mailBtn: 'Написати листа',
+      shareBtn: 'Поділитися',
     },
-  }[lang]
+  }[lang]), [lang, count])
 
   const cardStyle = {
     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.2) 100%)',
@@ -143,10 +168,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
   const filteredArticles = BLOG_ARTICLES.filter((article) => {
     const title = lang === 'ru' ? article.titleRu : article.titleUk
     const tag = lang === 'ru' ? article.tagRu : article.tagUk
-    
     const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilter = activeFilter === 'all' || tag === activeFilter
-    
     return matchesSearch && matchesFilter
   })
 
@@ -158,8 +181,9 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       
       {/* Умная кнопка НАЗАД */}
       <button
+        aria-label="Go back"
         onClick={() => {
-          triggerHaptic()
+          triggerHaptic('light')
           if (view === 'article') setView('journal')
           else if (view === 'journal') setView('cover')
           else if (view === 'collaboration') setView('cover')
@@ -244,7 +268,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </motion.button>
               </div>
 
-              <button onClick={() => { triggerHaptic(); onBack?.(); }} className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-2 active:scale-95 transition-all cursor-pointer">
+              <button onClick={() => { triggerHaptic('light'); onBack?.(); }} className="w-full text-center text-[15px] font-medium text-[#B9ACA0] hover:text-[#F5F1EB] py-2 active:scale-95 transition-all cursor-pointer">
                 {t.backToMenu}
               </button>
             </div>
@@ -261,7 +285,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto px-5 pt-20 pb-10"
           >
-            {/* Концепция Лебедева: жесткая типографика, никаких абстрактных иконок */}
             <div className="flex flex-col mt-4 mb-10 border-t border-[#3A332D] pt-8">
               <div className="flex items-center text-[10px] font-mono tracking-[0.2em] uppercase text-[#B9ACA0] mb-4">
                 <span className="bg-[#60A5FA] text-[#151210] px-2 py-0.5 font-bold mr-3">INFO</span>
@@ -275,7 +298,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               </p>
             </div>
 
-            {/* Карточка контактов */}
             <div className="rounded-2xl p-5 w-full flex flex-col" style={cardStyle}>
               <span className="text-[10px] text-[#B9ACA0] uppercase font-bold tracking-widest mb-1">{t.collabEmailLabel}</span>
               <span className="text-[1.4rem] font-medium text-[#F5F1EB] mb-6 tracking-wide">cordwain@tuta.io</span>
@@ -297,8 +319,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                   href="mailto:cordwain@tuta.io"
                   onClick={(e) => {
                     e.preventDefault();
-                    triggerHaptic();
-                    
+                    triggerHaptic('medium');
                     const mailUrl = 'mailto:cordwain@tuta.io';
                     const tg = (window as any).Telegram?.WebApp;
                     
@@ -435,6 +456,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         {view === 'article' && activeArticle && content && (
           <motion.div
             key="article"
+            ref={articleScrollRef}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
@@ -459,35 +481,58 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               </div>
             </div>
 
-            <div className="px-5 py-6 pb-20">
+            <div className="px-5 py-6 pb-8">
               <h1 className="font-display text-[1.8rem] leading-tight text-[#F5F1EB] mb-6">
                 {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
               </h1>
               
-              {/* === ЗДЕСЬ РАБОТАЕТ MARKDOWN === */}
+              {/* === РЕНДЕР MARKDOWN С ЧИСТЫМИ ПРОПСАМИ === */}
               <div className="article-content">
                 <Markdown
                   components={{
-                    p: ({ node, ...props }: any) => <p className="text-[14px] leading-relaxed text-[#B9ACA0] mb-4" {...props} />,
-                    h2: ({ node, ...props }: any) => <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4" {...props} />,
-                    h3: ({ node, ...props }: any) => <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3" {...props} />,
-                    ul: ({ node, ...props }: any) => <ul className="list-disc pl-5 mb-4 text-[14px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
-                    ol: ({ node, ...props }: any) => <ol className="list-decimal pl-5 mb-4 text-[14px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
-                    strong: ({ node, ...props }: any) => <strong className="font-semibold text-[#F5F1EB]" {...props} />,
-                    blockquote: ({ node, ...props }: any) => (
-                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-1 my-5 text-[13px] italic text-[#B9ACA0]/90 bg-[#D8A35C]/5 rounded-r-lg" {...props} />
+                    p: ({ node, ...props }) => <p className="text-[14.5px] leading-relaxed text-[#B9ACA0] mb-4" {...props} />,
+                    h2: ({ node, ...props }) => <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4" {...props} />,
+                    h3: ({ node, ...props }) => <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3" {...props} />,
+                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
+                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
+                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                    strong: ({ node, ...props }) => <strong className="font-semibold text-[#E5DCD3]" {...props} />,
+                    blockquote: ({ node, ...props }) => (
+                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg" {...props} />
                     ),
-                    a: ({ node, ...props }: any) => <a className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4" {...props} />
+                    a: ({ node, ...props }) => <a className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4 hover:decoration-[#60A5FA] transition-colors" {...props} />
                   }}
                 >
                   {content[lang]}
                 </Markdown>
               </div>
 
-              <div className="mt-10 pt-6 border-t border-[#2A231D] text-[11px] text-[#B9ACA0]/60">
-                {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
+              {/* Футер статьи с кнопкой Share */}
+              <div className="mt-10 pt-6 border-t border-[#2A231D] flex items-center justify-between">
+                <div className="text-[11px] text-[#B9ACA0]/60">
+                  {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
+                </div>
+                
+                <button
+                  onClick={() => handleShareArticle(
+                    lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk,
+                    lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk
+                  )}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D1815] text-[#D8A35C] text-[11px] font-semibold uppercase tracking-wider active:scale-95 transition-transform"
+                  style={{ border: '1px solid rgba(216,163,92,0.2)' }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                  {t.shareBtn}
+                </button>
               </div>
             </div>
+            
+            {/* Дополнительный отступ снизу для комфортного скролла */}
+            <div className="h-10 shrink-0"></div>
           </motion.div>
         )}
       </AnimatePresence>
