@@ -86,8 +86,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       console.error('Failed to copy email:', err)
     }
   }
-  
-// Нативный шеринг для Telegram
+
+  // Нативный шеринг для Telegram
   const handleShareArticle = (title: string, tag: string) => {
     triggerHaptic('medium')
     const tg = getWebApp()
@@ -108,7 +108,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       window.open(shareUrl, '_blank')
     }
   }
-  
 
   const t = useMemo(() => {
     const ruPlural = getPlural(count, ['статья', 'статьи', 'статей'])
@@ -650,6 +649,14 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                         {children}
                       </a>
                     ),
+                    // === КАРТИНКИ В ТЕКСТЕ СТАТЬИ ===
+                    img: ({ node, ...props }) => (
+                      <img
+                        className="w-full rounded-xl my-6 object-cover max-h-[420px]"
+                        loading="lazy"
+                        {...props}
+                      />
+                    ),
                   }}
                 >
                   {content[lang]}
@@ -689,4 +696,4 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       </AnimatePresence>
     </div>
   )
-}
+ }
