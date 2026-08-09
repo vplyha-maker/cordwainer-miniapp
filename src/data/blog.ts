@@ -41,5 +41,19 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     cover: '/covers/story.png',
     isNew: false,
     createdAt: '2026-08-05',
+  },
+  {
+  id: 'idastril-manuf'
+  titleRu: string
+  titleUk: string
+  excerptRu: string   // Краткое описание для карточки
+  excerptUk: string   // Короткий опис для картки
+  tagRu: string       // Рубрика (ИНДУСТРИЯ, МАРКЕТИНГ)
+  tagUk: string       // Рубрика (ІНДУСТРІЯ, МАРКЕТИНГ)
+  readTimeRu: string  // Время чтения ('7 мин')
+  readTimeUk: string  // Час читання ('7 хв')
+  cover: string       // Твой параметр для обложки (понадобится позже внутри статьи)
+  isNew: boolean
+  createdAt: string   // Твой параметр даты
   }
 ]
