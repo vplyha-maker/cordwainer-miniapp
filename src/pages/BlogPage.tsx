@@ -102,6 +102,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       window.open(shareUrl, '_blank')
     }
   }
+  
 
   const t = useMemo(() => {
     const ruPlural = getPlural(count, ['статья', 'статьи', 'статей'])
