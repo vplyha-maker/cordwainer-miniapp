@@ -25,7 +25,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     readTimeRu: '7 мин',
     readTimeUk: '7 хв',
     cover: '/covers/ortho.png',
-    isNew: true,
+    isNew: false,
     createdAt: '2026-08-08',
   },
   {
@@ -48,12 +48,12 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   titleUk: 'Крок у нікуди чи крок до себе? Битва конвеєра та ручного ремесла в сучасній взуттєвій індустрії',
   excerptRu: 'Битва конвейера и ручного ремесла в современной обувной индустрии',
   excerptUk: 'Битва конвеєра та ручного ремесла в сучасній взуттєвій індустрії',
-  tagRu: string       // Рубрика (ИНДУСТРИЯ, МАРКЕТИНГ)
-  tagUk: string       // Рубрика (ІНДУСТРІЯ, МАРКЕТИНГ)
-  readTimeRu: string  // Время чтения ('7 мин')
-  readTimeUk: string  // Час читання ('7 хв')
+  tagRu: 'ИНДУСТРИЯ',
+  tagUk: 'ІНДУСТРІЯ',
+  readTimeRu: '7 мин',
+  readTimeUk: '7 хв',
   cover: string       // Твой параметр для обложки (понадобится позже внутри статьи)
-  isNew: boolean
-  createdAt: string   // Твой параметр даты
+  isNew: true,
+  createdAt: '2026-09-05',
   }
 ]
