@@ -138,7 +138,7 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
 
 ---
 
-![Applehb](Apple.jpeg)
+![Applehb](Apple.jpg)
 
 *Обувь в XXI веке стала социальным паспортом. Мы покупаем не просто пару на сезон — мы покупаем версии самих себя, а сторителлинг брендов дает нам нужные слова, чтобы эту версию озвучити.*
 `,
@@ -178,7 +178,7 @@ export const ARTICLE_CONTENTS: Record<string, ArticleContent> = {
 
 ---
 
-![Applehb](Apple.jpeg)
+![Applehb](Apple.jpg)
 
 *Взуття у XXI столітті стало соціальним паспортом. Ми купуємо не просто пару на сезон — ми купуємо версії самих себе, а сторітеллинг брендів дає нам потрібні слова, щоб цю версію озвучити.*
 `
