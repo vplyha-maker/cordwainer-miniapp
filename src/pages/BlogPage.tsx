@@ -40,6 +40,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
   const [emailCopied, setEmailCopied] = useState(false)
 
   const articleScrollRef = useRef<HTMLDivElement>(null)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
@@ -50,6 +51,15 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       articleScrollRef.current.scrollTo(0, 0)
     }
   }, [view, activeArticleId])
+
+  // Очистка таймера копирования при размонтировании
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Надёжный тактильный отклик для Telegram WebApp и браузеров
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
@@ -80,8 +90,12 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         document.execCommand('copy')
         textArea.remove()
       }
+      
       setEmailCopied(true)
-      setTimeout(() => setEmailCopied(false), 2000)
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current)
+      }
+      copyTimeoutRef.current = setTimeout(() => setEmailCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy email:', err)
     }
@@ -94,13 +108,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
     // Сюда можно поставить свою ссылку (Vercel или t.me/...)
     const appUrl = 'https://t.me/YourBotName/app'
-
-    const text = 'Прочитал статью «' + title + '» (' + tag + ') в PRO Обувь.'
-    const shareUrl =
-      'https://t.me/share/url?url=' +
-      encodeURIComponent(appUrl) +
-      '&text=' +
-      encodeURIComponent(text)
+    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
 
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -213,6 +222,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
       {/* Умная кнопка НАЗАД */}
       <button
+        type="button"
         aria-label="Go back"
         onClick={() => {
           triggerHaptic('light')
@@ -275,6 +285,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
                 {/* Читать */}
                 <motion.button
+                  type="button"
                   onClick={() => {
                     triggerHaptic()
                     setView('journal')
@@ -313,6 +324,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
                 {/* Сотрудничество */}
                 <motion.button
+                  type="button"
                   onClick={() => {
                     triggerHaptic()
                     setView('collaboration')
@@ -341,6 +353,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
                 {/* В избранное */}
                 <motion.button
+                  type="button"
                   onClick={() => {
                     triggerHaptic()
                     onToggleFavorite?.()
@@ -376,6 +389,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               </div>
 
               <button
+                type="button"
                 onClick={() => {
                   triggerHaptic('light')
                   onBack?.()
@@ -419,6 +433,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
               <div className="grid grid-cols-2 gap-3 w-full mt-auto">
                 <button
+                  type="button"
                   onClick={handleCopyEmail}
                   className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
                   style={{
@@ -431,6 +446,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => {
                     triggerHaptic('medium')
                     setView('about')
@@ -499,6 +515,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 {t.filters.map((filter) => (
                   <button
                     key={filter.id}
+                    type="button"
                     onClick={() => {
                       triggerHaptic()
                       setActiveFilter(filter.id)
@@ -594,7 +611,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             <div className="relative w-full h-[40vh] shrink-0">
               <img
                 src={activeArticle.cover || '/blog-hero.png'}
-                alt="cover"
+                alt={lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
                 className="w-full h-full object-cover"
               />
               <div
@@ -657,6 +674,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                     a: ({ node, href, children, ...props }) => (
                       <a
                         href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4 hover:decoration-[#60A5FA] transition-colors"
                         {...props}
                       >
@@ -664,11 +683,12 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                       </a>
                     ),
                     // === КАРТИНКИ В ТЕКСТЕ СТАТЬИ (без обрезки + лёгкий фон) ===
-                    img: ({ node, ...props }) => (
+                    img: ({ node, alt, ...props }) => (
                       <div className="my-6 w-full flex justify-center rounded-xl bg-[#1D1815]/60 p-2">
                         <img
                           className="max-w-full max-h-[360px] w-auto h-auto object-contain rounded-lg"
                           loading="lazy"
+                          alt={alt || 'Иллюстрация к статье'}
                           {...props}
                         />
                       </div>
@@ -686,6 +706,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </div>
 
                 <button
+                  type="button"
                   onClick={() =>
                     handleShareArticle(
                       lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk,
