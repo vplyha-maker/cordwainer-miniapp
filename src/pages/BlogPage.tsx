@@ -4,6 +4,7 @@ import Markdown from 'react-markdown'
 import { BLOG_ARTICLES } from '../data/blog'
 import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
+import AboutProject from './AboutProject' 
 
 type BlogPageProps = {
   onBack?: () => void
