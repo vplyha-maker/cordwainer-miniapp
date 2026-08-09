@@ -86,15 +86,21 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       console.error('Failed to copy email:', err)
     }
   }
-
-  // Нативный шеринг для Telegram
+  
+// Нативный шеринг для Telegram
   const handleShareArticle = (title: string, tag: string) => {
     triggerHaptic('medium')
     const tg = getWebApp()
-    // Укажи здесь реальный URL твоего бота/приложения
+
+    // Сюда можно поставить свою ссылку (Vercel или t.me/...)
     const appUrl = 'https://t.me/YourBotName/app'
-    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
+
+    const text = 'Прочитал статью «' + title + '» (' + tag + ') в PRO Обувь.'
+    const shareUrl =
+      'https://t.me/share/url?url=' +
+      encodeURIComponent(appUrl) +
+      '&text=' +
+      encodeURIComponent(text)
 
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
