@@ -38,7 +38,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     tagUk: 'МАРКЕТИНГ',
     readTimeRu: '5 мин',
     readTimeUk: '5 хв',
-    cover: '/Air.jpg',
+    cover: 'Air.jpeg',
     isNew: false,
     createdAt: '2026-08-05',
   },
@@ -52,7 +52,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     tagUk: 'ІНДУСТРІЯ',
     readTimeRu: '7 мин',
     readTimeUk: '7 хв',
-    cover: 'Shoe-Factories.jpeg', // ← поставь реальный путь к обложке
+    cover: 'Shoe-Factories.jpg', // ← поставь реальный путь к обложке
     isNew: true,
     createdAt: '2026-09-05',
   },
