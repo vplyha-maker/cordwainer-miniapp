@@ -24,7 +24,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     tagUk: 'ІНДУСТРІЯ',
     readTimeRu: '7 мин',
     readTimeUk: '7 хв',
-    cover: '/covers/ortho.png',
+    cover: '3d.jpg',
     isNew: false,
     createdAt: '2026-08-08',
   },
