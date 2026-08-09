@@ -77,8 +77,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     const tg = (window as any).Telegram?.WebApp
     // Замените на URL вашего бота/приложения
     const appUrl = 'https://t.me/YourBotName/app' 
-    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
+    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
     
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -490,17 +490,38 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               <div className="article-content">
                 <Markdown
                   components={{
-                    p: ({ node, ...props }) => <p className="text-[14.5px] leading-relaxed text-[#B9ACA0] mb-4" {...props} />,
-                    h2: ({ node, ...props }) => <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4" {...props} />,
-                    h3: ({ node, ...props }) => <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3" {...props} />,
-                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
-                    ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />,
-                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-                    strong: ({ node, ...props }) => <strong className="font-semibold text-[#E5DCD3]" {...props} />,
-                    blockquote: ({ node, ...props }) => (
-                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg" {...props} />
+                    p: ({ children }) => (
+                      <p className="text-[14.5px] leading-relaxed text-[#B9ACA0] mb-4">{children}</p>
                     ),
-                    a: ({ node, ...props }) => <a className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4 hover:decoration-[#60A5FA] transition-colors" {...props} />
+                    h2: ({ children }) => (
+                      <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3">{children}</h3>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]">{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]">{children}</ol>
+                    ),
+                    li: ({ children }) => <li className="pl-1">{children}</li>,
+                    strong: ({ children }) => (
+                      <strong className="font-semibold text-[#E5DCD3]">{children}</strong>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg">
+                        {children}
+                      </blockquote>
+                    ),
+                    a: ({ href, children }) => (
+                      <a
+                        href={href}
+                        className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4 hover:decoration-[#60A5FA] transition-colors"
+                      >
+                        {children}
+                      </a>
+                    ),
                   }}
                 >
                   {content[lang]}
@@ -538,4 +559,4 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       </AnimatePresence>
     </div>
   )
-}
+        }
