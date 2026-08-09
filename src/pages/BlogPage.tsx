@@ -12,7 +12,7 @@ type BlogPageProps = {
   onToggleFavorite?: () => void
 }
 
-type ViewState = 'cover' | 'journal' | 'article' | 'collaboration'
+type ViewState = 'cover' | 'journal' | 'article' | 'collaboration' | 'about'
 
 // Вспомогательная функция для безопасного доступа к Telegram WebApp
 const getWebApp = () => {
@@ -146,7 +146,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         collabEmailLabel: 'Прямая связь',
         copyBtn: 'Скопировать',
         copiedBtn: 'Скопировано!',
-        mailBtn: 'Написать письмо',
+        aboutBtn: 'О проекте',
+        aboutPlaceholder: 'Текст о проекте появится здесь...',
         shareBtn: 'Поделиться',
       },
       uk: {
@@ -182,7 +183,8 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
         collabEmailLabel: 'Прямий звʼязок',
         copyBtn: 'Скопіювати',
         copiedBtn: 'Скопійовано!',
-        mailBtn: 'Написати листа',
+        aboutBtn: 'Про проєкт',
+        aboutPlaceholder: 'Текст про проєкт зʼявиться тут...',
         shareBtn: 'Поділитися',
       },
     }[lang]
@@ -216,6 +218,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           triggerHaptic('light')
           if (view === 'article') setView('journal')
           else if (view === 'journal') setView('cover')
+          else if (view === 'about') setView('collaboration')
           else if (view === 'collaboration') setView('cover')
           else onBack?.()
         }}
@@ -427,26 +430,37 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                   {emailCopied ? t.copiedBtn : t.copyBtn}
                 </button>
 
-                <a
-                  href="mailto:cordwain@tuta.io"
-                  onClick={(e) => {
-                    e.preventDefault()
+                <button
+                  onClick={() => {
                     triggerHaptic('medium')
-                    const mailUrl = 'mailto:cordwain@tuta.io'
-                    const tg = getWebApp()
-
-                    if (tg?.openLink) {
-                      tg.openLink(mailUrl)
-                    } else {
-                      window.location.href = mailUrl
-                    }
+                    setView('about')
                   }}
                   className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 text-[#151210]"
                   style={{ backgroundColor: '#D8A35C' }}
                 >
-                  {t.mailBtn}
-                </a>
+                  {t.aboutBtn}
+                </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ================= О ПРОЕКТЕ (ЗАГЛУШКА ДЛЯ ВАШЕГО ТЕКСТА) ================= */}
+        {view === 'about' && (
+          <motion.div
+            key="about"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto px-5 pt-20 pb-10"
+          >
+            <h2 className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter text-[#F5F1EB] mb-5">
+              {t.aboutBtn}
+            </h2>
+            <div className="text-[14px] text-[#B9ACA0] leading-relaxed">
+              {/* Сюда вы потом добавите импорт компонента с текстом из другой папки */}
+              <p>{t.aboutPlaceholder}</p>
             </div>
           </motion.div>
         )}
@@ -698,4 +712,4 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       </AnimatePresence>
     </div>
   )
- }
+}
