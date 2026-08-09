@@ -682,4 +682,4 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
       </AnimatePresence>
     </div>
   )
-  }
+}
