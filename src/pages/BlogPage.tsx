@@ -462,25 +462,21 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= О ПРОЕКТЕ (ЗАГЛУШКА ДЛЯ ВАШЕГО ТЕКСТА) ================= */}
+        {/* ================= О ПРОЕКТЕ (ВАШ ТЕРМИНАЛ С ТИТРАМИ) ================= */}
         {view === 'about' && (
           <motion.div
             key="about"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto px-5 pt-20 pb-10"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="absolute inset-0 z-50 bg-black"
           >
-            <h2 className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter text-[#F5F1EB] mb-5">
-              {t.aboutBtn}
-            </h2>
-            <div className="text-[14px] text-[#B9ACA0] leading-relaxed">
-              {/* Сюда вы потом добавите импорт компонента с текстом из другой папки */}
-              <p>{t.aboutPlaceholder}</p>
-            </div>
+            {/* Рендерим ваш компонент */}
+            <AboutProject />
           </motion.div>
         )}
+
 
         {/* ================= ЖУРНАЛ ================= */}
         {view === 'journal' && (
