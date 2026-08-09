@@ -14,6 +14,52 @@ type BlogPageProps = {
 
 type ViewState = 'cover' | 'journal' | 'article' | 'collaboration'
 
+export function BlogPage({ onBack, lang, isFavorite = falseЯ внимательно переписал твой компонент, исправив синтаксические ошибки, оптимизировав работу с Telegram WebApp и устранив потенциальные предупреждения React.
+
+### Что именно было улучшено:
+1. **Синтаксис:** Исправлена опечатка с заглавной буквы в `import` на первой строке.
+2. **Telegram WebApp:** Добавлена вспомогательная функция `getWebApp()`, чтобы не дублировать `(window as any).Telegram?.WebApp` в каждой функции. Это делает код чище и безопаснее.
+3. **Правильное склонение:** Улучшена логика для слов «статья/статті» (теперь корректно работает для чисел больше 20, например «21 статья», а не «21 статей»).
+4. **Безопасный Markdown:** В `react-markdown` пропсы теперь прокидываются через `({ node, ...props })` с удалением системного `node` (чтобы React не выдавал ошибки о попадании невалидных атрибутов в DOM).
+5. **Типизация и форматирование:** Код приведен к единому стилю, убраны лишние отступы, типизация сделана более строгой.
+
+### Обновленный код:
+
+```tsx
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import Markdown from 'react-markdown'
+import { BLOG_ARTICLES } from '../data/blog'
+import { ARTICLE_CONTENTS } from '../data/articleContents'
+import type { Lang } from '../App'
+
+type BlogPageProps = {
+  onBack?: () => void
+  lang: Lang
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
+}
+
+type ViewState = 'cover' | 'journal' | 'article' | 'collaboration'
+
+// Вспомогательная функция для безопасного доступа к Telegram WebApp
+const getWebApp = () => {
+  if (typeof window !== 'undefined') {
+    return (window as any).Telegram?.WebApp
+  }
+  return null
+}
+
+// Вспомогательная функция для правильного склонения слов
+const getPlural = (count: number, forms: [string, string, string]) => {
+  const cases = [2, 0, 1, 1, 1, 2]
+  return forms[
+    count % 100 > 4 && count % 100 < 20 
+      ? 2 
+      : cases[count % 10 < 5 ? count % 10 : 5]
+  ]
+}
+
 export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }: BlogPageProps) {
   const [view, setView] = useState<ViewState>('cover')
   const [searchQuery, setSearchQuery] = useState('')
@@ -35,13 +81,11 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
 
   // Надежный тактильный отклик для Telegram WebApp и браузеров
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
-    if (typeof window !== 'undefined') {
-      const tg = (window as any).Telegram?.WebApp
-      if (tg?.HapticFeedback) {
-        tg.HapticFeedback.impactOccurred(style)
-      } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(style === 'light' ? 20 : 40)
-      }
+    const tg = getWebApp()
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred(style)
+    } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(style === 'light' ? 20 : 40)
     }
   }
 
@@ -71,14 +115,14 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }
 
-  // Нативный шеринг для Telegram (ИСПРАВЛЕНО)
+  // Нативный шеринг для Telegram
   const handleShareArticle = (title: string, tag: string) => {
     triggerHaptic('medium')
-    const tg = (window as any).Telegram?.WebApp
-    // Замените на URL вашего бота/приложения
-    const appUrl = 'https://t.me/YourBotName/app' 
+    const tg = getWebApp()
+    // Укажи здесь реальный URL твоего бота/приложения
+    const appUrl = '[https://t.me/YourBotName/app](https://t.me/YourBotName/app)' 
     const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
+    const shareUrl = `[https://t.me/share/url?url=$](https://t.me/share/url?url=$){encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
     
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -87,76 +131,81 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     }
   }
 
-  const t = useMemo(() => ({
-    ru: {
-      title: 'PRO Обувь',
-      subtitle: 'БЛОГ И СТАТЬИ',
-      tagline: 'Изнанка обувной индустрии. Дизайн, технологии и секреты производства',
-      read: 'Читать',
-      readSub: count === 0 ? 'Статьи скоро появятся' : `${count} ${count === 1 ? 'статья' : count < 5 ? 'статьи' : 'статей'}`,
-      contact: 'Сотрудничество',
-      contactSub: 'Предложить идею',
-      favoriteAdd: 'В избранное',
-      favoriteAddSub: 'Сохранить на главной',
-      favoriteRemove: 'В избранном',
-      favoriteRemoveSub: 'Убрать с главной',
-      backToMenu: 'Назад в меню',
-      journalTitle: 'Журнал',
-      journalDesc: 'Размышления об индустрии, людях, дизайне, производстве и всем, что происходит вокруг обуви.',
-      searchPlaceholder: 'Найти статью...',
-      fresh: 'СВЕЖЕЕ',
-      filters: [
-        { id: 'all', label: 'Все' },
-        { id: 'ИНДУСТРИЯ', label: 'Индустрия' },
-        { id: 'МАРКЕТИНГ', label: 'Маркетинг' },
-        { id: 'ДИЗАЙН', label: 'Дизайн' },
-        { id: 'ПРОИЗВОДСТВО', label: 'Производство' },
-      ],
-      readBtn: 'Читать',
-      collabTitle: 'Сотрудничество',
-      collabSubtitle: 'ЦИФРОВАЯ ВИЗИТКА',
-      collabText: 'Мы всегда открыты для профессионального диалога. Разработка концептов, B2B-партнерство, коллаборации или новые идеи в сфере обувного дизайна и производства.',
-      collabEmailLabel: 'Прямая связь',
-      copyBtn: 'Скопировать',
-      copiedBtn: 'Скопировано!',
-      mailBtn: 'Написать письмо',
-      shareBtn: 'Поделиться',
-    },
-    uk: {
-      title: 'PRO Взуття',
-      subtitle: 'БЛОГ ТА СТАТТІ',
-      tagline: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
-      read: 'Читати',
-      readSub: count === 0 ? 'Статті зʼявляться незабаром' : `${count} ${count === 1 ? 'стаття' : count < 5 ? 'статті' : 'статей'}`,
-      contact: "Співпраця",
-      contactSub: 'Запропонувати ідею',
-      favoriteAdd: 'В обране',
-      favoriteAddSub: 'Зберегти на головній',
-      favoriteRemove: 'В обраному',
-      favoriteRemoveSub: 'Видалити з головної',
-      backToMenu: 'Назад до меню',
-      journalTitle: 'Журнал',
-      journalDesc: 'Роздуми про індустрію, людей, дизайн, виробництво та все, що відбувається навколо взуття.',
-      searchPlaceholder: 'Знайти статтю...',
-      fresh: 'СВІЖЕ',
-      filters: [
-        { id: 'all', label: 'Усі' },
-        { id: 'ІНДУСТРІЯ', label: 'Індустрія' },
-        { id: 'МАРКЕТИНГ', label: 'Маркетинг' },
-        { id: 'ДИЗАЙН', label: 'Дизайн' },
-        { id: 'ВИРОБНИЦТВО', label: 'Виробництво' },
-      ],
-      readBtn: 'Читати',
-      collabTitle: 'Співпраця',
-      collabSubtitle: 'ЦИФРОВА ВІЗИТКА',
-      collabText: 'Ми завжди відкриті до професійного діалогу. Розробка концептів, B2B-партнерство, колаборації або нові ідеї у сфері взуттєвого дизайну та виробництва.',
-      collabEmailLabel: 'Прямий звʼязок',
-      copyBtn: 'Скопіювати',
-      copiedBtn: 'Скопійовано!',
-      mailBtn: 'Написати листа',
-      shareBtn: 'Поділитися',
-    },
-  }[lang]), [lang, count])
+  const t = useMemo(() => {
+    const ruPlural = getPlural(count, ['статья', 'статьи', 'статей'])
+    const ukPlural = getPlural(count, ['стаття', 'статті', 'статей'])
+
+    return {
+      ru: {
+        title: 'PRO Обувь',
+        subtitle: 'БЛОГ И СТАТЬИ',
+        tagline: 'Изнанка обувной индустрии. Дизайн, технологии и секреты производства',
+        read: 'Читать',
+        readSub: count === 0 ? 'Статьи скоро появятся' : `${count} ${ruPlural}`,
+        contact: 'Сотрудничество',
+        contactSub: 'Предложить идею',
+        favoriteAdd: 'В избранное',
+        favoriteAddSub: 'Сохранить на главной',
+        favoriteRemove: 'В избранном',
+        favoriteRemoveSub: 'Убрать с главной',
+        backToMenu: 'Назад в меню',
+        journalTitle: 'Журнал',
+        journalDesc: 'Размышления об индустрии, людях, дизайне, производстве и всем, что происходит вокруг обуви.',
+        searchPlaceholder: 'Найти статью...',
+        fresh: 'СВЕЖЕЕ',
+        filters: [
+          { id: 'all', label: 'Все' },
+          { id: 'ИНДУСТРИЯ', label: 'Индустрия' },
+          { id: 'МАРКЕТИНГ', label: 'Маркетинг' },
+          { id: 'ДИЗАЙН', label: 'Дизайн' },
+          { id: 'ПРОИЗВОДСТВО', label: 'Производство' },
+        ],
+        readBtn: 'Читать',
+        collabTitle: 'Сотрудничество',
+        collabSubtitle: 'ЦИФРОВАЯ ВИЗИТКА',
+        collabText: 'Мы всегда открыты для профессионального диалога. Разработка концептов, B2B-партнерство, коллаборации или новые идеи в сфере обувного дизайна и производства.',
+        collabEmailLabel: 'Прямая связь',
+        copyBtn: 'Скопировать',
+        copiedBtn: 'Скопировано!',
+        mailBtn: 'Написать письмо',
+        shareBtn: 'Поделиться',
+      },
+      uk: {
+        title: 'PRO Взуття',
+        subtitle: 'БЛОГ ТА СТАТТІ',
+        tagline: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
+        read: 'Читати',
+        readSub: count === 0 ? 'Статті зʼявляться незабаром' : `${count} ${ukPlural}`,
+        contact: "Співпраця",
+        contactSub: 'Запропонувати ідею',
+        favoriteAdd: 'В обране',
+        favoriteAddSub: 'Зберегти на головній',
+        favoriteRemove: 'В обраному',
+        favoriteRemoveSub: 'Видалити з головної',
+        backToMenu: 'Назад до меню',
+        journalTitle: 'Журнал',
+        journalDesc: 'Роздуми про індустрію, людей, дизайн, виробництво та все, що відбувається навколо взуття.',
+        searchPlaceholder: 'Знайти статтю...',
+        fresh: 'СВІЖЕ',
+        filters: [
+          { id: 'all', label: 'Усі' },
+          { id: 'ІНДУСТРІЯ', label: 'Індустрія' },
+          { id: 'МАРКЕТИНГ', label: 'Маркетинг' },
+          { id: 'ДИЗАЙН', label: 'Дизайн' },
+          { id: 'ВИРОБНИЦТВО', label: 'Виробництво' },
+        ],
+        readBtn: 'Читати',
+        collabTitle: 'Співпраця',
+        collabSubtitle: 'ЦИФРОВА ВІЗИТКА',
+        collabText: 'Ми завжди відкриті до професійного діалогу. Розробка концептів, B2B-партнерство, колаборації або нові ідеї у сфері взуттєвого дизайну та виробництва.',
+        collabEmailLabel: 'Прямий звʼязок',
+        copyBtn: 'Скопіювати',
+        copiedBtn: 'Скопійовано!',
+        mailBtn: 'Написати листа',
+        shareBtn: 'Поділитися',
+      },
+    }[lang]
+  }, [lang, count])
 
   const cardStyle = {
     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.2) 100%)',
@@ -318,15 +367,15 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 <a
                   href="mailto:cordwain@tuta.io"
                   onClick={(e) => {
-                    e.preventDefault();
-                    triggerHaptic('medium');
-                    const mailUrl = 'mailto:cordwain@tuta.io';
-                    const tg = (window as any).Telegram?.WebApp;
+                    e.preventDefault()
+                    triggerHaptic('medium')
+                    const mailUrl = 'mailto:cordwain@tuta.io'
+                    const tg = getWebApp()
                     
                     if (tg?.openLink) {
-                      tg.openLink(mailUrl);
+                      tg.openLink(mailUrl)
                     } else {
-                      window.location.href = mailUrl;
+                      window.location.href = mailUrl
                     }
                   }}
                   className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 text-[#151210]"
@@ -394,10 +443,10 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               
               <div className="flex flex-col gap-3">
                 {filteredArticles.map((article, i) => {
-                  const title = lang === 'ru' ? article.titleRu : article.titleUk;
-                  const excerpt = lang === 'ru' ? article.excerptRu : article.excerptUk;
-                  const tag = lang === 'ru' ? article.tagRu : article.tagUk;
-                  const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk;
+                  const title = lang === 'ru' ? article.titleRu : article.titleUk
+                  const excerpt = lang === 'ru' ? article.excerptRu : article.excerptUk
+                  const tag = lang === 'ru' ? article.tagRu : article.tagUk
+                  const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk
 
                   return (
                     <motion.div
@@ -488,36 +537,33 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               
               {/* === РЕНДЕР MARKDOWN С ЧИСТЫМИ ПРОПСАМИ === */}
               <div className="article-content">
-                <Markdown
-                  components={{
-                    p: ({ children }) => (
-                      <p className="text-[14.5px] leading-relaxed text-[#B9ACA0] mb-4">{children}</p>
+                <Markdown ({ ...props components="{{" node, p:> (
+                      <p className="text-[14.5px] leading-relaxed text-[#B9ACA0] mb-4" {...props} />
                     ),
-                    h2: ({ children }) => (
-                      <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4">{children}</h2>
+                    h2: ({ node, ...props }) => (
+                      <h2 className="font-display text-[1.4rem] font-bold text-[#F5F1EB] mt-8 mb-4" {...props} />
                     ),
-                    h3: ({ children }) => (
-                      <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3">{children}</h3>
+                    h3: ({ node, ...props }) => (
+                      <h3 className="font-display text-[1.1rem] font-semibold text-[#D8A35C] mt-6 mb-3" {...props} />
                     ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]">{children}</ul>
+                    ul: ({ node, ...props }) => (
+                      <ul className="list-disc pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />
                     ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]">{children}</ol>
+                    ol: ({ node, ...props }) => (
+                      <ol className="list-decimal pl-5 mb-5 text-[14.5px] text-[#B9ACA0] space-y-2 marker:text-[#D8A35C]" {...props} />
                     ),
-                    li: ({ children }) => <li className="pl-1">{children}</li>,
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-[#E5DCD3]">{children}</strong>
+                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
+                    strong: ({ node, ...props }) => (
+                      <strong className="font-semibold text-[#E5DCD3]" {...props} />
                     ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg">
-                        {children}
-                      </blockquote>
+                    blockquote: ({ node, ...props }) => (
+                      <blockquote className="border-l-2 border-[#D8A35C] pl-4 py-2 my-6 text-[14px] italic text-[#B9ACA0] bg-[#D8A35C]/5 rounded-r-lg" {...props} />
                     ),
-                    a: ({ href, children }) => (
+                    a: ({ node, href, children, ...props }) => (
                       <a
                         href={href}
                         className="text-[#60A5FA] underline decoration-[#60A5FA]/30 underline-offset-4 hover:decoration-[#60A5FA] transition-colors"
+                        {...props}
                       >
                         {children}
                       </a>
