@@ -144,7 +144,7 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: '' },
     { text: '════════════════════════════════════════════════' },
     { text: '' },
-    { text: 'Присвячується мамі', customStyle: 'text-pink-400 text-lg drop-shadow-[0_0_12px_rgba(244,114,182,0.95)] tracking-[0.25em]' },
+    { text: 'Присвячується Мамі', customStyle: 'text-pink-400 text-lg drop-shadow-[0_0_12px_rgba(244,114,182,0.95)] tracking-[0.25em]' },
     { text: '' },
     { text: '════════════════════════════════════════════════' },
     { text: '' },
