@@ -107,10 +107,9 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     triggerHaptic('medium')
     const tg = getWebApp()
 
-    // Сюда можно поставить свою ссылку (Vercel или t.me/...)
     const appUrl = 'https://t.me/YourBotName/app'
-    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
+    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
 
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -462,7 +461,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= О ПРОЕКТЕ (ВАШ ТЕРМИНАЛ С ТИТРАМИ) ================= */}
+        {/* ================= О ПРОЕКТЕ ================= */}
         {view === 'about' && (
           <motion.div
             key="about"
@@ -472,11 +471,9 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
             transition={{ duration: 0.5 }}
             className="absolute inset-0 z-50 bg-black"
           >
-            {/* Рендерим ваш компонент */}
-            <AboutProject />
+            <AboutProject lang={lang} />
           </motion.div>
         )}
-
 
         {/* ================= ЖУРНАЛ ================= */}
         {view === 'journal' && (
@@ -594,7 +591,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
           </motion.div>
         )}
 
-        {/* ================= ЧИТАЛКА (ЭКРАН СТАТЬИ С MARKDOWN) ================= */}
+        {/* ================= ЧИТАЛКА ================= */}
         {view === 'article' && activeArticle && content && (
           <motion.div
             key="article"
@@ -633,7 +630,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
               </h1>
 
-              {/* === РЕНДЕР MARKDOWN С ЧИСТЫМИ ПРОПСАМИ === */}
               <div className="article-content">
                 <Markdown
                   components={{
@@ -679,7 +675,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                         {children}
                       </a>
                     ),
-                    // === КАРТИНКИ В ТЕКСТЕ СТАТЬИ (без обрезки + лёгкий фон) ===
                     img: ({ node, alt, ...props }) => (
                       <div className="my-6 w-full flex justify-center rounded-xl bg-[#1D1815]/60 p-2">
                         <img
@@ -696,7 +691,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
                 </Markdown>
               </div>
 
-              {/* Футер статьи с кнопкой Share */}
               <div className="mt-10 pt-6 border-t border-[#2A231D] flex items-center justify-between">
                 <div className="text-[11px] text-[#B9ACA0]/60">
                   {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
@@ -723,7 +717,6 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
               </div>
             </div>
 
-            {/* Дополнительный отступ снизу для комфортного скролла */}
             <div className="h-10 shrink-0" />
           </motion.div>
         )}
