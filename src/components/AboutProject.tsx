@@ -9,13 +9,22 @@ type Lang = 'ru' | 'uk';
 
 type AboutProjectProps = {
   lang?: Lang;
+  onClose?: () => void;
 };
+
+const ASCII_TITLE = `
+ ██████╗ ██████╗ ██████╗ ██████╗ ██╗    ██╗ █████╗ ██╗███╗   ██╗███████╗██████╗ 
+██╔════╝██╔═══██╗██╔══██╗██╔══██╗██║    ██║██╔══██╗██║████╗  ██║██╔════╝██╔══██╗
+██║     ██║   ██║██████╔╝██║  ██║██║ █╗ ██║███████║██║██╔██╗ ██║█████╗  ██████╔╝
+██║     ██║   ██║██╔══██╗██║  ██║██║███╗██║██╔══██║██║██║╚██╗██║██╔══╝  ██╔══██╗
+╚██████╗╚██████╔╝██║  ██║██████╔╝╚███╔███╔╝██║  ██║██║██║ ╚████║███████╗██║  ██║
+ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
+`.trim();
 
 const CREDITS: Record<Lang, CreditLine[]> = {
   ru: [
-    { text: 'CORDWAINER', customStyle: 'text-3xl md:text-4xl font-bold mb-8 text-[#00FF41] uppercase tracking-[0.3em]' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
     { text: 'ТЕХНИЧЕСКАЯ БАЗА ПРОЕКТА' },
     { text: '' },
@@ -48,7 +57,7 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: 'ready() • expand() • themeChanged' },
     { text: 'haptic feedback • цвета контейнера' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
     { text: 'БЛАГОДАРНОСТЬ' },
     { text: '' },
@@ -68,20 +77,19 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: 'Спасибо коллективу «Форвард Орто»' },
     { text: 'за вклад в мой профессиональный путь.' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
-    { text: 'Посвящается маме', customStyle: 'text-pink-400 text-xl drop-shadow-[0_0_10px_rgba(244,114,182,0.9)] tracking-widest' },
+    { text: 'Посвящается маме', customStyle: 'text-pink-400 text-lg drop-shadow-[0_0_12px_rgba(244,114,182,0.95)] tracking-[0.25em]' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
     { text: 'Спасибо, что открыли этот экран.' },
     { text: '' },
-    { text: '> _' },
+    { text: '' },
   ],
   uk: [
-    { text: 'CORDWAINER', customStyle: 'text-3xl md:text-4xl font-bold mb-8 text-[#00FF41] uppercase tracking-[0.3em]' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
     { text: 'ТЕХНІЧНА БАЗА ПРОЄКТУ' },
     { text: '' },
@@ -114,7 +122,7 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: 'ready() • expand() • themeChanged' },
     { text: 'haptic feedback • кольори контейнера' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
     { text: 'ВДЯЧНІСТЬ' },
     { text: '' },
@@ -134,42 +142,40 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: 'Дякую колективу «Форвард Орто»' },
     { text: 'за внесок у мій професійний шлях.' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
-    { text: 'Присвячується мамі', customStyle: 'text-pink-400 text-xl drop-shadow-[0_0_10px_rgba(244,114,182,0.9)] tracking-widest' },
+    { text: 'Присвячується мамі', customStyle: 'text-pink-400 text-lg drop-shadow-[0_0_12px_rgba(244,114,182,0.95)] tracking-[0.25em]' },
     { text: '' },
-    { text: '══════════════════════════════════════' },
+    { text: '════════════════════════════════════════════════' },
     { text: '' },
     { text: 'Дякуємо, що відкрили цей екран.' },
     { text: '' },
-    { text: '> _' },
+    { text: '' },
   ],
 };
 
-export default function AboutProject({ lang = 'ru' }: AboutProjectProps) {
+export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps) {
   const lines = CREDITS[lang] || CREDITS.ru;
 
   const [displayedLines, setDisplayedLines] = useState<string[]>([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [finished, setFinished] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Попытка запустить музыку в фоне при монтировании
   useEffect(() => {
     const audio = new Audio('/audio/start-me-up-8bit.mp3');
     audio.loop = true;
     audio.volume = 0.35;
     audioRef.current = audio;
 
-    // Пробуем автозапуск (иногда работает при запуске по внешней ссылке)
     audio.play()
       .then(() => setIsPlaying(true))
-      .catch(() => {
-        // Автозапуск заблокирован — ждём клика по кнопке
-      });
+      .catch(() => {});
 
     return () => {
       audio.pause();
@@ -179,7 +185,6 @@ export default function AboutProject({ lang = 'ru' }: AboutProjectProps) {
 
   const toggleMusic = () => {
     if (!audioRef.current) return;
-
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
@@ -189,9 +194,11 @@ export default function AboutProject({ lang = 'ru' }: AboutProjectProps) {
     }
   };
 
-  // Эффект печатной машинки (DOS-стиль)
   useEffect(() => {
-    if (currentLineIndex >= lines.length) return;
+    if (currentLineIndex >= lines.length) {
+      setFinished(true);
+      return;
+    }
 
     const line = lines[currentLineIndex];
     const fullText = line.text;
@@ -204,13 +211,13 @@ export default function AboutProject({ lang = 'ru' }: AboutProjectProps) {
           return next;
         });
         setCurrentCharIndex((c) => c + 1);
-      }, fullText === '' ? 80 : 28); // чуть быстрее для DOS-ощущения
+      }, fullText === '' ? 60 : 22);
     } else {
       timeoutRef.current = setTimeout(() => {
         setCurrentLineIndex((i) => i + 1);
         setCurrentCharIndex(0);
         setDisplayedLines((prev) => [...prev, '']);
-      }, fullText === '' ? 180 : 420);
+      }, fullText === '' ? 140 : 380);
     }
 
     return () => {
@@ -218,31 +225,43 @@ export default function AboutProject({ lang = 'ru' }: AboutProjectProps) {
     };
   }, [currentLineIndex, currentCharIndex, lines]);
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [displayedLines]);
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black font-mono text-[#00FF41] overflow-hidden">
-      {/* Лёгкий сканлайн-эффект (опционально) */}
+    <div className="fixed inset-0 z-50 flex flex-col bg-black font-mono text-[#00FF41] overflow-hidden select-none">
       <div
-        className="pointer-events-none absolute inset-0 z-10 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 z-30 opacity-[0.06]"
         style={{
           backgroundImage:
-            'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)',
+            'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.35) 2px, rgba(0,0,0,0.35) 4px)',
         }}
       />
 
-      {/* Кнопка музыки */}
-      <button
-        onClick={toggleMusic}
-        className="absolute top-4 right-4 z-20 px-3 py-1.5 border border-[#00FF41] hover:bg-[#00FF41] hover:text-black transition text-xs tracking-widest uppercase"
-      >
-        {isPlaying ? '■ STOP' : '▶ MUSIC'}
-      </button>
+      <div className="relative z-20 shrink-0 pt-6 pb-3 px-2 bg-black border-b border-[#00FF41]/25">
+        <pre className="text-[5px] sm:text-[6.5px] md:text-[8px] leading-[1.05] text-center text-[#00FF41] overflow-x-auto whitespace-pre font-mono tracking-tighter">
+          {ASCII_TITLE}
+        </pre>
 
-      {/* Основной терминал */}
-      <div className="relative z-0 flex-1 overflow-y-auto px-5 py-16 md:py-20">
-        <div className="max-w-2xl mx-auto space-y-1 text-[13px] md:text-[15px] leading-relaxed">
+        <button
+          onClick={toggleMusic}
+          className="absolute top-3 right-3 z-30 px-2.5 py-1 border border-[#00FF41]/70 hover:bg-[#00FF41] hover:text-black transition text-[10px] tracking-widest uppercase"
+        >
+          {isPlaying ? '■ STOP' : '▶ MUSIC'}
+        </button>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="relative z-10 flex-1 overflow-y-auto px-4 py-6 scroll-smooth"
+      >
+        <div className="max-w-2xl mx-auto space-y-1 text-[12.5px] md:text-[14px] leading-relaxed pb-24">
           {displayedLines.map((text, idx) => {
             const style = lines[idx]?.customStyle ?? '';
-            const isCurrent = idx === currentLineIndex;
+            const isCurrent = idx === currentLineIndex && !finished;
 
             return (
               <div key={idx} className={`${style} whitespace-pre-wrap`}>
@@ -256,11 +275,23 @@ export default function AboutProject({ lang = 'ru' }: AboutProjectProps) {
         </div>
       </div>
 
-      {/* Нижняя строка статуса */}
-      <div className="relative z-20 px-5 py-3 border-t border-[#00FF41]/30 text-[11px] tracking-widest text-[#00FF41]/70 flex justify-between">
-        <span>CORDWAINER TERMINAL v1.0</span>
-        <span>{lang.toUpperCase()}</span>
+      <div className="relative z-20 shrink-0 border-t border-[#00FF41]/30 bg-black">
+        {finished && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={onClose}
+              className="px-8 py-2.5 border-2 border-[#00FF41] text-[#00FF41] hover:bg-[#00FF41] hover:text-black transition tracking-[0.3em] uppercase text-sm font-bold"
+            >
+              {lang === 'uk' ? '[ ПОВЕРНУТИСЯ ]' : '[ ВЕРНУТЬСЯ ]'}
+            </button>
+          </div>
+        )}
+
+        <div className="px-4 py-2 flex justify-between text-[10px] tracking-widest text-[#00FF41]/60">
+          <span>CORDWAINER TERMINAL v1.0</span>
+          <span>{lang.toUpperCase()}</span>
+        </div>
       </div>
     </div>
   );
-    }
+}
