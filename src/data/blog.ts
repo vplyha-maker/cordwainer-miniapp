@@ -52,7 +52,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     tagUk: 'ІНДУСТРІЯ',
     readTimeRu: '7 мин',
     readTimeUk: '7 хв',
-    cover: '/covers/idastril.png', // ← поставь реальный путь к обложке
+    cover: '/public/Shoe-Factories.jpg', // ← поставь реальный путь к обложке
     isNew: true,
     createdAt: '2026-09-05',
   },
