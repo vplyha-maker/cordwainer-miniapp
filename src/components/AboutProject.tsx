@@ -12,6 +12,13 @@ type AboutProjectProps = {
   onClose?: () => void;
 };
 
+// Настройки синхронизации с музыкой (подбираем под 8-bit трек)
+const SONG_BPM = 122; // Темп трека (удары в минуту)
+const MS_PER_BEAT = 60000 / SONG_BPM; // Длительность одного удара (~491.8 мс)
+const CHAR_DELAY = MS_PER_BEAT / 16; // Скорость печати (16 символов на 1 удар = ~30.7 мс)
+const LINE_DELAY = MS_PER_BEAT * 1; // Пауза в конце строки (ровно 1 удар)
+const EMPTY_LINE_DELAY = MS_PER_BEAT / 2; // Пауза на пустых строках (половина удара)
+
 const ASCII_TITLE = `
  ██████╗ ██████╗ ██████╗ ██████╗ ██╗    ██╗ █████╗ ██╗███╗   ██╗███████╗██████╗ 
 ██╔════╝██╔═══██╗██╔══██╗██╔══██╗██║    ██║██╔══██╗██║████╗  ██║██╔════╝██╔══██╗
@@ -64,7 +71,7 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: 'состоящая из Telegram-бота и клиентского' },
     { text: 'Web-приложения (Mini App).' },
     { text: '' },
-    { text: '[ ИНФРАСТРУКТУРА И СЕРВЕРЫ ]' },
+    { text: '[ ИНФРАСТРУКТУРА И СЕРВЕРИ ]' },
     { text: '• MAIN BOT HOSTING: Render' },
     { text: '  Отвечает за ядро серверной логики, обработку' },
     { text: '  входящих команд и маршрутизацию пользователей.' },
@@ -225,13 +232,13 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           return next;
         });
         setCurrentCharIndex((c) => c + 1);
-      }, fullText === '' ? 60 : 22);
+      }, fullText === '' ? EMPTY_LINE_DELAY : CHAR_DELAY);
     } else {
       timeoutRef.current = setTimeout(() => {
         setCurrentLineIndex((i) => i + 1);
         setCurrentCharIndex(0);
         setDisplayedLines((prev) => [...prev, '']);
-      }, fullText === '' ? 140 : 380);
+      }, fullText === '' ? EMPTY_LINE_DELAY : LINE_DELAY);
     }
 
     return () => {
