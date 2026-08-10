@@ -45,7 +45,6 @@ export default function App() {
       const saved = localStorage.getItem('cordwainer_favorites')
       if (saved) {
         const parsed = JSON.parse(saved)
-        // Миграция со старого формата (массив строк)
         if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
           return parsed.map((id: string) => ({
             id,
@@ -62,6 +61,7 @@ export default function App() {
   })
 
   const [showPerfHint, setShowPerfHint] = useState(false)
+  const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
 
   const handleSetLang = (next: Lang) => {
     setLang(next)
@@ -89,7 +89,6 @@ export default function App() {
     })
   }
 
-  // Telegram theme
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -120,7 +119,6 @@ export default function App() {
     }
   }, [])
 
-  // Performance mode
   useEffect(() => {
     let cancelled = false
 
@@ -136,7 +134,6 @@ export default function App() {
         return
       }
 
-      // auto
       if (guessLowPowerDevice()) {
         applyPerfMode('fast')
         if (!cancelled) setShowPerfHint(true)
@@ -223,13 +220,20 @@ export default function App() {
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
+            onOpenArticle={(articleId) => {
+              setPendingArticleId(articleId)
+              setScreen('blog')
+            }}
           />
         )}
 
         {screen === 'blog' && (
           <BlogPage
             key="blog"
-            onBack={() => setScreen('home')}
+            onBack={() => {
+              setPendingArticleId(null)
+              setScreen('home')
+            }}
             lang={lang}
             isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
             onToggleFavorite={() =>
@@ -239,7 +243,6 @@ export default function App() {
                 imagePng: '/blog-hero.png',
               })
             }
-            // ── избранные статьи ──────────────────────────────────
             favoriteArticleIds={favorites
               .filter((f) => f.type === 'article')
               .map((f) => f.id)}
@@ -250,6 +253,8 @@ export default function App() {
                 imagePng: cover || `/${articleId}.png`,
               })
             }
+            initialArticleId={pendingArticleId}
+            onArticleOpened={() => setPendingArticleId(null)}
           />
         )}
       </AnimatePresence>
