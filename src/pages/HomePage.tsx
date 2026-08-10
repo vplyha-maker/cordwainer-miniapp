@@ -9,6 +9,7 @@ type HomePageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
+  onOpenArticle?: (articleId: string) => void
 }
 
 const cardStyle = {
@@ -25,10 +26,10 @@ export function HomePage({
   lang,
   setLang,
   favorites = [],
+  onOpenArticle,
 }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
 
-  // Фильтруем только статьи для меню HomePage
   const articleFavorites = favorites.filter((f) => f.type === 'article')
 
   const t = {
@@ -360,6 +361,11 @@ export function HomePage({
           transition={{ delay: 0.28 }}
           className="relative rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
           style={cardStyle}
+          onClick={() => {
+            if (articleFavorites.length > 0 && onOpenArticle) {
+              onOpenArticle(articleFavorites[0].id)
+            }
+          }}
         >
           <div className="w-8 h-8 rounded-xl bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-sm shrink-0">
             ★
@@ -369,7 +375,6 @@ export function HomePage({
             <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
           </div>
 
-          {/* Аватарки сохранённых статей */}
           <div className="flex -space-x-2 shrink-0">
             {articleFavorites.length === 0 && (
               <div className="w-7 h-7 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
@@ -379,13 +384,24 @@ export function HomePage({
               </div>
             )}
             {articleFavorites.slice(0, 4).map((item, idx) => (
-              <div
+              <button
                 key={item.id}
-                className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenArticle?.(item.id)
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+                className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative active:scale-90 transition-transform"
                 style={{ zIndex: 10 - idx }}
               >
-                <img src={item.imagePng} alt={item.id} className="w-full h-full object-cover" />
-              </div>
+                <img
+                  src={item.imagePng}
+                  alt=""
+                  draggable={false}
+                  className="w-full h-full object-cover pointer-events-none select-none"
+                />
+              </button>
             ))}
             {articleFavorites.length > 4 && (
               <div
