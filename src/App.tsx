@@ -45,6 +45,7 @@ export default function App() {
       const saved = localStorage.getItem('cordwainer_favorites')
       if (saved) {
         const parsed = JSON.parse(saved)
+        // Миграция со старого формата (массив строк)
         if (parsed.length > 0 && typeof parsed[0] === 'string') {
           return parsed.map((id: string) => ({
             id,
@@ -211,6 +212,7 @@ export default function App() {
             favorites={favorites}
           />
         )}
+
         {screen === 'home' && (
           <HomePage
             key="home"
@@ -222,6 +224,7 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
           />
         )}
+
         {screen === 'blog' && (
           <BlogPage
             key="blog"
@@ -235,9 +238,20 @@ export default function App() {
                 imagePng: '/blog-hero.png',
               })
             }
+            // ── избранные статьи ──────────────────────────────────
+            favoriteArticleIds={favorites
+              .filter((f) => f.type === 'article')
+              .map((f) => f.id)}
+            onToggleArticleFavorite={(articleId, cover) =>
+              toggleFavorite({
+                id: articleId,
+                type: 'article',
+                imagePng: cover || `/${articleId}.png`,
+              })
+            }
           />
         )}
       </AnimatePresence>
     </div>
   )
-}
+        }
