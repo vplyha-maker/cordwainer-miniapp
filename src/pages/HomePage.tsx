@@ -8,7 +8,8 @@ type HomePageProps = {
   onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
-  favorites?: FavoriteItem[] 
+  favorites?: FavoriteItem[]
+  onToggleFavorite?: (item: FavoriteItem) => void
 }
 
 const cardStyle = {
@@ -18,7 +19,14 @@ const cardStyle = {
   WebkitBackdropFilter: 'blur(10px)',
 }
 
-export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: HomePageProps) {
+export function HomePage({
+  onBack,
+  onOpenBlog,
+  lang,
+  setLang,
+  favorites = [],
+  onToggleFavorite,
+}: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
   
   // Фильтруем только статьи для меню HomePage
@@ -49,7 +57,6 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: 
       glossary: 'Глоссарий',
       glossarySub: '342 термина',
       favorites: 'Избранное',
-      // Динамический счетчик сохраненных
       favoritesSub: articleFavorites.length > 0 
         ? `Сохранено статей: ${articleFavorites.length}` 
         : 'Нет сохраненных статей',
