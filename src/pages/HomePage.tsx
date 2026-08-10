@@ -8,7 +8,7 @@ type HomePageProps = {
   onOpenBlog?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
-  favorites?: FavoriteItem[] // ОБНОВЛЕНО: Ожидаем массив объектов
+  favorites?: FavoriteItem[] 
 }
 
 const cardStyle = {
@@ -21,7 +21,7 @@ const cardStyle = {
 export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
   
-  // ДОБАВЛЕНО: Фильтруем только статьи для меню HomePage
+  // Фильтруем только статьи для меню HomePage
   const articleFavorites = favorites.filter((f) => f.type === 'article')
 
   const t = {
@@ -49,7 +49,10 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: 
       glossary: 'Глоссарий',
       glossarySub: '342 термина',
       favorites: 'Избранное',
-      favoritesSub: 'Сохранённые статьи',
+      // Динамический счетчик сохраненных
+      favoritesSub: articleFavorites.length > 0 
+        ? `Сохранено статей: ${articleFavorites.length}` 
+        : 'Нет сохраненных статей',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
       newBadge: 'NEW',
     },
@@ -77,7 +80,9 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: 
       glossary: 'Глосарій',
       glossarySub: '342 терміни',
       favorites: 'Обране',
-      favoritesSub: 'Збережені статті',
+      favoritesSub: articleFavorites.length > 0 
+        ? `Збережено статей: ${articleFavorites.length}` 
+        : 'Немає збережених статей',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
       newBadge: 'NEW',
     },
@@ -346,21 +351,32 @@ export function HomePage({ onBack, onOpenBlog, lang, setLang, favorites = [] }: 
             <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
           </div>
           
-          {/* ОБНОВЛЕНО: Динамическое отображение PNG-иконок избранного (только статьи) */}
-          <div className="flex -space-x-1.5 shrink-0">
+          {/* ОБНОВЛЕННЫЙ БЛОК АВАТАРОК ИЗБРАННЫХ СТАТЕЙ */}
+          <div className="flex -space-x-2 shrink-0">
             {articleFavorites.length === 0 && (
-              <div className="w-6 h-6 rounded-full bg-[#27211D] border-2 border-[#151210] flex items-center justify-center text-[12px] text-[#B9ACA0]/50 pb-0.5">
-                +
+              <div className="w-7 h-7 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
+                </svg>
               </div>
             )}
             {articleFavorites.slice(0, 4).map((item, idx) => (
               <div
                 key={idx}
-                className="w-6 h-6 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D]"
+                className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative"
+                style={{ zIndex: 10 - idx }}
               >
                 <img src={item.imagePng} alt={item.id} className="w-full h-full object-cover" />
               </div>
             ))}
+            {articleFavorites.length > 4 && (
+              <div 
+                className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[9px] font-bold text-[#D8A35C]"
+                style={{ zIndex: 0 }}
+              >
+                +{articleFavorites.length - 4}
+              </div>
+            )}
           </div>
         </motion.div>
 
