@@ -50,6 +50,7 @@ export function BlogPage({
   const [activeFilter, setActiveFilter] = useState('all')
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
   const [emailCopied, setEmailCopied] = useState(false)
+  const [aboutClickCount, setAboutClickCount] = useState(0)
 
   const articleScrollRef = useRef<HTMLDivElement>(null)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -123,8 +124,8 @@ export function BlogPage({
     const tg = getWebApp()
 
     const appUrl = 'https://t.me/YourBotName/app'
-    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
+    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
 
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -463,7 +464,13 @@ export function BlogPage({
                   type="button"
                   onClick={() => {
                     triggerHaptic('medium')
-                    setView('about')
+                    const nextCount = aboutClickCount + 1
+                    if (nextCount >= 12) {
+                      setAboutClickCount(0)
+                      setView('about')
+                    } else {
+                      setAboutClickCount(nextCount)
+                    }
                   }}
                   className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 text-[#151210]"
                   style={{ backgroundColor: '#D8A35C' }}
