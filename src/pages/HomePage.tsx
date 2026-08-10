@@ -29,7 +29,6 @@ export function HomePage({
   onOpenArticle,
 }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
-
   const articleFavorites = favorites.filter((f) => f.type === 'article')
 
   const t = {
@@ -257,15 +256,7 @@ export function HomePage({
             className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
             style={cardStyle}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="text-[#B9ACA0] shrink-0"
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[#B9ACA0] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
@@ -296,9 +287,7 @@ export function HomePage({
               >
                 {item.icon}
               </div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">
-                {item.title}
-              </div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">{item.title}</div>
               <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">{item.subtitle}</div>
               <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">{item.count}</div>
             </motion.button>
@@ -355,6 +344,7 @@ export function HomePage({
           })}
         </div>
 
+        {/* ========== БЛОК ИЗБРАННОЕ ========== */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -383,6 +373,7 @@ export function HomePage({
                 </svg>
               </div>
             )}
+
             {articleFavorites.slice(0, 4).map((item, idx) => (
               <button
                 key={item.id}
@@ -403,6 +394,7 @@ export function HomePage({
                 />
               </button>
             ))}
+
             {articleFavorites.length > 4 && (
               <div
                 className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[9px] font-bold text-[#D8A35C]"
