@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 import { BlogPage } from './pages/BlogPage'
-import { MarketingPage } from './pages/MarketingPage' // <-- Импортируем страницу маркетинга
-
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -20,8 +18,7 @@ declare global {
   }
 }
 
-// <-- Добавлен 'marketing', чтобы избежать черного экрана при переходе
-export type Screen = 'welcome' | 'home' | 'blog' | 'marketing'
+export type Screen = 'welcome' | 'home' | 'blog'
 export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
@@ -219,8 +216,6 @@ export default function App() {
             key="home"
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
-            // Передаем функцию для открытия страницы маркетинга из HomePage, если кнопка там
-            onOpenMarketing={() => setScreen('marketing')} 
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -239,13 +234,6 @@ export default function App() {
                 imagePng: '/blog-hero.png',
               })
             }
-          />
-        )}
-        {screen === 'marketing' && (
-          <MarketingPage
-            key="marketing"
-            onBack={() => setScreen('home')} // Возврат на главный экран
-            lang={lang}
           />
         )}
       </AnimatePresence>
