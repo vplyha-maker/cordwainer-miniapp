@@ -89,6 +89,7 @@ export default function App() {
     })
   }
 
+  // Telegram theme
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -119,6 +120,7 @@ export default function App() {
     }
   }, [])
 
+  // Performance mode
   useEffect(() => {
     let cancelled = false
 
@@ -260,4 +262,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
-}
+ }
