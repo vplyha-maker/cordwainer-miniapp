@@ -206,7 +206,7 @@ export function BlogPage({ onBack, lang, isFavorite = false, onToggleFavorite }:
     const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilter = activeFilter === 'all' || tag === activeFilter
     return matchesSearch && matchesFilter
-  })
+  }).slice().reverse()
 
   const activeArticle = activeArticleId ? BLOG_ARTICLES.find((a) => a.id === activeArticleId) : null
   const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
