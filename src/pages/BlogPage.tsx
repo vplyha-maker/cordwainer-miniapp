@@ -11,9 +11,10 @@ type BlogPageProps = {
   lang: Lang
   isFavorite?: boolean
   onToggleFavorite?: () => void
-  // НОВЫЕ ПРОПСЫ ДЛЯ ИЗБРАННОГО В СТАТЬЯХ
   favoriteArticleIds?: string[]
   onToggleArticleFavorite?: (articleId: string, cover: string) => void
+  initialArticleId?: string | null
+  onArticleOpened?: () => void
 }
 
 type ViewState = 'cover' | 'journal' | 'article' | 'collaboration' | 'about'
@@ -40,7 +41,9 @@ export function BlogPage({
   isFavorite = false, 
   onToggleFavorite,
   favoriteArticleIds = [],
-  onToggleArticleFavorite
+  onToggleArticleFavorite,
+  initialArticleId = null,
+  onArticleOpened,
 }: BlogPageProps) {
   const [view, setView] = useState<ViewState>('cover')
   const [searchQuery, setSearchQuery] = useState('')
@@ -53,6 +56,14 @@ export function BlogPage({
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
+
+  useEffect(() => {
+    if (initialArticleId) {
+      setActiveArticleId(initialArticleId)
+      setView('article')
+      onArticleOpened?.()
+    }
+  }, [initialArticleId])
 
   useEffect(() => {
     if (view === 'article' && articleScrollRef.current) {
@@ -225,7 +236,6 @@ export function BlogPage({
   const activeArticle = activeArticleId ? BLOG_ARTICLES.find((a) => a.id === activeArticleId) : null
   const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
   
-  // Проверяем, сохранена ли текущая открытая статья
   const isCurrentArticleFavorite = activeArticleId ? favoriteArticleIds.includes(activeArticleId) : false
 
   return (
@@ -254,7 +264,6 @@ export function BlogPage({
       </button>
 
       <AnimatePresence mode="wait">
-        {/* COVER, COLLABORATION, ABOUT, JOURNAL views - remain the same */}
         {view === 'cover' && (
            <motion.div
             key="cover"
@@ -264,7 +273,6 @@ export function BlogPage({
             transition={{ duration: 0.3 }}
             className="absolute inset-0 flex flex-col justify-between"
           >
-            {/* ... cover content (как в оригинале) ... */}
             <div className="absolute inset-0 z-0 h-[65vh] overflow-hidden pointer-events-none">
               <img src="/blog-hero.png" alt="PRO" className="w-full h-full object-cover object-center" />
               <div
@@ -385,8 +393,6 @@ export function BlogPage({
           </motion.div>
         )}
 
-        {/* ДРУГИЕ VIEWS (collaboration, about, journal)... */}
-        {/* Для краткости пропускаю изменения, они остаются такими же */}
         {view === 'collaboration' && (
            <motion.div
             key="collaboration"
@@ -557,7 +563,6 @@ export function BlogPage({
           </motion.div>
         )}
 
-        {/* ОБНОВЛЕННЫЙ VIEW ARTICLE */}
         {view === 'article' && activeArticle && content && (
           <motion.div
             key="article"
@@ -621,7 +626,6 @@ export function BlogPage({
                 </Markdown>
               </div>
 
-              {/* КРАСИВАЯ КНОПКА ДОБАВЛЕНИЯ В ИЗБРАННОЕ (UX) */}
               <div className="mt-10 mb-4">
                 <motion.button
                   whileTap={{ scale: 0.96 }}
