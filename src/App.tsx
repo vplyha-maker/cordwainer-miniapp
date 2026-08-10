@@ -219,6 +219,7 @@ export default function App() {
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
+            onToggleFavorite={toggleFavorite}
           />
         )}
         {screen === 'blog' && (
