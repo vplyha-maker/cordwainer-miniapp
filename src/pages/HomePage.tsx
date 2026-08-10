@@ -9,12 +9,12 @@ type HomePageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
-  onToggleFavorite?: (item: FavoriteItem) => void
 }
 
 const cardStyle = {
   background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-  boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+  boxShadow:
+    'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
 }
@@ -25,10 +25,9 @@ export function HomePage({
   lang,
   setLang,
   favorites = [],
-  onToggleFavorite,
 }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
-  
+
   // Фильтруем только статьи для меню HomePage
   const articleFavorites = favorites.filter((f) => f.type === 'article')
 
@@ -57,9 +56,10 @@ export function HomePage({
       glossary: 'Глоссарий',
       glossarySub: '342 термина',
       favorites: 'Избранное',
-      favoritesSub: articleFavorites.length > 0 
-        ? `Сохранено статей: ${articleFavorites.length}` 
-        : 'Нет сохраненных статей',
+      favoritesSub:
+        articleFavorites.length > 0
+          ? `Сохранено статей: ${articleFavorites.length}`
+          : 'Нет сохраненных статей',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
       newBadge: 'NEW',
     },
@@ -87,9 +87,10 @@ export function HomePage({
       glossary: 'Глосарій',
       glossarySub: '342 терміни',
       favorites: 'Обране',
-      favoritesSub: articleFavorites.length > 0 
-        ? `Збережено статей: ${articleFavorites.length}` 
-        : 'Немає збережених статей',
+      favoritesSub:
+        articleFavorites.length > 0
+          ? `Збережено статей: ${articleFavorites.length}`
+          : 'Немає збережених статей',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
       newBadge: 'NEW',
     },
@@ -255,7 +256,15 @@ export function HomePage({
             className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
             style={cardStyle}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[#B9ACA0] shrink-0">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="text-[#B9ACA0] shrink-0"
+            >
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
@@ -286,7 +295,9 @@ export function HomePage({
               >
                 {item.icon}
               </div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">{item.title}</div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">
+                {item.title}
+              </div>
               <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">{item.subtitle}</div>
               <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">{item.count}</div>
             </motion.button>
@@ -357,8 +368,8 @@ export function HomePage({
             <div className="text-[13px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
             <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
           </div>
-          
-          {/* ОБНОВЛЕННЫЙ БЛОК АВАТАРОК ИЗБРАННЫХ СТАТЕЙ */}
+
+          {/* Аватарки сохранённых статей */}
           <div className="flex -space-x-2 shrink-0">
             {articleFavorites.length === 0 && (
               <div className="w-7 h-7 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
@@ -369,7 +380,7 @@ export function HomePage({
             )}
             {articleFavorites.slice(0, 4).map((item, idx) => (
               <div
-                key={idx}
+                key={item.id}
                 className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative"
                 style={{ zIndex: 10 - idx }}
               >
@@ -377,7 +388,7 @@ export function HomePage({
               </div>
             ))}
             {articleFavorites.length > 4 && (
-              <div 
+              <div
                 className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[9px] font-bold text-[#D8A35C]"
                 style={{ zIndex: 0 }}
               >
@@ -404,4 +415,4 @@ export function HomePage({
       </div>
     </div>
   )
-}
+  }
