@@ -241,14 +241,25 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         }}
       />
 
-      <div className="relative z-20 shrink-0 pt-6 pb-3 px-2 bg-black border-b border-[#00FF41]/25">
-        <pre className="text-[5px] sm:text-[6.5px] md:text-[8px] leading-[1.05] text-center text-[#00FF41] overflow-x-auto whitespace-pre font-mono tracking-tighter">
-          {ASCII_TITLE}
-        </pre>
+      <div className="relative z-20 shrink-0 pt-6 pb-3 px-2 bg-black border-b border-[#00FF41]/25 flex items-center justify-center min-h-[60px]">
+        {/* Обертка для скролла, чтобы <pre> не ломал родительский flex-контейнер */}
+        <div className="w-full overflow-x-auto flex justify-center no-scrollbar">
+          <pre
+            className="text-[4.5px] sm:text-[6.5px] md:text-[8px] leading-[1.05] text-center text-[#00FF41] whitespace-pre font-mono tracking-tighter"
+            style={{
+              // Ключевое исправление для Android: запрещаем браузеру увеличивать мелкий шрифт
+              WebkitTextSizeAdjust: 'none',
+              textSizeAdjust: 'none',
+            }}
+          >
+            {ASCII_TITLE}
+          </pre>
+        </div>
 
         <button
           onClick={toggleMusic}
-          className="absolute top-3 right-3 z-30 px-2.5 py-1 border border-[#00FF41]/70 hover:bg-[#00FF41] hover:text-black transition text-[10px] tracking-widest uppercase"
+          // Добавлен bg-black в классы, чтобы кнопка всегда оставалась читаемой
+          className="absolute top-3 right-3 z-30 bg-black px-2.5 py-1 border border-[#00FF41]/70 hover:bg-[#00FF41] hover:text-black transition text-[10px] tracking-widest uppercase"
         >
           {isPlaying ? '■ STOP' : '▶ MUSIC'}
         </button>
