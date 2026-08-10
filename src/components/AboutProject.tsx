@@ -241,25 +241,31 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         }}
       />
 
-      <div className="relative z-20 shrink-0 pt-6 pb-3 px-2 bg-black border-b border-[#00FF41]/25 flex items-center justify-center min-h-[60px]">
-        {/* Обертка для скролла, чтобы <pre> не ломал родительский flex-контейнер */}
-        <div className="w-full overflow-x-auto flex justify-center no-scrollbar">
-          <pre
-            className="text-[4.5px] sm:text-[6.5px] md:text-[8px] leading-[1.05] text-center text-[#00FF41] whitespace-pre font-mono tracking-tighter"
-            style={{
-              // Ключевое исправление для Android: запрещаем браузеру увеличивать мелкий шрифт
-              WebkitTextSizeAdjust: 'none',
-              textSizeAdjust: 'none',
-            }}
-          >
-            {ASCII_TITLE}
-          </pre>
+      {/* Увеличили pt-8, чтобы освободить место сверху для кнопки */}
+      <div className="relative z-20 shrink-0 pt-8 pb-3 bg-black border-b border-[#00FF41]/25 min-h-[65px] flex items-center">
+        
+        <div className="w-full overflow-x-auto no-scrollbar">
+          {/* Конструкция w-fit min-w-full центрирует текст, но при переполнении оставляет левый край доступным */}
+          <div className="w-fit min-w-full flex justify-center px-2">
+            <pre
+              className="text-center text-[#00FF41] whitespace-pre font-mono tracking-tighter"
+              style={{
+                // clamp использует ширину экрана (vw) - Android не сможет это сломать
+                fontSize: 'clamp(3px, 1.15vw, 8px)',
+                lineHeight: '1.05',
+                WebkitTextSizeAdjust: 'none',
+                textSizeAdjust: 'none',
+              }}
+            >
+              {ASCII_TITLE}
+            </pre>
+          </div>
         </div>
 
         <button
           onClick={toggleMusic}
-          // Добавлен bg-black в классы, чтобы кнопка всегда оставалась читаемой
-          className="absolute top-3 right-3 z-30 bg-black px-2.5 py-1 border border-[#00FF41]/70 hover:bg-[#00FF41] hover:text-black transition text-[10px] tracking-widest uppercase"
+          // Кнопка приподнята (top-2), имеет фон (bg-black) и тени, чтобы всегда быть поверх текста
+          className="absolute top-2 right-2 z-30 bg-black px-2.5 py-1 border border-[#00FF41]/70 hover:bg-[#00FF41] hover:text-[#00FF41] transition text-[10px] tracking-widest uppercase shadow-[0_0_8px_rgba(0,0,0,1)]"
         >
           {isPlaying ? '■ STOP' : '▶ MUSIC'}
         </button>
