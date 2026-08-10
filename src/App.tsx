@@ -46,14 +46,14 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved)
         // Миграция со старого формата (массив строк)
-        if (parsed.length > 0 && typeof parsed[0] === 'string') {
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
           return parsed.map((id: string) => ({
             id,
             type: id.includes('blog') ? 'blog' : 'article',
             imagePng: id.includes('blog') ? '/blog-hero.png' : `/${id}.png`,
           }))
         }
-        return parsed
+        return parsed as FavoriteItem[]
       }
       return []
     } catch {
@@ -80,9 +80,11 @@ export default function App() {
       const next = exists
         ? prev.filter((fav) => fav.id !== item.id)
         : [...prev, item]
+
       try {
         localStorage.setItem('cordwainer_favorites', JSON.stringify(next))
       } catch {}
+
       return next
     })
   }
@@ -254,4 +256,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
-        }
+}
