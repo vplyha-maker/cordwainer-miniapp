@@ -263,8 +263,7 @@ export function BlogPage({
           else if (view === 'journal') {
             setShowOnlyFavorites(false)
             setView('cover')
-          }
-          else if (view === 'about') setView('collaboration')
+          } else if (view === 'about') setView('collaboration')
           else if (view === 'collaboration') setView('cover')
           else onBack?.()
         }}
@@ -524,14 +523,16 @@ export function BlogPage({
             <div className="px-4 shrink-0">
               <h2 className="font-display text-[2rem] leading-none text-[#F5F1EB] mb-1">
                 {showOnlyFavorites
-                  ? (lang === 'ru' ? 'Избранное' : 'Обране')
+                  ? lang === 'ru'
+                    ? 'Избранное'
+                    : 'Обране'
                   : t.journalTitle}
               </h2>
               <p className="text-[11px] text-[#B9ACA0] mb-4 leading-relaxed max-w-[90%]">
                 {showOnlyFavorites
-                  ? (lang === 'ru'
-                      ? `Сохранённые статьи · ${favoriteArticleIds.length}`
-                      : `Збережені статті · ${favoriteArticleIds.length}`)
+                  ? lang === 'ru'
+                    ? `Сохранённые статьи · ${favoriteArticleIds.length}`
+                    : `Збережені статті · ${favoriteArticleIds.length}`
                   : t.journalDesc}
               </p>
 
@@ -580,7 +581,9 @@ export function BlogPage({
             <div className="flex-1 overflow-y-auto px-4 mt-2 pb-8">
               <p className="text-[10px] tracking-[0.14em] uppercase text-[#D8A35C] mb-3 font-semibold">
                 {showOnlyFavorites
-                  ? (lang === 'ru' ? 'ИЗБРАННОЕ' : 'ОБРАНЕ')
+                  ? lang === 'ru'
+                    ? 'ИЗБРАННОЕ'
+                    : 'ОБРАНЕ'
                   : searchQuery
                     ? 'Результаты'
                     : t.fresh}
@@ -596,9 +599,9 @@ export function BlogPage({
                   return (
                     <motion.div
                       key={article.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.05 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2, delay: Math.min(i * 0.025, 0.25) }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         triggerHaptic()
@@ -630,7 +633,9 @@ export function BlogPage({
                 {filteredArticles.length === 0 && (
                   <div className="text-center text-[#B9ACA0] text-[13px] py-10">
                     {showOnlyFavorites
-                      ? (lang === 'ru' ? 'Нет сохранённых статей' : 'Немає збережених статей')
+                      ? lang === 'ru'
+                        ? 'Нет сохранённых статей'
+                        : 'Немає збережених статей'
                       : 'Ничего не найдено'}
                   </div>
                 )}
