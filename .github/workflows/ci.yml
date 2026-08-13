@@ -14,16 +14,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Просто ставим Node.js 24 без всяких требований к кэшу
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          # Кэш отключен, так как нет package-lock.json
+          node-version: 24
 
+      # Устанавливаем зависимости
       - name: Install dependencies
-        # Используем обычный install, он сам сгенерирует нужные связи
         run: npm install
 
-      - name: Check types and Build project
-        # Эта команда запустит "tsc -b && vite build" из твоего package.json
+      # Запускаем сборку (проверка типов + Vite build)
+      - name: Build project
         run: npm run build
