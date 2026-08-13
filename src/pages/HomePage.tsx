@@ -196,14 +196,11 @@ export function HomePage({
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
+      {/* Header */}
       <div className="px-4 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <motion.h1
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="font-display text-[1.65rem] leading-none text-[#F5F1EB]"
-        >
+        <h1 className="font-display text-[1.65rem] leading-none text-[#F5F1EB]">
           {t.menu}
-        </motion.h1>
+        </h1>
 
         <div className="flex items-center gap-1.5">
           <button
@@ -232,9 +229,7 @@ export function HomePage({
           </button>
 
           {onBack && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
+            <button
               onClick={onBack}
               className="w-9 h-9 rounded-full flex items-center justify-center text-[#B9ACA0] active:scale-90 transition-transform overflow-hidden cursor-pointer"
               style={cardStyle}
@@ -242,17 +237,14 @@ export function HomePage({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M15 18l-6-6 6-6" />
               </svg>
-            </motion.button>
+            </button>
           )}
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="flex-1 px-4 overflow-y-auto pb-[110px] overscroll-none"
-      >
+      {/* Content */}
+      <div className="flex-1 px-4 overflow-y-auto pb-[110px] overscroll-none">
+        {/* Search */}
         <div className="mb-4">
           <div
             className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
@@ -266,16 +258,14 @@ export function HomePage({
           </div>
         </div>
 
+        {/* Learning */}
         <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
           {t.learning}
         </p>
         <div className="grid grid-cols-2 gap-2 mb-5">
-          {LEARNING.map((item, i) => (
-            <motion.button
+          {LEARNING.map((item) => (
+            <button
               key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.06 + i * 0.03 }}
               className="relative rounded-2xl p-3 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer"
               style={cardStyle}
             >
@@ -292,31 +282,27 @@ export function HomePage({
               <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">{item.title}</div>
               <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">{item.subtitle}</div>
               <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">{item.count}</div>
-            </motion.button>
+            </button>
           ))}
         </div>
 
+        {/* Tools */}
         <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
           {t.tools}
         </p>
         <div className="grid grid-cols-3 gap-2 mb-5">
-          {TOOLS.map((item, i) => {
+          {TOOLS.map((item) => {
             const isBlog = item.id === 'blog'
             return (
-              <motion.button
+              <button
                 key={item.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18 + i * 0.03 }}
                 onClick={isBlog ? onOpenBlog : undefined}
                 className="relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
                 style={cardStyle}
               >
                 {isBlog && hasNewBlog && (
-                  <motion.div
+                  <div
                     className="absolute inset-0 rounded-2xl pointer-events-none"
-                    animate={{ opacity: [0.12, 0.35, 0.12] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                     style={{
                       boxShadow: 'inset 0 0 0 1px rgba(244,114,182,0.5), 0 0 16px rgba(244,114,182,0.2)',
                     }}
@@ -341,16 +327,13 @@ export function HomePage({
                 <div className="text-[9px] text-[#B9ACA0] leading-snug mt-1 relative z-10">
                   {item.subtitle}
                 </div>
-              </motion.button>
+              </button>
             )
           })}
         </div>
 
-        {/* ========== БЛОК ИЗБРАННОЕ ========== */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28 }}
+        {/* Избранное */}
+        <div
           className="relative rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
           style={cardStyle}
           onClick={() => {
@@ -414,20 +397,19 @@ export function HomePage({
               </button>
             )}
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.32 }}
+        {/* Quote */}
+        <div
           className="relative rounded-2xl p-4 overflow-hidden"
           style={cardStyle}
         >
           <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">{t.quote}</p>
           <p className="mt-2 text-[11px] text-[#D8A35C] font-display">Cordwainer</p>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
+      {/* Bottom Dock */}
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
         <BottomDock active="search" lang={lang} />
       </div>
