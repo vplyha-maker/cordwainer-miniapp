@@ -131,8 +131,9 @@ export function BlogPage({
     const tg = getWebApp()
 
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
-    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
+    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
+
 
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
