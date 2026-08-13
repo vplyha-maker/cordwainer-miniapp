@@ -392,7 +392,7 @@ export function HomePage({
                   e.stopPropagation()
                   onOpenFavorites?.()
                 }}
-                className="w-10 h-10 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[11px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
+                className="w-12 h-12 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[11px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
                 style={{ zIndex: 0 }}
               >
                 +{articleFavorites.length - 4}
