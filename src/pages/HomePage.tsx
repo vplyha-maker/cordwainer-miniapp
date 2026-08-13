@@ -13,17 +13,6 @@ type HomePageProps = {
   onOpenFavorites?: () => void
 }
 
-export function HomePage({
-  onBack,
-  onOpenBlog,
-  lang,
-  setLang,
-  favorites = [],
-  onOpenArticle,
-  onOpenFavorites,
-}: HomePageProps) {
-}
-
 const cardStyle = {
   background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
   boxShadow:
@@ -39,6 +28,7 @@ export function HomePage({
   setLang,
   favorites = [],
   onOpenArticle,
+  onOpenFavorites,
 }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
   const articleFavorites = favorites.filter((f) => f.type === 'article')
@@ -357,73 +347,90 @@ export function HomePage({
         </div>
 
         {/* ========== БЛОК ИЗБРАННОЕ ========== */}
-<motion.div
-  initial={{ opacity: 0, y: 8 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.28 }}
-  className="relative rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
-  style={cardStyle}
-  onClick={() => {
-    if (articleFavorites.length === 0) return
-    if (articleFavorites.length === 1) {
-      onOpenArticle?.(articleFavorites[0].id)
-    } else {
-      onOpenFavorites?.()
-    }
-  }}
->
-  <div className="w-8 h-8 rounded-xl bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-sm shrink-0">
-    ★
-  </div>
-  <div className="flex-1 min-w-0">
-    <div className="text-[13px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
-    <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
-  </div>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28 }}
+          className="relative rounded-2xl px-3.5 py-3 flex items-center gap-3 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
+          style={cardStyle}
+          onClick={() => {
+            if (articleFavorites.length === 0) return
+            if (articleFavorites.length === 1) {
+              onOpenArticle?.(articleFavorites[0].id)
+            } else {
+              onOpenFavorites?.()
+            }
+          }}
+        >
+          <div className="w-8 h-8 rounded-xl bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-sm shrink-0">
+            ★
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
+            <div className="text-[10px] text-[#B9ACA0]">{t.favoritesSub}</div>
+          </div>
 
-  <div className="flex -space-x-2 shrink-0">
-    {articleFavorites.length === 0 && (
-      <div className="w-7 h-7 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
-        </svg>
+          <div className="flex -space-x-2 shrink-0">
+            {articleFavorites.length === 0 && (
+              <div className="w-7 h-7 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
+                </svg>
+              </div>
+            )}
+
+            {articleFavorites.slice(0, 4).map((item, idx) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenArticle?.(item.id)
+                }}
+                onContextMenu={(e) => e.preventDefault()}
+                className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative active:scale-90 transition-transform"
+                style={{ zIndex: 10 - idx }}
+              >
+                <img
+                  src={item.imagePng}
+                  alt=""
+                  draggable={false}
+                  className="w-full h-full object-cover pointer-events-none select-none"
+                />
+              </button>
+            ))}
+
+            {articleFavorites.length > 4 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenFavorites?.()
+                }}
+                className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[9px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
+                style={{ zIndex: 0 }}
+              >
+                +{articleFavorites.length - 4}
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.32 }}
+          className="relative rounded-2xl p-4 overflow-hidden"
+          style={cardStyle}
+        >
+          <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">{t.quote}</p>
+          <p className="mt-2 text-[11px] text-[#D8A35C] font-display">Cordwainer</p>
+        </motion.div>
+      </motion.div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
+        <BottomDock active="search" lang={lang} />
       </div>
-    )}
-
-    {articleFavorites.slice(0, 4).map((item, idx) => (
-      <button
-        key={item.id}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onOpenArticle?.(item.id)
-        }}
-        onContextMenu={(e) => e.preventDefault()}
-        className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative active:scale-90 transition-transform"
-        style={{ zIndex: 10 - idx }}
-      >
-        <img
-          src={item.imagePng}
-          alt=""
-          draggable={false}
-          className="w-full h-full object-cover pointer-events-none select-none"
-        />
-      </button>
-    ))}
-
-    {articleFavorites.length > 4 && (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onOpenFavorites?.()
-        }}
-        className="w-7 h-7 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[9px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
-        style={{ zIndex: 0 }}
-      >
-        +{articleFavorites.length - 4}
-      </button>
-    )}
-  </div>
-</motion.div>
-        
-                  
+    </div>
+  )
+}
