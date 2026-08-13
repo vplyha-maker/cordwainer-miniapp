@@ -331,9 +331,9 @@ export function HomePage({
           })}
         </div>
 
-        {/* ========== ИЗБРАННОЕ — круглая звезда + крупные аватарки ========== */}
+        {/* ========== ИЗБРАННОЕ — ещё крупнее ========== */}
         <div
-          className="relative rounded-2xl px-3.5 py-3.5 flex items-center gap-3.5 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
+          className="relative rounded-2xl px-4 py-4 flex items-center gap-4 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
           style={cardStyle}
           onClick={() => {
             if (articleFavorites.length === 0) return
@@ -344,21 +344,21 @@ export function HomePage({
             }
           }}
         >
-          {/* Звезда — полностью круглая */}
-          <div className="w-11 h-11 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-xl shrink-0">
+          {/* Звезда */}
+          <div className="w-12 h-12 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-2xl shrink-0">
             ★
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
-            <div className="text-[11px] text-[#B9ACA0] mt-0.5">{t.favoritesSub}</div>
+            <div className="text-[15px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
+            <div className="text-[12px] text-[#B9ACA0] mt-0.5">{t.favoritesSub}</div>
           </div>
 
           {/* Аватарки статей */}
-          <div className="flex -space-x-2.5 shrink-0">
+          <div className="flex -space-x-3 shrink-0">
             {articleFavorites.length === 0 && (
-              <div className="w-9 h-9 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="w-10 h-10 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
                 </svg>
               </div>
@@ -373,7 +373,7 @@ export function HomePage({
                   onOpenArticle?.(item.id)
                 }}
                 onContextMenu={(e) => e.preventDefault()}
-                className="w-9 h-9 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative active:scale-90 transition-transform"
+                className="w-10 h-10 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative active:scale-90 transition-transform"
                 style={{ zIndex: 10 - idx }}
               >
                 <img
@@ -392,7 +392,7 @@ export function HomePage({
                   e.stopPropagation()
                   onOpenFavorites?.()
                 }}
-                className="w-9 h-9 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[10px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
+                className="w-10 h-10 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[11px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
                 style={{ zIndex: 0 }}
               >
                 +{articleFavorites.length - 4}
