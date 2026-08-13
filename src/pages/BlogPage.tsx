@@ -15,6 +15,7 @@ type BlogPageProps = {
   onToggleArticleFavorite?: (articleId: string, cover: string) => void
   initialArticleId?: string | null
   onArticleOpened?: () => void
+  initialShowFavorites?: boolean
 }
 
 type ViewState = 'cover' | 'journal' | 'article' | 'collaboration' | 'about'
@@ -44,6 +45,7 @@ export function BlogPage({
   onToggleArticleFavorite,
   initialArticleId = null,
   onArticleOpened,
+  initialShowFavorites = false,
 }: BlogPageProps) {
   const [view, setView] = useState<ViewState>('cover')
   const [searchQuery, setSearchQuery] = useState('')
@@ -51,6 +53,7 @@ export function BlogPage({
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
   const [emailCopied, setEmailCopied] = useState(false)
   const [aboutClickCount, setAboutClickCount] = useState(0)
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
   const articleScrollRef = useRef<HTMLDivElement>(null)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -58,14 +61,18 @@ export function BlogPage({
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
 
-  // Открываем статью сразу, если пришли из избранного
+  // Открываем статью или список избранного
   useEffect(() => {
     if (initialArticleId) {
       setActiveArticleId(initialArticleId)
       setView('article')
+      setShowOnlyFavorites(false)
       onArticleOpened?.()
+    } else if (initialShowFavorites) {
+      setShowOnlyFavorites(true)
+      setView('journal')
     }
-  }, [initialArticleId])
+  }, [initialArticleId, initialShowFavorites])
 
   useEffect(() => {
     if (view === 'article' && articleScrollRef.current) {
@@ -124,8 +131,8 @@ export function BlogPage({
     const tg = getWebApp()
 
     const appUrl = 'https://t.me/YourBotName/app'
-    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
+    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
+    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
 
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -227,13 +234,19 @@ export function BlogPage({
     WebkitBackdropFilter: 'blur(10px)',
   }
 
-  const filteredArticles = BLOG_ARTICLES.filter((article) => {
-    const title = lang === 'ru' ? article.titleRu : article.titleUk
-    const tag = lang === 'ru' ? article.tagRu : article.tagUk
-    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesFilter = activeFilter === 'all' || tag === activeFilter
-    return matchesSearch && matchesFilter
-  }).slice().reverse()
+  const filteredArticles = BLOG_ARTICLES
+    .filter((article) => {
+      if (showOnlyFavorites) {
+        return favoriteArticleIds.includes(article.id)
+      }
+      const title = lang === 'ru' ? article.titleRu : article.titleUk
+      const tag = lang === 'ru' ? article.tagRu : article.tagUk
+      const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchesFilter = activeFilter === 'all' || tag === activeFilter
+      return matchesSearch && matchesFilter
+    })
+    .slice()
+    .reverse()
 
   const activeArticle = activeArticleId ? BLOG_ARTICLES.find((a) => a.id === activeArticleId) : null
   const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
@@ -247,7 +260,10 @@ export function BlogPage({
         onClick={() => {
           triggerHaptic('light')
           if (view === 'article') setView('journal')
-          else if (view === 'journal') setView('cover')
+          else if (view === 'journal') {
+            setShowOnlyFavorites(false)
+            setView('cover')
+          }
           else if (view === 'about') setView('collaboration')
           else if (view === 'collaboration') setView('cover')
           else onBack?.()
@@ -306,6 +322,7 @@ export function BlogPage({
                   type="button"
                   onClick={() => {
                     triggerHaptic()
+                    setShowOnlyFavorites(false)
                     setView('journal')
                   }}
                   whileTap={{ scale: 0.94 }}
@@ -505,50 +522,68 @@ export function BlogPage({
             className="absolute inset-0 flex flex-col pt-16 z-20 bg-[#151210]"
           >
             <div className="px-4 shrink-0">
-              <h2 className="font-display text-[2rem] leading-none text-[#F5F1EB] mb-1">{t.journalTitle}</h2>
-              <p className="text-[11px] text-[#B9ACA0] mb-4 leading-relaxed max-w-[90%]">{t.journalDesc}</p>
+              <h2 className="font-display text-[2rem] leading-none text-[#F5F1EB] mb-1">
+                {showOnlyFavorites
+                  ? (lang === 'ru' ? 'Избранное' : 'Обране')
+                  : t.journalTitle}
+              </h2>
+              <p className="text-[11px] text-[#B9ACA0] mb-4 leading-relaxed max-w-[90%]">
+                {showOnlyFavorites
+                  ? (lang === 'ru'
+                      ? `Сохранённые статьи · ${favoriteArticleIds.length}`
+                      : `Збережені статті · ${favoriteArticleIds.length}`)
+                  : t.journalDesc}
+              </p>
 
-              <div className="relative mb-4">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="M21 21l-4.3-4.3" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder={t.searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-[#1D1815] border border-[#2A231D] rounded-xl py-2.5 pl-9 pr-4 text-[13px] text-[#F5F1EB] placeholder:text-[#B9ACA0]/60 focus:outline-none focus:border-[#D8A35C]/50 transition-colors"
-                />
-              </div>
+              {!showOnlyFavorites && (
+                <>
+                  <div className="relative mb-4">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.3-4.3" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={t.searchPlaceholder}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-[#1D1815] border border-[#2A231D] rounded-xl py-2.5 pl-9 pr-4 text-[13px] text-[#F5F1EB] placeholder:text-[#B9ACA0]/60 focus:outline-none focus:border-[#D8A35C]/50 transition-colors"
+                    />
+                  </div>
 
-              <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide snap-x">
-                {t.filters.map((filter) => (
-                  <button
-                    key={filter.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic()
-                      setActiveFilter(filter.id)
-                    }}
-                    className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border"
-                    style={{
-                      background: activeFilter === filter.id ? 'rgba(216,163,92,0.15)' : 'transparent',
-                      color: activeFilter === filter.id ? '#D8A35C' : '#B9ACA0',
-                      borderColor: activeFilter === filter.id ? 'rgba(216,163,92,0.3)' : 'rgba(185,172,160,0.2)',
-                    }}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
+                  <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide snap-x">
+                    {t.filters.map((filter) => (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic()
+                          setActiveFilter(filter.id)
+                        }}
+                        className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border"
+                        style={{
+                          background: activeFilter === filter.id ? 'rgba(216,163,92,0.15)' : 'transparent',
+                          color: activeFilter === filter.id ? '#D8A35C' : '#B9ACA0',
+                          borderColor: activeFilter === filter.id ? 'rgba(216,163,92,0.3)' : 'rgba(185,172,160,0.2)',
+                        }}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 mt-2 pb-8">
               <p className="text-[10px] tracking-[0.14em] uppercase text-[#D8A35C] mb-3 font-semibold">
-                {searchQuery ? 'Результаты' : t.fresh}
+                {showOnlyFavorites
+                  ? (lang === 'ru' ? 'ИЗБРАННОЕ' : 'ОБРАНЕ')
+                  : searchQuery
+                    ? 'Результаты'
+                    : t.fresh}
               </p>
 
               <div className="flex flex-col gap-3">
@@ -593,7 +628,11 @@ export function BlogPage({
                 })}
 
                 {filteredArticles.length === 0 && (
-                  <div className="text-center text-[#B9ACA0] text-[13px] py-10">Ничего не найдено</div>
+                  <div className="text-center text-[#B9ACA0] text-[13px] py-10">
+                    {showOnlyFavorites
+                      ? (lang === 'ru' ? 'Нет сохранённых статей' : 'Немає збережених статей')
+                      : 'Ничего не найдено'}
+                  </div>
                 )}
               </div>
             </div>
