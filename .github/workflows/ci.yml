@@ -1,1 +1,37 @@
+name: Code Quality & Build Check
+
+# Запускаем проверку при каждом пуше или PR в ветку main
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Скачиваем код репозитория
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 3. Устанавливаем зависимости из package.json
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Проверяем типы TypeScript (ловит опечатки, несуществующие пропсы и вызовы)
+      - name: Check TypeScript types
+        run: npx tsc --noEmit
+
+      # 5. Проверяем, собирается ли Vite-проект (ловит битые пути к картинкам/импортам)
+      - name: Build project
+        run: npm run build
 
