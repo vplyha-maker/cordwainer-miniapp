@@ -111,11 +111,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     WebkitBackdropFilter: 'blur(10px)',
   }
 
-  // Попытка добавить на главный экран
   const handleAddToHome = async () => {
-    // 1. Пробуем современный API (работает в некоторых браузерах / WebView)
     const deferredPrompt = (window as any).deferredPrompt
-
     if (deferredPrompt) {
       try {
         deferredPrompt.prompt()
@@ -124,12 +121,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           ;(window as any).deferredPrompt = null
           return
         }
-      } catch (e) {
-        // игнорируем
-      }
+      } catch (e) {}
     }
-
-    // 2. Если не сработало — показываем нашу инструкцию
     setShowWidgetHint(true)
   }
 
@@ -270,7 +263,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           </div>
         </button>
 
-        {/* Кнопка «На главный экран» */}
+        {/* ========== КНОПКА «НА ГЛАВНЫЙ ЭКРАН» ========== */}
         <button
           onClick={handleAddToHome}
           className="w-full relative rounded-2xl px-4 py-3.5 flex items-center gap-3.5 mb-5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
@@ -340,7 +333,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         <BottomDock active="search" lang={lang} />
       </div>
 
-      {/* Модалка с инструкцией */}
+      {/* Модалка */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
