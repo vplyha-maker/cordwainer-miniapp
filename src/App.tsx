@@ -225,6 +225,12 @@ export default function App() {
             favorites={favorites}
             onOpenArticle={(articleId) => {
               setPendingArticleId(articleId)
+              setShowOnlyFavorites(false)
+              setScreen('blog')
+            }}
+            onOpenFavorites={() => {
+              setPendingArticleId(null)
+              setShowOnlyFavorites(true)
               setScreen('blog')
             }}
           />
@@ -235,6 +241,7 @@ export default function App() {
             key="blog"
             onBack={() => {
               setPendingArticleId(null)
+              setShowOnlyFavorites(false)
               setScreen('home')
             }}
             lang={lang}
@@ -258,9 +265,10 @@ export default function App() {
             }
             initialArticleId={pendingArticleId}
             onArticleOpened={() => setPendingArticleId(null)}
+            initialShowFavorites={showOnlyFavorites}
           />
         )}
       </AnimatePresence>
     </div>
   )
- }
+}
