@@ -62,7 +62,6 @@ export default function App() {
 
   const [showPerfHint, setShowPerfHint] = useState(false)
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
-  const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
   const handleSetLang = (next: Lang) => {
