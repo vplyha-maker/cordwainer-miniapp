@@ -125,6 +125,7 @@ export function BlogPage({
     }
   }
 
+  // ===== ИСПРАВЛЕННАЯ ФУНКЦИЯ =====
   const handleShareArticle = (title: string, tag: string) => {
     triggerHaptic('medium')
     const tg = getWebApp()
@@ -588,7 +589,6 @@ export function BlogPage({
                     : t.fresh}
               </p>
 
-              {/* Список статей без Framer Motion — исправление бага Android */}
               <div className="flex flex-col gap-3">
                 {filteredArticles.map((article) => {
                   const title = lang === 'ru' ? article.titleRu : article.titleUk
@@ -805,4 +805,4 @@ export function BlogPage({
       </AnimatePresence>
     </div>
   )
- }
+}
