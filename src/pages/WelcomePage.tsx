@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang, FavoriteItem } from '../App'
 
@@ -11,8 +12,8 @@ type WelcomePageProps = {
 }
 
 export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [] }: WelcomePageProps) {
-  // ДОБАВЛЕНО: Фильтруем только блоговые записи для этой страницы
   const blogFavorites = favorites.filter((f) => f.type === 'blog')
+  const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   const t = {
     ru: {
@@ -29,6 +30,14 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Начать обучение',
       favorites: 'Избранное',
       seeAll: 'Смотреть все',
+      addToHome: 'На главный экран',
+      addToHomeSub: 'Быстрый доступ к приложению',
+      widgetTitle: 'Добавить на главный экран',
+      widgetText: 'Так вы сможете открывать Cordwainer одним касанием, как обычное приложение.',
+      widgetStep1: '1. Нажмите кнопку ⋮ вверху справа',
+      widgetStep2: '2. Выберите «Добавить на главный экран»',
+      widgetStep3: '3. Подтвердите добавление',
+      widgetClose: 'Понятно',
     },
     uk: {
       tagline: 'Енциклопедія взуттєвої майстерності',
@@ -44,6 +53,14 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Почати навчання',
       favorites: 'Обране',
       seeAll: 'Дивитись усі',
+      addToHome: 'На головний екран',
+      addToHomeSub: 'Швидкий доступ до застосунку',
+      widgetTitle: 'Додати на головний екран',
+      widgetText: 'Так ви зможете відкривати Cordwainer одним дотиком, як звичайний застосунок.',
+      widgetStep1: '1. Натисніть кнопку ⋮ вгорі справа',
+      widgetStep2: '2. Оберіть «Додати на головний екран»',
+      widgetStep3: '3. Підтвердіть додавання',
+      widgetClose: 'Зрозуміло',
     },
   }[lang]
 
@@ -86,8 +103,39 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     },
   ]
 
+  const cardStyle = {
+    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
+    boxShadow:
+      'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+  }
+
+  // Попытка добавить на главный экран
+  const handleAddToHome = async () => {
+    // 1. Пробуем современный API (работает в некоторых браузерах / WebView)
+    const deferredPrompt = (window as any).deferredPrompt
+
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt()
+        const { outcome } = await deferredPrompt.userChoice
+        if (outcome === 'accepted') {
+          ;(window as any).deferredPrompt = null
+          return
+        }
+      } catch (e) {
+        // игнорируем
+      }
+    }
+
+    // 2. Если не сработало — показываем нашу инструкцию
+    setShowWidgetHint(true)
+  }
+
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
+      {/* Hero */}
       <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] overflow-hidden z-20">
         <img
           src="/hero-cover.png"
@@ -104,22 +152,15 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
           <div className="flex items-start justify-between">
             <div>
-              <motion.h1
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
+              <h1
                 className="font-display text-[2.35rem] leading-[0.9] text-[#F5F1EB]"
                 style={{ textShadow: '0 2px 20px rgba(0,0,0,.6)' }}
               >
                 Cordwainer
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="mt-1.5 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]"
-              >
+              </h1>
+              <p className="mt-1.5 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]">
                 {t.tagline}
-              </motion.p>
+              </p>
             </div>
 
             <div className="flex flex-col items-center gap-1.5 shrink-0">
@@ -171,27 +212,15 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3"
-      >
+      {/* Content */}
+      <div className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3">
+        {/* Categories */}
         <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
-          {categories.map((item, index) => (
-            <motion.button
+          {categories.map((item) => (
+            <button
               key={item.title}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + index * 0.06, duration: 0.4 }}
-              whileTap={{ scale: 0.88 }}
-              className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full"
-              style={{
-                background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-              }}
+              className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full active:scale-[0.96] transition-transform"
+              style={cardStyle}
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
@@ -211,39 +240,20 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                   {item.sub}
                 </div>
               </div>
-            </motion.button>
+            </button>
           ))}
         </div>
 
-        <motion.button
+        {/* Start button */}
+        <button
           onClick={onStart}
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.5 }}
-          whileTap={{ scale: 0.94 }}
-          className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-5 cursor-pointer"
+          className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-4 cursor-pointer active:scale-[0.97] transition-transform"
           style={{
             background: 'linear-gradient(180deg,#F8F3EB 0%,#ECE1D0 100%)',
             border: '1px solid rgba(214,179,126,.30)',
             boxShadow: '0 14px 36px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.95)',
-            transform: 'translateZ(0)',
           }}
         >
-          <motion.div
-            className="absolute inset-y-0 w-32 pointer-events-none"
-            animate={{ x: ['-120%', '350%'] }}
-            transition={{
-              repeat: Infinity,
-              duration: 3.2,
-              repeatDelay: 1.8,
-              ease: 'easeInOut',
-            }}
-            style={{
-              background:
-                'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 15%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0) 85%, transparent 100%)',
-              transform: 'skewX(-20deg)',
-            }}
-          />
           <div className="relative h-full flex items-center justify-between px-6">
             <div className="flex flex-col text-left">
               <span
@@ -256,23 +266,32 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 {t.start}
               </span>
             </div>
-            <motion.div
-              animate={{ x: [0, 6, 0] }}
-              transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
-              style={{ fontSize: 28, color: '#8F6A42' }}
-            >
-              →
-            </motion.div>
+            <div style={{ fontSize: 28, color: '#8F6A42' }}>→</div>
           </div>
-        </motion.button>
+        </button>
 
-        {/* БЛОК ИЗБРАННОЕ (РОВНО 4 СЛОТА ДЛЯ БЛОГА) */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.5 }}
-          className="mb-2"
+        {/* Кнопка «На главный экран» */}
+        <button
+          onClick={handleAddToHome}
+          className="w-full relative rounded-2xl px-4 py-3.5 flex items-center gap-3.5 mb-5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
+          style={cardStyle}
         >
+          <div className="w-11 h-11 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] shrink-0">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" />
+              <path d="M12 18h.01" />
+              <path d="M9 6h6" />
+            </svg>
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <div className="text-[14px] font-semibold text-[#F5F1EB]">{t.addToHome}</div>
+            <div className="text-[11px] text-[#B9ACA0] mt-0.5">{t.addToHomeSub}</div>
+          </div>
+          <div className="text-[#D8A35C] text-lg opacity-70">＋</div>
+        </button>
+
+        {/* Favorites */}
+        <div className="mb-2">
           <div className="flex items-center justify-between mb-2 px-0.5">
             <span className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0]">
               {t.favorites}
@@ -284,48 +303,112 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
           <div className="grid grid-cols-4 gap-2">
             {[0, 1, 2, 3].map((index) => {
-              // ОБНОВЛЕНО: Берем элементы только с типом 'blog'
               const item = blogFavorites[index]
 
               return (
-                <motion.div
+                <div
                   key={index}
                   onClick={() => {
                     if (item?.id === 'blog-orvard' && onOpenBlog) {
                       onOpenBlog()
                     } else if (!item && onStart) {
-                      onStart() // Если слот пустой, открываем меню для поиска
+                      onStart()
                     }
                   }}
-                  whileTap={item ? { scale: 0.88 } : { scale: 0.95 }}
-                  className={`relative aspect-square rounded-xl flex items-center justify-center overflow-hidden cursor-pointer`}
-                  style={{
-                    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-                    boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                  }}
+                  className="relative aspect-square rounded-xl flex items-center justify-center overflow-hidden cursor-pointer active:scale-95 transition-transform"
+                  style={cardStyle}
                 >
-                  {/* ОБНОВЛЕНО: Заменяем эмодзи на PNG картинку, вписанную в кнопку (object-cover) */}
                   {item ? (
-                    <img 
-                      src={item.imagePng} 
-                      alt={item.id} 
-                      className="w-full h-full object-cover" 
+                    <img
+                      src={item.imagePng}
+                      alt={item.id}
+                      className="w-full h-full object-cover"
+                      draggable={false}
                     />
                   ) : (
                     <span className="text-[16px] font-light text-[#B9ACA0]/30">+</span>
                   )}
-                </motion.div>
+                </div>
               )
             })}
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
+      {/* Bottom Dock */}
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
         <BottomDock active="search" lang={lang} />
       </div>
+
+      {/* Модалка с инструкцией */}
+      <AnimatePresence>
+        {showWidgetHint && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end justify-center"
+            onClick={() => setShowWidgetHint(false)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md mx-4 mb-6 rounded-3xl overflow-hidden"
+              style={{
+                background: 'linear-gradient(180deg, #2A231D 0%, #1A1612 100%)',
+                border: '1px solid rgba(198,164,122,0.25)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              }}
+            >
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C]">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                      <rect x="5" y="2" width="14" height="20" rx="2" />
+                      <path d="M12 18h.01" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-[16px] font-semibold text-[#F5F1EB]">{t.widgetTitle}</div>
+                  </div>
+                </div>
+
+                <p className="text-[13px] text-[#B9ACA0] leading-relaxed mb-5">
+                  {t.widgetText}
+                </p>
+
+                <div className="space-y-3 mb-6">
+                  <div className="text-[13px] text-[#F5F1EB]/90">
+                    <span className="text-[#D8A35C] font-medium">{t.widgetStep1}</span>
+                  </div>
+                  <div className="text-[13px] text-[#F5F1EB]/90">
+                    <span className="text-[#D8A35C] font-medium">{t.widgetStep2}</span>
+                  </div>
+                  <div className="text-[13px] text-[#F5F1EB]/90">
+                    <span className="text-[#D8A35C] font-medium">{t.widgetStep3}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowWidgetHint(false)}
+                  className="w-full py-3.5 rounded-2xl text-[13px] font-semibold uppercase tracking-wider active:scale-[0.98] transition-transform"
+                  style={{
+                    background: 'linear-gradient(180deg, #D8A35C 0%, #C08A3E 100%)',
+                    color: '#1A1612',
+                  }}
+                >
+                  {t.widgetClose}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
