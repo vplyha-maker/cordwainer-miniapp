@@ -61,7 +61,6 @@ export function BlogPage({
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
 
-  // Открываем статью или список избранного
   useEffect(() => {
     if (initialArticleId) {
       setActiveArticleId(initialArticleId)
@@ -589,26 +588,23 @@ export function BlogPage({
                     : t.fresh}
               </p>
 
+              {/* Список статей без Framer Motion — исправление бага Android */}
               <div className="flex flex-col gap-3">
-                {filteredArticles.map((article, i) => {
+                {filteredArticles.map((article) => {
                   const title = lang === 'ru' ? article.titleRu : article.titleUk
                   const excerpt = lang === 'ru' ? article.excerptRu : article.excerptUk
                   const tag = lang === 'ru' ? article.tagRu : article.tagUk
                   const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk
 
                   return (
-                    <motion.div
+                    <div
                       key={article.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2, delay: Math.min(i * 0.025, 0.25) }}
-                      whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         triggerHaptic()
                         setActiveArticleId(article.id)
                         setView('article')
                       }}
-                      className="relative rounded-2xl p-4 overflow-hidden cursor-pointer"
+                      className="relative rounded-2xl p-4 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
                       style={cardStyle}
                     >
                       <div className="flex justify-between items-center mb-2">
@@ -618,15 +614,21 @@ export function BlogPage({
                           </span>
                           <span className="text-[9px] text-[#B9ACA0]">· {readTime}</span>
                         </div>
-                        {article.isNew && <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />}
+                        {article.isNew && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />
+                        )}
                       </div>
-                      <h3 className="text-[15px] font-semibold leading-snug text-[#F5F1EB] mb-1.5">{title}</h3>
-                      <p className="text-[11.5px] text-[#B9ACA0]/80 leading-relaxed line-clamp-2 mb-3">{excerpt}</p>
-                      <div className="flex items-center text-[11px] text-[#D8A35C] font-medium group">
+                      <h3 className="text-[15px] font-semibold leading-snug text-[#F5F1EB] mb-1.5">
+                        {title}
+                      </h3>
+                      <p className="text-[11.5px] text-[#B9ACA0]/80 leading-relaxed line-clamp-2 mb-3">
+                        {excerpt}
+                      </p>
+                      <div className="flex items-center text-[11px] text-[#D8A35C] font-medium">
                         {t.readBtn}
-                        <span className="ml-1 opacity-70 group-hover:translate-x-1 transition-transform">→</span>
+                        <span className="ml-1 opacity-70">→</span>
                       </div>
-                    </motion.div>
+                    </div>
                   )
                 })}
 
@@ -803,4 +805,4 @@ export function BlogPage({
       </AnimatePresence>
     </div>
   )
-}
+ }
