@@ -63,7 +63,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   excerptRu: 'Производственная панорама: от гибких мастерских до индустриальных гигантов',
   excerptUk: 'Виробнича панорама: від гнучких майстерень до індустріальних гігантів',
   tagRu: 'ПРОИЗВОДСТВО',
-  tagUk: 'ВИРОБНИТСТВО',
+  tagUk: 'ВИРОБНИЦТВО',
   readTimeRu: '5 мин',
   readTimeUk: '7 хв',
   cover: 'public/chinamanuf/xds.jpg',
