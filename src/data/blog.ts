@@ -66,7 +66,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   tagUk: 'ВИРОБНИЦТВО',
   readTimeRu: '5 мин',
   readTimeUk: '7 хв',
-  cover: 'public/chinamanuf/xds.jpg',
+  cover: 'chinamanuf/xds.jpg',
   isNew: true,
   createdAt: '2026-09-14',
 },
