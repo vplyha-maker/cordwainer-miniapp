@@ -5,7 +5,7 @@ import { BLOG_ARTICLES } from '../data/blog'
 import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
 import AboutProject from '../components/AboutProject'
-import EmptyState from '../components/EmptyState' // Убедитесь, что путь корректный
+import { EmptyState } from '../components/EmptyState'
 
 type BlogPageProps = {
   onBack?: () => void
