@@ -89,8 +89,56 @@
 }
 
 /* =========================================================
+   UI COMPONENTS (Optimized for performance)
+   ========================================================= */
+
+/* Primary Button */
+.btn-primary {
+  @apply relative overflow-hidden w-full h-[72px] rounded-[26px] cursor-pointer transition-transform active:scale-[0.97];
+  background: linear-gradient(180deg, #F8F3EB 0%, #E2D2BA 100%);
+  border: 1px solid rgba(214, 179, 126, 0.4);
+  /* Облегченная, но выразительная тень */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  will-change: transform;
+}
+
+/* Language Toggle Pills */
+.lang-toggle {
+  @apply flex items-center justify-center w-10 h-7 rounded-full text-[10px] font-bold tracking-wide transition-colors cursor-pointer;
+  will-change: background-color, color;
+}
+.lang-toggle.active {
+  background: rgba(216, 163, 92, 0.25);
+  color: #D8A35C;
+  box-shadow: 0 0 8px rgba(216, 163, 92, 0.2);
+}
+.lang-toggle.inactive {
+  background: transparent;
+  color: #B9ACA0;
+}
+.lang-toggle.inactive:hover {
+  color: #F5F1EB;
+}
+
+/* Small Action Pill (Add to Home) */
+.action-pill {
+  @apply flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-medium transition-transform active:scale-95 cursor-pointer;
+  background: rgba(29, 24, 21, 0.8);
+  border: 1px solid rgba(198, 164, 122, 0.25);
+  color: #D8A35C;
+  will-change: transform;
+}
+
+/* Simplified Card Base (No backdrop-filter for better FPS) */
+.card-simplified {
+  background: linear-gradient(180deg, rgba(39, 33, 29, 0.95) 0%, rgba(26, 22, 18, 0.95) 100%);
+  box-shadow: inset 0 1px 0 rgba(198, 164, 122, 0.15), 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(198, 164, 122, 0.05);
+}
+
+
+/* =========================================================
    PERF FAST MODE
-   Класс ставится на <html>: document.documentElement.classList.add('perf-fast')
    ========================================================= */
 
 html.perf-fast .glass {
@@ -99,24 +147,20 @@ html.perf-fast .glass {
   background: var(--color-surface);
 }
 
-/* Убираем тяжёлый blur везде */
 html.perf-fast * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-/* Упрощаем тени: оставляем только лёгкую глубину */
 html.perf-fast .leather-dock {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
-/* Бесконечные анимации (пульс NEW, блик и т.п.) */
 html.perf-fast [data-perf-anim],
 html.perf-fast .perf-anim {
   animation: none !important;
 }
 
-/* Меньше работы композитору при скролле */
 html.perf-fast body {
   -webkit-font-smoothing: auto;
 }
