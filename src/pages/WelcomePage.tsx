@@ -32,12 +32,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       seeAll: 'Смотреть все',
       addToHome: 'На главный экран',
       addToHomeSub: 'Быстрый доступ к приложению',
-      widgetTitle: 'Добавить на главный экран',
-      widgetText: 'Так вы сможете открывать Cordwainer одним касанием, как обычное приложение.',
-      widgetStep1: '1. Нажмите кнопку ⋮ вверху справа',
-      widgetStep2: '2. Выберите «Добавить на главный экран»',
-      widgetStep3: '3. Подтвердите добавление',
-      widgetClose: 'Понятно',
+      widgetTitle: 'Установка приложения',
+      widgetText: 'Telegram не позволяет сохранять иконки напрямую. Откройте приложение в вашем браузере (Chrome или Safari), чтобы добавить его на экран.',
+      widgetStep1: '1. Нажмите «Открыть в браузере» ниже',
+      widgetStep2: '2. В меню браузера выберите «Добавить на главный экран»',
+      widgetStep3: '3. Подтвердите установку',
+      widgetAction: 'Открыть в браузере',
     },
     uk: {
       tagline: 'Енциклопедія взуттєвої майстерності',
@@ -55,12 +55,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       seeAll: 'Дивитись усі',
       addToHome: 'На головний екран',
       addToHomeSub: 'Швидкий доступ до застосунку',
-      widgetTitle: 'Додати на головний екран',
-      widgetText: 'Так ви зможете відкривати Cordwainer одним дотиком, як звичайний застосунок.',
-      widgetStep1: '1. Натисніть кнопку ⋮ вгорі справа',
-      widgetStep2: '2. Оберіть «Додати на головний екран»',
-      widgetStep3: '3. Підтвердіть додавання',
-      widgetClose: 'Зрозуміло',
+      widgetTitle: 'Встановлення застосунку',
+      widgetText: 'Telegram не дозволяє зберігати іконки безпосередньо. Відкрийте застосунок у вашому браузері (Chrome або Safari), щоб додати його на екран.',
+      widgetStep1: '1. Натисніть «Відкрити в браузері» нижче',
+      widgetStep2: '2. У меню браузера оберіть «На головний екран»',
+      widgetStep3: '3. Підтвердіть встановлення',
+      widgetAction: 'Відкрити в браузері',
     },
   }[lang]
 
@@ -124,6 +124,21 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       } catch (e) {}
     }
     setShowWidgetHint(true)
+  }
+
+  const handleOpenInBrowser = () => {
+    const appUrl = 'https://cordwainer-miniapp.vercel.app'
+    const tg = (window as any).Telegram?.WebApp
+
+    // Если мы в Телеграме, заставляем его открыть ссылку во внешнем браузере (Chrome/Safari)
+    if (tg && tg.openLink) {
+      tg.openLink(appUrl)
+    } else {
+      // Запасной вариант для обычных браузеров
+      window.open(appUrl, '_blank')
+    }
+    
+    setShowWidgetHint(false)
   }
 
   return (
@@ -388,14 +403,14 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 </div>
 
                 <button
-                  onClick={() => setShowWidgetHint(false)}
-                  className="w-full py-3.5 rounded-2xl text-[13px] font-semibold uppercase tracking-wider active:scale-[0.98] transition-transform"
+                  onClick={handleOpenInBrowser}
+                  className="w-full py-3.5 rounded-2xl text-[13px] font-semibold uppercase tracking-wider active:scale-[0.98] transition-transform cursor-pointer"
                   style={{
                     background: 'linear-gradient(180deg, #D8A35C 0%, #C08A3E 100%)',
                     color: '#1A1612',
                   }}
                 >
-                  {t.widgetClose}
+                  {t.widgetAction}
                 </button>
               </div>
             </motion.div>
