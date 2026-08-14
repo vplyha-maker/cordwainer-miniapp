@@ -35,7 +35,7 @@ export function BottomDock({
       id: 'search',
       label: labels.search,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="11" cy="11" r="7" />
           <path d="M20 20L16.5 16.5" />
         </svg>
@@ -45,8 +45,12 @@ export function BottomDock({
       id: 'workspace',
       label: labels.workspace,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 5v14M5 12h14" />
+        // Заменил "плюс" на элегантную иконку инструментов/слоев
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
+          <path d="M12 12l8-4.5" />
+          <path d="M12 12v9" />
+          <path d="M12 12L4 7.5" />
         </svg>
       ),
     },
@@ -54,7 +58,7 @@ export function BottomDock({
       id: 'collection',
       label: labels.collection,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       ),
@@ -63,7 +67,7 @@ export function BottomDock({
       id: 'profile',
       label: labels.profile,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="8" r="4" />
           <path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6" />
         </svg>
@@ -72,72 +76,60 @@ export function BottomDock({
   ]
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-2 pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 pointer-events-none">
+      {/* Container */}
       <div
-        className="pointer-events-auto relative mx-auto max-w-md overflow-hidden rounded-[28px] p-1.5 flex items-center justify-between"
+        className="pointer-events-auto relative mx-auto max-w-[360px] overflow-hidden rounded-[24px] p-1.5 flex items-center justify-between"
         style={{
-          background: 'linear-gradient(180deg, #321E14 0%, #1A0D07 100%)',
-          border: '1px solid rgba(220, 165, 100, 0.3)',
+          background: 'rgba(25, 20, 18, 0.85)', // Глубокий кофейно-угольный оттенок
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(216, 163, 92, 0.12)', // Тончайшая золотистая окантовка
           boxShadow: `
-            0 20px 40px rgba(0,0,0,0.85),
-            inset 0 1px 1px rgba(255,255,255,0.08),
-            inset 0 -3px 12px rgba(0,0,0,0.6)
+            0 24px 48px rgba(0,0,0,0.6), /* Глубокая тень для эффекта левитации */
+            0 0 0 1px rgba(0,0,0,0.8), /* Темный ободок для контраста */
+            inset 0 1px 1px rgba(255,255,255,0.08) /* Верхний светлый блик (bevel) */
           `,
         }}
       >
-        <div
-          className="absolute inset-0 pointer-events-none z-0"
-          style={{
-            background: 'linear-gradient(180deg, rgba(255,255,255,.05), transparent 35%)',
-          }}
-        />
-
-        <div
-          className="absolute inset-[4px] rounded-[24px] pointer-events-none z-0"
-          style={{
-            border: '1px dashed rgba(220, 170, 110, 0.2)',
-          }}
-        />
-
-        <div className="relative z-10 flex w-full justify-between">
+        <div className="relative z-10 flex w-full justify-between gap-1">
           {TABS.map((tab) => {
             const isActive = active === tab.id
 
             return (
               <motion.button
                 key={tab.id}
-                whileTap={{ scale: 0.94 }}
+                whileTap={{ scale: 0.92 }}
                 onClick={() => onChange?.(tab.id)}
-                className="relative flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-[22px]"
+                className="relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-[18px] cursor-pointer"
                 style={{
-                  color: isActive ? '#E8B673' : '#8A7A6E',
+                  color: isActive ? '#D8A35C' : '#8A7A6E',
                 }}
               >
+                {/* Active Indicator (Pill) */}
                 {isActive && (
                   <motion.div
                     layoutId="activeDock"
                     transition={{
                       type: 'spring',
-                      stiffness: 450,
-                      damping: 32,
+                      stiffness: 500,
+                      damping: 35,
+                      mass: 0.8
                     }}
-                    className="absolute inset-0 rounded-[22px] z-0"
+                    className="absolute inset-0 rounded-[18px] z-0"
                     style={{
-                      background: 'linear-gradient(180deg, #60371E 0%, #3D2010 100%)',
-                      boxShadow: `
-                        inset 0 1px 1px rgba(255,255,255,0.12),
-                        inset 0 -2px 4px rgba(0,0,0,0.3),
-                        0 0 15px rgba(216,163,92,.15)
-                      `,
+                      background: 'linear-gradient(180deg, rgba(216,163,92,0.15) 0%, rgba(216,163,92,0.03) 100%)',
+                      border: '1px solid rgba(216,163,92,0.15)',
+                      boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05)',
                     }}
                   />
                 )}
 
+                {/* Icon */}
                 <motion.div
-                  className="relative z-10"
+                  className="relative z-10 flex items-center justify-center"
                   animate={{
-                    scale: isActive ? 1.1 : 1,
-                    y: isActive ? -1 : 0,
+                    y: isActive ? -2 : 0,
                   }}
                   transition={{
                     type: 'spring',
@@ -146,24 +138,32 @@ export function BottomDock({
                   }}
                   style={{
                     filter: isActive
-                      ? `
-                        drop-shadow(0 0 8px rgba(216,163,92,.4))
-                        drop-shadow(0 2px 4px rgba(0,0,0,.4))
-                      `
+                      ? 'drop-shadow(0 4px 6px rgba(216,163,92,0.25)) drop-shadow(0 0 12px rgba(216,163,92,0.15))'
                       : 'none',
                   }}
                 >
                   {tab.icon}
                 </motion.div>
 
+                {/* Label */}
                 <motion.span
-                  className="relative z-10 text-[10px] font-medium tracking-wide"
+                  className="relative z-10 text-[9.5px] font-medium tracking-[0.02em]"
                   animate={{
-                    opacity: isActive ? 1 : 0.9,
+                    opacity: isActive ? 1 : 0.7,
+                    fontWeight: isActive ? 600 : 500,
                   }}
                 >
                   {tab.label}
                 </motion.span>
+
+                {/* Active dot below text */}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeDot"
+                    className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#D8A35C]"
+                    style={{ boxShadow: '0 0 6px rgba(216,163,92,0.6)' }}
+                  />
+                )}
               </motion.button>
             )
           })}
