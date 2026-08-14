@@ -5,6 +5,7 @@ import { BLOG_ARTICLES } from '../data/blog'
 import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
 import AboutProject from '../components/AboutProject'
+import EmptyState from '../components/EmptyState' // Убедитесь, что путь корректный
 
 type BlogPageProps = {
   onBack?: () => void
@@ -511,7 +512,6 @@ export function BlogPage({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            // overflow-x-hidden и max-w-full блокируют езду влево-вправо на мобильных
             className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto overflow-x-hidden w-full max-w-full px-5 pt-20 pb-10 box-border"
           >
             <div className="flex flex-col mt-4 mb-10 border-t border-[#3A332D] pt-8">
@@ -547,7 +547,6 @@ export function BlogPage({
                   {emailCopied ? t.copiedBtn : t.copyBtn}
                 </button>
 
-                {/* Добавлена пружинистая анимация с помощью framer-motion */}
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.95 }}
@@ -698,32 +697,19 @@ export function BlogPage({
                 })}
 
                 {filteredArticles.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                    <div className="w-14 h-14 rounded-full bg-[#1D1815] flex items-center justify-center mb-4 border border-[#2A231D]">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="1.5">
-                        <circle cx="11" cy="11" r="8" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                    </div>
-                    <p className="text-[15px] font-semibold text-[#F5F1EB] mb-1">
-                      {showOnlyFavorites ? (lang === 'ru' ? 'Нет сохранённых статей' : 'Немає збережених статей') : t.emptyTitle}
-                    </p>
-                    <p className="text-[12px] text-[#B9ACA0] mb-6 max-w-[80%]">
-                      {showOnlyFavorites ? '' : t.emptyDesc}
-                    </p>
-                    {!showOnlyFavorites && (
-                      <button
-                        onClick={() => {
-                          triggerHaptic('light')
-                          setRawSearchQuery('')
-                          setActiveFilter('all')
-                        }}
-                        className="px-5 py-2.5 rounded-xl text-[11px] font-semibold uppercase tracking-wider text-[#151210] bg-[#D8A35C] active:scale-95 transition-transform focus-visible"
-                      >
-                        {t.emptyBtn}
-                      </button>
-                    )}
-                  </div>
+                  <EmptyState
+                    variant={showOnlyFavorites ? 'favorites' : 'search'}
+                    title={showOnlyFavorites ? (lang === 'ru' ? 'Нет сохранённых статей' : 'Немає збережених статей') : t.emptyTitle}
+                    description={showOnlyFavorites ? undefined : t.emptyDesc}
+                    action={!showOnlyFavorites ? {
+                      label: t.emptyBtn,
+                      onClick: () => {
+                        triggerHaptic('light')
+                        setRawSearchQuery('')
+                        setActiveFilter('all')
+                      }
+                    } : undefined}
+                  />
                 )}
               </div>
             </div>
