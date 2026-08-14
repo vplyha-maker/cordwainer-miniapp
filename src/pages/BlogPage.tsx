@@ -125,7 +125,7 @@ export function BlogPage({
     }
   }
 
-  // ===== ИСПРАВЛЕННАЯ ФУНКЦИЯ =====
+  // ===== ИСПРАВЛЕННАЯ ФУНКЦИЯ ======
   const handleShareArticle = (title: string, tag: string) => {
     triggerHaptic('medium')
     const tg = getWebApp()
