@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang, FavoriteItem } from '../App'
@@ -15,6 +15,19 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
   const blogFavorites = favorites.filter((f) => f.type === 'blog')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
+  // Инициализация языка из localStorage (если есть логика на уровне App, это дополнительная страховка)
+  useEffect(() => {
+    const savedLang = localStorage.getItem('app_lang') as Lang
+    if (savedLang && (savedLang === 'ru' || savedLang === 'uk')) {
+      if (savedLang !== lang) setLang(savedLang)
+    }
+  }, [])
+
+  const handleLangChange = (newLang: Lang) => {
+    localStorage.setItem('app_lang', newLang)
+    setLang(newLang)
+  }
+
   const t = {
     ru: {
       tagline: 'Энциклопедия обувного мастерства',
@@ -30,8 +43,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Начать обучение',
       favorites: 'Избранное',
       seeAll: 'Смотреть все',
-      addToHome: 'На главный экран',
-      addToHomeSub: 'Быстрый доступ к приложению',
+      addToHomeShort: 'Установить',
       widgetTitle: 'Установка приложения',
       widgetText: 'Telegram не позволяет сохранять иконки напрямую. Откройте приложение в вашем браузере (Chrome или Safari), чтобы добавить его на экран.',
       widgetStep1: '1. Нажмите «Открыть в браузере» ниже',
@@ -53,8 +65,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Почати навчання',
       favorites: 'Обране',
       seeAll: 'Дивитись усі',
-      addToHome: 'На головний екран',
-      addToHomeSub: 'Швидкий доступ до застосунку',
+      addToHomeShort: 'Встановити',
       widgetTitle: 'Встановлення застосунку',
       widgetText: 'Telegram не дозволяє зберігати іконки безпосередньо. Відкрийте застосунок у вашому браузері (Chrome або Safari), щоб додати його на екран.',
       widgetStep1: '1. Натисніть «Відкрити в браузері» нижче',
@@ -103,14 +114,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     },
   ]
 
-  const cardStyle = {
-    background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-    boxShadow:
-      'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
-  }
-
   const handleAddToHome = async () => {
     const deferredPrompt = (window as any).deferredPrompt
     if (deferredPrompt) {
@@ -130,14 +133,11 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
     const tg = (window as any).Telegram?.WebApp
 
-    // Если мы в Телеграме, заставляем его открыть ссылку во внешнем браузере (Chrome/Safari)
     if (tg && tg.openLink) {
       tg.openLink(appUrl)
     } else {
-      // Запасной вариант для обычных браузеров
       window.open(appUrl, '_blank')
     }
-    
     setShowWidgetHint(false)
   }
 
@@ -147,7 +147,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] overflow-hidden z-20">
         <img
           src="/hero-cover.png"
-          alt="Cordwainer"
+          alt="Cordwainer Background"
           className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
         />
         <div
@@ -159,50 +159,52 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         />
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
           <div className="flex items-start justify-between">
-            <div>
+            {/* Крупный логотип */}
+            <div className="flex-1 pr-2">
               <h1
-                className="font-display text-[2.35rem] leading-[0.9] text-[#F5F1EB]"
+                className="font-display text-[2.5rem] leading-[0.9] text-[#F5F1EB]"
                 style={{ textShadow: '0 2px 20px rgba(0,0,0,.6)' }}
               >
                 Cordwainer
               </h1>
-              <p className="mt-1.5 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]">
+              <p className="mt-2 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]">
                 {t.tagline}
               </p>
             </div>
 
-            <div className="flex flex-col items-center gap-1.5 shrink-0">
-              <button className="w-9 h-9 rounded-full bg-[#1D1815]/70 border border-[#C6A47A]/25 flex items-center justify-center text-[#F5F1EB] backdrop-blur-sm active:scale-90 transition-transform cursor-pointer">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="M20 20l-3.5-3.5" />
+            {/* Блок переключателя языков и кнопки установки */}
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <div className="flex bg-[#1D1815]/80 rounded-full p-1 border border-[#C6A47A]/20" role="group" aria-label="Language selection">
+                <button
+                  onClick={() => handleLangChange('ru')}
+                  className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
+                  aria-pressed={lang === 'ru'}
+                  role="button"
+                >
+                  RU
+                </button>
+                <button
+                  onClick={() => handleLangChange('uk')}
+                  className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}
+                  aria-pressed={lang === 'uk'}
+                  role="button"
+                >
+                  UA
+                </button>
+              </div>
+
+              {/* Мини-кнопка установки в едином стиле */}
+              <button 
+                onClick={handleAddToHome}
+                className="action-pill w-full flex items-center justify-center"
+                aria-label={t.addToHomeShort}
+                role="button"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" />
+                  <path d="M12 18h.01" />
                 </svg>
-              </button>
-
-              <button
-                onClick={() => setLang('ru')}
-                className="w-9 h-9 rounded-full border flex items-center justify-center text-[10px] font-bold tracking-wide backdrop-blur-sm active:scale-90 transition-transform cursor-pointer"
-                style={{
-                  background: lang === 'ru' ? 'rgba(216,163,92,0.25)' : 'rgba(29,24,21,0.70)',
-                  borderColor: lang === 'ru' ? '#D8A35C' : 'rgba(198,164,122,0.25)',
-                  color: lang === 'ru' ? '#D8A35C' : '#F5F1EB',
-                  boxShadow: lang === 'ru' ? '0 0 10px rgba(216,163,92,0.35)' : 'none',
-                }}
-              >
-                RU
-              </button>
-
-              <button
-                onClick={() => setLang('uk')}
-                className="w-9 h-9 rounded-full border flex items-center justify-center text-[10px] font-bold tracking-wide backdrop-blur-sm active:scale-90 transition-transform cursor-pointer"
-                style={{
-                  background: lang === 'uk' ? 'rgba(216,163,92,0.25)' : 'rgba(29,24,21,0.70)',
-                  borderColor: lang === 'uk' ? '#D8A35C' : 'rgba(198,164,122,0.25)',
-                  color: lang === 'uk' ? '#D8A35C' : '#F5F1EB',
-                  boxShadow: lang === 'uk' ? '0 0 10px rgba(216,163,92,0.35)' : 'none',
-                }}
-              >
-                UA
+                {t.addToHomeShort}
               </button>
             </div>
           </div>
@@ -222,20 +224,19 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
       {/* Content */}
       <div className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3">
-        {/* Categories */}
+        
+        {/* Categories (Optimized visual details) */}
         <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
           {categories.map((item) => (
             <button
               key={item.title}
-              className="relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full active:scale-[0.96] transition-transform"
-              style={cardStyle}
+              className="card-simplified relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full active:scale-[0.96] transition-transform"
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
                 style={{
                   background: `${item.accent}20`,
                   color: item.accent,
-                  boxShadow: `0 0 16px ${item.accent}40`,
                 }}
               >
                 {item.icon}
@@ -252,50 +253,24 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           ))}
         </div>
 
-        {/* Start button */}
+        {/* Primary Start button (Moved to index.css) */}
         <button
           onClick={onStart}
-          className="relative overflow-hidden w-full h-[72px] rounded-[26px] mb-4 cursor-pointer active:scale-[0.97] transition-transform"
-          style={{
-            background: 'linear-gradient(180deg,#F8F3EB 0%,#ECE1D0 100%)',
-            border: '1px solid rgba(214,179,126,.30)',
-            boxShadow: '0 14px 36px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.95)',
-          }}
+          className="btn-primary mb-6"
+          aria-label={t.start}
+          role="button"
         >
           <div className="relative h-full flex items-center justify-between px-6">
             <div className="flex flex-col text-left">
-              <span
-                className="uppercase"
-                style={{ fontSize: 10, letterSpacing: '.30em', color: '#8F6A42', fontWeight: 700 }}
-              >
+              <span className="uppercase text-[10px] tracking-[.30em] text-[#8F6A42] font-bold">
                 ISSUE 01
               </span>
-              <span style={{ marginTop: 6, fontSize: 20, fontWeight: 700, color: '#1A1612' }}>
+              <span className="mt-1 text-[20px] font-bold text-[#1A1612]">
                 {t.start}
               </span>
             </div>
-            <div style={{ fontSize: 28, color: '#8F6A42' }}>→</div>
+            <div className="text-[28px] text-[#8F6A42]">→</div>
           </div>
-        </button>
-
-        {/* ========== КНОПКА «НА ГЛАВНЫЙ ЭКРАН» ========== */}
-        <button
-          onClick={handleAddToHome}
-          className="w-full relative rounded-2xl px-4 py-3.5 flex items-center gap-3.5 mb-5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
-          style={cardStyle}
-        >
-          <div className="w-11 h-11 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] shrink-0">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" />
-              <path d="M12 18h.01" />
-              <path d="M9 6h6" />
-            </svg>
-          </div>
-          <div className="flex-1 text-left min-w-0">
-            <div className="text-[14px] font-semibold text-[#F5F1EB]">{t.addToHome}</div>
-            <div className="text-[11px] text-[#B9ACA0] mt-0.5">{t.addToHomeSub}</div>
-          </div>
-          <div className="text-[#D8A35C] text-lg opacity-70">＋</div>
         </button>
 
         {/* Favorites */}
@@ -323,13 +298,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                       onStart()
                     }
                   }}
-                  className="relative aspect-square rounded-xl flex items-center justify-center overflow-hidden cursor-pointer active:scale-95 transition-transform"
-                  style={cardStyle}
+                  className="card-simplified relative aspect-square rounded-xl flex items-center justify-center overflow-hidden cursor-pointer active:scale-95 transition-transform"
                 >
                   {item ? (
                     <img
                       src={item.imagePng}
-                      alt={item.id}
+                      alt={`Favorite ${index}`}
                       className="w-full h-full object-cover"
                       draggable={false}
                     />
