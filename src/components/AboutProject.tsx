@@ -19,13 +19,11 @@ const CHAR_DELAY = MS_PER_BEAT / 16; // Скорость печати (16 сим
 const LINE_DELAY = MS_PER_BEAT * 1; // Пауза в конце строки (ровно 1 удар)
 const EMPTY_LINE_DELAY = MS_PER_BEAT / 2; // Пауза на пустых строках (половина удара)
 
+// Компактный ASCII-арт (35 символов в ширину) — идеально помещается на любых смартфонах
 const ASCII_TITLE = `
- ██████╗ ██████╗ ██████╗ ██████╗ ██╗    ██╗ █████╗ ██╗███╗   ██╗███████╗██████╗ 
-██╔════╝██╔═══██╗██╔══██╗██╔══██╗██║    ██║██╔══██╗██║████╗  ██║██╔════╝██╔══██╗
-██║     ██║   ██║██████╔╝██║  ██║██║ █╗ ██║███████║██║██╔██╗ ██║█████╗  ██████╔╝
-██║     ██║   ██║██╔══██╗██║  ██║██║███╗██║██╔══██║██║██║╚██╗██║██╔══╝  ██╔══██╗
-╚██████╗╚██████╔╝██║  ██║██████╔╝╚███╔███╔╝██║  ██║██║██║ ╚████║███████╗██║  ██║
- ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
+▄▄▄ ▄▄▄ ▄▄▄ ▄▄  █ █ ▄▄▄ █ █ █ ▄▄▄ ▄▄▄
+█   █ █ █▀▄ █ █ █▀█ █▀█ █ █▄█ █▄  █▀▄
+▀▀▀ ▀▀▀ ▀ ▀ ▀▀  ▀ ▀ ▀ ▀ ▀ ▀ ▀ ▀▀▀ ▀ ▀
 `.trim();
 
 const CREDITS: Record<Lang, CreditLine[]> = {
@@ -301,8 +299,8 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
             <pre
               className="text-center text-[#00FF41] whitespace-pre font-mono tracking-tighter"
               style={{
-                fontSize: 'clamp(3px, 1.15vw, 8px)',
-                lineHeight: '1.05',
+                fontSize: 'clamp(6px, 2.2vw, 12px)',
+                lineHeight: '1.1',
                 WebkitTextSizeAdjust: 'none',
                 textSizeAdjust: 'none',
               }}
