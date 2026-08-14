@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BottomDock } from '../components/BottomDock'
 import { BLOG_ARTICLES } from '../data/blog'
 import type { Lang, FavoriteItem } from '../App'
@@ -12,14 +13,6 @@ type HomePageProps = {
   onOpenFavorites?: () => void
 }
 
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.01) 100%)',
-  boxShadow:
-    'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.25)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-}
-
 export function HomePage({
   onBack,
   onOpenBlog,
@@ -31,6 +24,19 @@ export function HomePage({
 }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
   const articleFavorites = favorites.filter((f) => f.type === 'article')
+
+  // Синхронизация с localStorage
+  useEffect(() => {
+    const savedLang = localStorage.getItem('app_lang') as Lang
+    if (savedLang && (savedLang === 'ru' || savedLang === 'uk')) {
+      if (savedLang !== lang) setLang(savedLang)
+    }
+  }, [])
+
+  const handleLangChange = (newLang: Lang) => {
+    localStorage.setItem('app_lang', newLang)
+    setLang(newLang)
+  }
 
   const t = {
     ru: {
@@ -201,37 +207,32 @@ export function HomePage({
           {t.menu}
         </h1>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setLang('ru')}
-            className="w-9 h-9 rounded-full border flex items-center justify-center text-[10px] font-bold tracking-wide active:scale-90 transition-transform cursor-pointer"
-            style={{
-              background: lang === 'ru' ? 'rgba(216,163,92,0.25)' : 'rgba(39,33,29,0.7)',
-              borderColor: lang === 'ru' ? '#D8A35C' : 'rgba(198,164,122,0.25)',
-              color: lang === 'ru' ? '#D8A35C' : '#F5F1EB',
-              boxShadow: lang === 'ru' ? '0 0 10px rgba(216,163,92,0.35)' : 'none',
-            }}
-          >
-            RU
-          </button>
-          <button
-            onClick={() => setLang('uk')}
-            className="w-9 h-9 rounded-full border flex items-center justify-center text-[10px] font-bold tracking-wide active:scale-90 transition-transform cursor-pointer"
-            style={{
-              background: lang === 'uk' ? 'rgba(216,163,92,0.25)' : 'rgba(39,33,29,0.7)',
-              borderColor: lang === 'uk' ? '#D8A35C' : 'rgba(198,164,122,0.25)',
-              color: lang === 'uk' ? '#D8A35C' : '#F5F1EB',
-              boxShadow: lang === 'uk' ? '0 0 10px rgba(216,163,92,0.35)' : 'none',
-            }}
-          >
-            UA
-          </button>
+        <div className="flex items-center gap-2">
+          {/* Segmented Language Toggle (Compact Pill) */}
+          <div className="flex bg-[#1D1815]/80 rounded-full p-1 border border-[#C6A47A]/20" role="group" aria-label="Language selection">
+            <button
+              onClick={() => handleLangChange('ru')}
+              className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
+              aria-pressed={lang === 'ru'}
+              role="button"
+            >
+              RU
+            </button>
+            <button
+              onClick={() => handleLangChange('uk')}
+              className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}
+              aria-pressed={lang === 'uk'}
+              role="button"
+            >
+              UA
+            </button>
+          </div>
 
           {onBack && (
             <button
               onClick={onBack}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[#B9ACA0] active:scale-90 transition-transform overflow-hidden cursor-pointer"
-              style={cardStyle}
+              className="card-simplified w-9 h-9 rounded-full flex items-center justify-center text-[#B9ACA0] active:scale-90 transition-transform overflow-hidden cursor-pointer"
+              aria-label="Go back"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M15 18l-6-6 6-6" />
@@ -246,8 +247,7 @@ export function HomePage({
         {/* Search */}
         <div className="mb-4">
           <div
-            className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
-            style={cardStyle}
+            className="card-simplified rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[#B9ACA0] shrink-0">
               <circle cx="11" cy="11" r="7" />
@@ -265,8 +265,7 @@ export function HomePage({
           {LEARNING.map((item) => (
             <button
               key={item.id}
-              className="relative rounded-2xl p-3 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer"
-              style={cardStyle}
+              className="card-simplified relative rounded-2xl p-3 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer"
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0"
@@ -296,8 +295,7 @@ export function HomePage({
               <button
                 key={item.id}
                 onClick={isBlog ? onOpenBlog : undefined}
-                className="relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
-                style={cardStyle}
+                className="card-simplified relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
               >
                 {isBlog && hasNewBlog && (
                   <div
@@ -331,10 +329,9 @@ export function HomePage({
           })}
         </div>
 
-        {/* ========== ИЗБРАННОЕ — ещё крупнее ========== */}
+        {/* Избранное */}
         <div
-          className="relative rounded-2xl px-4 py-4 flex items-center gap-4 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
-          style={cardStyle}
+          className="card-simplified relative rounded-2xl px-4 py-4 flex items-center gap-4 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
           onClick={() => {
             if (articleFavorites.length === 0) return
             if (articleFavorites.length === 1) {
@@ -402,7 +399,7 @@ export function HomePage({
         </div>
 
         {/* Quote */}
-        <div className="relative rounded-2xl p-4 overflow-hidden" style={cardStyle}>
+        <div className="card-simplified relative rounded-2xl p-4 overflow-hidden">
           <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">{t.quote}</p>
           <p className="mt-2 text-[11px] text-[#D8A35C] font-display">Cordwainer</p>
         </div>
