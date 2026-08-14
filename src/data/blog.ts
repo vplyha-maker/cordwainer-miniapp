@@ -53,7 +53,21 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     readTimeRu: '7 мин',
     readTimeUk: '7 хв',
     cover: 'Shoe-Factories.jpg', // ← поставь реальный путь к обложке
-    isNew: true,
+    isNew: false,
     createdAt: '2026-09-05',
   },
+  {
+    id: 'china-manuf' ,
+  titleRu: 'Иллюзия дешевой пары: суровая арифметика китайского обувпрома',
+  titleUk: 'Ілюзія дешевої пари: сувора арифметика китайського взуттєпрому',
+  excerptRu: 'Производственная панорама: от гибких мастерских до индустриальных гигантов',
+  excerptUk: 'Виробнича панорама: від гнучких майстерень до індустріальних гігантів',
+  tagRu: 'ПРОИЗВОДСТВО',
+  tagUk: 'ВИРОБНИТСТВО',
+  readTimeRu: '5 мин',
+  readTimeUk: '7 хв',
+  cover: 'public/chinamanuf/xds.jpg',
+  isNew: true,
+  createdAt: '2026-09-14',
+},
 ]
