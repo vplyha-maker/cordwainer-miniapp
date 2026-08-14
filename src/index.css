@@ -60,6 +60,13 @@
     -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
   }
+
+  /* Accessibility focus styles for keyboard navigation */
+  .focus-visible:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
 }
 
 @layer utilities {
@@ -85,6 +92,15 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       0 8px 24px -6px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Utility for hiding scrollbar visually but keeping scroll functional */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 
@@ -136,6 +152,16 @@
   border: 1px solid rgba(198, 164, 122, 0.05);
 }
 
+/* Performance Favorite Classes */
+.fav-highlight {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: rgba(244, 114, 182, 0.12);
+  box-shadow: 0 0 16px rgba(244, 114, 182, 0.25) inset;
+}
+.fav-highlight.is-on {
+  opacity: 1;
+}
 
 /* =========================================================
    PERF FAST MODE
