@@ -54,11 +54,16 @@ export function BlogPage({
   const [activeFilter, setActiveFilter] = useState('all')
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
   const [emailCopied, setEmailCopied] = useState(false)
+  
+  // Developer Easter Egg State
   const [aboutClickCount, setAboutClickCount] = useState(0)
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
+  
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
   const articleScrollRef = useRef<HTMLDivElement>(null)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
@@ -92,6 +97,7 @@ export function BlogPage({
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
     }
   }, [])
 
@@ -101,6 +107,42 @@ export function BlogPage({
       tg.HapticFeedback.impactOccurred(style)
     } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate(style === 'light' ? 20 : 40)
+    }
+  }
+
+  const showToastMessage = (message: string) => {
+    setToast({ message, visible: true })
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }))
+    }, 2000)
+  }
+
+  const handleAboutClick = () => {
+    triggerHaptic('medium')
+    const nextCount = aboutClickCount + 1
+    setAboutClickCount(nextCount)
+
+    const stepsLeft = 22 - nextCount
+
+    if (nextCount === 22) {
+      setAboutClickCount(0)
+      setView('about')
+    } else {
+      // Android style easter egg logic
+      if (lang === 'ru') {
+        if (nextCount === 3) showToastMessage(`Осталось ${stepsLeft} шагов, чтобы стать разработчиком.`)
+        else if (nextCount === 6) showToastMessage(`Вы уже близко. Осталось ${stepsLeft} шагов.`)
+        else if (nextCount === 9) showToastMessage(`Система фиксирует вашу настойчивость... Шагов: ${stepsLeft}.`)
+        else if (nextCount === 15) showToastMessage(`Осторожно, вы ломаете матрицу! Осталось ${stepsLeft} шагов.`)
+        else if (nextCount >= 18) showToastMessage(`Осталось шагов: ${stepsLeft}`)
+      } else {
+        if (nextCount === 3) showToastMessage(`Залишилося ${stepsLeft} кроків, щоб стати розробником.`)
+        else if (nextCount === 6) showToastMessage(`Ви вже близько. Залишилося ${stepsLeft} кроків.`)
+        else if (nextCount === 9) showToastMessage(`Система фіксує вашу наполегливість... Кроків: ${stepsLeft}.`)
+        else if (nextCount === 15) showToastMessage(`Обережно, ви ламаєте матрицю! Залишилося ${stepsLeft} кроків.`)
+        else if (nextCount >= 18) showToastMessage(`Залишилося кроків: ${stepsLeft}`)
+      }
     }
   }
 
@@ -138,7 +180,6 @@ export function BlogPage({
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
     const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
     
-    // Web Share API (Быстрее и нативнее для мобильных)
     if (navigator.share) {
       try {
         await navigator.share({
@@ -152,7 +193,6 @@ export function BlogPage({
       }
     }
 
-    // Fallback to Telegram link
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
@@ -247,7 +287,6 @@ export function BlogPage({
     }[lang]
   }, [lang, count])
 
-  // Calculate filter counts dynamically
   const filterCounts = useMemo(() => {
     const counts: Record<string, number> = { all: BLOG_ARTICLES.length }
     BLOG_ARTICLES.forEach((a) => {
@@ -281,7 +320,21 @@ export function BlogPage({
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
       
-      {/* Global Back Button - Скрыт в режиме article, так как там есть sticky header */}
+      {/* Toast Notification for Easter Egg */}
+      <AnimatePresence>
+        {toast.visible && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 bg-[#2A231D]/90 backdrop-blur-md border border-[#D8A35C]/30 rounded-full text-[#F5F1EB] text-[12px] font-medium tracking-wide shadow-xl whitespace-nowrap"
+          >
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Global Back Button */}
       {view !== 'article' && (
         <button
           type="button"
@@ -412,7 +465,6 @@ export function BlogPage({
                   </div>
                 </motion.button>
 
-                {/* Optimized Favorite Button: No background repaint animations */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -459,24 +511,25 @@ export function BlogPage({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto px-5 pt-20 pb-10"
+            // overflow-x-hidden и max-w-full блокируют езду влево-вправо на мобильных
+            className="absolute inset-0 flex flex-col z-40 bg-[#151210] overflow-y-auto overflow-x-hidden w-full max-w-full px-5 pt-20 pb-10 box-border"
           >
             <div className="flex flex-col mt-4 mb-10 border-t border-[#3A332D] pt-8">
               <div className="flex items-center text-[10px] font-mono tracking-[0.2em] uppercase text-[#B9ACA0] mb-4">
                 <span className="bg-[#60A5FA] text-[#151210] px-2 py-0.5 font-bold mr-3">INFO</span>
                 {t.collabSubtitle}
               </div>
-              <h2 className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter text-[#F5F1EB] mb-5">
+              <h2 className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter text-[#F5F1EB] mb-5 break-words">
                 {t.collabTitle}
               </h2>
               <p className="text-[13px] leading-relaxed text-[#B9ACA0] max-w-sm">{t.collabText}</p>
             </div>
 
-            <div className="rounded-2xl p-5 w-full flex flex-col" style={cardStyle}>
+            <div className="rounded-2xl p-5 w-full flex flex-col box-border" style={cardStyle}>
               <span className="text-[10px] text-[#B9ACA0] uppercase font-bold tracking-widest mb-1">
                 {t.collabEmailLabel}
               </span>
-              <span className="text-[1.4rem] font-medium text-[#F5F1EB] mb-6 tracking-wide">
+              <span className="text-[1.4rem] font-medium text-[#F5F1EB] mb-6 tracking-wide break-all">
                 cordwain@tuta.io
               </span>
 
@@ -494,23 +547,16 @@ export function BlogPage({
                   {emailCopied ? t.copiedBtn : t.copyBtn}
                 </button>
 
-                <button
+                {/* Добавлена пружинистая анимация с помощью framer-motion */}
+                <motion.button
                   type="button"
-                  onClick={() => {
-                    triggerHaptic('medium')
-                    const nextCount = aboutClickCount + 1
-                    if (nextCount >= 12) {
-                      setAboutClickCount(0)
-                      setView('about')
-                    } else {
-                      setAboutClickCount(nextCount)
-                    }
-                  }}
-                  className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 text-[#151210] focus-visible"
-                  style={{ backgroundColor: '#D8A35C' }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleAboutClick}
+                  className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 text-[#151210] focus-visible cursor-pointer"
+                  style={{ backgroundColor: '#D8A35C', willChange: 'transform' }}
                 >
                   {t.aboutBtn}
-                </button>
+                </motion.button>
               </div>
             </div>
           </motion.div>
@@ -566,7 +612,6 @@ export function BlogPage({
                     />
                   </div>
 
-                  {/* Segmented Filters with Counts */}
                   <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide snap-x" role="tablist">
                     {t.filters.map((filter) => {
                       const isActive = activeFilter === filter.id
@@ -652,7 +697,6 @@ export function BlogPage({
                   )
                 })}
 
-                {/* Empty State Custom View */}
                 {filteredArticles.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                     <div className="w-14 h-14 rounded-full bg-[#1D1815] flex items-center justify-center mb-4 border border-[#2A231D]">
@@ -696,7 +740,6 @@ export function BlogPage({
             transition={{ duration: 0.3, ease: 'easeOut' }}
             className="absolute inset-0 flex flex-col z-30 bg-[#151210] overflow-y-auto overflow-x-hidden"
           >
-            {/* Article Sticky Header */}
             <div className="sticky top-0 z-50 bg-[#151210]/85 backdrop-blur-md border-b border-[#2A231D]/60 px-4 py-3 flex items-center justify-between">
               <button
                 aria-label="Back"
@@ -802,7 +845,6 @@ export function BlogPage({
                 </Markdown>
               </div>
 
-              {/* Optimized Favorite Toggle Button in Article */}
               <div className="mt-10 mb-4">
                 <motion.button
                   whileTap={{ scale: 0.96 }}
@@ -816,7 +858,6 @@ export function BlogPage({
                   }`}
                   style={{ willChange: 'transform' }}
                 >
-                  {/* Overlay background for performance instead of animating gradient */}
                   <div className={`absolute inset-0 bg-gradient-to-b from-[#D8A35C]/15 to-[#D8A35C]/5 transition-opacity duration-300 ${isCurrentArticleFavorite ? 'opacity-100' : 'opacity-0'}`} />
                   <div className={`absolute inset-0 bg-gradient-to-b from-[#27211D]/70 to-[#1D1815]/50 transition-opacity duration-300 ${isCurrentArticleFavorite ? 'opacity-0' : 'opacity-100'}`} />
                   
