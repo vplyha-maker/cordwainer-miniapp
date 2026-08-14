@@ -35,6 +35,16 @@ const getPlural = (count: number, forms: [string, string, string]) => {
   ]
 }
 
+// Вспомогательная функция для унификации фильтров вне зависимости от языка
+const getTagSlug = (tag: string) => {
+  const upper = tag.toUpperCase()
+  if (upper === 'ИНДУСТРИЯ' || upper === 'ІНДУСТРІЯ') return 'industry'
+  if (upper === 'МАРКЕТИНГ') return 'marketing'
+  if (upper === 'ДИЗАЙН') return 'design'
+  if (upper === 'ПРОИЗВОДСТВО' || upper === 'ВИРОБНИЦТВО') return 'production'
+  return tag
+}
+
 export function BlogPage({
   onBack,
   lang,
@@ -65,9 +75,17 @@ export function BlogPage({
   const articleScrollRef = useRef<HTMLDivElement>(null)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  
+  // Ref для предотвращения бесконечного цикла useEffect
+  const onArticleOpenedRef = useRef(onArticleOpened)
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
+
+  // Обновляем актуальный callback без триггера useEffect
+  useEffect(() => {
+    onArticleOpenedRef.current = onArticleOpened
+  }, [onArticleOpened])
 
   // Debounce Effect
   useEffect(() => {
@@ -82,12 +100,13 @@ export function BlogPage({
       setActiveArticleId(initialArticleId)
       setView('article')
       setShowOnlyFavorites(false)
-      onArticleOpened?.()
+      onArticleOpenedRef.current?.()
     } else if (initialShowFavorites) {
       setShowOnlyFavorites(true)
+      setActiveFilter('favorites')
       setView('journal')
     }
-  }, [initialArticleId, initialShowFavorites, onArticleOpened])
+  }, [initialArticleId, initialShowFavorites])
 
   useEffect(() => {
     if (view === 'article' && articleScrollRef.current) {
@@ -130,7 +149,6 @@ export function BlogPage({
       setAboutClickCount(0)
       setView('about')
     } else {
-      // Android style easter egg logic
       if (lang === 'ru') {
         if (nextCount === 3) showToastMessage(`Осталось ${stepsLeft} шагов, чтобы стать разработчиком.`)
         else if (nextCount === 6) showToastMessage(`Вы уже близко. Осталось ${stepsLeft} шагов.`)
@@ -227,12 +245,16 @@ export function BlogPage({
         emptyTitle: 'Ничего не найдено',
         emptyDesc: 'Попробуйте изменить запрос или сбросить фильтры',
         emptyBtn: 'Сбросить фильтры',
+        emptyFavoritesTitle: 'Нет сохранённых статей',
+        emptyFavoritesDesc: 'Нажмите на иконку звезды в карточке статьи, чтобы добавить её в этот раздел',
+        emptyFavoritesBtn: 'Все статьи',
         filters: [
           { id: 'all', label: 'Все' },
-          { id: 'ИНДУСТРИЯ', label: 'Индустрия' },
-          { id: 'МАРКЕТИНГ', label: 'Маркетинг' },
-          { id: 'ДИЗАЙН', label: 'Дизайн' },
-          { id: 'ПРОИЗВОДСТВО', label: 'Производство' },
+          { id: 'favorites', label: '★ Избранное' },
+          { id: 'industry', label: 'Индустрия' },
+          { id: 'marketing', label: 'Маркетинг' },
+          { id: 'design', label: 'Дизайн' },
+          { id: 'production', label: 'Производство' },
         ],
         readBtn: 'Читать',
         collabTitle: 'Сотрудничество',
@@ -266,12 +288,16 @@ export function BlogPage({
         emptyTitle: 'Нічого не знайдено',
         emptyDesc: 'Спробуйте змінити запит або скинути фільтри',
         emptyBtn: 'Скинути фільтри',
+        emptyFavoritesTitle: 'Немає збережених статей',
+        emptyFavoritesDesc: 'Натисніть на іконку зірочки в картці статті, щоб додати її до цього розділу',
+        emptyFavoritesBtn: 'Усі статті',
         filters: [
           { id: 'all', label: 'Усі' },
-          { id: 'ІНДУСТРІЯ', label: 'Індустрія' },
-          { id: 'МАРКЕТИНГ', label: 'Маркетинг' },
-          { id: 'ДИЗАЙН', label: 'Дизайн' },
-          { id: 'ВИРОБНИЦТВО', label: 'Виробництво' },
+          { id: 'favorites', label: '★ Обране' },
+          { id: 'industry', label: 'Індустрія' },
+          { id: 'marketing', label: 'Маркетинг' },
+          { id: 'design', label: 'Дизайн' },
+          { id: 'production', label: 'Виробництво' },
         ],
         readBtn: 'Читати',
         collabTitle: 'Співпраця',
@@ -289,26 +315,36 @@ export function BlogPage({
   }, [lang, count])
 
   const filterCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: BLOG_ARTICLES.length }
+    const counts: Record<string, number> = {
+      all: BLOG_ARTICLES.length,
+      // Исправлено: считаем только существующие избранные статьи
+      favorites: BLOG_ARTICLES.filter((a) => favoriteArticleIds.includes(a.id)).length,
+    }
     BLOG_ARTICLES.forEach((a) => {
       const tag = lang === 'ru' ? a.tagRu : a.tagUk
-      counts[tag] = (counts[tag] || 0) + 1
+      const slug = getTagSlug(tag)
+      counts[slug] = (counts[slug] || 0) + 1
     })
     return counts
-  }, [lang])
+  }, [lang, favoriteArticleIds])
 
   const cardStyle = {
     background: 'linear-gradient(180deg, rgba(39,33,29,0.92) 10%, rgba(21,18,16,0.2) 100%)',
     boxShadow: 'inset 0 1px 0 rgba(198,164,122,0.35), inset 1px 0 0 rgba(198,164,122,0.05), inset -1px 0 0 rgba(198,164,122,0.05), 0 6px 18px rgba(0,0,0,0.3)',
   }
 
+  const isFavoritesActive = showOnlyFavorites || activeFilter === 'favorites'
+
   const filteredArticles = BLOG_ARTICLES
     .filter((article) => {
-      if (showOnlyFavorites) return favoriteArticleIds.includes(article.id)
+      if (isFavoritesActive) {
+        return favoriteArticleIds.includes(article.id)
+      }
       const title = lang === 'ru' ? article.titleRu : article.titleUk
       const tag = lang === 'ru' ? article.tagRu : article.tagUk
+      const slug = getTagSlug(tag)
       const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesFilter = activeFilter === 'all' || tag === activeFilter
+      const matchesFilter = activeFilter === 'all' || slug === activeFilter
       return matchesSearch && matchesFilter
     })
     .slice()
@@ -344,6 +380,7 @@ export function BlogPage({
             triggerHaptic('light')
             if (view === 'journal') {
               setShowOnlyFavorites(false)
+              setActiveFilter('all')
               setView('cover')
             } else if (view === 'about') setView('collaboration')
             else if (view === 'collaboration') setView('cover')
@@ -404,6 +441,7 @@ export function BlogPage({
                   onClick={() => {
                     triggerHaptic()
                     setShowOnlyFavorites(false)
+                    setActiveFilter('all')
                     setView('journal')
                   }}
                   whileTap={{ scale: 0.96 }}
@@ -585,68 +623,68 @@ export function BlogPage({
           >
             <div className="px-4 shrink-0">
               <h2 className="font-display text-[2rem] leading-none text-[#F5F1EB] mb-1">
-                {showOnlyFavorites ? (lang === 'ru' ? 'Избранное' : 'Обране') : t.journalTitle}
+                {isFavoritesActive ? (lang === 'ru' ? 'Избранное' : 'Обране') : t.journalTitle}
               </h2>
               <p className="text-[11px] text-[#B9ACA0] mb-4 leading-relaxed max-w-[90%]">
-                {showOnlyFavorites
+                {isFavoritesActive
                   ? (lang === 'ru' ? `Сохранённые статьи · ${favoriteArticleIds.length}` : `Збережені статті · ${favoriteArticleIds.length}`)
                   : t.journalDesc}
               </p>
 
-              {!showOnlyFavorites && (
-                <>
-                  <div className="relative mb-4">
-                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="M21 21l-4.3-4.3" />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder={t.searchPlaceholder}
-                      value={rawSearchQuery}
-                      onChange={(e) => setRawSearchQuery(e.target.value)}
-                      className="w-full bg-[#1D1815] border border-[#2A231D] rounded-xl py-2.5 pl-9 pr-4 text-[13px] text-[#F5F1EB] placeholder:text-[#B9ACA0]/60 focus:outline-none focus:border-[#D8A35C]/50 transition-colors"
-                    />
+              {!isFavoritesActive && (
+                <div className="relative mb-4">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B9ACA0" strokeWidth="2">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="M21 21l-4.3-4.3" />
+                    </svg>
                   </div>
-
-                  <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide snap-x" role="tablist">
-                    {t.filters.map((filter) => {
-                      const isActive = activeFilter === filter.id
-                      const count = filterCounts[filter.id] || 0
-                      
-                      return (
-                        <button
-                          key={filter.id}
-                          role="tab"
-                          aria-selected={isActive}
-                          aria-pressed={isActive}
-                          type="button"
-                          onClick={() => {
-                            triggerHaptic()
-                            setActiveFilter(filter.id)
-                          }}
-                          className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border focus-visible flex items-center gap-1.5"
-                          style={{
-                            background: isActive ? 'rgba(216,163,92,0.15)' : 'transparent',
-                            color: isActive ? '#D8A35C' : '#B9ACA0',
-                            borderColor: isActive ? 'rgba(216,163,92,0.3)' : 'rgba(185,172,160,0.2)',
-                          }}
-                        >
-                          {filter.label}
-                          <span className="opacity-60 text-[9px]">{count}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </>
+                  {/* Исправлено: text-[16px] для инпута, чтобы iOS WebKit не делал zoom */}
+                  <input
+                    type="text"
+                    placeholder={t.searchPlaceholder}
+                    value={rawSearchQuery}
+                    onChange={(e) => setRawSearchQuery(e.target.value)}
+                    className="w-full bg-[#1D1815] border border-[#2A231D] rounded-xl py-2 pl-9 pr-4 text-[16px] text-[#F5F1EB] placeholder:text-[#B9ACA0]/60 focus:outline-none focus:border-[#D8A35C]/50 transition-colors"
+                  />
+                </div>
               )}
+
+              <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide snap-x" role="tablist">
+                {t.filters.map((filter) => {
+                  const isActive = activeFilter === filter.id
+                  const count = filterCounts[filter.id] || 0
+                  
+                  return (
+                    <button
+                      key={filter.id}
+                      role="tab"
+                      aria-selected={isActive}
+                      aria-pressed={isActive}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic()
+                        if (filter.id !== 'favorites') setShowOnlyFavorites(false)
+                        setActiveFilter(filter.id)
+                      }}
+                      className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border focus-visible flex items-center gap-1.5"
+                      style={{
+                        background: isActive ? 'rgba(216,163,92,0.15)' : 'transparent',
+                        color: isActive ? '#D8A35C' : '#B9ACA0',
+                        borderColor: isActive ? 'rgba(216,163,92,0.3)' : 'rgba(185,172,160,0.2)',
+                      }}
+                    >
+                      {filter.label}
+                      <span className="opacity-60 text-[9px]">{count}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 mt-2 pb-8">
               <p className="text-[10px] tracking-[0.14em] uppercase text-[#D8A35C] mb-3 font-semibold">
-                {showOnlyFavorites ? (lang === 'ru' ? 'ИЗБРАННОЕ' : 'ОБРАНЕ') : (searchQuery ? 'Результаты' : t.fresh)}
+                {isFavoritesActive ? (lang === 'ru' ? 'ИЗБРАННОЕ' : 'ОБРАНЕ') : (searchQuery ? 'Результаты' : t.fresh)}
               </p>
 
               <div className="flex flex-col gap-3">
@@ -657,18 +695,17 @@ export function BlogPage({
                   const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk
 
                   return (
-                    <div
+                    // Исправлено: div заменен на button для соблюдения A11y и управления с клавиатуры
+                    <button
                       key={article.id}
-                      role="button"
-                      tabIndex={0}
+                      type="button"
                       aria-label={`Читать статью ${title}`}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { triggerHaptic(); setActiveArticleId(article.id); setView('article'); } }}
                       onClick={() => {
                         triggerHaptic()
                         setActiveArticleId(article.id)
                         setView('article')
                       }}
-                      className="relative rounded-2xl p-4 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus-visible"
+                      className="w-full text-left relative rounded-2xl p-4 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus-visible block"
                       style={cardStyle}
                     >
                       <div className="flex justify-between items-center mb-2">
@@ -692,23 +729,34 @@ export function BlogPage({
                         {t.readBtn}
                         <span className="ml-1 opacity-70">→</span>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
 
                 {filteredArticles.length === 0 && (
                   <EmptyState
-                    variant={showOnlyFavorites ? 'favorites' : 'search'}
-                    title={showOnlyFavorites ? (lang === 'ru' ? 'Нет сохранённых статей' : 'Немає збережених статей') : t.emptyTitle}
-                    description={showOnlyFavorites ? undefined : t.emptyDesc}
-                    action={!showOnlyFavorites ? {
-                      label: t.emptyBtn,
-                      onClick: () => {
-                        triggerHaptic('light')
-                        setRawSearchQuery('')
-                        setActiveFilter('all')
-                      }
-                    } : undefined}
+                    variant={isFavoritesActive ? 'favorites' : 'search'}
+                    title={isFavoritesActive ? t.emptyFavoritesTitle : t.emptyTitle}
+                    description={isFavoritesActive ? t.emptyFavoritesDesc : t.emptyDesc}
+                    action={
+                      isFavoritesActive
+                        ? {
+                            label: t.emptyFavoritesBtn,
+                            onClick: () => {
+                              triggerHaptic('light')
+                              setShowOnlyFavorites(false)
+                              setActiveFilter('all')
+                            },
+                          }
+                        : {
+                            label: t.emptyBtn,
+                            onClick: () => {
+                              triggerHaptic('light')
+                              setRawSearchQuery('')
+                              setActiveFilter('all')
+                            },
+                          }
+                    }
                   />
                 )}
               </div>
