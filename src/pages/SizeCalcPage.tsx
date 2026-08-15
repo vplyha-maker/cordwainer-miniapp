@@ -120,7 +120,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   }
 
   const startEdit = () => {
-    if (isEditing) return // Исправлено: не сбрасываем значение при повторном клике
     setEditValue(unit === 'cm' ? (footMm / 10).toFixed(1) : String(Math.round(footMm)))
     setIsEditing(true)
   }
@@ -572,4 +571,4 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       </div>
     </motion.div>
   )
-}
+    }
