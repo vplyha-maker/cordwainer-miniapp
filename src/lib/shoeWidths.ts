@@ -12,16 +12,25 @@ export interface WidthResult {
   color: string
   colorName: { ru: string; uk: string }
   girthMm: number
+  girthIn: number // Добавлено для конвертации mm/in
+}
+
+// Экспортируем лимиты для централизованного управления (валидация)
+export const SIZE_LIMITS: Record<Gender, { min: number, max: number }> = {
+  men: { min: 38, max: 50 },
+  women: { min: 34, max: 43 },
+  kids: { min: 16, max: 38 },
 }
 
 // Базовые размеры для расчета обхвата пучков по стандартам (ISO / ГОСТ)
 const BASE_MEASUREMENTS = {
-  men: { baseEu: 42, baseGirth: 254, widthStep: 5, lengthStep: 3 }, // 42 EU = ~270 Mondopoint
-  women: { baseEu: 38, baseGirth: 228, widthStep: 4, lengthStep: 3 }, // 38 EU = ~240 Mondopoint
+  men: { baseEu: 42, baseGirth: 254, widthStep: 5, lengthStep: 3 },
+  women: { baseEu: 38, baseGirth: 228, widthStep: 4, lengthStep: 3 },
   kids: { baseEu: 28, baseGirth: 164, widthStep: 3, lengthStep: 2.5 },
 }
 
-const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'girthMm'>>> = {
+// Источник данных: ГОСТ 3927-88 (Обувь. Колодки обувные) / ISO 9407
+const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'girthMm' | 'girthIn'>>> = {
   men: {
     narrow: { gostNum: 4, gostLetter: 'У', us: 'B', uk: 'C/D', euCode: 'E', color: '#10B981', colorName: { ru: 'Зеленый', uk: 'Зелений' } },
     standard: { gostNum: 6, gostLetter: 'С', us: 'D', uk: 'E/F', euCode: 'F', color: '#3B82F6', colorName: { ru: 'Синий', uk: 'Синій' } },
@@ -42,7 +51,6 @@ const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'girthM
   }
 }
 
-// Индексы для математики обхвата
 const WIDTH_MULTIPLIER: Record<WidthCategory, number> = {
   narrow: -1,
   standard: 0,
@@ -53,16 +61,20 @@ const WIDTH_MULTIPLIER: Record<WidthCategory, number> = {
 export function getWidthData(gender: Gender, sizeEu: number, category: WidthCategory): WidthResult {
   const baseData = WIDTH_DATA[gender][category]
   const metrics = BASE_MEASUREMENTS[gender]
+  const limits = SIZE_LIMITS[gender]
   
-  // Формула: Базовый обхват + (Дельта размера * градация длины) + (Дельта полноты * градация полноты)
-  const sizeDelta = sizeEu - metrics.baseEu
+  // Безопасное ограничение (clamp) размера для защиты логики
+  const clampedSize = Math.max(limits.min, Math.min(limits.max, sizeEu))
+  
+  const sizeDelta = clampedSize - metrics.baseEu
   const widthDelta = WIDTH_MULTIPLIER[category]
   
-  const girthMm = metrics.baseGirth + (sizeDelta * metrics.lengthStep) + (widthDelta * metrics.widthStep)
+  const girthMm = Math.round(metrics.baseGirth + (sizeDelta * metrics.lengthStep) + (widthDelta * metrics.widthStep))
+  const girthIn = Number((girthMm * 0.0393701).toFixed(2)) // Конвертация в дюймы
   
   return {
     ...baseData,
-    girthMm: Math.round(girthMm)
+    girthMm,
+    girthIn
   }
 }
-
