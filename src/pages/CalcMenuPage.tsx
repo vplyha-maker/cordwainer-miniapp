@@ -31,22 +31,32 @@ export function CalcMenuPage({
 
   const t = {
     ru: {
-      title: 'Калькуляторы',
-      sizeTitle: 'Конвертер размеров',
+      category: 'БЛОГ И СТАТЬИ',
+      title: 'PRO Расчёты',
+      desc: 'Изнанка обувной индустрии. Дизайн, технологии и секреты производства',
+      sizeTitle: 'Размеры',
       sizeSub: 'UK, US, EU, CM',
-      widthTitle: 'Полнота стопы',
+      widthTitle: 'Полнота',
       widthSub: 'Расчет по обхвату',
-      saveAdd: 'Сохранить на главной',
-      saveRemove: 'Убрать с главной',
+      saveAddTitle: 'На главную',
+      saveAddSub: 'Добавить калькулятор',
+      saveRemoveTitle: 'В избранном',
+      saveRemoveSub: 'Убрать с главной',
+      backMenu: 'Назад в меню',
     },
     uk: {
-      title: 'Калькулятори',
-      sizeTitle: 'Конвертер розмірів',
+      category: 'БЛОГ ТА СТАТТІ',
+      title: 'PRO Розрахунки',
+      desc: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
+      sizeTitle: 'Розміри',
       sizeSub: 'UK, US, EU, CM',
-      widthTitle: 'Повнота стопи',
+      widthTitle: 'Повнота',
       widthSub: 'Розрахунок за обхватом',
-      saveAdd: 'Зберегти на головній',
-      saveRemove: 'Видалити з головної',
+      saveAddTitle: 'На головну',
+      saveAddSub: 'Додати калькулятор',
+      saveRemoveTitle: 'В обраному',
+      saveRemoveSub: 'Видалити з головної',
+      backMenu: 'Назад в меню',
     },
   }[lang]
 
@@ -56,123 +66,187 @@ export function CalcMenuPage({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.25 }}
-      className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden"
+      className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EB] overflow-hidden justify-between"
     >
-      {/* Header Panel (Кнопка назад) */}
-      <div className="absolute top-0 left-0 right-0 z-50 bg-gradient-to-b from-[#151210]/90 to-transparent px-4 py-4 flex items-center">
+      {/* Верхний баннер с фоновым изображением */}
+      <div className="absolute inset-0 h-[65vh] w-full overflow-hidden pointer-events-none">
+        <img
+          src="/calc-hero.png"
+          alt="Calculators Background"
+          className="w-full h-full object-cover object-center opacity-40 brightness-75"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(18,16,14,0.2) 0%, rgba(18,16,14,0.7) 50%, #12100E 100%)',
+          }}
+        />
+      </div>
+
+      {/* Кнопка Назад вверху слева */}
+      <div className="relative z-50 p-4">
         <button
           aria-label="Back"
           onClick={() => {
             triggerHaptic('light')
             onBack()
           }}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1D1815]/80 backdrop-blur-md border border-[#C6A47A]/30 text-[#F5F1EB] active:scale-90 transition-transform cursor-pointer"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1D1815]/70 backdrop-blur-md border border-white/10 text-[#F5F1EB] active:scale-90 transition-transform cursor-pointer"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
-        <div className="flex-1 text-center font-display text-[1.1rem] text-[#F5F1EB] drop-shadow-md pr-9">
-          {t.title}
-        </div>
       </div>
 
-      {/* Заглавное фото */}
-      <div className="relative w-full h-[32vh] shrink-0">
-        <img
-          src="/calc-hero.png"
-          alt="Calculators"
-          className="w-full h-full object-cover bg-[#27211D]"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
-        {/* Заглушка, если нет картинки */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1D1815] to-[#27211D] -z-10 flex items-center justify-center">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="1" strokeOpacity="0.2">
-            <rect x="4" y="2" width="16" height="20" rx="3" />
-            <path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 18v.01M12 18v.01M8 18v.01M16 10v.01M12 10v.01M8 10v.01" />
-          </svg>
+      {/* Основной контент */}
+      <div className="relative z-10 px-5 flex flex-col justify-end pb-24 flex-1">
+        {/* Текстовый заголовок */}
+        <div className="mb-6">
+          <span className="text-[11px] font-semibold text-[#C6A47A] tracking-widest uppercase block mb-1.5">
+            {t.category}
+          </span>
+          <h1 className="text-3xl font-serif text-[#F5F1EB] font-normal tracking-wide mb-2">
+            {t.title}
+          </h1>
+          <p className="text-xs text-[#B9ACA0] leading-relaxed max-w-[290px]">
+            {t.desc}
+          </p>
         </div>
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(21,18,16,0.1) 0%, rgba(21,18,16,0.5) 60%, #151210 100%)' }} />
-      </div>
 
-      {/* Кнопки меню */}
-      <div className="flex-1 px-4 -mt-4 relative z-10 flex flex-col gap-3 pb-[110px] overflow-y-auto">
-        
-        {/* Конвертер размеров */}
-        <button
-          onClick={() => {
-            triggerHaptic('medium')
-            onOpenSizeCalc?.()
-          }}
-          className="card-simplified relative rounded-2xl p-4 text-left flex items-center gap-4 cursor-pointer active:scale-[0.97] transition-transform"
-        >
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(52, 211, 153, 0.15)', color: '#34D399' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-              <polyline points="3.29 7 12 12 20.71 7" />
-              <line x1="12" y1="22" x2="12" y2="12" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-[15px] font-semibold text-[#F5F1EB] leading-tight mb-1">{t.sizeTitle}</h3>
-            <p className="text-[12px] text-[#B9ACA0]">{t.sizeSub}</p>
-          </div>
-          <div className="text-[#B9ACA0]/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg></div>
-        </button>
+        {/* Сетка из 3 карточек (как на референсе) */}
+        <div className="grid grid-cols-3 gap-2.5 mb-6">
+          {/* Карточка 1: Размеры */}
+          <button
+            onClick={() => {
+              triggerHaptic('medium')
+              onOpenSizeCalc?.()
+            }}
+            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/80 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-xl bg-[#C6A47A]/15 text-[#C6A47A] flex items-center justify-center shadow-inner">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18M9 21V9M15 21V9" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight">
+                {t.sizeTitle}
+              </div>
+              <div className="text-[10px] text-[#B9ACA0] mt-0.5 leading-tight">
+                {t.sizeSub}
+              </div>
+            </div>
+          </button>
 
-        {/* Калькулятор полноты */}
-        <button
-          onClick={() => {
-            triggerHaptic('medium')
-            onOpenWidthCalc?.()
-          }}
-          className="card-simplified relative rounded-2xl p-4 text-left flex items-center gap-4 cursor-pointer active:scale-[0.97] transition-transform"
-        >
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-              <line x1="4" y1="22" x2="4" y2="15" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-[15px] font-semibold text-[#F5F1EB] leading-tight mb-1">{t.widthTitle}</h3>
-            <p className="text-[12px] text-[#B9ACA0]">{t.widthSub}</p>
-          </div>
-          <div className="text-[#B9ACA0]/50"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg></div>
-        </button>
+          {/* Карточка 2: Полнота */}
+          <button
+            onClick={() => {
+              triggerHaptic('medium')
+              onOpenWidthCalc?.()
+            }}
+            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/80 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shadow-inner">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight">
+                {t.widthTitle}
+              </div>
+              <div className="text-[10px] text-[#B9ACA0] mt-0.5 leading-tight">
+                {t.widthSub}
+              </div>
+            </div>
+          </button>
 
-        {/* Сохранить на главной */}
-        <div className="mt-4">
+          {/* Карточка 3: Сохранить / В избранном */}
           <button
             onClick={() => {
               triggerHaptic(isCalcSaved ? 'light' : 'medium')
               setIsCalcSaved(!isCalcSaved)
             }}
-            className={`btn-favorite-overlay w-full relative overflow-hidden flex items-center justify-center gap-3 py-4 rounded-2xl border transition-colors duration-300 active:scale-[0.98] cursor-pointer ${
-              isCalcSaved ? 'border-[#F59E0B]/40' : 'border-[#B9ACA0]/20'
+            className={`h-[125px] p-3 rounded-2xl transition-all active:scale-95 cursor-pointer flex flex-col justify-between text-left ${
+              isCalcSaved
+                ? 'bg-gradient-to-b from-[#5C223C] to-[#3B1527] border border-[#F472B6]/40 shadow-lg shadow-[#5C223C]/30'
+                : 'bg-[#1D1815]/80 backdrop-blur-md border border-white/10'
             }`}
           >
-            <div className={`absolute inset-0 bg-gradient-to-b from-[#F59E0B]/15 to-[#F59E0B]/5 transition-opacity duration-300 ${isCalcSaved ? 'opacity-100' : 'opacity-0'}`} />
-            <div className={`absolute inset-0 bg-gradient-to-b from-[#27211D]/70 to-[#1D1815]/50 transition-opacity duration-300 ${isCalcSaved ? 'opacity-0' : 'opacity-100'}`} />
-            
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill={isCalcSaved ? '#F59E0B' : 'none'}
-              stroke={isCalcSaved ? '#F59E0B' : '#B9ACA0'}
-              strokeWidth="1.8"
-              className="relative z-10 transition-colors duration-300"
+            <div
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                isCalcSaved
+                  ? 'bg-[#F472B6] text-white shadow-md'
+                  : 'bg-white/10 text-[#B9ACA0]'
+              }`}
             >
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-            <span className={`relative z-10 text-[12px] font-bold uppercase tracking-wider transition-colors duration-300 ${isCalcSaved ? 'text-[#F59E0B]' : 'text-[#F5F1EB]'}`}>
-              {isCalcSaved ? t.saveRemove : t.saveAdd}
-            </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill={isCalcSaved ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight">
+                {isCalcSaved ? t.saveRemoveTitle : t.saveAddTitle}
+              </div>
+              <div
+                className={`text-[10px] mt-0.5 leading-tight ${
+                  isCalcSaved ? 'text-[#F472B6] font-medium' : 'text-[#B9ACA0]'
+                }`}
+              >
+                {isCalcSaved ? t.saveRemoveSub : t.saveAddSub}
+              </div>
+            </div>
           </button>
         </div>
+
+        {/* Текстовая кнопка "Назад в меню" */}
+        <button
+          onClick={() => {
+            triggerHaptic('light')
+            onBack()
+          }}
+          className="text-center text-[13px] text-[#B9ACA0] hover:text-[#F5F1EB] active:opacity-60 transition-opacity font-medium py-1 cursor-pointer"
+        >
+          {t.backMenu}
+        </button>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
@@ -181,4 +255,3 @@ export function CalcMenuPage({
     </motion.div>
   )
 }
-
