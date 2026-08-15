@@ -1,6 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
 import {
   convertShoeSize,
@@ -19,7 +18,7 @@ const FlagEU = () => (
   <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
     <rect width="18" height="12" fill="#003399" />
     <g fill="#FFCC00">
-      {[0,1,2,3,4,5,6,7,8,9,10,11].map((i) => {
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
         const a = (i * 30 - 90) * (Math.PI / 180)
         return <circle key={i} cx={9 + 3.8 * Math.cos(a)} cy={6 + 3.8 * Math.sin(a)} r="0.55" />
       })}
@@ -55,7 +54,7 @@ const FlagUS = () => (
   </svg>
 )
 
-/* ---------- Accent themes ---------- */
+/* ---------- Accent themes by gender ---------- */
 const THEMES = {
   men: {
     accent: '#C6A47A',
@@ -66,7 +65,7 @@ const THEMES = {
     buttonText: '#0F0D0B',
   },
   women: {
-    accent: '#E8A0B5',          // soft rose
+    accent: '#E8A0B5',
     accentSoft: '#F2C4D0',
     accentBg: 'rgba(232,160,181,0.16)',
     accentBorder: 'rgba(232,160,181,0.25)',
@@ -74,7 +73,7 @@ const THEMES = {
     buttonText: '#1A1214',
   },
   kids: {
-    accent: '#7EB8D4',          // soft sky blue
+    accent: '#7EB8D4',
     accentSoft: '#A8D4E8',
     accentBg: 'rgba(126,184,212,0.16)',
     accentBorder: 'rgba(126,184,212,0.25)',
@@ -155,7 +154,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       cm: 'см',
       mm: 'мм',
       standardsTitle: 'Стандарты',
-      standardsNote: 'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
+      standardsNote:
+        'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
     },
     uk: {
       title: 'Розмір взуття',
@@ -173,7 +173,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       cm: 'см',
       mm: 'мм',
       standardsTitle: 'Стандарти',
-      standardsNote: 'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
+      standardsNote:
+        'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
     },
   }[lang]
 
@@ -190,7 +191,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-4 pt-3 pb-1">
         <button
-          onClick={() => { triggerHaptic(); onBack() }}
+          onClick={() => {
+            triggerHaptic()
+            onBack()
+          }}
           className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-transform"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -203,7 +207,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           <p className="text-[11px] text-[#7A726A]">{t.subtitle}</p>
         </div>
 
-        <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-transform"
+        <button
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-transform"
           style={{ color: theme.accent }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -213,13 +218,16 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-40 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-4 pb-28 scrollbar-hide">
         {/* Gender segmented */}
         <div className="mt-4 mb-6 flex p-[3px] rounded-2xl bg-[#1A1613] border border-white/[0.04]">
           {(['men', 'women', 'kids'] as Gender[]).map((g) => (
             <button
               key={g}
-              onClick={() => { triggerHaptic(); handleGenderChange(g) }}
+              onClick={() => {
+                triggerHaptic()
+                handleGenderChange(g)
+              }}
               className="flex-1 py-2.5 rounded-[14px] text-[13px] font-medium transition-all duration-200"
               style={
                 gender === g
@@ -240,7 +248,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               {(['cm', 'mm'] as const).map((u) => (
                 <button
                   key={u}
-                  onClick={() => { triggerHaptic(); setUnit(u) }}
+                  onClick={() => {
+                    triggerHaptic()
+                    setUnit(u)
+                  }}
                   className="px-3 py-1 rounded-full text-[11px] font-semibold transition-all"
                   style={
                     unit === u
@@ -255,7 +266,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
           <p className="text-[11px] text-[#6B635C] mb-6">{t.step1Hint}</p>
 
-          {/* Big value */}
+          {/* Big value — tappable for manual input */}
           <div className="text-center mb-7" onClick={startEdit}>
             {isEditing ? (
               <input
@@ -270,7 +281,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               />
             ) : (
               <div className="cursor-pointer active:opacity-70 transition-opacity">
-                <span className="text-[52px] font-light tracking-tight leading-none" style={{ color: theme.accentSoft }}>
+                <span
+                  className="text-[52px] font-light tracking-tight leading-none"
+                  style={{ color: theme.accentSoft }}
+                >
                   {displayValue}
                 </span>
                 <span className="text-[18px] text-[#6B635C] ml-1.5 align-top">{displayUnit}</span>
@@ -302,12 +316,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               style={{
                 background: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${pct}%, #2A241F ${pct}%, #2A241F 100%)`,
                 borderRadius: 999,
-                // @ts-ignore
-                ['--thumb-color' as any]: theme.accentSoft,
-                ['--thumb-border' as any]: theme.thumbBorder,
               }}
             />
-            {/* Custom thumb color via CSS variables fallback */}
             <style>{`
               input[type=range]::-webkit-slider-thumb {
                 background: ${theme.accentSoft} !important;
@@ -319,10 +329,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 border-color: ${theme.thumbBorder} !important;
               }
             `}</style>
-
             <div className="flex justify-between mt-2.5 text-[10px] text-[#5C554E]">
-              <span>{unit === 'cm' ? (range.min / 10).toFixed(1) : range.min} {displayUnit}</span>
-              <span>{unit === 'cm' ? (range.max / 10).toFixed(1) : range.max} {displayUnit}</span>
+              <span>
+                {unit === 'cm' ? (range.min / 10).toFixed(1) : range.min} {displayUnit}
+              </span>
+              <span>
+                {unit === 'cm' ? (range.max / 10).toFixed(1) : range.max} {displayUnit}
+              </span>
             </div>
           </div>
         </div>
@@ -340,7 +353,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </span>
           </div>
 
-          <div className="text-[64px] font-light leading-none tracking-tight mb-1" style={{ color: theme.accentSoft }}>
+          <div
+            className="text-[64px] font-light leading-none tracking-tight mb-1"
+            style={{ color: theme.accentSoft }}
+          >
             {formatSize(result.eu)}
           </div>
           <div className="text-[12px] text-[#6B635C] mb-5">{t.recommended}</div>
@@ -349,13 +365,17 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             <div className="flex items-center gap-1.5">
               <FlagUK />
               <span className="text-[12px] text-[#6B635C]">UK</span>
-              <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">{formatSize(result.uk)}</span>
+              <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">
+                {formatSize(result.uk)}
+              </span>
             </div>
             <div className="w-px h-4 bg-white/10" />
             <div className="flex items-center gap-1.5">
               <FlagUS />
               <span className="text-[12px] text-[#6B635C]">{usLabel}</span>
-              <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">{formatSize(result.us)}</span>
+              <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">
+                {formatSize(result.us)}
+              </span>
             </div>
             <div className="w-px h-4 bg-white/10" />
             <div className="flex items-center gap-1.5">
@@ -369,8 +389,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
         <p className="text-[11px] text-[#5C554E] leading-snug px-1 mb-3">{t.disclaimer}</p>
 
+        {/* How calculated — collapsible */}
         <button
-          onClick={() => { triggerHaptic(); setShowStandards((v) => !v) }}
+          onClick={() => {
+            triggerHaptic()
+            setShowStandards((v) => !v)
+          }}
           className="flex items-center gap-1.5 text-[12px] font-medium mb-4 px-1"
           style={{ color: theme.accent }}
         >
@@ -389,24 +413,35 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               className="overflow-hidden mb-6"
             >
               <div className="rounded-2xl bg-[#161311] border border-white/[0.04] p-4">
-                <div className="text-[11px] font-medium tracking-wide uppercase mb-3" style={{ color: theme.accent }}>
+                <div
+                  className="text-[11px] font-medium tracking-wide uppercase mb-3"
+                  style={{ color: theme.accent }}
+                >
                   {t.standardsTitle}
                 </div>
                 <div className="space-y-2 text-[12px] text-[#8F867E]">
                   <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>EU / UKR</span>
+                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
+                      EU / UKR
+                    </span>
                     <span>ISO 19407 · Paris Point</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>UK</span>
+                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
+                      UK
+                    </span>
                     <span>ISO 19407 · Barleycorn</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>US</span>
+                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
+                      US
+                    </span>
                     <span>ISO 19407 · UK + offset</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>Mondopoint</span>
+                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
+                      Mondopoint
+                    </span>
                     <span>ISO 9407 · мм стопы</span>
                   </div>
                 </div>
@@ -417,8 +452,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </AnimatePresence>
       </div>
 
-      {/* Sticky save — raised above dock */}
-      <div className="fixed bottom-[84px] left-0 right-0 px-4 z-40 pointer-events-none">
+      {/* Sticky save — no dock, raised from bottom */}
+      <div className="fixed bottom-6 left-0 right-0 px-4 z-40 pointer-events-none">
         <button
           onClick={() => triggerHaptic('medium')}
           className="w-full py-3.5 rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform pointer-events-auto"
@@ -433,11 +468,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </svg>
           {t.save}
         </button>
-      </div>
-
-      {/* Dock */}
-      <div className="fixed bottom-0 left-0 right-0 z-50">
-        <BottomDock active="workspace" lang={lang} />
       </div>
     </motion.div>
   )
