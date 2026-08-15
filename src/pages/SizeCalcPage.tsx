@@ -206,7 +206,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative flex flex-col h-[100dvh] bg-[#0F0D0B] text-[#F5F1EB] overflow-hidden"
+      className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden"
     >
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-4 pt-3 pb-1">
@@ -215,7 +215,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             triggerHaptic()
             onBack()
           }}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-transform"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1D1815] border border-[#C6A47A]/20 active:scale-90 transition-transform"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
@@ -224,11 +224,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
         <div className="text-center">
           <h1 className="text-[16px] font-medium tracking-wide">{t.title}</h1>
-          <p className="text-[11px] text-[#7A726A]">{t.subtitle}</p>
+          <p className="text-[11px] text-[#B9ACA0]">{t.subtitle}</p>
         </div>
 
         <button
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-transform"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1D1815] border border-[#C6A47A]/20 active:scale-90 transition-transform"
           style={{ color: theme.accent }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -240,7 +240,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-28 scrollbar-hide">
         {/* Gender segmented */}
-        <div className="mt-4 mb-6 flex p-[3px] rounded-2xl bg-[#1A1613] border border-white/[0.04]">
+        <div className="mt-4 mb-6 flex p-[3px] rounded-2xl bg-[#1D1815] border border-[#C6A47A]/20">
           {(['men', 'women', 'kids'] as Gender[]).map((g) => (
             <button
               key={g}
@@ -252,7 +252,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               style={
                 gender === g
                   ? { background: THEMES[g].accentBg, color: THEMES[g].accentSoft }
-                  : { color: '#6B635C' }
+                  : { color: '#B9ACA0' }
               }
             >
               {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
@@ -261,10 +261,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
 
         {/* Foot length card */}
-        <div className="rounded-3xl bg-[#161311] border border-white/[0.04] p-5 mb-4">
+        <div className="rounded-3xl bg-[#1D1815] border border-[#C6A47A]/20 p-5 mb-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
-            <div className="flex rounded-full bg-[#0F0D0B] p-0.5 border border-white/[0.04]">
+            <div className="flex rounded-full bg-[#151210] p-0.5 border border-[#C6A47A]/20">
               {(['cm', 'mm'] as const).map((u) => (
                 <button
                   key={u}
@@ -276,7 +276,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   style={
                     unit === u
                       ? { background: theme.accent, color: theme.buttonText }
-                      : { color: '#6B635C' }
+                      : { color: '#B9ACA0' }
                   }
                 >
                   {u === 'cm' ? t.cm : t.mm}
@@ -286,7 +286,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
           
           <div className="flex items-center justify-between mb-5">
-            <p className="text-[11px] text-[#6B635C]">{t.step1Hint}</p>
+            <p className="text-[11px] text-[#B9ACA0]">{t.step1Hint}</p>
             <button
               onClick={() => {
                 triggerHaptic()
@@ -310,18 +310,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 exit={{ opacity: 0, height: 0, y: -10 }}
                 className="overflow-hidden mb-6"
               >
-                <div className="flex items-center gap-3 p-3 mb-2 rounded-2xl bg-[#0F0D0B] border border-white/[0.04]">
+                <div className="flex items-center gap-3 p-3 mb-2 rounded-2xl bg-[#151210] border border-[#C6A47A]/20">
                   <div className="shrink-0 flex items-center justify-center w-12 relative">
                     <svg width="40" height="84" viewBox="0 0 40 84" fill="none">
-                      {/* Контур стопы */}
-                      <path d="M19.5 82C13 82 10 75 11 65C12.5 50 8 42 7 30C6 15 11 5 18 3C25 1 29 8 30 15C31 22 30 35 32 45C34.5 57 32 70 28 75C24.5 79.5 22 82 19.5 82Z" stroke="#6B635C" strokeWidth="1.5" />
-                      {/* Границы сверху и снизу */}
+                      <path d="M19.5 82C13 82 10 75 11 65C12.5 50 8 42 7 30C6 15 11 5 18 3C25 1 29 8 30 15C31 22 30 35 32 45C34.5 57 32 70 28 75C24.5 79.5 22 82 19.5 82Z" stroke="#B9ACA0" strokeWidth="1.5" />
                       <line x1="2" y1="82" x2="38" y2="82" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
                       <line x1="2" y1="2" x2="38" y2="2" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
-                      {/* Статическая скобка справа */}
                       <path d="M35 6L35 78M32 9L35 3L38 9M32 75L35 81L38 75" stroke={theme.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    {/* Анимированная сканирующая линия */}
                     <motion.div
                       animate={{ y: [0, 80, 0] }}
                       transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
@@ -329,13 +325,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       style={{ background: theme.accent, boxShadow: `0 0 6px ${theme.accent}` }}
                     />
                   </div>
-                  <div className="flex flex-col justify-center space-y-2 text-[11px] text-[#8F867E] leading-tight">
+                  <div className="flex flex-col justify-center space-y-2 text-[11px] text-[#B9ACA0] leading-tight">
                     <p>{t.measureGuide1}</p>
                     <p>{t.measureGuide2}</p>
                     <p>{t.measureGuide3}</p>
                   </div>
                 </div>
-                <div className="text-[11px] text-[#8F867E] bg-[#0F0D0B] p-3 rounded-xl border border-white/[0.04]">
+                <div className="text-[11px] text-[#B9ACA0] bg-[#151210] p-3 rounded-xl border border-[#C6A47A]/20">
                   {t.measureTip}
                 </div>
               </motion.div>
@@ -347,7 +343,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             <button
               onClick={(e) => stepValue(-1, e)}
               disabled={footMm <= range.min}
-              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-white/[0.04] active:bg-white/10 transition-colors disabled:opacity-30"
+              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-[#151210] border border-[#C6A47A]/20 active:bg-white/10 transition-colors disabled:opacity-30"
               style={{ color: theme.accentSoft }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -379,7 +375,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   >
                     {displayValue}
                   </span>
-                  <span className="text-[18px] text-[#6B635C] ml-1.5 align-top">{displayUnit}</span>
+                  <span className="text-[18px] text-[#B9ACA0] ml-1.5 align-top">{displayUnit}</span>
                 </div>
               )}
             </div>
@@ -387,7 +383,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             <button
               onClick={(e) => stepValue(1, e)}
               disabled={footMm >= range.max}
-              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-white/[0.04] active:bg-white/10 transition-colors disabled:opacity-30"
+              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-[#151210] border border-[#C6A47A]/20 active:bg-white/10 transition-colors disabled:opacity-30"
               style={{ color: theme.accentSoft }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -418,7 +414,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 [&::-moz-range-thumb]:rounded-full
                 [&::-moz-range-thumb]:border-[3px]"
               style={{
-                background: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${pct}%, #2A241F ${pct}%, #2A241F 100%)`,
+                background: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${pct}%, #2A231D ${pct}%, #2A231D 100%)`,
                 borderRadius: 999,
               }}
             />
@@ -433,7 +429,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 border-color: ${theme.thumbBorder} !important;
               }
             `}</style>
-            <div className="flex justify-between mt-2.5 text-[10px] text-[#5C554E]">
+            <div className="flex justify-between mt-2.5 text-[10px] text-[#B9ACA0]">
               <span>
                 {unit === 'cm' ? (range.min / 10).toFixed(1) : range.min} {displayUnit}
               </span>
@@ -446,13 +442,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
         {/* Result card */}
         <div
-          className="rounded-3xl bg-[#161311] p-6 mb-4 text-center"
+          className="rounded-3xl bg-[#1D1815] p-6 mb-4 text-center shadow-sm"
           style={{ border: `1px solid ${theme.accentBorder}` }}
         >
           <div className="flex items-center justify-center gap-1.5 mb-2">
             <FlagEU />
             <FlagUA />
-            <span className="text-[11px] text-[#8F867E] tracking-[0.12em] uppercase ml-1">
+            <span className="text-[11px] text-[#B9ACA0] tracking-[0.12em] uppercase ml-1">
               EU / UKR
             </span>
           </div>
@@ -463,27 +459,27 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           >
             {formatSize(result.eu)}
           </div>
-          <div className="text-[12px] text-[#6B635C] mb-5">{t.recommended}</div>
+          <div className="text-[12px] text-[#B9ACA0] mb-5">{t.recommended}</div>
 
-          <div className="flex items-center justify-center gap-5 pt-4 border-t border-white/[0.04]">
+          <div className="flex items-center justify-center gap-5 pt-4 border-t border-[#C6A47A]/10">
             <div className="flex items-center gap-1.5">
               <FlagUK />
-              <span className="text-[12px] text-[#6B635C]">UK</span>
+              <span className="text-[12px] text-[#B9ACA0]">UK</span>
               <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">
                 {formatSize(result.uk)}
               </span>
             </div>
-            <div className="w-px h-4 bg-white/10" />
+            <div className="w-px h-4 bg-[#C6A47A]/20" />
             <div className="flex items-center gap-1.5">
               <FlagUS />
-              <span className="text-[12px] text-[#6B635C]">{usLabel}</span>
+              <span className="text-[12px] text-[#B9ACA0]">{usLabel}</span>
               <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">
                 {formatSize(result.us)}
               </span>
             </div>
-            <div className="w-px h-4 bg-white/10" />
+            <div className="w-px h-4 bg-[#C6A47A]/20" />
             <div className="flex items-center gap-1.5">
-              <span className="text-[12px] text-[#6B635C]">CM</span>
+              <span className="text-[12px] text-[#B9ACA0]">CM</span>
               <span className="text-[15px] font-medium text-[#F5F1EB] ml-0.5">
                 {result.cm.toFixed(1).replace('.', ',')}
               </span>
@@ -491,7 +487,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
         </div>
 
-        <p className="text-[11px] text-[#5C554E] leading-snug px-1 mb-3">{t.disclaimer}</p>
+        <p className="text-[11px] text-[#B9ACA0]/70 leading-snug px-1 mb-3">{t.disclaimer}</p>
 
         {/* How calculated — collapsible */}
         <button
@@ -516,14 +512,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden mb-6"
             >
-              <div className="rounded-2xl bg-[#161311] border border-white/[0.04] p-4">
+              <div className="rounded-2xl bg-[#1D1815] border border-[#C6A47A]/20 p-4 shadow-sm">
                 <div
                   className="text-[11px] font-medium tracking-wide uppercase mb-3"
                   style={{ color: theme.accent }}
                 >
                   {t.standardsTitle}
                 </div>
-                <div className="space-y-2 text-[12px] text-[#8F867E]">
+                <div className="space-y-2 text-[12px] text-[#B9ACA0]">
                   <div className="flex gap-3">
                     <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
                       EU / UKR
@@ -549,7 +545,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     <span>ISO 9407 · мм стопы</span>
                   </div>
                 </div>
-                <p className="mt-3 text-[11px] text-[#5C554E] leading-snug">{t.standardsNote}</p>
+                <p className="mt-3 text-[11px] text-[#B9ACA0]/70 leading-snug">{t.standardsNote}</p>
               </div>
             </motion.div>
           )}
