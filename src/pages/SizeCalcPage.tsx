@@ -89,6 +89,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const [showStandards, setShowStandards] = useState(false)
+  const [showMeasureGuide, setShowMeasureGuide] = useState(false) // Новое состояние для подсказки
   const inputRef = useRef<HTMLInputElement>(null)
 
   const theme = THEMES[gender]
@@ -152,6 +153,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       subtitle: 'по длине стопы',
       step1: 'Длина стопы',
       step1Hint: 'От пятки до самого длинного пальца',
+      howToMeasureBtn: 'Как мерить?',
+      measureGuide1: '1. Встаньте на лист бумаги (в носках).',
+      measureGuide2: '2. Обведите стопу, держа карандаш вертикально.',
+      measureGuide3: '3. Измерьте линейкой расстояние от пятки до самого длинного пальца.',
       recommended: 'Рекомендуемый размер',
       disclaimer: 'Размеры ориентировочные и могут отличаться в зависимости от колодки и бренда.',
       howCalculated: 'Как считается?',
@@ -171,6 +176,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       subtitle: 'за довжиною стопи',
       step1: 'Довжина стопи',
       step1Hint: 'Від п’яти до найдовшого пальця',
+      howToMeasureBtn: 'Як міряти?',
+      measureGuide1: '1. Станьте на аркуш паперу (у шкарпетках).',
+      measureGuide2: '2. Обведіть стопу, тримаючи олівець вертикально.',
+      measureGuide3: '3. Виміряйте лінійкою відстань від п’яти до найдовшого пальця.',
       recommended: 'Рекомендований розмір',
       disclaimer: 'Розміри орієнтовні і можуть відрізнятися залежно від колодки та бренду.',
       howCalculated: 'Як рахується?',
@@ -251,7 +260,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
         {/* Foot length card */}
         <div className="rounded-3xl bg-[#161311] border border-white/[0.04] p-5 mb-4">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
             <div className="flex rounded-full bg-[#0F0D0B] p-0.5 border border-white/[0.04]">
               {(['cm', 'mm'] as const).map((u) => (
@@ -273,7 +282,50 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               ))}
             </div>
           </div>
-          <p className="text-[11px] text-[#6B635C] mb-6">{t.step1Hint}</p>
+          
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-[11px] text-[#6B635C]">{t.step1Hint}</p>
+            <button
+              onClick={() => {
+                triggerHaptic()
+                setShowMeasureGuide((v) => !v)
+              }}
+              className="flex items-center gap-1 text-[11px] font-medium transition-opacity active:opacity-70"
+              style={{ color: theme.accent }}
+            >
+              {t.howToMeasureBtn}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {showMeasureGuide ? <path d="M18 15l-6-6-6 6" /> : <path d="M6 9l6 6 6-6" />}
+              </svg>
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showMeasureGuide && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -10 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -10 }}
+                className="overflow-hidden"
+              >
+                <div className="flex items-center gap-3 p-3 mb-6 rounded-2xl bg-[#0F0D0B] border border-white/[0.04]">
+                  <div className="shrink-0 flex items-center justify-center w-12">
+                    <svg width="34" height="74" viewBox="0 0 40 84" fill="none">
+                      <path d="M19.5 82C13 82 10 75 11 65C12.5 50 8 42 7 30C6 15 11 5 18 3C25 1 29 8 30 15C31 22 30 35 32 45C34.5 57 32 70 28 75C24.5 79.5 22 82 19.5 82Z" stroke="#6B635C" strokeWidth="1.5" />
+                      <line x1="2" y1="82" x2="38" y2="82" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
+                      <line x1="2" y1="2" x2="38" y2="2" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
+                      <path d="M35 6L35 78M32 9L35 3L38 9M32 75L35 81L38 75" stroke={theme.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div className="flex flex-col justify-center space-y-2 text-[11px] text-[#8F867E] leading-tight">
+                    <p>{t.measureGuide1}</p>
+                    <p>{t.measureGuide2}</p>
+                    <p>{t.measureGuide3}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Big value with +/- steppers */}
           <div className="flex items-center justify-center gap-4 mb-7">
