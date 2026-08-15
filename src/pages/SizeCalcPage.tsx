@@ -293,7 +293,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 <input
                   ref={inputRef}
                   value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const sanitizedValue = e.target.value.replace(/[^0-9.,]/g, '')
+                    setEditValue(sanitizedValue)
+                  }}
                   onBlur={commitEdit}
                   onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
                   className="w-full text-center text-[48px] font-light bg-transparent outline-none border-b"
