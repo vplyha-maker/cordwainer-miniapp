@@ -71,7 +71,7 @@ export function CalcMenuPage({
       {/* Верхний баннер с фоновым изображением */}
       <div className="absolute inset-0 h-[65vh] w-full overflow-hidden pointer-events-none">
         <img
-          src="/calc-hero.png"
+          src="/CalcMenuPage/size.jpg"
           alt="Calculators Background"
           className="w-full h-full object-cover object-center opacity-40 brightness-75"
           onError={(e) => {
@@ -127,7 +127,7 @@ export function CalcMenuPage({
           </p>
         </div>
 
-        {/* Сетка из 3 карточек (как на референсе) */}
+        {/* Сетка из 3 карточек */}
         <div className="grid grid-cols-3 gap-2.5 mb-6">
           {/* Карточка 1: Размеры */}
           <button
