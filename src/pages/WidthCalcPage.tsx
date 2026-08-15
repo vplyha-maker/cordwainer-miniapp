@@ -10,34 +10,34 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
-// Насыщенные цвета для акцентов интерфейса
+// Мягкие, приглушенные цвета для темы оформления (гендерные)
 const THEMES = {
-  men: { accent: '#D4B895', accentSoft: '#F0DDC5', accentBg: 'rgba(198,164,122,0.15)' },
-  women: { accent: '#EC4899', accentSoft: '#F472B6', accentBg: 'rgba(236,72,153,0.15)' },
-  kids: { accent: '#0EA5E9', accentSoft: '#38BDF8', accentBg: 'rgba(14,165,233,0.15)' },
+  men: { accent: '#C6A47A', accentSoft: '#E8C9A0', accentBg: 'rgba(198,164,122,0.16)' },
+  women: { accent: '#E8A0B5', accentSoft: '#F2C4D0', accentBg: 'rgba(232,160,181,0.16)' },
+  kids: { accent: '#7EB8D4', accentSoft: '#A8D4E8', accentBg: 'rgba(126,184,212,0.16)' },
 } as const
 
-// Карта цветов для кнопок полноты (активное состояние)
+// Мягкие, пастельные цвета для кнопок выбора полноты и подкрашивания всех значений
 const WIDTH_BUTTON_THEMES: Record<WidthCategory, { bg: string, text: string, border: string }> = {
   narrow: { 
-    bg: 'rgba(132, 204, 22, 0.2)',   // Салатовый полупрозрачный
-    text: '#A3E635',                 // Салатовый яркий
-    border: '#84CC16' 
+    bg: 'rgba(110, 231, 183, 0.12)', // Мягкий изумрудный
+    text: '#6EE7B7',                 
+    border: 'rgba(110, 231, 183, 0.25)' 
   },
   standard: { 
-    bg: 'rgba(56, 189, 248, 0.2)',   // Голубой полупрозрачный
-    text: '#38BDF8',                 // Голубой яркий
-    border: '#0EA5E9' 
+    bg: 'rgba(125, 211, 252, 0.12)', // Мягкий голубой
+    text: '#7DD3FC',                 
+    border: 'rgba(125, 211, 252, 0.25)' 
   },
   wide: { 
-    bg: 'rgba(239, 68, 68, 0.2)',    // Красный полупрозрачный
-    text: '#F87171',                 // Красный яркий
-    border: '#EF4444' 
+    bg: 'rgba(252, 165, 165, 0.12)', // Мягкий кораллово-красный
+    text: '#FCA5A5',                 
+    border: 'rgba(252, 165, 165, 0.25)' 
   },
   xwide: { 
-    bg: 'rgba(168, 85, 247, 0.2)',   // Фиолетовый полупрозрачный
-    text: '#C084FC',                 // Фиолетовый яркий
-    border: '#A855F7' 
+    bg: 'rgba(216, 180, 254, 0.12)', // Мягкий лиловый
+    text: '#D8B4FE',                 
+    border: 'rgba(216, 180, 254, 0.25)' 
   }
 }
 
@@ -85,6 +85,9 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
 
   const theme = THEMES[gender]
   const limits = SIZE_LIMITS[gender]
+  
+  // Цвет активной полноты для подсвечивания всех остальных значений
+  const activeWidthColor = WIDTH_BUTTON_THEMES[widthCat].text
 
   useEffect(() => {
     localStorage.setItem('wc_gender', gender)
@@ -143,11 +146,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Размер (EU)', step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
-      gostNum: 'ГОСТ (Ц)', gostLet: 'ГОСТ (Б)', alt: 'АЛЬТ.', iso: 'ISO',
+      gostNum: 'ГОСТ (цифра)', gostLet: 'ГОСТ (буква)', iso: 'EU / ISO',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
-        gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая система). Определяет базовые обхваты колодки.' },
-        iso: { title: 'Альтернативные системы', text: 'Альтернативные буквенные системы (US/UK) и международный стандарт ISO/EU.' }
+        gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая и буквенная системы). Определяет базовые обхваты колодки.' },
+        iso: { title: 'Стандарт ISO', text: 'Международный стандарт ISO / EU для маркировки параметров обуви и колодок.' }
       }
     },
     uk: {
@@ -156,11 +159,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Розмір (EU)', step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
-      gostNum: 'ДСТУ (Ц)', gostLet: 'ДСТУ (Л)', alt: 'АЛЬТ.', iso: 'ISO',
+      gostNum: 'ДСТУ (цифра)', gostLet: 'ДСТУ (буква)', iso: 'EU / ISO',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
-        gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова система). Визначає базові обхвати колодки.' },
-        iso: { title: 'Альтернативні системи', text: 'Альтернативні літерні системи (US/UK) та міжнародний стандарт ISO/EU.' }
+        gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова та літерна системи). Визначає базові обхвати колодки.' },
+        iso: { title: 'Стандарт ISO', text: 'Міжнародний стандарт ISO / EU для маркування параметрів взуття та колодок.' }
       }
     }
   }[lang]
@@ -195,7 +198,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               <button
                 key={g} onClick={() => handleGender(g)}
                 className="flex-1 py-1.5 rounded-[12px] text-[12px] font-medium transition-all"
-                style={gender === g ? { background: theme.accentBg, color: theme.accentSoft } : { color: '#8F867E' }}
+                style={gender === g ? { background: THEMES[g].accentBg, color: THEMES[g].accentSoft } : { color: '#8F867E' }}
               >
                 {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
               </button>
@@ -207,6 +210,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
               <span className="text-[10px] text-[#8F867E]">({limits.min} - {limits.max})</span>
             </div>
+            
             <div className="flex items-center gap-3 bg-[#151210] p-1.5 rounded-full border border-white/5">
               <button
                 disabled={sizeEu <= limits.min} onClick={() => handleSizeChange(sizeEu - 1)}
@@ -215,6 +219,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
               </button>
+              {/* Размер EU подсвечивается цветом выбранного пола */}
               <div aria-live="polite" className="text-[24px] font-light w-10 text-center" style={{ color: theme.accentSoft }}>
                 {sizeEu}
               </div>
@@ -254,11 +259,12 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
             <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">US SIZE</span>
-            <span className="text-[28px] font-medium leading-none" style={{ color: theme.accentSoft }}>{result.us}</span>
+            {/* Значения US/UK зависят от выбранной полноты */}
+            <span className="text-[28px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.us}</span>
           </div>
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
             <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">UK SIZE</span>
-            <span className="text-[28px] font-medium leading-none" style={{ color: theme.accentSoft }}>{result.uk}</span>
+            <span className="text-[28px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.uk}</span>
           </div>
         </div>
 
@@ -269,10 +275,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             className="flex items-center justify-between w-full"
           >
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium" style={{ color: theme.accent }}>{t.proModules}</span>
+              {/* Заголовок PRO-блока также может использовать цвет полноты */}
+              <span className="text-[13px] font-medium transition-colors" style={{ color: activeWidthColor }}>{t.proModules}</span>
               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={result.colorName[lang]} />
             </div>
-            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: theme.accent }}>
+            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: activeWidthColor }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
             </motion.div>
           </button>
@@ -287,27 +294,21 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК: 4 в ряд с уникальной альтернативной системой */}
-                  <div className="grid grid-cols-4 gap-1">
-                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.gostNum}</span>
-                      <span className="text-[14px] font-medium text-white leading-none">{result.gostNum}</span>
+                  {/* МАРКИРОВКИ: 3 блока (ГОСТ цифра, ГОСТ буква, ISO / EU) */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.gostNum}</span>
+                      <span className="text-[15px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.gostNum}</span>
                     </div>
                     
-                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.gostLet}</span>
-                      <span className="text-[14px] font-medium text-white leading-none">{result.gostLetter}</span>
-                    </div>
-
-                    {/* Альтернативная система сбалансирована под конкретную буквенную кодировку полноты (например, A, B, C, D, E вместо дубляжа US) */}
-                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform" style={{ borderColor: `${theme.accent}30`, backgroundColor: theme.accentBg }}>
-                      <span className="text-[9px] mb-0.5 text-center" style={{ color: theme.accentSoft }}>{t.alt}</span>
-                      <span className="text-[15px] font-bold leading-none w-full text-center truncate px-1" style={{ color: theme.accentSoft }}>{result.euCode}</span>
+                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.gostLet}</span>
+                      <span className="text-[15px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.gostLetter}</span>
                     </div>
                     
-                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.iso}</span>
-                      <span className="text-[14px] font-medium text-white leading-none">{result.euCode}</span>
+                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.iso}</span>
+                      <span className="text-[15px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.euCode}</span>
                     </div>
                   </div>
 
@@ -334,10 +335,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
+                            <AnimatedIcon type={row.id} color={activeWidthColor} animKey={`${row.valMm}-${unit}`} />
                             <span className="text-[12px] text-white/90">{row.label}</span>
                           </div>
-                          <span className="text-[14px] font-medium" style={{ color: theme.accentSoft }}>
+                          {/* Значения в таблице также зависят от выбранной полноты */}
+                          <span className="text-[14px] font-medium transition-colors" style={{ color: activeWidthColor }}>
                             {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[10px] font-normal opacity-50">{unit}</span>
                           </span>
                         </div>
