@@ -89,7 +89,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const [showStandards, setShowStandards] = useState(false)
-  const [showMeasureGuide, setShowMeasureGuide] = useState(false) // Новое состояние для подсказки
+  const [showMeasureGuide, setShowMeasureGuide] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const theme = THEMES[gender]
@@ -155,8 +155,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       step1Hint: 'От пятки до самого длинного пальца',
       howToMeasureBtn: 'Как мерить?',
       measureGuide1: '1. Встаньте на лист бумаги (в носках).',
-      measureGuide2: '2. Обведите стопу, держа карандаш вертикально.',
+      measureGuide2: '2. Обведите стопу, держа ручку строго вертикально.',
       measureGuide3: '3. Измерьте линейкой расстояние от пятки до самого длинного пальца.',
+      measureTip: '💡 Лучше всего измерять стопу во второй половине дня — к вечеру ноги немного отекают и становятся больше.',
       recommended: 'Рекомендуемый размер',
       disclaimer: 'Размеры ориентировочные и могут отличаться в зависимости от колодки и бренда.',
       howCalculated: 'Как считается?',
@@ -178,8 +179,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       step1Hint: 'Від п’яти до найдовшого пальця',
       howToMeasureBtn: 'Як міряти?',
       measureGuide1: '1. Станьте на аркуш паперу (у шкарпетках).',
-      measureGuide2: '2. Обведіть стопу, тримаючи олівець вертикально.',
+      measureGuide2: '2. Обведіть стопу, тримаючи ручку строго вертикально.',
       measureGuide3: '3. Виміряйте лінійкою відстань від п’яти до найдовшого пальця.',
+      measureTip: '💡 Найкраще вимірювати стопу в другій половині дня — до вечора ноги трохи набрякають і стають більшими.',
       recommended: 'Рекомендований розмір',
       disclaimer: 'Розміри орієнтовні і можуть відрізнятися залежно від колодки та бренду.',
       howCalculated: 'Як рахується?',
@@ -306,22 +308,35 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 initial={{ opacity: 0, height: 0, y: -10 }}
                 animate={{ opacity: 1, height: 'auto', y: 0 }}
                 exit={{ opacity: 0, height: 0, y: -10 }}
-                className="overflow-hidden"
+                className="overflow-hidden mb-6"
               >
-                <div className="flex items-center gap-3 p-3 mb-6 rounded-2xl bg-[#0F0D0B] border border-white/[0.04]">
-                  <div className="shrink-0 flex items-center justify-center w-12">
-                    <svg width="34" height="74" viewBox="0 0 40 84" fill="none">
+                <div className="flex items-center gap-3 p-3 mb-2 rounded-2xl bg-[#0F0D0B] border border-white/[0.04]">
+                  <div className="shrink-0 flex items-center justify-center w-12 relative">
+                    <svg width="40" height="84" viewBox="0 0 40 84" fill="none">
+                      {/* Контур стопы */}
                       <path d="M19.5 82C13 82 10 75 11 65C12.5 50 8 42 7 30C6 15 11 5 18 3C25 1 29 8 30 15C31 22 30 35 32 45C34.5 57 32 70 28 75C24.5 79.5 22 82 19.5 82Z" stroke="#6B635C" strokeWidth="1.5" />
+                      {/* Границы сверху и снизу */}
                       <line x1="2" y1="82" x2="38" y2="82" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
                       <line x1="2" y1="2" x2="38" y2="2" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
+                      {/* Статическая скобка справа */}
                       <path d="M35 6L35 78M32 9L35 3L38 9M32 75L35 81L38 75" stroke={theme.accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
+                    {/* Анимированная сканирующая линия */}
+                    <motion.div
+                      animate={{ y: [0, 80, 0] }}
+                      transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+                      className="absolute top-[2px] left-0 w-full h-[1px]"
+                      style={{ background: theme.accent, boxShadow: `0 0 6px ${theme.accent}` }}
+                    />
                   </div>
                   <div className="flex flex-col justify-center space-y-2 text-[11px] text-[#8F867E] leading-tight">
                     <p>{t.measureGuide1}</p>
                     <p>{t.measureGuide2}</p>
                     <p>{t.measureGuide3}</p>
                   </div>
+                </div>
+                <div className="text-[11px] text-[#8F867E] bg-[#0F0D0B] p-3 rounded-xl border border-white/[0.04]">
+                  {t.measureTip}
                 </div>
               </motion.div>
             )}
