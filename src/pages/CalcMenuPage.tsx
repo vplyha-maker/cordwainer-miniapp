@@ -68,21 +68,22 @@ export function CalcMenuPage({
       transition={{ duration: 0.25 }}
       className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EB] overflow-hidden justify-between"
     >
-      {/* Верхний баннер с фоновым изображением */}
-      <div className="absolute inset-0 h-[65vh] w-full overflow-hidden pointer-events-none">
+      {/* Верхний баннер с осветленным и смасштабированным фоном */}
+      <div className="absolute inset-0 h-[55vh] w-full overflow-hidden pointer-events-none">
         <img
-          src="/CalcMenuPage/size.jpg"
+          src="/CalcMenuPage/sizi.jpg"
           alt="Calculators Background"
-          className="w-full h-full object-cover object-center opacity-40 brightness-75"
+          className="w-full h-full object-contain object-top opacity-85"
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
         />
+        {/* Мягкий градиент для плавного перехода в тёмный низ */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(to bottom, rgba(18,16,14,0.2) 0%, rgba(18,16,14,0.7) 50%, #12100E 100%)',
+              'linear-gradient(to bottom, rgba(18,16,14,0.1) 0%, rgba(18,16,14,0.4) 50%, #12100E 100%)',
           }}
         />
       </div>
@@ -135,7 +136,7 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenSizeCalc?.()
             }}
-            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/80 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer"
+            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/85 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer shadow-lg"
           >
             <div className="w-8 h-8 rounded-xl bg-[#C6A47A]/15 text-[#C6A47A] flex items-center justify-center shadow-inner">
               <svg
@@ -166,7 +167,7 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenWidthCalc?.()
             }}
-            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/80 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer"
+            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/85 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer shadow-lg"
           >
             <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shadow-inner">
               <svg
@@ -198,10 +199,10 @@ export function CalcMenuPage({
               triggerHaptic(isCalcSaved ? 'light' : 'medium')
               setIsCalcSaved(!isCalcSaved)
             }}
-            className={`h-[125px] p-3 rounded-2xl transition-all active:scale-95 cursor-pointer flex flex-col justify-between text-left ${
+            className={`h-[125px] p-3 rounded-2xl transition-all active:scale-95 cursor-pointer flex flex-col justify-between text-left shadow-lg ${
               isCalcSaved
-                ? 'bg-gradient-to-b from-[#5C223C] to-[#3B1527] border border-[#F472B6]/40 shadow-lg shadow-[#5C223C]/30'
-                : 'bg-[#1D1815]/80 backdrop-blur-md border border-white/10'
+                ? 'bg-gradient-to-b from-[#5C223C] to-[#3B1527] border border-[#F472B6]/40 shadow-[#5C223C]/30'
+                : 'bg-[#1D1815]/85 backdrop-blur-md border border-white/10'
             }`}
           >
             <div
