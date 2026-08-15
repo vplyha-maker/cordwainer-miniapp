@@ -68,22 +68,22 @@ export function CalcMenuPage({
       transition={{ duration: 0.25 }}
       className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EB] overflow-hidden justify-between"
     >
-      {/* Верхний баннер с осветленным и смасштабированным фоном */}
-      <div className="absolute inset-0 h-[55vh] w-full overflow-hidden pointer-events-none">
+      {/* Полный экран 9:16 без срезов по бокам */}
+      <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none">
         <img
-          src="/CalcMenuPage/size.jpg"
+          src="/CalcMenuPage/sizi.jpg"
           alt="Calculators Background"
-          className="w-full h-full object-contain object-top opacity-85"
+          className="w-full h-full object-cover object-top opacity-90"
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
         />
-        {/* Мягкий градиент для плавного перехода в тёмный низ */}
+        {/* Градиент от прозрачного к тёмному фону книзу */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(to bottom, rgba(18,16,14,0.1) 0%, rgba(18,16,14,0.4) 50%, #12100E 100%)',
+              'linear-gradient(to bottom, rgba(18,16,14,0.1) 0%, rgba(18,16,14,0.5) 45%, #12100E 80%)',
           }}
         />
       </div>
@@ -117,13 +117,13 @@ export function CalcMenuPage({
       <div className="relative z-10 px-5 flex flex-col justify-end pb-24 flex-1">
         {/* Текстовый заголовок */}
         <div className="mb-6">
-          <span className="text-[11px] font-semibold text-[#C6A47A] tracking-widest uppercase block mb-1.5">
+          <span className="text-[11px] font-semibold text-[#C6A47A] tracking-widest uppercase block mb-1.5 drop-shadow">
             {t.category}
           </span>
-          <h1 className="text-3xl font-serif text-[#F5F1EB] font-normal tracking-wide mb-2">
+          <h1 className="text-3xl font-serif text-[#F5F1EB] font-normal tracking-wide mb-2 drop-shadow-md">
             {t.title}
           </h1>
-          <p className="text-xs text-[#B9ACA0] leading-relaxed max-w-[290px]">
+          <p className="text-xs text-[#B9ACA0] leading-relaxed max-w-[290px] drop-shadow-sm">
             {t.desc}
           </p>
         </div>
