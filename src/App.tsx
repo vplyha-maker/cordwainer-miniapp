@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 import { BlogPage } from './pages/BlogPage'
+import { CalcMenuPage } from './pages/CalcMenuPage'
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -18,7 +19,7 @@ declare global {
   }
 }
 
-export type Screen = 'welcome' | 'home' | 'blog'
+export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu'
 export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
@@ -220,6 +221,7 @@ export default function App() {
             key="home"
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
+            onOpenCalcMenu={() => setScreen('calc-menu')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -266,6 +268,14 @@ export default function App() {
             initialArticleId={pendingArticleId}
             onArticleOpened={() => setPendingArticleId(null)}
             initialShowFavorites={showOnlyFavorites}
+          />
+        )}
+
+        {screen === 'calc-menu' && (
+          <CalcMenuPage
+            key="calc-menu"
+            lang={lang}
+            onBack={() => setScreen('home')}
           />
         )}
       </AnimatePresence>
