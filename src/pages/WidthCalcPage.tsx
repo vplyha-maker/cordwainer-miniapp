@@ -16,8 +16,35 @@ const THEMES = {
   kids: { accent: '#90C8E4', accentSoft: '#C2E5F4', accentBg: 'rgba(126,184,212,0.15)' },
 } as const
 
-type InfoModalType = 'gostNum' | 'gostLet' | 'iso' | null
+type InfoModalType = 'gostNum' | 'iso' | null
 type Unit = 'mm' | 'in'
+
+// Инженерные SVG иконки с анимацией отрисовки
+const AnimatedIcon = ({ type, color }: { type: 'length' | 'ball' | 'instep' | 'heel', color: string }) => {
+  const prefersReducedMotion = useReducedMotion()
+  
+  const paths = {
+    length: "M3 12h18M5 9v6M19 9v6", // Длина (мерная линия)
+    ball: "M12 5c-4.4 0-8 3.1-8 7s3.6 7 8 7 8-3.1 8-7", // Пучки (поперечный срез)
+    instep: "M4 16c0-6 4-10 8-10s8 4 8 10", // Взъем (дуга сверху)
+    heel: "M18 6L6 18M7 7l-2 2 2 2" // Косой обхват (диагональ пятки)
+  }
+
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mr-2 opacity-80" style={{ color }}>
+      <motion.path
+        d={paths[type]}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={prefersReducedMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+      />
+    </svg>
+  )
+}
 
 export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -90,15 +117,17 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       men: 'Мужчины', women: 'Женщины', kids: 'Дети',
       step1: 'Размер (EU)', step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
-      gostNum: 'ГОСТ (Цифра)', gostLet: 'ГОСТ (Буква)',
       proHeader: 'Внутренний стандарт',
       proDesc: 'Цветовая кодировка колодок на производстве.',
       proModules: 'PRO: Конструктивные данные',
-      // Новые переводы для таблицы параметров
+      gostBlockTitle: 'Отечественные стандарты (ГОСТ)',
+      gostNum: 'ГОСТ (Цифра)', 
+      gostLet: 'ГОСТ (Буква)',
+      gostLetDesc: 'Альтернативная система полноты (A, B, C, D, E)',
+      iso: 'EU / ISO',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
         gostNum: { title: 'Цифровой ГОСТ', text: 'Отечественный стандарт (ГОСТ 3927-88). Определяет шаг изменения обхвата в пучках.' },
-        gostLet: { title: 'Буквенный ГОСТ', text: 'Альтернативная система маркировки полноты буквами (A, B, C, D, E).' },
         iso: { title: 'Система EU / ISO', text: 'Международный стандарт маркировки на базе штихмассовой системы.' }
       }
     },
@@ -107,15 +136,17 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       men: 'Чоловіки', women: 'Жінки', kids: 'Діти',
       step1: 'Розмір (EU)', step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
-      gostNum: 'ДСТУ (Цифра)', gostLet: 'ДСТУ (Літера)',
       proHeader: 'Внутрішній стандарт',
       proDesc: 'Кольорове кодування колодок на виробництві.',
       proModules: 'PRO: Конструктивні дані',
-      // Новые переводы для таблицы параметров
+      gostBlockTitle: 'Вітчизняні стандарти (ДСТУ)',
+      gostNum: 'ДСТУ (Цифра)', 
+      gostLet: 'ДСТУ (Літера)',
+      gostLetDesc: 'Альтернативна система повноти (A, B, C, D, E)',
+      iso: 'EU / ISO',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
         gostNum: { title: 'Цифровий ДСТУ', text: 'Вітчизняний стандарт (ГОСТ 3927-88). Визначає крок зміни обхвату в пучках.' },
-        gostLet: { title: 'Літерний ДСТУ', text: 'Альтернативна система маркування повноти літерами (A, B, C, D, E).' },
         iso: { title: 'Система EU / ISO', text: 'Міжнародний стандарт маркування на базі штихмасової системи.' }
       }
     }
@@ -129,7 +160,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       transition={{ duration: 0.22, ease: 'easeOut' }}
       className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden"
     >
-      {/* 1. Header (Compact) */}
+      {/* HEADER */}
       <div className="relative z-20 flex items-center justify-between px-4 pt-3 pb-2 bg-[#151210]/95 backdrop-blur">
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
@@ -141,15 +172,13 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           <h1 className="text-[15px] font-semibold tracking-wide">{t.title}</h1>
           <p className="text-[11px] text-[#8F867E]">{t.subtitle}</p>
         </div>
-        <div className="w-10 h-10" /> {/* Spacer for centering */}
+        <div className="w-10 h-10" />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4 scrollbar-hide">
         
-        {/* 2. INPUT CONFIGURATION CARD (Logical Grouping) */}
+        {/* INPUT CARD */}
         <div className="bg-[#1D1815] rounded-3xl p-4 border border-white/5 shadow-sm space-y-5">
-          
-          {/* Gender Tabs */}
           <div className="flex p-1 rounded-2xl bg-[#151210] border border-white/5">
             {(['men', 'women', 'kids'] as Gender[]).map((g) => (
               <button
@@ -162,17 +191,14 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             ))}
           </div>
 
-          {/* Size Stepper */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
               <span className="text-[11px] text-[#8F867E]">({limits.min} - {limits.max})</span>
             </div>
-            
             <div className="flex items-center gap-4 bg-[#151210] p-1.5 rounded-full border border-white/5">
               <button
-                disabled={sizeEu <= limits.min}
-                onClick={() => handleSizeChange(sizeEu - 1)}
+                disabled={sizeEu <= limits.min} onClick={() => handleSizeChange(sizeEu - 1)}
                 className="w-10 h-10 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
                 style={{ color: theme.accentSoft }}
               >
@@ -182,8 +208,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 {sizeEu}
               </div>
               <button
-                disabled={sizeEu >= limits.max}
-                onClick={() => handleSizeChange(sizeEu + 1)}
+                disabled={sizeEu >= limits.max} onClick={() => handleSizeChange(sizeEu + 1)}
                 className="w-10 h-10 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
                 style={{ color: theme.accentSoft }}
               >
@@ -192,7 +217,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             </div>
           </div>
 
-          {/* Width Category Grid */}
           <div>
             <span className="text-[13px] font-medium text-[#F5F1EB] block mb-2">{t.step2}</span>
             <div className="grid grid-cols-4 gap-1.5">
@@ -211,7 +235,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* 3. PRIMARY RESULTS (US & UK) */}
+        {/* PRIMARY RESULTS (Сфокусировано на главной задаче) */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-4 flex flex-col items-center justify-center">
             <span className="text-[11px] text-[#8F867E] mb-1 font-medium">US SIZE</span>
@@ -223,7 +247,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* 4. PRO DATA (Progressive Disclosure) */}
+        {/* PRO DATA */}
         <div className="rounded-3xl bg-[#1D1815] border border-white/5 p-4">
            <button
             onClick={() => { triggerHaptic(); setShowPro(!showPro) }}
@@ -245,28 +269,43 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 className="overflow-hidden"
               >
                 <div className="pt-4 space-y-4">
-                  {/* Standard codes */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'gostNum' as const, label: t.gostNum, val: result.gostNum },
-                      { id: 'gostLet' as const, label: t.gostLet, val: result.gostLetter },
-                      { id: 'iso' as const, label: 'EU / ISO', val: result.euCode }
-                    ].map((item) => (
-                      <button 
-                        key={item.id} onClick={() => { triggerHaptic('light'); setActiveInfo(item.id); }}
-                        className="bg-[#151210] p-2 rounded-xl border border-white/5 text-center active:scale-95 transition-transform"
-                      >
-                        <div className="text-[9px] text-[#8F867E] uppercase mb-1">{item.label}</div>
-                        <div className="text-[18px] font-medium text-white">{item.val}</div>
+                  
+                  {/* СТАНДАРТЫ ГОСТ И ISO (Развернуто для ясности) */}
+                  <div className="bg-[#151210] rounded-xl border border-white/5 p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-medium text-[#8F867E]">{t.gostBlockTitle}</span>
+                      <button onClick={() => { triggerHaptic('light'); setActiveInfo('gostNum'); }} className="text-[#8F867E] active:scale-95">
+                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                       </button>
-                    ))}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-[#1D1815] rounded-lg p-2.5 flex justify-between items-center border border-white/5">
+                        <span className="text-[11px] text-[#8F867E] uppercase">{t.gostNum}</span>
+                        <span className="text-[16px] font-medium text-white">{result.gostNum}</span>
+                      </div>
+                      <div className="bg-[#1D1815] rounded-lg p-2.5 flex justify-between items-center border border-white/5">
+                        <span className="text-[11px] text-[#8F867E] uppercase">{t.iso}</span>
+                        <span className="text-[16px] font-medium text-white">{result.euCode}</span>
+                      </div>
+                    </div>
+
+                    {/* Вынесенный ГОСТ (Буква) без модалки */}
+                    <div className="bg-[#1D1815] rounded-lg p-3 border border-white/5 flex items-center justify-between">
+                      <div>
+                        <div className="text-[13px] font-medium text-white mb-0.5">{t.gostLet}: {result.gostLetter}</div>
+                        <div className="text-[10px] text-[#8F867E] leading-snug">{t.gostLetDesc}</div>
+                      </div>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px]" style={{ backgroundColor: theme.accentBg, color: theme.accentSoft }}>
+                        {result.gostLetter}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* ВНИМАНИЕ: Новая таблица измерений */}
+                  {/* ТАБЛИЦА ФИЗИЧЕСКИХ ПАРАМЕТРОВ С АНИМАЦИЕЙ */}
                   <div className="bg-[#151210] rounded-xl border border-white/5 overflow-hidden">
                     <div className="flex justify-between items-center p-3 border-b border-white/5">
-                      <span className="text-[12px] font-medium text-[#8F867E]">Mondopoint / ГОСТ 3927-88</span>
-                      {/* Единый тумблер управления для всей таблицы */}
+                      <span className="text-[12px] font-medium text-[#8F867E]">Mondopoint (Физика колодки)</span>
                       <div className="flex bg-[#1D1815] rounded-md p-0.5">
                         {(['mm', 'in'] as Unit[]).map(u => (
                           <button 
@@ -279,13 +318,16 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                     
                     <div className="p-3 space-y-3">
                       {[
-                        { label: t.tableLength, valMm: result.footLengthMm, valIn: result.footLengthIn },
-                        { label: t.tableBall, valMm: result.girthMm, valIn: result.girthIn },
-                        { label: t.tableInstep, valMm: result.instepMm, valIn: result.instepIn },
-                        { label: t.tableHeel, valMm: result.heelMm, valIn: result.heelIn }
-                      ].map((row, i) => (
-                        <div key={i} className="flex justify-between items-end">
-                          <span className="text-[13px] text-white/90">{row.label}</span>
+                        { id: 'length' as const, label: t.tableLength, valMm: result.footLengthMm, valIn: result.footLengthIn },
+                        { id: 'ball' as const, label: t.tableBall, valMm: result.girthMm, valIn: result.girthIn },
+                        { id: 'instep' as const, label: t.tableInstep, valMm: result.instepMm, valIn: result.instepIn },
+                        { id: 'heel' as const, label: t.tableHeel, valMm: result.heelMm, valIn: result.heelIn }
+                      ].map((row) => (
+                        <div key={row.id} className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <AnimatedIcon type={row.id} color={theme.accentSoft} />
+                            <span className="text-[13px] text-white/90">{row.label}</span>
+                          </div>
                           <span className="text-[16px] font-medium" style={{ color: theme.accentSoft }}>
                             {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[11px] font-normal opacity-50">{unit}</span>
                           </span>
@@ -309,7 +351,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
       </div>
 
-      {/* Info Modal */}
+      {/* Info Modal (Оставлен только для технической справки) */}
       <AnimatePresence>
         {activeInfo && (
           <motion.div
