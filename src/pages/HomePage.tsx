@@ -6,6 +6,7 @@ import type { Lang, FavoriteItem } from '../App'
 type HomePageProps = {
   onBack?: () => void
   onOpenBlog?: () => void
+  onOpenCalcMenu?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -16,6 +17,7 @@ type HomePageProps = {
 export function HomePage({
   onBack,
   onOpenBlog,
+  onOpenCalcMenu,
   lang,
   setLang,
   favorites = [],
@@ -291,10 +293,17 @@ export function HomePage({
         <div className="grid grid-cols-3 gap-2 mb-5">
           {TOOLS.map((item) => {
             const isBlog = item.id === 'blog'
+            const isCalc = item.id === 'calc'
             return (
               <button
                 key={item.id}
-                onClick={isBlog ? onOpenBlog : undefined}
+                onClick={
+                  isBlog 
+                    ? onOpenBlog 
+                    : isCalc 
+                    ? onOpenCalcMenu 
+                    : undefined
+                }
                 className="card-simplified relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
               >
                 {isBlog && hasNewBlog && (
