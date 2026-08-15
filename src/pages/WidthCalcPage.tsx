@@ -10,17 +10,16 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
-// Обновленные, более насыщенные цвета для women и kids
+// Насыщенные цвета для акцентов
 const THEMES = {
   men: { accent: '#D4B895', accentSoft: '#F0DDC5', accentBg: 'rgba(198,164,122,0.15)' },
-  women: { accent: '#EC4899', accentSoft: '#F472B6', accentBg: 'rgba(236,72,153,0.15)' }, // Сочный розовый
-  kids: { accent: '#0EA5E9', accentSoft: '#38BDF8', accentBg: 'rgba(14,165,233,0.15)' },  // Насыщенный голубой
+  women: { accent: '#EC4899', accentSoft: '#F472B6', accentBg: 'rgba(236,72,153,0.15)' },
+  kids: { accent: '#0EA5E9', accentSoft: '#38BDF8', accentBg: 'rgba(14,165,233,0.15)' },
 } as const
 
 type InfoModalType = 'gostNum' | 'iso' | null
 type Unit = 'mm' | 'in'
 
-// Инженерные SVG иконки с принудительной анимацией при изменении данных (animKey)
 const AnimatedIcon = ({ type, color, animKey }: { type: 'length' | 'ball' | 'instep' | 'heel', color: string, animKey: string | number }) => {
   const prefersReducedMotion = useReducedMotion()
   
@@ -120,11 +119,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Размер (EU)', step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
-      gostNum: 'ГОСТ (Цифра)', gostLet: 'Альт. система', iso: 'ISO / EU',
+      gostNum: 'ГОСТ (Ц)', gostLet: 'ГОСТ (Б)', alt: 'АЛЬТ.', iso: 'ISO',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
         gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая система). Определяет базовые обхваты колодки.' },
-        iso: { title: 'Альтернативные системы', text: 'Буквенная система (A, B, C, D, E) и международный стандарт ISO.' }
+        iso: { title: 'Альтернативные системы', text: 'Буквенная система и международный стандарт ISO/EU.' }
       }
     },
     uk: {
@@ -133,11 +132,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Розмір (EU)', step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
-      gostNum: 'ДСТУ (Цифра)', gostLet: 'Альт. система', iso: 'ISO / EU',
+      gostNum: 'ДСТУ (Ц)', gostLet: 'ДСТУ (Л)', alt: 'АЛЬТ.', iso: 'ISO',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
         gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова система). Визначає базові обхвати колодки.' },
-        iso: { title: 'Альтернативні системи', text: 'Літерна система (A, B, C, D, E) та міжнародний стандарт ISO.' }
+        iso: { title: 'Альтернативні системи', text: 'Літерна система та міжнародний стандарт ISO/EU.' }
       }
     }
   }[lang]
@@ -166,7 +165,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
 
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-hide">
         
-        {/* INPUT CARD */}
         <div className="bg-[#1D1815] rounded-3xl p-3.5 border border-white/5 space-y-4">
           <div className="flex p-1 rounded-2xl bg-[#151210] border border-white/5">
             {(['men', 'women', 'kids'] as Gender[]).map((g) => (
@@ -224,7 +222,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* PRIMARY RESULTS */}
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
             <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">US SIZE</span>
@@ -261,20 +258,28 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК (Акцент на альтернативной системе) */}
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[10px] text-[#8F867E] mb-1 text-center">{t.gostNum}</span>
-                      <span className="text-[16px] font-medium text-white leading-none">{result.gostNum}</span>
+                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК: 4 в ряд */}
+                  <div className="grid grid-cols-4 gap-1">
+                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.gostNum}</span>
+                      <span className="text-[14px] font-medium text-white leading-none">{result.gostNum}</span>
                     </div>
-                    {/* Альтернативная система теперь выделена визуально */}
-                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform" style={{ borderColor: `${theme.accent}30`, backgroundColor: theme.accentBg }}>
-                      <span className="text-[10px] mb-1 text-center" style={{ color: theme.accentSoft }}>{t.gostLet}</span>
-                      <span className="text-[18px] font-bold leading-none" style={{ color: theme.accentSoft }}>{result.euCode}</span>
+                    
+                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.gostLet}</span>
+                      <span className="text-[14px] font-medium text-white leading-none">{result.gostLetter}</span>
                     </div>
-                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[10px] text-[#8F867E] mb-1 text-center">ГОСТ (Буква)</span>
-                      <span className="text-[16px] font-medium text-white leading-none">{result.gostLetter}</span>
+
+                    {/* Альтернативная система (US маркировка или другие длинные буквенные значения) */}
+                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform" style={{ borderColor: `${theme.accent}30`, backgroundColor: theme.accentBg }}>
+                      <span className="text-[9px] mb-0.5 text-center" style={{ color: theme.accentSoft }}>{t.alt}</span>
+                      {/* truncate не даст порвать сетку, если букв будет 4-5 */}
+                      <span className="text-[15px] font-bold leading-none w-full text-center truncate px-1" style={{ color: theme.accentSoft }}>{result.us}</span>
+                    </div>
+                    
+                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.iso}</span>
+                      <span className="text-[14px] font-medium text-white leading-none">{result.euCode}</span>
                     </div>
                   </div>
 
@@ -319,7 +324,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
       </div>
 
-      {/* Info Modal */}
       <AnimatePresence>
         {activeInfo && (
           <motion.div
