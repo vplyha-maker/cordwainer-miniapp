@@ -10,36 +10,12 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
-// Мягкие, приглушенные цвета для темы оформления (гендерные)
+// Единая система акцентов (Gender-based Theme)
 const THEMES = {
-  men: { accent: '#C6A47A', accentSoft: '#E8C9A0', accentBg: 'rgba(198,164,122,0.16)' },
-  women: { accent: '#E8A0B5', accentSoft: '#F2C4D0', accentBg: 'rgba(232,160,181,0.16)' },
-  kids: { accent: '#7EB8D4', accentSoft: '#A8D4E8', accentBg: 'rgba(126,184,212,0.16)' },
+  men: { accent: '#C6A47A', accentSoft: '#E8C9A0', accentBg: 'rgba(198,164,122,0.16)', border: 'rgba(198,164,122,0.3)' },
+  women: { accent: '#E8A0B5', accentSoft: '#F2C4D0', accentBg: 'rgba(232,160,181,0.16)', border: 'rgba(232,160,181,0.3)' },
+  kids: { accent: '#7EB8D4', accentSoft: '#A8D4E8', accentBg: 'rgba(126,184,212,0.16)', border: 'rgba(126,184,212,0.3)' },
 } as const
-
-// Мягкие, пастельные цвета для кнопок выбора полноты и подкрашивания всех значений
-const WIDTH_BUTTON_THEMES: Record<WidthCategory, { bg: string, text: string, border: string }> = {
-  narrow: { 
-    bg: 'rgba(110, 231, 183, 0.12)', // Мягкий изумрудный
-    text: '#6EE7B7',                 
-    border: 'rgba(110, 231, 183, 0.25)' 
-  },
-  standard: { 
-    bg: 'rgba(125, 211, 252, 0.12)', // Мягкий голубой
-    text: '#7DD3FC',                 
-    border: 'rgba(125, 211, 252, 0.25)' 
-  },
-  wide: { 
-    bg: 'rgba(252, 165, 165, 0.12)', // Мягкий кораллово-красный
-    text: '#FCA5A5',                 
-    border: 'rgba(252, 165, 165, 0.25)' 
-  },
-  xwide: { 
-    bg: 'rgba(216, 180, 254, 0.12)', // Мягкий лиловый
-    text: '#D8B4FE',                 
-    border: 'rgba(216, 180, 254, 0.25)' 
-  }
-}
 
 type InfoModalType = 'gostNum' | 'iso' | null
 type Unit = 'mm' | 'in'
@@ -85,9 +61,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
 
   const theme = THEMES[gender]
   const limits = SIZE_LIMITS[gender]
-  
-  // Цвет активной полноты для подсвечивания всех остальных значений
-  const activeWidthColor = WIDTH_BUTTON_THEMES[widthCat].text
 
   useEffect(() => {
     localStorage.setItem('wc_gender', gender)
@@ -219,7 +192,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
               </button>
-              {/* Размер EU подсвечивается цветом выбранного пола */}
               <div aria-live="polite" className="text-[24px] font-light w-10 text-center" style={{ color: theme.accentSoft }}>
                 {sizeEu}
               </div>
@@ -238,14 +210,13 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             <div className="grid grid-cols-4 gap-1.5">
               {(Object.keys(t.cats) as WidthCategory[]).map(cat => {
                 const isSelected = widthCat === cat
-                const catTheme = WIDTH_BUTTON_THEMES[cat]
                 return (
                   <button
                     key={cat} 
                     onClick={() => { triggerHaptic(); setWidthCat(cat) }}
                     className="py-2 px-1 rounded-xl text-[11px] font-medium transition-all text-center leading-tight"
                     style={isSelected 
-                      ? { background: catTheme.bg, color: catTheme.text, border: `1px solid ${catTheme.border}` }
+                      ? { background: theme.accentBg, color: theme.accentSoft, border: `1px solid ${theme.border}` }
                       : { background: '#151210', color: '#8F867E', border: '1px solid transparent' }}
                   >
                     {t.cats[cat]}
@@ -256,15 +227,27 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
+        {/* ОСНОВНЫЕ РЕЗУЛЬТАТЫ - Максимальный контраст */}
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
             <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">US SIZE</span>
-            {/* Значения US/UK зависят от выбранной полноты */}
-            <span className="text-[28px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.us}</span>
+            <motion.span 
+              key={`${result.us}-${widthCat}`}
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="text-[28px] font-medium text-[#F5F1EB] leading-none"
+            >
+              {result.us}
+            </motion.span>
           </div>
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
             <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">UK SIZE</span>
-            <span className="text-[28px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.uk}</span>
+            <motion.span 
+              key={`${result.uk}-${widthCat}`}
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="text-[28px] font-medium text-[#F5F1EB] leading-none"
+            >
+              {result.uk}
+            </motion.span>
           </div>
         </div>
 
@@ -272,14 +255,13 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         <div className="rounded-3xl bg-[#1D1815] border border-white/5 p-3.5">
            <button
             onClick={() => { triggerHaptic(); setShowPro(!showPro) }}
-            className="flex items-center justify-between w-full"
+            className="flex items-center justify-between w-full group"
           >
             <div className="flex items-center gap-2">
-              {/* Заголовок PRO-блока также может использовать цвет полноты */}
-              <span className="text-[13px] font-medium transition-colors" style={{ color: activeWidthColor }}>{t.proModules}</span>
+              <span className="text-[13px] font-medium text-[#F5F1EB] group-hover:text-white transition-colors">{t.proModules}</span>
               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={result.colorName[lang]} />
             </div>
-            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: activeWidthColor }}>
+            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-[#8F867E]">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
             </motion.div>
           </button>
@@ -294,21 +276,27 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* МАРКИРОВКИ: 3 блока (ГОСТ цифра, ГОСТ буква, ISO / EU) */}
+                  {/* МАРКИРОВКИ: 3 блока */}
                   <div className="grid grid-cols-3 gap-1.5">
                     <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
                       <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.gostNum}</span>
-                      <span className="text-[15px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.gostNum}</span>
+                      <motion.span key={result.gostNum} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[15px] font-medium text-[#F5F1EB] leading-none">
+                        {result.gostNum}
+                      </motion.span>
                     </div>
                     
                     <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
                       <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.gostLet}</span>
-                      <span className="text-[15px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.gostLetter}</span>
+                      <motion.span key={result.gostLetter} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[15px] font-medium text-[#F5F1EB] leading-none">
+                        {result.gostLetter}
+                      </motion.span>
                     </div>
                     
                     <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
                       <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.iso}</span>
-                      <span className="text-[15px] font-medium leading-none transition-colors" style={{ color: activeWidthColor }}>{result.euCode}</span>
+                      <motion.span key={result.euCode} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[15px] font-medium text-[#F5F1EB] leading-none">
+                        {result.euCode}
+                      </motion.span>
                     </div>
                   </div>
 
@@ -335,13 +323,16 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={activeWidthColor} animKey={`${row.valMm}-${unit}`} />
+                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
                             <span className="text-[12px] text-white/90">{row.label}</span>
                           </div>
-                          {/* Значения в таблице также зависят от выбранной полноты */}
-                          <span className="text-[14px] font-medium transition-colors" style={{ color: activeWidthColor }}>
+                          <motion.span 
+                            key={`${row.valMm}-${unit}`}
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                            className="text-[14px] font-medium text-[#F5F1EB]"
+                          >
                             {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[10px] font-normal opacity-50">{unit}</span>
-                          </span>
+                          </motion.span>
                         </div>
                       ))}
                     </div>
@@ -354,6 +345,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
       </div>
 
+      {/* Модальное окно */}
       <AnimatePresence>
         {activeInfo && (
           <motion.div
