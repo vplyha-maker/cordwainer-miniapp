@@ -133,6 +133,15 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     setIsEditing(false)
   }
 
+  const stepValue = (delta: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setFootMm((prev) => {
+      const next = Math.min(range.max, Math.max(range.min, prev + delta))
+      if (next !== prev) triggerHaptic('light')
+      return next
+    })
+  }
+
   useEffect(() => {
     if (isEditing) inputRef.current?.focus()
   }, [isEditing])
@@ -266,30 +275,54 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
           <p className="text-[11px] text-[#6B635C] mb-6">{t.step1Hint}</p>
 
-          {/* Big value — tappable for manual input */}
-          <div className="text-center mb-7" onClick={startEdit}>
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                className="w-44 text-center text-[52px] font-light bg-transparent outline-none border-b"
-                style={{ color: theme.accentSoft, borderColor: `${theme.accent}66` }}
-                inputMode="decimal"
-              />
-            ) : (
-              <div className="cursor-pointer active:opacity-70 transition-opacity">
-                <span
-                  className="text-[52px] font-light tracking-tight leading-none"
-                  style={{ color: theme.accentSoft }}
-                >
-                  {displayValue}
-                </span>
-                <span className="text-[18px] text-[#6B635C] ml-1.5 align-top">{displayUnit}</span>
-              </div>
-            )}
+          {/* Big value with +/- steppers */}
+          <div className="flex items-center justify-center gap-4 mb-7">
+            <button
+              onClick={(e) => stepValue(-1, e)}
+              disabled={footMm <= range.min}
+              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-white/[0.04] active:bg-white/10 transition-colors disabled:opacity-30"
+              style={{ color: theme.accentSoft }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+
+            <div className="text-center w-36" onClick={startEdit}>
+              {isEditing ? (
+                <input
+                  ref={inputRef}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                  className="w-full text-center text-[48px] font-light bg-transparent outline-none border-b"
+                  style={{ color: theme.accentSoft, borderColor: `${theme.accent}66` }}
+                  inputMode="decimal"
+                />
+              ) : (
+                <div className="cursor-pointer active:opacity-70 transition-opacity whitespace-nowrap">
+                  <span
+                    className="text-[48px] font-light tracking-tight leading-none"
+                    style={{ color: theme.accentSoft }}
+                  >
+                    {displayValue}
+                  </span>
+                  <span className="text-[18px] text-[#6B635C] ml-1.5 align-top">{displayUnit}</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={(e) => stepValue(1, e)}
+              disabled={footMm >= range.max}
+              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full bg-white/[0.04] active:bg-white/10 transition-colors disabled:opacity-30"
+              style={{ color: theme.accentSoft }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           </div>
 
           {/* Slider */}
