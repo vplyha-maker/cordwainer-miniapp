@@ -23,9 +23,7 @@ const FlagEU = () => (
         const angle = (i * 30 - 90) * (Math.PI / 180)
         const cx = 9 + 3.8 * Math.cos(angle)
         const cy = 6 + 3.8 * Math.sin(angle)
-        return (
-          <circle key={i} cx={cx} cy={cy} r="0.55" />
-        )
+        return <circle key={i} cx={cx} cy={cy} r="0.55" />
       })}
     </g>
   </svg>
@@ -122,6 +120,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       us: 'US',
       eu: 'EU / UKR',
       cmLabel: 'CM',
+      standardsTitle: 'Стандарты конвертации',
+      standardsNote:
+        'Расчёты основаны на рекомендованных таблицах ISO 19407:2023. Реальные размеры брендов могут отличаться.',
     },
     uk: {
       title: 'Розмір взуття',
@@ -149,6 +150,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       us: 'US',
       eu: 'EU / UKR',
       cmLabel: 'CM',
+      standardsTitle: 'Стандарти конвертації',
+      standardsNote:
+        'Розрахунки базуються на рекомендованих таблицях ISO 19407:2023. Реальні розміри брендів можуть відрізнятися.',
     },
   }[lang]
 
@@ -382,12 +386,42 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
 
         {/* Disclaimer */}
-        <div className="flex gap-2.5 items-start px-1 mb-5">
+        <div className="flex gap-2.5 items-start px-1 mb-4">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8F867E" strokeWidth="1.6" className="shrink-0 mt-0.5">
             <circle cx="12" cy="12" r="10" />
             <path d="M12 8v4M12 16h.01" />
           </svg>
           <p className="text-[11px] text-[#8F867E] leading-snug">{t.disclaimer}</p>
+        </div>
+
+        {/* Standards info block */}
+        <div className="rounded-2xl bg-[#1A1613] border border-white/5 p-4 mb-5">
+          <div className="text-[12px] font-medium text-[#C6A47A] tracking-wide uppercase mb-3">
+            {t.standardsTitle}
+          </div>
+
+          <div className="space-y-2.5 text-[12px] text-[#B9ACA0] leading-snug">
+            <div className="flex gap-2.5">
+              <span className="text-[#E8C9A0] font-medium shrink-0 w-[78px]">EU / UKR</span>
+              <span>ISO 19407 · Paris Point (6,67 мм)</span>
+            </div>
+            <div className="flex gap-2.5">
+              <span className="text-[#E8C9A0] font-medium shrink-0 w-[78px]">UK</span>
+              <span>ISO 19407 · Barleycorn (8,46 мм)</span>
+            </div>
+            <div className="flex gap-2.5">
+              <span className="text-[#E8C9A0] font-medium shrink-0 w-[78px]">US</span>
+              <span>ISO 19407 · на базе UK + смещение</span>
+            </div>
+            <div className="flex gap-2.5">
+              <span className="text-[#E8C9A0] font-medium shrink-0 w-[78px]">Mondopoint</span>
+              <span>ISO 9407 · длина стопы в мм</span>
+            </div>
+          </div>
+
+          <p className="mt-3 text-[11px] text-[#6B635C] leading-snug">
+            {t.standardsNote}
+          </p>
         </div>
 
         {/* More section */}
@@ -454,4 +488,4 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       </div>
     </motion.div>
   )
-}
+    }
