@@ -71,7 +71,7 @@ export function CalcMenuPage({
       {/* Верхний баннер с осветленным и смасштабированным фоном */}
       <div className="absolute inset-0 h-[55vh] w-full overflow-hidden pointer-events-none">
         <img
-          src="/CalcMenuPage/sizi.jpg"
+          src="/CalcMenuPage/size.jpg"
           alt="Calculators Background"
           className="w-full h-full object-contain object-top opacity-85"
           onError={(e) => {
