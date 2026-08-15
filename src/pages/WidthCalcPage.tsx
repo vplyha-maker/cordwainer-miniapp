@@ -19,20 +19,21 @@ const THEMES = {
 type InfoModalType = 'gostNum' | 'iso' | null
 type Unit = 'mm' | 'in'
 
-// Инженерные SVG иконки с анимацией отрисовки
-const AnimatedIcon = ({ type, color }: { type: 'length' | 'ball' | 'instep' | 'heel', color: string }) => {
+// Инженерные SVG иконки с принудительной анимацией при изменении данных (animKey)
+const AnimatedIcon = ({ type, color, animKey }: { type: 'length' | 'ball' | 'instep' | 'heel', color: string, animKey: string | number }) => {
   const prefersReducedMotion = useReducedMotion()
   
   const paths = {
-    length: "M3 12h18M5 9v6M19 9v6", // Длина (мерная линия)
-    ball: "M12 5c-4.4 0-8 3.1-8 7s3.6 7 8 7 8-3.1 8-7", // Пучки (поперечный срез)
-    instep: "M4 16c0-6 4-10 8-10s8 4 8 10", // Взъем (дуга сверху)
-    heel: "M18 6L6 18M7 7l-2 2 2 2" // Косой обхват (диагональ пятки)
+    length: "M3 12h18M5 9v6M19 9v6",
+    ball: "M12 5c-4.4 0-8 3.1-8 7s3.6 7 8 7 8-3.1 8-7",
+    instep: "M4 16c0-6 4-10 8-10s8 4 8 10",
+    heel: "M18 6L6 18M7 7l-2 2 2 2"
   }
 
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mr-2 opacity-80" style={{ color }}>
       <motion.path
+        key={animKey} // Ключевой момент: заставляет Framer Motion перезапустить анимацию
         d={paths[type]}
         stroke="currentColor"
         strokeWidth="1.5"
@@ -40,7 +41,7 @@ const AnimatedIcon = ({ type, color }: { type: 'length' | 'ball' | 'instep' | 'h
         strokeLinejoin="round"
         initial={prefersReducedMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
         animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       />
     </svg>
   )
@@ -117,17 +118,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       men: 'Мужчины', women: 'Женщины', kids: 'Дети',
       step1: 'Размер (EU)', step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
-      proHeader: 'Внутренний стандарт',
-      proDesc: 'Цветовая кодировка колодок на производстве.',
       proModules: 'PRO: Конструктивные данные',
-      gostBlockTitle: 'Отечественные стандарты (ГОСТ)',
-      gostNum: 'ГОСТ (Цифра)', 
-      gostLet: 'ГОСТ (Буква)',
-      gostLetDesc: 'Альтернативная система полноты (A, B, C, D, E)',
-      iso: 'EU / ISO',
+      gostNum: 'ГОСТ (Ц)', gostLet: 'ГОСТ (Б)', iso: 'ISO / EU',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
-        gostNum: { title: 'Цифровой ГОСТ', text: 'Отечественный стандарт (ГОСТ 3927-88). Определяет шаг изменения обхвата в пучках.' },
+        gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая система) и альтернативная буквенная маркировка.' },
         iso: { title: 'Система EU / ISO', text: 'Международный стандарт маркировки на базе штихмассовой системы.' }
       }
     },
@@ -136,17 +131,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       men: 'Чоловіки', women: 'Жінки', kids: 'Діти',
       step1: 'Розмір (EU)', step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
-      proHeader: 'Внутрішній стандарт',
-      proDesc: 'Кольорове кодування колодок на виробництві.',
       proModules: 'PRO: Конструктивні дані',
-      gostBlockTitle: 'Вітчизняні стандарти (ДСТУ)',
-      gostNum: 'ДСТУ (Цифра)', 
-      gostLet: 'ДСТУ (Літера)',
-      gostLetDesc: 'Альтернативна система повноти (A, B, C, D, E)',
-      iso: 'EU / ISO',
+      gostNum: 'ДСТУ (Ц)', gostLet: 'ДСТУ (Л)', iso: 'ISO / EU',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
-        gostNum: { title: 'Цифровий ДСТУ', text: 'Вітчизняний стандарт (ГОСТ 3927-88). Визначає крок зміни обхвату в пучках.' },
+        gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова система) та альтернативне літерне маркування.' },
         iso: { title: 'Система EU / ISO', text: 'Міжнародний стандарт маркування на базі штихмасової системи.' }
       }
     }
@@ -160,30 +149,31 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       transition={{ duration: 0.22, ease: 'easeOut' }}
       className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden"
     >
-      {/* HEADER */}
-      <div className="relative z-20 flex items-center justify-between px-4 pt-3 pb-2 bg-[#151210]/95 backdrop-blur">
+      {/* HEADER (Сжат по вертикали) */}
+      <div className="relative z-20 flex items-center justify-between px-4 py-2 bg-[#151210]/95 backdrop-blur">
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1D1815] border border-white/10 active:scale-95 transition-transform"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1D1815] border border-white/10 active:scale-95 transition-transform"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="text-center">
-          <h1 className="text-[15px] font-semibold tracking-wide">{t.title}</h1>
-          <p className="text-[11px] text-[#8F867E]">{t.subtitle}</p>
+          <h1 className="text-[14px] font-semibold tracking-wide">{t.title}</h1>
+          <p className="text-[10px] text-[#8F867E] leading-none mt-0.5">{t.subtitle}</p>
         </div>
-        <div className="w-10 h-10" />
+        <div className="w-9 h-9" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4 scrollbar-hide">
+      {/* Основной контент без скролла */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-hide">
         
         {/* INPUT CARD */}
-        <div className="bg-[#1D1815] rounded-3xl p-4 border border-white/5 shadow-sm space-y-5">
+        <div className="bg-[#1D1815] rounded-3xl p-3.5 border border-white/5 space-y-4">
           <div className="flex p-1 rounded-2xl bg-[#151210] border border-white/5">
             {(['men', 'women', 'kids'] as Gender[]).map((g) => (
               <button
                 key={g} onClick={() => handleGender(g)}
-                className="flex-1 py-2.5 rounded-[12px] text-[13px] font-medium transition-all"
+                className="flex-1 py-1.5 rounded-[12px] text-[12px] font-medium transition-all"
                 style={gender === g ? { background: theme.accentBg, color: theme.accentSoft } : { color: '#8F867E' }}
               >
                 {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
@@ -191,39 +181,39 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             ))}
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between px-1">
             <div className="flex flex-col">
               <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
-              <span className="text-[11px] text-[#8F867E]">({limits.min} - {limits.max})</span>
+              <span className="text-[10px] text-[#8F867E]">({limits.min} - {limits.max})</span>
             </div>
-            <div className="flex items-center gap-4 bg-[#151210] p-1.5 rounded-full border border-white/5">
+            <div className="flex items-center gap-3 bg-[#151210] p-1.5 rounded-full border border-white/5">
               <button
                 disabled={sizeEu <= limits.min} onClick={() => handleSizeChange(sizeEu - 1)}
-                className="w-10 h-10 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
+                className="w-9 h-9 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
                 style={{ color: theme.accentSoft }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
               </button>
-              <div aria-live="polite" className="text-[28px] font-light w-12 text-center" style={{ color: theme.accentSoft }}>
+              <div aria-live="polite" className="text-[24px] font-light w-10 text-center" style={{ color: theme.accentSoft }}>
                 {sizeEu}
               </div>
               <button
                 disabled={sizeEu >= limits.max} onClick={() => handleSizeChange(sizeEu + 1)}
-                className="w-10 h-10 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
+                className="w-9 h-9 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
                 style={{ color: theme.accentSoft }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
               </button>
             </div>
           </div>
 
           <div>
-            <span className="text-[13px] font-medium text-[#F5F1EB] block mb-2">{t.step2}</span>
+            <span className="text-[13px] font-medium text-[#F5F1EB] block mb-2 px-1">{t.step2}</span>
             <div className="grid grid-cols-4 gap-1.5">
               {(Object.keys(t.cats) as WidthCategory[]).map(cat => (
                 <button
                   key={cat} onClick={() => { triggerHaptic(); setWidthCat(cat) }}
-                  className="py-2.5 px-1 rounded-xl text-[12px] font-medium transition-all text-center leading-tight"
+                  className="py-2 px-1 rounded-xl text-[11px] font-medium transition-all text-center leading-tight"
                   style={widthCat === cat 
                     ? { background: theme.accentBg, color: theme.accentSoft, border: `1px solid ${theme.accent}40` }
                     : { background: '#151210', color: '#8F867E', border: '1px solid transparent' }}
@@ -235,27 +225,30 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* PRIMARY RESULTS (Сфокусировано на главной задаче) */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-4 flex flex-col items-center justify-center">
-            <span className="text-[11px] text-[#8F867E] mb-1 font-medium">US SIZE</span>
-            <span className="text-[32px] font-medium leading-none" style={{ color: theme.accentSoft }}>{result.us}</span>
+        {/* PRIMARY RESULTS (Уменьшены отступы) */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
+            <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">US SIZE</span>
+            <span className="text-[28px] font-medium leading-none" style={{ color: theme.accentSoft }}>{result.us}</span>
           </div>
-          <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-4 flex flex-col items-center justify-center">
-            <span className="text-[11px] text-[#8F867E] mb-1 font-medium">UK SIZE</span>
-            <span className="text-[32px] font-medium leading-none" style={{ color: theme.accentSoft }}>{result.uk}</span>
+          <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
+            <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">UK SIZE</span>
+            <span className="text-[28px] font-medium leading-none" style={{ color: theme.accentSoft }}>{result.uk}</span>
           </div>
         </div>
 
         {/* PRO DATA */}
-        <div className="rounded-3xl bg-[#1D1815] border border-white/5 p-4">
+        <div className="rounded-3xl bg-[#1D1815] border border-white/5 p-3.5">
            <button
             onClick={() => { triggerHaptic(); setShowPro(!showPro) }}
-            className="flex items-center justify-between w-full text-[13px] font-medium"
-            style={{ color: theme.accent }}
+            className="flex items-center justify-between w-full"
           >
-            {t.proModules}
-            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-medium" style={{ color: theme.accent }}>{t.proModules}</span>
+              {/* Цветовой маркер интегрирован в заголовок, экономим целую строку */}
+              <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={result.colorName[lang]} />
+            </div>
+            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: theme.accent }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
             </motion.div>
           </button>
@@ -268,55 +261,39 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="pt-4 space-y-4">
+                <div className="pt-3 space-y-3">
                   
-                  {/* СТАНДАРТЫ ГОСТ И ISO (Развернуто для ясности) */}
-                  <div className="bg-[#151210] rounded-xl border border-white/5 p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-medium text-[#8F867E]">{t.gostBlockTitle}</span>
-                      <button onClick={() => { triggerHaptic('light'); setActiveInfo('gostNum'); }} className="text-[#8F867E] active:scale-95">
-                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                      </button>
+                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК (3 в ряд) */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[10px] text-[#8F867E] mb-1">{t.gostNum}</span>
+                      <span className="text-[16px] font-medium text-white leading-none">{result.gostNum}</span>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-[#1D1815] rounded-lg p-2.5 flex justify-between items-center border border-white/5">
-                        <span className="text-[11px] text-[#8F867E] uppercase">{t.gostNum}</span>
-                        <span className="text-[16px] font-medium text-white">{result.gostNum}</span>
-                      </div>
-                      <div className="bg-[#1D1815] rounded-lg p-2.5 flex justify-between items-center border border-white/5">
-                        <span className="text-[11px] text-[#8F867E] uppercase">{t.iso}</span>
-                        <span className="text-[16px] font-medium text-white">{result.euCode}</span>
-                      </div>
+                    <div className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5">
+                      <span className="text-[10px] text-[#8F867E] mb-1">{t.gostLet}</span>
+                      <span className="text-[16px] font-bold leading-none" style={{ color: theme.accentSoft }}>{result.gostLetter}</span>
                     </div>
-
-                    {/* Вынесенный ГОСТ (Буква) без модалки */}
-                    <div className="bg-[#1D1815] rounded-lg p-3 border border-white/5 flex items-center justify-between">
-                      <div>
-                        <div className="text-[13px] font-medium text-white mb-0.5">{t.gostLet}: {result.gostLetter}</div>
-                        <div className="text-[10px] text-[#8F867E] leading-snug">{t.gostLetDesc}</div>
-                      </div>
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px]" style={{ backgroundColor: theme.accentBg, color: theme.accentSoft }}>
-                        {result.gostLetter}
-                      </div>
+                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
+                      <span className="text-[10px] text-[#8F867E] mb-1">{t.iso}</span>
+                      <span className="text-[16px] font-medium text-white leading-none">{result.euCode}</span>
                     </div>
                   </div>
 
-                  {/* ТАБЛИЦА ФИЗИЧЕСКИХ ПАРАМЕТРОВ С АНИМАЦИЕЙ */}
-                  <div className="bg-[#151210] rounded-xl border border-white/5 overflow-hidden">
-                    <div className="flex justify-between items-center p-3 border-b border-white/5">
-                      <span className="text-[12px] font-medium text-[#8F867E]">Mondopoint (Физика колодки)</span>
+                  {/* ТАБЛИЦА ФИЗИЧЕСКИХ ПАРАМЕТРОВ */}
+                  <div className="bg-[#151210] rounded-xl border border-white/5 p-2.5">
+                    <div className="flex justify-between items-center pb-2 mb-2 border-b border-white/5">
+                      <span className="text-[11px] font-medium text-[#8F867E]">Mondopoint (мм/дюймы)</span>
                       <div className="flex bg-[#1D1815] rounded-md p-0.5">
                         {(['mm', 'in'] as Unit[]).map(u => (
                           <button 
                             key={u} onClick={() => { triggerHaptic('light'); setUnit(u) }}
-                            className={`px-3 py-1 rounded text-[10px] font-medium transition-colors ${unit === u ? 'bg-white/10 text-white' : 'text-[#8F867E]'}`}
+                            className={`px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors ${unit === u ? 'bg-white/10 text-white' : 'text-[#8F867E]'}`}
                           >{u}</button>
                         ))}
                       </div>
                     </div>
                     
-                    <div className="p-3 space-y-3">
+                    <div className="space-y-2">
                       {[
                         { id: 'length' as const, label: t.tableLength, valMm: result.footLengthMm, valIn: result.footLengthIn },
                         { id: 'ball' as const, label: t.tableBall, valMm: result.girthMm, valIn: result.girthIn },
@@ -325,25 +302,18 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={theme.accentSoft} />
-                            <span className="text-[13px] text-white/90">{row.label}</span>
+                            {/* animKey заставляет иконку перерисовываться при изменении значения */}
+                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
+                            <span className="text-[12px] text-white/90">{row.label}</span>
                           </div>
-                          <span className="text-[16px] font-medium" style={{ color: theme.accentSoft }}>
-                            {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[11px] font-normal opacity-50">{unit}</span>
+                          <span className="text-[14px] font-medium" style={{ color: theme.accentSoft }}>
+                            {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[10px] font-normal opacity-50">{unit}</span>
                           </span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Color coding */}
-                  <div className="flex items-center gap-3 p-3 bg-[#151210] rounded-xl border border-white/5">
-                    <div className="w-8 h-10 rounded-t-full rounded-b-sm shadow-inner shrink-0" style={{ backgroundColor: result.color }} />
-                    <div>
-                      <div className="text-[12px] font-medium text-white mb-0.5">{t.proHeader}: {result.colorName[lang]}</div>
-                      <div className="text-[11px] text-[#8F867E] leading-snug">{t.proDesc}</div>
-                    </div>
-                  </div>
                 </div>
               </motion.div>
             )}
@@ -351,7 +321,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
       </div>
 
-      {/* Info Modal (Оставлен только для технической справки) */}
+      {/* Info Modal */}
       <AnimatePresence>
         {activeInfo && (
           <motion.div
@@ -364,14 +334,14 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               initial={prefersReducedMotion ? { scale: 1 } : { scale: 0.95, y: 10 }} 
               animate={{ scale: 1, y: 0 }} exit={prefersReducedMotion ? { scale: 1 } : { scale: 0.95, y: 10 }}
               onClick={e => e.stopPropagation()}
-              className="w-full max-w-[300px] bg-[#1D1815] border border-white/10 rounded-3xl p-6 shadow-2xl"
+              className="w-full max-w-[280px] bg-[#1D1815] border border-white/10 rounded-3xl p-5 shadow-2xl"
             >
-              <h3 className="text-[16px] font-medium text-white mb-2">{t.modal[activeInfo].title}</h3>
-              <p className="text-[13px] text-[#8F867E] leading-relaxed mb-6">{t.modal[activeInfo].text}</p>
+              <h3 className="text-[15px] font-medium text-white mb-2">{t.modal[activeInfo].title}</h3>
+              <p className="text-[12px] text-[#8F867E] leading-relaxed mb-5">{t.modal[activeInfo].text}</p>
               
               <button
                 onClick={() => setActiveInfo(null)}
-                className="w-full py-3 rounded-xl font-medium text-[14px]"
+                className="w-full py-2.5 rounded-xl font-medium text-[13px]"
                 style={{ backgroundColor: theme.accentBg, color: theme.accentSoft }}
               >
                 {lang === 'ru' ? 'Понятно' : 'Зрозуміло'}
