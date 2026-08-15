@@ -8,6 +8,8 @@ type CalcMenuPageProps = {
   lang: Lang
   onOpenSizeCalc?: () => void
   onOpenWidthCalc?: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
 }
 
 export function CalcMenuPage({
@@ -15,9 +17,9 @@ export function CalcMenuPage({
   lang,
   onOpenSizeCalc,
   onOpenWidthCalc,
+  isFavorite = false,
+  onToggleFavorite,
 }: CalcMenuPageProps) {
-  const [isCalcSaved, setIsCalcSaved] = useState(false)
-
   const triggerHaptic = (style: 'light' | 'medium' = 'light') => {
     if (typeof window !== 'undefined') {
       const tg = (window as any).Telegram?.WebApp
@@ -78,7 +80,6 @@ export function CalcMenuPage({
             e.currentTarget.style.display = 'none'
           }}
         />
-        {/* Более плотный градиент для читаемости без использования blur */}
         <div
           className="absolute inset-0"
           style={{
@@ -88,7 +89,7 @@ export function CalcMenuPage({
         />
       </div>
 
-      {/* Кнопка Назад вверху слева (оптимизирована) */}
+      {/* Кнопка Назад вверху слева */}
       <div className="relative z-50 p-4">
         <button
           aria-label="Back"
@@ -115,7 +116,6 @@ export function CalcMenuPage({
 
       {/* Основной контент */}
       <div className="relative z-10 px-5 flex flex-col justify-end pb-24 flex-1">
-        {/* Улучшенная типографика */}
         <div className="mb-5">
           <span className="text-[10px] font-semibold text-[#C6A47A] tracking-[0.15em] uppercase block mb-1.5">
             {t.category}
@@ -128,7 +128,7 @@ export function CalcMenuPage({
           </p>
         </div>
 
-        {/* Сетка из 3 карточек (уменьшены для будущих кнопок сверху) */}
+        {/* Сетка из 3 карточек */}
         <div className="grid grid-cols-3 gap-2.5 mb-5">
           {/* Карточка 1: Размеры */}
           <button
@@ -193,14 +193,14 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Карточка 3: Розовая звездочка */}
+          {/* Карточка 3: Розовая звездочка (интегрирована с глобальным избранным) */}
           <button
             onClick={() => {
-              triggerHaptic(isCalcSaved ? 'light' : 'medium')
-              setIsCalcSaved(!isCalcSaved)
+              triggerHaptic(isFavorite ? 'light' : 'medium')
+              onToggleFavorite?.()
             }}
             className={`h-[96px] p-2.5 rounded-[14px] transition-all active:scale-95 cursor-pointer flex flex-col justify-between text-left bg-[#1D1815]/95 ${
-              isCalcSaved ? 'border border-[#F472B6]/40' : 'border border-white/5'
+              isFavorite ? 'border border-[#F472B6]/40' : 'border border-white/5'
             }`}
           >
             <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#F472B6]/10 text-[#F472B6]">
@@ -208,7 +208,7 @@ export function CalcMenuPage({
                 width="16"
                 height="16"
                 viewBox="0 0 24 24"
-                fill={isCalcSaved ? 'currentColor' : 'none'}
+                fill={isFavorite ? 'currentColor' : 'none'}
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
@@ -220,14 +220,14 @@ export function CalcMenuPage({
             </div>
             <div>
               <div className="text-xs font-medium text-[#F5F1EB] leading-tight mb-0.5">
-                {isCalcSaved ? t.saveRemoveTitle : t.saveAddTitle}
+                {isFavorite ? t.saveRemoveTitle : t.saveAddTitle}
               </div>
               <div
                 className={`text-[9px] leading-tight truncate ${
-                  isCalcSaved ? 'text-[#F472B6]' : 'text-[#8F867E]'
+                  isFavorite ? 'text-[#F472B6]' : 'text-[#8F867E]'
                 }`}
               >
-                {isCalcSaved ? t.saveRemoveSub : t.saveAddSub}
+                {isFavorite ? t.saveRemoveSub : t.saveAddSub}
               </div>
             </div>
           </button>
