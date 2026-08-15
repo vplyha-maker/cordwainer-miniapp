@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage'
 import { BlogPage } from './pages/BlogPage'
 import { CalcMenuPage } from './pages/CalcMenuPage'
 import { SizeCalcPage } from './pages/SizeCalcPage'
+import { WidthCalcPage } from './pages/WidthCalcPage' // <-- Добавлен импорт
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -20,7 +21,8 @@ declare global {
   }
 }
 
-export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu' | 'size-calc'
+// <-- Добавлен 'width-calc'
+export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu' | 'size-calc' | 'width-calc' 
 export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
@@ -278,12 +280,22 @@ export default function App() {
             lang={lang}
             onBack={() => setScreen('home')}
             onOpenSizeCalc={() => setScreen('size-calc')}
+            onOpenWidthCalc={() => setScreen('width-calc')} // <-- Пробросили метод для полноты
           />
         )}
 
         {screen === 'size-calc' && (
           <SizeCalcPage
             key="size-calc"
+            lang={lang}
+            onBack={() => setScreen('calc-menu')}
+          />
+        )}
+
+        {/* <-- Добавлен экран WidthCalcPage */}
+        {screen === 'width-calc' && (
+          <WidthCalcPage
+            key="width-calc"
             lang={lang}
             onBack={() => setScreen('calc-menu')}
           />
