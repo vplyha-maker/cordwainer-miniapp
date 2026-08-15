@@ -12,24 +12,28 @@ export interface WidthResult {
   color: string
   colorName: { ru: string; uk: string }
   girthMm: number
-  girthIn: number // Добавлено для конвертации mm/in
+  girthIn: number
 }
 
-// Экспортируем лимиты для централизованного управления (валидация)
+// Константа для конвертации миллиметров в дюймы
+const MM_TO_INCHES = 0.0393701;
+
+// Лимиты для централизованного управления (валидация на стороне UI)
 export const SIZE_LIMITS: Record<Gender, { min: number, max: number }> = {
   men: { min: 38, max: 50 },
   women: { min: 34, max: 43 },
   kids: { min: 16, max: 38 },
 }
 
-// Базовые размеры для расчета обхвата пучков по стандартам (ISO / ГОСТ)
+// Базовые параметры по ГОСТ 3927-88 (Обувь. Колодки обувные)
+// widthStep  — шаг изменения обхвата на 1 единицу полноты ГОСТ
+// lengthStep — шаг изменения обхвата на 1 размер обуви
 const BASE_MEASUREMENTS = {
   men: { baseEu: 42, baseGirth: 254, widthStep: 5, lengthStep: 3 },
   women: { baseEu: 38, baseGirth: 228, widthStep: 4, lengthStep: 3 },
   kids: { baseEu: 28, baseGirth: 164, widthStep: 3, lengthStep: 2.5 },
 }
 
-// Источник данных: ГОСТ 3927-88 (Обувь. Колодки обувные) / ISO 9407
 const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'girthMm' | 'girthIn'>>> = {
   men: {
     narrow: { gostNum: 4, gostLetter: 'У', us: 'B', uk: 'C/D', euCode: 'E', color: '#10B981', colorName: { ru: 'Зеленый', uk: 'Зелений' } },
@@ -51,13 +55,6 @@ const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'girthM
   }
 }
 
-const WIDTH_MULTIPLIER: Record<WidthCategory, number> = {
-  narrow: -1,
-  standard: 0,
-  wide: 1,
-  xwide: 2
-}
-
 export function getWidthData(gender: Gender, sizeEu: number, category: WidthCategory): WidthResult {
   const baseData = WIDTH_DATA[gender][category]
   const metrics = BASE_MEASUREMENTS[gender]
@@ -66,11 +63,23 @@ export function getWidthData(gender: Gender, sizeEu: number, category: WidthCate
   // Безопасное ограничение (clamp) размера для защиты логики
   const clampedSize = Math.max(limits.min, Math.min(limits.max, sizeEu))
   
+  // Смещение по размеру относительно базового стандарта
   const sizeDelta = clampedSize - metrics.baseEu
-  const widthDelta = WIDTH_MULTIPLIER[category]
   
-  const girthMm = Math.round(metrics.baseGirth + (sizeDelta * metrics.lengthStep) + (widthDelta * metrics.widthStep))
-  const girthIn = Number((girthMm * 0.0393701).toFixed(2)) // Конвертация в дюймы
+  // ИДЕАЛЬНАЯ МАТЕМАТИКА ГОСТ:
+  // Динамически вычисляем разницу в полноте, сравнивая ГОСТ номер выбранной категории
+  // с ГОСТ номером стандартной категории для данного пола.
+  const baseGostNum = WIDTH_DATA[gender].standard.gostNum
+  const targetGostNum = baseData.gostNum
+  const widthDelta = targetGostNum - baseGostNum
+  
+  // Финальный расчет обхвата в миллиметрах
+  const girthMm = Math.round(
+    metrics.baseGirth + (sizeDelta * metrics.lengthStep) + (widthDelta * metrics.widthStep)
+  )
+  
+  // Конвертация в дюймы
+  const girthIn = Number((girthMm * MM_TO_INCHES).toFixed(2))
   
   return {
     ...baseData,
