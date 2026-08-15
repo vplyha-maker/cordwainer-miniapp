@@ -94,9 +94,10 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       proHeader: 'Внутренний стандарт',
       proDesc: 'Цветовая кодировка колодок на производстве.',
       proModules: 'PRO: Конструктивные данные',
-      girthTitle: 'Обхват в пучках:', export: 'Экспорт',
+      // Новые переводы для таблицы параметров
+      tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
-        gostNum: { title: 'Цифровой ГОСТ', text: 'Отечественный стандарт. Определяет шаг изменения обхвата в пучках.' },
+        gostNum: { title: 'Цифровой ГОСТ', text: 'Отечественный стандарт (ГОСТ 3927-88). Определяет шаг изменения обхвата в пучках.' },
         gostLet: { title: 'Буквенный ГОСТ', text: 'Альтернативная система маркировки полноты буквами (A, B, C, D, E).' },
         iso: { title: 'Система EU / ISO', text: 'Международный стандарт маркировки на базе штихмассовой системы.' }
       }
@@ -110,9 +111,10 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       proHeader: 'Внутрішній стандарт',
       proDesc: 'Кольорове кодування колодок на виробництві.',
       proModules: 'PRO: Конструктивні дані',
-      girthTitle: 'Обхват у пучках:', export: 'Експорт',
+      // Новые переводы для таблицы параметров
+      tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
-        gostNum: { title: 'Цифровий ДСТУ', text: 'Вітчизняний стандарт. Визначає крок зміни обхвату в пучках.' },
+        gostNum: { title: 'Цифровий ДСТУ', text: 'Вітчизняний стандарт (ГОСТ 3927-88). Визначає крок зміни обхвату в пучках.' },
         gostLet: { title: 'Літерний ДСТУ', text: 'Альтернативна система маркування повноти літерами (A, B, C, D, E).' },
         iso: { title: 'Система EU / ISO', text: 'Міжнародний стандарт маркування на базі штихмасової системи.' }
       }
@@ -160,7 +162,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             ))}
           </div>
 
-          {/* Size Stepper (No redundant slider) */}
+          {/* Size Stepper */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
@@ -260,21 +262,35 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                     ))}
                   </div>
 
-                  {/* Physical measurements */}
-                  <div className="flex justify-between items-center bg-[#151210] p-3 rounded-xl border border-white/5">
-                    <span className="text-[13px] font-medium text-white">{t.girthTitle}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[18px] font-bold" style={{ color: theme.accentSoft }}>
-                        {unit === 'mm' ? result.girthMm : result.girthIn}
-                      </span>
+                  {/* ВНИМАНИЕ: Новая таблица измерений */}
+                  <div className="bg-[#151210] rounded-xl border border-white/5 overflow-hidden">
+                    <div className="flex justify-between items-center p-3 border-b border-white/5">
+                      <span className="text-[12px] font-medium text-[#8F867E]">Mondopoint / ГОСТ 3927-88</span>
+                      {/* Единый тумблер управления для всей таблицы */}
                       <div className="flex bg-[#1D1815] rounded-md p-0.5">
                         {(['mm', 'in'] as Unit[]).map(u => (
                           <button 
                             key={u} onClick={() => { triggerHaptic('light'); setUnit(u) }}
-                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${unit === u ? 'bg-white/10 text-white' : 'text-[#8F867E]'}`}
+                            className={`px-3 py-1 rounded text-[10px] font-medium transition-colors ${unit === u ? 'bg-white/10 text-white' : 'text-[#8F867E]'}`}
                           >{u}</button>
                         ))}
                       </div>
+                    </div>
+                    
+                    <div className="p-3 space-y-3">
+                      {[
+                        { label: t.tableLength, valMm: result.footLengthMm, valIn: result.footLengthIn },
+                        { label: t.tableBall, valMm: result.girthMm, valIn: result.girthIn },
+                        { label: t.tableInstep, valMm: result.instepMm, valIn: result.instepIn },
+                        { label: t.tableHeel, valMm: result.heelMm, valIn: result.heelIn }
+                      ].map((row, i) => (
+                        <div key={i} className="flex justify-between items-end">
+                          <span className="text-[13px] text-white/90">{row.label}</span>
+                          <span className="text-[16px] font-medium" style={{ color: theme.accentSoft }}>
+                            {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[11px] font-normal opacity-50">{unit}</span>
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
