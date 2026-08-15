@@ -39,9 +39,9 @@ export function CalcMenuPage({
       widthTitle: 'Полнота',
       widthSub: 'Расчет по обхвату',
       saveAddTitle: 'На главную',
-      saveAddSub: 'Добавить калькулятор',
+      saveAddSub: 'Добавить',
       saveRemoveTitle: 'В избранном',
-      saveRemoveSub: 'Убрать с главной',
+      saveRemoveSub: 'Сохранено',
       backMenu: 'Назад в меню',
     },
     uk: {
@@ -53,9 +53,9 @@ export function CalcMenuPage({
       widthTitle: 'Повнота',
       widthSub: 'Розрахунок за обхватом',
       saveAddTitle: 'На головну',
-      saveAddSub: 'Додати калькулятор',
+      saveAddSub: 'Додати',
       saveRemoveTitle: 'В обраному',
-      saveRemoveSub: 'Видалити з головної',
+      saveRemoveSub: 'Збережено',
       backMenu: 'Назад в меню',
     },
   }[lang]
@@ -65,30 +65,30 @@ export function CalcMenuPage({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.25 }}
-      className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EB] overflow-hidden justify-between"
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EB] overflow-hidden justify-between transform-gpu"
     >
-      {/* Полный экран 9:16 без срезов по бокам */}
+      {/* Полный экран 9:16 с центрированием картинки */}
       <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none">
         <img
           src="/CalcMenuPage/size.jpg"
           alt="Calculators Background"
-          className="w-full h-full object-cover object-top opacity-90"
+          className="w-full h-full object-cover object-[center_top] opacity-90"
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
         />
-        {/* Градиент от прозрачного к тёмному фону книзу */}
+        {/* Более плотный градиент для читаемости без использования blur */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(to bottom, rgba(18,16,14,0.1) 0%, rgba(18,16,14,0.5) 45%, #12100E 80%)',
+              'linear-gradient(to bottom, rgba(18,16,14,0.2) 0%, rgba(18,16,14,0.7) 45%, #12100E 85%)',
           }}
         />
       </div>
 
-      {/* Кнопка Назад вверху слева */}
+      {/* Кнопка Назад вверху слева (оптимизирована) */}
       <div className="relative z-50 p-4">
         <button
           aria-label="Back"
@@ -96,7 +96,7 @@ export function CalcMenuPage({
             triggerHaptic('light')
             onBack()
           }}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1D1815]/70 backdrop-blur-md border border-white/10 text-[#F5F1EB] active:scale-90 transition-transform cursor-pointer"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1D1815]/90 border border-white/10 text-[#F5F1EB] active:scale-90 transition-transform cursor-pointer"
         >
           <svg
             width="18"
@@ -115,33 +115,33 @@ export function CalcMenuPage({
 
       {/* Основной контент */}
       <div className="relative z-10 px-5 flex flex-col justify-end pb-24 flex-1">
-        {/* Текстовый заголовок */}
-        <div className="mb-6">
-          <span className="text-[11px] font-semibold text-[#C6A47A] tracking-widest uppercase block mb-1.5 drop-shadow">
+        {/* Улучшенная типографика */}
+        <div className="mb-5">
+          <span className="text-[10px] font-semibold text-[#C6A47A] tracking-[0.15em] uppercase block mb-1.5">
             {t.category}
           </span>
-          <h1 className="text-3xl font-serif text-[#F5F1EB] font-normal tracking-wide mb-2 drop-shadow-md">
+          <h1 className="text-3xl font-serif text-white font-normal tracking-wide mb-2">
             {t.title}
           </h1>
-          <p className="text-xs text-[#B9ACA0] leading-relaxed max-w-[290px] drop-shadow-sm">
+          <p className="text-[13px] text-[#B9ACA0] leading-snug max-w-[280px]">
             {t.desc}
           </p>
         </div>
 
-        {/* Сетка из 3 карточек */}
-        <div className="grid grid-cols-3 gap-2.5 mb-6">
+        {/* Сетка из 3 карточек (уменьшены для будущих кнопок сверху) */}
+        <div className="grid grid-cols-3 gap-2.5 mb-5">
           {/* Карточка 1: Размеры */}
           <button
             onClick={() => {
               triggerHaptic('medium')
               onOpenSizeCalc?.()
             }}
-            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/85 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer shadow-lg"
+            className="h-[96px] p-2.5 rounded-[14px] bg-[#1D1815]/95 border border-white/5 flex flex-col justify-between text-left transition-transform active:scale-95 cursor-pointer"
           >
-            <div className="w-8 h-8 rounded-xl bg-[#C6A47A]/15 text-[#C6A47A] flex items-center justify-center shadow-inner">
+            <div className="w-7 h-7 rounded-lg bg-[#C6A47A]/10 text-[#C6A47A] flex items-center justify-center">
               <svg
-                width="18"
-                height="18"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -152,10 +152,10 @@ export function CalcMenuPage({
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight">
+              <div className="text-xs font-medium text-[#F5F1EB] leading-tight mb-0.5">
                 {t.sizeTitle}
               </div>
-              <div className="text-[10px] text-[#B9ACA0] mt-0.5 leading-tight">
+              <div className="text-[9px] text-[#8F867E] leading-tight truncate">
                 {t.sizeSub}
               </div>
             </div>
@@ -167,12 +167,12 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenWidthCalc?.()
             }}
-            className="h-[125px] p-3 rounded-2xl bg-[#1D1815]/85 backdrop-blur-md border border-white/10 flex flex-col justify-between text-left transition-all active:scale-95 cursor-pointer shadow-lg"
+            className="h-[96px] p-2.5 rounded-[14px] bg-[#1D1815]/95 border border-white/5 flex flex-col justify-between text-left transition-transform active:scale-95 cursor-pointer"
           >
-            <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shadow-inner">
+            <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
               <svg
-                width="18"
-                height="18"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -184,34 +184,26 @@ export function CalcMenuPage({
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight">
+              <div className="text-xs font-medium text-[#F5F1EB] leading-tight mb-0.5">
                 {t.widthTitle}
               </div>
-              <div className="text-[10px] text-[#B9ACA0] mt-0.5 leading-tight">
+              <div className="text-[9px] text-[#8F867E] leading-tight truncate">
                 {t.widthSub}
               </div>
             </div>
           </button>
 
-          {/* Карточка 3: Сохранить / В избранном */}
+          {/* Карточка 3: Розовая звездочка */}
           <button
             onClick={() => {
               triggerHaptic(isCalcSaved ? 'light' : 'medium')
               setIsCalcSaved(!isCalcSaved)
             }}
-            className={`h-[125px] p-3 rounded-2xl transition-all active:scale-95 cursor-pointer flex flex-col justify-between text-left shadow-lg ${
-              isCalcSaved
-                ? 'bg-gradient-to-b from-[#5C223C] to-[#3B1527] border border-[#F472B6]/40 shadow-[#5C223C]/30'
-                : 'bg-[#1D1815]/85 backdrop-blur-md border border-white/10'
+            className={`h-[96px] p-2.5 rounded-[14px] transition-all active:scale-95 cursor-pointer flex flex-col justify-between text-left bg-[#1D1815]/95 ${
+              isCalcSaved ? 'border border-[#F472B6]/40' : 'border border-white/5'
             }`}
           >
-            <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-                isCalcSaved
-                  ? 'bg-[#F472B6] text-white shadow-md'
-                  : 'bg-white/10 text-[#B9ACA0]'
-              }`}
-            >
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#F472B6]/10 text-[#F472B6]">
               <svg
                 width="16"
                 height="16"
@@ -219,17 +211,20 @@ export function CalcMenuPage({
                 fill={isCalcSaved ? 'currentColor' : 'none'}
                 stroke="currentColor"
                 strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="transition-all duration-300"
               >
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight">
+              <div className="text-xs font-medium text-[#F5F1EB] leading-tight mb-0.5">
                 {isCalcSaved ? t.saveRemoveTitle : t.saveAddTitle}
               </div>
               <div
-                className={`text-[10px] mt-0.5 leading-tight ${
-                  isCalcSaved ? 'text-[#F472B6] font-medium' : 'text-[#B9ACA0]'
+                className={`text-[9px] leading-tight truncate ${
+                  isCalcSaved ? 'text-[#F472B6]' : 'text-[#8F867E]'
                 }`}
               >
                 {isCalcSaved ? t.saveRemoveSub : t.saveAddSub}
