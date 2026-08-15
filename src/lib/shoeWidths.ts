@@ -11,12 +11,22 @@ export interface WidthResult {
   euCode: string
   color: string
   colorName: { ru: string; uk: string }
-  girthMm: number
+  // Новые параметры (метрическая и английская системы):
+  footLengthMm: number
+  footLengthIn: number
+  girthMm: number // Обхват в пучках
   girthIn: number
+  instepMm: number // Прямой взъем
+  instepIn: number
+  heelMm: number // Косой обхват (через пятку)
+  heelIn: number
 }
 
 // Константа для конвертации миллиметров в дюймы
 const MM_TO_INCHES = 0.0393701;
+
+// 1 размер EU (штихмассовая система) = 2/3 см (приблизительно 6.67 мм)
+const PARIS_POINT_MM = 6.67; 
 
 // Лимиты для централизованного управления (валидация на стороне UI)
 export const SIZE_LIMITS: Record<Gender, { min: number, max: number }> = {
@@ -29,12 +39,12 @@ export const SIZE_LIMITS: Record<Gender, { min: number, max: number }> = {
 // widthStep  — шаг изменения обхвата на 1 единицу полноты ГОСТ
 // lengthStep — шаг изменения обхвата на 1 размер обуви
 const BASE_MEASUREMENTS = {
-  men: { baseEu: 42, baseGirth: 254, widthStep: 5, lengthStep: 3 },
-  women: { baseEu: 38, baseGirth: 228, widthStep: 4, lengthStep: 3 },
-  kids: { baseEu: 28, baseGirth: 164, widthStep: 3, lengthStep: 2.5 },
+  men: { baseEu: 42, baseLength: 270, baseGirth: 254, baseInstep: 256, baseHeel: 335, widthStep: 5, lengthStep: 3 },
+  women: { baseEu: 38, baseLength: 240, baseGirth: 228, baseInstep: 229, baseHeel: 300, widthStep: 4, lengthStep: 3 },
+  kids: { baseEu: 28, baseLength: 175, baseGirth: 164, baseInstep: 165, baseHeel: 225, widthStep: 3, lengthStep: 2.5 },
 }
 
-const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'girthMm' | 'girthIn'>>> = {
+const WIDTH_DATA: Record<Gender, Record<WidthCategory, Omit<WidthResult, 'footLengthMm' | 'footLengthIn' | 'girthMm' | 'girthIn' | 'instepMm' | 'instepIn' | 'heelMm' | 'heelIn'>>> = {
   men: {
     narrow: { gostNum: 4, gostLetter: 'У', us: 'B', uk: 'C/D', euCode: 'E', color: '#10B981', colorName: { ru: 'Зеленый', uk: 'Зелений' } },
     standard: { gostNum: 6, gostLetter: 'С', us: 'D', uk: 'E/F', euCode: 'F', color: '#3B82F6', colorName: { ru: 'Синий', uk: 'Синій' } },
@@ -73,17 +83,32 @@ export function getWidthData(gender: Gender, sizeEu: number, category: WidthCate
   const targetGostNum = baseData.gostNum
   const widthDelta = targetGostNum - baseGostNum
   
-  // Финальный расчет обхвата в миллиметрах
-  const girthMm = Math.round(
-    metrics.baseGirth + (sizeDelta * metrics.lengthStep) + (widthDelta * metrics.widthStep)
-  )
+  // Рассчитываем длину стопы в миллиметрах по штихмассовой системе
+  const footLengthMm = Math.round(metrics.baseLength + (sizeDelta * PARIS_POINT_MM))
+  const footLengthIn = Number((footLengthMm * MM_TO_INCHES).toFixed(2))
+
+  // Общее смещение для всех видов обхватов (зависит от изменения размера и полноты)
+  const gradingOffset = (sizeDelta * metrics.lengthStep) + (widthDelta * metrics.widthStep)
   
-  // Конвертация в дюймы
+  // Финальный расчет обхватов в миллиметрах
+  const girthMm = Math.round(metrics.baseGirth + gradingOffset)
+  const instepMm = Math.round(metrics.baseInstep + gradingOffset)
+  const heelMm = Math.round(metrics.baseHeel + gradingOffset)
+  
+  // Конвертация обхватов в дюймы
   const girthIn = Number((girthMm * MM_TO_INCHES).toFixed(2))
+  const instepIn = Number((instepMm * MM_TO_INCHES).toFixed(2))
+  const heelIn = Number((heelMm * MM_TO_INCHES).toFixed(2))
   
   return {
     ...baseData,
+    footLengthMm,
+    footLengthIn,
     girthMm,
-    girthIn
+    girthIn,
+    instepMm,
+    instepIn,
+    heelMm,
+    heelIn
   }
 }
