@@ -10,12 +10,36 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
-// Насыщенные цвета для акцентов
+// Насыщенные цвета для акцентов интерфейса
 const THEMES = {
   men: { accent: '#D4B895', accentSoft: '#F0DDC5', accentBg: 'rgba(198,164,122,0.15)' },
   women: { accent: '#EC4899', accentSoft: '#F472B6', accentBg: 'rgba(236,72,153,0.15)' },
   kids: { accent: '#0EA5E9', accentSoft: '#38BDF8', accentBg: 'rgba(14,165,233,0.15)' },
 } as const
+
+// Карта цветов для кнопок полноты (активное состояние)
+const WIDTH_BUTTON_THEMES: Record<WidthCategory, { bg: string, text: string, border: string }> = {
+  narrow: { 
+    bg: 'rgba(132, 204, 22, 0.2)',   // Салатовый полупрозрачный
+    text: '#A3E635',                 // Салатовый яркий
+    border: '#84CC16' 
+  },
+  standard: { 
+    bg: 'rgba(56, 189, 248, 0.2)',   // Голубой полупрозрачный
+    text: '#38BDF8',                 // Голубой яркий
+    border: '#0EA5E9' 
+  },
+  wide: { 
+    bg: 'rgba(239, 68, 68, 0.2)',    // Красный полупрозрачный
+    text: '#F87171',                 // Красный яркий
+    border: '#EF4444' 
+  },
+  xwide: { 
+    bg: 'rgba(168, 85, 247, 0.2)',   // Фиолетовый полупрозрачный
+    text: '#C084FC',                 // Фиолетовый яркий
+    border: '#A855F7' 
+  }
+}
 
 type InfoModalType = 'gostNum' | 'iso' | null
 type Unit = 'mm' | 'in'
@@ -123,7 +147,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
         gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая система). Определяет базовые обхваты колодки.' },
-        iso: { title: 'Альтернативные системы', text: 'Буквенная система и международный стандарт ISO/EU.' }
+        iso: { title: 'Альтернативные системы', text: 'Альтернативные буквенные системы (US/UK) и международный стандарт ISO/EU.' }
       }
     },
     uk: {
@@ -136,7 +160,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
         gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова система). Визначає базові обхвати колодки.' },
-        iso: { title: 'Альтернативні системи', text: 'Літерна система та міжнародний стандарт ISO/EU.' }
+        iso: { title: 'Альтернативні системи', text: 'Альтернативні літерні системи (US/UK) та міжнародний стандарт ISO/EU.' }
       }
     }
   }[lang]
@@ -207,17 +231,22 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           <div>
             <span className="text-[13px] font-medium text-[#F5F1EB] block mb-2 px-1">{t.step2}</span>
             <div className="grid grid-cols-4 gap-1.5">
-              {(Object.keys(t.cats) as WidthCategory[]).map(cat => (
-                <button
-                  key={cat} onClick={() => { triggerHaptic(); setWidthCat(cat) }}
-                  className="py-2 px-1 rounded-xl text-[11px] font-medium transition-all text-center leading-tight"
-                  style={widthCat === cat 
-                    ? { background: theme.accentBg, color: theme.accentSoft, border: `1px solid ${theme.accent}40` }
-                    : { background: '#151210', color: '#8F867E', border: '1px solid transparent' }}
-                >
-                  {t.cats[cat]}
-                </button>
-              ))}
+              {(Object.keys(t.cats) as WidthCategory[]).map(cat => {
+                const isSelected = widthCat === cat
+                const catTheme = WIDTH_BUTTON_THEMES[cat]
+                return (
+                  <button
+                    key={cat} 
+                    onClick={() => { triggerHaptic(); setWidthCat(cat) }}
+                    className="py-2 px-1 rounded-xl text-[11px] font-medium transition-all text-center leading-tight"
+                    style={isSelected 
+                      ? { background: catTheme.bg, color: catTheme.text, border: `1px solid ${catTheme.border}` }
+                      : { background: '#151210', color: '#8F867E', border: '1px solid transparent' }}
+                  >
+                    {t.cats[cat]}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -258,7 +287,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК: 4 в ряд */}
+                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК: 4 в ряд с уникальной альтернативной системой */}
                   <div className="grid grid-cols-4 gap-1">
                     <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
                       <span className="text-[9px] text-[#8F867E] mb-0.5 text-center">{t.gostNum}</span>
@@ -270,11 +299,10 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       <span className="text-[14px] font-medium text-white leading-none">{result.gostLetter}</span>
                     </div>
 
-                    {/* Альтернативная система (US маркировка или другие длинные буквенные значения) */}
+                    {/* Альтернативная система сбалансирована под конкретную буквенную кодировку полноты (например, A, B, C, D, E вместо дубляжа US) */}
                     <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform" style={{ borderColor: `${theme.accent}30`, backgroundColor: theme.accentBg }}>
                       <span className="text-[9px] mb-0.5 text-center" style={{ color: theme.accentSoft }}>{t.alt}</span>
-                      {/* truncate не даст порвать сетку, если букв будет 4-5 */}
-                      <span className="text-[15px] font-bold leading-none w-full text-center truncate px-1" style={{ color: theme.accentSoft }}>{result.us}</span>
+                      <span className="text-[15px] font-bold leading-none w-full text-center truncate px-1" style={{ color: theme.accentSoft }}>{result.euCode}</span>
                     </div>
                     
                     <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-1.5 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
