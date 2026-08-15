@@ -14,6 +14,51 @@ type SizeCalcPageProps = {
   lang: Lang
 }
 
+/* ---------- Мини-флаги (SVG) ---------- */
+const FlagEU = () => (
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden">
+    <rect width="18" height="12" fill="#003399" />
+    <g fill="#FFCC00">
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
+        const angle = (i * 30 - 90) * (Math.PI / 180)
+        const cx = 9 + 3.8 * Math.cos(angle)
+        const cy = 6 + 3.8 * Math.sin(angle)
+        return (
+          <circle key={i} cx={cx} cy={cy} r="0.55" />
+        )
+      })}
+    </g>
+  </svg>
+)
+
+const FlagUK = () => (
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden">
+    <rect width="18" height="12" fill="#012169" />
+    <path d="M0 0 L18 12 M18 0 L0 12" stroke="#fff" strokeWidth="2" />
+    <path d="M0 0 L18 12 M18 0 L0 12" stroke="#C8102E" strokeWidth="1" />
+    <path d="M9 0 V12 M0 6 H18" stroke="#fff" strokeWidth="3.2" />
+    <path d="M9 0 V12 M0 6 H18" stroke="#C8102E" strokeWidth="1.6" />
+  </svg>
+)
+
+const FlagUS = () => (
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden">
+    <rect width="18" height="12" fill="#B22234" />
+    <rect y="1.33" width="18" height="1.33" fill="#fff" />
+    <rect y="4" width="18" height="1.33" fill="#fff" />
+    <rect y="6.67" width="18" height="1.33" fill="#fff" />
+    <rect y="9.33" width="18" height="1.33" fill="#fff" />
+    <rect width="7.2" height="6.5" fill="#3C3B6E" />
+  </svg>
+)
+
+const FlagUA = () => (
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden">
+    <rect width="18" height="6" fill="#0057B7" />
+    <rect y="6" width="18" height="6" fill="#FFD700" />
+  </svg>
+)
+
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [gender, setGender] = useState<Gender>('men')
   const [unit, setUnit] = useState<'cm' | 'mm'>('cm')
@@ -75,8 +120,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       usM: 'US (M)',
       usW: 'US (W)',
       us: 'US',
-      eu: 'EU',
-      ukr: 'UKR',
+      eu: 'EU / UKR',
       cmLabel: 'CM',
     },
     uk: {
@@ -103,8 +147,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       usM: 'US (M)',
       usW: 'US (W)',
       us: 'US',
-      eu: 'EU',
-      ukr: 'UKR',
+      eu: 'EU / UKR',
       cmLabel: 'CM',
     },
   }[lang]
@@ -284,9 +327,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </span>
           </div>
 
+          {/* Big EU / UKR card */}
           <div className="rounded-xl bg-[#12100E] border border-[#C6A47A]/20 p-5 mb-3 text-center">
-            <div className="text-[12px] text-[#8F867E] tracking-widest uppercase mb-1">
-              {t.eu}
+            <div className="flex items-center justify-center gap-1.5 mb-1">
+              <FlagEU />
+              <FlagUA />
+              <span className="text-[12px] text-[#8F867E] tracking-widest uppercase ml-1">
+                {t.eu}
+              </span>
             </div>
             <div className="text-[56px] font-light text-[#E8C9A0] leading-none tracking-tight">
               {formatSize(result.eu)}
@@ -296,22 +344,34 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          {/* Secondary sizes — 3 columns */}
+          <div className="grid grid-cols-3 gap-2">
             {[
-              { label: t.uk, value: formatSize(result.uk) },
-              { label: usLabel, value: formatSize(result.us) },
-              { label: t.ukr, value: formatSize(result.ukr) },
+              {
+                label: t.uk,
+                value: formatSize(result.uk),
+                flag: <FlagUK />,
+              },
+              {
+                label: usLabel,
+                value: formatSize(result.us),
+                flag: <FlagUS />,
+              },
               {
                 label: t.cmLabel,
                 value: result.cm.toFixed(1).replace('.', ','),
+                flag: null,
               },
             ].map((item) => (
               <div
                 key={item.label}
                 className="rounded-xl bg-[#12100E] border border-white/5 py-3 text-center"
               >
-                <div className="text-[10px] text-[#6B635C] uppercase tracking-wider mb-1">
-                  {item.label}
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  {item.flag}
+                  <span className="text-[10px] text-[#6B635C] uppercase tracking-wider">
+                    {item.label}
+                  </span>
                 </div>
                 <div className="text-[16px] font-medium text-[#F5F1EB]">
                   {item.value}
