@@ -5,6 +5,7 @@ import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 import { BlogPage } from './pages/BlogPage'
 import { CalcMenuPage } from './pages/CalcMenuPage'
+import { SizeCalcPage } from './pages/SizeCalcPage'
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -19,7 +20,7 @@ declare global {
   }
 }
 
-export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu'
+export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu' | 'size-calc'
 export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
@@ -276,6 +277,15 @@ export default function App() {
             key="calc-menu"
             lang={lang}
             onBack={() => setScreen('home')}
+            onOpenSizeCalc={() => setScreen('size-calc')}
+          />
+        )}
+
+        {screen === 'size-calc' && (
+          <SizeCalcPage
+            key="size-calc"
+            lang={lang}
+            onBack={() => setScreen('calc-menu')}
           />
         )}
       </AnimatePresence>
