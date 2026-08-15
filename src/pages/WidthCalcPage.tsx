@@ -10,10 +10,11 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
+// Обновленные, более насыщенные цвета для women и kids
 const THEMES = {
   men: { accent: '#D4B895', accentSoft: '#F0DDC5', accentBg: 'rgba(198,164,122,0.15)' },
-  women: { accent: '#F0B1C4', accentSoft: '#F9D8E1', accentBg: 'rgba(232,160,181,0.15)' },
-  kids: { accent: '#90C8E4', accentSoft: '#C2E5F4', accentBg: 'rgba(126,184,212,0.15)' },
+  women: { accent: '#EC4899', accentSoft: '#F472B6', accentBg: 'rgba(236,72,153,0.15)' }, // Сочный розовый
+  kids: { accent: '#0EA5E9', accentSoft: '#38BDF8', accentBg: 'rgba(14,165,233,0.15)' },  // Насыщенный голубой
 } as const
 
 type InfoModalType = 'gostNum' | 'iso' | null
@@ -33,7 +34,7 @@ const AnimatedIcon = ({ type, color, animKey }: { type: 'length' | 'ball' | 'ins
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mr-2 opacity-80" style={{ color }}>
       <motion.path
-        key={animKey} // Ключевой момент: заставляет Framer Motion перезапустить анимацию
+        key={animKey}
         d={paths[type]}
         stroke="currentColor"
         strokeWidth="1.5"
@@ -119,11 +120,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Размер (EU)', step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
-      gostNum: 'ГОСТ (Ц)', gostLet: 'ГОСТ (Б)', iso: 'ISO / EU',
+      gostNum: 'ГОСТ (Цифра)', gostLet: 'Альт. система', iso: 'ISO / EU',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
       modal: {
-        gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая система) и альтернативная буквенная маркировка.' },
-        iso: { title: 'Система EU / ISO', text: 'Международный стандарт маркировки на базе штихмассовой системы.' }
+        gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая система). Определяет базовые обхваты колодки.' },
+        iso: { title: 'Альтернативные системы', text: 'Буквенная система (A, B, C, D, E) и международный стандарт ISO.' }
       }
     },
     uk: {
@@ -132,11 +133,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Розмір (EU)', step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
-      gostNum: 'ДСТУ (Ц)', gostLet: 'ДСТУ (Л)', iso: 'ISO / EU',
+      gostNum: 'ДСТУ (Цифра)', gostLet: 'Альт. система', iso: 'ISO / EU',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
       modal: {
-        gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова система) та альтернативне літерне маркування.' },
-        iso: { title: 'Система EU / ISO', text: 'Міжнародний стандарт маркування на базі штихмасової системи.' }
+        gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова система). Визначає базові обхвати колодки.' },
+        iso: { title: 'Альтернативні системи', text: 'Літерна система (A, B, C, D, E) та міжнародний стандарт ISO.' }
       }
     }
   }[lang]
@@ -149,7 +150,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       transition={{ duration: 0.22, ease: 'easeOut' }}
       className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden"
     >
-      {/* HEADER (Сжат по вертикали) */}
       <div className="relative z-20 flex items-center justify-between px-4 py-2 bg-[#151210]/95 backdrop-blur">
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
@@ -164,7 +164,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         <div className="w-9 h-9" />
       </div>
 
-      {/* Основной контент без скролла */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-hide">
         
         {/* INPUT CARD */}
@@ -225,7 +224,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* PRIMARY RESULTS (Уменьшены отступы) */}
+        {/* PRIMARY RESULTS */}
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
             <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">US SIZE</span>
@@ -245,7 +244,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           >
             <div className="flex items-center gap-2">
               <span className="text-[13px] font-medium" style={{ color: theme.accent }}>{t.proModules}</span>
-              {/* Цветовой маркер интегрирован в заголовок, экономим целую строку */}
               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={result.colorName[lang]} />
             </div>
             <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: theme.accent }}>
@@ -263,19 +261,20 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК (3 в ряд) */}
+                  {/* КОМПАКТНЫЙ БЛОК МАРКИРОВОК (Акцент на альтернативной системе) */}
                   <div className="grid grid-cols-3 gap-1.5">
                     <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[10px] text-[#8F867E] mb-1">{t.gostNum}</span>
+                      <span className="text-[10px] text-[#8F867E] mb-1 text-center">{t.gostNum}</span>
                       <span className="text-[16px] font-medium text-white leading-none">{result.gostNum}</span>
                     </div>
-                    <div className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5">
-                      <span className="text-[10px] text-[#8F867E] mb-1">{t.gostLet}</span>
-                      <span className="text-[16px] font-bold leading-none" style={{ color: theme.accentSoft }}>{result.gostLetter}</span>
+                    {/* Альтернативная система теперь выделена визуально */}
+                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform" style={{ borderColor: `${theme.accent}30`, backgroundColor: theme.accentBg }}>
+                      <span className="text-[10px] mb-1 text-center" style={{ color: theme.accentSoft }}>{t.gostLet}</span>
+                      <span className="text-[18px] font-bold leading-none" style={{ color: theme.accentSoft }}>{result.euCode}</span>
                     </div>
                     <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[10px] text-[#8F867E] mb-1">{t.iso}</span>
-                      <span className="text-[16px] font-medium text-white leading-none">{result.euCode}</span>
+                      <span className="text-[10px] text-[#8F867E] mb-1 text-center">ГОСТ (Буква)</span>
+                      <span className="text-[16px] font-medium text-white leading-none">{result.gostLetter}</span>
                     </div>
                   </div>
 
@@ -302,7 +301,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            {/* animKey заставляет иконку перерисовываться при изменении значения */}
                             <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
                             <span className="text-[12px] text-white/90">{row.label}</span>
                           </div>
