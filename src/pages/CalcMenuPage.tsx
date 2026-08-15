@@ -71,7 +71,7 @@ export function CalcMenuPage({
       {/* Полный экран 9:16 без срезов по бокам */}
       <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none">
         <img
-          src="/CalcMenuPage/sizi.jpg"
+          src="/CalcMenuPage/size.jpg"
           alt="Calculators Background"
           className="w-full h-full object-cover object-top opacity-90"
           onError={(e) => {
