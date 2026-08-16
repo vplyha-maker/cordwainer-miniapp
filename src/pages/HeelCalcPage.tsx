@@ -26,7 +26,6 @@ type HeelCalcPageProps = {
 }
 
 export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
-  // --- 1. Стейты (Исправление 1: Эталон при открытии вместо ошибки) ---
   const [shoeSize, setShoeSize] = useState(38)
   const [heelHeight, setHeelHeight] = useState(55)     
   const [toeThickness, setToeThickness] = useState(10) 
@@ -52,7 +51,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     } catch {}
   }
 
-  // Обновленные термины (Исправление 2: Указание, что именно компенсировать)
   const t = {
     ru: {
       title: 'Инженерия и Баланс',
@@ -255,7 +253,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       Q ${xBall + rockerZoneLength * 0.5} ${yFootBall}, ${xToe} ${yFootToe}
     `
 
-    // Исправление 3: Надежная база для пятки, чтобы SVG не ломался, если платформа >= каблук
     const platformBase = Math.max(tScaled, 2) 
     const heelBodyThickness = Math.min(hScaled, Math.max(5 * scale, platformBase * 0.15))
     const yHeelBase = yFootHeel + heelBodyThickness 
@@ -303,12 +300,28 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       }
     }
 
-    const shankLenScaled = engineeringData.shankLength * scale
-    const shankEndY = soleType === 'rocker' ? yFootBall - (toeLiftScaled * 0.2) : yFootBall
+    // ИСПРАВЛЕНИЕ ГЕЛЕНКА: Использование алгоритма Де Кастельжо для идеального совпадения кривых
+    const archDist = Math.max(1, xBall - xHeel);
+    const shankLenScaled = engineeringData.shankLength * scale;
+    
+    // t — это процент прохождения длины геленка относительно длины всей арки (от 0 до 1)
+    const t = Math.max(0, Math.min(1, shankLenScaled / archDist));
+    const mt = 1 - t;
+    
+    // Математический расчет саб-кривой, чтобы геленок строго повторял линию стельки (topPath)
+    const q1x = mt * xHeel + t * controlX1;
+    const q1y = mt * yFootHeel + t * controlY1;
+    
+    const q2x = mt * mt * xHeel + 2 * mt * t * controlX1 + t * t * controlX2;
+    const q2y = mt * mt * yFootHeel + 2 * mt * t * controlY1 + t * t * controlY2;
+    
+    const q3x = mt * mt * mt * xHeel + 3 * mt * mt * t * controlX1 + 3 * mt * t * t * controlX2 + t * t * t * xBall;
+    const q3y = mt * mt * mt * yFootHeel + 3 * mt * mt * t * controlY1 + 3 * mt * t * t * controlY2 + t * t * t * yFootBall;
 
+    const sOffset = 2; // Минимальное смещение внутрь подошвы
     const shankCurve = `
-      M ${xHeel + 5} ${yFootHeel + 2}
-      C ${controlX1} ${yFootHeel + 2}, ${xHeel + shankLenScaled * 0.8} ${shankEndY + 2}, ${xHeel + shankLenScaled} ${shankEndY + 2}
+      M ${xHeel + 2} ${yFootHeel + sOffset}
+      C ${q1x} ${q1y + sOffset}, ${q2x} ${q2y + sOffset}, ${q3x} ${q3y + sOffset}
     `
 
     return { 
