@@ -1,255 +1,133 @@
-import { SpectrumPoint, parseSpectrum, spectrumToRGB, rgbToHex, RGB } from '../utils/colorScience'
+import { Pigment, PIGMENTS, initPigment } from './pigments'
+import { SpectrumPoint, parseSpectrum, spectrumToRGB, rgbToHex } from '../utils/colorScience'
 
-export interface Pigment {
-  id: string
-  name: {
-    uk: string
-    ru: string
-    en: string
-  }
-  spectrumText?: string
-  spectrum?: SpectrumPoint[]
-  color?: RGB
-  hex?: string
+const SPECTRUM_FILES: Record<string, string> = {
+  titanium_white: 'titanium_white.txt',
+  zinc_white: 'zinc_white.txt',
+  lead_white: 'lead_white.txt',
+  antimony_white: 'antimony_white.txt',
+  lithopone: 'lithopone.txt',
+  chalk: 'chalk.txt',
+  gypsum: 'gypsum.txt',
+  cadmium_yellow: 'cadmium_yellow.txt',
+  chrome_yellow: 'chrome_yellow.txt',
+  naples_yellow: 'naples_yellow.txt',
+  hansa_yellow: 'hansa_yellow.txt',
+  arylide_yellow: 'arylide_yellow.txt',
+  nickel_azo_yellow: 'nickel_azo_yellow.txt',
+  cobalt_yellow: 'cobalt_yellow.txt',
+  lead_tin_yellow_i: 'lead_tin_yellow_i.txt',
+  lead_tin_yellow_ii: 'lead_tin_yellow_ii.txt',
+  massicot: 'massicot.txt',
+  orpiment: 'orpiment.txt',
+  gamboge: 'gamboge.txt',
+  saffron: 'saffron.txt',
+  curcuma: 'curcuma.txt',
+  stil_de_grain: 'stil_de_grain.txt',
+  yellow_ochre: 'yellow_ochre.txt',
+  yellow_lake_reseda: 'yellow_lake_reseda.txt',
+  safflower: 'safflower.txt',
+  cadmium_red: 'cadmium_red.txt',
+  vermilion: 'vermilion.txt',
+  vermilion_nat: 'vermilion_nat.txt',
+  red_lead: 'red_lead.txt',
+  red_ochre: 'red_ochre.txt',
+  realgar: 'realgar.txt',
+  alizarine: 'alizarine.txt',
+  carmine_lake: 'carmine_lake.txt',
+  madder_lake: 'madder_lake.txt',
+  lac_dye: 'lac_dye.txt',
+  naphthol_red: 'naphthol_red.txt',
+  pyrrole_red: 'pyrrole_red.txt',
+  rhodamine: 'rhodamine.txt',
+  phthalo_blue: 'phthalo_blue.txt',
+  ultramarine: 'ultramarine.txt',
+  ultramarine_nat: 'ultramarine_nat.txt',
+  cobalt_blue: 'cobalt_blue.txt',
+  cobalt_cerulean: 'cobalt_cerulean.txt',
+  cobalt_chromite_blue: 'cobalt_chromite_blue.txt',
+  prussian_blue: 'prussian_blue.txt',
+  azurite: 'azurite.txt',
+  blue_bice: 'blue_bice.txt',
+  egyptian_blue: 'egyptian_blue.txt',
+  han_blue: 'han_blue.txt',
+  maya_blue: 'maya_blue.txt',
+  smalt: 'smalt.txt',
+  indigo: 'indigo.txt',
+  methylene_blue: 'methylene_blue.txt',
+  tyrian_purple: 'tyrian_purple.txt',
+  phthalo_green: 'phthalo_green.txt',
+  viridian: 'viridian.txt',
+  chrome_oxide_green: 'chrome_oxide_green.txt',
+  cadmium_green: 'cadmium_green.txt',
+  cobalt_titanate_green: 'cobalt_titanate_green.txt',
+  green_earth: 'green_earth.txt',
+  malachite: 'malachite.txt',
+  verdigris: 'verdigris.txt',
+  copper_resinate: 'copper_resinate.txt',
+  naphthol_green: 'naphthol_green.txt',
+  vivianite: 'vivianite.txt',
+  burnt_sienna: 'burnt_sienna.txt',
+  raw_sienna: 'raw_sienna.txt',
+  burnt_umber: 'burnt_umber.txt',
+  raw_umber: 'raw_umber.txt',
+  van_dyke_brown: 'van_dyke_brown.txt',
+  sepia: 'sepia.txt',
+  bitumen: 'bitumen.txt',
+  bone_black: 'bone_black.txt',
+  ivory_black: 'ivory_black.txt',
+  lamp_black: 'lamp_black.txt',
+  vine_black: 'vine_black.txt',
+  aniline_black: 'aniline_black.txt',
+  cobalt_violet: 'cobalt_violet.txt',
+  manganese_violet: 'manganese_violet.txt',
+  iron_gall_ink: 'iron_gall_ink.txt',
+  bismuth: 'bismuth.txt',
+  acrylic_binder: 'acrylic_binder.txt',
+  cardboard: 'cardboard.txt',
 }
 
-export const PIGMENTS: Pigment[] = [
-  // ===== БЕЛЫЕ =====
-  { id: 'titanium_white', name: { uk: 'Титанові білила', ru: 'Титановые белила', en: 'Titanium White' } },
-  { id: 'zinc_white', name: { uk: 'Цинкові білила', ru: 'Цинковые белила', en: 'Zinc White' } },
-  { id: 'lead_white', name: { uk: 'Свинцеві білила', ru: 'Свинцовые белила', en: 'Lead White' } },
-  { id: 'antimony_white', name: { uk: 'Сурьмяні білила', ru: 'Сурьмяные белила', en: 'Antimony White' } },
-  { id: 'lithopone', name: { uk: 'Літопон', ru: 'Литопон', en: 'Lithopone' } },
-  { id: 'chalk', name: { uk: 'Крейда', ru: 'Мел', en: 'Chalk' } },
-  { id: 'gypsum', name: { uk: 'Гіпс', ru: 'Гипс', en: 'Gypsum' } },
-
-  // ===== ЖЁЛТЫЕ =====
-  { id: 'cadmium_yellow', name: { uk: 'Кадмій жовтий', ru: 'Кадмий жёлтый', en: 'Cadmium Yellow' } },
-  { id: 'chrome_yellow', name: { uk: 'Хромова жовта', ru: 'Хромовая жёлтая', en: 'Chrome Yellow' } },
-  { id: 'naples_yellow', name: { uk: 'Неаполітанська жовта', ru: 'Неаполитанская жёлтая', en: 'Naples Yellow' } },
-  { id: 'hansa_yellow', name: { uk: 'Ганза жовта', ru: 'Ганза жёлтая', en: 'Hansa Yellow' } },
-  { id: 'arylide_yellow', name: { uk: 'Арилід жовтий', ru: 'Арилид жёлтый', en: 'Arylide Yellow' } },
-  { id: 'nickel_azo_yellow', name: { uk: 'Нікель-азо жовтий', ru: 'Никель-азо жёлтый', en: 'Nickel Azo Yellow' } },
-  { id: 'cobalt_yellow', name: { uk: 'Кобальт жовтий', ru: 'Кобальт жёлтый', en: 'Cobalt Yellow' } },
-  { id: 'lead_tin_yellow_i', name: { uk: 'Свинцево-олов\'яна жовта I', ru: 'Свинцово-оловянная жёлтая I', en: 'Lead Tin Yellow I' } },
-  { id: 'lead_tin_yellow_ii', name: { uk: 'Свинцево-олов\'яна жовта II', ru: 'Свинцово-оловянная жёлтая II', en: 'Lead Tin Yellow II' } },
-  { id: 'massicot', name: { uk: 'Масикот', ru: 'Массикот', en: 'Massicot' } },
-  { id: 'orpiment', name: { uk: 'Аурипігмент', ru: 'Аурипигмент', en: 'Orpiment' } },
-  { id: 'gamboge', name: { uk: 'Гуммігут', ru: 'Гуммигут', en: 'Gamboge' } },
-  { id: 'saffron', name: { uk: 'Шафран', ru: 'Шафран', en: 'Saffron' } },
-  { id: 'curcuma', name: { uk: 'Куркума', ru: 'Куркума', en: 'Curcuma' } },
-  { id: 'stil_de_grain', name: { uk: 'Стиль-де-грен', ru: 'Стиль-де-грен', en: 'Stil de Grain' } },
-  { id: 'yellow_ochre', name: { uk: 'Вохра жовта', ru: 'Охра жёлтая', en: 'Yellow Ochre' } },
-  { id: 'yellow_lake_reseda', name: { uk: 'Жовтий лак резеда', ru: 'Жёлтый лак резеда', en: 'Yellow Lake Reseda' } },
-  { id: 'safflower', name: { uk: 'Сафлор', ru: 'Сафлор', en: 'Safflower' } },
-
-  // ===== КРАСНЫЕ =====
-  { id: 'cadmium_red', name: { uk: 'Кадмій червоний', ru: 'Кадмий красный', en: 'Cadmium Red' } },
-  { id: 'vermilion', name: { uk: 'Кіновар (штучна)', ru: 'Киноварь (искусственная)', en: 'Vermilion Artificial' } },
-  { id: 'vermilion_nat', name: { uk: 'Кіновар (натуральна)', ru: 'Киноварь (натуральная)', en: 'Vermilion Natural' } },
-  { id: 'red_lead', name: { uk: 'Свинцевий сурик', ru: 'Свинцовый сурик', en: 'Red Lead' } },
-  { id: 'red_ochre', name: { uk: 'Вохра червона', ru: 'Охра красная', en: 'Red Ochre' } },
-  { id: 'realgar', name: { uk: 'Реальгар', ru: 'Реальгар', en: 'Realgar' } },
-  { id: 'alizarine', name: { uk: 'Алізарин', ru: 'Ализарин', en: 'Alizarine' } },
-  { id: 'carmine_lake', name: { uk: 'Кармінний лак', ru: 'Карминный лак', en: 'Carmine Lake' } },
-  { id: 'madder_lake', name: { uk: 'Крап-лак', ru: 'Крапп-лак', en: 'Madder Lake' } },
-  { id: 'lac_dye', name: { uk: 'Лак-дай', ru: 'Лак-дай', en: 'Lac Dye' } },
-  { id: 'naphthol_red', name: { uk: 'Нафтол червоний', ru: 'Нафтол красный', en: 'Naphthol Red' } },
-  { id: 'pyrrole_red', name: { uk: 'Піррол червоний', ru: 'Пиррол красный', en: 'Pyrrole Red' } },
-  { id: 'rhodamine', name: { uk: 'Родамін', ru: 'Родамин', en: 'Rhodamine' } },
-
-  // ===== СИНИЕ =====
-  { id: 'phthalo_blue', name: { uk: 'Фталоціанін синій', ru: 'Фталоцианин синий', en: 'Phthalo Blue' } },
-  { id: 'ultramarine', name: { uk: 'Ультрамарин (штучний)', ru: 'Ультрамарин (искусственный)', en: 'Ultramarine Artificial' } },
-  { id: 'ultramarine_nat', name: { uk: 'Ультрамарин (натуральний)', ru: 'Ультрамарин (натуральный)', en: 'Ultramarine Natural' } },
-  { id: 'cobalt_blue', name: { uk: 'Кобальт синій', ru: 'Кобальт синий', en: 'Cobalt Blue' } },
-  { id: 'cobalt_cerulean', name: { uk: 'Кобальт небесно-блакитний', ru: 'Кобальт небесно-голубой', en: 'Cobalt Cerulean' } },
-  { id: 'cobalt_chromite_blue', name: { uk: 'Кобальт хромітовий синій', ru: 'Кобальт хромитовый синий', en: 'Cobalt Chromite Blue' } },
-  { id: 'prussian_blue', name: { uk: 'Берлінська лазур', ru: 'Берлинская лазурь', en: 'Prussian Blue' } },
-  { id: 'azurite', name: { uk: 'Азурит', ru: 'Азурит', en: 'Azurite' } },
-  { id: 'blue_bice', name: { uk: 'Блакитна біса', ru: 'Голубая биса', en: 'Blue Bice' } },
-  { id: 'egyptian_blue', name: { uk: 'Єгипетський синій', ru: 'Египетский синий', en: 'Egyptian Blue' } },
-  { id: 'han_blue', name: { uk: 'Ханьський синій', ru: 'Ханьский синий', en: 'Han Blue' } },
-  { id: 'maya_blue', name: { uk: 'Майя-синій', ru: 'Майя-синий', en: 'Maya Blue' } },
-  { id: 'smalt', name: { uk: 'Смальта', ru: 'Смальта', en: 'Smalt' } },
-  { id: 'indigo', name: { uk: 'Індиго', ru: 'Индиго', en: 'Indigo' } },
-  { id: 'methylene_blue', name: { uk: 'Метиленовий синій', ru: 'Метиленовый синий', en: 'Methylene Blue' } },
-  { id: 'tyrian_purple', name: { uk: 'Тірійський пурпур', ru: 'Тирский пурпур', en: 'Tyrian Purple' } },
-
-  // ===== ЗЕЛЁНЫЕ =====
-  { id: 'phthalo_green', name: { uk: 'Фталоціанін зелений', ru: 'Фталоцианин зелёный', en: 'Phthalo Green' } },
-  { id: 'viridian', name: { uk: 'Віридіанова зелень', ru: 'Виридоновая зелень', en: 'Viridian' } },
-  { id: 'chrome_oxide_green', name: { uk: 'Оксид хрому зелений', ru: 'Оксид хрома зелёный', en: 'Chrome Oxide Green' } },
-  { id: 'cadmium_green', name: { uk: 'Кадмій зелений', ru: 'Кадмий зелёный', en: 'Cadmium Green' } },
-  { id: 'cobalt_titanate_green', name: { uk: 'Кобальт титанатовий зелений', ru: 'Кобальт титанатовый зелёный', en: 'Cobalt Titanate Green' } },
-  { id: 'green_earth', name: { uk: 'Зелена земля', ru: 'Зелёная земля', en: 'Green Earth' } },
-  { id: 'malachite', name: { uk: 'Малахіт', ru: 'Малахит', en: 'Malachite' } },
-  { id: 'verdigris', name: { uk: 'Ярь-медянка', ru: 'Ярь-медянка', en: 'Verdigris' } },
-  { id: 'copper_resinate', name: { uk: 'Мідний резинат', ru: 'Медный резинат', en: 'Copper Resinate' } },
-  { id: 'naphthol_green', name: { uk: 'Нафтол зелений', ru: 'Нафтол зелёный', en: 'Naphthol Green' } },
-  { id: 'vivianite', name: { uk: 'Вівіаніт', ru: 'Вивианит', en: 'Vivianite' } },
-
-  // ===== КОРИЧНЕВЫЕ =====
-  { id: 'burnt_sienna', name: { uk: 'Сієна палена', ru: 'Сиена жжёная', en: 'Burnt Sienna' } },
-  { id: 'raw_sienna', name: { uk: 'Сієна натуральна', ru: 'Сиена натуральная', en: 'Raw Sienna' } },
-  { id: 'burnt_umber', name: { uk: 'Умбра палена', ru: 'Умбра жжёная', en: 'Burnt Umber' } },
-  { id: 'raw_umber', name: { uk: 'Умбра натуральна', ru: 'Умбра натуральная', en: 'Raw Umber' } },
-  { id: 'van_dyke_brown', name: { uk: 'Ван Дік коричневий', ru: 'Ван Дик коричневый', en: 'Van Dyke Brown' } },
-  { id: 'sepia', name: { uk: 'Сепія', ru: 'Сепия', en: 'Sepia' } },
-  { id: 'bitumen', name: { uk: 'Бітум', ru: 'Битум', en: 'Bitumen' } },
-
-  // ===== ЧЁРНЫЕ =====
-  { id: 'bone_black', name: { uk: 'Кісткова сажа', ru: 'Костяная сажа', en: 'Bone Black' } },
-  { id: 'ivory_black', name: { uk: 'Чорна зі слонової кістки', ru: 'Чёрная из слоновой кости', en: 'Ivory Black' } },
-  { id: 'lamp_black', name: { uk: 'Сажа газова', ru: 'Сажа газовая', en: 'Lamp Black' } },
-  { id: 'vine_black', name: { uk: 'Виноградна сажа', ru: 'Виноградная сажа', en: 'Vine Black' } },
-  { id: 'aniline_black', name: { uk: 'Анілінова чорна', ru: 'Анилиновая чёрная', en: 'Aniline Black' } },
-
-  // ===== ФИОЛЕТОВЫЕ =====
-  { id: 'cobalt_violet', name: { uk: 'Кобальт фіолетовий', ru: 'Кобальт фиолетовый', en: 'Cobalt Violet' } },
-  { id: 'manganese_violet', name: { uk: 'Марганцева фіолетова', ru: 'Марганцевая фиолетовая', en: 'Manganese Violet' } },
-
-  // ===== ПРОЧИЕ =====
-  { id: 'iron_gall_ink', name: { uk: 'Залізогалові чорнила', ru: 'Железогалловые чернила', en: 'Iron Gall Ink' } },
-  { id: 'bismuth', name: { uk: 'Вісмут (метал)', ru: 'Висмут (металл)', en: 'Bismuth' } },
-  { id: 'acrylic_binder', name: { uk: 'Акриловий біндер', ru: 'Акриловый биндер', en: 'Acrylic Binder' } },
-  { id: 'cardboard', name: { uk: 'Картон', ru: 'Картон', en: 'Cardboard' } },
-]
-
-export function initPigment(pigment: Pigment, spectrumText: string): Pigment {
-  const spectrum = parseSpectrum(spectrumText)
-  const color = spectrumToRGB(spectrum)
-  const hex = rgbToHex(color)
-
-  return {
-    ...pigment,
-    spectrumText,
-    spectrum,
-    color,
-    hex,
+export async function loadSpectrum(filename: string): Promise<SpectrumPoint[]> {
+  const response = await fetch(`/spectra/${filename}`)
+  if (!response.ok) {
+    throw new Error(`Не удалось загрузить спектр: ${filename}`)
   }
-    }import { SpectrumPoint, parseSpectrum, spectrumToRGB, rgbToHex, RGB } from '../utils/colorScience';
-
-export interface Pigment {
-  id: string;
-  name: {
-    uk: string;
-    ru: string;
-    en: string;
-  };
-  spectrumText?: string;
-  spectrum?: SpectrumPoint[];
-  color?: RGB;
-  hex?: string;
+  const text = await response.text()
+  return parseSpectrum(text)
 }
 
-export const PIGMENTS: Pigment[] = [
-  { id: 'titanium_white', name: { uk: 'Титанові білила', ru: 'Титановые белила', en: 'Titanium White' } },
-  { id: 'zinc_white', name: { uk: 'Цинкові білила', ru: 'Цинковые белила', en: 'Zinc White' } },
-  { id: 'lead_white', name: { uk: 'Свинцеві білила', ru: 'Свинцовые белила', en: 'Lead White' } },
-  { id: 'antimony_white', name: { uk: 'Сурьмяні білила', ru: 'Сурьмяные белила', en: 'Antimony White' } },
-  { id: 'lithopone', name: { uk: 'Літопон', ru: 'Литопон', en: 'Lithopone' } },
-  { id: 'chalk', name: { uk: 'Крейда', ru: 'Мел', en: 'Chalk' } },
-  { id: 'gypsum', name: { uk: 'Гіпс', ru: 'Гипс', en: 'Gypsum' } },
+export async function loadAllPigments(): Promise<Pigment[]> {
+  const result: Pigment[] = []
 
-  { id: 'cadmium_yellow', name: { uk: 'Кадмій жовтий', ru: 'Кадмий жёлтый', en: 'Cadmium Yellow' } },
-  { id: 'chrome_yellow', name: { uk: 'Хромова жовта', ru: 'Хромовая жёлтая', en: 'Chrome Yellow' } },
-  { id: 'naples_yellow', name: { uk: 'Неаполітанська жовта', ru: 'Неаполитанская жёлтая', en: 'Naples Yellow' } },
-  { id: 'hansa_yellow', name: { uk: 'Ганза жовта', ru: 'Ганза жёлтая', en: 'Hansa Yellow' } },
-  { id: 'arylide_yellow', name: { uk: 'Арилід жовтий', ru: 'Арилид жёлтый', en: 'Arylide Yellow' } },
-  { id: 'nickel_azo_yellow', name: { uk: 'Нікель-азо жовтий', ru: 'Никель-азо жёлтый', en: 'Nickel Azo Yellow' } },
-  { id: 'cobalt_yellow', name: { uk: 'Кобальт жовтий', ru: 'Кобальт жёлтый', en: 'Cobalt Yellow' } },
-  { id: 'lead_tin_yellow_i', name: { uk: 'Свинцево-олов\'яна жовта I', ru: 'Свинцово-оловянная жёлтая I', en: 'Lead Tin Yellow I' } },
-  { id: 'lead_tin_yellow_ii', name: { uk: 'Свинцево-олов\'яна жовта II', ru: 'Свинцово-оловянная жёлтая II', en: 'Lead Tin Yellow II' } },
-  { id: 'massicot', name: { uk: 'Масикот', ru: 'Массикот', en: 'Massicot' } },
-  { id: 'orpiment', name: { uk: 'Аурипігмент', ru: 'Аурипигмент', en: 'Orpiment' } },
-  { id: 'gamboge', name: { uk: 'Гуммігут', ru: 'Гуммигут', en: 'Gamboge' } },
-  { id: 'saffron', name: { uk: 'Шафран', ru: 'Шафран', en: 'Saffron' } },
-  { id: 'curcuma', name: { uk: 'Куркума', ru: 'Куркума', en: 'Curcuma' } },
-  { id: 'stil_de_grain', name: { uk: 'Стиль де грен', ru: 'Стиль де грен', en: 'Stil de Grain' } },
-  { id: 'yellow_ochre', name: { uk: 'Вохра жовта', ru: 'Охра жёлтая', en: 'Yellow Ochre' } },
-  { id: 'yellow_lake_reseda', name: { uk: 'Жовтий лак резеда', ru: 'Жёлтый лак резеда', en: 'Yellow Lake Reseda' } },
-  { id: 'safflower', name: { uk: 'Сафлор', ru: 'Сафлор', en: 'Safflower' } },
+  for (const pigment of PIGMENTS) {
+    const filename = SPECTRUM_FILES[pigment.id]
 
-  { id: 'cadmium_red', name: { uk: 'Кадмій червоний', ru: 'Кадмий красный', en: 'Cadmium Red' } },
-  { id: 'vermilion', name: { uk: 'Кіновар (штучна)', ru: 'Киноварь (искусственная)', en: 'Vermilion Art' } },
-  { id: 'vermilion_nat', name: { uk: 'Кіновар (натуральна)', ru: 'Киноварь (натуральная)', en: 'Vermilion Nat' } },
-  { id: 'red_lead', name: { uk: 'Свинцевий сурик', ru: 'Свинцовый сурик', en: 'Red Lead' } },
-  { id: 'red_ochre', name: { uk: 'Вохра червона', ru: 'Охра красная', en: 'Red Ochre' } },
-  { id: 'realgar', name: { uk: 'Реальгар', ru: 'Реальгар', en: 'Realgar' } },
-  { id: 'alizarine', name: { uk: 'Алізарин', ru: 'Ализарин', en: 'Alizarine' } },
-  { id: 'carmine_lake', name: { uk: 'Кармін', ru: 'Кармин', en: 'Carmine Lake' } },
-  { id: 'madder_lake', name: { uk: 'Крап', ru: 'Крапп', en: 'Madder Lake' } },
-  { id: 'lac_dye', name: { uk: 'Лак-дай', ru: 'Лак-дай', en: 'Lac Dye' } },
-  { id: 'naphthol_red', name: { uk: 'Нафтол червоний', ru: 'Нафтол красный', en: 'Naphthol Red' } },
-  { id: 'pyrrole_red', name: { uk: 'Піррол червоний', ru: 'Пиррол красный', en: 'Pyrrole Red' } },
-  { id: 'rhodamine', name: { uk: 'Родамін', ru: 'Родамин', en: 'Rhodamine' } },
+    if (!filename) {
+      console.warn(`Нет файла спектра для: ${pigment.id}`)
+      result.push(pigment)
+      continue
+    }
 
-  { id: 'phthalo_blue', name: { uk: 'Фталоціанін синій', ru: 'Фталоцианин синий', en: 'Phthalo Blue' } },
-  { id: 'ultramarine', name: { uk: 'Ультрамарин (штучний)', ru: 'Ультрамарин (искусственный)', en: 'Ultramarine Art' } },
-  { id: 'ultramarine_nat', name: { uk: 'Ультрамарин (натуральний)', ru: 'Ультрамарин (натуральный)', en: 'Ultramarine Nat' } },
-  { id: 'cobalt_blue', name: { uk: 'Кобальт синій', ru: 'Кобальт синий', en: 'Cobalt Blue' } },
-  { id: 'cobalt_cerulean', name: { uk: 'Кобальт небесний', ru: 'Кобальт небесный', en: 'Cobalt Cerulean' } },
-  { id: 'cobalt_chromite_blue', name: { uk: 'Кобальт хромітовий синій', ru: 'Кобальт хромитовый синий', en: 'Cobalt Chromite Blue' } },
-  { id: 'prussian_blue', name: { uk: 'Берлінська лазур', ru: 'Берлинская лазурь', en: 'Prussian Blue' } },
-  { id: 'azurite', name: { uk: 'Азурит', ru: 'Азурит', en: 'Azurite' } },
-  { id: 'blue_bice', name: { uk: 'Блакитна біса', ru: 'Голубая биса', en: 'Blue Bice' } },
-  { id: 'egyptian_blue', name: { uk: 'Єгипетський синій', ru: 'Египетский синий', en: 'Egyptian Blue' } },
-  { id: 'han_blue', name: { uk: 'Ханьський синій', ru: 'Ханьский синий', en: 'Han Blue' } },
-  { id: 'maya_blue', name: { uk: 'Майя синій', ru: 'Майя синий', en: 'Maya Blue' } },
-  { id: 'smalt', name: { uk: 'Смальта', ru: 'Смальта', en: 'Smalt' } },
-  { id: 'indigo', name: { uk: 'Індиго', ru: 'Индиго', en: 'Indigo' } },
-  { id: 'methylene_blue', name: { uk: 'Метиленовий синій', ru: 'Метиленовый синий', en: 'Methylene Blue' } },
-  { id: 'tyrian_purple', name: { uk: 'Тірійський пурпур', ru: 'Тирский пурпур', en: 'Tyrian Purple' } },
+    try {
+      const response = await fetch(`/spectra/${filename}`)
+      const text = await response.text()
+      const initialized = initPigment(pigment, text)
+      result.push(initialized)
+      console.log(`✓ ${pigment.name.ru} → ${initialized.hex}`)
+    } catch (err) {
+      console.error(`Ошибка загрузки ${pigment.id}:`, err)
+      result.push(pigment)
+    }
+  }
 
-  { id: 'phthalo_green', name: { uk: 'Фталоціанін зелений', ru: 'Фталоцианин зелёный', en: 'Phthalo Green' } },
-  { id: 'viridian', name: { uk: 'Віридіанова зелень', ru: 'Виридоновая зелень', en: 'Viridian' } },
-  { id: 'chrome_oxide_green', name: { uk: 'Оксид хрому зелений', ru: 'Оксид хрома зелёный', en: 'Chrome Oxide Green' } },
-  { id: 'cadmium_green', name: { uk: 'Кадмій зелений', ru: 'Кадмий зелёный', en: 'Cadmium Green' } },
-  { id: 'cobalt_titanate_green', name: { uk: 'Кобальт титанатовий зелений', ru: 'Кобальт титанатовый зелёный', en: 'Cobalt Titanate Green' } },
-  { id: 'green_earth', name: { uk: 'Зелена земля', ru: 'Зелёная земля', en: 'Green Earth' } },
-  { id: 'malachite', name: { uk: 'Малахіт', ru: 'Малахит', en: 'Malachite' } },
-  { id: 'verdigris', name: { uk: 'Ярь-медянка', ru: 'Ярь-медянка', en: 'Verdigris' } },
-  { id: 'copper_resinate', name: { uk: 'Мідний резинат', ru: 'Медный резинат', en: 'Copper Resinate' } },
-  { id: 'naphthol_green', name: { uk: 'Нафтол зелений', ru: 'Нафтол зелёный', en: 'Naphthol Green' } },
-  { id: 'vivianite', name: { uk: 'Вівіаніт', ru: 'Вивианит', en: 'Vivianite' } },
+  return result
+}
 
-  { id: 'burnt_sienna', name: { uk: 'Сієна палена', ru: 'Сиена жжёная', en: 'Burnt Sienna' } },
-  { id: 'raw_sienna', name: { uk: 'Сієна натуральна', ru: 'Сиена натуральная', en: 'Raw Sienna' } },
-  { id: 'burnt_umber', name: { uk: 'Умбра палена', ru: 'Умбра жжёная', en: 'Burnt Umber' } },
-  { id: 'raw_umber', name: { uk: 'Умбра натуральна', ru: 'Умбра натуральная', en: 'Raw Umber' } },
-  { id: 'van_dyke_brown', name: { uk: 'Ван Дік коричневий', ru: 'Ван Дик коричневый', en: 'Van Dyke Brown' } },
-  { id: 'sepia', name: { uk: 'Сепія', ru: 'Сепия', en: 'Sepia' } },
-  { id: 'bitumen', name: { uk: 'Бітум', ru: 'Битум', en: 'Bitumen' } },
-
-  { id: 'bone_black', name: { uk: 'Кісткова сажа', ru: 'Костяная сажа', en: 'Bone Black' } },
-  { id: 'ivory_black', name: { uk: 'Слонова кістка чорна', ru: 'Слоновая кость чёрная', en: 'Ivory Black' } },
-  { id: 'lamp_black', name: { uk: 'Сажа газова', ru: 'Сажа газовая', en: 'Lamp Black' } },
-  { id: 'vine_black', name: { uk: 'Виноградна сажа', ru: 'Виноградная сажа', en: 'Vine Black' } },
-  { id: 'aniline_black', name: { uk: 'Анілінова чорна', ru: 'Анилиновая чёрная', en: 'Aniline Black' } },
-
-  { id: 'cobalt_violet', name: { uk: 'Кобальт фіолетовий', ru: 'Кобальт фиолетовый', en: 'Cobalt Violet' } },
-  { id: 'manganese_violet', name: { uk: 'Марганцева фіолетова', ru: 'Марганцевая фиолетовая', en: 'Manganese Violet' } },
-
-  { id: 'iron_gall_ink', name: { uk: 'Залізогаловий чорнило', ru: 'Железогалловые чернила', en: 'Iron Gall Ink' } },
-  { id: 'bismuth', name: { uk: 'Вісмут', ru: 'Висмут', en: 'Bismuth' } },
-  { id: 'acrylic_binder', name: { uk: 'Акриловий біндер', ru: 'Акриловый биндер', en: 'Acrylic Binder' } },
-  { id: 'cardboard', name: { uk: 'Картон', ru: 'Картон', en: 'Cardboard' } },
-];
-
-/**
- * Инициализирует пигмент: парсит спектр и считает цвет
- */
-export function initPigment(pigment: Pigment, spectrumText: string): Pigment {
-  const spectrum = parseSpectrum(spectrumText);
-  const color = spectrumToRGB(spectrum);
-  const hex = rgbToHex(color);
-
+export function getColorFromSpectrumText(text: string) {
+  const spectrum = parseSpectrum(text)
+  const rgb = spectrumToRGB(spectrum)
   return {
-    ...pigment,
-    spectrumText,
-    spectrum,
-    color,
-    hex,
-  };
+    rgb,
+    hex: rgbToHex(rgb),
+  }
 }
