@@ -37,7 +37,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [heelType, setHeelType] = useState<'stiletto' | 'block' | 'kitten'>('stiletto')
   const [showSpecs, setShowSpecs] = useState(false)
 
-  // Защита от отрицательного перепада (Edge Case)
+  // Защита от избыточного превышения платформы над каблуком (Edge Case)
   useEffect(() => {
     if (toeThickness > heelHeight + 10) {
       setToeThickness(heelHeight + 10)
@@ -71,6 +71,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       warn2Desc: 'Эффект "обратного завала".',
       errTitle: '⚠️ КРИТИЧЕСКИЙ КАБЛУК',
       errDesc: `Угол стопы > ${CRITICAL_ANGLE}°. Требуется компенсация платформой.`,
+      negDropTitle: '⚠️ ОБРАТНЫЙ ЗАВАЛ',
+      negDropDesc: 'Платформа выше каблука. Носок ниже пятки.',
       heelLbl: 'ПЯТКА',
       toeLbl: 'НОСОК',
       stiletto: 'Шпилька',
@@ -98,6 +100,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       warn2Desc: 'Ефект "зворотного завалу".',
       errTitle: '⚠️ КРИТИЧНИЙ ПІДБОР',
       errDesc: `Кут стопи > ${CRITICAL_ANGLE}°. Потрібна компенсація платформою.`,
+      negDropTitle: '⚠️ ЗВОРОТНІЙ ЗАВАЛ',
+      negDropDesc: 'Платформа вища за підбор. Носок нижче п’ятки.',
       heelLbl: 'П\'ЯТКА',
       toeLbl: 'НОСОК',
       stiletto: 'Шпилька',
@@ -119,7 +123,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-    // Нормирование базовой нагрузки
+    // Нормирование базовой нагрузки (при отрицательном перепаде нагрузка падает ниже базовой)
     const loadCalc = BASE_LOAD + (netRise / H_REF) * LOAD_PER_H_REF
     
     // Учёт эффекта рокера на нагрузку
@@ -151,7 +155,15 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     
     const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-    if (engineeringData.internalSlope >= CRITICAL_ANGLE || engineeringData.forefootLoad >= CRITICAL_LOAD) {
+    // Проверка на отрицательный угол (носок ниже пятки / обратный завал)
+    if (engineeringData.internalSlope < 0) {
+      status = 'WARNING'
+      title = t.negDropTitle
+      message = t.negDropDesc
+      colors = 'border-blue-500/30 bg-blue-500/20 text-blue-400'
+      boxColors = 'border-blue-500/40 bg-blue-950/20'
+    }
+    else if (engineeringData.internalSlope >= CRITICAL_ANGLE || engineeringData.forefootLoad >= CRITICAL_LOAD) {
       status = 'ERROR'
       title = t.errTitle
       message = t.errDesc
