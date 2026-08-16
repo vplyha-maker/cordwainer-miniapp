@@ -72,6 +72,7 @@ export function HeelCanvas({
   const rearLabel = t.rearfoot ?? t.heelLbl
   const foreLabel = t.forefoot ?? t.toeLbl
   const entryLabel = t.entryAngle ?? 'Угол въезда'
+  const dropMm = heelHeight - toeThickness
 
   return (
     <div className={`flex flex-col rounded-[14px] border overflow-hidden ${boxColors}`}>
@@ -100,10 +101,10 @@ export function HeelCanvas({
           preserveAspectRatio="xMidYMax meet"
           className="overflow-visible"
         >
-          {/* Заголовок: Распределение массы */}
+          {/* Заголовок */}
           <text
             x={(g.xHeel + g.xToe) / 2 - 42}
-            y="9"
+            y="8"
             fill="#A3988E"
             fontSize="6.5"
             fontWeight="600"
@@ -111,19 +112,19 @@ export function HeelCanvas({
             {massTitle}
           </text>
 
-          {/* Пятка */}
-          <text x={g.xHeel - 4} y="20" fill="#A3988E" fontSize="6.5" fontWeight="500">
+          {/* Пятка — слева вверху, не на каблуке */}
+          <text x={Math.max(2, g.xHeel - 2)} y="18" fill="#A3988E" fontSize="6.5" fontWeight="500">
             {rearLabel}
           </text>
-          <text x={g.xHeel - 4} y="31" fill="#22C55E" fontSize="11" fontWeight="700">
+          <text x={Math.max(2, g.xHeel - 2)} y="29" fill="#22C55E" fontSize="11" fontWeight="700">
             {eng.heelLoad}%
           </text>
 
-          {/* Носок */}
-          <text x={g.xToe - 30} y="20" fill="#A3988E" fontSize="6.5" fontWeight="500">
+          {/* Носок — справа вверху */}
+          <text x={g.xToe - 32} y="18" fill="#A3988E" fontSize="6.5" fontWeight="500">
             {foreLabel}
           </text>
-          <text x={g.xToe - 30} y="31" fill="#EF4444" fontSize="11" fontWeight="700">
+          <text x={g.xToe - 32} y="29" fill="#EF4444" fontSize="11" fontWeight="700">
             {eng.forefootLoad}%
           </text>
 
@@ -132,7 +133,7 @@ export function HeelCanvas({
             <>
               <text
                 x={(g.xHeel + g.xToe) / 2 - 28}
-                y="20"
+                y="18"
                 fill="#A3988E"
                 fontSize="6.5"
                 fontWeight="500"
@@ -141,7 +142,7 @@ export function HeelCanvas({
               </text>
               <text
                 x={(g.xHeel + g.xToe) / 2 - 14}
-                y="31"
+                y="29"
                 fill="#D49A5C"
                 fontSize="11"
                 fontWeight="700"
@@ -151,6 +152,7 @@ export function HeelCanvas({
             </>
           )}
 
+          {/* Земля и линия платформы */}
           <line
             x1="0"
             y1={g.yGround}
@@ -171,6 +173,7 @@ export function HeelCanvas({
             opacity="0.4"
           />
 
+          {/* Heel Center Line — только стандарт */}
           {soleType === 'flat' && (
             <>
               <line
@@ -204,16 +207,30 @@ export function HeelCanvas({
             </>
           )}
 
-          <text
-            x={g.xHeelCenter + 6}
-            y={g.yFootBall - 4}
-            fill="#3B82F6"
-            fontSize="8"
-            fontWeight="600"
-          >
-            {t.dropLbl}: {heelHeight - toeThickness} мм
-          </text>
+          {/* Перепад: стандарт — у земли; рокер — у точки переката сверху */}
+          {soleType === 'rocker' ? (
+            <text
+              x={g.xBall + 8}
+              y={Math.min(g.yFootBall - 10, g.yGround - 14)}
+              fill="#3B82F6"
+              fontSize="8"
+              fontWeight="600"
+            >
+              {t.dropLbl}: {dropMm} мм
+            </text>
+          ) : (
+            <text
+              x={g.xHeelCenter + 12}
+              y={g.yGround - 6}
+              fill="#3B82F6"
+              fontSize="8"
+              fontWeight="600"
+            >
+              {t.dropLbl}: {dropMm} мм
+            </text>
+          )}
 
+          {/* Геометрия */}
           <path d={g.heelPath} fill="#D49A5C" opacity="0.9" />
           <path
             d={g.solePath}
@@ -222,14 +239,19 @@ export function HeelCanvas({
             strokeWidth="1.4"
             strokeLinejoin="round"
           />
-          <path
-            d={g.shankCurve}
-            fill="none"
-            stroke="#94A3B8"
-            strokeWidth={Math.max(1.1, eng.steelThickness * g.scale)}
-            strokeLinecap="round"
-          />
 
+          {/* Супинатор — только стандарт */}
+          {soleType === 'flat' && (
+            <path
+              d={g.shankCurve}
+              fill="none"
+              stroke="#94A3B8"
+              strokeWidth={Math.max(1.1, eng.steelThickness * g.scale)}
+              strokeLinecap="round"
+            />
+          )}
+
+          {/* Точка переката — рокер */}
           {soleType === 'rocker' && (
             <>
               <circle cx={g.xBall} cy={g.yFootBall} r="2.8" fill="#EF4444" />
@@ -247,7 +269,7 @@ export function HeelCanvas({
         </svg>
       </div>
 
-      {/* Низ: угол колодки + нагрузка */}
+      {/* Низ */}
       <div className="px-2.5 py-1.5 border-t border-white/5 flex justify-between text-[9px] bg-black/20">
         <span>
           {t.internalSlope}{' '}
