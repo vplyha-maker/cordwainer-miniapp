@@ -82,7 +82,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       warningText: 'Кут понад 14° або висота > 40мм критично знижує площу опори п\'яти. Тиск на плеснову зону збільшено на 65%+',
       info: {
         size: { title: 'Розмір взуття', desc: 'Визначає базову довжину стопи. Пропорційно впливає на довжину геленкової частини та загальну геометрію колодки.' },
-        angle: { title: 'Кут геленка (α)', desc: 'Кут нахилу стопи від пучків до п\'яти. Визначає крутизну підйому. Занадто великий кут переносить критичну вагу на передню частину.' },
+        angle: { title: 'Кут геленка (α)', desc: 'Кут нахилу стопи від пучків до п\'яти. Визначає крутизну підйому. Занадто великий кут переносит критичну вагу на передню частину.' },
         tToe: { title: 'Товщина носка', desc: 'Висота підошви в носковій частині. Діє як платформа, піднімаючи всю стопу і відповідно збільшуючи підсумкову висоту підбора.' },
         toeRoll: { title: 'Перекат носка', desc: 'Піднятість самого кінчика носка від землі. Необхідна для забезпечення природного біомеханічного перекату стопи при кроці.' },
         effLength: { title: 'Довжина перекату', desc: 'Горизонтальна відстань від кінчика носка до точки опори пучкової частини. Залежить від форми носка та величини перекату.' },
@@ -250,8 +250,13 @@ function InfoButton({ onClick }: { onClick: () => void }) {
   return (
     <button 
       onClick={onClick}
-      className="text-[#A3988E] hover:text-[#D49A5C] transition-colors active:scale-90 opacity-70 hover:opacity-100"
+      // relative - нужен для позиционирования псевдоэлемента
+      className="relative flex items-center justify-center text-[#A3988E] hover:text-[#D49A5C] transition-colors active:scale-90 opacity-70 hover:opacity-100"
+      aria-label="Подробнее"
     >
+      {/* Невидимая область клика (Hitbox), расширяющая кнопку на 14px во все стороны (итого ~44x44px) */}
+      <span className="absolute inset-[-14px]" aria-hidden="true" />
+      
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="16" x2="12" y2="12" />
