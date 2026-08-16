@@ -7,7 +7,8 @@ type CalcMenuPageProps = {
   lang: Lang
   onOpenSizeCalc?: () => void
   onOpenWidthCalc?: () => void
-  onOpenHeelCalc?: () => void // <-- Новый пропс
+  onOpenHeelCalc?: () => void
+  onOpenColorCalc?: () => void // <-- Новый пропс
   isFavorite?: boolean
   onToggleFavorite?: () => void
 }
@@ -18,6 +19,7 @@ export function CalcMenuPage({
   onOpenSizeCalc,
   onOpenWidthCalc,
   onOpenHeelCalc,
+  onOpenColorCalc, // <-- Извлечение нового пропса
   isFavorite = false,
   onToggleFavorite,
 }: CalcMenuPageProps) {
@@ -44,6 +46,8 @@ export function CalcMenuPage({
       saveAddSub: 'Добавить',
       saveRemoveTitle: 'В избранном',
       saveRemoveSub: 'Сохранено',
+      colorTitle: 'Колористика', // <-- Новые тексты
+      colorSub: 'Смешивание красок',
       backMenu: 'Назад в меню',
     },
     uk: {
@@ -60,6 +64,8 @@ export function CalcMenuPage({
       saveAddSub: 'Додати',
       saveRemoveTitle: 'В обраному',
       saveRemoveSub: 'Збережено',
+      colorTitle: 'Колористика', // <-- Нові тексти
+      colorSub: 'Змішування фарб',
       backMenu: 'Назад в меню',
     },
   }[lang]
@@ -113,7 +119,7 @@ export function CalcMenuPage({
           </p>
         </div>
 
-        {/* Новая сбалансированная сетка 2x2 (Закон Фиттса - больше зона клика) */}
+        {/* Сетка 2x2 с пятым элементом */}
         <div className="grid grid-cols-2 gap-3 mb-6">
           {/* Размеры */}
           <button
@@ -148,14 +154,14 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Новый Калькулятор: Каблук */}
+          {/* Каблук */}
           <button
             onClick={() => { triggerHaptic('medium'); onOpenHeelCalc?.() }}
             className="h-[104px] p-3.5 rounded-[18px] bg-[#1C1816]/95 border border-white/5 flex flex-col justify-between text-left transition-transform active:scale-95"
           >
             <div className="w-8 h-8 rounded-[10px] bg-[#8B5CF6]/15 text-[#8B5CF6] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 20h18L12 4 3 20z" /> {/* Иконка треугольника/угла */}
+                <path d="M3 20h18L12 4 3 20z" />
                 <path d="M12 15v.01" />
               </svg>
             </div>
@@ -165,7 +171,7 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Избранное */}
+          {/* Избранное (теперь четвертая кнопка) */}
           <button
             onClick={() => { triggerHaptic(isFavorite ? 'light' : 'medium'); onToggleFavorite?.() }}
             className={`h-[104px] p-3.5 rounded-[18px] transition-all active:scale-95 flex flex-col justify-between text-left bg-[#1C1816]/95 ${
@@ -182,6 +188,23 @@ export function CalcMenuPage({
               <div className={`text-[11px] truncate ${isFavorite ? 'text-[#F472B6]' : 'text-[#A3988E]'}`}>
                 {isFavorite ? t.saveRemoveSub : t.saveAddSub}
               </div>
+            </div>
+          </button>
+
+          {/* Новый Калькулятор: Колористика (Пятая кнопка) */}
+          <button
+            onClick={() => { triggerHaptic('medium'); onOpenColorCalc?.() }}
+            className="h-[104px] p-3.5 rounded-[18px] bg-[#1C1816]/95 border border-white/5 flex flex-col justify-between text-left transition-transform active:scale-95"
+          >
+            <div className="w-8 h-8 rounded-[10px] bg-[#10B981]/15 text-[#10B981] flex items-center justify-center">
+              {/* Иконка капли (краски) */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-[13px] font-medium leading-tight mb-0.5">{t.colorTitle}</div>
+              <div className="text-[11px] text-[#A3988E] truncate">{t.colorSub}</div>
             </div>
           </button>
         </div>
