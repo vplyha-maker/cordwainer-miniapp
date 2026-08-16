@@ -7,8 +7,6 @@ export const HEEL_CONST = {
   STEP_TO_MM: 6.67,
   FUNCTIONAL_ALLOWANCE: 12,
   L_EFF_RATIO: 0.73,
-  SHANK_PROPORTION: 0.48,
-  SHANK_OFFSET: 15,
   MAX_TOE: 80,
   MAX_LIFT: 50,
   CRITICAL_ANGLE: 18,
@@ -90,7 +88,11 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const forefootLoad = Math.min(100, Math.max(0, Math.round(loadCalc)))
   const heelLoad = 100 - forefootLoad
 
-  const shankLength = Math.round(lastLengthMm * C.SHANK_PROPORTION + C.SHANK_OFFSET)
+  // Геленок: от центра пятки (15%) до точки переката
+  const heelCenterPos = lastLengthMm * C.HEEL_CENTER_RATIO
+  const ballPos = lastLengthMm * (rockerStartPct / 100)
+  const shankLength = Math.round(Math.max(40, ballPos - heelCenterPos - 5))
+
   let steelThickness = 1.2
   if (netRise > 40 && netRise <= 70) steelThickness = 1.5
   else if (netRise > 70) steelThickness = 2.0
@@ -99,8 +101,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const heelOffsetTooFarForward =
     soleType === 'flat' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
 
-  // --- Риск инверсии ---
-  // Даже при «достаточной» ширине набойки остаётся базовый риск от высоты.
+  // Риск инверсии
   let inversionRisk = 0
   if (soleType === 'flat' && netRise > 0) {
     const minSafeTip =
@@ -112,7 +113,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     const ratio = tipWidthMm / Math.max(minSafeTip, 1)
 
     if (ratio >= 1) {
-      // Набойка достаточная → только остаточный риск от высоты
       const residual =
         heelType === 'block'  ? netRise / 10 :
         heelType === 'flared' ? netRise / 9 :
@@ -120,7 +120,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
         /* stiletto */          netRise / 5
       inversionRisk = Math.min(35, Math.max(0, Math.round(residual)))
     } else {
-      // Набойка узкая → основной риск
       const narrow = (1 - ratio) * 100
       const heightBonus = netRise > 70 ? 15 : netRise > 50 ? 8 : 0
       inversionRisk = Math.min(100, Math.max(0, Math.round(narrow + heightBonus)))
@@ -224,4 +223,4 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
   }
 
   return { toeThickness, heelHeight, heelTipOffsetMm, tipWidthMm, rockerAngle }
-}
+  }
