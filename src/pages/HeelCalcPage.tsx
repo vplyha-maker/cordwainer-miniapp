@@ -119,23 +119,18 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const lEff = lastLengthMm * L_EFF_RATIO
     const netRise = heelHeight - toeThickness
 
-    // Угол стопы (внутренний наклон колодки)
     const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-    // Нормирование базовой нагрузки (при отрицательном перепаде нагрузка падает ниже базовой)
     const loadCalc = BASE_LOAD + (netRise / H_REF) * LOAD_PER_H_REF
     
-    // Учёт эффекта рокера на нагрузку
     const rockerEffectFactor = (soleType === 'rocker') 
       ? Math.min(1, rockerAngle / MAX_ROCKER_ANGLE) * (1 - (rockerStartPct - 55) / 40) 
       : 0
     
-    // Уменьшаем нагрузку до ROCKER_MITIGATION_CAP (25%) при больших рокерах
     const adjustedLoad = loadCalc * (1 - ROCKER_MITIGATION_CAP * rockerEffectFactor)
     const forefootLoad = Math.min(100, Math.max(0, Math.round(adjustedLoad)))
 
-    // Расчет супинатора
     const shankLength = Math.round((lastLengthMm * SHANK_PROPORTION) + SHANK_OFFSET)
     
     let steelThickness = 1.2
@@ -155,7 +150,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     
     const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-    // Проверка на отрицательный угол (носок ниже пятки / обратный завал)
     if (engineeringData.internalSlope < 0) {
       status = 'WARNING'
       title = t.negDropTitle
@@ -188,21 +182,18 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     return { status, title, message, colors, boxColors }
   }, [engineeringData, rockerAngle, soleType, heelHeight, t])
 
-  // --- 4. Auto-Fix (Расчет безопасной платформы) ---
+  // --- 4. Auto-Fix ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
     if (soleType === 'flat') setSoleType('rocker')
 
-    // Опускаем угол до безопасных 14.5 градусов
     const targetAngleRad = (SAFE_ANGLE * Math.PI) / 180
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
     const neededPlatform = Math.max(0, Math.round(heelHeight - maxSafeNetRise))
     
-    // Зафиксированы границы toeThickness: >= 0, <= MAX_TOE, <= heelHeight + 10
     const safePlatform = Math.max(0, Math.min(MAX_TOE, heelHeight + 10, neededPlatform))
     setToeThickness(safePlatform)
     
-    // Авто-rocker: относительная величина (80% от полученного безопасного угла)
     const newNetRise = heelHeight - safePlatform
     const newSlope = Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
     const idealRocker = Math.round(newSlope * 0.8)
@@ -222,7 +213,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const xToe = padding + (totalLength * scale)
     const yGround = 150 
 
-    // Расчет каблука
     const getHeelPath = () => {
       const h = heelHeight * scale
       const x = xHeel
@@ -238,44 +228,46 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       }
     }
 
-    // Верхняя линия подошвы
     const ySoleHeelTop = yGround - heelHeight * scale
     const ySoleRockerTop = yGround - toeThickness * scale
     
-    // Расчет рокера
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
     const rockerZoneRealLength = totalLength * (1 - rockerStartPct / 100)
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
     
     const toeLiftReal = rockerZoneRealLength * Math.sin(rockerAngleRad)
-    const toeLiftSvg = Math.min(MAX_LIFT, Math.max(0, toeLiftReal)) * scale
+    const toeLiftSvg = soleType === 'rocker' ? Math.min(MAX_LIFT, Math.max(0, toeLiftReal)) * scale : 0
     const ySoleToeTop = ySoleRockerTop - toeLiftSvg
 
-    // ДИНАМИЧЕСКАЯ ТОЛЩИНА: платформа имеет массу, а не просто тонкую линию
+    // Толщина подошвы: если задана платформа, рисуем её объем корректно
     const platformBaseSvg = toeThickness > 0 ? (toeThickness * scale) : 5
-    const ySoleHeelBottom = ySoleHeelTop + 5 // В пятке оставляем изящность до каблука
-    const ySoleRockerBottom = ySoleRockerTop + platformBaseSvg
-    const ySoleToeBottom = ySoleToeTop + platformBaseSvg
+    const ySoleHeelBottom = ySoleHeelTop + 5 
+    
+    // Нижняя линия подошвы зависит от типа: для flat она идет параллельно на уровне платформы
+    const ySoleHeelBottomFlat = yGround - (toeThickness * scale) + 5
+    const ySoleRockerBottom = soleType === 'rocker' ? ySoleRockerTop + platformBaseSvg : yGround
+    const ySoleToeBottom = soleType === 'rocker' ? ySoleToeTop + platformBaseSvg : yGround
 
-    // Обновленный путь: рисуем массивную платформу в передней части
-    const solePath = `
+    const solePath = soleType === 'rocker' ? `
       M ${xHeel} ${ySoleHeelTop}
       C ${xHeel + 30 * scale} ${ySoleHeelTop}, 
         ${xRockerStart - 20 * scale} ${ySoleRockerTop}, 
         ${xRockerStart} ${ySoleRockerTop}
       Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerTop}, 
         ${xToe} ${ySoleToeTop}
-      
       L ${xToe} ${ySoleToeBottom}
-      
       Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerBottom}, 
         ${xRockerStart} ${ySoleRockerBottom}
       C ${xRockerStart - 20 * scale} ${ySoleRockerBottom}, 
         ${xHeel + 30 * scale} ${ySoleHeelBottom}, 
         ${xHeel} ${ySoleHeelBottom} Z
+    ` : `
+      M ${xHeel} ${ySoleHeelTop}
+      L ${xToe} ${ySoleRockerTop}
+      L ${xToe} ${yGround}
+      L ${xHeel} ${ySoleHeelBottomFlat} Z
     `
 
-    // Металлический геленок (супинатор)
     const shankCurve = `
       M ${xHeel + 5 * scale} ${ySoleHeelTop + 2}
       Q ${xHeel + 35 * scale} ${ySoleHeelTop + 2} 
@@ -313,7 +305,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   return (
     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-[100dvh] bg-[#110F0E] text-[#F3EFEA] overflow-hidden">
       
-      {/* Шапка (Компактная) */}
+      {/* Шапка */}
       <div className="flex-shrink-0 p-3 flex items-center justify-between border-b border-white/5 bg-[#110F0E]/80 backdrop-blur-md z-10">
         <button onClick={() => { triggerHaptic('light'); onBack() }} className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1C1816] border border-white/5 active:scale-90 transition-transform">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -342,7 +334,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             </div>
           </div>
 
-          {/* SVG Canvas с обновленным preserveAspectRatio */}
+          {/* SVG Canvas */}
           <div className="relative flex justify-center items-center w-full" style={{ height: geometry.svgHeight }}>
             <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} preserveAspectRatio="xMidYMax meet" className="overflow-visible">
               <text x={geometry.xHeel - 10} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.heelLbl}</text>
@@ -372,7 +364,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
         </div>
 
-        {/* Компактные переключатели */}
+        {/* Переключатели */}
         <div className="grid grid-cols-2 gap-2">
           <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
             {(['flat', 'rocker'] as const).map(type => (
@@ -386,7 +378,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
         </div>
 
-        {/* Компактная сетка контролов */}
+        {/* Сетка контролов */}
         <div className="grid grid-cols-2 gap-2">
           <Stepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} />
           <Stepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" />
@@ -397,7 +389,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
         </div>
         
-        {/* Аккордеон Спецификации */}
+        {/* Спецификация */}
         <div className="pt-1">
           <button onClick={() => { triggerHaptic('light'); setShowSpecs(!showSpecs) }} className="w-full py-2.5 px-3 bg-[#1C1816] rounded-xl text-[12px] font-medium flex items-center justify-between border border-white/5">
             <span>{t.specsBtn}</span>
