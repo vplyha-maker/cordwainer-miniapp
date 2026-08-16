@@ -13,17 +13,17 @@ interface ColorCalcPageProps {
 interface PaintPart {
   id: string
   pigmentId: string
-  amount: number
+  amount: string // Изменено на string для стабильной работы на iOS
 }
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Исправлено: стартовые значения теперь 0, чтобы поля были пустыми при загрузке
+  // Стартовые значения теперь пустые строки
   const [paints, setPaints] = useState<PaintPart[]>([
-    { id: '1', pigmentId: 'titanium_white', amount: 0 },
-    { id: '2', pigmentId: 'cadmium_yellow', amount: 0 },
+    { id: '1', pigmentId: 'titanium_white', amount: '' },
+    { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
   ])
 
   useEffect(() => {
@@ -38,7 +38,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
-  const totalAmount = paints.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+  // При расчетах переводим строки в числа
+  const totalAmount = paints.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
 
   const mixedColor = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
@@ -47,10 +48,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
     for (const paint of paints) {
       const pigment = pigments.find((p) => p.id === paint.pigmentId)
-      if (pigment?.spectrum && paint.amount > 0) {
+      const val = parseFloat(paint.amount) || 0 // Конвертация для расчетов
+      if (pigment?.spectrum && val > 0) {
         components.push({
           spectrum: pigment.spectrum,
-          volume: paint.amount,
+          volume: val,
         })
       }
     }
@@ -70,9 +72,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setPaints([
       ...paints,
       {
-        id: Date.now().toString(),
+        id: Math.random().toString(36).slice(2), // Более надежный генератор ID
         pigmentId: pigments[0]?.id || 'titanium_white',
-        amount: 0, // Исправлено: новые цвета тоже добавляются пустыми
+        amount: '',
       },
     ])
   }
@@ -82,7 +84,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setPaints(paints.filter((p) => p.id !== id))
   }
 
-  const updatePaint = (id: string, field: keyof PaintPart, value: string | number) => {
+  const updatePaint = (id: string, field: keyof PaintPart, value: string) => {
     setPaints(paints.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
@@ -133,7 +135,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {/* Внедренный вами код с text-black */}
               {paints.map((paint) => (
                 <div key={paint.id} className="flex items-center gap-2">
                   {/* Выбор пигмента */}
@@ -149,23 +150,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     ))}
                   </select>
 
-                  {/* Объём */}
+                  {/* Объём - Исправлено для iOS */}
                   <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="5000"
-                    step="0.1"
-                    value={paint.amount === 0 ? '' : paint.amount}
+                    type="text" // Используем text вместо number
+                    inputMode="decimal" // Вызывает цифровую клавиатуру
+                    value={paint.amount}
                     onChange={(e) => {
-                      const raw = e.target.value
-                      if (raw === '') {
-                        updatePaint(paint.id, 'amount', 0)
-                        return
-                      }
-                      const val = parseFloat(raw)
-                      if (!isNaN(val)) {
-                        updatePaint(paint.id, 'amount', Math.min(Math.max(val, 0), 5000))
+                      // Меняем запятую на точку (особенность клавиатур на iOS/Android)
+                      let val = e.target.value.replace(',', '.')
+                      
+                      // Проверяем, что введено корректное число (только цифры и макс. одна точка)
+                      if (/^\d*\.?\d*$/.test(val)) {
+                        // Защита: не больше 5000 мл
+                        if (parseFloat(val) > 5000) {
+                          val = '5000'
+                        }
+                        updatePaint(paint.id, 'amount', val)
                       }
                     }}
                     className="w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#D8A35C]"
@@ -222,9 +222,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
           <div className="flex flex-col gap-2">
             {paints.map((paint) => {
+              const paintAmount = parseFloat(paint.amount) || 0 // Конвертация для процентов
               const percentage =
                 totalAmount > 0
-                  ? ((paint.amount / totalAmount) * 100).toFixed(1)
+                  ? ((paintAmount / totalAmount) * 100).toFixed(1)
                   : '0.0'
 
               const pigment = pigments.find((p) => p.id === paint.pigmentId)
