@@ -204,14 +204,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   // --- 5. Глубокая Математика SVG Геометрии ---
   const geometry = useMemo(() => {
     const totalLength = (shoeSize * STEP_TO_MM) + FUNCTIONAL_ALLOWANCE
-    const scale = 0.85 // Чуть уменьшили масштаб, чтобы влезали большие размеры
+    const scale = 0.85 
     const svgWidth = totalLength * scale
     const svgHeight = 180 
-    const padding = 45 // Отступы по краям
+    const padding = 45 
 
     // Координаты по оси X
     const xHeel = padding
-    const xBall = padding + (totalLength * (rockerStartPct / 100)) * scale // Точка переката
+    const xBall = padding + (totalLength * (rockerStartPct / 100)) * scale 
     const xToe = padding + (totalLength * scale)
     
     // Координаты по оси Y (Земля)
@@ -226,7 +226,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const yFootBall = yGround - tScaled
     
     // Расчет подъема носка (Toe Spring)
-    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 2 // У flat всегда есть минимальный подъем 2°
+    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 2 
     const rockerZoneLength = xToe - xBall
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
     
@@ -235,7 +235,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const yFootToe = yFootBall - toeLiftScaled
 
     // 2. Построение профиля подошвы (Sole Path)
-    // Используем кубические кривые Безье (C) для плавного перехода геленка
     const controlX1 = xHeel + (xBall - xHeel) * 0.4
     const controlX2 = xHeel + (xBall - xHeel) * 0.7
 
@@ -248,7 +247,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     `
 
     // Нижняя кромка (Подметка)
-    const platformBase = tScaled > 0 ? tScaled : 4 // Минимальная толщина
+    const platformBase = tScaled > 0 ? tScaled : 4 
     const yBottomBall = yGround
     const yBottomToe = soleType === 'rocker' ? yFootToe + platformBase : yGround - 2
     
@@ -260,21 +259,33 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     `
     const solePath = topPath + bottomPath
 
-    // 3. Построение каблука (Heel Path)
-    const heelW = 20 * scale // Базовая ширина
+    // 3. Построение каблука (Heel Path) - Изменено под логику Рокера
+    const heelW = 20 * scale 
     const getHeelPath = () => {
+      // Если рокерная подошва, то рисуем монолитный клин (танкетку), заполняющий геленок
+      if (soleType === 'rocker') {
+        return `
+          M ${xHeel} ${yGround - hScaled + platformBase - 0.5}
+          C ${controlX1} ${yGround - hScaled + platformBase}, ${controlX2} ${yBottomBall}, ${xBall} ${yBottomBall}
+          L ${xHeel + 30} ${yGround}
+          C ${xHeel + 15} ${yGround}, ${xHeel - 2} ${yGround - (hScaled * 0.3)}, ${xHeel} ${yGround - hScaled + platformBase - 0.5}
+          Z
+        `
+      }
+
+      // Для стандарта - рисуем классические каблуки
       switch (heelType) {
-        case 'stiletto': // Тонкая шпилька, сужается к низу
+        case 'stiletto': 
           return `M ${xHeel + 2} ${yGround - hScaled + platformBase - 1} 
                   L ${xHeel + 4} ${yGround} 
                   L ${xHeel + 10} ${yGround} 
                   L ${xHeel + 14} ${yGround - hScaled + platformBase - 1} Z`
-        case 'block': // Массивный прямой блок
+        case 'block': 
           return `M ${xHeel - 2} ${yGround - hScaled + platformBase - 1} 
                   L ${xHeel} ${yGround} 
                   L ${xHeel + heelW * 1.5} ${yGround} 
                   L ${xHeel + heelW * 1.5} ${yGround - hScaled + platformBase - 1} Z`
-        case 'kitten': // Рюмочка (талированный изгиб)
+        case 'kitten': 
           return `M ${xHeel + 2} ${yGround - hScaled + platformBase - 1} 
                   Q ${xHeel + 10} ${yGround - hScaled * 0.5} ${xHeel + 8} ${yGround} 
                   L ${xHeel + 14} ${yGround} 
@@ -283,7 +294,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       }
     }
 
-    // 4. Металлический геленок (Shank) - строго по изгибу арки
+    // 4. Металлический геленок (Shank)
     const shankLenScaled = engineeringData.shankLength * scale
     const shankCurve = `
       M ${xHeel + 5} ${yFootHeel + 2}
@@ -355,23 +366,18 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           <div className="relative flex justify-center items-center w-full" style={{ height: geometry.svgHeight }}>
             <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} preserveAspectRatio="xMidYMax meet" className="overflow-visible">
               
-              {/* Маркеры */}
               <text x={geometry.xHeel - 15} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.heelLbl}</text>
               <text x={geometry.xToe - 30} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.toeLbl}</text>
               
-              {/* Линия земли */}
               <line x1="0" y1={geometry.yGround} x2={geometry.svgWidth} y2={geometry.yGround} stroke="#4A423C" strokeWidth="1" strokeDasharray="2 2" />
               
-              {/* Линия платформы (визуальная компенсация) */}
               <line x1={geometry.xHeel - 15} y1={geometry.yFootBall} x2={geometry.xToe + 15} y2={geometry.yFootBall} stroke="#3B82F6" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" style={{ transition: 'all 0.3s ease' }} />
               <text x={geometry.xHeel - 40} y={geometry.yFootBall + 3} fill="#3B82F6" fontSize="9" fontWeight="600" style={{ transition: 'all 0.3s ease' }}>H: {heelHeight - toeThickness}</text>
 
-              {/* Геометрия обуви */}
               <path d={geometry.heelPath} fill="#D49A5C" opacity="0.8" style={{ transition: 'all 0.3s ease' }} />
               <path d={geometry.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="1.5" strokeLinejoin="round" style={{ transition: 'all 0.3s ease' }} />
               <path d={geometry.shankCurve} fill="none" stroke="#94A3B8" strokeWidth={engineeringData.steelThickness * geometry.scale} strokeLinecap="round" style={{ transition: 'all 0.3s ease' }} />
 
-              {/* Индикатор рокера */}
               {soleType === 'rocker' && (
                 <>
                   <circle cx={geometry.xBall} cy={geometry.yFootBall} r="3" fill="#EF4444" style={{ transition: 'all 0.3s ease' }} />
@@ -395,9 +401,24 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             ))}
           </div>
           <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
-            {(['stiletto', 'block', 'kitten'] as const).map(type => (
-              <button key={type} onClick={() => { triggerHaptic('light'); setHeelType(type) }} className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${heelType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E] bg-transparent'}`}>{t[type]}</button>
-            ))}
+            {(['stiletto', 'block', 'kitten'] as const).map(type => {
+              const isRocker = soleType === 'rocker' // <-- Логика блокировки
+              return (
+                <button 
+                  key={type} 
+                  disabled={isRocker}
+                  onClick={() => { triggerHaptic('light'); setHeelType(type) }} 
+                  className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-all duration-300
+                    ${isRocker 
+                      ? 'opacity-30 cursor-not-allowed text-[#A3988E]' // Затенение при Рокере
+                      : heelType === type 
+                        ? 'bg-[#8B5CF6] text-white shadow-md' 
+                        : 'text-[#A3988E] bg-transparent hover:bg-white/5'}`}
+                >
+                  {t[type]}
+                </button>
+              )
+            })}
           </div>
         </div>
 
