@@ -217,13 +217,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const svgHeight = 175 
     const padding = 35 
 
-    // Координаты X от единой длины, масштаб применяется последовательно
     const xHeel = padding
     const xRockerStart = padding + (totalLength * (rockerStartPct / 100)) * scale
     const xToe = padding + (totalLength * scale)
     const yGround = 150 
 
-    // Расчет каблука (отмасштабирован)
+    // Расчет каблука
     const getHeelPath = () => {
       const h = heelHeight * scale
       const x = xHeel
@@ -239,10 +238,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       }
     }
 
+    // Верхняя линия подошвы
     const ySoleHeelTop = yGround - heelHeight * scale
     const ySoleRockerTop = yGround - toeThickness * scale
     
-    // Расчет рокера: радианы, реальная длина зоны, затем масштаб
+    // Расчет рокера
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
     const rockerZoneRealLength = totalLength * (1 - rockerStartPct / 100)
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
@@ -251,10 +251,13 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const toeLiftSvg = Math.min(MAX_LIFT, Math.max(0, toeLiftReal)) * scale
     const ySoleToeTop = ySoleRockerTop - toeLiftSvg
 
-    // Визуальная толщина подошвы для SVG
-    const tSvg = 5 
+    // ДИНАМИЧЕСКАЯ ТОЛЩИНА: платформа имеет массу, а не просто тонкую линию
+    const platformBaseSvg = toeThickness > 0 ? (toeThickness * scale) : 5
+    const ySoleHeelBottom = ySoleHeelTop + 5 // В пятке оставляем изящность до каблука
+    const ySoleRockerBottom = ySoleRockerTop + platformBaseSvg
+    const ySoleToeBottom = ySoleToeTop + platformBaseSvg
 
-    // Упрощенный, предсказуемый путь подошвы (Cubic/Quadratic Bezier)
+    // Обновленный путь: рисуем массивную платформу в передней части
     const solePath = `
       M ${xHeel} ${ySoleHeelTop}
       C ${xHeel + 30 * scale} ${ySoleHeelTop}, 
@@ -262,19 +265,21 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
         ${xRockerStart} ${ySoleRockerTop}
       Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerTop}, 
         ${xToe} ${ySoleToeTop}
-      L ${xToe} ${ySoleToeTop + tSvg}
-      Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerTop + tSvg}, 
-        ${xRockerStart} ${ySoleRockerTop + tSvg}
-      C ${xRockerStart - 20 * scale} ${ySoleRockerTop + tSvg}, 
-        ${xHeel + 30 * scale} ${ySoleHeelTop + tSvg}, 
-        ${xHeel} ${ySoleHeelTop + tSvg} Z
+      
+      L ${xToe} ${ySoleToeBottom}
+      
+      Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerBottom}, 
+        ${xRockerStart} ${ySoleRockerBottom}
+      C ${xRockerStart - 20 * scale} ${ySoleRockerBottom}, 
+        ${xHeel + 30 * scale} ${ySoleHeelBottom}, 
+        ${xHeel} ${ySoleHeelBottom} Z
     `
 
-    // Кривая геленка (отмасштабирована)
+    // Металлический геленок (супинатор)
     const shankCurve = `
-      M ${xHeel + 5 * scale} ${ySoleHeelTop + tSvg/2}
-      Q ${xHeel + 35 * scale} ${ySoleHeelTop + tSvg/2} 
-        ${xHeel + (engineeringData.shankLength * scale)} ${ySoleRockerTop + tSvg/2}
+      M ${xHeel + 5 * scale} ${ySoleHeelTop + 2}
+      Q ${xHeel + 35 * scale} ${ySoleHeelTop + 2} 
+        ${xHeel + (engineeringData.shankLength * scale)} ${ySoleRockerTop + 2}
     `
 
     return { 
