@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
-import { mixSpectra, spectrumToRGB, rgbToHex } from '../utils/colorScience'
+import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint } from '../utils/colorScience'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -12,7 +12,7 @@ interface ColorCalcPageProps {
 
 interface PaintPart {
   id: string
-  pigmentId: string   // id из базы пигментов
+  pigmentId: string
   amount: number
 }
 
@@ -20,54 +20,51 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Состав смеси
   const [paints, setPaints] = useState<PaintPart[]>([
     { id: '1', pigmentId: 'titanium_white', amount: 50 },
     { id: '2', pigmentId: 'cadmium_yellow', amount: 20 },
   ])
 
-  // Загружаем пигменты один раз
   useEffect(() => {
     loadAllPigments()
-      .then((loaded) => {
+      .then((loaded: Pigment[]) => {
         setPigments(loaded)
         setLoading(false)
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error(err)
         setLoading(false)
       })
   }, [])
 
-  // Общий объём
   const totalAmount = paints.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
 
-  // Считаем смешанный цвет
   const mixedColor = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
 
-    const components = paints
-      .map((paint) => {
-        const pigment = pigments.find((p) => p.id === paint.pigmentId)
-        if (!pigment?.spectrum || paint.amount <= 0) return null
-        return {
+    const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
+
+    for (const paint of paints) {
+      const pigment = pigments.find((p) => p.id === paint.pigmentId)
+      if (pigment?.spectrum && paint.amount > 0) {
+        components.push({
           spectrum: pigment.spectrum,
           volume: paint.amount,
-        }
-      })
-      .filter(Boolean) as { spectrum: any; volume: number }[]
+        })
+      }
+    }
 
     if (components.length === 0) return null
 
     const mixedSpectrum = mixSpectra(components)
     const rgb = spectrumToRGB(mixedSpectrum)
+
     return {
       rgb,
       hex: rgbToHex(rgb),
     }
   }, [paints, pigments, totalAmount])
 
-  // Добавить краску
   const addPaint = () => {
     setPaints([
       ...paints,
@@ -79,20 +76,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     ])
   }
 
-  // Удалить краску
   const removePaint = (id: string) => {
     if (paints.length <= 1) return
     setPaints(paints.filter((p) => p.id !== id))
   }
 
-  // Обновить краску
   const updatePaint = (id: string, field: keyof PaintPart, value: string | number) => {
-    setPaints(
-      paints.map((p) => (p.id === id ? { ...p, [field]: value } : p))
-    )
+    setPaints(paints.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
-  // Получить название пигмента
   const getPigmentName = (pigmentId: string) => {
     const pigment = pigments.find((p) => p.id === pigmentId)
     if (!pigment) return '...'
@@ -127,10 +119,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </h1>
       </div>
 
-      {/* Основной контент */}
       <div className="flex-1 flex flex-col gap-4">
-
-        {/* Блок состава смеси */}
+        {/* Состав смеси */}
         <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm">
           <h2 className="text-sm font-semibold mb-4 opacity-80">
             {lang === 'uk' ? 'Склад суміші' : 'Состав смеси'}
@@ -144,7 +134,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <div className="flex flex-col gap-3">
               {paints.map((paint) => (
                 <div key={paint.id} className="flex items-center gap-2">
-                  {/* Выбор пигмента */}
                   <select
                     value={paint.pigmentId}
                     onChange={(e) => updatePaint(paint.id, 'pigmentId', e.target.value)}
@@ -157,7 +146,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     ))}
                   </select>
 
-                  {/* Объём */}
                   <input
                     type="number"
                     min="0"
@@ -172,7 +160,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                   <span className="text-xs opacity-50 w-6">мл</span>
 
-                  {/* Удалить */}
                   <button
                     onClick={() => removePaint(paint.id)}
                     className="p-2 text-red-500 opacity-70 hover:opacity-100"
@@ -196,22 +183,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </button>
         </div>
 
-        {/* Блок результата */}
+        {/* Результат */}
         <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-6 shadow-md">
-          {/* Большой цветной квадрат */}
           <div className="flex flex-col items-center mb-6">
             <div
               className="w-32 h-32 rounded-2xl border-2 border-white/20 shadow-lg mb-3 transition-colors duration-300"
-              style={{
-                backgroundColor: mixedColor?.hex || '#333',
-              }}
+              style={{ backgroundColor: mixedColor?.hex || '#333' }}
             />
             <div className="text-sm opacity-70">
               {mixedColor ? mixedColor.hex : '—'}
             </div>
           </div>
 
-          {/* Общий объём */}
           <div className="flex justify-between items-end mb-4 border-b border-gray-700 pb-4">
             <span className="text-sm opacity-70">
               {lang === 'uk' ? 'Загальний об’єм:' : 'Общий объем:'}
@@ -221,7 +204,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </span>
           </div>
 
-          {/* Пропорции */}
           <div className="flex flex-col gap-2">
             {paints.map((paint) => {
               const percentage =
@@ -234,7 +216,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               return (
                 <div key={paint.id} className="flex justify-between items-center text-sm">
                   <div className="flex items-center gap-2 truncate pr-4">
-                    {/* Маленький цветной кружок пигмента */}
                     <div
                       className="w-3 h-3 rounded-full border border-white/30 flex-shrink-0"
                       style={{ backgroundColor: pigment?.hex || '#666' }}
