@@ -11,7 +11,7 @@ const BASE_LOAD = 50
 const LOAD_PER_H_REF = 20
 const SHANK_PROPORTION = 0.48
 const SHANK_OFFSET = 15
-const MAX_TOE = 80                    // УВЕЛИЧЕНО до 80мм для экстремальных каблуков
+const MAX_TOE = 80                    
 const MAX_LIFT = 50
 const CRITICAL_ANGLE = 18
 const COMFORT_ANGLE = 14
@@ -120,7 +120,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const lEff = lastLengthMm * L_EFF_RATIO
     const netRise = heelHeight - toeThickness
 
-    const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
+    // Исправление 6: Защита от деления на ноль
+    const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
     const loadCalc = BASE_LOAD + (netRise / H_REF) * LOAD_PER_H_REF
@@ -191,27 +192,21 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const targetAngleRad = (SAFE_ANGLE * Math.PI) / 180
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
     
-    // Идеальная толщина платформы для текущего каблука
     const neededPlatform = Math.max(0, Math.round(heelHeight - maxSafeNetRise))
     
     let finalPlatform = toeThickness;
     let finalHeel = heelHeight;
 
     if (neededPlatform <= MAX_TOE) {
-      // 1. Если хватает разрешенной толщины платформы — просто поднимаем её
       finalPlatform = neededPlatform;
     } else {
-      // 2. Если уперлись в лимит платформы (MAX_TOE)
-      // Выкручиваем платформу на максимум
       finalPlatform = MAX_TOE;
-      // И ПРИНУДИТЕЛЬНО СНИЖАЕМ КАБЛУК, чтобы достичь баланса
       finalHeel = Math.round(MAX_TOE + maxSafeNetRise);
       setHeelHeight(finalHeel);
     }
 
     setToeThickness(finalPlatform)
     
-    // Пересчет рокера под новые, сбалансированные параметры
     const newNetRise = finalHeel - finalPlatform
     const newSlope = Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
     const idealRocker = Math.round(newSlope * 0.8)
@@ -222,9 +217,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const geometry = useMemo(() => {
     const totalLength = (shoeSize * STEP_TO_MM) + FUNCTIONAL_ALLOWANCE
     const scale = 0.85 
-    const svgWidth = totalLength * scale
-    const svgHeight = 180 
     const padding = 45 
+    
+    // Исправление 7: Синхронизация масштабирования SVG viewBox
+    const svgWidth = (totalLength * scale) + padding * 2
+    const svgHeight = 180 
 
     const xHeel = padding
     const xBall = padding + (totalLength * (rockerStartPct / 100)) * scale 
@@ -238,32 +235,41 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const yFootHeel = yGround - hScaled
     const yFootBall = yGround - tScaled
     
-    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 2 
+    // Исправление 4: Сброс угла рокера при flat подошве, чтобы избежать невидимого искривления
+    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0 
     const rockerZoneLength = xToe - xBall
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
     
-    const toeLiftRaw = rockerZoneLength * Math.sin(rockerAngleRad)
+    // Исправление 1: Безопасный расчет синуса для рокера (защита от аномалий)
+    const safeSine = Math.min(1, Math.max(0, Math.sin(rockerAngleRad)))
+    const toeLiftRaw = rockerZoneLength * safeSine
     const toeLiftScaled = Math.min(MAX_LIFT * scale, toeLiftRaw)
     const yFootToe = yFootBall - toeLiftScaled
 
     const controlX1 = xHeel + (xBall - xHeel) * 0.4
     const controlX2 = xHeel + (xBall - xHeel) * 0.7
 
+    // Исправление 2: Корректные контрольные точки Cubic Bezier по оси Y
+    const controlY1 = yFootHeel * 0.7 + yFootBall * 0.3
+    const controlY2 = yFootHeel * 0.3 + yFootBall * 0.7
+
     const topPath = `
       M ${xHeel - 5} ${yFootHeel - 5} 
       L ${xHeel} ${yFootHeel} 
-      C ${controlX1} ${yFootHeel}, ${controlX2} ${yFootBall}, ${xBall} ${yFootBall}
+      C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${xBall} ${yFootBall}
       Q ${xBall + rockerZoneLength * 0.5} ${yFootBall}, ${xToe} ${yFootToe}
     `
 
-    const platformBase = tScaled > 0 ? tScaled : 4 
+    // Исправление 3: Согласованность координат пятки и платформы
+    const platformBase = Math.max(tScaled, 2) // минимум 2px
+    const yHeelBase = yGround - hScaled + platformBase 
     const yBottomBall = yGround
     const yBottomToe = soleType === 'rocker' ? yFootToe + platformBase : yGround - 2
     
     const bottomPath = `
       L ${xToe} ${yBottomToe}
       Q ${xBall + rockerZoneLength * 0.5} ${yBottomBall}, ${xBall} ${yBottomBall}
-      C ${controlX2} ${yBottomBall}, ${controlX1} ${yGround - hScaled + platformBase}, ${xHeel} ${yGround - hScaled + platformBase}
+      C ${controlX2} ${yBottomBall}, ${controlX1} ${yHeelBase}, ${xHeel} ${yHeelBase}
       Z
     `
     const solePath = topPath + bottomPath
@@ -272,42 +278,45 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const getHeelPath = () => {
       if (soleType === 'rocker') {
         return `
-          M ${xHeel} ${yGround - hScaled + platformBase - 0.5}
-          C ${controlX1} ${yGround - hScaled + platformBase}, ${controlX2} ${yBottomBall}, ${xBall} ${yBottomBall}
+          M ${xHeel} ${yHeelBase - 0.5}
+          C ${controlX1} ${yHeelBase}, ${controlX2} ${yBottomBall}, ${xBall} ${yBottomBall}
           L ${xHeel + 30} ${yGround}
-          C ${xHeel + 15} ${yGround}, ${xHeel - 2} ${yGround - (hScaled * 0.3)}, ${xHeel} ${yGround - hScaled + platformBase - 0.5}
+          C ${xHeel + 15} ${yGround}, ${xHeel - 2} ${yGround - (hScaled * 0.3)}, ${xHeel} ${yHeelBase - 0.5}
           Z
         `
       }
 
       switch (heelType) {
         case 'stiletto': 
-          return `M ${xHeel + 2} ${yGround - hScaled + platformBase - 1} 
+          return `M ${xHeel + 2} ${yHeelBase - 1} 
                   L ${xHeel + 4} ${yGround} 
                   L ${xHeel + 10} ${yGround} 
-                  L ${xHeel + 14} ${yGround - hScaled + platformBase - 1} Z`
+                  L ${xHeel + 14} ${yHeelBase - 1} Z`
         case 'block': 
-          return `M ${xHeel - 2} ${yGround - hScaled + platformBase - 1} 
+          return `M ${xHeel - 2} ${yHeelBase - 1} 
                   L ${xHeel} ${yGround} 
                   L ${xHeel + heelW * 1.5} ${yGround} 
-                  L ${xHeel + heelW * 1.5} ${yGround - hScaled + platformBase - 1} Z`
+                  L ${xHeel + heelW * 1.5} ${yHeelBase - 1} Z`
         case 'kitten': 
-          return `M ${xHeel + 2} ${yGround - hScaled + platformBase - 1} 
+          return `M ${xHeel + 2} ${yHeelBase - 1} 
                   Q ${xHeel + 10} ${yGround - hScaled * 0.5} ${xHeel + 8} ${yGround} 
                   L ${xHeel + 14} ${yGround} 
-                  Q ${xHeel + 18} ${yGround - hScaled * 0.5} ${xHeel + 16} ${yGround - hScaled + platformBase - 1} Z`
+                  Q ${xHeel + 18} ${yGround - hScaled * 0.5} ${xHeel + 16} ${yHeelBase - 1} Z`
         default: return ''
       }
     }
 
     const shankLenScaled = engineeringData.shankLength * scale
+    // Исправление 5: Динамический расчет высоты конца шанка в зависимости от рокера
+    const shankEndY = soleType === 'rocker' ? yFootBall - (toeLiftScaled * 0.2) : yFootBall
+
     const shankCurve = `
       M ${xHeel + 5} ${yFootHeel + 2}
-      C ${controlX1} ${yFootHeel + 2}, ${xHeel + shankLenScaled * 0.8} ${yFootBall + 2}, ${xHeel + shankLenScaled} ${yFootBall + 2}
+      C ${controlX1} ${yFootHeel + 2}, ${xHeel + shankLenScaled * 0.8} ${shankEndY + 2}, ${xHeel + shankLenScaled} ${shankEndY + 2}
     `
 
     return { 
-      svgWidth: svgWidth + padding * 2, svgHeight, 
+      svgWidth, svgHeight, 
       solePath, shankCurve, heelPath: getHeelPath(),
       xHeel, xBall, xToe, yGround, scale, yFootBall, yFootHeel
     }
