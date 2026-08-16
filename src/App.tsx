@@ -7,7 +7,8 @@ import { BlogPage } from './pages/BlogPage'
 import { CalcMenuPage } from './pages/CalcMenuPage'
 import { SizeCalcPage } from './pages/SizeCalcPage'
 import { WidthCalcPage } from './pages/WidthCalcPage'
-import { HeelCalcPage } from './pages/HeelCalcPage' // <-- Импорт нового калькулятора
+import { HeelCalcPage } from './pages/HeelCalcPage'
+import { ColorCalcPage } from './pages/ColorCalcPage' // <-- 1. Импорт нового калькулятора цветов
 
 import {
   getSavedPerfMode,
@@ -23,8 +24,8 @@ declare global {
   }
 }
 
-// <-- Добавлен 'heel-calc'
-export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu' | 'size-calc' | 'width-calc' | 'heel-calc'
+// <-- 2. Добавлен 'color-calc' в типы экранов
+export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu' | 'size-calc' | 'width-calc' | 'heel-calc' | 'color-calc'
 export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
@@ -283,7 +284,8 @@ export default function App() {
             onBack={() => setScreen('home')}
             onOpenSizeCalc={() => setScreen('size-calc')}
             onOpenWidthCalc={() => setScreen('width-calc')}
-            onOpenHeelCalc={() => setScreen('heel-calc')} // <-- Проброс для вызова калькулятора каблука
+            onOpenHeelCalc={() => setScreen('heel-calc')}
+            onOpenColorCalc={() => setScreen('color-calc')} // <-- 3. Проброс для вызова калькулятора цветов
           />
         )}
 
@@ -303,10 +305,18 @@ export default function App() {
           />
         )}
 
-        {/* <-- Новый экран калькулятора каблука */}
         {screen === 'heel-calc' && (
           <HeelCalcPage
             key="heel-calc"
+            lang={lang}
+            onBack={() => setScreen('calc-menu')}
+          />
+        )}
+
+        {/* <-- 4. Новый экран калькулятора цветов */}
+        {screen === 'color-calc' && (
+          <ColorCalcPage
+            key="color-calc"
             lang={lang}
             onBack={() => setScreen('calc-menu')}
           />
