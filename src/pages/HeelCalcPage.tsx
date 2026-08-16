@@ -26,10 +26,10 @@ type HeelCalcPageProps = {
 }
 
 export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
-  // --- 1. Стейты ---
+  // --- 1. Стейты (Исправление 1: Эталон при открытии вместо ошибки) ---
   const [shoeSize, setShoeSize] = useState(38)
-  const [heelHeight, setHeelHeight] = useState(75)     
-  const [toeThickness, setToeThickness] = useState(15) 
+  const [heelHeight, setHeelHeight] = useState(55)     
+  const [toeThickness, setToeThickness] = useState(10) 
   const [rockerAngle, setRockerAngle] = useState(12)   
   const [rockerStartPct, setRockerStartPct] = useState(65)
   
@@ -52,7 +52,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     } catch {}
   }
 
-  // Обновленные, профессиональные термины
+  // Обновленные термины (Исправление 2: Указание, что именно компенсировать)
   const t = {
     ru: {
       title: 'Инженерия и Баланс',
@@ -68,7 +68,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       successTitle: '✅ БАЛАНС В НОРМЕ',
       successDesc: 'Физиологическая норма.',
       warnTitle: '⚠️ ВЫСОКИЙ ПОДЪЕМ',
-      warn1Desc: `Угол больше ${COMFORT_ANGLE}°. Рекомендуется компенсация.`,
+      warn1Desc: `Угол больше ${COMFORT_ANGLE}°. Увеличьте платформу или уменьшите каблук.`,
       warn2Desc: 'Чрезмерный рокер при низком каблуке.',
       errTitle: '⚠️ КРИТИЧЕСКИЙ НАКЛОН',
       errDesc: `Угол колодки > ${CRITICAL_ANGLE}°. Требуется утолщение платформы или снижение каблука.`,
@@ -97,7 +97,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       successTitle: '✅ БАЛАНС У НОРМІ',
       successDesc: 'Фізіологічна норма.',
       warnTitle: '⚠️ ВИСОКИЙ ПІДЙОМ',
-      warn1Desc: `Кут більше ${COMFORT_ANGLE}°. Рекомендована компенсація.`,
+      warn1Desc: `Кут більше ${COMFORT_ANGLE}°. Збільште платформу або зменште підбор.`,
       warn2Desc: 'Надмірний рокер при низькому підборі.',
       errTitle: '⚠️ КРИТИЧНИЙ НАХИЛ',
       errDesc: `Кут колодки > ${CRITICAL_ANGLE}°. Потрібне потовщення платформи або зниження підбора.`,
@@ -120,7 +120,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const lEff = lastLengthMm * L_EFF_RATIO
     const netRise = heelHeight - toeThickness
 
-    // Исправление 6: Защита от деления на ноль
     const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
@@ -184,7 +183,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     return { status, title, message, colors, boxColors }
   }, [engineeringData, rockerAngle, soleType, heelHeight, t])
 
-  // --- 4. УМНЫЙ Auto-Fix (Двусторонняя корректировка) ---
+  // --- 4. УМНЫЙ Auto-Fix ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
     if (soleType === 'flat') setSoleType('rocker')
@@ -219,7 +218,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const scale = 0.85 
     const padding = 45 
     
-    // Исправление 7: Синхронизация масштабирования SVG viewBox
     const svgWidth = (totalLength * scale) + padding * 2
     const svgHeight = 180 
 
@@ -235,12 +233,10 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const yFootHeel = yGround - hScaled
     const yFootBall = yGround - tScaled
     
-    // Исправление 4: Сброс угла рокера при flat подошве, чтобы избежать невидимого искривления
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0 
     const rockerZoneLength = xToe - xBall
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
     
-    // Исправление 1: Безопасный расчет синуса для рокера (защита от аномалий)
     const safeSine = Math.min(1, Math.max(0, Math.sin(rockerAngleRad)))
     const toeLiftRaw = rockerZoneLength * safeSine
     const toeLiftScaled = Math.min(MAX_LIFT * scale, toeLiftRaw)
@@ -249,7 +245,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const controlX1 = xHeel + (xBall - xHeel) * 0.4
     const controlX2 = xHeel + (xBall - xHeel) * 0.7
 
-    // Исправление 2: Корректные контрольные точки Cubic Bezier по оси Y
     const controlY1 = yFootHeel * 0.7 + yFootBall * 0.3
     const controlY2 = yFootHeel * 0.3 + yFootBall * 0.7
 
@@ -260,9 +255,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       Q ${xBall + rockerZoneLength * 0.5} ${yFootBall}, ${xToe} ${yFootToe}
     `
 
-    // Исправление 3: Согласованность координат пятки и платформы
-    const platformBase = Math.max(tScaled, 2) // минимум 2px
-    const yHeelBase = yGround - hScaled + platformBase 
+    // Исправление 3: Надежная база для пятки, чтобы SVG не ломался, если платформа >= каблук
+    const platformBase = Math.max(tScaled, 2) 
+    const heelBodyThickness = Math.min(hScaled, Math.max(5 * scale, platformBase * 0.15))
+    const yHeelBase = yFootHeel + heelBodyThickness 
+    
     const yBottomBall = yGround
     const yBottomToe = soleType === 'rocker' ? yFootToe + platformBase : yGround - 2
     
@@ -307,7 +304,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     }
 
     const shankLenScaled = engineeringData.shankLength * scale
-    // Исправление 5: Динамический расчет высоты конца шанка в зависимости от рокера
     const shankEndY = soleType === 'rocker' ? yFootBall - (toeLiftScaled * 0.2) : yFootBall
 
     const shankCurve = `
