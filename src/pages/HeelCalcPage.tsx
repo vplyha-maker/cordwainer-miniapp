@@ -79,7 +79,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       kitten: 'Рюмочка',
       flat: 'Стандарт',
       rocker: 'Рокер',
-      specsBtn: '⚙️ Спецификация и Математика'
+      specsBtn: '⚙️ Спецификация и Математика',
+      dropLbl: 'Перепад'
     },
     uk: {
       title: 'Інженерія та Баланс',
@@ -108,7 +109,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       kitten: 'Чарочка',
       flat: 'Стандарт',
       rocker: 'Рокер',
-      specsBtn: '⚙️ Специфікація та Математика'
+      specsBtn: '⚙️ Специфікація та Математика',
+      dropLbl: 'Перепад'
     },
   }[lang]
 
@@ -300,15 +302,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       }
     }
 
-    // ИСПРАВЛЕНИЕ ГЕЛЕНКА: Использование алгоритма Де Кастельжо для идеального совпадения кривых
     const archDist = Math.max(1, xBall - xHeel);
     const shankLenScaled = engineeringData.shankLength * scale;
     
-    // t — это процент прохождения длины геленка относительно длины всей арки (от 0 до 1)
     const t = Math.max(0, Math.min(1, shankLenScaled / archDist));
     const mt = 1 - t;
     
-    // Математический расчет саб-кривой, чтобы геленок строго повторял линию стельки (topPath)
     const q1x = mt * xHeel + t * controlX1;
     const q1y = mt * yFootHeel + t * controlY1;
     
@@ -318,7 +317,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const q3x = mt * mt * mt * xHeel + 3 * mt * mt * t * controlX1 + 3 * mt * t * t * controlX2 + t * t * t * xBall;
     const q3y = mt * mt * mt * yFootHeel + 3 * mt * mt * t * controlY1 + 3 * mt * t * t * controlY2 + t * t * t * yFootBall;
 
-    const sOffset = 2; // Минимальное смещение внутрь подошвы
+    const sOffset = 2; 
     const shankCurve = `
       M ${xHeel + 2} ${yFootHeel + sOffset}
       C ${q1x} ${q1y + sOffset}, ${q2x} ${q2y + sOffset}, ${q3x} ${q3y + sOffset}
@@ -393,9 +392,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               <text x={geometry.xToe - 30} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.toeLbl}</text>
               
               <line x1="0" y1={geometry.yGround} x2={geometry.svgWidth} y2={geometry.yGround} stroke="#4A423C" strokeWidth="1" strokeDasharray="2 2" />
-              
               <line x1={geometry.xHeel - 15} y1={geometry.yFootBall} x2={geometry.xToe + 15} y2={geometry.yFootBall} stroke="#3B82F6" strokeWidth="1" strokeDasharray="3 3" opacity="0.5" style={{ transition: 'all 0.3s ease' }} />
-              <text x={geometry.xHeel - 40} y={geometry.yFootBall + 3} fill="#3B82F6" fontSize="9" fontWeight="600" style={{ transition: 'all 0.3s ease' }}>H: {heelHeight - toeThickness}</text>
+              
+              {/* ИЗМЕНЕНИЕ ЗДЕСЬ: Заменили 'H:' на локализованный термин и сместили под свод стопы */}
+              <text x={geometry.xHeel + 12} y={geometry.yFootBall - 4} fill="#3B82F6" fontSize="9" fontWeight="600" style={{ transition: 'all 0.3s ease' }}>
+                {t.dropLbl}: {heelHeight - toeThickness} мм
+              </text>
 
               <path d={geometry.heelPath} fill="#D49A5C" opacity="0.8" style={{ transition: 'all 0.3s ease' }} />
               <path d={geometry.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="1.5" strokeLinejoin="round" style={{ transition: 'all 0.3s ease' }} />
