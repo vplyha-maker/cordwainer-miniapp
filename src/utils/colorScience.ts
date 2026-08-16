@@ -275,4 +275,4 @@ export function mixSpectra(
   }
 
   return result;
-    }
+}
