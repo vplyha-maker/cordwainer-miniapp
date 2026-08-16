@@ -100,7 +100,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 pb-8">
+      <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 pb-6">
         <HeelCanvas
           geometry={geometry}
           eng={eng}
@@ -108,35 +108,12 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           auditTitle={(t as any)[audit.titleKey]}
           auditMessage={(t as any)[audit.messageKey]}
           soleType={soleType}
+          heelType={heelType}
           heelHeight={heelHeight}
           toeThickness={toeThickness}
           labels={t}
           onFix={handleFix}
         />
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-[#1C1816] border border-white/5 rounded-xl p-2.5 text-center">
-            <div className="text-[10px] text-[#A3988E] uppercase mb-1">{t.massTitle}</div>
-            <div className="flex justify-center gap-3 text-[12px]">
-              <span>{t.forefoot}: <strong className="text-red-400">{eng.forefootLoad}%</strong></span>
-              <span>{t.rearfoot}: <strong className="text-green-400">{eng.heelLoad}%</strong></span>
-            </div>
-          </div>
-          <div className="bg-[#1C1816] border border-white/5 rounded-xl p-2.5 text-center">
-            <div className="text-[10px] text-[#A3988E] uppercase mb-1">
-              {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
-                ? t.entryAngle
-                : t.invertRisk}
-            </div>
-            <div className="text-[14px] font-bold">
-              {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
-                ? `${eng.entryAngleDeg}°`
-                : soleType === 'flat'
-                  ? <span className={eng.inversionRisk >= 55 ? 'text-red-400' : ''}>{eng.inversionRisk}%</span>
-                  : '—'}
-            </div>
-          </div>
-        </div>
 
         {/* Стандарт / Рокер */}
         <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
@@ -145,7 +122,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               key={type}
               onClick={() => { haptic(); setSoleType(type) }}
               className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg ${
-                soleType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E]'
+                soleType === type ? 'bg-[#8B5CF6] text-white' : 'text-[#A3988E]'
               }`}
             >
               {t[type]}
@@ -153,27 +130,25 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           ))}
         </div>
 
-        {/* Типы каблука — сетка 2×2 */}
-        <div className="grid grid-cols-2 gap-1 bg-[#1C1816] p-1 rounded-xl border border-white/5">
-          {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
-            <button
-              key={type}
-              disabled={soleType === 'rocker'}
-              onClick={() => { haptic(); setHeelType(type) }}
-              className={`py-2 text-[11px] font-medium rounded-lg transition-all ${
-                soleType === 'rocker'
-                  ? 'opacity-30 text-[#A3988E]'
-                  : heelType === type
-                    ? 'bg-[#8B5CF6] text-white shadow-md'
-                    : 'text-[#A3988E] active:bg-white/5'
-              }`}
-            >
-              {t[type]}
-            </button>
-          ))}
-        </div>
+        {/* Типы каблука — только Стандарт */}
+        {soleType === 'flat' && (
+          <div className="grid grid-cols-2 gap-1 bg-[#1C1816] p-1 rounded-xl border border-white/5">
+            {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => { haptic(); setHeelType(type) }}
+                className={`py-1.5 text-[11px] font-medium rounded-lg ${
+                  heelType === type ? 'bg-[#8B5CF6] text-white' : 'text-[#A3988E]'
+                }`}
+              >
+                {t[type]}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <div className="grid grid-cols-2 gap-2">
+        {/* Степперы */}
+        <div className="grid grid-cols-2 gap-1.5">
           <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
           <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" onHaptic={() => haptic()} />
           <HeelStepper
@@ -229,52 +204,56 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           )}
         </div>
 
-        <div className="pt-1">
-          <button
-            onClick={() => { haptic(); setShowSpecs(!showSpecs) }}
-            className="w-full py-2.5 px-3 bg-[#1C1816] rounded-xl text-[12px] font-medium flex items-center justify-between border border-white/5"
+        {/* Спека */}
+        <button
+          onClick={() => { haptic(); setShowSpecs(!showSpecs) }}
+          className="w-full py-2 px-3 bg-[#1C1816] rounded-xl text-[11px] font-medium flex items-center justify-between border border-white/5"
+        >
+          <span>{t.specsBtn}</span>
+          <svg
+            className={`w-3.5 h-3.5 text-[#A3988E] transition-transform ${showSpecs ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <span>{t.specsBtn}</span>
-            <svg className={`w-4 h-4 text-[#A3988E] transition-transform ${showSpecs ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <AnimatePresence>
-            {showSpecs && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1, marginTop: 6 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="bg-[#1C1816] p-3 rounded-xl border border-white/5 text-[11px] text-[#A3988E] space-y-2">
-                  <Row label="Перекат" value={`${rockerStartPct}%`} />
-                  <Row label="Длина геленка" value={`${eng.shankLength} мм`} />
-                  <Row label="Толщина стали (65Г)" value={`${eng.steelThickness.toFixed(1)} мм`} />
-                  <Row label="L_eff" value={`${eng.lEff.toFixed(1)} мм`} />
-                  <Row label="Heel Center Line" value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`} />
-                  {soleType === 'flat' && (
-                    <>
-                      <Row
-                        label="Смещение"
-                        value={`${heelTipOffsetMm} мм`}
-                        danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
-                      />
-                      <Row label="Набойка" value={`${tipWidthMm} мм`} />
-                      <Row label={t.invertRisk} value={`${eng.inversionRisk}%`} danger={eng.inversionRisk >= 55} />
-                      {(heelType === 'kitten' || heelType === 'flared') && (
-                        <Row label={t.entryAngle} value={`${eng.entryAngleDeg}°`} />
-                      )}
-                    </>
-                  )}
-                  <div className="pt-2 mt-2 border-t border-white/5 font-mono text-[10px] text-[#D49A5C] bg-black/20 p-2 rounded-lg text-center">
-                    Angle = arcsin((H − T) / L_eff)
-                  </div>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <AnimatePresence>
+          {showSpecs && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-[#1C1816] p-2.5 rounded-xl border border-white/5 text-[10px] text-[#A3988E] space-y-1.5">
+                <Row label="Перекат" value={`${rockerStartPct}%`} />
+                <Row label="Геленок" value={`${eng.shankLength} мм`} />
+                <Row label="Сталь 65Г" value={`${eng.steelThickness.toFixed(1)} мм`} />
+                <Row label="L_eff" value={`${eng.lEff.toFixed(1)} мм`} />
+                <Row label="Heel Center" value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`} />
+                {soleType === 'flat' && (
+                  <>
+                    <Row
+                      label="Смещение"
+                      value={`${heelTipOffsetMm} мм`}
+                      danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
+                    />
+                    <Row label="Набойка" value={`${tipWidthMm} мм`} />
+                    <Row label={t.invertRisk} value={`${eng.inversionRisk}%`} danger={eng.inversionRisk >= 55} />
+                    {(heelType === 'kitten' || heelType === 'flared') && (
+                      <Row label={t.entryAngle} value={`${eng.entryAngleDeg}°`} />
+                    )}
+                  </>
+                )}
+                <div className="pt-1.5 mt-1 border-t border-white/5 font-mono text-[9px] text-[#D49A5C] bg-black/20 p-1.5 rounded-lg text-center">
+                  Angle = arcsin((H − T) / L_eff)
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   )
