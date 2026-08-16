@@ -227,4 +227,4 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
   }
 
   return { toeThickness, heelHeight, heelTipOffsetMm, tipWidthMm, rockerAngle }
-  }
+}
