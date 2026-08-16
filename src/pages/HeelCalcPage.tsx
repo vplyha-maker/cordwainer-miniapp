@@ -138,41 +138,41 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
-            {(['flat', 'rocker'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => { haptic(); setSoleType(type) }}
-                className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg ${
-                  soleType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E]'
-                }`}
-              >
-                {t[type]}
-              </button>
-            ))}
-          </div>
-          <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5 overflow-x-auto">
-            {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
-              <button
-                key={type}
-                disabled={soleType === 'rocker'}
-                onClick={() => { haptic(); setHeelType(type) }}
-                className={`flex-1 min-w-[52px] py-1.5 text-[10px] font-medium rounded-lg ${
-                  soleType === 'rocker'
-                    ? 'opacity-30 text-[#A3988E]'
-                    : heelType === type
-                      ? 'bg-[#8B5CF6] text-white shadow-md'
-                      : 'text-[#A3988E]'
-                }`}
-              >
-                {t[type]}
-              </button>
-            ))}
-          </div>
+        {/* Стандарт / Рокер */}
+        <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
+          {(['flat', 'rocker'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => { haptic(); setSoleType(type) }}
+              className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg ${
+                soleType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E]'
+              }`}
+            >
+              {t[type]}
+            </button>
+          ))}
         </div>
 
-        {/* Контролы: Перекат — для ВСЕХ моделей */}
+        {/* Типы каблука — сетка 2×2 */}
+        <div className="grid grid-cols-2 gap-1 bg-[#1C1816] p-1 rounded-xl border border-white/5">
+          {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
+            <button
+              key={type}
+              disabled={soleType === 'rocker'}
+              onClick={() => { haptic(); setHeelType(type) }}
+              className={`py-2 text-[11px] font-medium rounded-lg transition-all ${
+                soleType === 'rocker'
+                  ? 'opacity-30 text-[#A3988E]'
+                  : heelType === type
+                    ? 'bg-[#8B5CF6] text-white shadow-md'
+                    : 'text-[#A3988E] active:bg-white/5'
+              }`}
+            >
+              {t[type]}
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
           <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" onHaptic={() => haptic()} />
@@ -255,7 +255,11 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   <Row label="Heel Center Line" value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`} />
                   {soleType === 'flat' && (
                     <>
-                      <Row label="Смещение" value={`${heelTipOffsetMm} мм`} danger={eng.heelOffsetTooFarBack} />
+                      <Row
+                        label="Смещение"
+                        value={`${heelTipOffsetMm} мм`}
+                        danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
+                      />
                       <Row label="Набойка" value={`${tipWidthMm} мм`} />
                       <Row label={t.invertRisk} value={`${eng.inversionRisk}%`} danger={eng.inversionRisk >= 55} />
                       {(heelType === 'kitten' || heelType === 'flared') && (
@@ -304,6 +308,8 @@ function getLabels(lang: Lang) {
     negDropTitle: '⚠️ ОБРАТНЫЙ УКЛОН', negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
     heelBackTitle: '⚠️ КАБЛУК ЗАВАЛЕН НАЗАД',
     heelBackDesc: 'Ошибка: Каблук завален назад, произойдет перелом супинатора под весом пациента.',
+    heelFwdTitle: '⚠️ СМЕЩЕНИЕ ВПЕРЁД',
+    heelFwdDesc: `Набойка смещена вперёд больше чем на ${C.MAX_HEEL_OFFSET_MM} мм. Снижена стабильность, риск срыва посадки каблука.`,
     invertTitle: '⚠️ РИСК ИНВЕРСИИ',
     invertDesc: 'Набойка слишком узкая при высоком каблуке — высокий риск подворачивания лодыжки.',
     heelLbl: 'ПЯТКА', toeLbl: 'НОСОК',
@@ -331,6 +337,8 @@ function getLabels(lang: Lang) {
     negDropTitle: '⚠️ ЗВОРОТНІЙ УХИЛ', negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
     heelBackTitle: '⚠️ ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
     heelBackDesc: 'Помилка: Підбор завалений назад, відбудеться перелом супінатора під вагою пацієнта.',
+    heelFwdTitle: '⚠️ ЗМІЩЕННЯ ВПЕРЕД',
+    heelFwdDesc: `Набійка зміщена вперед більше ніж на ${C.MAX_HEEL_OFFSET_MM} мм. Знижена стабільність, ризик зриву посадки підбора.`,
     invertTitle: '⚠️ РИЗИК ІНВЕРСІЇ',
     invertDesc: 'Набійка занадто вузька при високому підборі — високий ризик підвертання щиколотки.',
     heelLbl: "П'ЯТКА", toeLbl: 'НОСОК',
