@@ -11,6 +11,10 @@ type Labels = {
   internalSlope: string
   loadLbl: string
   fixBtn: string
+  massTitle?: string
+  forefoot?: string
+  rearfoot?: string
+  entryAngle?: string
 }
 
 type Props = {
@@ -64,6 +68,11 @@ export function HeelCanvas({
   const showEntry =
     soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
 
+  const massTitle = t.massTitle ?? 'Распределение массы'
+  const rearLabel = t.rearfoot ?? t.heelLbl
+  const foreLabel = t.forefoot ?? t.toeLbl
+  const entryLabel = t.entryAngle ?? 'Угол въезда'
+
   return (
     <div className={`flex flex-col rounded-[14px] border overflow-hidden ${boxColors}`}>
       {/* Алерт */}
@@ -91,19 +100,55 @@ export function HeelCanvas({
           preserveAspectRatio="xMidYMax meet"
           className="overflow-visible"
         >
-          {/* Массы: пятка (зелёный) / носок (красный) */}
-          <text x={g.xHeel - 4} y="15" fill="#22C55E" fontSize="9" fontWeight="700">
+          {/* Заголовок: Распределение массы */}
+          <text
+            x={(g.xHeel + g.xToe) / 2 - 42}
+            y="9"
+            fill="#A3988E"
+            fontSize="6.5"
+            fontWeight="600"
+          >
+            {massTitle}
+          </text>
+
+          {/* Пятка */}
+          <text x={g.xHeel - 4} y="20" fill="#A3988E" fontSize="6.5" fontWeight="500">
+            {rearLabel}
+          </text>
+          <text x={g.xHeel - 4} y="31" fill="#22C55E" fontSize="11" fontWeight="700">
             {eng.heelLoad}%
           </text>
-          <text x={g.xToe - 28} y="15" fill="#EF4444" fontSize="9" fontWeight="700">
+
+          {/* Носок */}
+          <text x={g.xToe - 30} y="20" fill="#A3988E" fontSize="6.5" fontWeight="500">
+            {foreLabel}
+          </text>
+          <text x={g.xToe - 30} y="31" fill="#EF4444" fontSize="11" fontWeight="700">
             {eng.forefootLoad}%
           </text>
 
-          {/* Угол въезда — рюмочка / трапеция */}
+          {/* Угол въезда */}
           {showEntry && (
-            <text x={(g.xHeel + g.xToe) / 2 - 18} y="15" fill="#A3988E" fontSize="8" fontWeight="600">
-              ∠ {eng.entryAngleDeg}°
-            </text>
+            <>
+              <text
+                x={(g.xHeel + g.xToe) / 2 - 28}
+                y="20"
+                fill="#A3988E"
+                fontSize="6.5"
+                fontWeight="500"
+              >
+                {entryLabel}
+              </text>
+              <text
+                x={(g.xHeel + g.xToe) / 2 - 14}
+                y="31"
+                fill="#D49A5C"
+                fontSize="11"
+                fontWeight="700"
+              >
+                {eng.entryAngleDeg}°
+              </text>
+            </>
           )}
 
           <line
