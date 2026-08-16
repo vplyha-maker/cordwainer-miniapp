@@ -15,7 +15,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [rockerAngle, setRockerAngle] = useState(12)   
   const [rockerStartPct, setRockerStartPct] = useState(63) 
   
-  // Новые стейты для интеграции женских каблуков
+  // Стейты для интеграции женских каблуков
   const [heelType, setHeelType] = useState<'stiletto' | 'block' | 'kitten'>('stiletto')
   const [showSpecs, setShowSpecs] = useState(false)
   const [showFormulas, setShowFormulas] = useState(false)
@@ -163,47 +163,59 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const xToe = padding + totalLength * scale
     const yGround = 150
 
-    const ySoleHeelBottom = yGround
-    const ySoleRockerBottom = yGround
+    // Отрисовка формы каблука
+    const getHeelPath = () => {
+      const h = heelHeight * scale
+      const x = xHeel
+      const y = yGround
+      
+      switch (heelType) {
+        case 'stiletto':
+          return `M ${x + 5} ${y - h} L ${x + 2} ${y} L ${x + 8} ${y} Z`
+        case 'block':
+          return `M ${x} ${y - h} L ${x + 15} ${y - h} L ${x + 15} ${y} L ${x} ${y} Z`
+        case 'kitten':
+          return `M ${x + 8} ${y - h} Q ${x - 5} ${y - h/2} ${x + 2} ${y} L ${x + 10} ${y} Q ${x + 12} ${y - h/2} ${x + 12} ${y - h} Z`
+        default: return ''
+      }
+    }
 
-    // Взлет носка
+    const ySoleHeelTop = yGround - heelHeight * scale
+    const ySoleRockerTop = yGround - toeThickness * scale
     const rockerLengthMm = totalLength * (1 - rockerStartPct / 100)
     const rockerLengthSvg = rockerLengthMm * scale
     const toeLiftSvg = rockerLengthSvg * Math.sin((rockerAngle * Math.PI) / 180)
-    const ySoleToeBottom = yGround - toeLiftSvg
-
-    // Верхняя грань
-    const ySoleHeelTop = yGround - heelHeight * scale
-    const ySoleRockerTop = yGround - toeThickness * scale
-    const ySoleToeTop = ySoleToeBottom - toeThickness * scale
+    const ySoleToeTop = (yGround - toeLiftSvg) - toeThickness * scale
 
     // Линия центра пятки (15% от длины)
     const xHeelCenter = padding + (totalLength * 0.15 * scale)
 
-    // Органический путь (Обувь)
+    // Основное тело подошвы
     const solePath = `
-      M ${xHeel} ${ySoleHeelTop}
-      C ${xHeel + 20 * scale} ${ySoleHeelTop}, 
+      M ${xHeel + 12} ${ySoleHeelTop}
+      C ${xHeel + 40 * scale} ${ySoleHeelTop}, 
         ${xRockerStart - 30 * scale} ${ySoleRockerTop}, 
         ${xRockerStart} ${ySoleRockerTop}
       C ${xRockerStart + 15 * scale} ${ySoleRockerTop}, 
         ${xToe - 10 * scale} ${ySoleToeTop + 5}, 
         ${xToe} ${ySoleToeTop}
-      C ${xToe + 5} ${ySoleToeTop + 10},
-        ${xToe + 5} ${ySoleToeBottom},
-        ${xToe} ${ySoleToeBottom}
-      C ${xToe - 15 * scale} ${ySoleToeBottom}, 
-        ${xRockerStart + 10 * scale} ${ySoleRockerBottom}, 
-        ${xRockerStart} ${ySoleRockerBottom}
-      L ${xHeel + 10} ${ySoleHeelBottom}
-      C ${xHeel} ${ySoleHeelBottom}, 
-        ${xHeel - 5} ${ySoleHeelTop + 10}, 
-        ${xHeel} ${ySoleHeelTop}
+      L ${xToe} ${ySoleToeTop + 5}
+      L ${xHeel + 12} ${ySoleHeelTop + 5}
       Z
     `
 
-    return { svgWidth: svgWidth + padding * 2, svgHeight, solePath, xHeel, xRockerStart, xToe, yGround, xHeelCenter }
-  }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct])
+    return { 
+      svgWidth: svgWidth + padding * 2, 
+      svgHeight, 
+      solePath, 
+      heelPath: getHeelPath(),
+      xHeel, 
+      xRockerStart, 
+      xToe, 
+      yGround, 
+      xHeelCenter 
+    }
+  }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct, heelType])
 
   // --- 6. Аудит (Сводный) ---
   const balanceAudit = useMemo(() => {
@@ -292,6 +304,9 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             {/* Линия падения центра тяжести (Пятка) */}
             <line x1={geometry.xHeelCenter} y1={20} x2={geometry.xHeelCenter} y2={geometry.yGround} stroke="#10B981" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5" />
             <circle cx={geometry.xHeelCenter} cy={geometry.yGround} r="2.5" fill="#10B981" opacity="0.7" />
+
+            {/* Каблук */}
+            <path d={geometry.heelPath} fill="#D49A5C" opacity="0.8" />
 
             {/* Тело подошвы */}
             <path d={geometry.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="2" strokeLinejoin="round" />
