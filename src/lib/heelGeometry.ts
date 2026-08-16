@@ -39,10 +39,10 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   } = input
 
   const totalLength = shoeSize * C.STEP_TO_MM + C.FUNCTIONAL_ALLOWANCE
-  const scale = 0.85
-  const padding = 45
+  const scale = 0.78
+  const padding = 36
   const svgWidth = totalLength * scale + padding * 2
-  const svgHeight = 180
+  const svgHeight = 148
 
   const xHeel = padding
   const xBall = padding + totalLength * (rockerStartPct / 100) * scale
@@ -51,7 +51,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const offsetPx = soleType === 'flat' ? heelTipOffsetMm * scale : 0
   const xTipCenter = xHeelCenter + offsetPx
 
-  const yGround = 150
+  const yGround = 122
   const hScaled = heelHeight * scale
   const tScaled = toeThickness * scale
   const yFootHeel = yGround - hScaled
@@ -65,7 +65,6 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   )
   const yFootToe = yFootBall - toeLift
 
-  // Свод от центра пятки
   const archStartX = xHeelCenter
   const c1x = archStartX + (xBall - archStartX) * 0.35
   const c2x = archStartX + (xBall - archStartX) * 0.7
@@ -79,7 +78,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     Q ${xBall + rockerZone * 0.45} ${yFootBall}, ${xToe} ${yFootToe}
   `
 
-  const yHeelSeat = yFootHeel + Math.min(hScaled * 0.12, 8 * scale)
+  const yHeelSeat = yFootHeel + Math.min(hScaled * 0.12, 7 * scale)
   const yBottomToe = soleType === 'rocker' ? yFootToe + Math.max(tScaled, 2) : yGround - 1
 
   const bottomPath = `
@@ -96,7 +95,6 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     soleType, heelType, xHeel, xBall, xTipCenter, yHeelSeat, yGround, hScaled, tipW, c1x, c2x,
   })
 
-  // Супинатор от центра пятки
   const archDist = Math.max(1, xBall - archStartX)
   const tt = Math.max(0, Math.min(1, (shankLength * scale) / archDist))
   const mt = 1 - tt
@@ -104,9 +102,17 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const q1y = mt * yFootHeel + tt * c1y
   const q2x = mt * mt * archStartX + 2 * mt * tt * c1x + tt * tt * c2x
   const q2y = mt * mt * yFootHeel + 2 * mt * tt * c1y + tt * tt * c2y
-  const q3x = mt * mt * mt * archStartX + 3 * mt * mt * tt * c1x + 3 * mt * tt * tt * c2x + tt * tt * tt * xBall
-  const q3y = mt * mt * mt * yFootHeel + 3 * mt * mt * tt * c1y + 3 * mt * tt * tt * c2y + tt * tt * tt * yFootBall
-  const sOff = 3
+  const q3x =
+    mt * mt * mt * archStartX +
+    3 * mt * mt * tt * c1x +
+    3 * mt * tt * tt * c2x +
+    tt * tt * tt * xBall
+  const q3y =
+    mt * mt * mt * yFootHeel +
+    3 * mt * mt * tt * c1y +
+    3 * mt * tt * tt * c2y +
+    tt * tt * tt * yFootBall
+  const sOff = 2.5
   const shankCurve = `
     M ${archStartX} ${yFootHeel + sOff}
     C ${q1x} ${q1y + sOff}, ${q2x} ${q2y + sOff}, ${q3x} ${q3y + sOff}
@@ -138,34 +144,34 @@ function buildHeelPath(p: {
     return `
       M ${xHeel} ${yHeelSeat}
       C ${c1x} ${yHeelSeat}, ${c2x} ${yGround}, ${xBall} ${yGround}
-      L ${xHeel + 28} ${yGround}
-      C ${xHeel + 14} ${yGround}, ${xHeel - 2} ${yGround - hScaled * 0.25}, ${xHeel} ${yHeelSeat}
+      L ${xHeel + 24} ${yGround}
+      C ${xHeel + 12} ${yGround}, ${xHeel - 2} ${yGround - hScaled * 0.25}, ${xHeel} ${yHeelSeat}
       Z
     `
   }
 
   switch (heelType) {
     case 'stiletto': {
-      const top = Math.max(2.2, tipW * 0.9)
-      const bot = Math.max(1.2, tipW / 2)
+      const top = Math.max(2, tipW * 0.9)
+      const bot = Math.max(1.1, tipW / 2)
       return `M ${xTipCenter - top} ${yHeelSeat} L ${xTipCenter - bot} ${yGround} L ${xTipCenter + bot} ${yGround} L ${xTipCenter + top} ${yHeelSeat} Z`
     }
     case 'kitten': {
-      const top = Math.max(4, tipW * 0.85)
-      const bot = Math.max(2, tipW / 2)
+      const top = Math.max(3.5, tipW * 0.85)
+      const bot = Math.max(1.8, tipW / 2)
       const midY = yHeelSeat + (yGround - yHeelSeat) * 0.55
       return `M ${xTipCenter - top} ${yHeelSeat} Q ${xTipCenter - bot * 0.4} ${midY} ${xTipCenter - bot} ${yGround} L ${xTipCenter + bot} ${yGround} Q ${xTipCenter + bot * 0.4} ${midY} ${xTipCenter + top} ${yHeelSeat} Z`
     }
     case 'block': {
-      const half = Math.max(5, tipW / 2)
+      const half = Math.max(4.5, tipW / 2)
       return `M ${xTipCenter - half} ${yHeelSeat} L ${xTipCenter - half * 0.92} ${yGround} L ${xTipCenter + half * 0.92} ${yGround} L ${xTipCenter + half} ${yHeelSeat} Z`
     }
     case 'flared': {
-      const top = Math.max(2.5, tipW * 0.32)
-      const bot = Math.max(5, tipW / 2)
+      const top = Math.max(2.2, tipW * 0.32)
+      const bot = Math.max(4.5, tipW / 2)
       return `M ${xTipCenter - top} ${yHeelSeat} L ${xTipCenter - bot} ${yGround} L ${xTipCenter + bot} ${yGround} L ${xTipCenter + top} ${yHeelSeat} Z`
     }
     default:
       return ''
   }
-  }
+}
