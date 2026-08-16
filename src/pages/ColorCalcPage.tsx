@@ -20,9 +20,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Исправлено: стартовые значения теперь 0, чтобы поля были пустыми при загрузке
   const [paints, setPaints] = useState<PaintPart[]>([
-    { id: '1', pigmentId: 'titanium_white', amount: 50 },
-    { id: '2', pigmentId: 'cadmium_yellow', amount: 20 },
+    { id: '1', pigmentId: 'titanium_white', amount: 0 },
+    { id: '2', pigmentId: 'cadmium_yellow', amount: 0 },
   ])
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       {
         id: Date.now().toString(),
         pigmentId: pigments[0]?.id || 'titanium_white',
-        amount: 10,
+        amount: 0, // Исправлено: новые цвета тоже добавляются пустыми
       },
     ])
   }
@@ -132,12 +133,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              {/* Внедренный вами код с text-black */}
               {paints.map((paint) => (
                 <div key={paint.id} className="flex items-center gap-2">
+                  {/* Выбор пигмента */}
                   <select
                     value={paint.pigmentId}
                     onChange={(e) => updatePaint(paint.id, 'pigmentId', e.target.value)}
-                    className="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D8A35C]"
+                    className="flex-1 min-w-0 bg-white text-black border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D8A35C]"
                   >
                     {pigments.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -146,17 +149,26 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     ))}
                   </select>
 
+                  {/* Объём */}
                   <input
                     type="number"
+                    inputMode="decimal"
                     min="0"
                     max="5000"
                     step="0.1"
-                    value={paint.amount || ''}
+                    value={paint.amount === 0 ? '' : paint.amount}
                     onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0
-                      updatePaint(paint.id, 'amount', Math.min(Math.max(val, 0), 5000))
+                      const raw = e.target.value
+                      if (raw === '') {
+                        updatePaint(paint.id, 'amount', 0)
+                        return
+                      }
+                      const val = parseFloat(raw)
+                      if (!isNaN(val)) {
+                        updatePaint(paint.id, 'amount', Math.min(Math.max(val, 0), 5000))
+                      }
                     }}
-                    className="w-20 flex-shrink-0 bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#D8A35C]"
+                    className="w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#D8A35C]"
                     placeholder="0"
                   />
 
