@@ -1,6 +1,6 @@
 // src/components/heel/HeelCanvas.tsx
 import React from 'react'
-import type { HeelEngineering, HeelAudit, SoleType } from '../../lib/heelCalc'
+import type { HeelEngineering, HeelAudit, SoleType, HeelType } from '../../lib/heelCalc'
 import type { HeelGeometry } from '../../lib/heelGeometry'
 import { HEEL_CONST } from '../../lib/heelCalc'
 
@@ -20,6 +20,7 @@ type Props = {
   auditTitle: string
   auditMessage: string
   soleType: SoleType
+  heelType: HeelType
   heelHeight: number
   toeThickness: number
   labels: Labels
@@ -48,6 +49,7 @@ export function HeelCanvas({
   auditTitle,
   auditMessage,
   soleType,
+  heelType,
   heelHeight,
   toeThickness,
   labels: t,
@@ -59,9 +61,12 @@ export function HeelCanvas({
   const textColor =
     audit.titleKey === 'negDropTitle' ? 'text-blue-400' : style.colors
 
+  const showEntry =
+    soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
+
   return (
     <div className={`flex flex-col rounded-[14px] border overflow-hidden ${boxColors}`}>
-      {/* Алерт — компактно */}
+      {/* Алерт */}
       <div className="flex items-start justify-between gap-2 px-2.5 pt-2 pb-1">
         <div className="min-w-0">
           <div className={`text-[11px] font-bold leading-tight ${textColor}`}>{auditTitle}</div>
@@ -86,14 +91,30 @@ export function HeelCanvas({
           preserveAspectRatio="xMidYMax meet"
           className="overflow-visible"
         >
-          <text x={g.xHeel - 6} y="16" fill="#8B5CF6" fontSize="9" fontWeight="bold" opacity="0.75">
-            {t.heelLbl}
+          {/* Массы: пятка (зелёный) / носок (красный) */}
+          <text x={g.xHeel - 4} y="15" fill="#22C55E" fontSize="9" fontWeight="700">
+            {eng.heelLoad}%
           </text>
-          <text x={g.xToe - 24} y="16" fill="#8B5CF6" fontSize="9" fontWeight="bold" opacity="0.75">
-            {t.toeLbl}
+          <text x={g.xToe - 28} y="15" fill="#EF4444" fontSize="9" fontWeight="700">
+            {eng.forefootLoad}%
           </text>
 
-          <line x1="0" y1={g.yGround} x2={g.svgWidth} y2={g.yGround} stroke="#4A423C" strokeWidth="1" strokeDasharray="2 2" />
+          {/* Угол въезда — рюмочка / трапеция */}
+          {showEntry && (
+            <text x={(g.xHeel + g.xToe) / 2 - 18} y="15" fill="#A3988E" fontSize="8" fontWeight="600">
+              ∠ {eng.entryAngleDeg}°
+            </text>
+          )}
+
+          <line
+            x1="0"
+            y1={g.yGround}
+            x2={g.svgWidth}
+            y2={g.yGround}
+            stroke="#4A423C"
+            strokeWidth="1"
+            strokeDasharray="2 2"
+          />
           <line
             x1={g.xHeel - 8}
             y1={g.yFootBall}
@@ -112,7 +133,13 @@ export function HeelCanvas({
                 y1={g.yFootHeel - 8}
                 x2={g.xHeelCenter}
                 y2={g.yGround + 4}
-                stroke={eng.heelOffsetTooFarBack ? '#EF4444' : eng.heelOffsetTooFarForward ? '#F59E0B' : '#22C55E'}
+                stroke={
+                  eng.heelOffsetTooFarBack
+                    ? '#EF4444'
+                    : eng.heelOffsetTooFarForward
+                      ? '#F59E0B'
+                      : '#22C55E'
+                }
                 strokeWidth="1.4"
                 strokeDasharray="4 3"
                 opacity="0.95"
@@ -121,17 +148,35 @@ export function HeelCanvas({
                 cx={g.xTipCenter}
                 cy={g.yGround}
                 r="2.8"
-                fill={eng.heelOffsetTooFarBack ? '#EF4444' : eng.heelOffsetTooFarForward ? '#F59E0B' : '#22C55E'}
+                fill={
+                  eng.heelOffsetTooFarBack
+                    ? '#EF4444'
+                    : eng.heelOffsetTooFarForward
+                      ? '#F59E0B'
+                      : '#22C55E'
+                }
               />
             </>
           )}
 
-          <text x={g.xHeelCenter + 6} y={g.yFootBall - 4} fill="#3B82F6" fontSize="8" fontWeight="600">
+          <text
+            x={g.xHeelCenter + 6}
+            y={g.yFootBall - 4}
+            fill="#3B82F6"
+            fontSize="8"
+            fontWeight="600"
+          >
             {t.dropLbl}: {heelHeight - toeThickness} мм
           </text>
 
           <path d={g.heelPath} fill="#D49A5C" opacity="0.9" />
-          <path d={g.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="1.4" strokeLinejoin="round" />
+          <path
+            d={g.solePath}
+            fill="#2A2421"
+            stroke="#D49A5C"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
           <path
             d={g.shankCurve}
             fill="none"
@@ -157,7 +202,7 @@ export function HeelCanvas({
         </svg>
       </div>
 
-      {/* Низ: угол + нагрузка */}
+      {/* Низ: угол колодки + нагрузка */}
       <div className="px-2.5 py-1.5 border-t border-white/5 flex justify-between text-[9px] bg-black/20">
         <span>
           {t.internalSlope}{' '}
@@ -165,7 +210,11 @@ export function HeelCanvas({
         </span>
         <span>
           {t.loadLbl}{' '}
-          <strong className={`text-[10px] ${eng.forefootLoad >= HEEL_CONST.CRITICAL_LOAD ? 'text-red-400' : ''}`}>
+          <strong
+            className={`text-[10px] ${
+              eng.forefootLoad >= HEEL_CONST.CRITICAL_LOAD ? 'text-red-400' : ''
+            }`}
+          >
             {eng.forefootLoad}%
           </strong>
         </span>
