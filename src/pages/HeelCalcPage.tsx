@@ -3,22 +3,22 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
 // --- КОНСТАНТЫ И КОЭФФИЦИЕНТЫ ---
-const STEP_TO_MM = 6.67               // Перевод штихового размера в миллиметры
-const FUNCTIONAL_ALLOWANCE = 12       // Функциональный припуск колодки (мм)
-const L_EFF_RATIO = 0.73              // Эмпирический коэффициент расположения пучков (73%)
-const H_REF = 40                      // Базовая высота для нормирования нагрузки (мм)
-const BASE_LOAD = 50                  // Базовая нагрузка (%)
-const LOAD_PER_H_REF = 20             // Прирост нагрузки на каждые H_REF мм подъема (%)
-const SHANK_PROPORTION = 0.48         // Пропорция геленочной части
-const SHANK_OFFSET = 15               // Смещение для супинатора (мм)
-const MAX_TOE = 60                    // Максимальная толщина платформы (мм)
-const MAX_LIFT = 50                   // Максимальный подъем носка для SVG (мм)
-const CRITICAL_ANGLE = 18             // Критический порог перегрузки плюсневых костей (°)
-const COMFORT_ANGLE = 14              // Физиологический порог комфорта (°)
-const SAFE_ANGLE = 14.5               // Безопасный угол для Auto-Fix (°)
-const CRITICAL_LOAD = 80              // Критическая нагрузка на пучки (%)
-const MAX_ROCKER_ANGLE = 30           // База для расчета фактора рокера (°)
-const ROCKER_MITIGATION_CAP = 0.25    // Максимальное снижение нагрузки от рокера (25%)
+const STEP_TO_MM = 6.67
+const FUNCTIONAL_ALLOWANCE = 12
+const L_EFF_RATIO = 0.73
+const H_REF = 40
+const BASE_LOAD = 50
+const LOAD_PER_H_REF = 20
+const SHANK_PROPORTION = 0.48
+const SHANK_OFFSET = 15
+const MAX_TOE = 80                    // УВЕЛИЧЕНО до 80мм для экстремальных каблуков
+const MAX_LIFT = 50
+const CRITICAL_ANGLE = 18
+const COMFORT_ANGLE = 14
+const SAFE_ANGLE = 14.5
+const CRITICAL_LOAD = 80
+const MAX_ROCKER_ANGLE = 30
+const ROCKER_MITIGATION_CAP = 0.25
 
 type HeelCalcPageProps = {
   onBack: () => void
@@ -31,7 +31,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [heelHeight, setHeelHeight] = useState(75)     
   const [toeThickness, setToeThickness] = useState(15) 
   const [rockerAngle, setRockerAngle] = useState(12)   
-  const [rockerStartPct, setRockerStartPct] = useState(65) // Сдвинул дефолт на 65% (анатомический стандарт)
+  const [rockerStartPct, setRockerStartPct] = useState(65)
   
   const [soleType, setSoleType] = useState<'flat' | 'rocker'>('rocker')
   const [heelType, setHeelType] = useState<'stiletto' | 'block' | 'kitten'>('stiletto')
@@ -71,7 +71,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       warn1Desc: `Угол больше ${COMFORT_ANGLE}°. Рекомендуется компенсация.`,
       warn2Desc: 'Чрезмерный рокер при низком каблуке.',
       errTitle: '⚠️ КРИТИЧЕСКИЙ НАКЛОН',
-      errDesc: `Угол колодки > ${CRITICAL_ANGLE}°. Требуется утолщение платформы.`,
+      errDesc: `Угол колодки > ${CRITICAL_ANGLE}°. Требуется утолщение платформы или снижение каблука.`,
       negDropTitle: '⚠️ ОБРАТНЫЙ УКЛОН',
       negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
       heelLbl: 'ПЯТКА',
@@ -100,7 +100,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       warn1Desc: `Кут більше ${COMFORT_ANGLE}°. Рекомендована компенсація.`,
       warn2Desc: 'Надмірний рокер при низькому підборі.',
       errTitle: '⚠️ КРИТИЧНИЙ НАХИЛ',
-      errDesc: `Кут колодки > ${CRITICAL_ANGLE}°. Потрібне потовщення платформи.`,
+      errDesc: `Кут колодки > ${CRITICAL_ANGLE}°. Потрібне потовщення платформи або зниження підбора.`,
       negDropTitle: '⚠️ ЗВОРОТНІЙ УХИЛ',
       negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
       heelLbl: 'П\'ЯТКА',
@@ -183,19 +183,36 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     return { status, title, message, colors, boxColors }
   }, [engineeringData, rockerAngle, soleType, heelHeight, t])
 
-  // --- 4. Auto-Fix ---
+  // --- 4. УМНЫЙ Auto-Fix (Двусторонняя корректировка) ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
     if (soleType === 'flat') setSoleType('rocker')
 
     const targetAngleRad = (SAFE_ANGLE * Math.PI) / 180
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
+    
+    // Идеальная толщина платформы для текущего каблука
     const neededPlatform = Math.max(0, Math.round(heelHeight - maxSafeNetRise))
     
-    const safePlatform = Math.max(0, Math.min(MAX_TOE, heelHeight + 10, neededPlatform))
-    setToeThickness(safePlatform)
+    let finalPlatform = toeThickness;
+    let finalHeel = heelHeight;
+
+    if (neededPlatform <= MAX_TOE) {
+      // 1. Если хватает разрешенной толщины платформы — просто поднимаем её
+      finalPlatform = neededPlatform;
+    } else {
+      // 2. Если уперлись в лимит платформы (MAX_TOE)
+      // Выкручиваем платформу на максимум
+      finalPlatform = MAX_TOE;
+      // И ПРИНУДИТЕЛЬНО СНИЖАЕМ КАБЛУК, чтобы достичь баланса
+      finalHeel = Math.round(MAX_TOE + maxSafeNetRise);
+      setHeelHeight(finalHeel);
+    }
+
+    setToeThickness(finalPlatform)
     
-    const newNetRise = heelHeight - safePlatform
+    // Пересчет рокера под новые, сбалансированные параметры
+    const newNetRise = finalHeel - finalPlatform
     const newSlope = Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
     const idealRocker = Math.round(newSlope * 0.8)
     setRockerAngle(Math.max(5, Math.min(20, idealRocker)))
@@ -209,23 +226,18 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const svgHeight = 180 
     const padding = 45 
 
-    // Координаты по оси X
     const xHeel = padding
     const xBall = padding + (totalLength * (rockerStartPct / 100)) * scale 
     const xToe = padding + (totalLength * scale)
     
-    // Координаты по оси Y (Земля)
     const yGround = 150 
 
-    // Расчеты высот с учетом масштаба
     const hScaled = heelHeight * scale
     const tScaled = toeThickness * scale
     
-    // 1. Верхняя линия (Стелька / Footbed)
     const yFootHeel = yGround - hScaled
     const yFootBall = yGround - tScaled
     
-    // Расчет подъема носка (Toe Spring)
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 2 
     const rockerZoneLength = xToe - xBall
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
@@ -234,11 +246,9 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const toeLiftScaled = Math.min(MAX_LIFT * scale, toeLiftRaw)
     const yFootToe = yFootBall - toeLiftScaled
 
-    // 2. Построение профиля подошвы (Sole Path)
     const controlX1 = xHeel + (xBall - xHeel) * 0.4
     const controlX2 = xHeel + (xBall - xHeel) * 0.7
 
-    // Верхняя кромка (Стелька)
     const topPath = `
       M ${xHeel - 5} ${yFootHeel - 5} 
       L ${xHeel} ${yFootHeel} 
@@ -246,7 +256,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       Q ${xBall + rockerZoneLength * 0.5} ${yFootBall}, ${xToe} ${yFootToe}
     `
 
-    // Нижняя кромка (Подметка)
     const platformBase = tScaled > 0 ? tScaled : 4 
     const yBottomBall = yGround
     const yBottomToe = soleType === 'rocker' ? yFootToe + platformBase : yGround - 2
@@ -259,10 +268,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     `
     const solePath = topPath + bottomPath
 
-    // 3. Построение каблука (Heel Path) - Изменено под логику Рокера
     const heelW = 20 * scale 
     const getHeelPath = () => {
-      // Если рокерная подошва, то рисуем монолитный клин (танкетку), заполняющий геленок
       if (soleType === 'rocker') {
         return `
           M ${xHeel} ${yGround - hScaled + platformBase - 0.5}
@@ -273,7 +280,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
         `
       }
 
-      // Для стандарта - рисуем классические каблуки
       switch (heelType) {
         case 'stiletto': 
           return `M ${xHeel + 2} ${yGround - hScaled + platformBase - 1} 
@@ -294,7 +300,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       }
     }
 
-    // 4. Металлический геленок (Shank)
     const shankLenScaled = engineeringData.shankLength * scale
     const shankCurve = `
       M ${xHeel + 5} ${yFootHeel + 2}
@@ -402,7 +407,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
           <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
             {(['stiletto', 'block', 'kitten'] as const).map(type => {
-              const isRocker = soleType === 'rocker' // <-- Логика блокировки
+              const isRocker = soleType === 'rocker'
               return (
                 <button 
                   key={type} 
@@ -410,7 +415,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   onClick={() => { triggerHaptic('light'); setHeelType(type) }} 
                   className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-all duration-300
                     ${isRocker 
-                      ? 'opacity-30 cursor-not-allowed text-[#A3988E]' // Затенение при Рокере
+                      ? 'opacity-30 cursor-not-allowed text-[#A3988E]' 
                       : heelType === type 
                         ? 'bg-[#8B5CF6] text-white shadow-md' 
                         : 'text-[#A3988E] bg-transparent hover:bg-white/5'}`}
