@@ -71,4 +71,4 @@ export function getColorFromSpectrumText(text: string) {
     rgb,
     hex: rgbToHex(rgb),
   };
-  }
+}
