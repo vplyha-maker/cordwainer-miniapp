@@ -137,7 +137,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <select
                     value={paint.pigmentId}
                     onChange={(e) => updatePaint(paint.id, 'pigmentId', e.target.value)}
-                    className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D8A35C]"
+                    className="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D8A35C]"
                   >
                     {pigments.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -149,20 +149,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <input
                     type="number"
                     min="0"
+                    max="5000"
                     step="0.1"
                     value={paint.amount || ''}
-                    onChange={(e) =>
-                      updatePaint(paint.id, 'amount', parseFloat(e.target.value) || 0)
-                    }
-                    className="w-20 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:border-[#D8A35C]"
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0
+                      updatePaint(paint.id, 'amount', Math.min(Math.max(val, 0), 5000))
+                    }}
+                    className="w-20 flex-shrink-0 bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#D8A35C]"
                     placeholder="0"
                   />
 
-                  <span className="text-xs opacity-50 w-6">мл</span>
+                  <span className="text-xs opacity-50 flex-shrink-0">мл</span>
 
                   <button
                     onClick={() => removePaint(paint.id)}
-                    className="p-2 text-red-500 opacity-70 hover:opacity-100"
+                    className="p-2 text-red-500 opacity-70 hover:opacity-100 flex-shrink-0"
                     disabled={paints.length <= 1}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -200,7 +202,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               {lang === 'uk' ? 'Загальний об’єм:' : 'Общий объем:'}
             </span>
             <span className="text-2xl font-bold">
-              {totalAmount.toFixed(1)} мл
+              {totalAmount > 1000
+                ? (totalAmount / 1000).toFixed(2) + ' л'
+                : totalAmount.toFixed(1) + ' мл'}
             </span>
           </div>
 
@@ -215,7 +219,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
               return (
                 <div key={paint.id} className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-2 truncate pr-4">
+                  <div className="flex items-center gap-2 truncate pr-4 min-w-0">
                     <div
                       className="w-3 h-3 rounded-full border border-white/30 flex-shrink-0"
                       style={{ backgroundColor: pigment?.hex || '#666' }}
@@ -224,7 +228,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       {getPigmentName(paint.pigmentId)}
                     </span>
                   </div>
-                  <span className="font-mono text-[#D8A35C]">{percentage}%</span>
+                  <span className="font-mono text-[#D8A35C] flex-shrink-0">{percentage}%</span>
                 </div>
               )
             })}
