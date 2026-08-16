@@ -77,7 +77,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
   const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-  // P = 50 + ((H − T) / L_eff) × 100
   let loadCalc = 50 + (netRise / Math.max(lEff, 1)) * 100
   if (soleType === 'rocker') {
     const factor =
@@ -101,7 +100,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const heelOffsetTooFarForward =
     soleType === 'flat' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
 
-  // Риск инверсии
   let inversionRisk = 0
   if (soleType === 'flat' && netRise > 0) {
     const minSafeTip =
@@ -160,8 +158,13 @@ export function computeAudit(
   const C = HEEL_CONST
   const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
+  // Критично: завал назад → перелом супинатора
   if (eng.heelOffsetTooFarBack) {
     return { status: 'ERROR', titleKey: 'heelBackTitle', messageKey: 'heelBackDesc' }
+  }
+  // Предупреждение: смещение вперёд > 5 мм
+  if (eng.heelOffsetTooFarForward) {
+    return { status: 'WARNING', titleKey: 'heelFwdTitle', messageKey: 'heelFwdDesc' }
   }
   if (eng.internalSlope < 0) {
     return { status: 'WARNING', titleKey: 'negDropTitle', messageKey: 'negDropDesc' }
@@ -211,6 +214,7 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
   }
 
   if (eng.heelOffsetTooFarBack) heelTipOffsetMm = 0
+  if (eng.heelOffsetTooFarForward) heelTipOffsetMm = C.MAX_HEEL_OFFSET_MM
   if (eng.highInversionRisk) {
     tipWidthMm = Math.max(tipWidthMm, defaultTipWidth(input.heelType) + 4)
   }
