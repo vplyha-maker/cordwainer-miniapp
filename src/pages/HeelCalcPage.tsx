@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
 type HeelCalcPageProps = {
@@ -14,6 +14,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [toeThickness, setToeThickness] = useState(12) 
   const [rockerAngle, setRockerAngle] = useState(22)   
   const [rockerStartPct, setRockerStartPct] = useState(63) 
+  const [showFormulas, setShowFormulas] = useState(false) // Стейт для вкладки формул
 
   // Haptic Feedback
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
@@ -47,7 +48,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       errTitle: '❌ БЛОКИРОВКА',
       errDesc: 'Критическая диспропорция! Пациент будет соскальзывать.',
       heelLbl: 'ПЯТКА',
-      toeLbl: 'НОСОК'
+      toeLbl: 'НОСОК',
+      formulaBtn: 'ℹ️ Как это считается?',
+      formulaTitle: 'Математика комфорта',
+      formulaText: 'Внутренний угол наклона (α) рассчитывается через арксинус разницы высот пятки (H) и носка (T), деленной на эффективную длину колодки (L × 0.73). Рокер компенсирует этот угол для плавного переката.',
+      formulaMath: 'α = arcsin((H - T) / (L * 0.73))'
     },
     uk: {
       title: 'Біомеханіка та Підбор',
@@ -70,7 +75,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       errTitle: '❌ БЛОКУВАННЯ',
       errDesc: 'Критична диспропорція! Пацієнт буде зісковзувати.',
       heelLbl: 'П\'ЯТКА',
-      toeLbl: 'НОСОК'
+      toeLbl: 'НОСОК',
+      formulaBtn: 'ℹ️ Як це рахується?',
+      formulaTitle: 'Математика комфорту',
+      formulaText: 'Внутрішній кут нахилу (α) розраховується через арксинус різниці висот підбора (H) та носка (T), поділеної на ефективну довжину колодки (L × 0.73). Рокер компенсує цей кут для плавного перекату.',
+      formulaMath: 'α = arcsin((H - T) / (L * 0.73))'
     },
   }[lang]
 
@@ -101,13 +110,13 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     setRockerAngle(idealRocker)
   }
 
-  // --- 5. Геометрия (Плавная анатомическая форма + отступы под текст) ---
+  // --- 5. Геометрия ---
   const geometry = useMemo(() => {
     const totalLength = shoeSize * 6.67 + 12
     const scale = 1.05
     const svgWidth = totalLength * scale
     const svgHeight = 180
-    const padding = 35 // Увеличен отступ для текста
+    const padding = 35 
 
     const xHeel = padding
     const xRockerStart = padding + totalLength * (rockerStartPct / 100) * scale
@@ -191,7 +200,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     return { status, title, message, colorClasses, internalSlope: internalSlopeAngle.toFixed(1) }
   }, [shoeSize, heelHeight, rockerAngle, toeThickness, t])
 
-  // --- 7. Крупный UI Компонент Степпера (Большие кнопки) ---
+  // --- 7. Крупный UI Компонент Степпера ---
   const Stepper = ({ label, value, min, max, onChange, unit = '' }: any) => {
     const handleAdd = () => { if (value < max) { triggerHaptic('light'); onChange(value + 1) } }
     const handleSub = () => { if (value > min) { triggerHaptic('light'); onChange(value - 1) } }
@@ -297,7 +306,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
         </div>
 
-        {/* Сетка контролов (Компактная, 2 колонки) */}
+        {/* Сетка контролов */}
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Stepper label={t.size} min={35} max={48} value={shoeSize} onChange={setShoeSize} unit="" />
@@ -308,6 +317,43 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           <Stepper label={t.start} min={55} max={75} value={rockerStartPct} onChange={setRockerStartPct} unit="%" />
         </div>
         
+        {/* Вкладка: Как это считается? */}
+        <div className="pt-2">
+          <button 
+            onClick={() => { triggerHaptic('light'); setShowFormulas(!showFormulas) }}
+            className="w-full py-3.5 px-4 bg-[#1C1816] rounded-[14px] text-[13px] font-medium flex items-center justify-between border border-white/5 active:bg-white/5 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-[#A3988E]">
+              {t.formulaBtn}
+            </span>
+            <svg 
+              className={`w-4 h-4 text-[#A3988E] transition-transform duration-300 ${showFormulas ? 'rotate-180' : ''}`} 
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <AnimatePresence>
+            {showFormulas && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0, marginTop: 0 }} 
+                animate={{ height: 'auto', opacity: 1, marginTop: 8 }} 
+                exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-[#1C1816] p-4 rounded-[14px] border border-white/5 text-[12px] leading-relaxed text-[#A3988E]">
+                  <h4 className="text-[#F3EFEA] font-bold mb-2 text-[13px]">{t.formulaTitle}</h4>
+                  <p>{t.formulaText}</p>
+                  <div className="mt-3 pt-3 border-t border-white/5 font-mono text-[12px] text-[#8B5CF6] text-center tracking-wider bg-black/20 p-2 rounded-lg">
+                    {t.formulaMath}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
       </div>
     </motion.div>
   )
