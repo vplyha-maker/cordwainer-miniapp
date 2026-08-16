@@ -5,20 +5,20 @@
  */
 
 export interface SpectrumPoint {
-  wavelength: number; // нм
-  reflectance: number; // 0–100
+  wavelength: number // нм
+  reflectance: number // 0–100
 }
 
 export interface RGB {
-  r: number; // 0–255
-  g: number;
-  b: number;
+  r: number // 0–255
+  g: number
+  b: number
 }
 
 export interface XYZ {
-  x: number;
-  y: number;
-  z: number;
+  x: number
+  y: number
+  z: number
 }
 
 // CIE 1931 2° Color Matching Functions (каждые 5 нм, 380–780)
@@ -104,7 +104,7 @@ const CIE_CMF = [
   { wl: 770, x: 0.000083, y: 0.000030, z: 0.000000 },
   { wl: 775, x: 0.000059, y: 0.000021, z: 0.000000 },
   { wl: 780, x: 0.000042, y: 0.000015, z: 0.000000 },
-];
+]
 
 // Illuminant D65 (каждые 5 нм)
 const D65 = [
@@ -117,162 +117,143 @@ const D65 = [
   80.0268, 80.1207, 80.2146, 81.2462, 82.2778, 80.281, 78.2842, 74.0027, 69.7213,
   70.6652, 71.6091, 72.979, 74.349, 67.9767, 61.6043, 65.7448, 69.8856, 72.486,
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
-];
+]
 
-/**
- * Парсит текст файла спектра
- */
 export function parseSpectrum(text: string): SpectrumPoint[] {
-  const lines = text.trim().split(/\r?\n/);
-  const points: SpectrumPoint[] = [];
+  const lines = text.trim().split(/\r?\n/)
+  const points: SpectrumPoint[] = []
 
   for (const line of lines) {
-    const parts = line.trim().split(/[\s,;]+/);
-    if (parts.length < 2) continue;
+    const parts = line.trim().split(/[\s,;]+/)
+    if (parts.length < 2) continue
 
-    const wl = parseFloat(parts[0]);
-    const refl = parseFloat(parts[1]);
+    const wl = parseFloat(parts[0])
+    const refl = parseFloat(parts[1])
 
     if (!isNaN(wl) && !isNaN(refl)) {
-      points.push({ wavelength: wl, reflectance: refl });
+      points.push({ wavelength: wl, reflectance: refl })
     }
   }
 
-  points.sort((a, b) => a.wavelength - b.wavelength);
-  return points;
+  points.sort((a, b) => a.wavelength - b.wavelength)
+  return points
 }
 
-/**
- * Линейная интерполяция reflectance на нужной длине волны
- */
 function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): number {
-  if (spectrum.length === 0) return 0;
-  if (wavelength <= spectrum[0].wavelength) return spectrum[0].reflectance;
+  if (spectrum.length === 0) return 0
+  if (wavelength <= spectrum[0].wavelength) return spectrum[0].reflectance
   if (wavelength >= spectrum[spectrum.length - 1].wavelength) {
-    return spectrum[spectrum.length - 1].reflectance;
+    return spectrum[spectrum.length - 1].reflectance
   }
 
-  let low = 0;
-  let high = spectrum.length - 1;
+  let low = 0
+  let high = spectrum.length - 1
 
   while (high - low > 1) {
-    const mid = Math.floor((low + high) / 2);
-    if (spectrum[mid].wavelength < wavelength) low = mid;
-    else high = mid;
+    const mid = Math.floor((low + high) / 2)
+    if (spectrum[mid].wavelength < wavelength) low = mid
+    else high = mid
   }
 
-  const p1 = spectrum[low];
-  const p2 = spectrum[high];
-  const t = (wavelength - p1.wavelength) / (p2.wavelength - p1.wavelength);
-  return p1.reflectance + t * (p2.reflectance - p1.reflectance);
+  const p1 = spectrum[low]
+  const p2 = spectrum[high]
+  const t = (wavelength - p1.wavelength) / (p2.wavelength - p1.wavelength)
+  return p1.reflectance + t * (p2.reflectance - p1.reflectance)
 }
 
-/**
- * Spectrum → CIE XYZ
- */
 export function spectrumToXYZ(spectrum: SpectrumPoint[]): XYZ {
-  let X = 0;
-  let Y = 0;
-  let Z = 0;
-  let N = 0;
+  let X = 0
+  let Y = 0
+  let Z = 0
+  let N = 0
 
-  const step = 5;
+  const step = 5
 
   for (let i = 0; i < CIE_CMF.length; i++) {
-    const wl = CIE_CMF[i].wl;
-    const refl = interpolateReflectance(spectrum, wl) / 100; // 0–1
+    const wl = CIE_CMF[i].wl
+    const refl = interpolateReflectance(spectrum, wl) / 100
 
-    const S = D65[i];
-    const xBar = CIE_CMF[i].x;
-    const yBar = CIE_CMF[i].y;
-    const zBar = CIE_CMF[i].z;
+    const S = D65[i]
+    const xBar = CIE_CMF[i].x
+    const yBar = CIE_CMF[i].y
+    const zBar = CIE_CMF[i].z
 
-    X += S * refl * xBar * step;
-    Y += S * refl * yBar * step;
-    Z += S * refl * zBar * step;
-    N += S * yBar * step;
+    X += S * refl * xBar * step
+    Y += S * refl * yBar * step
+    Z += S * refl * zBar * step
+    N += S * yBar * step
   }
 
-  const k = 100 / N;
+  const k = 100 / N
 
   return {
     x: X * k,
     y: Y * k,
     z: Z * k,
-  };
+  }
 }
 
-/**
- * XYZ → linear sRGB
- */
 function xyzToLinearRGB(xyz: XYZ) {
-  const r =  3.2404542 * xyz.x - 1.5371385 * xyz.y - 0.4985314 * xyz.z;
-  const g = -0.9692660 * xyz.x + 1.8760108 * xyz.y + 0.0415560 * xyz.z;
-  const b =  0.0556434 * xyz.x - 0.2040259 * xyz.y + 1.0572252 * xyz.z;
+  const r = 3.2404542 * xyz.x - 1.5371385 * xyz.y - 0.4985314 * xyz.z
+  const g = -0.9692660 * xyz.x + 1.8760108 * xyz.y + 0.0415560 * xyz.z
+  const b = 0.0556434 * xyz.x - 0.2040259 * xyz.y + 1.0572252 * xyz.z
 
-  return { r: r / 100, g: g / 100, b: b / 100 };
+  return { r: r / 100, g: g / 100, b: b / 100 }
 }
 
-/**
- * Линейный RGB → gamma-corrected sRGB (0–255)
- */
 function linearToSrgb(c: number): number {
-  const clipped = Math.max(0, Math.min(1, c));
+  const clipped = Math.max(0, Math.min(1, c))
   const encoded =
     clipped <= 0.0031308
       ? 12.92 * clipped
-      : 1.055 * Math.pow(clipped, 1 / 2.4) - 0.055;
-  return Math.round(encoded * 255);
+      : 1.055 * Math.pow(clipped, 1 / 2.4) - 0.055
+  return Math.round(encoded * 255)
 }
 
-/**
- * Главная функция: Spectrum → RGB
- */
 export function spectrumToRGB(spectrum: SpectrumPoint[]): RGB {
-  const xyz = spectrumToXYZ(spectrum);
-  const linear = xyzToLinearRGB(xyz);
+  const xyz = spectrumToXYZ(spectrum)
+  const linear = xyzToLinearRGB(xyz)
 
   return {
     r: linearToSrgb(linear.r),
     g: linearToSrgb(linear.g),
     b: linearToSrgb(linear.b),
-  };
+  }
 }
 
-/**
- * RGB → HEX
- */
 export function rgbToHex(rgb: RGB): string {
-  const toHex = (n: number) => n.toString(16).padStart(2, '0');
-  return `#\( {toHex(rgb.r)} \){toHex(rgb.g)}${toHex(rgb.b)}`;
+  const toHex = (n: number): string => {
+    const value = Math.max(0, Math.min(255, Math.round(n)))
+    const hex = value.toString(16)
+    return hex.length === 1 ? '0' + hex : hex
+  }
+
+  return '#' + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b)
 }
 
-/**
- * Простое смешивание спектров по объёму (линейное)
- */
 export function mixSpectra(
   components: { spectrum: SpectrumPoint[]; volume: number }[]
 ): SpectrumPoint[] {
-  const totalVolume = components.reduce((sum, c) => sum + c.volume, 0);
-  if (totalVolume <= 0) return [];
+  const totalVolume = components.reduce((sum, c) => sum + c.volume, 0)
+  if (totalVolume <= 0) return []
 
-  const base = components[0].spectrum;
-  const result: SpectrumPoint[] = [];
+  const base = components[0].spectrum
+  const result: SpectrumPoint[] = []
 
   for (const point of base) {
-    let mixedRefl = 0;
+    let mixedRefl = 0
 
     for (const comp of components) {
-      const weight = comp.volume / totalVolume;
-      const refl = interpolateReflectance(comp.spectrum, point.wavelength);
-      mixedRefl += weight * refl;
+      const weight = comp.volume / totalVolume
+      const refl = interpolateReflectance(comp.spectrum, point.wavelength)
+      mixedRefl += weight * refl
     }
 
     result.push({
       wavelength: point.wavelength,
       reflectance: mixedRefl,
-    });
+    })
   }
 
-  return result;
+  return result
 }
