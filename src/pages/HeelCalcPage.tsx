@@ -186,7 +186,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   // --- 4. УМНЫЙ Auto-Fix ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
-    if (soleType === 'flat') setSoleType('rocker')
 
     const targetAngleRad = (SAFE_ANGLE * Math.PI) / 180
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
@@ -206,10 +205,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
     setToeThickness(finalPlatform)
     
-    const newNetRise = finalHeel - finalPlatform
-    const newSlope = Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
-    const idealRocker = Math.round(newSlope * 0.8)
-    setRockerAngle(Math.max(5, Math.min(20, idealRocker)))
+    if (soleType === 'rocker') {
+      const newNetRise = finalHeel - finalPlatform
+      const newSlope = Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
+      const idealRocker = Math.round(newSlope * 0.8)
+      setRockerAngle(Math.max(5, Math.min(20, idealRocker)))
+    }
   }
 
   // --- 5. Глубокая Математика SVG Геометрии ---
