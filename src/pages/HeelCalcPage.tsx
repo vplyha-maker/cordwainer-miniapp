@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
-// --- КОНСТАНТЫ И КОЭФФИЦИЕНТЫ ---
+// --- КОНСТАНТЫ ---
 const STEP_TO_MM = 6.67
 const FUNCTIONAL_ALLOWANCE = 12
 const L_EFF_RATIO = 0.73
@@ -16,13 +16,11 @@ const SAFE_ANGLE = 14.5
 const CRITICAL_LOAD = 80
 const MAX_ROCKER_ANGLE = 30
 const ROCKER_MITIGATION_CAP = 0.25
-/** Линия центра тяжести (Heel Center Line): 15% длины стельки */
-const HEEL_CENTER_RATIO = 0.15
-/** Допустимое смещение набойки вперёд, мм */
-const MAX_HEEL_OFFSET_MM = 5
+const HEEL_CENTER_RATIO = 0.15   // 15% длины стельки — центр пятки
+const MAX_HEEL_OFFSET_MM = 5     // допустимо смещение набойки вперёд ≤ 5 мм
 
 type SoleType = 'flat' | 'rocker'
-type HeelType = 'stiletto' | 'block' | 'kitten'
+type HeelType = 'stiletto' | 'block' | 'kitten' | 'flared'
 
 type HeelCalcPageProps = {
   onBack: () => void
@@ -38,14 +36,26 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
   const [soleType, setSoleType] = useState<SoleType>('flat')
   const [heelType, setHeelType] = useState<HeelType>('stiletto')
+  /** Смещение центра набойки от Heel Center Line, мм (+ вперёд, − назад) */
+  const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
+  /** Ширина набойки (подошва каблука), мм — для flared / block */
+  const [tipWidthMm, setTipWidthMm] = useState(12)
   const [showSpecs, setShowSpecs] = useState(false)
 
-  // Защита: платформа не может быть абсурдно выше каблука
   useEffect(() => {
     if (toeThickness > heelHeight + 10) {
       setToeThickness(heelHeight + 10)
     }
   }, [heelHeight, toeThickness])
+
+  // Дефолты ширины набойки при смене типа каблука
+  useEffect(() => {
+    if (soleType !== 'flat') return
+    if (heelType === 'stiletto') setTipWidthMm(8)
+    else if (heelType === 'kitten') setTipWidthMm(14)
+    else if (heelType === 'block') setTipWidthMm(28)
+    else if (heelType === 'flared') setTipWidthMm(22)
+  }, [heelType, soleType])
 
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
     try {
@@ -65,6 +75,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       angle: 'Угол',
       start: 'Перекат',
       fixBtn: 'Баланс',
+      offset: 'Смещение',
+      tipW: 'Набойка',
       internalSlope: 'Наклон колодки:',
       loadLbl: 'Нагрузка на плюсну:',
       successTitle: '✅ БАЛАНС В НОРМЕ',
@@ -80,16 +92,25 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       negDropTitle: '⚠️ ОБРАТНЫЙ УКЛОН',
       negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
       heelBackTitle: '⚠️ КАБЛУК ЗАВАЛЕН НАЗАД',
-      heelBackDesc: 'Ошибка: каблук завален назад — риск перелома супинатора под весом пациента.',
+      heelBackDesc:
+        'Ошибка: Каблук завален назад, произойдет перелом супинатора под весом пациента.',
+      invertTitle: '⚠️ РИСК ИНВЕРСИИ',
+      invertDesc: 'Набойка слишком узкая при высоком каблуке — высокий риск подворачивания лодыжки.',
       heelLbl: 'ПЯТКА',
       toeLbl: 'НОСОК',
       stiletto: 'Шпилька',
       block: 'Блок',
       kitten: 'Рюмочка',
+      flared: 'Трапеция',
       flat: 'Стандарт',
       rocker: 'Рокер',
       specsBtn: '⚙️ Спецификация и Математика',
       dropLbl: 'Перепад',
+      massTitle: 'Распределение массы',
+      forefoot: 'Носок',
+      rearfoot: 'Пятка',
+      invertRisk: 'Риск инверсии',
+      entryAngle: 'Угол въезда',
       formulaStandard: 'P = 50 + ((H − T) / L_eff) × 100',
       formulaRocker: 'P_rocker = P × (1 − 0.25 × rockerFactor)',
     },
@@ -102,6 +123,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       angle: 'Кут',
       start: 'Перекат',
       fixBtn: 'Баланс',
+      offset: 'Зміщення',
+      tipW: 'Набійка',
       internalSlope: 'Нахил колодки:',
       loadLbl: 'Навантаження на плюсну:',
       successTitle: '✅ БАЛАНС У НОРМІ',
@@ -117,22 +140,31 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       negDropTitle: '⚠️ ЗВОРОТНІЙ УХИЛ',
       negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
       heelBackTitle: '⚠️ ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
-      heelBackDesc: 'Помилка: підбор завалений назад — ризик перелому супінатора під вагою пацієнта.',
+      heelBackDesc:
+        'Помилка: Підбор завалений назад, відбудеться перелом супінатора під вагою пацієнта.',
+      invertTitle: '⚠️ РИЗИК ІНВЕРСІЇ',
+      invertDesc: 'Набійка занадто вузька при високому підборі — високий ризик підвертання щиколотки.',
       heelLbl: "П'ЯТКА",
       toeLbl: 'НОСОК',
       stiletto: 'Шпилька',
       block: 'Блок',
       kitten: 'Чарочка',
+      flared: 'Трапеція',
       flat: 'Стандарт',
       rocker: 'Рокер',
       specsBtn: '⚙️ Специфікація та Математика',
       dropLbl: 'Перепад',
+      massTitle: 'Розподіл маси',
+      forefoot: 'Носок',
+      rearfoot: "П'ятка",
+      invertRisk: 'Ризик інверсії',
+      entryAngle: 'Кут вʼїзду',
       formulaStandard: 'P = 50 + ((H − T) / L_eff) × 100',
       formulaRocker: 'P_rocker = P × (1 − 0.25 × rockerFactor)',
     },
   }[lang]
 
-  // --- 2. Инженерные вычисления (раздельно: standard / rocker) ---
+  // --- Инженерия ---
   const engineeringData = useMemo(() => {
     const lastLengthMm = shoeSize * STEP_TO_MM + FUNCTIONAL_ALLOWANCE
     const lEff = lastLengthMm * L_EFF_RATIO
@@ -141,59 +173,81 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-    // Главная формула аудита шпилек:
-    // P_forefoot = 50 + ((H_heel - T_toe) / L_eff) * 100
+    // P = 50 + ((H - T) / L_eff) * 100
     let loadCalc = 50 + (netRise / Math.max(lEff, 1)) * 100
-
-    // Mitigation только для рокерной подошвы
     if (soleType === 'rocker') {
       const rockerEffectFactor =
         Math.min(1, rockerAngle / MAX_ROCKER_ANGLE) *
         (1 - (rockerStartPct - 55) / 40)
-      loadCalc = loadCalc * (1 - ROCKER_MITIGATION_CAP * Math.max(0, rockerEffectFactor))
+      loadCalc *= 1 - ROCKER_MITIGATION_CAP * Math.max(0, rockerEffectFactor)
     }
-
     const forefootLoad = Math.min(100, Math.max(0, Math.round(loadCalc)))
+    const heelLoad = 100 - forefootLoad
 
     const shankLength = Math.round(lastLengthMm * SHANK_PROPORTION + SHANK_OFFSET)
-
     let steelThickness = 1.2
     if (netRise > 40 && netRise <= 70) steelThickness = 1.5
     else if (netRise > 70) steelThickness = 2.0
 
-    const heelCenterXRatio = HEEL_CENTER_RATIO
+    // --- Стандарт: смещение набойки ---
+    const heelOffsetTooFarBack = soleType === 'flat' && heelTipOffsetMm < -0.5
+    const heelOffsetTooFarForward =
+      soleType === 'flat' && heelTipOffsetMm > MAX_HEEL_OFFSET_MM
 
-    let estimatedHeelTipOffsetMm = 0
-    if (soleType === 'flat') {
-      if (heelType === 'stiletto') {
-        estimatedHeelTipOffsetMm = netRise > 60 ? -2 : 0
-      } else if (heelType === 'kitten') {
-        estimatedHeelTipOffsetMm = 1
-      } else {
-        estimatedHeelTipOffsetMm = 3
-      }
+    // --- Коэффициент риска инверсии (подворачивание) ---
+    // Чем выше каблук и уже набойка — тем выше риск.
+    // База: для шпильки 8 мм при 90 мм ≈ высокий риск.
+    let inversionRisk = 0
+    if (soleType === 'flat' && netRise > 0) {
+      const minSafeTip =
+        heelType === 'stiletto' ? 10 + netRise * 0.08 :
+        heelType === 'kitten' ? 12 + netRise * 0.06 :
+        heelType === 'flared' ? 16 + netRise * 0.05 :
+        20 + netRise * 0.04 // block
+      const ratio = tipWidthMm / Math.max(minSafeTip, 1)
+      inversionRisk = Math.min(100, Math.max(0, Math.round((1 - ratio) * 100 + (netRise > 70 ? 15 : 0))))
+      if (ratio >= 1) inversionRisk = Math.min(inversionRisk, 25)
     }
 
-    const heelOffsetTooFarBack = estimatedHeelTipOffsetMm < -0.5
-    const heelOffsetTooFarForward = estimatedHeelTipOffsetMm > MAX_HEEL_OFFSET_MM
+    // --- Угол въезда пяточной закругленности (kitten / flared) ---
+    // Упрощённо: чем выше и уже — тем острее «вход» в контакт.
+    let entryAngleDeg = 0
+    if (soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')) {
+      const tipHalf = tipWidthMm / 2
+      entryAngleDeg = Math.atan2(netRise, Math.max(tipHalf, 1)) * (180 / Math.PI)
+      entryAngleDeg = parseFloat(entryAngleDeg.toFixed(1))
+    }
 
     return {
       lastLengthMm,
       internalSlope,
       forefootLoad,
+      heelLoad,
       shankLength,
       steelThickness,
       netRise,
       lEff,
-      heelCenterXRatio,
-      estimatedHeelTipOffsetMm,
+      heelCenterXRatio: HEEL_CENTER_RATIO,
       heelOffsetTooFarBack,
       heelOffsetTooFarForward,
       requiresMetatarsalPad: forefootLoad > CRITICAL_LOAD,
+      inversionRisk,
+      entryAngleDeg,
+      highInversionRisk: inversionRisk >= 55,
     }
-  }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct, soleType, heelType])
+  }, [
+    shoeSize,
+    heelHeight,
+    toeThickness,
+    rockerAngle,
+    rockerStartPct,
+    soleType,
+    heelType,
+    heelTipOffsetMm,
+    tipWidthMm,
+  ])
 
-  // --- 3. Аудит и баланс ---
+  // --- Аудит ---
   const balanceAudit = useMemo(() => {
     let status: 'SUCCESS' | 'WARNING' | 'ERROR' = 'SUCCESS'
     let title = t.successTitle
@@ -219,6 +273,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       status = 'ERROR'
       title = t.padTitle
       message = t.padDesc
+      colors = 'border-red-500/30 bg-red-500/20 text-red-400'
+      boxColors = 'border-red-500/40 bg-red-950/20'
+    } else if (engineeringData.highInversionRisk) {
+      status = 'ERROR'
+      title = t.invertTitle
+      message = t.invertDesc
       colors = 'border-red-500/30 bg-red-500/20 text-red-400'
       boxColors = 'border-red-500/40 bg-red-950/20'
     } else if (
@@ -247,13 +307,10 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     return { status, title, message, colors, boxColors }
   }, [engineeringData, rockerAngle, soleType, heelHeight, t])
 
-  // --- 4. Умный Auto-Fix ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
-
     const targetAngleRad = (SAFE_ANGLE * Math.PI) / 180
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
-
     const neededPlatform = Math.max(0, Math.round(heelHeight - maxSafeNetRise))
 
     let finalPlatform = toeThickness
@@ -266,53 +323,60 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       finalHeel = Math.round(MAX_TOE + maxSafeNetRise)
       setHeelHeight(finalHeel)
     }
-
     setToeThickness(finalPlatform)
+
+    // Если завал назад — вернуть набойку на ось
+    if (engineeringData.heelOffsetTooFarBack) {
+      setHeelTipOffsetMm(0)
+    }
+    // Если узкая набойка — расширить
+    if (engineeringData.highInversionRisk) {
+      const safe =
+        heelType === 'stiletto' ? 12 :
+        heelType === 'kitten' ? 16 :
+        heelType === 'flared' ? 20 : 28
+      setTipWidthMm(Math.max(tipWidthMm, safe))
+    }
 
     if (soleType === 'rocker') {
       const newNetRise = finalHeel - finalPlatform
       const newSlope =
         Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
-      const idealRocker = Math.round(newSlope * 0.8)
-      setRockerAngle(Math.max(5, Math.min(20, idealRocker)))
+      setRockerAngle(Math.max(5, Math.min(20, Math.round(newSlope * 0.8))))
     }
   }
-  // --- 5. SVG-геометрия + Heel Center Line ---
+
+  // --- SVG (стандарт перерисован, рокер без изменений) ---
   const geometry = useMemo(() => {
     const totalLength = shoeSize * STEP_TO_MM + FUNCTIONAL_ALLOWANCE
     const scale = 0.85
     const padding = 45
-
     const svgWidth = totalLength * scale + padding * 2
     const svgHeight = 180
 
     const xHeel = padding
     const xBall = padding + totalLength * (rockerStartPct / 100) * scale
     const xToe = padding + totalLength * scale
-
-    // Вертикаль центра пятки (15% длины стельки)
-    const xHeelCenter = padding + totalLength * engineeringData.heelCenterXRatio * scale
+    const xHeelCenter = padding + totalLength * HEEL_CENTER_RATIO * scale
+    // Смещение набойки в координатах SVG
+    const offsetPx = (soleType === 'flat' ? heelTipOffsetMm : 0) * scale
+    const xTipCenter = xHeelCenter + offsetPx
 
     const yGround = 150
-
     const hScaled = heelHeight * scale
     const tScaled = toeThickness * scale
-
     const yFootHeel = yGround - hScaled
     const yFootBall = yGround - tScaled
 
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
     const rockerZoneLength = xToe - xBall
     const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
-
     const safeSine = Math.min(1, Math.max(0, Math.sin(rockerAngleRad)))
-    const toeLiftRaw = rockerZoneLength * safeSine
-    const toeLiftScaled = Math.min(MAX_LIFT * scale, toeLiftRaw)
+    const toeLiftScaled = Math.min(MAX_LIFT * scale, rockerZoneLength * safeSine)
     const yFootToe = yFootBall - toeLiftScaled
 
     const controlX1 = xHeel + (xBall - xHeel) * 0.4
     const controlX2 = xHeel + (xBall - xHeel) * 0.7
-
     const controlY1 = yFootHeel * 0.7 + yFootBall * 0.3
     const controlY2 = yFootHeel * 0.3 + yFootBall * 0.7
 
@@ -322,14 +386,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${xBall} ${yFootBall}
       Q ${xBall + rockerZoneLength * 0.5} ${yFootBall}, ${xToe} ${yFootToe}
     `
-
     const platformBase = Math.max(tScaled, 2)
     const heelBodyThickness = Math.min(hScaled, Math.max(5 * scale, platformBase * 0.15))
     const yHeelBase = yFootHeel + heelBodyThickness
-
     const yBottomBall = yGround
     const yBottomToe = soleType === 'rocker' ? yFootToe + platformBase : yGround - 2
-
     const bottomPath = `
       L ${xToe} ${yBottomToe}
       Q ${xBall + rockerZoneLength * 0.5} ${yBottomBall}, ${xBall} ${yBottomBall}
@@ -338,8 +399,9 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     `
     const solePath = topPath + bottomPath
 
-    const heelW = 20 * scale
+    const tipW = tipWidthMm * scale
     const getHeelPath = () => {
+      // РОКЕР — без изменений
       if (soleType === 'rocker') {
         return `
           M ${xHeel} ${yHeelBase - 0.5}
@@ -350,40 +412,54 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
         `
       }
 
+      // СТАНДАРТ — каблук рисуется относительно xTipCenter (с учётом смещения)
       switch (heelType) {
-        case 'stiletto':
-          // Ось шпильки должна совпадать с Heel Center Line
-          return `M ${xHeelCenter - 4} ${yHeelBase - 1}
-                  L ${xHeelCenter - 2} ${yGround}
-                  L ${xHeelCenter + 2} ${yGround}
-                  L ${xHeelCenter + 4} ${yHeelBase - 1} Z`
-        case 'block':
-          return `M ${xHeelCenter - heelW * 0.6} ${yHeelBase - 1}
-                  L ${xHeelCenter - heelW * 0.55} ${yGround}
-                  L ${xHeelCenter + heelW * 0.7} ${yGround}
-                  L ${xHeelCenter + heelW * 0.65} ${yHeelBase - 1} Z`
-        case 'kitten':
-          return `M ${xHeelCenter - 4} ${yHeelBase - 1}
-                  Q ${xHeelCenter + 2} ${yGround - hScaled * 0.5} ${xHeelCenter} ${yGround}
-                  L ${xHeelCenter + 6} ${yGround}
-                  Q ${xHeelCenter + 8} ${yGround - hScaled * 0.5} ${xHeelCenter + 6} ${yHeelBase - 1} Z`
+        case 'stiletto': {
+          const half = Math.max(1.5, tipW / 2)
+          return `M ${xTipCenter - half - 2} ${yHeelBase - 1}
+                  L ${xTipCenter - half} ${yGround}
+                  L ${xTipCenter + half} ${yGround}
+                  L ${xTipCenter + half + 2} ${yHeelBase - 1} Z`
+        }
+        case 'block': {
+          const half = Math.max(6, tipW / 2)
+          return `M ${xTipCenter - half} ${yHeelBase - 1}
+                  L ${xTipCenter - half * 0.95} ${yGround}
+                  L ${xTipCenter + half * 0.95} ${yGround}
+                  L ${xTipCenter + half} ${yHeelBase - 1} Z`
+        }
+        case 'kitten': {
+          // Рюмочка: сужение к низу + лёгкий изгиб
+          const topHalf = Math.max(4, tipW * 0.7)
+          const botHalf = Math.max(2, tipW / 2)
+          return `M ${xTipCenter - topHalf} ${yHeelBase - 1}
+                  Q ${xTipCenter - botHalf * 0.3} ${yGround - hScaled * 0.45} ${xTipCenter - botHalf} ${yGround}
+                  L ${xTipCenter + botHalf} ${yGround}
+                  Q ${xTipCenter + botHalf * 0.3} ${yGround - hScaled * 0.45} ${xTipCenter + topHalf} ${yHeelBase - 1} Z`
+        }
+        case 'flared': {
+          // Трапеция: широкая набойка, сужение кверху
+          const topHalf = Math.max(3, tipW * 0.35)
+          const botHalf = Math.max(5, tipW / 2)
+          return `M ${xTipCenter - topHalf} ${yHeelBase - 1}
+                  L ${xTipCenter - botHalf} ${yGround}
+                  L ${xTipCenter + botHalf} ${yGround}
+                  L ${xTipCenter + topHalf} ${yHeelBase - 1} Z`
+        }
         default:
           return ''
       }
     }
 
+    // Геленок
     const archDist = Math.max(1, xBall - xHeel)
     const shankLenScaled = engineeringData.shankLength * scale
-
     const tt = Math.max(0, Math.min(1, shankLenScaled / archDist))
     const mt = 1 - tt
-
     const q1x = mt * xHeel + tt * controlX1
     const q1y = mt * yFootHeel + tt * controlY1
-
     const q2x = mt * mt * xHeel + 2 * mt * tt * controlX1 + tt * tt * controlX2
     const q2y = mt * mt * yFootHeel + 2 * mt * tt * controlY1 + tt * tt * controlY2
-
     const q3x =
       mt * mt * mt * xHeel +
       3 * mt * mt * tt * controlX1 +
@@ -394,7 +470,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       3 * mt * mt * tt * controlY1 +
       3 * mt * tt * tt * controlY2 +
       tt * tt * tt * yFootBall
-
     const sOffset = 2
     const shankCurve = `
       M ${xHeel + 2} ${yFootHeel + sOffset}
@@ -411,10 +486,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       xBall,
       xToe,
       xHeelCenter,
+      xTipCenter,
       yGround,
       scale,
       yFootBall,
       yFootHeel,
+      yHeelBase,
     }
   }, [
     shoeSize,
@@ -424,11 +501,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     rockerStartPct,
     heelType,
     soleType,
+    heelTipOffsetMm,
+    tipWidthMm,
     engineeringData.shankLength,
-    engineeringData.heelCenterXRatio,
   ])
 
-  // --- 6. Компактный UI-степпер ---
   const Stepper = ({
     label,
     value,
@@ -507,15 +584,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           }}
           className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1C1816] border border-white/5 active:scale-90 transition-transform"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
@@ -526,10 +595,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 pb-8">
-        {/* Интерактивный экран */}
-        <div
-          className={`flex flex-col rounded-[16px] border transition-colors duration-500 overflow-hidden relative ${balanceAudit.boxColors}`}
-        >
+        {/* Канвас + алерт */}
+        <div className={`flex flex-col rounded-[16px] border transition-colors duration-500 overflow-hidden relative ${balanceAudit.boxColors}`}>
           <div className="flex flex-col p-2.5 pb-0 z-10 min-h-[45px]">
             <div className="flex justify-between items-start gap-2">
               <div className="flex flex-col">
@@ -549,11 +616,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             </div>
           </div>
 
-          {/* SVG */}
-          <div
-            className="relative flex justify-center items-center w-full"
-            style={{ height: geometry.svgHeight }}
-          >
+          <div className="relative flex justify-center items-center w-full" style={{ height: geometry.svgHeight }}>
             <svg
               width="100%"
               height="100%"
@@ -561,39 +624,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               preserveAspectRatio="xMidYMax meet"
               className="overflow-visible"
             >
-              <text
-                x={geometry.xHeel - 15}
-                y="25"
-                fill="#8B5CF6"
-                fontSize="10"
-                fontWeight="bold"
-                opacity="0.8"
-              >
+              <text x={geometry.xHeel - 15} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">
                 {t.heelLbl}
               </text>
-              <text
-                x={geometry.xToe - 30}
-                y="25"
-                fill="#8B5CF6"
-                fontSize="10"
-                fontWeight="bold"
-                opacity="0.8"
-              >
+              <text x={geometry.xToe - 30} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">
                 {t.toeLbl}
               </text>
 
-              {/* Земля */}
-              <line
-                x1="0"
-                y1={geometry.yGround}
-                x2={geometry.svgWidth}
-                y2={geometry.yGround}
-                stroke="#4A423C"
-                strokeWidth="1"
-                strokeDasharray="2 2"
-              />
-
-              {/* Горизонт платформы */}
+              <line x1="0" y1={geometry.yGround} x2={geometry.svgWidth} y2={geometry.yGround} stroke="#4A423C" strokeWidth="1" strokeDasharray="2 2" />
               <line
                 x1={geometry.xHeel - 15}
                 y1={geometry.yFootBall}
@@ -603,69 +641,49 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                 strokeWidth="1"
                 strokeDasharray="3 3"
                 opacity="0.5"
-                style={{ transition: 'all 0.3s ease' }}
               />
 
-              {/* Heel Center Line — только для standard */}
+              {/* Heel Center Line — только стандарт */}
               {soleType === 'flat' && (
-                <line
-                  x1={geometry.xHeelCenter}
-                  y1={geometry.yFootHeel - 8}
-                  x2={geometry.xHeelCenter}
-                  y2={geometry.yGround + 4}
-                  stroke={
-                    engineeringData.heelOffsetTooFarBack ? '#EF4444' : '#22C55E'
-                  }
-                  strokeWidth="1.5"
-                  strokeDasharray="4 3"
-                  opacity="0.9"
-                  style={{ transition: 'all 0.3s ease' }}
-                />
+                <>
+                  <line
+                    x1={geometry.xHeelCenter}
+                    y1={geometry.yFootHeel - 10}
+                    x2={geometry.xHeelCenter}
+                    y2={geometry.yGround + 6}
+                    stroke={engineeringData.heelOffsetTooFarBack ? '#EF4444' : '#22C55E'}
+                    strokeWidth="1.5"
+                    strokeDasharray="4 3"
+                    opacity="0.95"
+                  />
+                  {/* точка опоры набойки */}
+                  <circle
+                    cx={geometry.xTipCenter}
+                    cy={geometry.yGround}
+                    r="3.5"
+                    fill={engineeringData.heelOffsetTooFarBack ? '#EF4444' : '#22C55E'}
+                    opacity="0.9"
+                  />
+                </>
               )}
 
-              <text
-                x={geometry.xHeel + 12}
-                y={geometry.yFootBall - 4}
-                fill="#3B82F6"
-                fontSize="9"
-                fontWeight="600"
-                style={{ transition: 'all 0.3s ease' }}
-              >
+              <text x={geometry.xHeel + 12} y={geometry.yFootBall - 4} fill="#3B82F6" fontSize="9" fontWeight="600">
                 {t.dropLbl}: {heelHeight - toeThickness} мм
               </text>
 
-              <path
-                d={geometry.heelPath}
-                fill="#D49A5C"
-                opacity="0.8"
-                style={{ transition: 'all 0.3s ease' }}
-              />
-              <path
-                d={geometry.solePath}
-                fill="#2A2421"
-                stroke="#D49A5C"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-                style={{ transition: 'all 0.3s ease' }}
-              />
+              <path d={geometry.heelPath} fill="#D49A5C" opacity="0.85" />
+              <path d={geometry.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="1.5" strokeLinejoin="round" />
               <path
                 d={geometry.shankCurve}
                 fill="none"
                 stroke="#94A3B8"
                 strokeWidth={engineeringData.steelThickness * geometry.scale}
                 strokeLinecap="round"
-                style={{ transition: 'all 0.3s ease' }}
               />
 
               {soleType === 'rocker' && (
                 <>
-                  <circle
-                    cx={geometry.xBall}
-                    cy={geometry.yFootBall}
-                    r="3"
-                    fill="#EF4444"
-                    style={{ transition: 'all 0.3s ease' }}
-                  />
+                  <circle cx={geometry.xBall} cy={geometry.yFootBall} r="3" fill="#EF4444" />
                   <line
                     x1={geometry.xBall}
                     y1={geometry.yFootBall}
@@ -674,7 +692,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                     stroke="#EF4444"
                     strokeWidth="1"
                     strokeDasharray="2 2"
-                    style={{ transition: 'all 0.3s ease' }}
                   />
                 </>
               )}
@@ -684,24 +701,51 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           <div className="px-3 pb-2 pt-1 border-t border-white/5 flex justify-between text-[10px] opacity-90 z-10 bg-black/20">
             <span>
               {t.internalSlope}{' '}
-              <strong className="text-[11px]">
-                {engineeringData.internalSlope.toFixed(1)}°
-              </strong>
+              <strong className="text-[11px]">{engineeringData.internalSlope.toFixed(1)}°</strong>
             </span>
             <span>
               {t.loadLbl}{' '}
-              <strong
-                className={`text-[11px] ${
-                  engineeringData.forefootLoad >= CRITICAL_LOAD ? 'text-red-400' : ''
-                }`}
-              >
+              <strong className={`text-[11px] ${engineeringData.forefootLoad >= CRITICAL_LOAD ? 'text-red-400' : ''}`}>
                 {engineeringData.forefootLoad}%
               </strong>
             </span>
           </div>
         </div>
 
-        {/* Переключатели: standard / rocker + форма каблука */}
+        {/* Инфо-панель распределения масс */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-[#1C1816] border border-white/5 rounded-xl p-2.5 text-center">
+            <div className="text-[10px] text-[#A3988E] uppercase mb-1">{t.massTitle}</div>
+            <div className="flex justify-center gap-3 text-[12px]">
+              <span>
+                {t.forefoot}: <strong className="text-red-400">{engineeringData.forefootLoad}%</strong>
+              </span>
+              <span>
+                {t.rearfoot}: <strong className="text-green-400">{engineeringData.heelLoad}%</strong>
+              </span>
+            </div>
+          </div>
+          <div className="bg-[#1C1816] border border-white/5 rounded-xl p-2.5 text-center">
+            <div className="text-[10px] text-[#A3988E] uppercase mb-1">
+              {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
+                ? t.entryAngle
+                : t.invertRisk}
+            </div>
+            <div className="text-[14px] font-bold">
+              {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared') ? (
+                <>{engineeringData.entryAngleDeg}°</>
+              ) : soleType === 'flat' ? (
+                <span className={engineeringData.inversionRisk >= 55 ? 'text-red-400' : 'text-[#F3EFEA]'}>
+                  {engineeringData.inversionRisk}%
+                </span>
+              ) : (
+                '—'
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Переключатели */}
         <div className="grid grid-cols-2 gap-2">
           <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
             {(['flat', 'rocker'] as const).map((type) => (
@@ -712,17 +756,15 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   setSoleType(type)
                 }}
                 className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
-                  soleType === type
-                    ? 'bg-[#8B5CF6] text-white shadow-md'
-                    : 'text-[#A3988E] bg-transparent'
+                  soleType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E] bg-transparent'
                 }`}
               >
                 {t[type]}
               </button>
             ))}
           </div>
-          <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
-            {(['stiletto', 'block', 'kitten'] as const).map((type) => {
+          <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5 overflow-x-auto">
+            {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => {
               const isRocker = soleType === 'rocker'
               return (
                 <button
@@ -732,7 +774,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                     triggerHaptic('light')
                     setHeelType(type)
                   }}
-                  className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-all duration-300
+                  className={`flex-1 min-w-[52px] py-1.5 text-[10px] font-medium rounded-lg transition-all duration-300
                     ${
                       isRocker
                         ? 'opacity-30 cursor-not-allowed text-[#A3988E]'
@@ -751,14 +793,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
         {/* Контролы */}
         <div className="grid grid-cols-2 gap-2">
           <Stepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} />
-          <Stepper
-            label={t.heel}
-            min={10}
-            max={130}
-            value={heelHeight}
-            onChange={setHeelHeight}
-            unit="мм"
-          />
+          <Stepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" />
           <Stepper
             label={t.toe}
             min={0}
@@ -776,17 +811,41 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             unit="°"
             disabled={soleType === 'flat'}
           />
-          <div className="col-span-2">
-            <Stepper
-              label={t.start}
-              min={55}
-              max={75}
-              value={rockerStartPct}
-              onChange={setRockerStartPct}
-              unit="%"
-              disabled={soleType === 'flat'}
-            />
-          </div>
+
+          {/* Параметры только для СТАНДАРТА */}
+          {soleType === 'flat' && (
+            <>
+              <Stepper
+                label={t.offset}
+                min={-15}
+                max={15}
+                value={heelTipOffsetMm}
+                onChange={setHeelTipOffsetMm}
+                unit="мм"
+              />
+              <Stepper
+                label={t.tipW}
+                min={6}
+                max={45}
+                value={tipWidthMm}
+                onChange={setTipWidthMm}
+                unit="мм"
+              />
+            </>
+          )}
+
+          {soleType === 'rocker' && (
+            <div className="col-span-2">
+              <Stepper
+                label={t.start}
+                min={55}
+                max={75}
+                value={rockerStartPct}
+                onChange={setRockerStartPct}
+                unit="%"
+              />
+            </div>
+          )}
         </div>
 
         {/* Спецификация */}
@@ -800,9 +859,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           >
             <span>{t.specsBtn}</span>
             <svg
-              className={`w-4 h-4 text-[#A3988E] transition-transform duration-300 ${
-                showSpecs ? 'rotate-180' : ''
-              }`}
+              className={`w-4 h-4 text-[#A3988E] transition-transform duration-300 ${showSpecs ? 'rotate-180' : ''}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -825,22 +882,42 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   </div>
                   <div className="flex justify-between">
                     <span>Толщина стали (65Г):</span>
-                    <strong className="text-[#F3EFEA]">
-                      {engineeringData.steelThickness.toFixed(1)} мм
-                    </strong>
+                    <strong className="text-[#F3EFEA]">{engineeringData.steelThickness.toFixed(1)} мм</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>L_eff ({(L_EFF_RATIO * 100).toFixed(0)}%):</span>
-                    <strong className="text-[#F3EFEA]">
-                      {engineeringData.lEff.toFixed(1)} мм
-                    </strong>
+                    <strong className="text-[#F3EFEA]">{engineeringData.lEff.toFixed(1)} мм</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Heel Center Line:</span>
-                    <strong className="text-[#F3EFEA]">
-                      {(HEEL_CENTER_RATIO * 100).toFixed(0)}% длины
-                    </strong>
+                    <strong className="text-[#F3EFEA]">{(HEEL_CENTER_RATIO * 100).toFixed(0)}% длины</strong>
                   </div>
+                  {soleType === 'flat' && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Смещение набойки:</span>
+                        <strong className={engineeringData.heelOffsetTooFarBack ? 'text-red-400' : 'text-[#F3EFEA]'}>
+                          {heelTipOffsetMm} мм
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Ширина набойки:</span>
+                        <strong className="text-[#F3EFEA]">{tipWidthMm} мм</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>{t.invertRisk}:</span>
+                        <strong className={engineeringData.inversionRisk >= 55 ? 'text-red-400' : 'text-[#F3EFEA]'}>
+                          {engineeringData.inversionRisk}%
+                        </strong>
+                      </div>
+                      {(heelType === 'kitten' || heelType === 'flared') && (
+                        <div className="flex justify-between">
+                          <span>{t.entryAngle}:</span>
+                          <strong className="text-[#F3EFEA]">{engineeringData.entryAngleDeg}°</strong>
+                        </div>
+                      )}
+                    </>
+                  )}
                   {engineeringData.requiresMetatarsalPad && (
                     <div className="flex justify-between text-red-400">
                       <span>Пелот Зейца:</span>
@@ -849,9 +926,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   )}
                   <div className="pt-2 mt-2 border-t border-white/5 font-mono text-[10px] text-[#D49A5C] bg-black/20 p-2 rounded-lg text-center space-y-1">
                     <div>Angle = arcsin((H − T) / L_eff)</div>
-                    <div>
-                      {soleType === 'flat' ? t.formulaStandard : t.formulaRocker}
-                    </div>
+                    <div>{soleType === 'flat' ? t.formulaStandard : t.formulaRocker}</div>
                   </div>
                 </div>
               </motion.div>
@@ -861,4 +936,4 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       </div>
     </motion.div>
   )
-}
+    }
