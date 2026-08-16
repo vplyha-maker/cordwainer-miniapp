@@ -15,7 +15,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [rockerAngle, setRockerAngle] = useState(12)   
   const [rockerStartPct, setRockerStartPct] = useState(63) 
   
-  // Стейты для интеграции женских каблуков
+  // Стейты для интеграции женских каблуков и типа подошвы
+  const [soleType, setSoleType] = useState<'flat' | 'rocker'>('rocker')
   const [heelType, setHeelType] = useState<'stiletto' | 'block' | 'kitten'>('stiletto')
   const [showSpecs, setShowSpecs] = useState(false)
   const [showFormulas, setShowFormulas] = useState(false)
@@ -56,6 +57,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       stiletto: 'Шпилька',
       block: 'Блок',
       kitten: 'Рюмочка',
+      flat: 'Плоская (Flat)',
+      rocker: 'Рокерная (Rocker)',
       specsBtn: '⚙️ Спецификация геленка',
       shankLength: 'Длина супинатора:',
       shankSteel: 'Толщина стали (65Г):',
@@ -90,6 +93,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       stiletto: 'Шпилька',
       block: 'Блок',
       kitten: 'Чарочка',
+      flat: 'Пласка (Flat)',
+      rocker: 'Рокерна (Rocker)',
       specsBtn: '⚙️ Специфікація геленка',
       shankLength: 'Довжина супінатора:',
       shankSteel: 'Товщина сталі (65Г):',
@@ -101,18 +106,21 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     },
   }[lang]
 
-  // --- 3. Инженерные Вычисления (Рокер + Шпильки) ---
+  // --- 3. Инженерные Вычисления (Рокер + Шпильки + Тип подошвы) ---
   const engineeringData = useMemo(() => {
     const lastLengthMm = (shoeSize * 6.67) + 12
     const lEff = lastLengthMm * 0.73
     const netRise = heelHeight - toeThickness
     
-    // Угол наклона
-    const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
-    const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
+    // Если подошва плоская, эффект рокера не учитывается в математике
+    const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-    // Нагрузка на переднюю часть стопы
-    const forefootLoad = Math.min(95, Math.max(0, Math.round(50 + (netRise / lEff) * 100)))
+    // Угол наклона с компенсацией рокера
+    const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
+    const internalSlope = (Math.asin(asinArg) * (180 / Math.PI)) - (activeRocker * 0.5)
+
+    // Нагрузка на переднюю часть стопы (рокер забирает часть нагрузки)
+    const forefootLoad = Math.min(95, Math.max(0, Math.round(50 + (netRise / lEff) * 100 - (activeRocker * 1.5))))
 
     // Расчет супинатора (Геленка)
     const shankLength = Math.round((lastLengthMm * 0.48) + 15)
@@ -132,11 +140,16 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     }
 
     return { internalSlope, forefootLoad, shankLength, steelThickness, shankType, ballClearance: 12 }
-  }, [shoeSize, heelHeight, toeThickness, heelType, lang])
+  }, [shoeSize, heelHeight, toeThickness, heelType, lang, soleType, rockerAngle])
 
   // --- 4. Auto-Fix ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
+    // Включаем рокер, если был Flat, так как AutoFix опирается на физиологию
+    if (soleType === 'flat') {
+      setSoleType('rocker')
+    }
+
     // Если перегруз по шпильке - спасаем платформой
     if (engineeringData.forefootLoad > 80) {
       const lastLengthMm = (shoeSize * 6.67) + 12
@@ -182,9 +195,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
     const ySoleHeelTop = yGround - heelHeight * scale
     const ySoleRockerTop = yGround - toeThickness * scale
+    
+    // Если Flat - носок не задирается
+    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
     const rockerLengthMm = totalLength * (1 - rockerStartPct / 100)
     const rockerLengthSvg = rockerLengthMm * scale
-    const toeLiftSvg = rockerLengthSvg * Math.sin((rockerAngle * Math.PI) / 180)
+    const toeLiftSvg = rockerLengthSvg * Math.sin((activeRockerAngle * Math.PI) / 180)
     const ySoleToeTop = (yGround - toeLiftSvg) - toeThickness * scale
 
     // Линия центра пятки (15% от длины)
@@ -215,7 +231,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       yGround, 
       xHeelCenter 
     }
-  }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct, heelType])
+  }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct, heelType, soleType])
 
   // --- 6. Аудит (Сводный) ---
   const balanceAudit = useMemo(() => {
@@ -223,18 +239,20 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     let title = t.successTitle
     let message = t.successDesc
     let colorClasses = 'border-green-500/30 bg-green-500/10 text-green-400'
+    
+    const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
     if (engineeringData.forefootLoad > 80 || engineeringData.internalSlope > 18) {
       status = 'ERROR'
       title = t.errTitle
       message = t.errDesc
       colorClasses = 'border-red-500/30 bg-red-500/10 text-red-400'
-    } else if (engineeringData.internalSlope > 14 && rockerAngle < 8) {
+    } else if (engineeringData.internalSlope > 14 && activeRocker < 8) {
       status = 'WARNING'
       title = t.warnTitle
       message = t.warn1Desc
       colorClasses = 'border-amber-500/30 bg-amber-500/10 text-amber-400'
-    } else if (heelHeight < 20 && rockerAngle > 16) {
+    } else if (heelHeight < 20 && activeRocker > 16) {
       status = 'WARNING'
       title = t.warnTitle
       message = t.warn2Desc
@@ -242,19 +260,19 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     }
 
     return { status, title, message, colorClasses }
-  }, [engineeringData, rockerAngle, heelHeight, t])
+  }, [engineeringData, rockerAngle, soleType, heelHeight, t])
 
-  // --- 7. Крупный UI Компонент Степпера ---
-  const Stepper = ({ label, value, min, max, onChange, unit = '' }: any) => {
-    const handleAdd = () => { if (value < max) { triggerHaptic('light'); onChange(value + 1) } }
-    const handleSub = () => { if (value > min) { triggerHaptic('light'); onChange(value - 1) } }
+  // --- 7. Крупный UI Компонент Степпера с поддержкой Disabled ---
+  const Stepper = ({ label, value, min, max, onChange, unit = '', disabled = false }: any) => {
+    const handleAdd = () => { if (!disabled && value < max) { triggerHaptic('light'); onChange(value + 1) } }
+    const handleSub = () => { if (!disabled && value > min) { triggerHaptic('light'); onChange(value - 1) } }
 
     return (
-      <div className="bg-[#1C1816] border border-white/5 rounded-[16px] p-3 flex flex-col justify-between">
+      <div className={`bg-[#1C1816] border border-white/5 rounded-[16px] p-3 flex flex-col justify-between transition-opacity duration-300 ${disabled ? 'opacity-40 pointer-events-none' : ''}`}>
         <span className="text-[#A3988E] text-[12px] font-medium mb-3 uppercase tracking-wider">{label}</span>
         <div className="flex items-center justify-between gap-2">
           <button 
-            onClick={handleSub} disabled={value <= min}
+            onClick={handleSub} disabled={disabled || value <= min}
             className="w-11 h-11 flex items-center justify-center rounded-[10px] bg-white/5 active:bg-white/10 active:scale-95 disabled:opacity-30 transition-all"
           >
             <span className="text-2xl font-medium leading-none mb-1">-</span>
@@ -263,7 +281,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             {value}<span className="text-[12px] text-[#A3988E] ml-1">{unit}</span>
           </div>
           <button 
-            onClick={handleAdd} disabled={value >= max}
+            onClick={handleAdd} disabled={disabled || value >= max}
             className="w-11 h-11 flex items-center justify-center rounded-[10px] bg-white/5 active:bg-white/10 active:scale-95 disabled:opacity-30 transition-all"
           >
             <span className="text-2xl font-medium leading-none mb-1">+</span>
@@ -311,28 +329,47 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             {/* Тело подошвы */}
             <path d={geometry.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="2" strokeLinejoin="round" />
 
-            {/* Точка переката */}
-            <circle cx={geometry.xRockerStart} cy={geometry.yGround} r="3.5" fill="#EF4444" />
-            <line x1={geometry.xRockerStart} y1={geometry.yGround} x2={geometry.xRockerStart} y2={geometry.yGround - 35} stroke="#EF4444" strokeWidth="1" strokeDasharray="2 2" />
-            <text x={geometry.xRockerStart - 25} y={geometry.yGround - 40} fontSize="10" fill="#EF4444" fontWeight="600">{rockerStartPct}%</text>
+            {/* Элементы рокера (Отображаются только если выбрана рокерная подошва) */}
+            {soleType === 'rocker' && (
+              <>
+                {/* Точка переката */}
+                <circle cx={geometry.xRockerStart} cy={geometry.yGround} r="3.5" fill="#EF4444" />
+                <line x1={geometry.xRockerStart} y1={geometry.yGround} x2={geometry.xRockerStart} y2={geometry.yGround - 35} stroke="#EF4444" strokeWidth="1" strokeDasharray="2 2" />
+                <text x={geometry.xRockerStart - 25} y={geometry.yGround - 40} fontSize="10" fill="#EF4444" fontWeight="600">{rockerStartPct}%</text>
 
-            {/* Угол рокера */}
-            <path d={`M ${geometry.xRockerStart + 30} ${geometry.yGround} A 30 30 0 0 0 ${geometry.xRockerStart + 30} ${geometry.yGround - 11}`} fill="none" stroke="#8B5CF6" strokeWidth="1.5" />
-            <text x={geometry.xToe - 30} y={geometry.yGround - 10} fontSize="11" fill="#8B5CF6" fontWeight="bold">{rockerAngle}°</text>
+                {/* Угол рокера */}
+                <path d={`M ${geometry.xRockerStart + 30} ${geometry.yGround} A 30 30 0 0 0 ${geometry.xRockerStart + 30} ${geometry.yGround - 11}`} fill="none" stroke="#8B5CF6" strokeWidth="1.5" />
+                <text x={geometry.xToe - 30} y={geometry.yGround - 10} fontSize="11" fill="#8B5CF6" fontWeight="bold">{rockerAngle}°</text>
+              </>
+            )}
           </svg>
         </div>
 
-        {/* Выбор типа каблука */}
-        <div className="flex bg-[#1C1816] p-1 rounded-[12px] border border-white/5">
-          {(['stiletto', 'block', 'kitten'] as const).map(type => (
-            <button
-              key={type}
-              onClick={() => { triggerHaptic('light'); setHeelType(type) }}
-              className={`flex-1 py-2 text-[12px] font-medium rounded-[10px] transition-colors ${heelType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E] bg-transparent'}`}
-            >
-              {t[type]}
-            </button>
-          ))}
+        {/* Выбор типа подошвы и каблука */}
+        <div className="flex flex-col gap-2">
+          <div className="flex bg-[#1C1816] p-1 rounded-[12px] border border-white/5">
+            {(['flat', 'rocker'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => { triggerHaptic('light'); setSoleType(type) }}
+                className={`flex-1 py-2 text-[12px] font-medium rounded-[10px] transition-colors ${soleType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E] bg-transparent'}`}
+              >
+                {t[type]}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex bg-[#1C1816] p-1 rounded-[12px] border border-white/5">
+            {(['stiletto', 'block', 'kitten'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => { triggerHaptic('light'); setHeelType(type) }}
+                className={`flex-1 py-2 text-[12px] font-medium rounded-[10px] transition-colors ${heelType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E] bg-transparent'}`}
+              >
+                {t[type]}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Панель аудита и Auto-fix */}
@@ -362,8 +399,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
           <Stepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" />
           <Stepper label={t.toe} min={0} max={60} value={toeThickness} onChange={setToeThickness} unit="мм" />
-          <Stepper label={t.angle} min={5} max={30} value={rockerAngle} onChange={setRockerAngle} unit="°" />
-          <Stepper label={t.start} min={55} max={75} value={rockerStartPct} onChange={setRockerStartPct} unit="%" />
+          <Stepper 
+            label={t.angle} min={5} max={30} value={rockerAngle} onChange={setRockerAngle} unit="°" 
+            disabled={soleType === 'flat'} 
+          />
+          <Stepper 
+            label={t.start} min={55} max={75} value={rockerStartPct} onChange={setRockerStartPct} unit="%" 
+            disabled={soleType === 'flat'} 
+          />
         </div>
         
         {/* Аккордеоны информации (Супинатор и Формулы) */}
