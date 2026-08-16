@@ -61,8 +61,15 @@ export interface HeelAudit {
 export function computeEngineering(input: HeelInput): HeelEngineering {
   const C = HEEL_CONST
   const {
-    shoeSize, heelHeight, toeThickness, soleType, heelType,
-    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm,
+    shoeSize,
+    heelHeight,
+    toeThickness,
+    soleType,
+    heelType,
+    rockerAngle,
+    rockerStartPct,
+    heelTipOffsetMm,
+    tipWidthMm,
   } = input
 
   const lastLengthMm = shoeSize * C.STEP_TO_MM + C.FUNCTIONAL_ALLOWANCE
@@ -72,6 +79,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
   const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
+  // P = 50 + ((H − T) / L_eff) × 100
   let loadCalc = 50 + (netRise / Math.max(lEff, 1)) * 100
   if (soleType === 'rocker') {
     const factor =
@@ -88,18 +96,35 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   else if (netRise > 70) steelThickness = 2.0
 
   const heelOffsetTooFarBack = soleType === 'flat' && heelTipOffsetMm < -0.5
-  const heelOffsetTooFarForward = soleType === 'flat' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
+  const heelOffsetTooFarForward =
+    soleType === 'flat' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
 
+  // --- Риск инверсии ---
+  // Даже при «достаточной» ширине набойки остаётся базовый риск от высоты.
   let inversionRisk = 0
   if (soleType === 'flat' && netRise > 0) {
-    const minSafe =
+    const minSafeTip =
       heelType === 'stiletto' ? 10 + netRise * 0.08 :
-      heelType === 'kitten' ? 12 + netRise * 0.06 :
-      heelType === 'flared' ? 16 + netRise * 0.05 :
-      20 + netRise * 0.04
-    const ratio = tipWidthMm / Math.max(minSafe, 1)
-    inversionRisk = Math.min(100, Math.max(0, Math.round((1 - ratio) * 100 + (netRise > 70 ? 15 : 0))))
-    if (ratio >= 1) inversionRisk = Math.min(inversionRisk, 25)
+      heelType === 'kitten'   ? 12 + netRise * 0.06 :
+      heelType === 'flared'   ? 16 + netRise * 0.05 :
+      /* block */               18 + netRise * 0.06
+
+    const ratio = tipWidthMm / Math.max(minSafeTip, 1)
+
+    if (ratio >= 1) {
+      // Набойка достаточная → только остаточный риск от высоты
+      const residual =
+        heelType === 'block'  ? netRise / 10 :
+        heelType === 'flared' ? netRise / 9 :
+        heelType === 'kitten' ? netRise / 7 :
+        /* stiletto */          netRise / 5
+      inversionRisk = Math.min(35, Math.max(0, Math.round(residual)))
+    } else {
+      // Набойка узкая → основной риск
+      const narrow = (1 - ratio) * 100
+      const heightBonus = netRise > 70 ? 15 : netRise > 50 ? 8 : 0
+      inversionRisk = Math.min(100, Math.max(0, Math.round(narrow + heightBonus)))
+    }
   }
 
   let entryAngleDeg = 0
@@ -193,7 +218,8 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
 
   if (input.soleType === 'rocker') {
     const newRise = heelHeight - toeThickness
-    const slope = Math.asin(Math.max(-1, Math.min(1, newRise / eng.lEff))) * (180 / Math.PI)
+    const slope =
+      Math.asin(Math.max(-1, Math.min(1, newRise / eng.lEff))) * (180 / Math.PI)
     rockerAngle = Math.max(5, Math.min(20, Math.round(slope * 0.8)))
   }
 
