@@ -64,7 +64,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
   const geometry = useMemo(
     () => buildHeelGeometry({ ...input, shankLength: eng.shankLength }),
-    [input, eng.shankLength]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shoeSize, heelHeight, toeThickness, soleType, heelType, rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm, eng.shankLength]
   )
 
   const handleFix = () => {
@@ -84,7 +85,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       exit={{ opacity: 0, x: -20 }}
       className="flex flex-col h-[100dvh] bg-[#110F0E] text-[#F3EFEA] overflow-hidden"
     >
-      {/* Header */}
       <div className="flex-shrink-0 p-3 flex items-center justify-between border-b border-white/5 bg-[#110F0E]/80 backdrop-blur-md z-10">
         <button
           onClick={() => { haptic(); onBack() }}
@@ -114,7 +114,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           onFix={handleFix}
         />
 
-        {/* Mass panel */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-[#1C1816] border border-white/5 rounded-xl p-2.5 text-center">
             <div className="text-[10px] text-[#A3988E] uppercase mb-1">{t.massTitle}</div>
@@ -125,7 +124,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
           <div className="bg-[#1C1816] border border-white/5 rounded-xl p-2.5 text-center">
             <div className="text-[10px] text-[#A3988E] uppercase mb-1">
-              {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared') ? t.entryAngle : t.invertRisk}
+              {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
+                ? t.entryAngle
+                : t.invertRisk}
             </div>
             <div className="text-[14px] font-bold">
               {soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
@@ -137,7 +138,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         </div>
 
-        {/* Mode toggles */}
         <div className="grid grid-cols-2 gap-2">
           <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
             {(['flat', 'rocker'] as const).map((type) => (
@@ -172,7 +172,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         </div>
 
-        {/* Controls */}
+        {/* Контролы: Перекат — для ВСЕХ моделей */}
         <div className="grid grid-cols-2 gap-2">
           <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
           <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" onHaptic={() => haptic()} />
@@ -185,23 +185,50 @@ export function HeelCalcPage({ onBack, lang }: Props) {
             unit="мм"
             onHaptic={() => haptic()}
           />
+          <HeelStepper
+            label={t.start}
+            min={55}
+            max={75}
+            value={rockerStartPct}
+            onChange={setRockerStartPct}
+            unit="%"
+            onHaptic={() => haptic()}
+          />
 
           {soleType === 'rocker' ? (
-            <>
-              <HeelStepper label={t.angle} min={5} max={30} value={rockerAngle} onChange={setRockerAngle} unit="°" onHaptic={() => haptic()} />
-              <div className="col-span-2">
-                <HeelStepper label={t.start} min={55} max={75} value={rockerStartPct} onChange={setRockerStartPct} unit="%" onHaptic={() => haptic()} />
-              </div>
-            </>
+            <HeelStepper
+              label={t.angle}
+              min={5}
+              max={30}
+              value={rockerAngle}
+              onChange={setRockerAngle}
+              unit="°"
+              onHaptic={() => haptic()}
+            />
           ) : (
             <>
-              <HeelStepper label={t.offset} min={-15} max={15} value={heelTipOffsetMm} onChange={setHeelTipOffsetMm} unit="мм" onHaptic={() => haptic()} />
-              <HeelStepper label={t.tipW} min={6} max={45} value={tipWidthMm} onChange={setTipWidthMm} unit="мм" onHaptic={() => haptic()} />
+              <HeelStepper
+                label={t.offset}
+                min={-15}
+                max={15}
+                value={heelTipOffsetMm}
+                onChange={setHeelTipOffsetMm}
+                unit="мм"
+                onHaptic={() => haptic()}
+              />
+              <HeelStepper
+                label={t.tipW}
+                min={6}
+                max={45}
+                value={tipWidthMm}
+                onChange={setTipWidthMm}
+                unit="мм"
+                onHaptic={() => haptic()}
+              />
             </>
           )}
         </div>
 
-        {/* Specs */}
         <div className="pt-1">
           <button
             onClick={() => { haptic(); setShowSpecs(!showSpecs) }}
@@ -221,6 +248,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 className="overflow-hidden"
               >
                 <div className="bg-[#1C1816] p-3 rounded-xl border border-white/5 text-[11px] text-[#A3988E] space-y-2">
+                  <Row label="Перекат" value={`${rockerStartPct}%`} />
                   <Row label="Длина геленка" value={`${eng.shankLength} мм`} />
                   <Row label="Толщина стали (65Г)" value={`${eng.steelThickness.toFixed(1)} мм`} />
                   <Row label="L_eff" value={`${eng.lEff.toFixed(1)} мм`} />
@@ -230,6 +258,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                       <Row label="Смещение" value={`${heelTipOffsetMm} мм`} danger={eng.heelOffsetTooFarBack} />
                       <Row label="Набойка" value={`${tipWidthMm} мм`} />
                       <Row label={t.invertRisk} value={`${eng.inversionRisk}%`} danger={eng.inversionRisk >= 55} />
+                      {(heelType === 'kitten' || heelType === 'flared') && (
+                        <Row label={t.entryAngle} value={`${eng.entryAngleDeg}°`} />
+                      )}
                     </>
                   )}
                   <div className="pt-2 mt-2 border-t border-white/5 font-mono text-[10px] text-[#D49A5C] bg-black/20 p-2 rounded-lg text-center">
