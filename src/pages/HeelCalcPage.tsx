@@ -211,48 +211,70 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
   // --- 5. Геометрия SVG ---
   const geometry = useMemo(() => {
-    const totalLength = shoeSize * STEP_TO_MM + FUNCTIONAL_ALLOWANCE
+    const totalLength = (shoeSize * STEP_TO_MM) + FUNCTIONAL_ALLOWANCE
     const scale = 0.9 
     const svgWidth = totalLength * scale
     const svgHeight = 175 
     const padding = 35 
 
+    // Координаты X от единой длины, масштаб применяется последовательно
     const xHeel = padding
-    const xRockerStart = padding + totalLength * (rockerStartPct / 100) * scale
-    const xToe = padding + totalLength * scale
+    const xRockerStart = padding + (totalLength * (rockerStartPct / 100)) * scale
+    const xToe = padding + (totalLength * scale)
     const yGround = 150 
 
+    // Расчет каблука (отмасштабирован)
     const getHeelPath = () => {
       const h = heelHeight * scale
       const x = xHeel
       const y = yGround
       switch (heelType) {
-        case 'stiletto': return `M ${x + 5} ${y - h} L ${x + 2} ${y} L ${x + 8} ${y} Z`
-        case 'block': return `M ${x} ${y - h} L ${x + 15} ${y - h} L ${x + 15} ${y} L ${x} ${y} Z`
-        case 'kitten': return `M ${x + 8} ${y - h} Q ${x - 5} ${y - h/2} ${x + 2} ${y} L ${x + 10} ${y} Q ${x + 12} ${y - h/2} ${x + 12} ${y - h} Z`
+        case 'stiletto': 
+          return `M ${x + 6*scale} ${y - h} L ${x + 2*scale} ${y} L ${x + 8*scale} ${y} Z`
+        case 'block': 
+          return `M ${x} ${y - h} L ${x + 18*scale} ${y - h} L ${x + 18*scale} ${y} L ${x} ${y} Z`
+        case 'kitten': 
+          return `M ${x + 10*scale} ${y - h} Q ${x - 4*scale} ${y - h/2} ${x + 4*scale} ${y} L ${x + 12*scale} ${y} Q ${x + 16*scale} ${y - h/2} ${x + 16*scale} ${y - h} Z`
         default: return ''
       }
     }
 
     const ySoleHeelTop = yGround - heelHeight * scale
     const ySoleRockerTop = yGround - toeThickness * scale
-    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
     
-    const rawLift = (totalLength * (1 - rockerStartPct / 100) * scale) * Math.sin((activeRockerAngle * Math.PI) / 180)
-    const toeLiftSvg = Math.min(MAX_LIFT, Math.max(0, rawLift))
-    const ySoleToeTop = (yGround - toeLiftSvg) - toeThickness * scale
+    // Расчет рокера: радианы, реальная длина зоны, затем масштаб
+    const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
+    const rockerZoneRealLength = totalLength * (1 - rockerStartPct / 100)
+    const rockerAngleRad = activeRockerAngle * (Math.PI / 180)
+    
+    const toeLiftReal = rockerZoneRealLength * Math.sin(rockerAngleRad)
+    const toeLiftSvg = Math.min(MAX_LIFT, Math.max(0, toeLiftReal)) * scale
+    const ySoleToeTop = ySoleRockerTop - toeLiftSvg
 
+    // Визуальная толщина подошвы для SVG
+    const tSvg = 5 
+
+    // Упрощенный, предсказуемый путь подошвы (Cubic/Quadratic Bezier)
     const solePath = `
-      M ${xHeel + 12} ${ySoleHeelTop}
-      C ${xHeel + 30 * scale} ${ySoleHeelTop}, ${xRockerStart - 20 * scale} ${ySoleRockerTop}, ${xRockerStart} ${ySoleRockerTop}
-      C ${xRockerStart + 15 * scale} ${ySoleRockerTop}, ${xToe - 10 * scale} ${ySoleToeTop + 5}, ${xToe} ${ySoleToeTop}
-      L ${xToe} ${ySoleToeTop + 5}
-      L ${xHeel + 12} ${ySoleHeelTop + 5} Z
+      M ${xHeel} ${ySoleHeelTop}
+      C ${xHeel + 30 * scale} ${ySoleHeelTop}, 
+        ${xRockerStart - 20 * scale} ${ySoleRockerTop}, 
+        ${xRockerStart} ${ySoleRockerTop}
+      Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerTop}, 
+        ${xToe} ${ySoleToeTop}
+      L ${xToe} ${ySoleToeTop + tSvg}
+      Q ${xRockerStart + (xToe - xRockerStart) / 2} ${ySoleRockerTop + tSvg}, 
+        ${xRockerStart} ${ySoleRockerTop + tSvg}
+      C ${xRockerStart - 20 * scale} ${ySoleRockerTop + tSvg}, 
+        ${xHeel + 30 * scale} ${ySoleHeelTop + tSvg}, 
+        ${xHeel} ${ySoleHeelTop + tSvg} Z
     `
 
+    // Кривая геленка (отмасштабирована)
     const shankCurve = `
-      M ${xHeel + 15} ${ySoleHeelTop + 2}
-      Q ${xHeel + 35} ${ySoleHeelTop + 2} ${xHeel + (engineeringData.shankLength * scale)} ${ySoleRockerTop + 2}
+      M ${xHeel + 5 * scale} ${ySoleHeelTop + tSvg/2}
+      Q ${xHeel + 35 * scale} ${ySoleHeelTop + tSvg/2} 
+        ${xHeel + (engineeringData.shankLength * scale)} ${ySoleRockerTop + tSvg/2}
     `
 
     return { 
