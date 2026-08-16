@@ -15,14 +15,18 @@ export interface HeelCalculationParams {
   rockerStartPct?: number
   soleType?: SoleType
   heelShape?: HeelShape
-  /** Опционально: смещение центра набойки от Heel Center Line, мм (+: вперёд) */
+  /**
+   * Смещение центра набойки от Heel Center Line, мм.
+   * +: вперёд, −: назад (завал).
+   */
   heelTipOffsetMm?: number
 }
 
 export interface HeelCalculationResult {
   lastLength: number
   effLength: number
-  netHeelHeight: number          // H - T
+  /** Чистый перепад H − T, мм */
+  netHeelHeight: number
   totalHeelHeight: number
   internalSlopeDeg: number
   /** % нагрузки на плюсну (метатарзальную зону) */
@@ -31,9 +35,13 @@ export interface HeelCalculationResult {
   /** Жёсткий алерт: > 80% → обязательный пелот Зейца */
   requiresMetatarsalPad: boolean
   medicalMessage: string | null
+  /** Длина геленка, мм */
+  shankLength: number
+  /** Рекомендуемая толщина супинатора (сталь 65Г), мм */
+  steelThickness: number
   /** Визуальные маркеры для SVG */
-  heelCenterLineXRatio: number   // 0.15
-  maxAllowedHeelOffsetMm: number // 5
+  heelCenterLineXRatio: number
+  maxAllowedHeelOffsetMm: number
   heelOffsetStatus: 'ok' | 'too_far_back' | 'too_far_forward'
   heelOffsetMessage: string | null
 }
@@ -44,15 +52,23 @@ const L_EFF_RATIO = 0.73
 const HEEL_CENTER_RATIO = 0.15
 const MAX_HEEL_OFFSET_MM = 5
 const CRITICAL_FOREFOOT = 80
+const COMFORT_SLOPE_DEG = 14
 const ROCKER_MITIGATION_CAP = 0.25
 const MAX_ROCKER_ANGLE = 30
+const SHANK_PROPORTION = 0.48
+const SHANK_OFFSET = 15
 
 /**
  * Основной калькулятор геометрии + аудит нагрузки на пучки.
- * Для standard — «чистая» эмпирическая формула.
- * Для rocker — формула + mitigation от угла/старта переката.
+ *
+ * Standard:  P = 50 + ((H − T) / L_eff) × 100
+ * Rocker:    P_rocker = P × (1 − 0.25 × rockerFactor)
+ *
+ * При P > 80% — обязательный метатарзальный пелот (капли Зейца).
  */
-export function calculateHeelGeometry(params: HeelCalculationParams): HeelCalculationResult {
+export function calculateHeelGeometry(
+  params: HeelCalculationParams
+): HeelCalculationResult {
   const {
     shoeSize,
     heelHeight,
@@ -78,41 +94,49 @@ export function calculateHeelGeometry(params: HeelCalculationParams): HeelCalcul
 
   // 5. Нагрузка на плюсну (главная формула аудита шпилек)
   // P_forefoot = 50 + ((H_heel - T_toe) / L_eff) * 100
-  let forefootLoad = 50 + (netRise / lEff) * 100
+  let forefootLoad = 50 + (netRise / Math.max(lEff, 1)) * 100
 
   // 6. Mitigation только для рокера
   if (soleType === 'rocker') {
     const rockerEffectFactor =
       Math.min(1, rockerAngle / MAX_ROCKER_ANGLE) *
       (1 - (rockerStartPct - 55) / 40)
-    forefootLoad = forefootLoad * (1 - ROCKER_MITIGATION_CAP * Math.max(0, rockerEffectFactor))
+    forefootLoad *= 1 - ROCKER_MITIGATION_CAP * Math.max(0, rockerEffectFactor)
   }
 
   const forefootLoadPct = Math.min(100, Math.max(0, Math.round(forefootLoad)))
 
-  // 7. Ортопедические алерты
+  // 7. Геленок и толщина стали
+  const shankLength = Math.round(lastLengthMm * SHANK_PROPORTION + SHANK_OFFSET)
+  let steelThickness = 1.2
+  if (netRise > 40 && netRise <= 70) steelThickness = 1.5
+  else if (netRise > 70) steelThickness = 2.0
+
+  // 8. Ортопедические алерты
   const requiresMetatarsalPad = forefootLoadPct > CRITICAL_FOREFOOT
   const isMedicalWarning =
-    requiresMetatarsalPad || Math.abs(internalSlopeDeg) > 14 || netRise > 40
+    requiresMetatarsalPad ||
+    Math.abs(internalSlopeDeg) > COMFORT_SLOPE_DEG ||
+    netRise > 40
 
   let medicalMessage: string | null = null
   if (requiresMetatarsalPad) {
     medicalMessage =
       'Требуется обязательная установка встроенного метатарзального пелота (капли Зейца) в стельку для разгрузки нервных окончаний.'
-  } else if (internalSlopeDeg > 14 || netRise > 40) {
+  } else if (netRise < 0) {
+    medicalMessage =
+      'Обратный уклон: платформа выше каблука. Нарушение биомеханики.'
+  } else if (internalSlopeDeg > COMFORT_SLOPE_DEG || netRise > 40) {
     medicalMessage =
       'Высокий подъём / критический наклон. Рекомендуется увеличить платформу или снизить каблук.'
-  } else if (netRise < 0) {
-    medicalMessage = 'Обратный уклон: платформа выше каблука. Нарушение биомеханики.'
   }
 
-  // 8. Визуальные маркеры: Heel Center Line (15% длины стельки)
-  // Набойка должна лежать под этой вертикалью (±5 мм вперёд допустимо)
+  // 9. Heel Center Line (15% длины стельки)
+  // Набойка должна лежать под вертикалью (±5 мм вперёд допустимо)
   let heelOffsetStatus: HeelCalculationResult['heelOffsetStatus'] = 'ok'
   let heelOffsetMessage: string | null = null
 
   if (heelTipOffsetMm < -0.5) {
-    // смещение назад
     heelOffsetStatus = 'too_far_back'
     heelOffsetMessage =
       'Ошибка: Каблук завален назад, произойдет перелом супинатора под весом пациента.'
@@ -131,6 +155,8 @@ export function calculateHeelGeometry(params: HeelCalculationParams): HeelCalcul
     isMedicalWarning,
     requiresMetatarsalPad,
     medicalMessage,
+    shankLength,
+    steelThickness,
     heelCenterLineXRatio: HEEL_CENTER_RATIO,
     maxAllowedHeelOffsetMm: MAX_HEEL_OFFSET_MM,
     heelOffsetStatus,
@@ -138,7 +164,10 @@ export function calculateHeelGeometry(params: HeelCalculationParams): HeelCalcul
   }
 }
 
-/** Удобный хелпер только для % нагрузки (можно вызывать отдельно в UI) */
+/**
+ * Хелпер только для % нагрузки на плюсну.
+ * Можно вызывать отдельно в UI без полного расчёта.
+ */
 export function calcForefootLoadPct(
   heelHeight: number,
   tToe: number,
@@ -147,12 +176,27 @@ export function calcForefootLoadPct(
   rockerAngle = 0,
   rockerStartPct = 65
 ): number {
-  let p = 50 + ((heelHeight - tToe) / lEff) * 100
+  let p = 50 + ((heelHeight - tToe) / Math.max(lEff, 1)) * 100
+
   if (soleType === 'rocker') {
     const factor =
       Math.min(1, rockerAngle / MAX_ROCKER_ANGLE) *
       (1 - (rockerStartPct - 55) / 40)
     p *= 1 - ROCKER_MITIGATION_CAP * Math.max(0, factor)
   }
+
   return Math.min(100, Math.max(0, Math.round(p)))
-  }
+}
+
+/** Константы, которые UI может показать в спецификации */
+export const HEEL_CALC_CONSTANTS = {
+  STEP_TO_MM,
+  FUNCTIONAL_ALLOWANCE,
+  L_EFF_RATIO,
+  HEEL_CENTER_RATIO,
+  MAX_HEEL_OFFSET_MM,
+  CRITICAL_FOREFOOT,
+  COMFORT_SLOPE_DEG,
+  ROCKER_MITIGATION_CAP,
+  MAX_ROCKER_ANGLE,
+} as const
