@@ -91,23 +91,27 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     },
   }[lang]
 
-  // --- 2. Инженерные Вычисления (Исправленная логика) ---
+  // --- 2. Инженерные Вычисления ---
   const engineeringData = useMemo(() => {
-    // 1. Длина следа колодки и эффективная длина (до пучков)
+    // 6.67: перевод штихового размера в миллиметры. +12 мм: функциональный припуск.
     const lastLengthMm = (shoeSize * 6.67) + 12
+    
+    // 0.73: эмпирический коэффициент (пучки пальцев находятся примерно на 73% длины стопы)
     const lEff = lastLengthMm * 0.73
     
-    // 2. Чистая высота приподнятости пятки колодки
+    // Чистая высота приподнятости пятки колодки
     const netRise = heelHeight - toeThickness
 
-    // 3. Угол стопы (без вычета рокера, так как рокер не меняет внутренний угол)
+    // Угол стопы (внутренний наклон колодки)
     const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-    // 4. Процент нагрузки на переднюю часть
-    const forefootLoad = Math.min(100, Math.max(0, Math.round(50 + (netRise / lEff) * 100)))
+    // Нормирование нагрузки (H_ref = 40 мм). 
+    // Базовая нагрузка = 50%. Каждые 40 мм чистого подъема добавляют ~20% нагрузки на пучки.
+    const loadCalc = 50 + (netRise / 40) * 20
+    const forefootLoad = Math.min(100, Math.max(0, Math.round(loadCalc)))
 
-    // 5. Расчет супинатора
+    // Расчет супинатора (0.48 - приблизительная пропорция геленочной части)
     const shankLength = Math.round((lastLengthMm * 0.48) + 15)
     let steelThickness = 1.2
     if (netRise > 40 && netRise <= 70) steelThickness = 1.5
@@ -126,7 +130,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     
     const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-    // Критическая ошибка: угол больше 18° или нагрузка больше 80%
+    // 18° - Критический порог перегрузки плюсневых костей
     if (engineeringData.internalSlope >= 18 || engineeringData.forefootLoad >= 80) {
       status = 'ERROR'
       title = t.errTitle
@@ -134,8 +138,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       colors = 'border-red-500/30 bg-red-500/20 text-red-400'
       boxColors = 'border-red-500/40 bg-red-950/20'
     } 
-    // Предупреждение: угол больше 14° или чистый перепад больше 40мм
-    else if (engineeringData.internalSlope > 14 || engineeringData.netRise > 40) {
+    // 14° - Физиологический порог комфорта. Жесткое условие netRise > 40 мм убрано.
+    else if (engineeringData.internalSlope > 14) {
       status = 'WARNING'
       title = t.warnTitle
       message = t.warn1Desc
@@ -163,25 +167,29 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
     const neededPlatform = Math.max(0, Math.round(heelHeight - maxSafeNetRise))
     
-    setToeThickness(Math.min(60, neededPlatform))
+    // Зафиксированы границы toeThickness: >= 0, <= 60, <= heelHeight + 10
+    const safePlatform = Math.max(0, Math.min(60, heelHeight + 10, neededPlatform))
+    setToeThickness(safePlatform)
     
-    // Подстраиваем рокер под новый наклон
-    let idealRocker = Math.round(14.5 - 2)
+    // Авто-rocker: относительная величина (80% от полученного безопасного угла)
+    const newNetRise = heelHeight - safePlatform
+    const newSlope = Math.asin(Math.max(-1, Math.min(1, newNetRise / engineeringData.lEff))) * (180 / Math.PI)
+    const idealRocker = Math.round(newSlope * 0.8)
     setRockerAngle(Math.max(5, Math.min(20, idealRocker)))
   }
 
-  // --- 5. Геометрия SVG (Сжатая для экономии места) ---
+  // --- 5. Геометрия SVG ---
   const geometry = useMemo(() => {
     const totalLength = shoeSize * 6.67 + 12
-    const scale = 0.9 // Уменьшенный масштаб
+    const scale = 0.9 
     const svgWidth = totalLength * scale
-    const svgHeight = 175 // Снижена высота
+    const svgHeight = 175 
     const padding = 35 
 
     const xHeel = padding
     const xRockerStart = padding + totalLength * (rockerStartPct / 100) * scale
     const xToe = padding + totalLength * scale
-    const yGround = 150 // Поднята земля
+    const yGround = 150 
 
     const getHeelPath = () => {
       const h = heelHeight * scale
@@ -198,7 +206,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const ySoleHeelTop = yGround - heelHeight * scale
     const ySoleRockerTop = yGround - toeThickness * scale
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
-    const toeLiftSvg = (totalLength * (1 - rockerStartPct / 100) * scale) * Math.sin((activeRockerAngle * Math.PI) / 180)
+    
+    // Ограничение максимального lift для стабильного отображения SVG
+    const maxLift = 50 
+    const rawLift = (totalLength * (1 - rockerStartPct / 100) * scale) * Math.sin((activeRockerAngle * Math.PI) / 180)
+    const toeLiftSvg = Math.min(maxLift, Math.max(0, rawLift))
     const ySoleToeTop = (yGround - toeLiftSvg) - toeThickness * scale
 
     const solePath = `
@@ -274,9 +286,9 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             </div>
           </div>
 
-          {/* SVG Canvas */}
+          {/* SVG Canvas (Добавлен preserveAspectRatio) */}
           <div className="relative flex justify-center items-center w-full" style={{ height: geometry.svgHeight }}>
-            <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} className="overflow-visible">
+            <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} preserveAspectRatio="xMidYMid meet" className="overflow-visible">
               <text x={geometry.xHeel - 10} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.heelLbl}</text>
               <text x={geometry.xToe - 25} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.toeLbl}</text>
               
@@ -342,6 +354,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   <div className="flex justify-between"><span>Длина геленка:</span> <strong className="text-[#F3EFEA]">{engineeringData.shankLength} мм</strong></div>
                   <div className="flex justify-between"><span>Сталь (65Г):</span> <strong className="text-[#F3EFEA]">{engineeringData.steelThickness.toFixed(1)} мм</strong></div>
                   <div className="flex justify-between"><span>L_eff (73%):</span> <strong className="text-[#F3EFEA]">{engineeringData.lEff.toFixed(1)} мм</strong></div>
+                  <div className="flex justify-between"><span>H_ref:</span> <strong className="text-[#F3EFEA]">40 мм</strong></div>
                   <div className="pt-2 mt-2 border-t border-white/5 font-mono text-[10px] text-[#D49A5C] bg-black/20 p-2 rounded-lg text-center">
                     Angle = arcsin((H - T) / L_eff)
                   </div>
