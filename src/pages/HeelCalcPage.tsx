@@ -2,6 +2,24 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
+// --- КОНСТАНТЫ И КОЭФФИЦИЕНТЫ ---
+const STEP_TO_MM = 6.67               // Перевод штихового размера в миллиметры
+const FUNCTIONAL_ALLOWANCE = 12       // Функциональный припуск (мм)
+const L_EFF_RATIO = 0.73              // Эмпирический коэффициент расположения пучков (73%)
+const H_REF = 40                      // Базовая высота для нормирования нагрузки (мм)
+const BASE_LOAD = 50                  // Базовая нагрузка (%)
+const LOAD_PER_H_REF = 20             // Прирост нагрузки на каждые H_REF мм подъема (%)
+const SHANK_PROPORTION = 0.48         // Приблизительная пропорция геленочной части
+const SHANK_OFFSET = 15               // Смещение для супинатора (мм)
+const MAX_TOE = 60                    // Максимальная толщина платформы (мм)
+const MAX_LIFT = 50                   // Максимальный подъем носка для SVG (мм)
+const CRITICAL_ANGLE = 18             // Критический порог перегрузки плюсневых костей (°)
+const COMFORT_ANGLE = 14              // Физиологический порог комфорта (°)
+const SAFE_ANGLE = 14.5               // Безопасный угол для Auto-Fix (°)
+const CRITICAL_LOAD = 80              // Критическая нагрузка на пучки (%)
+const MAX_ROCKER_ANGLE = 30           // База для расчета фактора рокера (°)
+const ROCKER_MITIGATION_CAP = 0.25    // Максимальное снижение нагрузки от рокера (25%)
+
 type HeelCalcPageProps = {
   onBack: () => void
   lang: Lang
@@ -49,10 +67,10 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       successTitle: '✅ БАЛАНС В НОРМЕ',
       successDesc: 'Физиологическая норма.',
       warnTitle: '⚠️ ВЫСОКИЙ ПОДЪЕМ',
-      warn1Desc: 'Угол больше 14°. Рекомендуется гелевая стелька.',
+      warn1Desc: `Угол больше ${COMFORT_ANGLE}°. Рекомендуется гелевая стелька.`,
       warn2Desc: 'Эффект "обратного завала".',
       errTitle: '⚠️ КРИТИЧЕСКИЙ КАБЛУК',
-      errDesc: 'Угол стопы > 18°. Требуется компенсация платформой.',
+      errDesc: `Угол стопы > ${CRITICAL_ANGLE}°. Требуется компенсация платформой.`,
       heelLbl: 'ПЯТКА',
       toeLbl: 'НОСОК',
       stiletto: 'Шпилька',
@@ -76,10 +94,10 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       successTitle: '✅ БАЛАНС У НОРМІ',
       successDesc: 'Фізіологічна норма.',
       warnTitle: '⚠️ ВИСОКИЙ ПІДЙОМ',
-      warn1Desc: 'Кут більше 14°. Рекомендована гелева устілка.',
+      warn1Desc: `Кут більше ${COMFORT_ANGLE}°. Рекомендована гелева устілка.`,
       warn2Desc: 'Ефект "зворотного завалу".',
       errTitle: '⚠️ КРИТИЧНИЙ ПІДБОР',
-      errDesc: 'Кут стопи > 18°. Потрібна компенсація платформою.',
+      errDesc: `Кут стопи > ${CRITICAL_ANGLE}°. Потрібна компенсація платформою.`,
       heelLbl: 'П\'ЯТКА',
       toeLbl: 'НОСОК',
       stiletto: 'Шпилька',
@@ -93,32 +111,35 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
   // --- 2. Инженерные Вычисления ---
   const engineeringData = useMemo(() => {
-    // 6.67: перевод штихового размера в миллиметры. +12 мм: функциональный припуск.
-    const lastLengthMm = (shoeSize * 6.67) + 12
-    
-    // 0.73: эмпирический коэффициент (пучки пальцев находятся примерно на 73% длины стопы)
-    const lEff = lastLengthMm * 0.73
-    
-    // Чистая высота приподнятости пятки колодки
+    const lastLengthMm = (shoeSize * STEP_TO_MM) + FUNCTIONAL_ALLOWANCE
+    const lEff = lastLengthMm * L_EFF_RATIO
     const netRise = heelHeight - toeThickness
 
     // Угол стопы (внутренний наклон колодки)
     const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
     const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-    // Нормирование нагрузки (H_ref = 40 мм). 
-    // Базовая нагрузка = 50%. Каждые 40 мм чистого подъема добавляют ~20% нагрузки на пучки.
-    const loadCalc = 50 + (netRise / 40) * 20
-    const forefootLoad = Math.min(100, Math.max(0, Math.round(loadCalc)))
+    // Нормирование базовой нагрузки
+    const loadCalc = BASE_LOAD + (netRise / H_REF) * LOAD_PER_H_REF
+    
+    // Учёт эффекта рокера на нагрузку
+    const rockerEffectFactor = (soleType === 'rocker') 
+      ? Math.min(1, rockerAngle / MAX_ROCKER_ANGLE) * (1 - (rockerStartPct - 55) / 40) 
+      : 0
+    
+    // Уменьшаем нагрузку до ROCKER_MITIGATION_CAP (25%) при больших рокерах
+    const adjustedLoad = loadCalc * (1 - ROCKER_MITIGATION_CAP * rockerEffectFactor)
+    const forefootLoad = Math.min(100, Math.max(0, Math.round(adjustedLoad)))
 
-    // Расчет супинатора (0.48 - приблизительная пропорция геленочной части)
-    const shankLength = Math.round((lastLengthMm * 0.48) + 15)
+    // Расчет супинатора
+    const shankLength = Math.round((lastLengthMm * SHANK_PROPORTION) + SHANK_OFFSET)
+    
     let steelThickness = 1.2
-    if (netRise > 40 && netRise <= 70) steelThickness = 1.5
+    if (netRise > H_REF && netRise <= 70) steelThickness = 1.5
     else if (netRise > 70) steelThickness = 2.0
 
     return { internalSlope, forefootLoad, shankLength, steelThickness, netRise, lEff }
-  }, [shoeSize, heelHeight, toeThickness])
+  }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct, soleType])
 
   // --- 3. Аудит и Баланс ---
   const balanceAudit = useMemo(() => {
@@ -130,16 +151,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     
     const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-    // 18° - Критический порог перегрузки плюсневых костей
-    if (engineeringData.internalSlope >= 18 || engineeringData.forefootLoad >= 80) {
+    if (engineeringData.internalSlope >= CRITICAL_ANGLE || engineeringData.forefootLoad >= CRITICAL_LOAD) {
       status = 'ERROR'
       title = t.errTitle
       message = t.errDesc
       colors = 'border-red-500/30 bg-red-500/20 text-red-400'
       boxColors = 'border-red-500/40 bg-red-950/20'
     } 
-    // 14° - Физиологический порог комфорта. Жесткое условие netRise > 40 мм убрано.
-    else if (engineeringData.internalSlope > 14) {
+    else if (engineeringData.internalSlope > COMFORT_ANGLE) {
       status = 'WARNING'
       title = t.warnTitle
       message = t.warn1Desc
@@ -163,12 +182,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     if (soleType === 'flat') setSoleType('rocker')
 
     // Опускаем угол до безопасных 14.5 градусов
-    const targetAngleRad = (14.5 * Math.PI) / 180
+    const targetAngleRad = (SAFE_ANGLE * Math.PI) / 180
     const maxSafeNetRise = engineeringData.lEff * Math.sin(targetAngleRad)
     const neededPlatform = Math.max(0, Math.round(heelHeight - maxSafeNetRise))
     
-    // Зафиксированы границы toeThickness: >= 0, <= 60, <= heelHeight + 10
-    const safePlatform = Math.max(0, Math.min(60, heelHeight + 10, neededPlatform))
+    // Зафиксированы границы toeThickness: >= 0, <= MAX_TOE, <= heelHeight + 10
+    const safePlatform = Math.max(0, Math.min(MAX_TOE, heelHeight + 10, neededPlatform))
     setToeThickness(safePlatform)
     
     // Авто-rocker: относительная величина (80% от полученного безопасного угла)
@@ -180,7 +199,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
   // --- 5. Геометрия SVG ---
   const geometry = useMemo(() => {
-    const totalLength = shoeSize * 6.67 + 12
+    const totalLength = shoeSize * STEP_TO_MM + FUNCTIONAL_ALLOWANCE
     const scale = 0.9 
     const svgWidth = totalLength * scale
     const svgHeight = 175 
@@ -207,10 +226,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const ySoleRockerTop = yGround - toeThickness * scale
     const activeRockerAngle = soleType === 'rocker' ? rockerAngle : 0
     
-    // Ограничение максимального lift для стабильного отображения SVG
-    const maxLift = 50 
     const rawLift = (totalLength * (1 - rockerStartPct / 100) * scale) * Math.sin((activeRockerAngle * Math.PI) / 180)
-    const toeLiftSvg = Math.min(maxLift, Math.max(0, rawLift))
+    const toeLiftSvg = Math.min(MAX_LIFT, Math.max(0, rawLift))
     const ySoleToeTop = (yGround - toeLiftSvg) - toeThickness * scale
 
     const solePath = `
@@ -286,9 +303,9 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             </div>
           </div>
 
-          {/* SVG Canvas (Добавлен preserveAspectRatio) */}
+          {/* SVG Canvas с обновленным preserveAspectRatio */}
           <div className="relative flex justify-center items-center w-full" style={{ height: geometry.svgHeight }}>
-            <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} preserveAspectRatio="xMidYMid meet" className="overflow-visible">
+            <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} preserveAspectRatio="xMidYMax meet" className="overflow-visible">
               <text x={geometry.xHeel - 10} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.heelLbl}</text>
               <text x={geometry.xToe - 25} y="25" fill="#8B5CF6" fontSize="10" fontWeight="bold" opacity="0.8">{t.toeLbl}</text>
               
@@ -312,7 +329,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
           <div className="px-3 pb-2 pt-1 border-t border-white/5 flex justify-between text-[10px] opacity-90 z-10 bg-black/20">
             <span>{t.internalSlope} <strong className="text-[11px]">{engineeringData.internalSlope.toFixed(1)}°</strong></span>
-            <span>{t.loadLbl} <strong className={`text-[11px] ${engineeringData.forefootLoad > 80 ? 'text-red-400' : ''}`}>{engineeringData.forefootLoad}%</strong></span>
+            <span>{t.loadLbl} <strong className={`text-[11px] ${engineeringData.forefootLoad >= CRITICAL_LOAD ? 'text-red-400' : ''}`}>{engineeringData.forefootLoad}%</strong></span>
           </div>
         </div>
 
@@ -334,7 +351,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
         <div className="grid grid-cols-2 gap-2">
           <Stepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} />
           <Stepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" />
-          <Stepper label={t.toe} min={0} max={Math.min(60, heelHeight + 10)} value={toeThickness} onChange={setToeThickness} unit="мм" />
+          <Stepper label={t.toe} min={0} max={Math.min(MAX_TOE, heelHeight + 10)} value={toeThickness} onChange={setToeThickness} unit="мм" />
           <Stepper label={t.angle} min={5} max={30} value={rockerAngle} onChange={setRockerAngle} unit="°" disabled={soleType === 'flat'} />
           <div className="col-span-2">
             <Stepper label={t.start} min={55} max={75} value={rockerStartPct} onChange={setRockerStartPct} unit="%" disabled={soleType === 'flat'} />
@@ -353,8 +370,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                 <div className="bg-[#1C1816] p-3 rounded-xl border border-white/5 text-[11px] text-[#A3988E] space-y-2">
                   <div className="flex justify-between"><span>Длина геленка:</span> <strong className="text-[#F3EFEA]">{engineeringData.shankLength} мм</strong></div>
                   <div className="flex justify-between"><span>Сталь (65Г):</span> <strong className="text-[#F3EFEA]">{engineeringData.steelThickness.toFixed(1)} мм</strong></div>
-                  <div className="flex justify-between"><span>L_eff (73%):</span> <strong className="text-[#F3EFEA]">{engineeringData.lEff.toFixed(1)} мм</strong></div>
-                  <div className="flex justify-between"><span>H_ref:</span> <strong className="text-[#F3EFEA]">40 мм</strong></div>
+                  <div className="flex justify-between"><span>L_eff ({(L_EFF_RATIO * 100).toFixed(0)}%):</span> <strong className="text-[#F3EFEA]">{engineeringData.lEff.toFixed(1)} мм</strong></div>
+                  <div className="flex justify-between"><span>H_ref:</span> <strong className="text-[#F3EFEA]">{H_REF} мм</strong></div>
                   <div className="pt-2 mt-2 border-t border-white/5 font-mono text-[10px] text-[#D49A5C] bg-black/20 p-2 rounded-lg text-center">
                     Angle = arcsin((H - T) / L_eff)
                   </div>
