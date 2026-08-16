@@ -9,12 +9,16 @@ type HeelCalcPageProps = {
 
 export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   // --- 1. Стейты ---
-  const [shoeSize, setShoeSize] = useState(42)
-  const [heelHeight, setHeelHeight] = useState(50)     
-  const [toeThickness, setToeThickness] = useState(12) 
-  const [rockerAngle, setRockerAngle] = useState(22)   
+  const [shoeSize, setShoeSize] = useState(38) // Дефолт для женской обуви
+  const [heelHeight, setHeelHeight] = useState(75)     
+  const [toeThickness, setToeThickness] = useState(15) 
+  const [rockerAngle, setRockerAngle] = useState(12)   
   const [rockerStartPct, setRockerStartPct] = useState(63) 
-  const [showFormulas, setShowFormulas] = useState(false) // Стейт для вкладки формул
+  
+  // Новые стейты для интеграции женских каблуков
+  const [heelType, setHeelType] = useState<'stiletto' | 'block' | 'kitten'>('stiletto')
+  const [showSpecs, setShowSpecs] = useState(false)
+  const [showFormulas, setShowFormulas] = useState(false)
 
   // Haptic Feedback
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
@@ -28,89 +32,125 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   // --- 2. Локализация ---
   const t = {
     ru: {
-      title: 'Биомеханика и Каблук',
-      desc: 'Расчет рокерной подошвы',
+      title: 'Инженерия и Баланс',
+      desc: 'Аудит рокера и шпилек',
       size: 'Размер (EU)',
       heel: 'Каблук',
-      toe: 'Носок',
+      toe: 'Носок/Платф.',
       angle: 'Угол',
       start: 'Старт',
       fixBtn: '🪄 Баланс',
       groundLine: 'ЛИНИЯ ОПОРЫ',
-      rockerPoint: 'Точка переката',
-      internalSlope: 'Наклон:',
+      internalSlope: 'Наклон стопы:',
       targetRocker: 'Рокер:',
+      loadLbl: 'Нагрузка на пучки:',
       successTitle: '✅ АУДИТ ПРОЙДЕН',
-      successDesc: 'Рокер компенсирует наклон. Колодка сбалансирована.',
+      successDesc: 'Баланс в пределах физиологической нормы.',
       warnTitle: '⚠️ ПРЕДУПРЕЖДЕНИЕ',
       warn1Desc: 'Высокий подъем без переката. Перегрузка плюсневых костей.',
       warn2Desc: 'Эффект "обратного завала". Центр тяжести на пятке.',
-      errTitle: '❌ БЛОКИРОВКА',
-      errDesc: 'Критическая диспропорция! Пациент будет соскальзывать.',
+      errTitle: '❌ ОПАСНАЯ КОНСТРУКЦИЯ',
+      errDesc: 'Критический наклон! Риск деформации стопы. Требуется метатарзальный пелот.',
       heelLbl: 'ПЯТКА',
       toeLbl: 'НОСОК',
+      stiletto: 'Шпилька',
+      block: 'Блок',
+      kitten: 'Рюмочка',
+      specsBtn: '⚙️ Спецификация геленка',
+      shankLength: 'Длина супинатора:',
+      shankSteel: 'Толщина стали (65Г):',
+      shankProfile: 'Профиль детали:',
       formulaBtn: 'ℹ️ Как это считается?',
       formulaTitle: 'Математика комфорта',
-      formulaText: 'Внутренний угол наклона (α) рассчитывается через арксинус разницы высот пятки (H) и носка (T), деленной на эффективную длину колодки (L × 0.73). Рокер компенсирует этот угол для плавного переката.',
+      formulaText: 'Распределение веса: P = 50 + ((H - T) / L_eff) × 100. Чем выше каблук, тем сильнее смещается центр тяжести на носок. Металлический геленок (супинатор) рассчитывается от высоты подъема и берет на себя торсионную нагрузку.',
       formulaMath: 'α = arcsin((H - T) / (L * 0.73))'
     },
     uk: {
-      title: 'Біомеханіка та Підбор',
-      desc: 'Розрахунок рокерної підошви',
+      title: 'Інженерія та Баланс',
+      desc: 'Аудит рокера та шпильок',
       size: 'Розмір (EU)',
       heel: 'Підбор',
-      toe: 'Носок',
+      toe: 'Носок/Платф.',
       angle: 'Кут',
       start: 'Старт',
       fixBtn: '🪄 Баланс',
       groundLine: 'ЛІНІЯ ОПОРИ',
-      rockerPoint: 'Точка перекату',
-      internalSlope: 'Нахил:',
+      internalSlope: 'Нахил стопи:',
       targetRocker: 'Рокер:',
+      loadLbl: 'Навантаження на пучки:',
       successTitle: '✅ АУДИТ ПРОЙДЕНО',
-      successDesc: 'Рокер компенсує нахил. Колодка збалансована.',
+      successDesc: 'Баланс у межах фізіологічної норми.',
       warnTitle: '⚠️ ПОПЕРЕДЖЕННЯ',
       warn1Desc: 'Високий підйом без перекату. Перевантаження плеснових кісток.',
       warn2Desc: 'Ефект "зворотного завалу". Центр ваги на п\'яті.',
-      errTitle: '❌ БЛОКУВАННЯ',
-      errDesc: 'Критична диспропорція! Пацієнт буде зісковзувати.',
+      errTitle: '❌ НЕБЕЗПЕЧНА КОНСТРУКЦІЯ',
+      errDesc: 'Критичний нахил! Ризик деформації стопи. Потрібен метатарзальний пелот.',
       heelLbl: 'П\'ЯТКА',
       toeLbl: 'НОСОК',
+      stiletto: 'Шпилька',
+      block: 'Блок',
+      kitten: 'Чарочка',
+      specsBtn: '⚙️ Специфікація геленка',
+      shankLength: 'Довжина супінатора:',
+      shankSteel: 'Товщина сталі (65Г):',
+      shankProfile: 'Профіль деталі:',
       formulaBtn: 'ℹ️ Як це рахується?',
       formulaTitle: 'Математика комфорту',
-      formulaText: 'Внутрішній кут нахилу (α) розраховується через арксинус різниці висот підбора (H) та носка (T), поділеної на ефективну довжину колодки (L × 0.73). Рокер компенсує цей кут для плавного перекату.',
+      formulaText: 'Розподіл ваги: P = 50 + ((H - T) / L_eff) × 100. Чим вищий підбор, тим сильніше зміщується центр ваги на носок. Металевий геленок (супінатор) розраховується від висоти підйому і бере на себе торсіонне навантаження.',
       formulaMath: 'α = arcsin((H - T) / (L * 0.73))'
     },
   }[lang]
 
-  // --- 3. Вычисления ---
-  const calculateInternalSlope = (size: number, heel: number, toe: number) => {
-    const lastLengthMm = size * 6.67 + 12
+  // --- 3. Инженерные Вычисления (Рокер + Шпильки) ---
+  const engineeringData = useMemo(() => {
+    const lastLengthMm = (shoeSize * 6.67) + 12
     const lEff = lastLengthMm * 0.73
-    const netHeelRise = heel - toe
-    const asinArg = Math.max(-1, Math.min(1, netHeelRise / lEff))
-    return Math.asin(asinArg) * (180 / Math.PI)
-  }
+    const netRise = heelHeight - toeThickness
+    
+    // Угол наклона
+    const asinArg = Math.max(-1, Math.min(1, netRise / lEff))
+    const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
+
+    // Нагрузка на переднюю часть стопы
+    const forefootLoad = Math.min(95, Math.max(0, Math.round(50 + (netRise / lEff) * 100)))
+
+    // Расчет супинатора (Геленка)
+    const shankLength = Math.round((lastLengthMm * 0.48) + 15)
+    let steelThickness = 1.2
+    let shankType = lang === 'ru' ? "Стандартный плоский" : "Стандартний плоский"
+
+    if (netRise > 40 && netRise <= 70) {
+      steelThickness = 1.5
+      shankType = lang === 'ru' ? "Усиленный (с ребром жесткости)" : "Посилений (з ребром жорсткості)"
+    } else if (netRise > 70) {
+      steelThickness = 2.0
+      if (heelType === 'stiletto') {
+        shankType = lang === 'ru' ? "Двухслойный арочный / Гофре" : "Двошаровий арковий / Гофре"
+      } else {
+        shankType = lang === 'ru' ? "Утолщенный двухреберный" : "Потовщений двореберний"
+      }
+    }
+
+    return { internalSlope, forefootLoad, shankLength, steelThickness, shankType, ballClearance: 12 }
+  }, [shoeSize, heelHeight, toeThickness, heelType, lang])
 
   // --- 4. Auto-Fix ---
   const handleAutoFix = () => {
     triggerHaptic('medium')
-    const internalSlope = calculateInternalSlope(shoeSize, heelHeight, toeThickness)
-    let idealRocker = Math.round(internalSlope - 2)
-    idealRocker = Math.max(5, Math.min(20, idealRocker)) 
-    
-    if (heelHeight > 45 && idealRocker >= 20) {
-      const maxSafeHeel = Math.round(
-        ((shoeSize * 6.67 + 12) * 0.73 * Math.sin((16 * Math.PI) / 180)) + toeThickness
-      )
-      setHeelHeight(maxSafeHeel)
-      setRockerAngle(14)
-      return
+    // Если перегруз по шпильке - спасаем платформой
+    if (engineeringData.forefootLoad > 80) {
+      const lastLengthMm = (shoeSize * 6.67) + 12
+      const lEff = lastLengthMm * 0.73
+      const neededPlatform = Math.max(0, Math.round(heelHeight - (lEff * Math.sin((16 * Math.PI) / 180))))
+      setToeThickness(Math.min(50, neededPlatform)) // Поднимаем носок (платформу)
     }
+
+    let idealRocker = Math.round(engineeringData.internalSlope - 2)
+    idealRocker = Math.max(5, Math.min(20, idealRocker)) 
     setRockerAngle(idealRocker)
   }
 
-  // --- 5. Геометрия ---
+  // --- 5. Геометрия SVG ---
   const geometry = useMemo(() => {
     const totalLength = shoeSize * 6.67 + 12
     const scale = 1.05
@@ -137,6 +177,9 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     const ySoleRockerTop = yGround - toeThickness * scale
     const ySoleToeTop = ySoleToeBottom - toeThickness * scale
 
+    // Линия центра пятки (15% от длины)
+    const xHeelCenter = padding + (totalLength * 0.15 * scale)
+
     // Органический путь (Обувь)
     const solePath = `
       M ${xHeel} ${ySoleHeelTop}
@@ -159,33 +202,22 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       Z
     `
 
-    return {
-      svgWidth: svgWidth + padding * 2,
-      svgHeight,
-      solePath,
-      xHeel,
-      xRockerStart,
-      xToe,
-      yGround,
-      ySoleHeelTop
-    }
+    return { svgWidth: svgWidth + padding * 2, svgHeight, solePath, xHeel, xRockerStart, xToe, yGround, xHeelCenter }
   }, [shoeSize, heelHeight, toeThickness, rockerAngle, rockerStartPct])
 
-  // --- 6. Аудит ---
+  // --- 6. Аудит (Сводный) ---
   const balanceAudit = useMemo(() => {
-    const internalSlopeAngle = calculateInternalSlope(shoeSize, heelHeight, toeThickness)
-    
     let status: 'SUCCESS' | 'WARNING' | 'ERROR' = 'SUCCESS'
     let title = t.successTitle
     let message = t.successDesc
     let colorClasses = 'border-green-500/30 bg-green-500/10 text-green-400'
 
-    if (heelHeight > 40 && rockerAngle > 15) {
+    if (engineeringData.forefootLoad > 80 || engineeringData.internalSlope > 18) {
       status = 'ERROR'
       title = t.errTitle
       message = t.errDesc
       colorClasses = 'border-red-500/30 bg-red-500/10 text-red-400'
-    } else if (internalSlopeAngle > 14 && rockerAngle < 8) {
+    } else if (engineeringData.internalSlope > 14 && rockerAngle < 8) {
       status = 'WARNING'
       title = t.warnTitle
       message = t.warn1Desc
@@ -197,8 +229,8 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       colorClasses = 'border-amber-500/30 bg-amber-500/10 text-amber-400'
     }
 
-    return { status, title, message, colorClasses, internalSlope: internalSlopeAngle.toFixed(1) }
-  }, [shoeSize, heelHeight, rockerAngle, toeThickness, t])
+    return { status, title, message, colorClasses }
+  }, [engineeringData, rockerAngle, heelHeight, t])
 
   // --- 7. Крупный UI Компонент Степпера ---
   const Stepper = ({ label, value, min, max, onChange, unit = '' }: any) => {
@@ -210,20 +242,16 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
         <span className="text-[#A3988E] text-[12px] font-medium mb-3 uppercase tracking-wider">{label}</span>
         <div className="flex items-center justify-between gap-2">
           <button 
-            onClick={handleSub}
-            disabled={value <= min}
+            onClick={handleSub} disabled={value <= min}
             className="w-11 h-11 flex items-center justify-center rounded-[10px] bg-white/5 active:bg-white/10 active:scale-95 disabled:opacity-30 transition-all"
           >
             <span className="text-2xl font-medium leading-none mb-1">-</span>
           </button>
-          
           <div className="flex items-baseline justify-center font-bold text-[18px] text-[#F3EFEA]">
             {value}<span className="text-[12px] text-[#A3988E] ml-1">{unit}</span>
           </div>
-
           <button 
-            onClick={handleAdd}
-            disabled={value >= max}
+            onClick={handleAdd} disabled={value >= max}
             className="w-11 h-11 flex items-center justify-center rounded-[10px] bg-white/5 active:bg-white/10 active:scale-95 disabled:opacity-30 transition-all"
           >
             <span className="text-2xl font-medium leading-none mb-1">+</span>
@@ -235,18 +263,13 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="flex flex-col h-[100dvh] bg-[#110F0E] text-[#F3EFEA] overflow-hidden"
     >
       {/* Шапка */}
       <div className="flex-shrink-0 p-4 flex items-center justify-between border-b border-white/5 bg-[#110F0E]/80 backdrop-blur-md z-10">
-        <button
-          onClick={() => { triggerHaptic('light'); onBack() }}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1C1816] border border-white/5 active:scale-90 transition-transform"
-        >
+        <button onClick={() => { triggerHaptic('light'); onBack() }} className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1C1816] border border-white/5 active:scale-90 transition-transform">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="text-right">
@@ -257,19 +280,20 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-12">
         
-        {/* Окно визуализации SVG (С подписями Пятка/Носок) */}
+        {/* Окно визуализации SVG */}
         <div className="bg-[#1C1816] border border-white/5 rounded-[16px] p-2 relative overflow-hidden flex justify-center items-center h-[180px]">
           <svg width="100%" height="100%" viewBox={`0 0 ${geometry.svgWidth} ${geometry.svgHeight}`} className="overflow-visible">
-            
-            {/* Текстовые маркеры ПЯТКА / НОСОК */}
             <text x={geometry.xHeel - 10} y="25" fill="#8B5CF6" fontSize="12" fontWeight="bold" opacity="0.8">{t.heelLbl}</text>
             <text x={geometry.xToe - 30} y="25" fill="#8B5CF6" fontSize="12" fontWeight="bold" opacity="0.8">{t.toeLbl}</text>
             
             {/* Линия земли */}
             <line x1="0" y1={geometry.yGround} x2={geometry.svgWidth} y2={geometry.yGround} stroke="#4A423C" strokeWidth="1" strokeDasharray="3 3" />
-            <text x="10" y={geometry.yGround + 14} fontSize="9" fill="#8A827C">{t.groundLine}</text>
+            
+            {/* Линия падения центра тяжести (Пятка) */}
+            <line x1={geometry.xHeelCenter} y1={20} x2={geometry.xHeelCenter} y2={geometry.yGround} stroke="#10B981" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.5" />
+            <circle cx={geometry.xHeelCenter} cy={geometry.yGround} r="2.5" fill="#10B981" opacity="0.7" />
 
-            {/* Тело подошвы (Плавное) */}
+            {/* Тело подошвы */}
             <path d={geometry.solePath} fill="#2A2421" stroke="#D49A5C" strokeWidth="2" strokeLinejoin="round" />
 
             {/* Точка переката */}
@@ -278,12 +302,22 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             <text x={geometry.xRockerStart - 25} y={geometry.yGround - 40} fontSize="10" fill="#EF4444" fontWeight="600">{rockerStartPct}%</text>
 
             {/* Угол рокера */}
-            <path 
-              d={`M ${geometry.xRockerStart + 30} ${geometry.yGround} A 30 30 0 0 0 ${geometry.xRockerStart + 30} ${geometry.yGround - 11}`} 
-              fill="none" stroke="#8B5CF6" strokeWidth="1.5" 
-            />
+            <path d={`M ${geometry.xRockerStart + 30} ${geometry.yGround} A 30 30 0 0 0 ${geometry.xRockerStart + 30} ${geometry.yGround - 11}`} fill="none" stroke="#8B5CF6" strokeWidth="1.5" />
             <text x={geometry.xToe - 30} y={geometry.yGround - 10} fontSize="11" fill="#8B5CF6" fontWeight="bold">{rockerAngle}°</text>
           </svg>
+        </div>
+
+        {/* Выбор типа каблука */}
+        <div className="flex bg-[#1C1816] p-1 rounded-[12px] border border-white/5">
+          {(['stiletto', 'block', 'kitten'] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => { triggerHaptic('light'); setHeelType(type) }}
+              className={`flex-1 py-2 text-[12px] font-medium rounded-[10px] transition-colors ${heelType === type ? 'bg-[#8B5CF6] text-white shadow-md' : 'text-[#A3988E] bg-transparent'}`}
+            >
+              {t[type]}
+            </button>
+          ))}
         </div>
 
         {/* Панель аудита и Auto-fix */}
@@ -301,59 +335,76 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           </div>
           <p className="text-[12px] leading-snug opacity-90 mb-3">{balanceAudit.message}</p>
           <div className="text-[11px] opacity-75 pt-3 border-t border-current/20 flex justify-between">
-            <span>{t.internalSlope} <strong className="text-[12px]">{balanceAudit.internalSlope}°</strong></span>
-            <span>{t.targetRocker} <strong className="text-[12px]">{rockerAngle}°</strong></span>
+            <span>{t.internalSlope} <strong className="text-[12px]">{engineeringData.internalSlope.toFixed(1)}°</strong></span>
+            <span>{t.loadLbl} <strong className={`text-[12px] ${engineeringData.forefootLoad > 80 ? 'font-bold' : ''}`}>{engineeringData.forefootLoad}%</strong></span>
           </div>
         </div>
 
         {/* Сетка контролов */}
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <Stepper label={t.size} min={35} max={48} value={shoeSize} onChange={setShoeSize} unit="" />
+            <Stepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} unit="" />
           </div>
-          <Stepper label={t.heel} min={10} max={60} value={heelHeight} onChange={setHeelHeight} unit="мм" />
-          <Stepper label={t.toe} min={5} max={30} value={toeThickness} onChange={setToeThickness} unit="мм" />
+          <Stepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" />
+          <Stepper label={t.toe} min={0} max={60} value={toeThickness} onChange={setToeThickness} unit="мм" />
           <Stepper label={t.angle} min={5} max={30} value={rockerAngle} onChange={setRockerAngle} unit="°" />
           <Stepper label={t.start} min={55} max={75} value={rockerStartPct} onChange={setRockerStartPct} unit="%" />
         </div>
         
-        {/* Вкладка: Как это считается? */}
-        <div className="pt-2">
-          <button 
-            onClick={() => { triggerHaptic('light'); setShowFormulas(!showFormulas) }}
-            className="w-full py-3.5 px-4 bg-[#1C1816] rounded-[14px] text-[13px] font-medium flex items-center justify-between border border-white/5 active:bg-white/5 transition-colors"
-          >
-            <span className="flex items-center gap-2 text-[#A3988E]">
-              {t.formulaBtn}
-            </span>
-            <svg 
-              className={`w-4 h-4 text-[#A3988E] transition-transform duration-300 ${showFormulas ? 'rotate-180' : ''}`} 
-              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        {/* Аккордеоны информации (Супинатор и Формулы) */}
+        <div className="pt-2 space-y-2">
+          
+          {/* Спецификация супинатора */}
+          <div>
+            <button 
+              onClick={() => { triggerHaptic('light'); setShowSpecs(!showSpecs) }}
+              className={`w-full py-3.5 px-4 bg-[#1C1816] rounded-[14px] text-[13px] font-medium flex items-center justify-between border transition-colors ${showSpecs ? 'border-[#8B5CF6]/50' : 'border-white/5 active:bg-white/5'}`}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          <AnimatePresence>
-            {showFormulas && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0, marginTop: 0 }} 
-                animate={{ height: 'auto', opacity: 1, marginTop: 8 }} 
-                exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="bg-[#1C1816] p-4 rounded-[14px] border border-white/5 text-[12px] leading-relaxed text-[#A3988E]">
-                  <h4 className="text-[#F3EFEA] font-bold mb-2 text-[13px]">{t.formulaTitle}</h4>
-                  <p>{t.formulaText}</p>
-                  <div className="mt-3 pt-3 border-t border-white/5 font-mono text-[12px] text-[#8B5CF6] text-center tracking-wider bg-black/20 p-2 rounded-lg">
-                    {t.formulaMath}
+              <span className="flex items-center gap-2 text-[#F3EFEA]">{t.specsBtn}</span>
+              <svg className={`w-4 h-4 text-[#A3988E] transition-transform duration-300 ${showSpecs ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <AnimatePresence>
+              {showSpecs && (
+                <motion.div initial={{ height: 0, opacity: 0, marginTop: 0 }} animate={{ height: 'auto', opacity: 1, marginTop: 8 }} exit={{ height: 0, opacity: 0, marginTop: 0 }} className="overflow-hidden">
+                  <div className="bg-[#1C1816] p-4 rounded-[14px] border border-white/5 text-[12px] text-[#A3988E] space-y-2">
+                    <div className="flex justify-between"><span>{t.shankLength}</span> <strong className="text-[#F3EFEA]">{engineeringData.shankLength} мм</strong></div>
+                    <div className="flex justify-between"><span>{t.shankSteel}</span> <strong className="text-[#F3EFEA]">{engineeringData.steelThickness.toFixed(1)} мм</strong></div>
+                    <div className="pt-2 mt-2 border-t border-white/5 text-[#8B5CF6] font-medium">{t.shankProfile} {engineeringData.shankType}</div>
                   </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
+          {/* Формулы */}
+          <div>
+            <button 
+              onClick={() => { triggerHaptic('light'); setShowFormulas(!showFormulas) }}
+              className="w-full py-3.5 px-4 bg-[#1C1816] rounded-[14px] text-[13px] font-medium flex items-center justify-between border border-white/5 active:bg-white/5 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-[#A3988E]">{t.formulaBtn}</span>
+              <svg className={`w-4 h-4 text-[#A3988E] transition-transform duration-300 ${showFormulas ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <AnimatePresence>
+              {showFormulas && (
+                <motion.div initial={{ height: 0, opacity: 0, marginTop: 0 }} animate={{ height: 'auto', opacity: 1, marginTop: 8 }} exit={{ height: 0, opacity: 0, marginTop: 0 }} className="overflow-hidden">
+                  <div className="bg-[#1C1816] p-4 rounded-[14px] border border-white/5 text-[12px] leading-relaxed text-[#A3988E]">
+                    <h4 className="text-[#F3EFEA] font-bold mb-2 text-[13px]">{t.formulaTitle}</h4>
+                    <p>{t.formulaText}</p>
+                    <div className="mt-3 pt-3 border-t border-white/5 font-mono text-[11px] text-[#D49A5C] text-center bg-black/20 p-2 rounded-lg">
+                      {t.formulaMath}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+        </div>
       </div>
     </motion.div>
   )
