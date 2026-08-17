@@ -52,7 +52,6 @@ const PigmentSelector = ({
   const selectedPigment = pigments.find((p) => p.id === value)
   const isUk = lang === 'uk'
 
-  // Живой поиск по локализованному названию, английскому названию и ID
   const filteredPigments = useMemo(() => {
     const term = search.toLowerCase()
     return pigments.filter((p) => {
@@ -77,13 +76,12 @@ const PigmentSelector = ({
 
   return (
     <div className="relative flex-1 min-w-0" ref={wrapperRef}>
-      {/* Инпут автодополнения */}
       <div
-        className="flex items-center gap-2 bg-white text-black border border-gray-200 rounded-lg px-3 py-2 text-sm cursor-text focus-within:border-[#D8A35C] transition-colors"
+        className="flex items-center gap-2 bg-white text-black border border-gray-200 rounded-lg px-3 py-2.5 text-sm cursor-text focus-within:border-[#D8A35C] transition-colors"
         onClick={() => setIsOpen(true)}
       >
         <div
-          className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0 shadow-inner"
+          className="w-5 h-5 rounded-full border border-gray-300 flex-shrink-0 shadow-inner"
           style={{ backgroundColor: selectedPigment?.hex || '#ccc' }}
         />
         <input
@@ -94,7 +92,8 @@ const PigmentSelector = ({
             setIsOpen(true)
           }}
           placeholder={isUk ? 'Пошук кольору...' : 'Поиск цвета...'}
-          className="flex-1 w-full bg-transparent outline-none truncate"
+          className="flex-1 w-full bg-transparent outline-none truncate text-base"
+          style={{ fontSize: '16px' }}
         />
         <svg
           className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -104,7 +103,6 @@ const PigmentSelector = ({
         </svg>
       </div>
 
-      {/* Выпадающий список */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -131,16 +129,14 @@ const PigmentSelector = ({
                     }}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      {/* Выкрас */}
                       <div
-                        className="w-6 h-6 rounded-md border border-gray-300 shadow-sm flex-shrink-0"
+                        className="w-7 h-7 rounded-md border border-gray-300 shadow-sm flex-shrink-0"
                         style={{ backgroundColor: p.hex || '#e5e7eb' }}
                       />
                       <div className="flex flex-col truncate pr-2">
                         <span className="text-sm font-medium text-gray-900 truncate">
                           {isUk ? p.name.uk : p.name.ru}
                         </span>
-                        {/* Подсказка категории (Progressive Disclosure - Уровень 1) */}
                         <span className="text-xs text-gray-500 truncate">
                           {getPigmentCategory(p.id, lang)}
                         </span>
@@ -148,7 +144,7 @@ const PigmentSelector = ({
                     </div>
 
                     <button
-                      className="info-btn p-1.5 text-gray-400 hover:text-[#D8A35C] rounded-full hover:bg-orange-50 transition-colors flex-shrink-0"
+                      className="info-btn p-2 text-gray-400 hover:text-[#D8A35C] rounded-full hover:bg-orange-50 transition-colors flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation()
                         setExpandedId(expandedId === p.id ? null : p.id)
@@ -162,7 +158,6 @@ const PigmentSelector = ({
                     </button>
                   </div>
 
-                  {/* Progressive Disclosure - Уровень 2: Детали из вашего интерфейса Pigment */}
                   <AnimatePresence>
                     {expandedId === p.id && (
                       <motion.div
@@ -187,7 +182,6 @@ const PigmentSelector = ({
                             </div>
                           )}
 
-                          {/* Интеграция компонента спектра */}
                           {p.spectrum && p.spectrum.length > 0 && (
                             <div className="mt-3 p-2 bg-black/5 rounded-lg border border-black/5">
                               <p className="text-xs text-gray-500 mb-1 font-medium">
@@ -220,11 +214,15 @@ const PigmentSelector = ({
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
 
   const [paints, setPaints] = useState<PaintPart[]>([
     { id: '1', pigmentId: 'titanium_white', amount: '' },
     { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
   ])
+
+  // Refs для фокуса на поле объёма после добавления
+  const amountRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
     loadAllPigments()
@@ -268,14 +266,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }, [paints, pigments, totalAmount])
 
   const addPaint = () => {
+    const newId = Math.random().toString(36).slice(2)
     setPaints([
       ...paints,
       {
-        id: Math.random().toString(36).slice(2),
+        id: newId,
         pigmentId: pigments[0]?.id || 'titanium_white',
         amount: '',
       },
     ])
+
+    // Фокус на новое поле объёма после рендера
+    setTimeout(() => {
+      amountRefs.current[newId]?.focus()
+    }, 50)
   }
 
   const removePaint = (id: string) => {
@@ -287,11 +291,28 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setPaints(paints.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
+  const clearAllAmounts = () => {
+    setPaints(paints.map((p) => ({ ...p, amount: '' })))
+  }
+
   const getPigmentName = (pigmentId: string) => {
     const pigment = pigments.find((p) => p.id === pigmentId)
     if (!pigment) return '...'
     return lang === 'uk' ? pigment.name.uk : pigment.name.ru
   }
+
+  const copyHex = async () => {
+    if (!mixedColor) return
+    try {
+      await navigator.clipboard.writeText(mixedColor.hex.toUpperCase())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch (err) {
+      console.error('Copy failed', err)
+    }
+  }
+
+  const isUk = lang === 'uk'
 
   return (
     <motion.div
@@ -300,29 +321,42 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       exit={{ opacity: 0, x: -20 }}
       className="min-h-screen flex flex-col pt-safe px-4 pb-8"
     >
-      <div className="flex items-center mb-6 mt-4">
+      {/* Header */}
+      <div className="flex items-center mb-5 mt-4">
         <button
           onClick={onBack}
-          className="p-2 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100 transition-opacity"
+          className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100 transition-opacity"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold ml-2">
-          {lang === 'uk' ? 'Калькулятор кольору' : 'Калькулятор цвета'}
+        <h1 className="text-xl font-bold ml-1">
+          {isUk ? 'Калькулятор кольору' : 'Калькулятор цвета'}
         </h1>
       </div>
 
       <div className="flex-1 flex flex-col gap-4">
+        {/* ===== Блок состава ===== */}
         <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm z-10">
-          <h2 className="text-sm font-semibold mb-4 opacity-80">
-            {lang === 'uk' ? 'Склад суміші' : 'Состав смеси'}
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold opacity-80">
+              {isUk ? 'Склад суміші' : 'Состав смеси'}
+            </h2>
+
+            {totalAmount > 0 && (
+              <button
+                onClick={clearAllAmounts}
+                className="text-xs text-red-500/80 hover:text-red-600 font-medium px-2 py-1 rounded-md hover:bg-red-50 transition-colors"
+              >
+                {isUk ? 'Очистити обсяги' : 'Очистить объёмы'}
+              </button>
+            )}
+          </div>
 
           {loading ? (
-            <div className="text-sm opacity-60 py-4 text-center">
-              {lang === 'uk' ? 'Завантаження пігментів...' : 'Загрузка пигментов...'}
+            <div className="text-sm opacity-60 py-6 text-center">
+              {isUk ? 'Завантаження пігментів...' : 'Загрузка пигментов...'}
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -337,6 +371,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                   {/* Улучшенный инпут для iPhone */}
                   <input
+                    ref={(el) => {
+                      amountRefs.current[paint.id] = el
+                    }}
                     type="text"
                     inputMode="decimal"
                     enterKeyHint="done"
@@ -345,12 +382,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     spellCheck={false}
                     value={paint.amount}
                     onChange={(e) => {
-                      // Разрешаем цифры, точку и запятую
                       let val = e.target.value.replace(',', '.')
-
-                      // Разрешаем пустое значение и промежуточные состояния (например "12." или ".5")
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        // Ограничиваем только когда число уже валидное
                         const num = parseFloat(val)
                         if (!isNaN(num) && num > 5000) {
                           val = '5000'
@@ -359,7 +392,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       }
                     }}
                     onBlur={(e) => {
-                      // На blur подчищаем значение
                       let val = e.target.value.replace(',', '.')
                       if (val === '.' || val === '') {
                         updatePaint(paint.id, 'amount', '')
@@ -370,19 +402,21 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
                       }
                     }}
-                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-base text-center focus:outline-none focus:border-[#D8A35C] transition-colors"
+                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-center focus:outline-none focus:border-[#D8A35C] transition-colors"
                     placeholder="0"
-                    style={{ fontSize: '16px' }} // Важно для iOS — предотвращает зум
+                    style={{ fontSize: '16px' }}
                   />
 
-                  <span className="text-xs opacity-50 flex-shrink-0">мл</span>
+                  <span className="text-xs opacity-50 flex-shrink-0 w-6">мл</span>
 
+                  {/* Увеличенная зона нажатия для удаления */}
                   <button
                     onClick={() => removePaint(paint.id)}
-                    className="p-2 text-red-500 opacity-70 hover:opacity-100 flex-shrink-0 transition-opacity"
+                    className="p-2.5 -mr-1 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0 transition-all active:scale-90"
                     disabled={paints.length <= 1}
+                    style={{ opacity: paints.length <= 1 ? 0.3 : 1 }}
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>
@@ -394,56 +428,115 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <button
             onClick={addPaint}
             disabled={loading}
-            className="mt-4 w-full py-2.5 rounded-lg border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C] hover:text-white transition-colors disabled:opacity-40"
+            className="mt-4 w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C] hover:text-white transition-colors disabled:opacity-40 active:scale-[0.98]"
           >
-            {lang === 'uk' ? '+ Додати колір' : '+ Добавить цвет'}
+            {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
           </button>
         </div>
 
-        <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-6 shadow-md mt-2 relative z-0">
-          <div className="flex flex-col items-center mb-6">
+        {/* ===== Блок результата ===== */}
+        <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md relative z-0">
+          <h2 className="text-sm font-semibold opacity-70 mb-4">
+            {isUk ? 'Результат змішування' : 'Результат смешивания'}
+          </h2>
+
+          {/* Цвет + HEX + RGB */}
+          <div className="flex flex-col items-center mb-5">
             <div
-              className="w-32 h-32 rounded-2xl border-2 border-white/20 shadow-lg mb-3 transition-colors duration-300"
-              style={{ backgroundColor: mixedColor?.hex || '#333' }}
-            />
-            <div className="text-sm opacity-70 font-mono tracking-wider">
-              {mixedColor ? mixedColor.hex.toUpperCase() : '—'}
+              className="w-36 h-36 rounded-2xl border-2 border-white/15 shadow-lg mb-4 transition-colors duration-300 relative overflow-hidden"
+              style={{ backgroundColor: mixedColor?.hex || '#2a2522' }}
+            >
+              {!mixedColor && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xs text-white/40 text-center px-4 leading-relaxed">
+                    {isUk
+                      ? 'Введіть обсяги,\nщоб побачити колір'
+                      : 'Введите объёмы,\nчтобы увидеть цвет'}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {mixedColor ? (
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-mono tracking-wider font-medium">
+                    {mixedColor.hex.toUpperCase()}
+                  </span>
+                  <button
+                    onClick={copyHex}
+                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium transition-colors active:scale-95"
+                  >
+                    {copied
+                      ? (isUk ? 'Скопійовано' : 'Скопировано')
+                      : (isUk ? 'Копіювати' : 'Копировать')}
+                  </button>
+                </div>
+                <div className="text-xs opacity-50 font-mono">
+                  RGB {mixedColor.rgb.r}, {mixedColor.rgb.g}, {mixedColor.rgb.b}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm opacity-40 font-mono tracking-wider">—</div>
+            )}
           </div>
 
-          <div className="flex justify-between items-end mb-4 border-b border-gray-700 pb-4">
-            <span className="text-sm opacity-70">
-              {lang === 'uk' ? 'Загальний об’єм:' : 'Общий объем:'}
+          {/* Общий объём */}
+          <div className="flex justify-between items-end mb-5 border-b border-white/10 pb-4">
+            <span className="text-sm opacity-60">
+              {isUk ? 'Загальний об’єм' : 'Общий объём'}
             </span>
-            <span className="text-2xl font-bold">
+            <span className="text-2xl font-bold tabular-nums">
               {totalAmount > 1000
                 ? (totalAmount / 1000).toFixed(2) + ' л'
                 : totalAmount.toFixed(1) + ' мл'}
             </span>
           </div>
 
-          <div className="flex flex-col gap-2">
+          {/* Проценты + progress bars */}
+          <div className="flex flex-col gap-3">
             {paints.map((paint) => {
               const paintAmount = parseFloat(paint.amount) || 0
               const percentage =
                 totalAmount > 0
-                  ? ((paintAmount / totalAmount) * 100).toFixed(1)
-                  : '0.0'
+                  ? (paintAmount / totalAmount) * 100
+                  : 0
 
               const pigment = pigments.find((p) => p.id === paint.pigmentId)
+              const displayPercent =
+                percentage === 0
+                  ? '0%'
+                  : percentage < 0.1
+                    ? '<0.1%'
+                    : percentage.toFixed(1) + '%'
 
               return (
-                <div key={paint.id} className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-2 truncate pr-4 min-w-0">
-                    <div
-                      className="w-3 h-3 rounded-full border border-white/30 flex-shrink-0 shadow-sm"
-                      style={{ backgroundColor: pigment?.hex || '#666' }}
-                    />
-                    <span className="opacity-80 truncate">
-                      {getPigmentName(paint.pigmentId)}
+                <div key={paint.id} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-sm">
+                    <div className="flex items-center gap-2.5 truncate pr-3 min-w-0">
+                      <div
+                        className="w-3.5 h-3.5 rounded-full border border-white/25 flex-shrink-0 shadow-sm"
+                        style={{ backgroundColor: pigment?.hex || '#666' }}
+                      />
+                      <span className="opacity-85 truncate text-[13px]">
+                        {getPigmentName(paint.pigmentId)}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[#D8A35C] flex-shrink-0 text-[13px] tabular-nums">
+                      {displayPercent}
                     </span>
                   </div>
-                  <span className="font-mono text-[#D8A35C] flex-shrink-0">{percentage}%</span>
+
+                  {/* Progress bar */}
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: pigment?.hex || '#D8A35C' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(percentage, 100)}%` }}
+                      transition={{ duration: 0.35, ease: 'easeOut' }}
+                    />
+                  </div>
                 </div>
               )
             })}
