@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { SpectrumPoint } from './colorScience'
+import { SpectrumPoint } from '../utils/colorScience'
 
 interface SpectrumGraphProps {
   spectrum: SpectrumPoint[]
