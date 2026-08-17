@@ -1,5 +1,3 @@
-// src/pages/ColorCalcPage.tsx
-
 import { motion } from 'framer-motion'
 import { useState, useEffect, useRef } from 'react'
 
@@ -9,7 +7,7 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
-import { findBasicRecipe, getPureBasicPigments } from '../utils/calculatorLogic' // ДОБАВЛЕН ИМПОРТ
+import { findRecipeByHex, getPureBasicPigments } from '../utils/calculatorLogic' 
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -30,7 +28,7 @@ function normalizeHex(raw: string): string | null {
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
-  const [isCalculating, setIsCalculating] = useState(false) // СОСТОЯНИЕ ЗАГРУЗКИ ПОДБОРА
+  const [isCalculating, setIsCalculating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
@@ -44,7 +42,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     removePaint,
     updatePaint,
     clearAllAmounts,
-    setPaints // ВАЖНО: Обязательно добавь экспорт setPaints в хук usePaintMix
+    setPaints
   } = usePaintMix(pigments)
 
   const { mixedColor } = useColorCalculations({
@@ -54,7 +52,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     lang,
   })
 
-  // Смесь изменилась → подставляем её HEX (если пользователь не редактирует вручную)
+  // Реакция на изменение объемов руками
   useEffect(() => {
     if (mixedColor?.hex && !userEdited.current) {
       const hex = mixedColor.hex.toUpperCase()
@@ -67,11 +65,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [mixedColor?.hex])
 
-  // При изменении объёмов/пигментов снова доверяем смеси
   useEffect(() => {
     userEdited.current = false
   }, [paints, totalAmount])
 
+  // Загрузка пигментов при старте
   useEffect(() => {
     loadAllPigments()
       .then((loaded) => {
@@ -84,26 +82,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
-  // === НОВАЯ ЛОГИКА: Реакция на ввод HEX пользователем ===
+  // === Расчет рецепта по введенному HEX ===
   useEffect(() => {
-    if (userEdited.current && validHex && pigments.length > 0) {
-      setIsCalculating(true) // Включаем индикатор на квадрате
+    if (userEdited.current && validHex && pigments.length > 0 && !loading) {
+      setIsCalculating(true)
       
-      // Используем setTimeout, чтобы React успел отрисовать индикатор загрузки (UI не зависал)
       const timeoutId = setTimeout(() => {
         const basicPigments = getPureBasicPigments(pigments)
-        // Ищем рецепт на 4 пигмента по введенному HEX
-        const recipeData = findBasicRecipe(validHex, basicPigments, 4)
+        // Вызываем нашу новую функцию
+        const recipeData = findRecipeByHex(validHex, basicPigments, 4)
 
         if (recipeData && recipeData.recipe.length > 0 && setPaints) {
-          // Преобразуем ответ в формат хука usePaintMix
           const newPaints = recipeData.recipe.map((r) => ({
-            id: Math.random().toString(36).substring(2, 9), // генерируем уникальный ID для строки
-            pigmentId: r.pigment.id,
+            id: Math.random().toString(36).substring(2, 9),
+            pigmentId: r.pigment.id, 
             amount: String(r.ml)
           }))
           
-          // Обновляем строки в верхнем баре
           setPaints(newPaints)
         }
         setIsCalculating(false)
@@ -111,8 +106,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
       return () => clearTimeout(timeoutId)
     }
-  }, [validHex, pigments, setPaints])
-  // ========================================================
+  }, [validHex, pigments, loading, setPaints])
+  // =========================================
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
@@ -153,7 +148,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       exit={{ opacity: 0, y: -8 }}
       className="min-h-screen flex flex-col pt-safe px-4 pb-10"
     >
-      {/* Header */}
       <header className="flex items-center gap-1 py-3">
         <button
           onClick={onBack}
@@ -176,8 +170,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-
-        {/* ===== Состав смеси ===== */}
         <section className="bg-[#1C1816] rounded-2xl overflow-hidden">
           <div className="px-4 pt-4 pb-3 flex items-center justify-between">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
@@ -271,14 +263,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* ===== Результат ===== */}
         <section className="bg-[#1C1816] rounded-2xl px-4 pt-4 pb-5">
           <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90 mb-4">
             {isUk ? 'Результат' : 'Результат'}
           </h2>
 
           <div className="flex flex-col items-center">
-            {/* КВАДРАТ С ИНДИКАТОРОМ ЗАГРУЗКИ */}
             <div
               className="relative w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150 overflow-hidden"
               style={{ backgroundColor: displayColor }}
@@ -296,7 +286,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               )}
             </div>
 
-            {/* HEX + копировать — в одну линию без переполнения */}
             <div className="w-full flex items-center gap-2">
               <input
                 type="text"
@@ -332,7 +321,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* ===== Объём — сразу под результатом ===== */}
         <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5 flex items-center justify-between">
           <span className="text-[14px] text-[#F5F1EA]/50">
             {isUk ? 'Загальний об’єм' : 'Общий объём'}
