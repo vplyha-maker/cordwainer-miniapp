@@ -19,16 +19,11 @@ import {
   simulateLayersKM,
   findBasicRecipe
 } from '../utils/calculatorLogic'
+import { usePaintMix } from '../hooks/usePaintMix'
 
 interface ColorCalcPageProps {
   lang: Lang
   onBack: () => void
-}
-
-interface PaintPart {
-  id: string
-  pigmentId: string
-  amount: string
 }
 
 type Mode = 'coverage' | 'neutralize'
@@ -201,12 +196,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [showRecipe, setShowRecipe] = useState(false)
   const [basicRecipe, setBasicRecipe] = useState<ReturnType<typeof findBasicRecipe>>(null)
 
-  const [paints, setPaints] = useState<PaintPart[]>([
-    { id: '1', pigmentId: 'titanium_white', amount: '' },
-    { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
-  ])
-
-  const amountRefs = useRef<Map<string, HTMLInputElement>>(new Map())
+  // === Хук управления смесью ===
+  const {
+    paints,
+    amountRefs,
+    totalAmount,
+    addPaint,
+    removePaint,
+    updatePaint,
+    clearAllAmounts,
+  } = usePaintMix(pigments)
 
   useEffect(() => {
     loadAllPigments()
@@ -225,8 +224,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     const recommended = getOstwaldNeutralizer(unwantedPigmentId, pigments)
     setNeutralizerPigmentId(recommended)
   }, [unwantedPigmentId, pigments, autoNeutralizer])
-
-  const totalAmount = paints.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
 
   const mixedColor = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
@@ -306,29 +303,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     const rgb = spectrumToRGB(mixed)
     return { rgb, hex: rgbToHex(rgb) }
   }, [pigments, unwantedPigmentId, neutralizerPigmentId, neutralizeStrength])
-
-  const addPaint = () => {
-    const newId = Math.random().toString(36).slice(2)
-    setPaints([...paints, { id: newId, pigmentId: pigments[0]?.id || 'titanium_white', amount: '' }])
-    setTimeout(() => {
-      const input = amountRefs.current.get(newId)
-      if (input) input.focus()
-    }, 50)
-  }
-
-  const removePaint = (id: string) => {
-    if (paints.length <= 1) return
-    setPaints(paints.filter((p) => p.id !== id))
-    amountRefs.current.delete(id)
-  }
-
-  const updatePaint = (id: string, field: keyof PaintPart, value: string) => {
-    setPaints(paints.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
-  }
-
-  const clearAllAmounts = () => {
-    setPaints(paints.map((p) => ({ ...p, amount: '' })))
-  }
 
   const getPigmentName = (pigmentId: string) => {
     const pigment = pigments.find((p) => p.id === pigmentId)
