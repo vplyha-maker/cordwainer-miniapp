@@ -18,13 +18,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
-  // dummy values — нужны только чтобы хук не падал
-  const basePigmentId = 'titanium_white'
-  const coverageSystem = 'acrylic' as const
-  const unwantedPigmentId = 'cadmium_yellow'
-  const neutralizerPigmentId = 'ultramarine'
-  const neutralizeStrength = 35
-
   const {
     paints,
     amountRefs,
@@ -39,11 +32,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     pigments,
     paints,
     totalAmount,
-    basePigmentId,
-    coverageSystem,
-    unwantedPigmentId,
-    neutralizerPigmentId,
-    neutralizeStrength,
     lang,
   })
 
@@ -201,7 +189,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </button>
         </div>
 
-        {/* ===== Результат смешивания — по центру ===== */}
+        {/* ===== Результат смешивания ===== */}
         <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-6 shadow-sm flex flex-col items-center">
           <div className="text-xs opacity-50 mb-4 font-medium uppercase tracking-wider">
             {isUk ? 'Результат змішування' : 'Результат смешивания'}
