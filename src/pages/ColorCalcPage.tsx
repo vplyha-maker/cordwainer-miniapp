@@ -3,7 +3,14 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
-import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint } from '../utils/colorScience'
+import {
+  mixSpectra,
+  spectrumToRGB,
+  rgbToHex,
+  SpectrumPoint,
+  spectrumToRGBWithIlluminant,
+  IlluminantType,
+} from '../utils/colorScience'
 import { SpectrumGraph } from '../components/SpectrumGraph'
 
 interface ColorCalcPageProps {
@@ -17,7 +24,8 @@ interface PaintPart {
   amount: string
 }
 
-// Хелпер для определения категории пигмента на основе его ID
+type BackgroundType = 'white' | 'lightgray' | 'darkgray' | 'black'
+
 const getPigmentCategory = (id: string, lang: Lang) => {
   const isUk = lang === 'uk'
   if (id.includes('cadmium')) return isUk ? 'Кадмієва група' : 'Кадмиевая группа'
@@ -30,9 +38,6 @@ const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-// ==========================================
-// UX Компонент: Визуальный селектор пигментов
-// ==========================================
 const PigmentSelector = ({
   pigments,
   value,
@@ -92,7 +97,7 @@ const PigmentSelector = ({
             setIsOpen(true)
           }}
           placeholder={isUk ? 'Пошук кольору...' : 'Поиск цвета...'}
-          className="flex-1 w-full bg-transparent outline-none truncate text-base"
+          className="flex-1 w-full bg-transparent outline-none truncate"
           style={{ fontSize: '16px' }}
         />
         <svg
@@ -208,9 +213,6 @@ const PigmentSelector = ({
   )
 }
 
-// ==========================================
-// Основная страница калькулятора
-// ==========================================
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -221,7 +223,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
   ])
 
-  // Refs для фокуса на поле объёма после добавления
+  // Новые состояния для превью
+  const [background, setBackground] = useState<BackgroundType>('white')
+  const [illuminant, setIlluminant] = useState<IlluminantType>('D65')
+
   const amountRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
@@ -238,7 +243,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const totalAmount = paints.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
 
-  const mixedColor = useMemo(() => {
+  // Смешанный спектр (считаем один раз)
+  const mixedSpectrum = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
 
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
@@ -255,15 +261,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
 
     if (components.length === 0) return null
+    return mixSpectra(components)
+  }, [paints, pigments, totalAmount])
 
-    const mixedSpectrum = mixSpectra(components)
-    const rgb = spectrumToRGB(mixedSpectrum)
-
+  // Цвет под выбранным освещением
+  const mixedColor = useMemo(() => {
+    if (!mixedSpectrum) return null
+    const rgb = spectrumToRGBWithIlluminant(mixedSpectrum, illuminant)
     return {
       rgb,
       hex: rgbToHex(rgb),
     }
-  }, [paints, pigments, totalAmount])
+  }, [mixedSpectrum, illuminant])
 
   const addPaint = () => {
     const newId = Math.random().toString(36).slice(2)
@@ -275,8 +284,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         amount: '',
       },
     ])
-
-    // Фокус на новое поле объёма после рендера
     setTimeout(() => {
       amountRefs.current[newId]?.focus()
     }, 50)
@@ -314,12 +321,33 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const isUk = lang === 'uk'
 
+  const bgColors: Record<BackgroundType, string> = {
+    white: '#F5F1EA',
+    lightgray: '#C8C4BC',
+    darkgray: '#4A4640',
+    black: '#151210',
+  }
+
+  const illuminantLabels: Record<IlluminantType, { uk: string; ru: string }> = {
+    D65: { uk: 'День', ru: 'День' },
+    A: { uk: 'Тёпла', ru: 'Тёплая' },
+    cool: { uk: 'Холодна', ru: 'Холодная' },
+    twilight: { uk: 'Сутінки', ru: 'Сумерки' },
+  }
+
+  const bgLabels: Record<BackgroundType, { uk: string; ru: string }> = {
+    white: { uk: 'Білий', ru: 'Белый' },
+    lightgray: { uk: 'Сірий', ru: 'Серый' },
+    darkgray: { uk: 'Темний', ru: 'Тёмный' },
+    black: { uk: 'Чорний', ru: 'Чёрный' },
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="min-h-screen flex flex-col pt-safe px-4 pb-8"
+      className="min-h-screen flex flex-col pt-safe px-4 pb-10"
     >
       {/* Header */}
       <div className="flex items-center mb-5 mt-4">
@@ -337,7 +365,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </div>
 
       <div className="flex-1 flex flex-col gap-4">
-        {/* ===== Блок состава ===== */}
+        {/* ===== Состав смеси ===== */}
         <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm z-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold opacity-80">
@@ -369,7 +397,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     lang={lang}
                   />
 
-                  {/* Улучшенный инпут для iPhone */}
                   <input
                     ref={(el) => {
                       amountRefs.current[paint.id] = el
@@ -385,9 +412,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       let val = e.target.value.replace(',', '.')
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         const num = parseFloat(val)
-                        if (!isNaN(num) && num > 5000) {
-                          val = '5000'
-                        }
+                        if (!isNaN(num) && num > 5000) val = '5000'
                         updatePaint(paint.id, 'amount', val)
                       }
                     }}
@@ -409,7 +434,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                   <span className="text-xs opacity-50 flex-shrink-0 w-6">мл</span>
 
-                  {/* Увеличенная зона нажатия для удаления */}
                   <button
                     onClick={() => removePaint(paint.id)}
                     className="p-2.5 -mr-1 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0 transition-all active:scale-90"
@@ -434,27 +458,32 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </button>
         </div>
 
-        {/* ===== Блок результата ===== */}
+        {/* ===== Результат ===== */}
         <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md relative z-0">
           <h2 className="text-sm font-semibold opacity-70 mb-4">
             {isUk ? 'Результат змішування' : 'Результат смешивания'}
           </h2>
 
-          {/* Цвет + HEX + RGB */}
+          {/* Большой цвет на выбранном фоне */}
           <div className="flex flex-col items-center mb-5">
             <div
-              className="w-36 h-36 rounded-2xl border-2 border-white/15 shadow-lg mb-4 transition-colors duration-300 relative overflow-hidden"
-              style={{ backgroundColor: mixedColor?.hex || '#2a2522' }}
+              className="w-full max-w-[280px] aspect-square rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-300 flex items-center justify-center p-6"
+              style={{ backgroundColor: bgColors[background] }}
             >
-              {!mixedColor && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs text-white/40 text-center px-4 leading-relaxed">
-                    {isUk
-                      ? 'Введіть обсяги,\nщоб побачити колір'
-                      : 'Введите объёмы,\nчтобы увидеть цвет'}
-                  </span>
-                </div>
-              )}
+              <div
+                className="w-full h-full rounded-xl shadow-inner transition-colors duration-300 relative overflow-hidden"
+                style={{ backgroundColor: mixedColor?.hex || '#2a2522' }}
+              >
+                {!mixedColor && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs text-white/40 text-center px-4 leading-relaxed">
+                      {isUk
+                        ? 'Введіть обсяги,\nщоб побачити колір'
+                        : 'Введите объёмы,\nчтобы увидеть цвет'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {mixedColor ? (
@@ -481,6 +510,50 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             )}
           </div>
 
+          {/* Выбор фона */}
+          <div className="mb-5">
+            <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
+              {isUk ? 'Фон' : 'Фон'}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.keys(bgColors) as BackgroundType[]).map((bg) => (
+                <button
+                  key={bg}
+                  onClick={() => setBackground(bg)}
+                  className={`py-2.5 rounded-xl text-xs font-medium transition-all active:scale-95 border ${
+                    background === bg
+                      ? 'border-[#D8A35C] bg-[#D8A35C]/15 text-[#D8A35C]'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  {isUk ? bgLabels[bg].uk : bgLabels[bg].ru}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Выбор освещения */}
+          <div className="mb-6">
+            <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
+              {isUk ? 'Освітлення' : 'Освещение'}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.keys(illuminantLabels) as IlluminantType[]).map((ill) => (
+                <button
+                  key={ill}
+                  onClick={() => setIlluminant(ill)}
+                  className={`py-2.5 rounded-xl text-xs font-medium transition-all active:scale-95 border ${
+                    illuminant === ill
+                      ? 'border-[#D8A35C] bg-[#D8A35C]/15 text-[#D8A35C]'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  {isUk ? illuminantLabels[ill].uk : illuminantLabels[ill].ru}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Общий объём */}
           <div className="flex justify-between items-end mb-5 border-b border-white/10 pb-4">
             <span className="text-sm opacity-60">
@@ -497,11 +570,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <div className="flex flex-col gap-3">
             {paints.map((paint) => {
               const paintAmount = parseFloat(paint.amount) || 0
-              const percentage =
-                totalAmount > 0
-                  ? (paintAmount / totalAmount) * 100
-                  : 0
-
+              const percentage = totalAmount > 0 ? (paintAmount / totalAmount) * 100 : 0
               const pigment = pigments.find((p) => p.id === paint.pigmentId)
               const displayPercent =
                 percentage === 0
@@ -527,7 +596,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </span>
                   </div>
 
-                  {/* Progress bar */}
                   <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full rounded-full"
