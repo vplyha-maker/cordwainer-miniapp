@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
-import { rgbToHex } from '../utils/colorScience'
+import { rgbToHex, RGB } from '../utils/colorScience'   // ← добавили RGB
 import { CoverageSystem } from '../utils/calculatorLogic'
 import { PigmentSelector } from './PigmentSelector'
 import { PaintPart } from '../hooks/usePaintMix'
@@ -20,11 +20,11 @@ interface CoverageModeProps {
     note: string
   } | null
   layers: {
-    layer1: [number, number, number]
-    layer2: [number, number, number]
-    layer3: [number, number, number]
-    final: [number, number, number]
-  } | null
+    layer1: RGB
+    layer2: RGB
+    layer3: RGB
+    final: RGB
+  } | null                                          // ← здесь используем RGB
   copied: boolean
   onCopyHex: () => void
   paints: PaintPart[]
