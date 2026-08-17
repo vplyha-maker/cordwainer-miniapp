@@ -2,6 +2,7 @@
  * colorScience.ts
  * Reflectance spectrum → XYZ → sRGB
  * CIE 1931 2° + Illuminant D65
+ * Subtractive mixing via Kubelka-Munk theory
  */
 
 export interface SpectrumPoint {
@@ -118,6 +119,27 @@ const D65 = [
   70.6652, 71.6091, 72.979, 74.349, 67.9767, 61.6043, 65.7448, 69.8856, 72.486,
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
 ]
+
+// --- Вспомогательные функции для физики смешивания (Кубелка-Мунк) ---
+
+/**
+ * Переводит коэффициент отражения (0-1) в отношение K/S (Поглощение/Рассеяние)
+ */
+function reflectanceToKS(r: number): number {
+  // Ограничиваем r, чтобы избежать деления на 0 при полном отражении/поглощении
+  const clampedR = Math.max(0.0001, Math.min(0.9999, r))
+  return Math.pow(1 - clampedR, 2) / (2 * clampedR)
+}
+
+/**
+ * Переводит отношение K/S обратно в коэффициент отражения (0-1)
+ */
+function ksToReflectance(ks: number): number {
+  const r = 1 + ks - Math.sqrt(Math.pow(ks, 2) + 2 * ks)
+  return Math.max(0, Math.min(1, r))
+}
+
+// --------------------------------------------------------------------
 
 export function parseSpectrum(text: string): SpectrumPoint[] {
   const lines = text.trim().split(/\r?\n/)
@@ -241,17 +263,24 @@ export function mixSpectra(
   const result: SpectrumPoint[] = []
 
   for (const point of base) {
-    let mixedRefl = 0
+    let mixedKS = 0
 
     for (const comp of components) {
       const weight = comp.volume / totalVolume
-      const refl = interpolateReflectance(comp.spectrum, point.wavelength)
-      mixedRefl += weight * refl
+      
+      // Исходное отражение хранится в диапазоне 0-100, переводим в 0-1 для формулы
+      const refl = interpolateReflectance(comp.spectrum, point.wavelength) / 100
+      
+      // Складываем K/S смеси с учетом доли объема пигмента
+      mixedKS += weight * reflectanceToKS(refl)
     }
+
+    // Переводим суммарный K/S обратно в отражение и возвращаем в диапазон 0-100
+    const finalRefl = ksToReflectance(mixedKS) * 100
 
     result.push({
       wavelength: point.wavelength,
-      reflectance: mixedRefl,
+      reflectance: finalRefl,
     })
   }
 
