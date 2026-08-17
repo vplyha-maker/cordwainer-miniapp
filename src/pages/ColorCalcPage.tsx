@@ -37,7 +37,9 @@ const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-// Автоподбор нейтрализатора по кругу Оствальда
+// ==========================================
+// Улучшенный подбор нейтрализатора по Оствальду
+// ==========================================
 function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   const pigment = pigments.find((p) => p.id === pigmentId)
   if (!pigment?.hex) return 'ultramarine'
@@ -47,49 +49,49 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   const g = parseInt(hex.substring(2, 4), 16)
   const b = parseInt(hex.substring(4, 6), 16)
 
+  // Переводим в простой HSL-подобный оттенок
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   const delta = max - min
 
-  if (delta < 30) return 'ultramarine'
+  if (delta < 25) return 'ultramarine' // почти серый
 
-  if (r > 140 && g > 110 && b < 120 && r - b > 40) {
-    const violet = pigments.find((p) =>
+  // Жёлтый / жёлто-зелёный / оливковый → фиолетовый / ультрамарин
+  if (r > 150 && g > 120 && b < 110) {
+    const violet = pigments.find(p =>
       p.id.includes('ultramarine') || p.id.includes('violet') || p.id.includes('purple')
     )
     return violet?.id || 'ultramarine'
   }
 
-  if (r > 140 && g > 60 && g < 160 && b < 100) {
-    const blue = pigments.find((p) =>
-      p.id.includes('ultramarine') ||
-      p.id.includes('prussian') ||
-      p.id.includes('cobalt') ||
-      (p.id.includes('phthalo') && p.name.en.toLowerCase().includes('blue'))
+  // Оранжевый / рыжий → синий
+  if (r > 160 && g > 70 && g < 150 && b < 90) {
+    const blue = pigments.find(p =>
+      p.id.includes('ultramarine') || p.id.includes('prussian') || p.id.includes('cobalt_blue') || p.id.includes('phthalo')
     )
     return blue?.id || 'ultramarine'
   }
 
-  if (g > r && g > b && g - Math.min(r, b) > 30) {
-    const red = pigments.find((p) =>
-      (p.id.includes('cadmium') && (p.id.includes('red') || p.id.includes('scarlet'))) ||
-      p.id.includes('iron_oxide') ||
-      p.id.includes('venetian')
+  // Зелёный → красный
+  if (g > r + 20 && g > b + 20) {
+    const red = pigments.find(p =>
+      p.id.includes('cadmium_red') || p.id.includes('iron_oxide') || p.id.includes('venetian') || p.id.includes('scarlet')
     )
     return red?.id || 'cadmium_red'
   }
 
-  if (b > r && b > g) {
-    const orange = pigments.find((p) =>
-      (p.id.includes('cadmium') && (p.id.includes('orange') || p.id.includes('yellow'))) ||
-      p.id.includes('ochre')
+  // Синий → оранжевый / жёлтый
+  if (b > r + 15 && b > g + 10) {
+    const warm = pigments.find(p =>
+      p.id.includes('cadmium_orange') || p.id.includes('cadmium_yellow') || p.id.includes('ochre')
     )
-    return orange?.id || 'cadmium_yellow'
+    return warm?.id || 'cadmium_yellow'
   }
 
-  if (r > g && r > b && r - b > 40) {
-    const green = pigments.find((p) =>
-      p.id.includes('phthalo') || p.id.includes('green_earth') || p.id.includes('viridian')
+  // Красный → зелёный
+  if (r > g + 30 && r > b + 30) {
+    const green = pigments.find(p =>
+      p.id.includes('phthalo_green') || p.id.includes('green_earth') || p.id.includes('viridian')
     )
     return green?.id || 'green_earth'
   }
@@ -97,15 +99,18 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   return 'ultramarine'
 }
 
-/**
- * Симуляція шарів через Kubelka-Munk
- */
+// ==========================================
+// Kubelka-Munk симуляция слоёв + прозрачность
+// ==========================================
 function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
   system: CoverageSystem
 ) {
-  let strength = system === 'aniline' ? 27 : 46
+  // Базовая сила слоя (условные единицы volume)
+  // Анилин более прозрачный → меньше strength
+  // Акрил более укрывистый → больше strength
+  let strength = system === 'aniline' ? 24 : 48
 
   const baseRgb = spectrumToRGB(baseSpectrum)
   const paintRgb = spectrumToRGB(paintSpectrum)
@@ -114,10 +119,12 @@ function simulateLayersKM(
   const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
   const deltaL = Math.abs(paintL - baseL)
 
-  if (deltaL > 0.42) strength *= 0.75
-  else if (deltaL < 0.14) strength *= 1.14
+  // Чем больше разница яркости — тем хуже один слой перекрывает
+  if (deltaL > 0.45) strength *= 0.72
+  else if (deltaL > 0.30) strength *= 0.85
+  else if (deltaL < 0.12) strength *= 1.18
 
-  strength = Math.max(18, Math.min(55, strength))
+  strength = Math.max(16, Math.min(58, strength))
 
   const mixLayer = (current: SpectrumPoint[], paint: SpectrumPoint[], s: number) => {
     return mixSpectra([
@@ -127,8 +134,8 @@ function simulateLayersKM(
   }
 
   const layer1 = mixLayer(baseSpectrum, paintSpectrum, strength)
-  const layer2 = mixLayer(layer1, paintSpectrum, strength * 0.93)
-  const layer3 = mixLayer(layer2, paintSpectrum, strength * 0.90)
+  const layer2 = mixLayer(layer1, paintSpectrum, strength * 0.94)
+  const layer3 = mixLayer(layer2, paintSpectrum, strength * 0.91)
 
   return {
     layer1,
@@ -140,6 +147,110 @@ function simulateLayersKM(
   }
 }
 
+// ==========================================
+// Базовая палитра + поиск рецепта
+// ==========================================
+const BASIC_PALETTE_IDS = [
+  'titanium_white',
+  'carbon_black',
+  'ivory_black',
+  'cadmium_yellow',
+  'ochre',
+  'cadmium_red',
+  'iron_oxide_red',
+  'ultramarine',
+  'prussian_blue',
+  'phthalo_blue',
+  'green_earth',
+  'phthalo_green',
+]
+
+function getBasicPigments(pigments: Pigment[]): Pigment[] {
+  return pigments.filter(p => BASIC_PALETTE_IDS.includes(p.id) && p.spectrum && p.spectrum.length > 0)
+}
+
+function findBasicRecipe(
+  targetSpectrum: SpectrumPoint[],
+  basicPigments: Pigment[],
+  maxComponents = 3
+) {
+  if (!basicPigments.length || !targetSpectrum.length) return null
+
+  const targetRgb = spectrumToRGB(targetSpectrum)
+
+  // Берём самые близкие по RGB
+  const scored = basicPigments.map(p => {
+    const rgb = spectrumToRGB(p.spectrum!)
+    const dist = Math.sqrt(
+      (rgb.r - targetRgb.r) ** 2 +
+      (rgb.g - targetRgb.g) ** 2 +
+      (rgb.b - targetRgb.b) ** 2
+    )
+    return { pigment: p, dist }
+  })
+
+  scored.sort((a, b) => a.dist - b.dist)
+  const candidates = scored.slice(0, Math.min(maxComponents, scored.length)).map(s => s.pigment)
+
+  let best: { volumes: number[]; rgb: { r: number; g: number; b: number }; deltaE: number } | null = null
+
+  const steps = [0, 15, 30, 50, 70, 100]
+
+  const search = (idx: number, vols: number[]) => {
+    if (idx === candidates.length) {
+      const total = vols.reduce((s, v) => s + v, 0)
+      if (total < 8) return
+
+      const components = candidates.map((p, i) => ({
+        spectrum: p.spectrum!,
+        volume: vols[i],
+      }))
+
+      const mixed = mixSpectra(components)
+      const rgb = spectrumToRGB(mixed)
+      const deltaE = Math.sqrt(
+        (rgb.r - targetRgb.r) ** 2 +
+        (rgb.g - targetRgb.g) ** 2 +
+        (rgb.b - targetRgb.b) ** 2
+      )
+
+      if (!best || deltaE < best.deltaE) {
+        best = { volumes: [...vols], rgb, deltaE }
+      }
+      return
+    }
+
+    for (const s of steps) {
+      vols[idx] = s
+      search(idx + 1, vols)
+    }
+  }
+
+  search(0, new Array(candidates.length).fill(0))
+
+  if (!best) return null
+
+  const total = best.volumes.reduce((s, v) => s + v, 0)
+  const scale = 20 / total
+
+  const recipe = candidates
+    .map((p, i) => ({
+      pigment: p,
+      ml: Math.round(best!.volumes[i] * scale * 10) / 10,
+    }))
+    .filter(r => r.ml >= 0.5)
+
+  return {
+    recipe,
+    resultRgb: best.rgb,
+    resultHex: rgbToHex(best.rgb),
+    deltaE: Math.round(best.deltaE),
+  }
+}
+
+// ==========================================
+// PigmentSelector
+// ==========================================
 const PigmentSelector = ({
   pigments,
   value,
@@ -158,12 +269,12 @@ const PigmentSelector = ({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  const selectedPigment = pigments.find((p) => p.id === value)
+  const selectedPigment = pigments.find(p => p.id === value)
   const isUk = lang === 'uk'
 
   const filteredPigments = useMemo(() => {
     const term = search.toLowerCase()
-    return pigments.filter((p) => {
+    return pigments.filter(p => {
       const nameLocal = isUk ? p.name.uk : p.name.ru
       return (
         nameLocal.toLowerCase().includes(term) ||
@@ -196,7 +307,7 @@ const PigmentSelector = ({
         <input
           type="text"
           value={isOpen ? search : selectedPigment ? (isUk ? selectedPigment.name.uk : selectedPigment.name.ru) : ''}
-          onChange={(e) => {
+          onChange={e => {
             setSearch(e.target.value)
             setIsOpen(true)
           }}
@@ -204,10 +315,7 @@ const PigmentSelector = ({
           className="flex-1 w-full bg-transparent outline-none truncate"
           style={{ fontSize: '16px' }}
         />
-        <svg
-          className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-        >
+        <svg className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
@@ -226,11 +334,11 @@ const PigmentSelector = ({
                 {isUk ? 'Нічого не знайдено' : 'Ничего не найдено'}
               </div>
             ) : (
-              filteredPigments.map((p) => (
+              filteredPigments.map(p => (
                 <div key={p.id} className="border-b border-gray-100 last:border-0">
                   <div
-                    className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={(e) => {
+                    className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer"
+                    onClick={e => {
                       if ((e.target as HTMLElement).closest('.info-btn')) return
                       onChange(p.id)
                       setIsOpen(false)
@@ -238,10 +346,7 @@ const PigmentSelector = ({
                     }}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="w-7 h-7 rounded-md border border-gray-300 shadow-sm flex-shrink-0"
-                        style={{ backgroundColor: p.hex || '#e5e7eb' }}
-                      />
+                      <div className="w-7 h-7 rounded-md border border-gray-300 shadow-sm flex-shrink-0" style={{ backgroundColor: p.hex || '#e5e7eb' }} />
                       <div className="flex flex-col truncate pr-2">
                         <span className="text-sm font-medium text-gray-900 truncate">
                           {isUk ? p.name.uk : p.name.ru}
@@ -251,10 +356,9 @@ const PigmentSelector = ({
                         </span>
                       </div>
                     </div>
-
                     <button
-                      className="info-btn p-2 text-gray-400 hover:text-[#D8A35C] rounded-full hover:bg-orange-50 transition-colors flex-shrink-0"
-                      onClick={(e) => {
+                      className="info-btn p-2 text-gray-400 hover:text-[#D8A35C] rounded-full"
+                      onClick={e => {
                         e.stopPropagation()
                         setExpandedId(expandedId === p.id ? null : p.id)
                       }}
@@ -276,30 +380,13 @@ const PigmentSelector = ({
                         className="overflow-hidden bg-gray-50 text-xs text-gray-600 px-3"
                       >
                         <div className="py-2 border-t border-gray-100 flex flex-col gap-1 pb-3">
-                          <div className="flex justify-between">
-                            <span className="opacity-70">ID:</span>
-                            <span className="font-mono text-gray-800">{p.id}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="opacity-70">EN:</span>
-                            <span className="text-gray-800 font-medium">{p.name.en}</span>
-                          </div>
-                          {p.hex && (
-                            <div className="flex justify-between">
-                              <span className="opacity-70">HEX:</span>
-                              <span className="font-mono text-gray-800 uppercase">{p.hex}</span>
-                            </div>
-                          )}
+                          <div className="flex justify-between"><span className="opacity-70">ID:</span><span className="font-mono">{p.id}</span></div>
+                          <div className="flex justify-between"><span className="opacity-70">EN:</span><span>{p.name.en}</span></div>
+                          {p.hex && <div className="flex justify-between"><span className="opacity-70">HEX:</span><span className="font-mono uppercase">{p.hex}</span></div>}
                           {p.spectrum && p.spectrum.length > 0 && (
-                            <div className="mt-3 p-2 bg-black/5 rounded-lg border border-black/5">
-                              <p className="text-xs text-gray-500 mb-1 font-medium">
-                                {isUk ? 'Спектр відбиття' : 'Спектр отражения'}
-                              </p>
-                              <SpectrumGraph
-                                spectrum={p.spectrum}
-                                className="h-20 w-full text-gray-300"
-                                lineColor={p.hex || '#666'}
-                              />
+                            <div className="mt-3 p-2 bg-black/5 rounded-lg">
+                              <p className="text-xs text-gray-500 mb-1">{isUk ? 'Спектр відбиття' : 'Спектр отражения'}</p>
+                              <SpectrumGraph spectrum={p.spectrum} className="h-20 w-full text-gray-300" lineColor={p.hex || '#666'} />
                             </div>
                           )}
                         </div>
@@ -316,6 +403,9 @@ const PigmentSelector = ({
   )
 }
 
+// ==========================================
+// Основной компонент
+// ==========================================
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -329,6 +419,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [neutralizeStrength, setNeutralizeStrength] = useState(35)
   const [autoNeutralizer, setAutoNeutralizer] = useState(true)
 
+  const [showRecipe, setShowRecipe] = useState(false)
+  const [basicRecipe, setBasicRecipe] = useState<ReturnType<typeof findBasicRecipe>>(null)
+
   const [paints, setPaints] = useState<PaintPart[]>([
     { id: '1', pigmentId: 'titanium_white', amount: '' },
     { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
@@ -338,11 +431,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   useEffect(() => {
     loadAllPigments()
-      .then((loaded: Pigment[]) => {
+      .then(loaded => {
         setPigments(loaded)
         setLoading(false)
       })
-      .catch((err: unknown) => {
+      .catch(err => {
         console.error(err)
         setLoading(false)
       })
@@ -358,30 +451,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const mixedColor = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
-
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
-
     for (const paint of paints) {
-      const pigment = pigments.find((p) => p.id === paint.pigmentId)
+      const pigment = pigments.find(p => p.id === paint.pigmentId)
       const val = parseFloat(paint.amount) || 0
       if (pigment?.spectrum && val > 0) {
         components.push({ spectrum: pigment.spectrum, volume: val })
       }
     }
-
     if (components.length === 0) return null
-
     const mixedSpectrum = mixSpectra(components)
     const rgb = spectrumToRGB(mixedSpectrum)
     return { rgb, hex: rgbToHex(rgb), spectrum: mixedSpectrum }
   }, [paints, pigments, totalAmount])
 
-  // Kubelka-Munk симуляция слоёв
   const layerData = useMemo(() => {
     if (!mixedColor?.spectrum) return null
-    const basePigment = pigments.find((p) => p.id === basePigmentId)
+    const basePigment = pigments.find(p => p.id === basePigmentId)
     if (!basePigment?.spectrum) return null
-
     return simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, coverageSystem)
   }, [basePigmentId, mixedColor, pigments, coverageSystem])
 
@@ -395,10 +482,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [layerData])
 
-  // Рекомендация по укрывистости
   const coverageAdvice = useMemo(() => {
     if (!layerData) return null
-    const { deltaL, strength } = layerData
+    const { deltaL } = layerData
     const isUk = lang === 'uk'
 
     let opacityLabel = ''
@@ -425,12 +511,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         : 'Цвет хорошо ложится на основу. Можно работать тонкими слоями.'
     }
 
-    return { opacityLabel, layersLabel, note, strength }
+    return { opacityLabel, layersLabel, note }
   }, [layerData, coverageSystem, lang])
 
   const neutralizeResult = useMemo(() => {
-    const unwanted = pigments.find((p) => p.id === unwantedPigmentId)
-    const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
+    const unwanted = pigments.find(p => p.id === unwantedPigmentId)
+    const neutralizer = pigments.find(p => p.id === neutralizerPigmentId)
     if (!unwanted?.spectrum || !neutralizer?.spectrum) return null
 
     const components = [
@@ -444,28 +530,25 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const addPaint = () => {
     const newId = Math.random().toString(36).slice(2)
-    setPaints([
-      ...paints,
-      { id: newId, pigmentId: pigments[0]?.id || 'titanium_white', amount: '' },
-    ])
+    setPaints([...paints, { id: newId, pigmentId: pigments[0]?.id || 'titanium_white', amount: '' }])
     setTimeout(() => amountRefs.current[newId]?.focus(), 50)
   }
 
   const removePaint = (id: string) => {
     if (paints.length <= 1) return
-    setPaints(paints.filter((p) => p.id !== id))
+    setPaints(paints.filter(p => p.id !== id))
   }
 
   const updatePaint = (id: string, field: keyof PaintPart, value: string) => {
-    setPaints(paints.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
+    setPaints(paints.map(p => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
   const clearAllAmounts = () => {
-    setPaints(paints.map((p) => ({ ...p, amount: '' })))
+    setPaints(paints.map(p => ({ ...p, amount: '' })))
   }
 
   const getPigmentName = (pigmentId: string) => {
-    const pigment = pigments.find((p) => p.id === pigmentId)
+    const pigment = pigments.find(p => p.id === pigmentId)
     if (!pigment) return '...'
     return lang === 'uk' ? pigment.name.uk : pigment.name.ru
   }
@@ -483,7 +566,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const changeStrength = (delta: number) => {
-    setNeutralizeStrength((prev) => Math.min(60, Math.max(10, prev + delta)))
+    setNeutralizeStrength(prev => Math.min(60, Math.max(10, prev + delta)))
+  }
+
+  const handleShowRecipe = () => {
+    const neutralizer = pigments.find(p => p.id === neutralizerPigmentId)
+    if (!neutralizer?.spectrum) return
+    const basic = getBasicPigments(pigments)
+    const result = findBasicRecipe(neutralizer.spectrum, basic)
+    setBasicRecipe(result)
+    setShowRecipe(true)
   }
 
   const isUk = lang === 'uk'
@@ -496,10 +588,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       className="min-h-screen flex flex-col pt-safe px-4 pb-10"
     >
       <div className="flex items-center mb-5 mt-4">
-        <button
-          onClick={onBack}
-          className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100 transition-opacity"
-        >
+        <button onClick={onBack} className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -517,10 +606,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               {isUk ? 'Склад суміші (цільовий колір)' : 'Состав смеси (целевой цвет)'}
             </h2>
             {totalAmount > 0 && (
-              <button
-                onClick={clearAllAmounts}
-                className="text-xs text-red-500/80 hover:text-red-600 font-medium px-2 py-1 rounded-md hover:bg-red-50 transition-colors"
-              >
+              <button onClick={clearAllAmounts} className="text-xs text-red-500/80 font-medium px-2 py-1 rounded-md hover:bg-red-50">
                 {isUk ? 'Очистити' : 'Очистить'}
               </button>
             )}
@@ -532,16 +618,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {paints.map((paint) => (
+              {paints.map(paint => (
                 <div key={paint.id} className="flex items-center gap-2">
                   <PigmentSelector
                     pigments={pigments}
                     value={paint.pigmentId}
-                    onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
+                    onChange={newId => updatePaint(paint.id, 'pigmentId', newId)}
                     lang={lang}
                   />
                   <input
-                    ref={(el) => { amountRefs.current[paint.id] = el }}
+                    ref={el => { amountRefs.current[paint.id] = el }}
                     type="text"
                     inputMode="decimal"
                     enterKeyHint="done"
@@ -549,7 +635,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     autoCorrect="off"
                     spellCheck={false}
                     value={paint.amount}
-                    onChange={(e) => {
+                    onChange={e => {
                       let val = e.target.value.replace(',', '.')
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         const num = parseFloat(val)
@@ -557,25 +643,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         updatePaint(paint.id, 'amount', val)
                       }
                     }}
-                    onBlur={(e) => {
+                    onBlur={e => {
                       let val = e.target.value.replace(',', '.')
                       if (val === '.' || val === '') {
                         updatePaint(paint.id, 'amount', '')
                         return
                       }
                       const num = parseFloat(val)
-                      if (!isNaN(num)) {
-                        updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                      }
+                      if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
                     }}
-                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-center focus:outline-none focus:border-[#D8A35C] transition-colors"
+                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-center focus:outline-none focus:border-[#D8A35C]"
                     placeholder="0"
                     style={{ fontSize: '16px' }}
                   />
                   <span className="text-xs opacity-50 flex-shrink-0 w-6">мл</span>
                   <button
                     onClick={() => removePaint(paint.id)}
-                    className="p-2.5 -mr-1 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full flex-shrink-0 transition-all active:scale-90"
+                    className="p-2.5 -mr-1 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full"
                     disabled={paints.length <= 1}
                     style={{ opacity: paints.length <= 1 ? 0.3 : 1 }}
                   >
@@ -591,28 +675,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <button
             onClick={addPaint}
             disabled={loading}
-            className="mt-4 w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C] hover:text-white transition-colors disabled:opacity-40 active:scale-[0.98]"
+            className="mt-4 w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C] hover:text-white transition-colors disabled:opacity-40"
           >
             {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
           </button>
         </div>
 
         {/* Результат */}
-        <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md relative z-0">
+        <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md">
           <div className="flex gap-2 mb-5">
             <button
               onClick={() => setMode('coverage')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'coverage' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70 hover:bg-white/15'
-              }`}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${mode === 'coverage' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'}`}
             >
               {isUk ? 'Укривистість / Слої' : 'Укрывистость / Слои'}
             </button>
             <button
               onClick={() => setMode('neutralize')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'neutralize' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70 hover:bg-white/15'
-              }`}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${mode === 'neutralize' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'}`}
             >
               {isUk ? 'Нейтралізація' : 'Нейтрализация'}
             </button>
@@ -625,16 +705,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
                   {isUk ? 'Колір основи (шкіри)' : 'Цвет основы (кожи)'}
                 </div>
-                <PigmentSelector
-                  pigments={pigments}
-                  value={basePigmentId}
-                  onChange={setBasePigmentId}
-                  lang={lang}
-                  placeholder={isUk ? 'Оберіть основу...' : 'Выберите основу...'}
-                />
+                <PigmentSelector pigments={pigments} value={basePigmentId} onChange={setBasePigmentId} lang={lang} />
               </div>
 
-              {/* Переключатель системы */}
               <div>
                 <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
                   {isUk ? 'Тип системи' : 'Тип системы'}
@@ -642,36 +715,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCoverageSystem('aniline')}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      coverageSystem === 'aniline'
-                        ? 'bg-[#D8A35C] text-black'
-                        : 'bg-white/10 text-white/70'
-                    }`}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${coverageSystem === 'aniline' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'}`}
                   >
-                    {isUk ? 'Анілін' : 'Анилин'}
+                    {isUk ? 'Анілін (прозорий)' : 'Анилин (прозрачный)'}
                   </button>
                   <button
                     onClick={() => setCoverageSystem('acrylic')}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      coverageSystem === 'acrylic'
-                        ? 'bg-[#D8A35C] text-black'
-                        : 'bg-white/10 text-white/70'
-                    }`}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${coverageSystem === 'acrylic' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'}`}
                   >
-                    {isUk ? 'Акрил' : 'Акрил'}
+                    {isUk ? 'Акрил (укривистий)' : 'Акрил (укрывистый)'}
                   </button>
                 </div>
               </div>
 
-              {/* Целевой цвет */}
               <div className="flex flex-col items-center">
-                <div className="text-xs opacity-50 mb-2">
-                  {isUk ? 'Цільовий колір суміші' : 'Целевой цвет смеси'}
-                </div>
-                <div
-                  className="w-28 h-28 rounded-2xl border-2 border-white/15 shadow-lg mb-2"
-                  style={{ backgroundColor: mixedColor?.hex || '#2a2522' }}
-                />
+                <div className="text-xs opacity-50 mb-2">{isUk ? 'Цільовий колір суміші' : 'Целевой цвет смеси'}</div>
+                <div className="w-28 h-28 rounded-2xl border-2 border-white/15 shadow-lg mb-2" style={{ backgroundColor: mixedColor?.hex || '#2a2522' }} />
                 {mixedColor ? (
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm">{mixedColor.hex.toUpperCase()}</span>
@@ -680,40 +739,26 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs opacity-40">
-                    {isUk ? 'Введіть обсяги вище' : 'Введите объёмы выше'}
-                  </span>
+                  <span className="text-xs opacity-40">{isUk ? 'Введіть обсяги вище' : 'Введите объёмы выше'}</span>
                 )}
               </div>
 
-              {/* Рекомендация */}
               {coverageAdvice && (
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
-                      <div className="text-[11px] opacity-50 mb-0.5">
-                        {isUk ? 'Укривистість' : 'Укрывистость'}
-                      </div>
-                      <div className="text-sm font-semibold text-[#D8A35C]">
-                        {coverageAdvice.opacityLabel}
-                      </div>
+                      <div className="text-[11px] opacity-50 mb-0.5">{isUk ? 'Укривистість' : 'Укрывистость'}</div>
+                      <div className="text-sm font-semibold text-[#D8A35C]">{coverageAdvice.opacityLabel}</div>
                     </div>
                     <div>
-                      <div className="text-[11px] opacity-50 mb-0.5">
-                        {isUk ? 'Рекомендовано шарів' : 'Рекомендуемо слоёв'}
-                      </div>
-                      <div className="text-sm font-semibold text-[#D8A35C]">
-                        {coverageAdvice.layersLabel}
-                      </div>
+                      <div className="text-[11px] opacity-50 mb-0.5">{isUk ? 'Рекомендовано шарів' : 'Рекомендуемо слоёв'}</div>
+                      <div className="text-sm font-semibold text-[#D8A35C]">{coverageAdvice.layersLabel}</div>
                     </div>
                   </div>
-                  <p className="text-[13px] leading-relaxed opacity-80">
-                    {coverageAdvice.note}
-                  </p>
+                  <p className="text-[13px] leading-relaxed opacity-80">{coverageAdvice.note}</p>
                 </div>
               )}
 
-              {/* Превью слоёв */}
               {layers && (
                 <div>
                   <div className="text-xs opacity-50 mb-3 font-medium uppercase tracking-wider">
@@ -727,10 +772,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       { label: isUk ? 'Фінал' : 'Финал', color: layers.final },
                     ].map((item, i) => (
                       <div key={i} className="flex flex-col items-center gap-1.5">
-                        <div
-                          className="w-full aspect-square rounded-xl border border-white/15 shadow-sm"
-                          style={{ backgroundColor: rgbToHex(item.color) }}
-                        />
+                        <div className="w-full aspect-square rounded-xl border border-white/15" style={{ backgroundColor: rgbToHex(item.color) }} />
                         <span className="text-[10px] opacity-60 text-center">{item.label}</span>
                       </div>
                     ))}
@@ -756,9 +798,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <PigmentSelector
                   pigments={pigments}
                   value={unwantedPigmentId}
-                  onChange={(id) => {
+                  onChange={id => {
                     setUnwantedPigmentId(id)
                     setAutoNeutralizer(true)
+                    setShowRecipe(false)
                   }}
                   lang={lang}
                 />
@@ -778,9 +821,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <PigmentSelector
                   pigments={pigments}
                   value={neutralizerPigmentId}
-                  onChange={(id) => {
+                  onChange={id => {
                     setNeutralizerPigmentId(id)
                     setAutoNeutralizer(false)
+                    setShowRecipe(false)
                   }}
                   lang={lang}
                 />
@@ -794,19 +838,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <button
                     onClick={() => changeStrength(-5)}
                     disabled={neutralizeStrength <= 10}
-                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 flex items-center justify-center text-xl font-medium transition-all active:scale-90"
+                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 flex items-center justify-center text-xl font-medium active:scale-90"
                   >
                     −
                   </button>
                   <div className="w-16 text-center">
-                    <span className="text-2xl font-bold text-[#D8A35C] tabular-nums">
-                      {neutralizeStrength}%
-                    </span>
+                    <span className="text-2xl font-bold text-[#D8A35C] tabular-nums">{neutralizeStrength}%</span>
                   </div>
                   <button
                     onClick={() => changeStrength(5)}
                     disabled={neutralizeStrength >= 60}
-                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 flex items-center justify-center text-xl font-medium transition-all active:scale-90"
+                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 flex items-center justify-center text-xl font-medium active:scale-90"
                   >
                     +
                   </button>
@@ -815,64 +857,89 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
               {neutralizeResult && (
                 <div className="flex flex-col items-center mt-2">
-                  <div className="text-xs opacity-50 mb-2">
-                    {isUk ? 'Результат тонування' : 'Результат тонирования'}
-                  </div>
-                  <div
-                    className="w-32 h-32 rounded-2xl border-2 border-white/15 shadow-lg mb-3"
-                    style={{ backgroundColor: neutralizeResult.hex }}
-                  />
-                  <div className="flex items-center gap-2">
+                  <div className="text-xs opacity-50 mb-2">{isUk ? 'Результат тонування' : 'Результат тонирования'}</div>
+                  <div className="w-32 h-32 rounded-2xl border-2 border-white/15 shadow-lg mb-3" style={{ backgroundColor: neutralizeResult.hex }} />
+                  <div className="flex items-center gap-2 mb-4">
                     <span className="font-mono text-sm">{neutralizeResult.hex.toUpperCase()}</span>
-                    <button
-                      onClick={() => copyHex(neutralizeResult.hex)}
-                      className="px-2.5 py-1 rounded-lg bg-white/10 text-xs"
-                    >
+                    <button onClick={() => copyHex(neutralizeResult.hex)} className="px-2.5 py-1 rounded-lg bg-white/10 text-xs">
                       {copied ? '✓' : (isUk ? 'Копіювати' : 'Копировать')}
                     </button>
+                  </div>
+
+                  {/* Кнопка рецепта */}
+                  <button
+                    onClick={handleShowRecipe}
+                    className="w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C]/10 transition-colors"
+                  >
+                    {isUk ? 'Як змішати з базових фарб' : 'Как смешать из базовых красок'}
+                  </button>
+                </div>
+              )}
+
+              {/* Рецепт */}
+              {showRecipe && basicRecipe && (
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-medium">
+                      {isUk ? 'Рецепт з базової палітри (±20 мл)' : 'Рецепт из базовой палитры (±20 мл)'}
+                    </div>
+                    <button onClick={() => setShowRecipe(false)} className="text-white/50 text-lg leading-none">×</button>
+                  </div>
+
+                  <div className="flex flex-col gap-2 mb-4">
+                    {basicRecipe.recipe.map(item => (
+                      <div key={item.pigment.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: item.pigment.hex }} />
+                          <span>{isUk ? item.pigment.name.uk : item.pigment.name.ru}</span>
+                        </div>
+                        <span className="font-mono text-[#D8A35C]">{item.ml} мл</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg border border-white/15" style={{ backgroundColor: basicRecipe.resultHex }} />
+                    <div className="text-xs opacity-70">
+                      <div>ΔE ≈ {basicRecipe.deltaE}</div>
+                      <div className="opacity-50">
+                        {basicRecipe.deltaE < 8
+                          ? (isUk ? 'Дуже близький' : 'Очень близкий')
+                          : basicRecipe.deltaE < 15
+                            ? (isUk ? 'Прийнятний' : 'Приемлемый')
+                            : (isUk ? 'Приблизний' : 'Приблизительный')}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Объём + проценты */}
           {mode === 'coverage' && (
             <>
               <div className="flex justify-between items-end mt-6 mb-4 border-t border-white/10 pt-4">
-                <span className="text-sm opacity-60">
-                  {isUk ? 'Загальний об’єм суміші' : 'Общий объём смеси'}
-                </span>
+                <span className="text-sm opacity-60">{isUk ? 'Загальний об’єм суміші' : 'Общий объём смеси'}</span>
                 <span className="text-xl font-bold tabular-nums">
-                  {totalAmount > 1000
-                    ? (totalAmount / 1000).toFixed(2) + ' л'
-                    : totalAmount.toFixed(1) + ' мл'}
+                  {totalAmount > 1000 ? (totalAmount / 1000).toFixed(2) + ' л' : totalAmount.toFixed(1) + ' мл'}
                 </span>
               </div>
 
               <div className="flex flex-col gap-3">
-                {paints.map((paint) => {
+                {paints.map(paint => {
                   const paintAmount = parseFloat(paint.amount) || 0
                   const percentage = totalAmount > 0 ? (paintAmount / totalAmount) * 100 : 0
-                  const pigment = pigments.find((p) => p.id === paint.pigmentId)
-                  const displayPercent =
-                    percentage === 0 ? '0%' : percentage < 0.1 ? '<0.1%' : percentage.toFixed(1) + '%'
+                  const pigment = pigments.find(p => p.id === paint.pigmentId)
+                  const displayPercent = percentage === 0 ? '0%' : percentage < 0.1 ? '<0.1%' : percentage.toFixed(1) + '%'
 
                   return (
                     <div key={paint.id} className="flex flex-col gap-1.5">
                       <div className="flex justify-between items-center text-sm">
                         <div className="flex items-center gap-2.5 truncate pr-3 min-w-0">
-                          <div
-                            className="w-3.5 h-3.5 rounded-full border border-white/25 flex-shrink-0"
-                            style={{ backgroundColor: pigment?.hex || '#666' }}
-                          />
-                          <span className="opacity-85 truncate text-[13px]">
-                            {getPigmentName(paint.pigmentId)}
-                          </span>
+                          <div className="w-3.5 h-3.5 rounded-full border border-white/25 flex-shrink-0" style={{ backgroundColor: pigment?.hex || '#666' }} />
+                          <span className="opacity-85 truncate text-[13px]">{getPigmentName(paint.pigmentId)}</span>
                         </div>
-                        <span className="font-mono text-[#D8A35C] text-[13px] tabular-nums">
-                          {displayPercent}
-                        </span>
+                        <span className="font-mono text-[#D8A35C] text-[13px] tabular-nums">{displayPercent}</span>
                       </div>
                       <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                         <motion.div
