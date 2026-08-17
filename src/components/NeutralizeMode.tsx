@@ -21,6 +21,7 @@ interface NeutralizeModeProps {
   setShowRecipe: (value: boolean) => void
   basicRecipe: BasicRecipeResult | null
   onShowRecipe: () => void
+  getPigmentName: (id: string) => string
 }
 
 export function NeutralizeMode({
@@ -41,6 +42,7 @@ export function NeutralizeMode({
   setShowRecipe,
   basicRecipe,
   onShowRecipe,
+  getPigmentName,
 }: NeutralizeModeProps) {
   const isUk = lang === 'uk'
 
@@ -150,7 +152,9 @@ export function NeutralizeMode({
         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-medium">
-              {isUk ? 'Рецепт з базової палітри (±20 мл)' : 'Рецепт из базовой палитры (±20 мл)'}
+              {isUk
+                ? `Рецепт «${getPigmentName(neutralizerPigmentId)}» (±20 мл)`
+                : `Рецепт «${getPigmentName(neutralizerPigmentId)}» (±20 мл)`}
             </div>
             <button
               onClick={() => setShowRecipe(false)}
