@@ -13,10 +13,21 @@ interface ColorCalcPageProps {
   onBack: () => void
 }
 
+function normalizeHex(raw: string): string | null {
+  let v = raw.trim().replace(/^#/, '').toUpperCase()
+  if (/^[0-9A-F]{3}$/.test(v)) {
+    v = v[0] + v[0] + v[1] + v[1] + v[2] + v[2]
+  }
+  if (/^[0-9A-F]{6}\( /.test(v)) return `# \){v}`
+  return null
+}
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [hexInput, setHexInput] = useState('')
+  const [validHex, setValidHex] = useState<string | null>(null)
 
   const {
     paints,
@@ -36,6 +47,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   })
 
   useEffect(() => {
+    if (mixedColor?.hex) {
+      const hex = mixedColor.hex.toUpperCase()
+      setHexInput(hex)
+      setValidHex(hex)
+    } else if (!validHex) {
+      setHexInput('')
+      setValidHex(null)
+    }
+  }, [mixedColor?.hex])
+
+  useEffect(() => {
     loadAllPigments()
       .then((loaded) => {
         setPigments(loaded)
@@ -47,10 +69,21 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
+  const handleHexChange = (raw: string) => {
+    const cleaned = raw.replace(/[^#0-9A-Fa-f]/g, '').slice(0, 7)
+    setHexInput(cleaned)
+    const normalized = normalizeHex(cleaned)
+    if (normalized) setValidHex(normalized)
+  }
+
+  const handleHexBlur = () => {
+    if (validHex) setHexInput(validHex)
+  }
+
   const copyHex = async () => {
-    if (!mixedColor?.hex) return
+    if (!validHex) return
     try {
-      await navigator.clipboard.writeText(mixedColor.hex.toUpperCase())
+      await navigator.clipboard.writeText(validHex)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch (err) {
@@ -59,177 +92,206 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const isUk = lang === 'uk'
+  const displayColor = validHex || '#E8E4DC'
+  const hasColor = Boolean(validHex)
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="min-h-screen flex flex-col pt-safe px-4 pb-10"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="min-h-screen flex flex-col pt-safe px-4 pb-12 bg-[var(--color-bg,#F8F5F0)]"
     >
-      {/* Header */}
-      <div className="flex items-center mb-5 mt-4">
+      {/* ===== Header ===== */}
+      <header className="flex items-center gap-1 py-3">
         <button
           onClick={onBack}
-          className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100"
+          className="w-11 h-11 -ml-2 flex items-center justify-center rounded-full active:bg-black/5"
+          aria-label={isUk ? 'Назад' : 'Назад'}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path
               d="M15 18L9 12L15 6"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         </button>
-        <h1 className="text-xl font-bold ml-1">
+        <h1 className="text-[17px] font-semibold tracking-tight">
           {isUk ? 'Калькулятор кольору' : 'Калькулятор цвета'}
         </h1>
-      </div>
+      </header>
 
-      <div className="flex-1 flex flex-col gap-4">
-        {/* ===== Блок смеси ===== */}
-        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold opacity-80">
+      <div className="flex-1 flex flex-col gap-5 mt-1">
+
+        {/* ===== 1. Состав смеси ===== */}
+        <section className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+            <h2 className="text-[13px] font-semibold text-black/80">
               {isUk ? 'Склад суміші' : 'Состав смеси'}
             </h2>
             {totalAmount > 0 && (
               <button
                 onClick={clearAllAmounts}
-                className="text-xs text-red-500/80 font-medium px-2 py-1 rounded-md hover:bg-red-50"
+                className="text-[12px] font-medium text-red-500/90 px-2 py-1 -mr-1 rounded-lg active:bg-red-50"
               >
                 {isUk ? 'Очистити' : 'Очистить'}
               </button>
             )}
           </div>
 
-          {loading ? (
-            <div className="text-sm opacity-60 py-6 text-center">
-              {isUk ? 'Завантаження пігментів...' : 'Загрузка пигментов...'}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {paints.map((paint) => (
-                <div key={paint.id} className="flex items-center gap-2">
-                  <PigmentSelector
-                    pigments={pigments}
-                    value={paint.pigmentId}
-                    onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
-                    lang={lang}
-                  />
-                  <input
-                    ref={(el) => {
-                      if (el) amountRefs.current.set(paint.id, el)
-                      else amountRefs.current.delete(paint.id)
-                    }}
-                    type="text"
-                    inputMode="decimal"
-                    enterKeyHint="done"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    value={paint.amount}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(',', '.')
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        const num = parseFloat(val)
-                        if (!isNaN(num) && num > 5000) val = '5000'
-                        updatePaint(paint.id, 'amount', val)
-                      }
-                    }}
-                    onBlur={(e) => {
-                      let val = e.target.value.replace(',', '.')
-                      if (val === '.' || val === '') {
-                        updatePaint(paint.id, 'amount', '')
-                        return
-                      }
-                      const num = parseFloat(val)
-                      if (!isNaN(num))
-                        updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                    }}
-                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-center focus:outline-none focus:border-[#D8A35C]"
-                    placeholder="0"
-                    style={{ fontSize: '16px' }}
-                  />
-                  <span className="text-xs opacity-50 flex-shrink-0 w-6">мл</span>
-                  <button
-                    onClick={() => removePaint(paint.id)}
-                    className="p-2.5 -mr-1 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full"
-                    disabled={paints.length <= 1}
-                    style={{ opacity: paints.length <= 1 ? 0.3 : 1 }}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M18 6L6 18M6 6l12 12"
+          <div className="px-4 pb-4">
+            {loading ? (
+              <div className="py-8 text-center text-[13px] text-black/40">
+                {isUk ? 'Завантаження…' : 'Загрузка…'}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {paints.map((paint) => (
+                  <div key={paint.id} className="flex items-center gap-2.5">
+                    <div className="flex-1 min-w-0">
+                      <PigmentSelector
+                        pigments={pigments}
+                        value={paint.pigmentId}
+                        onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
+                        lang={lang}
                       />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                    </div>
 
-          <button
-            onClick={addPaint}
-            disabled={loading}
-            className="mt-4 w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C] hover:text-white transition-colors disabled:opacity-40"
-          >
-            {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
-          </button>
-        </div>
+                    <input
+                      ref={(el) => {
+                        if (el) amountRefs.current.set(paint.id, el)
+                        else amountRefs.current.delete(paint.id)
+                      }}
+                      type="text"
+                      inputMode="decimal"
+                      enterKeyHint="done"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      value={paint.amount}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(',', '.')
+                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                          const num = parseFloat(val)
+                          if (!isNaN(num) && num > 5000) val = '5000'
+                          updatePaint(paint.id, 'amount', val)
+                        }
+                      }}
+                      onBlur={(e) => {
+                        let val = e.target.value.replace(',', '.')
+                        if (val === '.' || val === '') {
+                          updatePaint(paint.id, 'amount', '')
+                          return
+                        }
+                        const num = parseFloat(val)
+                        if (!isNaN(num))
+                          updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                      }}
+                      className="w-[68px] flex-shrink-0 bg-[#F7F5F1] text-black border-0 rounded-xl px-2 py-3 text-center font-medium focus:outline-none focus:ring-2 focus:ring-[#D8A35C]/50"
+                      placeholder="0"
+                      style={{ fontSize: '16px' }}
+                    />
+                    <span className="text-[12px] text-black/40 w-6 flex-shrink-0">мл</span>
 
-        {/* ===== Результат смешивания ===== */}
-        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-6 shadow-sm flex flex-col items-center">
-          <div className="text-xs opacity-50 mb-4 font-medium uppercase tracking-wider">
-            {isUk ? 'Результат змішування' : 'Результат смешивания'}
+                    <button
+                      onClick={() => removePaint(paint.id)}
+                      disabled={paints.length <= 1}
+                      className="w-10 h-10 -mr-1 flex items-center justify-center rounded-full text-black/30 active:bg-black/5 disabled:opacity-20"
+                      aria-label={isUk ? 'Видалити' : 'Удалить'}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={addPaint}
+              disabled={loading}
+              className="mt-4 w-full py-3.5 rounded-xl border border-dashed border-[#D8A35C]/60 text-[#B8863B] text-[14px] font-medium active:bg-[#D8A35C]/10 disabled:opacity-40 transition-colors"
+            >
+              {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
+            </button>
           </div>
+        </section>
 
+        {/* ===== 2. Результат (главный фокус) ===== */}
+        <section className="bg-white rounded-2xl shadow-sm px-5 pt-5 pb-6 flex flex-col items-center">
+          <h2 className="text-[13px] font-semibold text-black/80 mb-4 self-start">
+            {isUk ? 'Результат' : 'Результат'}
+          </h2>
+
+          {/* Цветовой квадрат — самый важный элемент */}
           <div
-            className="w-36 h-36 rounded-2xl border border-black/10 shadow-md mb-4"
-            style={{ backgroundColor: mixedColor?.hex || '#E8E4DC' }}
+            className="w-40 h-40 rounded-2xl shadow-inner border border-black/5 mb-5 transition-colors duration-150"
+            style={{ backgroundColor: displayColor }}
+            role="img"
+            aria-label={hasColor ? validHex! : isUk ? 'Колір ще не розрахований' : 'Цвет ещё не рассчитан'}
           />
 
-          {mixedColor ? (
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-base font-medium tracking-wide">
-                {mixedColor.hex.toUpperCase()}
-              </span>
+          {/* HEX-поле */}
+          <div className="w-full max-w-[260px]">
+            <label
+              htmlFor="hex-input"
+              className="block text-[11px] font-medium text-black/40 uppercase tracking-wider mb-1.5 text-center"
+            >
+              HEX
+            </label>
+
+            <div className="flex gap-2">
+              <input
+                id="hex-input"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                value={hexInput}
+                onChange={(e) => handleHexChange(e.target.value)}
+                onBlur={handleHexBlur}
+                placeholder="#000000"
+                className="flex-1 bg-[#F7F5F1] text-black border-0 rounded-xl px-3 py-3 text-center font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-[#D8A35C]/50"
+                style={{ fontSize: '16px' }}
+              />
+
               <button
                 onClick={copyHex}
-                className="px-3 py-1.5 rounded-lg bg-black/5 text-xs font-medium hover:bg-black/10 transition-colors"
+                disabled={!hasColor}
+                className="h-[48px] px-4 rounded-xl bg-[#D8A35C] text-black text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
               >
                 {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
               </button>
             </div>
-          ) : (
-            <span className="text-sm opacity-40">
-              {isUk ? 'Введіть обсяги пігментів' : 'Введите объёмы пигментов'}
-            </span>
-          )}
-        </div>
 
-        {/* ===== Общий объём ===== */}
-        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl px-4 py-4 shadow-sm flex justify-between items-center">
-          <span className="text-sm opacity-60">
-            {isUk ? 'Загальний об’єм суміші' : 'Общий объём смеси'}
+            <p className="mt-2.5 text-[12px] text-center text-black/35 leading-snug">
+              {hasColor
+                ? isUk
+                  ? 'Змінюйте код — квадрат оновиться одразу'
+                  : 'Меняйте код — квадрат обновится сразу'
+                : isUk
+                  ? 'Вкажіть обсяги пігментів або введіть HEX'
+                  : 'Укажите объёмы пигментов или введите HEX'}
+            </p>
+          </div>
+        </section>
+
+        {/* ===== 3. Объём (второстепенная информация) ===== */}
+        <section className="bg-white rounded-2xl shadow-sm px-4 py-4 flex items-center justify-between">
+          <span className="text-[14px] text-black/50">
+            {isUk ? 'Загальний об’єм' : 'Общий объём'}
           </span>
-          <span className="text-xl font-bold tabular-nums">
+          <span className="text-[18px] font-semibold tabular-nums tracking-tight">
             {totalAmount > 1000
-              ? (totalAmount / 1000).toFixed(2) + ' л'
-              : totalAmount.toFixed(1) + ' мл'}
+              ? `${(totalAmount / 1000).toFixed(2)} л`
+              : `${totalAmount.toFixed(1)} мл`}
           </span>
-        </div>
+        </section>
       </div>
     </motion.div>
   )
