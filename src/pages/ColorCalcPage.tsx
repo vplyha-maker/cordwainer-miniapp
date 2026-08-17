@@ -25,6 +25,69 @@ interface PaintPart {
 type Mode = 'coverage' | 'neutralize'
 type CoverageSystem = 'aniline' | 'acrylic'
 
+// ==========================================
+// Чистые базовые цвета (канцтовары)
+// ==========================================
+
+const PURE_BASIC_COLORS = [
+  {
+    id: 'pure_white',
+    name: { uk: 'Білий', ru: 'Белый', en: 'White' },
+    // Используем массив для надежного фоллбэка, если первого ID нет в базе
+    sourceIds: ['titanium_white', 'zinc_white', 'lithopone'],
+  },
+  {
+    id: 'pure_black',
+    name: { uk: 'Чорний', ru: 'Чёрный', en: 'Black' },
+    sourceIds: ['carbon_black', 'ivory_black', 'lamp_black'],
+  },
+  {
+    id: 'pure_red',
+    name: { uk: 'Червоний', ru: 'Красный', en: 'Red' },
+    sourceIds: ['cadmium_red', 'iron_oxide_red', 'pyrrole_red'],
+  },
+  {
+    id: 'pure_yellow',
+    name: { uk: 'Жовтий', ru: 'Жёлтый', en: 'Yellow' },
+    sourceIds: ['cadmium_yellow', 'ochre', 'azo_yellow'],
+  },
+  {
+    id: 'pure_blue',
+    name: { uk: 'Синій', ru: 'Синий', en: 'Blue' },
+    sourceIds: ['ultramarine', 'phthalo_blue', 'prussian_blue'],
+  },
+  {
+    id: 'pure_green',
+    name: { uk: 'Зелений', ru: 'Зелёный', en: 'Green' },
+    sourceIds: ['phthalo_green', 'green_earth', 'viridian'],
+  },
+] as const
+
+/**
+ * Получаем чистые базовые цвета из нашей базы пигментов
+ */
+function getPureBasicPigments(pigments: Pigment[]): Pigment[] {
+  return PURE_BASIC_COLORS.map((basic) => {
+    // Ищем первый доступный пигмент из списка вариантов
+    const source = pigments.find((p) => basic.sourceIds.includes(p.id))
+    
+    if (source?.spectrum) {
+      return {
+        ...source,
+        id: basic.id,
+        name: {
+          uk: basic.name.uk,
+          ru: basic.name.ru,
+          en: basic.name.en,
+        },
+        hex: source.hex,
+      }
+    }
+
+    return null
+  }).filter(Boolean) as Pigment[]
+}
+
 const getPigmentCategory = (id: string, lang: Lang) => {
   const isUk = lang === 'uk'
   if (id.includes('cadmium')) return isUk ? 'Кадмієва група' : 'Кадмиевая группа'
@@ -129,25 +192,6 @@ function simulateLayersKM(
     strength: Math.round(strength),
     deltaL,
   }
-}
-
-const BASIC_PALETTE_IDS = [
-  'titanium_white',
-  'carbon_black',
-  'ivory_black',
-  'cadmium_yellow',
-  'ochre',
-  'cadmium_red',
-  'iron_oxide_red',
-  'ultramarine',
-  'prussian_blue',
-  'phthalo_blue',
-  'green_earth',
-  'phthalo_green',
-]
-
-function getBasicPigments(pigments: Pigment[]): Pigment[] {
-  return pigments.filter(p => BASIC_PALETTE_IDS.includes(p.id) && p.spectrum && p.spectrum.length > 0)
 }
 
 function findBasicRecipe(
@@ -564,7 +608,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const handleShowRecipe = () => {
     const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
     if (!neutralizer?.spectrum) return
-    const basic = getBasicPigments(pigments)
+    const basic = getPureBasicPigments(pigments)
     const result = findBasicRecipe(neutralizer.spectrum, basic)
     setBasicRecipe(result)
     setShowRecipe(true)
