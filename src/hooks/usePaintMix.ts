@@ -57,6 +57,11 @@ export function usePaintMix(pigments: Pigment[]) {
     setPaints((prev) => prev.map((p) => ({ ...p, amount: '' })))
   }
 
+  // Добавляем функцию для полной перезаписи массива красок (нужна для генерации рецепта по HEX)
+  const setAllPaints = (newPaints: PaintPart[]) => {
+    setPaints(newPaints)
+  }
+
   return {
     paints,
     amountRefs,
@@ -65,5 +70,6 @@ export function usePaintMix(pigments: Pigment[]) {
     removePaint,
     updatePaint,
     clearAllAmounts,
+    setAllPaints, // Экспортируем добавленную функцию
   }
-                                           }
+}
