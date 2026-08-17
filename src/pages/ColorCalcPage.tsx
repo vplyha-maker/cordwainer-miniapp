@@ -4,8 +4,7 @@ import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
 import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint } from '../utils/colorScience'
-// Добавлен импорт графика (убедись, что путь к файлу верный)
-import { SpectrumGraph } from './components/SpectrumGraph' 
+import { SpectrumGraph } from '../components/SpectrumGraph'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -125,7 +124,7 @@ const PigmentSelector = ({
                   <div
                     className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={(e) => {
-                      if ((e.target as HTMLElement).closest('.info-btn')) return;
+                      if ((e.target as HTMLElement).closest('.info-btn')) return
                       onChange(p.id)
                       setIsOpen(false)
                       setSearch('')
@@ -187,17 +186,17 @@ const PigmentSelector = ({
                               <span className="font-mono text-gray-800 uppercase">{p.hex}</span>
                             </div>
                           )}
-                          
+
                           {/* Интеграция компонента спектра */}
                           {p.spectrum && p.spectrum.length > 0 && (
                             <div className="mt-3 p-2 bg-black/5 rounded-lg border border-black/5">
                               <p className="text-xs text-gray-500 mb-1 font-medium">
                                 {isUk ? 'Спектр відбиття' : 'Спектр отражения'}
                               </p>
-                              <SpectrumGraph 
-                                spectrum={p.spectrum} 
-                                className="h-20 w-full text-gray-300" 
-                                lineColor={p.hex || '#666'} 
+                              <SpectrumGraph
+                                spectrum={p.spectrum}
+                                className="h-20 w-full text-gray-300"
+                                lineColor={p.hex || '#666'}
                               />
                             </div>
                           )}
@@ -329,7 +328,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <div className="flex flex-col gap-3">
               {paints.map((paint) => (
                 <div key={paint.id} className="flex items-center gap-2">
-                  <PigmentSelector 
+                  <PigmentSelector
                     pigments={pigments}
                     value={paint.pigmentId}
                     onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
