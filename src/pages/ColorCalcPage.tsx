@@ -32,10 +32,13 @@ function normalizeHex(raw: string): string | null {
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
+  const [isMatching, setIsMatching] = useState(false) // Состояние загрузки при подборе по HEX
   const [copied, setCopied] = useState(false)
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
+  
   const userEdited = useRef(false)
+  const isInternalUpdate = useRef(false) // Защита от зацикливания при программном изменении рецепта
 
   const {
     paints,
@@ -45,17 +48,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     removePaint,
     updatePaint,
     clearAllAmounts,
+    setAllPaints, // Функция должна быть добавлена в usePaintMix для массовой установки рецепта
   } = usePaintMix(pigments)
 
-  const { mixedColor } = useColorCalculations({
+  const { mixedColor, findRecipeForHex } = useColorCalculations({
     pigments,
     paints,
     totalAmount,
     lang,
   })
 
-  // Смесь изменилась → подставляем её HEX (если пользователь не редактирует вручную)
+  // Смесь изменилась → подставляем её HEX (если пользователь не редактировал вручную)
   useEffect(() => {
+    if (isInternalUpdate.current) return
+
     if (mixedColor?.hex && !userEdited.current) {
       const hex = mixedColor.hex.toUpperCase()
       setHexInput(hex)
@@ -67,9 +73,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [mixedColor?.hex])
 
-  // При изменении объёмов/пигментов снова доверяем смеси
+  // При изменении объёмов/пигментов снова доверяем смеси (если это не внутренний подбор)
   useEffect(() => {
-    userEdited.current = false
+    if (!isInternalUpdate.current) {
+      userEdited.current = false
+    }
   }, [paints, totalAmount])
 
   useEffect(() => {
@@ -84,7 +92,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
-  const handleHexChange = (raw: string) => {
+  // Обработка ввода HEX и запуск обратного расчета
+  const handleHexChange = async (raw: string) => {
     userEdited.current = true
     const cleaned = raw.replace(/[^#0-9A-Fa-f]/g, '').slice(0, 7)
     setHexInput(cleaned)
@@ -92,8 +101,28 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     const normalized = normalizeHex(cleaned)
     if (normalized) {
       setValidHex(normalized)
+      
+      // Запускаем физический подбор рецепта по введенному HEX
+      if (pigments.length > 0 && setAllPaints) {
+        setIsMatching(true)
+        try {
+          const recipe = await findRecipeForHex(normalized)
+          if (recipe && recipe.length > 0) {
+            isInternalUpdate.current = true
+            setAllPaints(recipe)
+            // Сбрасываем флаг внутренней защиты после завершения рендеринга
+            setTimeout(() => {
+              isInternalUpdate.current = false
+            }, 100)
+          }
+        } catch (err) {
+          console.error("Ошибка подбора рецепта:", err)
+        } finally {
+          setIsMatching(false)
+        }
+      }
     } else {
-      setValidHex(null) // Сбрасываем валидный цвет, если код неполный
+      setValidHex(null)
     }
   }
 
@@ -249,9 +278,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
           <div className="flex flex-col items-center">
             <div
-              className="w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150"
+              className="w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150 relative flex items-center justify-center"
               style={{ backgroundColor: displayColor }}
-            />
+            >
+              {/* Спиннер во время подбора цвета */}
+              {isMatching && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-xs rounded-2xl flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-[#D8A35C] border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
 
             {/* HEX + копировать — в одну линию без переполнения */}
             <div className="w-full flex items-center gap-2">
@@ -278,13 +314,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
 
             <p className="mt-2.5 text-[12px] text-center text-[#F5F1EA]/35">
-              {hasColor
+              {isMatching
                 ? isUk
-                  ? 'Змінюйте код — квадрат оновиться одразу'
-                  : 'Меняйте код — квадрат обновится сразу'
-                : isUk
-                  ? 'Вкажіть обсяги або введіть HEX'
-                  : 'Укажите объёмы или введите HEX'}
+                  ? 'Підбираємо пропорції пігментів…'
+                  : 'Подбираем пропорции пигментов…'
+                : hasColor
+                  ? isUk
+                    ? 'Змінюйте код — калькулятор підбере рецепт'
+                    : 'Меняйте код — калькулятор подберет рецепт'
+                  : isUk
+                    ? 'Вкажіть обсяги або введіть HEX'
+                    : 'Укажите объёмы или введите HEX'}
             </p>
           </div>
         </section>
