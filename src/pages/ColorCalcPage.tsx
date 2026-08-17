@@ -6,15 +6,17 @@ import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
 import {
   CoverageSystem,
-  getPureBasicPigments,
   getOstwaldNeutralizer,
-  findBasicRecipe
 } from '../utils/calculatorLogic'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
 import { CoverageMode } from '../components/CoverageMode'
 import { NeutralizeMode } from '../components/NeutralizeMode'
+import {
+  findBasicPaletteRecipe,
+  BasicRecipeResult,
+} from '../utils/basicPaletteRecipe'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -37,7 +39,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [autoNeutralizer, setAutoNeutralizer] = useState(true)
 
   const [showRecipe, setShowRecipe] = useState(false)
-  const [basicRecipe, setBasicRecipe] = useState<ReturnType<typeof findBasicRecipe>>(null)
+  const [basicRecipe, setBasicRecipe] = useState<BasicRecipeResult | null>(null)
 
   // === Хуки ===
   const {
@@ -110,8 +112,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const handleShowRecipe = () => {
     const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
     if (!neutralizer?.spectrum) return
-    const basic = getPureBasicPigments(pigments)
-    const result = findBasicRecipe(neutralizer.spectrum, basic)
+
+    const result = findBasicPaletteRecipe(neutralizer.spectrum)
     setBasicRecipe(result)
     setShowRecipe(true)
   }
