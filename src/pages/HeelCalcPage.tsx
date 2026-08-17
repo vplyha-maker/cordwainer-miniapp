@@ -1,336 +1,331 @@
-import { motion } from 'framer-motion'
-import { useState, useEffect } from 'react'
-
-import { Lang } from '../App'
-import { Pigment } from '../data/pigments'
-import { loadAllPigments } from '../data/loadPigments'
+// src/pages/HeelCalcPage.tsx
+import React, { useState, useMemo, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import type { Lang } from '../App'
 import {
-  CoverageSystem,
-  getOstwaldNeutralizer,
-} from '../utils/calculatorLogic'
-import { usePaintMix } from '../hooks/usePaintMix'
-import { useColorCalculations } from '../hooks/useColorCalculations'
-import { PigmentSelector } from '../components/PigmentSelector'
-import { CoverageMode } from '../components/CoverageMode'
-import { NeutralizeMode } from '../components/NeutralizeMode'
-import {
-  findBasicPaletteRecipe,
-  BasicRecipeResult,
-} from '../utils/basicPaletteRecipe'
+  HEEL_CONST,
+  computeEngineering,
+  computeAudit,
+  defaultTipWidth,
+  suggestAutoFix,
+  type SoleType,
+  type HeelType,
+} from '../lib/heelCalc'
+import { buildHeelGeometry } from '../lib/heelGeometry'
+import { HeelStepper } from '../components/heel/HeelStepper'
+import { HeelCanvas } from '../components/heel/HeelCanvas'
 
-interface ColorCalcPageProps {
-  lang: Lang
-  onBack: () => void
-}
+type Props = { onBack: () => void; lang: Lang }
 
-type Mode = 'coverage' | 'neutralize'
-
-export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
-  const [pigments, setPigments] = useState<Pigment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
-  const [mode, setMode] = useState<Mode>('coverage')
-  const [coverageSystem, setCoverageSystem] = useState<CoverageSystem>('acrylic')
-
-  const [basePigmentId, setBasePigmentId] = useState('titanium_white')
-  const [unwantedPigmentId, setUnwantedPigmentId] = useState('cadmium_yellow')
-  const [neutralizerPigmentId, setNeutralizerPigmentId] = useState('ultramarine')
-  const [neutralizeStrength, setNeutralizeStrength] = useState(35)
-  const [autoNeutralizer, setAutoNeutralizer] = useState(true)
-
-  const [showRecipe, setShowRecipe] = useState(false)
-  const [basicRecipe, setBasicRecipe] = useState<BasicRecipeResult | null>(null)
-
-  // === Хуки ===
-  const {
-    paints,
-    amountRefs,
-    totalAmount,
-    addPaint,
-    removePaint,
-    updatePaint,
-    clearAllAmounts,
-  } = usePaintMix(pigments)
-
-  const {
-    mixedColor,
-    layers,
-    coverageAdvice,
-    neutralizeResult,
-  } = useColorCalculations({
-    pigments,
-    paints,
-    totalAmount,
-    basePigmentId,
-    coverageSystem,
-    unwantedPigmentId,
-    neutralizerPigmentId,
-    neutralizeStrength,
-    lang,
-  })
+export function HeelCalcPage({ onBack, lang }: Props) {
+  const [shoeSize, setShoeSize] = useState(38)
+  const [heelHeight, setHeelHeight] = useState(55)
+  const [toeThickness, setToeThickness] = useState(10)
+  const [rockerAngle, setRockerAngle] = useState(12)
+  const [rockerStartPct, setRockerStartPct] = useState(65)
+  const [soleType, setSoleType] = useState<SoleType>('flat')
+  const [heelType, setHeelType] = useState<HeelType>('stiletto')
+  const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
+  const [tipWidthMm, setTipWidthMm] = useState(10)
+  const [showSpecs, setShowSpecs] = useState(false)
 
   useEffect(() => {
-    loadAllPigments()
-      .then((loaded) => {
-        setPigments(loaded)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error(err)
-        setLoading(false)
-      })
-  }, [])
+    if (toeThickness > heelHeight + 10) setToeThickness(heelHeight + 10)
+  }, [heelHeight, toeThickness])
 
   useEffect(() => {
-    if (!autoNeutralizer || pigments.length === 0) return
-    const recommended = getOstwaldNeutralizer(unwantedPigmentId, pigments)
-    setNeutralizerPigmentId(recommended)
-  }, [unwantedPigmentId, pigments, autoNeutralizer])
+    if (soleType === 'flat') setTipWidthMm(defaultTipWidth(heelType))
+  }, [heelType, soleType])
 
-  const getPigmentName = (pigmentId: string) => {
-    const pigment = pigments.find((p) => p.id === pigmentId)
-    if (!pigment) return '...'
-    return lang === 'uk' ? pigment.name.uk : pigment.name.ru
-  }
-
-  const copyHex = async (hex?: string) => {
-    const value = hex || mixedColor?.hex
-    if (!value) return
+  const haptic = (style: 'light' | 'medium' = 'light') => {
     try {
-      await navigator.clipboard.writeText(value.toUpperCase())
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    } catch (err) {
-      console.error(err)
-    }
+      const tg = (window as any).Telegram?.WebApp
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+      else if (navigator.vibrate) navigator.vibrate(style === 'light' ? 20 : 40)
+    } catch {}
   }
 
-  const changeStrength = (delta: number) => {
-    setNeutralizeStrength((prev) => Math.min(60, Math.max(10, prev + delta)))
+  const t = useMemo(() => getLabels(lang), [lang])
+
+  const input = {
+    shoeSize, heelHeight, toeThickness, soleType, heelType,
+    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm,
   }
 
-  const handleShowRecipe = () => {
-    const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
-    if (!neutralizer?.spectrum) return
+  const eng = useMemo(() => computeEngineering(input), [
+    shoeSize, heelHeight, toeThickness, soleType, heelType,
+    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm,
+  ])
 
-    const result = findBasicPaletteRecipe(neutralizer.spectrum)
-    setBasicRecipe(result)
-    setShowRecipe(true)
+  const audit = useMemo(
+    () => computeAudit(eng, soleType, heelHeight, rockerAngle),
+    [eng, soleType, heelHeight, rockerAngle]
+  )
+
+  const geometry = useMemo(
+    () => buildHeelGeometry({ ...input, shankLength: eng.shankLength }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shoeSize, heelHeight, toeThickness, soleType, heelType, rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm, eng.shankLength]
+  )
+
+  const handleFix = () => {
+    haptic('medium')
+    const fix = suggestAutoFix(input, eng)
+    setToeThickness(fix.toeThickness)
+    setHeelHeight(fix.heelHeight)
+    setHeelTipOffsetMm(fix.heelTipOffsetMm)
+    setTipWidthMm(fix.tipWidthMm)
+    setRockerAngle(fix.rockerAngle)
   }
-
-  const isUk = lang === 'uk'
 
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="min-h-screen flex flex-col pt-safe px-4 pb-10"
+      className="flex flex-col h-[100dvh] bg-[#110F0E] text-[#F3EFEA] overflow-hidden"
     >
-      {/* Header */}
-      <div className="flex items-center mb-5 mt-4">
-        <button onClick={onBack} className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <div className="flex-shrink-0 p-3 flex items-center justify-between border-b border-white/5 bg-[#110F0E]/80 backdrop-blur-md z-10">
+        <button
+          onClick={() => { haptic(); onBack() }}
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1C1816] border border-white/5 active:scale-90"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold ml-1">
-          {isUk ? 'Калькулятор кольору' : 'Калькулятор цвета'}
-        </h1>
+        <div className="text-right">
+          <h1 className="text-[14px] font-medium leading-none mb-1">{t.title}</h1>
+          <p className="text-[10px] text-[#A3988E]">{t.desc}</p>
+        </div>
       </div>
 
-      <div className="flex-1 flex flex-col gap-4">
-        {/* ===== Блок смеси ===== */}
-        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm z-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold opacity-80">
-              {isUk ? 'Склад суміші (цільовий колір)' : 'Состав смеси (целевой цвет)'}
-            </h2>
-            {totalAmount > 0 && (
+      <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 pb-6">
+        <HeelCanvas
+          geometry={geometry}
+          eng={eng}
+          audit={audit}
+          auditTitle={(t as any)[audit.titleKey]}
+          auditMessage={(t as any)[audit.messageKey]}
+          soleType={soleType}
+          heelType={heelType}
+          heelHeight={heelHeight}
+          toeThickness={toeThickness}
+          labels={t}
+          onFix={handleFix}
+        />
+
+        {/* Стандарт / Рокер */}
+        <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
+          {(['flat', 'rocker'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => { haptic(); setSoleType(type) }}
+              className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg ${
+                soleType === type ? 'bg-[#8B5CF6] text-white' : 'text-[#A3988E]'
+              }`}
+            >
+              {t[type]}
+            </button>
+          ))}
+        </div>
+
+        {/* Типы каблука — только Стандарт */}
+        {soleType === 'flat' && (
+          <div className="grid grid-cols-2 gap-1 bg-[#1C1816] p-1 rounded-xl border border-white/5">
+            {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
               <button
-                onClick={clearAllAmounts}
-                className="text-xs text-red-500/80 font-medium px-2 py-1 rounded-md hover:bg-red-50"
+                key={type}
+                onClick={() => { haptic(); setHeelType(type) }}
+                className={`py-1.5 text-[11px] font-medium rounded-lg ${
+                  heelType === type ? 'bg-[#8B5CF6] text-white' : 'text-[#A3988E]'
+                }`}
               >
-                {isUk ? 'Очистити' : 'Очистить'}
+                {t[type]}
               </button>
-            )}
+            ))}
           </div>
+        )}
 
-          {loading ? (
-            <div className="text-sm opacity-60 py-6 text-center">
-              {isUk ? 'Завантаження пігментів...' : 'Загрузка пигментов...'}
-            </div>
+        {/* Степперы */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
+          <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" onHaptic={() => haptic()} />
+          <HeelStepper
+            label={t.toe}
+            min={0}
+            max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)}
+            value={toeThickness}
+            onChange={setToeThickness}
+            unit="мм"
+            onHaptic={() => haptic()}
+          />
+          <HeelStepper
+            label={t.start}
+            min={55}
+            max={75}
+            value={rockerStartPct}
+            onChange={setRockerStartPct}
+            unit="%"
+            onHaptic={() => haptic()}
+          />
+
+          {soleType === 'rocker' ? (
+            <HeelStepper
+              label={t.angle}
+              min={5}
+              max={30}
+              value={rockerAngle}
+              onChange={setRockerAngle}
+              unit="°"
+              onHaptic={() => haptic()}
+            />
           ) : (
-            <div className="flex flex-col gap-3">
-              {paints.map((paint) => (
-                <div key={paint.id} className="flex items-center gap-2">
-                  <PigmentSelector
-                    pigments={pigments}
-                    value={paint.pigmentId}
-                    onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
-                    lang={lang}
-                  />
-                  <input
-                    ref={(el) => {
-                      if (el) amountRefs.current.set(paint.id, el)
-                      else amountRefs.current.delete(paint.id)
-                    }}
-                    type="text"
-                    inputMode="decimal"
-                    enterKeyHint="done"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    value={paint.amount}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(',', '.')
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        const num = parseFloat(val)
-                        if (!isNaN(num) && num > 5000) val = '5000'
-                        updatePaint(paint.id, 'amount', val)
-                      }
-                    }}
-                    onBlur={(e) => {
-                      let val = e.target.value.replace(',', '.')
-                      if (val === '.' || val === '') {
-                        updatePaint(paint.id, 'amount', '')
-                        return
-                      }
-                      const num = parseFloat(val)
-                      if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                    }}
-                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-center focus:outline-none focus:border-[#D8A35C]"
-                    placeholder="0"
-                    style={{ fontSize: '16px' }}
-                  />
-                  <span className="text-xs opacity-50 flex-shrink-0 w-6">мл</span>
-                  <button
-                    onClick={() => removePaint(paint.id)}
-                    className="p-2.5 -mr-1 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full"
-                    disabled={paints.length <= 1}
-                    style={{ opacity: paints.length <= 1 ? 0.3 : 1 }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={addPaint}
-            disabled={loading}
-            className="mt-4 w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C] hover:text-white transition-colors disabled:opacity-40"
-          >
-            {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
-          </button>
-
-          {/* ===== Результат смеси (сразу под составом) ===== */}
-          <div className="mt-5 pt-4 border-t border-black/10">
-            <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
-              {isUk ? 'Результат змішування' : 'Результат смешивания'}
-            </div>
-            <div className="flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded-xl border border-black/10 shadow-sm flex-shrink-0"
-                style={{ backgroundColor: mixedColor?.hex || '#E8E4DC' }}
+            <>
+              <HeelStepper
+                label={t.offset}
+                min={-15}
+                max={15}
+                value={heelTipOffsetMm}
+                onChange={setHeelTipOffsetMm}
+                unit="мм"
+                onHaptic={() => haptic()}
               />
-              <div className="flex flex-col gap-1.5 min-w-0">
-                {mixedColor ? (
+              <HeelStepper
+                label={t.tipW}
+                min={6}
+                max={45}
+                value={tipWidthMm}
+                onChange={setTipWidthMm}
+                unit="мм"
+                onHaptic={() => haptic()}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Спека */}
+        <button
+          onClick={() => { haptic(); setShowSpecs(!showSpecs) }}
+          className="w-full py-2 px-3 bg-[#1C1816] rounded-xl text-[11px] font-medium flex items-center justify-between border border-white/5"
+        >
+          <span>{t.specsBtn}</span>
+          <svg
+            className={`w-3.5 h-3.5 text-[#A3988E] transition-transform ${showSpecs ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <AnimatePresence>
+          {showSpecs && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-[#1C1816] p-2.5 rounded-xl border border-white/5 text-[10px] text-[#A3988E] space-y-1.5">
+                <Row label="Перекат" value={`${rockerStartPct}%`} />
+                <Row label="Геленок" value={`${eng.shankLength} мм`} />
+                <Row label="Сталь 65Г" value={`${eng.steelThickness.toFixed(1)} мм`} />
+                <Row label="L_eff" value={`${eng.lEff.toFixed(1)} мм`} />
+                <Row label="Heel Center" value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`} />
+                {soleType === 'flat' && (
                   <>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-medium text-black">
-                        {mixedColor.hex.toUpperCase()}
-                      </span>
-                      <button
-                        onClick={() => copyHex()}
-                        className="px-2 py-0.5 rounded-md bg-black/5 text-xs text-black/70"
-                      >
-                        {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
-                      </button>
-                    </div>
-                    <div className="text-[11px] opacity-50">
-                      {isUk ? 'Kubelka-Munk суміш' : 'Смесь Kubelka-Munk'}
-                    </div>
+                    <Row
+                      label="Смещение"
+                      value={`${heelTipOffsetMm} мм`}
+                      danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
+                    />
+                    <Row label="Набойка" value={`${tipWidthMm} мм`} />
+                    <Row label={t.invertRisk} value={`${eng.inversionRisk}%`} danger={eng.inversionRisk >= 55} />
+                    {(heelType === 'kitten' || heelType === 'flared') && (
+                      <Row label={t.entryAngle} value={`${eng.entryAngleDeg}°`} />
+                    )}
                   </>
-                ) : (
-                  <span className="text-xs opacity-40">
-                    {isUk ? 'Введіть обсяги пігментів' : 'Введите объёмы пигментов'}
-                  </span>
                 )}
+                <div className="pt-1.5 mt-1 border-t border-white/5 font-mono text-[9px] text-[#D49A5C] bg-black/20 p-1.5 rounded-lg text-center">
+                  Angle = arcsin((H − T) / L_eff)
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ===== Блок режимов ===== */}
-        <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md">
-          {/* Переключатель режимов */}
-          <div className="flex gap-2 mb-5">
-            <button
-              onClick={() => setMode('coverage')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'coverage' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'
-              }`}
-            >
-              {isUk ? 'Укривистість / Слої' : 'Укрывистость / Слои'}
-            </button>
-            <button
-              onClick={() => setMode('neutralize')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'neutralize' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'
-              }`}
-            >
-              {isUk ? 'Нейтралізація' : 'Нейтрализация'}
-            </button>
-          </div>
-
-          {/* Контент режимов */}
-          {mode === 'coverage' && (
-            <CoverageMode
-              lang={lang}
-              pigments={pigments}
-              basePigmentId={basePigmentId}
-              setBasePigmentId={setBasePigmentId}
-              coverageSystem={coverageSystem}
-              setCoverageSystem={setCoverageSystem}
-              mixedColor={mixedColor}
-              coverageAdvice={coverageAdvice}
-              layers={layers}
-              copied={copied}
-              onCopyHex={() => copyHex()}
-              paints={paints}
-              totalAmount={totalAmount}
-              getPigmentName={getPigmentName}
-            />
+            </motion.div>
           )}
-
-          {mode === 'neutralize' && (
-            <NeutralizeMode
-              lang={lang}
-              pigments={pigments}
-              unwantedPigmentId={unwantedPigmentId}
-              setUnwantedPigmentId={setUnwantedPigmentId}
-              neutralizerPigmentId={neutralizerPigmentId}
-              setNeutralizerPigmentId={setNeutralizerPigmentId}
-              autoNeutralizer={autoNeutralizer}
-              setAutoNeutralizer={setAutoNeutralizer}
-              neutralizeStrength={neutralizeStrength}
-              changeStrength={changeStrength}
-              neutralizeResult={neutralizeResult}
-              copied={copied}
-              onCopyHex={copyHex}
-              showRecipe={showRecipe}
-              setShowRecipe={setShowRecipe}
-              basicRecipe={basicRecipe}
-              onShowRecipe={handleShowRecipe}
-              getPigmentName={getPigmentName}
-            />
-          )}
-        </div>
+        </AnimatePresence>
       </div>
     </motion.div>
   )
+}
+
+function Row({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span>{label}:</span>
+      <strong className={danger ? 'text-red-400' : 'text-[#F3EFEA]'}>{value}</strong>
+    </div>
+  )
+}
+
+function getLabels(lang: Lang) {
+  const C = HEEL_CONST
+  const ru = {
+    title: 'Инженерия и Баланс',
+    desc: 'Аудит профиля и каблука',
+    size: 'Размер', heel: 'Каблук', toe: 'Платформа', angle: 'Угол', start: 'Перекат',
+    fixBtn: 'Баланс', offset: 'Смещение', tipW: 'Набойка',
+    internalSlope: 'Наклон колодки:', loadLbl: 'Нагрузка на плюсну:',
+    successTitle: '✅ БАЛАНС В НОРМЕ', successDesc: 'Физиологическая норма.',
+    warnTitle: '⚠️ ВЫСОКИЙ ПОДЪЕМ',
+    warn1Desc: `Угол больше ${C.COMFORT_ANGLE}°. Увеличьте платформу или уменьшите каблук.`,
+    warn2Desc: 'Чрезмерный рокер при низком каблуке.',
+    errTitle: '⚠️ КРИТИЧЕСКИЙ НАКЛОН',
+    errDesc: `Угол колодки > ${C.CRITICAL_ANGLE}°. Требуется утолщение платформы или снижение каблука.`,
+    padTitle: '⚠️ КРИТИЧЕСКАЯ НАГРУЗКА НА ПЛЮСНУ',
+    padDesc: 'Требуется обязательная установка встроенного метатарзального пелота (капли Зейца) в стельку для разгрузки нервных окончаний.',
+    negDropTitle: '⚠️ ОБРАТНЫЙ УКЛОН', negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
+    heelBackTitle: '⚠️ КАБЛУК ЗАВАЛЕН НАЗАД',
+    heelBackDesc: 'Ошибка: Каблук завален назад, произойдет перелом супинатора под весом пациента.',
+    heelFwdTitle: '⚠️ СМЕЩЕНИЕ ВПЕРЁД',
+    heelFwdDesc: `Набойка смещена вперёд больше чем на ${C.MAX_HEEL_OFFSET_MM} мм. Снижена стабильность, риск срыва посадки каблука.`,
+    invertTitle: '⚠️ РИСК ИНВЕРСИИ',
+    invertDesc: 'Набойка слишком узкая при высоком каблуке — высокий риск подворачивания лодыжки.',
+    heelLbl: 'ПЯТКА', toeLbl: 'НОСОК',
+    stiletto: 'Шпилька', block: 'Блок', kitten: 'Рюмочка', flared: 'Трапеция',
+    flat: 'Стандарт', rocker: 'Рокер',
+    specsBtn: '⚙️ Спецификация и Математика', dropLbl: 'Перепад',
+    massTitle: 'Распределение массы', forefoot: 'Носок', rearfoot: 'Пятка',
+    invertRisk: 'Риск инверсии', entryAngle: 'Угол въезда',
+  }
+  const uk = {
+    ...ru,
+    title: 'Інженерія та Баланс',
+    desc: 'Аудит профілю та підбора',
+    size: 'Розмір', heel: 'Підбор', toe: 'Платформа', angle: 'Кут', start: 'Перекат',
+    fixBtn: 'Баланс', offset: 'Зміщення', tipW: 'Набійка',
+    internalSlope: 'Нахил колодки:', loadLbl: 'Навантаження на плюсну:',
+    successTitle: '✅ БАЛАНС У НОРМІ', successDesc: 'Фізіологічна норма.',
+    warnTitle: '⚠️ ВИСОКИЙ ПІДЙОМ',
+    warn1Desc: `Кут більше ${C.COMFORT_ANGLE}°. Збільште платформу або зменште підбор.`,
+    warn2Desc: 'Надмірний рокер при низькому підборі.',
+    errTitle: '⚠️ КРИТИЧНИЙ НАХИЛ',
+    errDesc: `Кут колодки > ${C.CRITICAL_ANGLE}°. Потрібне потовщення платформи або зниження підбора.`,
+    padTitle: '⚠️ КРИТИЧНЕ НАВАНТАЖЕННЯ НА ПЛЮСНУ',
+    padDesc: 'Потрібна обовʼязкова установка вбудованого метатарзального пелота (краплі Зейца) у устілку для розвантаження нервових закінчень.',
+    negDropTitle: '⚠️ ЗВОРОТНІЙ УХИЛ', negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
+    heelBackTitle: '⚠️ ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
+    heelBackDesc: 'Помилка: Підбор завалений назад, відбудеться перелом супінатора під вагою пацієнта.',
+    heelFwdTitle: '⚠️ ЗМІЩЕННЯ ВПЕРЕД',
+    heelFwdDesc: `Набійка зміщена вперед більше ніж на ${C.MAX_HEEL_OFFSET_MM} мм. Знижена стабільність, ризик зриву посадки підбора.`,
+    invertTitle: '⚠️ РИЗИК ІНВЕРСІЇ',
+    invertDesc: 'Набійка занадто вузька при високому підборі — високий ризик підвертання щиколотки.',
+    heelLbl: "П'ЯТКА", toeLbl: 'НОСОК',
+    stiletto: 'Шпилька', block: 'Блок', kitten: 'Чарочка', flared: 'Трапеція',
+    flat: 'Стандарт', rocker: 'Рокер',
+    specsBtn: '⚙️ Специфікація та Математика', dropLbl: 'Перепад',
+    massTitle: 'Розподіл маси', forefoot: 'Носок', rearfoot: "П'ятка",
+    invertRisk: 'Ризик інверсії', entryAngle: 'Кут вʼїзду',
+  }
+  return lang === 'uk' ? uk : ru
 }
