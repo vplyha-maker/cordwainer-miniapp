@@ -33,7 +33,6 @@ const PURE_BASIC_COLORS = [
   {
     id: 'pure_white',
     name: { uk: 'Білий', ru: 'Белый', en: 'White' },
-    // Используем массив для надежного фоллбэка, если первого ID нет в базе
     sourceIds: ['titanium_white', 'zinc_white', 'lithopone'],
   },
   {
@@ -68,8 +67,7 @@ const PURE_BASIC_COLORS = [
  */
 function getPureBasicPigments(pigments: Pigment[]): Pigment[] {
   return PURE_BASIC_COLORS.map((basic) => {
-    // Ищем первый доступный пигмент из списка вариантов
-    const source = pigments.find((p) => basic.sourceIds.includes(p.id))
+    const source = pigments.find((p) => basic.sourceIds.some((id) => id === p.id))
     
     if (source?.spectrum) {
       return {
