@@ -172,7 +172,7 @@ export interface BasicRecipeItem {
 
 export interface BasicRecipeResult {
   recipe: BasicRecipeItem[]
-  resultRgb: { r: number; g: number; b: number }   // ← добавили для совместимости
+  resultRgb: { r: number; g: number; b: number }
   resultHex: string
   deltaE: number
 }
