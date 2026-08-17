@@ -226,6 +226,43 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           >
             {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
           </button>
+
+          {/* ===== Результат смеси (сразу под составом) ===== */}
+          <div className="mt-5 pt-4 border-t border-black/10">
+            <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
+              {isUk ? 'Результат змішування' : 'Результат смешивания'}
+            </div>
+            <div className="flex items-center gap-4">
+              <div
+                className="w-16 h-16 rounded-xl border border-black/10 shadow-sm flex-shrink-0"
+                style={{ backgroundColor: mixedColor?.hex || '#E8E4DC' }}
+              />
+              <div className="flex flex-col gap-1.5 min-w-0">
+                {mixedColor ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-medium text-black">
+                        {mixedColor.hex.toUpperCase()}
+                      </span>
+                      <button
+                        onClick={() => copyHex()}
+                        className="px-2 py-0.5 rounded-md bg-black/5 text-xs text-black/70"
+                      >
+                        {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
+                      </button>
+                    </div>
+                    <div className="text-[11px] opacity-50">
+                      {isUk ? 'Kubelka-Munk суміш' : 'Смесь Kubelka-Munk'}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-xs opacity-40">
+                    {isUk ? 'Введіть обсяги пігментів' : 'Введите объёмы пигментов'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* ===== Блок режимов ===== */}
@@ -289,6 +326,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               setShowRecipe={setShowRecipe}
               basicRecipe={basicRecipe}
               onShowRecipe={handleShowRecipe}
+              getPigmentName={getPigmentName}
             />
           )}
         </div>
