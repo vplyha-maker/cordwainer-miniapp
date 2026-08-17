@@ -1,30 +1,16 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useMemo, useRef } from 'react'
+
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
+import { SpectrumGraph } from '../components/SpectrumGraph'
 import {
   mixSpectra,
   spectrumToRGB,
   rgbToHex,
   SpectrumPoint,
 } from '../utils/colorScience'
-import { SpectrumGraph } from '../components/SpectrumGraph'
-
-interface ColorCalcPageProps {
-  lang: Lang
-  onBack: () => void
-}
-
-interface PaintPart {
-  id: string
-  pigmentId: string
-  amount: string
-}
-
-type Mode = 'coverage' | 'neutralize'
-type CoverageSystem = 'aniline' | 'acrylic'
-// Добавляем импорт наших вынесенных функций:
 import {
   CoverageSystem,
   getPureBasicPigments,
@@ -47,7 +33,7 @@ interface PaintPart {
 
 type Mode = 'coverage' | 'neutralize'
 
- const PigmentSelector = ({
+const PigmentSelector = ({
   pigments,
   value,
   onChange,
@@ -220,7 +206,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
   ])
 
-  const amountRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const amountRefs = useRef<Map<string, HTMLInputElement>>(new Map())
 
   useEffect(() => {
     loadAllPigments()
@@ -324,12 +310,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const addPaint = () => {
     const newId = Math.random().toString(36).slice(2)
     setPaints([...paints, { id: newId, pigmentId: pigments[0]?.id || 'titanium_white', amount: '' }])
-    setTimeout(() => amountRefs.current[newId]?.focus(), 50)
+    setTimeout(() => {
+      const input = amountRefs.current.get(newId)
+      if (input) input.focus()
+    }, 50)
   }
 
   const removePaint = (id: string) => {
     if (paints.length <= 1) return
     setPaints(paints.filter((p) => p.id !== id))
+    amountRefs.current.delete(id)
   }
 
   const updatePaint = (id: string, field: keyof PaintPart, value: string) => {
@@ -419,7 +409,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     lang={lang}
                   />
                   <input
-                    ref={(el) => { amountRefs.current[paint.id] = el }}
+                    ref={(el) => {
+                      if (el) amountRefs.current.set(paint.id, el)
+                      else amountRefs.current.delete(paint.id)
+                    }}
                     type="text"
                     inputMode="decimal"
                     enterKeyHint="done"
