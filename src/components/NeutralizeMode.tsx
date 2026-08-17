@@ -1,7 +1,7 @@
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { PigmentSelector } from './PigmentSelector'
-import { findBasicRecipe } from '../utils/calculatorLogic'
+import { BasicRecipeResult } from '../utils/basicPaletteRecipe'
 
 interface NeutralizeModeProps {
   lang: Lang
@@ -19,7 +19,7 @@ interface NeutralizeModeProps {
   onCopyHex: (hex?: string) => void
   showRecipe: boolean
   setShowRecipe: (value: boolean) => void
-  basicRecipe: ReturnType<typeof findBasicRecipe>
+  basicRecipe: BasicRecipeResult | null
   onShowRecipe: () => void
 }
 
@@ -152,7 +152,10 @@ export function NeutralizeMode({
             <div className="text-sm font-medium">
               {isUk ? 'Рецепт з базової палітри (±20 мл)' : 'Рецепт из базовой палитры (±20 мл)'}
             </div>
-            <button onClick={() => setShowRecipe(false)} className="text-white/50 text-lg leading-none">
+            <button
+              onClick={() => setShowRecipe(false)}
+              className="text-white/50 text-lg leading-none"
+            >
               ×
             </button>
           </div>
