@@ -45,7 +45,6 @@ export const PURE_BASIC_COLORS = [
   },
 ] as const
 
-// ИСПРАВЛЕНИЕ: Возвращаем оригинальный пигмент, не меняя его ID
 export function getPureBasicPigments(pigments: Pigment[]): Pigment[] {
   return PURE_BASIC_COLORS.map((basic) => {
     const source = pigments.find((p) => basic.sourceIds.some((id) => id === p.id))
@@ -149,7 +148,6 @@ export function simulateLayersKM(
   }
 }
 
-// ОРИГИНАЛЬНАЯ ФУНКЦИЯ (возвращена, чтобы не было ошибки Vercel)
 export function findBasicRecipe(
   targetSpectrum: SpectrumPoint[],
   basicPigments: Pigment[],
@@ -245,7 +243,6 @@ export function findBasicRecipe(
   }
 }
 
-// Вспомогательная функция HEX -> RGB
 export function hexToRgbObj(hex: string) {
   let c = hex.replace(/^#/, '')
   if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
@@ -256,7 +253,7 @@ export function hexToRgbObj(hex: string) {
   }
 }
 
-// НОВАЯ ФУНКЦИЯ ДЛЯ ВВОДА HEX: с улучшенным выбором кандидатов
+// НОВАЯ УМНАЯ ФУНКЦИЯ ДЛЯ ВВОДА HEX: 
 export function findRecipeByHex(
   targetHex: string,
   basicPigments: Pigment[],
@@ -265,28 +262,9 @@ export function findRecipeByHex(
   if (!basicPigments.length || !targetHex) return null
 
   const targetRgb = hexToRgbObj(targetHex)
-
-  // УМНЫЙ ПОДБОР: Всегда берем белый и черный в пул кандидатов, если они есть
-  const wAndB = basicPigments.filter(p => 
-    p.id.includes('white') || p.id.includes('black') || p.id.includes('lithopone')
-  )
   
-  // Остальные цвета сортируем по близости к нужному
-  const colored = basicPigments.filter(p => !wAndB.includes(p))
-  const scoredColored = colored.map((p) => {
-    if (!p.spectrum) return { pigment: p, dist: 999 }
-    const rgb = spectrumToRGB(p.spectrum)
-    const dist = Math.sqrt((rgb.r - targetRgb.r)**2 + (rgb.g - targetRgb.g)**2 + (rgb.b - targetRgb.b)**2)
-    return { pigment: p, dist }
-  })
-  scoredColored.sort((a, b) => a.dist - b.dist)
-
-  // Итоговые кандидаты: Белый + Черный + 2 ближайших цветных (итого 4)
-  const candidates = [
-    ...wAndB,
-    ...scoredColored.slice(0, Math.max(0, maxComponents - wAndB.length)).map(s => s.pigment)
-  ].filter(Boolean)
-
+  // Берем все 6 базовых цветов (Белый, Черный, Красный, Желтый, Синий, Зеленый)
+  const candidates = basicPigments.slice(0, 6)
   if (candidates.length === 0) return null
 
   interface BestResult {
@@ -295,39 +273,55 @@ export function findRecipeByHex(
     deltaE: number
   }
 
-  const bestHolder: { current: BestResult | null } = { current: null }
-  // Увеличили шаги для большей точности сложных темных цветов
-  const steps = [0, 10, 25, 45, 70, 100]
+  let best: BestResult | null = null
+  // Более тонкие шаги (4, 12) позволяют добавлять микро-дозы черного или синего (3-5%)
+  const steps = [0, 4, 12, 25, 45, 75, 100]
 
   const search = (idx: number, vols: number[]) => {
     if (idx === candidates.length) {
       const total = vols.reduce((s, v) => s + v, 0)
       if (total < 5) return
 
-      const components = candidates.map((p, i) => ({
-        spectrum: p.spectrum!,
-        volume: vols[i],
-      }))
+      const components = []
+      for (let i = 0; i < candidates.length; i++) {
+        if (vols[i] > 0) {
+          components.push({ spectrum: candidates[i].spectrum!, volume: vols[i] })
+        }
+      }
+
+      if (components.length === 0 || components.length > maxComponents) return
 
       const mixed = mixSpectra(components)
       const rgb = spectrumToRGB(mixed)
-      const deltaE = Math.sqrt((rgb.r - targetRgb.r)**2 + (rgb.g - targetRgb.g)**2 + (rgb.b - targetRgb.b)**2)
+      
+      // Улучшенная формула разницы цветов (взвешенная)
+      const rDiff = rgb.r - targetRgb.r
+      const gDiff = rgb.g - targetRgb.g
+      const bDiff = rgb.b - targetRgb.b
+      const deltaE = Math.sqrt(rDiff * rDiff * 0.3 + gDiff * gDiff * 0.59 + bDiff * bDiff * 0.11)
 
-      if (!bestHolder.current || deltaE < bestHolder.current.deltaE) {
-        bestHolder.current = { volumes: [...vols], rgb, deltaE }
+      if (!best || deltaE < (best as BestResult).deltaE) {
+        best = { volumes: [...vols], rgb, deltaE }
       }
       return
     }
 
     for (const s of steps) {
       vols[idx] = s
+
+      // Оптимизация: не смешиваем больше компонентов, чем maxComponents
+      let active = 0
+      for (let k = 0; k <= idx; k++) {
+        if (vols[k] > 0) active++
+      }
+      if (active > maxComponents) continue
+
       search(idx + 1, vols)
     }
   }
 
   search(0, new Array(candidates.length).fill(0))
 
-  const best = bestHolder.current
   if (!best) return null
 
   const total = best.volumes.reduce((s, v) => s + v, 0)
@@ -336,9 +330,13 @@ export function findRecipeByHex(
   const recipe = candidates
     .map((p, i) => ({
       pigment: p,
-      ml: Math.round(best.volumes[i] * scale * 10) / 10,
+      // Округляем до 1 знака после запятой
+      ml: Math.round(best!.volumes[i] * scale * 10) / 10, 
     }))
     .filter((r) => r.ml > 0)
+
+  // Сортируем от большего объема к меньшему для красоты
+  recipe.sort((a, b) => b.ml - a.ml)
 
   return {
     recipe,
