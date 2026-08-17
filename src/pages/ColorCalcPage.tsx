@@ -4,44 +4,27 @@ import { useState, useEffect } from 'react'
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
-import {
-  CoverageSystem,
-  getOstwaldNeutralizer,
-} from '../utils/calculatorLogic'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
-import { CoverageMode } from '../components/CoverageMode'
-import { NeutralizeMode } from '../components/NeutralizeMode'
-import {
-  findBasicPaletteRecipe,
-  BasicRecipeResult,
-} from '../utils/basicPaletteRecipe'
 
 interface ColorCalcPageProps {
   lang: Lang
   onBack: () => void
 }
 
-type Mode = 'coverage' | 'neutralize'
-
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
-  const [mode, setMode] = useState<Mode>('coverage')
-  const [coverageSystem, setCoverageSystem] = useState<CoverageSystem>('acrylic')
 
-  const [basePigmentId, setBasePigmentId] = useState('titanium_white')
-  const [unwantedPigmentId, setUnwantedPigmentId] = useState('cadmium_yellow')
-  const [neutralizerPigmentId, setNeutralizerPigmentId] = useState('ultramarine')
-  const [neutralizeStrength, setNeutralizeStrength] = useState(35)
-  const [autoNeutralizer, setAutoNeutralizer] = useState(true)
+  // dummy values — нужны только чтобы хук не падал
+  const basePigmentId = 'titanium_white'
+  const coverageSystem = 'acrylic' as const
+  const unwantedPigmentId = 'cadmium_yellow'
+  const neutralizerPigmentId = 'ultramarine'
+  const neutralizeStrength = 35
 
-  const [showRecipe, setShowRecipe] = useState(false)
-  const [basicRecipe, setBasicRecipe] = useState<BasicRecipeResult | null>(null)
-
-  // === Хуки ===
   const {
     paints,
     amountRefs,
@@ -52,12 +35,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     clearAllAmounts,
   } = usePaintMix(pigments)
 
-  const {
-    mixedColor,
-    layers,
-    coverageAdvice,
-    neutralizeResult,
-  } = useColorCalculations({
+  const { mixedColor } = useColorCalculations({
     pigments,
     paints,
     totalAmount,
@@ -81,41 +59,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
-  useEffect(() => {
-    if (!autoNeutralizer || pigments.length === 0) return
-    const recommended = getOstwaldNeutralizer(unwantedPigmentId, pigments)
-    setNeutralizerPigmentId(recommended)
-  }, [unwantedPigmentId, pigments, autoNeutralizer])
-
-  const getPigmentName = (pigmentId: string) => {
-    const pigment = pigments.find((p) => p.id === pigmentId)
-    if (!pigment) return '...'
-    return lang === 'uk' ? pigment.name.uk : pigment.name.ru
-  }
-
-  const copyHex = async (hex?: string) => {
-    const value = hex || mixedColor?.hex
-    if (!value) return
+  const copyHex = async () => {
+    if (!mixedColor?.hex) return
     try {
-      await navigator.clipboard.writeText(value.toUpperCase())
+      await navigator.clipboard.writeText(mixedColor.hex.toUpperCase())
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch (err) {
       console.error(err)
     }
-  }
-
-  const changeStrength = (delta: number) => {
-    setNeutralizeStrength((prev) => Math.min(60, Math.max(10, prev + delta)))
-  }
-
-  const handleShowRecipe = () => {
-    const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
-    if (!neutralizer?.spectrum) return
-
-    const result = findBasicPaletteRecipe(neutralizer.spectrum)
-    setBasicRecipe(result)
-    setShowRecipe(true)
   }
 
   const isUk = lang === 'uk'
@@ -129,9 +81,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     >
       {/* Header */}
       <div className="flex items-center mb-5 mt-4">
-        <button onClick={onBack} className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100">
+        <button
+          onClick={onBack}
+          className="p-2.5 -ml-2 text-[var(--color-ink)] opacity-70 hover:opacity-100"
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M15 18L9 12L15 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <h1 className="text-xl font-bold ml-1">
@@ -141,10 +102,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
       <div className="flex-1 flex flex-col gap-4">
         {/* ===== Блок смеси ===== */}
-        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm z-10">
+        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold opacity-80">
-              {isUk ? 'Склад суміші (цільовий колір)' : 'Состав смеси (целевой цвет)'}
+              {isUk ? 'Склад суміші' : 'Состав смеси'}
             </h2>
             {totalAmount > 0 && (
               <button
@@ -197,7 +158,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         return
                       }
                       const num = parseFloat(val)
-                      if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                      if (!isNaN(num))
+                        updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
                     }}
                     className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-center focus:outline-none focus:border-[#D8A35C]"
                     placeholder="0"
@@ -210,8 +172,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     disabled={paints.length <= 1}
                     style={{ opacity: paints.length <= 1 ? 0.3 : 1 }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M18 6L6 18M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -226,109 +199,48 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           >
             {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
           </button>
-
-          {/* ===== Результат смеси (сразу под составом) ===== */}
-          <div className="mt-5 pt-4 border-t border-black/10">
-            <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
-              {isUk ? 'Результат змішування' : 'Результат смешивания'}
-            </div>
-            <div className="flex items-center gap-4">
-              <div
-                className="w-16 h-16 rounded-xl border border-black/10 shadow-sm flex-shrink-0"
-                style={{ backgroundColor: mixedColor?.hex || '#E8E4DC' }}
-              />
-              <div className="flex flex-col gap-1.5 min-w-0">
-                {mixedColor ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-medium text-black">
-                        {mixedColor.hex.toUpperCase()}
-                      </span>
-                      <button
-                        onClick={() => copyHex()}
-                        className="px-2 py-0.5 rounded-md bg-black/5 text-xs text-black/70"
-                      >
-                        {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
-                      </button>
-                    </div>
-                    <div className="text-[11px] opacity-50">
-                      {isUk ? 'Kubelka-Munk суміш' : 'Смесь Kubelka-Munk'}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-xs opacity-40">
-                    {isUk ? 'Введіть обсяги пігментів' : 'Введите объёмы пигментов'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* ===== Блок режимов ===== */}
-        <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md">
-          {/* Переключатель режимов */}
-          <div className="flex gap-2 mb-5">
-            <button
-              onClick={() => setMode('coverage')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'coverage' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'
-              }`}
-            >
-              {isUk ? 'Укривистість / Слої' : 'Укрывистость / Слои'}
-            </button>
-            <button
-              onClick={() => setMode('neutralize')}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'neutralize' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70'
-              }`}
-            >
-              {isUk ? 'Нейтралізація' : 'Нейтрализация'}
-            </button>
+        {/* ===== Результат смешивания — по центру ===== */}
+        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-6 shadow-sm flex flex-col items-center">
+          <div className="text-xs opacity-50 mb-4 font-medium uppercase tracking-wider">
+            {isUk ? 'Результат змішування' : 'Результат смешивания'}
           </div>
 
-          {/* Контент режимов */}
-          {mode === 'coverage' && (
-            <CoverageMode
-              lang={lang}
-              pigments={pigments}
-              basePigmentId={basePigmentId}
-              setBasePigmentId={setBasePigmentId}
-              coverageSystem={coverageSystem}
-              setCoverageSystem={setCoverageSystem}
-              mixedColor={mixedColor}
-              coverageAdvice={coverageAdvice}
-              layers={layers}
-              copied={copied}
-              onCopyHex={() => copyHex()}
-              paints={paints}
-              totalAmount={totalAmount}
-              getPigmentName={getPigmentName}
-            />
-          )}
+          <div
+            className="w-36 h-36 rounded-2xl border border-black/10 shadow-md mb-4"
+            style={{ backgroundColor: mixedColor?.hex || '#E8E4DC' }}
+          />
 
-          {mode === 'neutralize' && (
-            <NeutralizeMode
-              lang={lang}
-              pigments={pigments}
-              unwantedPigmentId={unwantedPigmentId}
-              setUnwantedPigmentId={setUnwantedPigmentId}
-              neutralizerPigmentId={neutralizerPigmentId}
-              setNeutralizerPigmentId={setNeutralizerPigmentId}
-              autoNeutralizer={autoNeutralizer}
-              setAutoNeutralizer={setAutoNeutralizer}
-              neutralizeStrength={neutralizeStrength}
-              changeStrength={changeStrength}
-              neutralizeResult={neutralizeResult}
-              copied={copied}
-              onCopyHex={copyHex}
-              showRecipe={showRecipe}
-              setShowRecipe={setShowRecipe}
-              basicRecipe={basicRecipe}
-              onShowRecipe={handleShowRecipe}
-              getPigmentName={getPigmentName}
-            />
+          {mixedColor ? (
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-base font-medium tracking-wide">
+                {mixedColor.hex.toUpperCase()}
+              </span>
+              <button
+                onClick={copyHex}
+                className="px-3 py-1.5 rounded-lg bg-black/5 text-xs font-medium hover:bg-black/10 transition-colors"
+              >
+                {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
+              </button>
+            </div>
+          ) : (
+            <span className="text-sm opacity-40">
+              {isUk ? 'Введіть обсяги пігментів' : 'Введите объёмы пигментов'}
+            </span>
           )}
+        </div>
+
+        {/* ===== Общий объём ===== */}
+        <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl px-4 py-4 shadow-sm flex justify-between items-center">
+          <span className="text-sm opacity-60">
+            {isUk ? 'Загальний об’єм суміші' : 'Общий объём смеси'}
+          </span>
+          <span className="text-xl font-bold tabular-nums">
+            {totalAmount > 1000
+              ? (totalAmount / 1000).toFixed(2) + ' л'
+              : totalAmount.toFixed(1) + ' мл'}
+          </span>
         </div>
       </div>
     </motion.div>
