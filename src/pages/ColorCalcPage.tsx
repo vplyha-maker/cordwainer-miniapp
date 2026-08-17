@@ -5,7 +5,7 @@ import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
 import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint } from '../utils/colorScience'
 // Добавлен импорт графика (убедись, что путь к файлу верный)
-import { SpectrumGraph } from './SpectrumGraph' 
+import { SpectrumGraph } from './components/SpectrumGraph' 
 
 interface ColorCalcPageProps {
   lang: Lang
