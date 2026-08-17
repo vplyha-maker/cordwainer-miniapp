@@ -15,10 +15,17 @@ interface ColorCalcPageProps {
 
 function normalizeHex(raw: string): string | null {
   let v = raw.trim().replace(/^#/, '').toUpperCase()
+  
+  // Если введено 3 символа, удваиваем их (например, F00 -> FF0000)
   if (/^[0-9A-F]{3}$/.test(v)) {
     v = v[0] + v[0] + v[1] + v[1] + v[2] + v[2]
   }
-  if (/^[0-9A-F]{6}\( /.test(v)) return `# \){v}`
+  
+  // Если получилось 6 символов, возвращаем с решеткой
+  if (/^[0-9A-F]{6}$/.test(v)) {
+    return `#${v}`
+  }
+  
   return null
 }
 
@@ -81,9 +88,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     userEdited.current = true
     const cleaned = raw.replace(/[^#0-9A-Fa-f]/g, '').slice(0, 7)
     setHexInput(cleaned)
+    
     const normalized = normalizeHex(cleaned)
     if (normalized) {
       setValidHex(normalized)
+    } else {
+      setValidHex(null) // Сбрасываем валидный цвет, если код неполный
     }
   }
 
