@@ -37,9 +37,6 @@ const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-// ==========================================
-// Улучшенный подбор нейтрализатора по Оствальду
-// ==========================================
 function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   const pigment = pigments.find((p) => p.id === pigmentId)
   if (!pigment?.hex) return 'ultramarine'
@@ -49,14 +46,13 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   const g = parseInt(hex.substring(2, 4), 16)
   const b = parseInt(hex.substring(4, 6), 16)
 
-  // Переводим в простой HSL-подобный оттенок
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   const delta = max - min
 
-  if (delta < 25) return 'ultramarine' // почти серый
+  if (delta < 25) return 'ultramarine'
 
-  // Жёлтый / жёлто-зелёный / оливковый → фиолетовый / ультрамарин
+  // Жёлтый → фиолетовый / ультрамарин
   if (r > 150 && g > 120 && b < 110) {
     const violet = pigments.find(p =>
       p.id.includes('ultramarine') || p.id.includes('violet') || p.id.includes('purple')
@@ -99,17 +95,11 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   return 'ultramarine'
 }
 
-// ==========================================
-// Kubelka-Munk симуляция слоёв + прозрачность
-// ==========================================
 function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
   system: CoverageSystem
 ) {
-  // Базовая сила слоя (условные единицы volume)
-  // Анилин более прозрачный → меньше strength
-  // Акрил более укрывистый → больше strength
   let strength = system === 'aniline' ? 24 : 48
 
   const baseRgb = spectrumToRGB(baseSpectrum)
@@ -119,7 +109,6 @@ function simulateLayersKM(
   const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
   const deltaL = Math.abs(paintL - baseL)
 
-  // Чем больше разница яркости — тем хуже один слой перекрывает
   if (deltaL > 0.45) strength *= 0.72
   else if (deltaL > 0.30) strength *= 0.85
   else if (deltaL < 0.12) strength *= 1.18
@@ -147,9 +136,6 @@ function simulateLayersKM(
   }
 }
 
-// ==========================================
-// Базовая палитра + поиск рецепта
-// ==========================================
 const BASIC_PALETTE_IDS = [
   'titanium_white',
   'carbon_black',
@@ -173,13 +159,17 @@ function findBasicRecipe(
   targetSpectrum: SpectrumPoint[],
   basicPigments: Pigment[],
   maxComponents = 3
-) {
+): {
+  recipe: { pigment: Pigment; ml: number }[]
+  resultRgb: { r: number; g: number; b: number }
+  resultHex: string
+  deltaE: number
+} | null {
   if (!basicPigments.length || !targetSpectrum.length) return null
 
   const targetRgb = spectrumToRGB(targetSpectrum)
 
-  // Берём самые близкие по RGB
-  const scored = basicPigments.map(p => {
+  const scored = basicPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const dist = Math.sqrt(
       (rgb.r - targetRgb.r) ** 2 +
@@ -190,15 +180,23 @@ function findBasicRecipe(
   })
 
   scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, Math.min(maxComponents, scored.length)).map(s => s.pigment)
+  const candidates = scored.slice(0, Math.min(maxComponents, scored.length)).map((s) => s.pigment)
 
-  let best: { volumes: number[]; rgb: { r: number; g: number; b: number }; deltaE: number } | null = null
+  if (candidates.length === 0) return null
+
+  type BestResult = {
+    volumes: number[]
+    rgb: { r: number; g: number; b: number }
+    deltaE: number
+  }
+
+  let best: BestResult | null = null
 
   const steps = [0, 15, 30, 50, 70, 100]
 
   const search = (idx: number, vols: number[]) => {
     if (idx === candidates.length) {
-      const total = vols.reduce((s, v) => s + v, 0)
+      const total = vols.reduce((s: number, v: number) => s + v, 0)
       if (total < 8) return
 
       const components = candidates.map((p, i) => ({
@@ -230,7 +228,7 @@ function findBasicRecipe(
 
   if (!best) return null
 
-  const total = best.volumes.reduce((s, v) => s + v, 0)
+  const total = best.volumes.reduce((s: number, v: number) => s + v, 0)
   const scale = 20 / total
 
   const recipe = candidates
@@ -238,7 +236,7 @@ function findBasicRecipe(
       pigment: p,
       ml: Math.round(best!.volumes[i] * scale * 10) / 10,
     }))
-    .filter(r => r.ml >= 0.5)
+    .filter((r) => r.ml >= 0.5)
 
   return {
     recipe,
@@ -248,9 +246,6 @@ function findBasicRecipe(
   }
 }
 
-// ==========================================
-// PigmentSelector
-// ==========================================
 const PigmentSelector = ({
   pigments,
   value,
@@ -269,12 +264,12 @@ const PigmentSelector = ({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  const selectedPigment = pigments.find(p => p.id === value)
+  const selectedPigment = pigments.find((p) => p.id === value)
   const isUk = lang === 'uk'
 
   const filteredPigments = useMemo(() => {
     const term = search.toLowerCase()
-    return pigments.filter(p => {
+    return pigments.filter((p) => {
       const nameLocal = isUk ? p.name.uk : p.name.ru
       return (
         nameLocal.toLowerCase().includes(term) ||
@@ -307,7 +302,7 @@ const PigmentSelector = ({
         <input
           type="text"
           value={isOpen ? search : selectedPigment ? (isUk ? selectedPigment.name.uk : selectedPigment.name.ru) : ''}
-          onChange={e => {
+          onChange={(e) => {
             setSearch(e.target.value)
             setIsOpen(true)
           }}
@@ -334,11 +329,11 @@ const PigmentSelector = ({
                 {isUk ? 'Нічого не знайдено' : 'Ничего не найдено'}
               </div>
             ) : (
-              filteredPigments.map(p => (
+              filteredPigments.map((p) => (
                 <div key={p.id} className="border-b border-gray-100 last:border-0">
                   <div
                     className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer"
-                    onClick={e => {
+                    onClick={(e) => {
                       if ((e.target as HTMLElement).closest('.info-btn')) return
                       onChange(p.id)
                       setIsOpen(false)
@@ -358,7 +353,7 @@ const PigmentSelector = ({
                     </div>
                     <button
                       className="info-btn p-2 text-gray-400 hover:text-[#D8A35C] rounded-full"
-                      onClick={e => {
+                      onClick={(e) => {
                         e.stopPropagation()
                         setExpandedId(expandedId === p.id ? null : p.id)
                       }}
@@ -403,9 +398,6 @@ const PigmentSelector = ({
   )
 }
 
-// ==========================================
-// Основной компонент
-// ==========================================
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -431,11 +423,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   useEffect(() => {
     loadAllPigments()
-      .then(loaded => {
+      .then((loaded) => {
         setPigments(loaded)
         setLoading(false)
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err)
         setLoading(false)
       })
@@ -453,7 +445,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (pigments.length === 0 || totalAmount <= 0) return null
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
     for (const paint of paints) {
-      const pigment = pigments.find(p => p.id === paint.pigmentId)
+      const pigment = pigments.find((p) => p.id === paint.pigmentId)
       const val = parseFloat(paint.amount) || 0
       if (pigment?.spectrum && val > 0) {
         components.push({ spectrum: pigment.spectrum, volume: val })
@@ -467,7 +459,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const layerData = useMemo(() => {
     if (!mixedColor?.spectrum) return null
-    const basePigment = pigments.find(p => p.id === basePigmentId)
+    const basePigment = pigments.find((p) => p.id === basePigmentId)
     if (!basePigment?.spectrum) return null
     return simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, coverageSystem)
   }, [basePigmentId, mixedColor, pigments, coverageSystem])
@@ -515,8 +507,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }, [layerData, coverageSystem, lang])
 
   const neutralizeResult = useMemo(() => {
-    const unwanted = pigments.find(p => p.id === unwantedPigmentId)
-    const neutralizer = pigments.find(p => p.id === neutralizerPigmentId)
+    const unwanted = pigments.find((p) => p.id === unwantedPigmentId)
+    const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
     if (!unwanted?.spectrum || !neutralizer?.spectrum) return null
 
     const components = [
@@ -536,19 +528,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const removePaint = (id: string) => {
     if (paints.length <= 1) return
-    setPaints(paints.filter(p => p.id !== id))
+    setPaints(paints.filter((p) => p.id !== id))
   }
 
   const updatePaint = (id: string, field: keyof PaintPart, value: string) => {
-    setPaints(paints.map(p => (p.id === id ? { ...p, [field]: value } : p)))
+    setPaints(paints.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
   }
 
   const clearAllAmounts = () => {
-    setPaints(paints.map(p => ({ ...p, amount: '' })))
+    setPaints(paints.map((p) => ({ ...p, amount: '' })))
   }
 
   const getPigmentName = (pigmentId: string) => {
-    const pigment = pigments.find(p => p.id === pigmentId)
+    const pigment = pigments.find((p) => p.id === pigmentId)
     if (!pigment) return '...'
     return lang === 'uk' ? pigment.name.uk : pigment.name.ru
   }
@@ -566,11 +558,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const changeStrength = (delta: number) => {
-    setNeutralizeStrength(prev => Math.min(60, Math.max(10, prev + delta)))
+    setNeutralizeStrength((prev) => Math.min(60, Math.max(10, prev + delta)))
   }
 
   const handleShowRecipe = () => {
-    const neutralizer = pigments.find(p => p.id === neutralizerPigmentId)
+    const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
     if (!neutralizer?.spectrum) return
     const basic = getBasicPigments(pigments)
     const result = findBasicRecipe(neutralizer.spectrum, basic)
@@ -599,7 +591,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </div>
 
       <div className="flex-1 flex flex-col gap-4">
-        {/* Состав смеси */}
         <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm z-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold opacity-80">
@@ -618,16 +609,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {paints.map(paint => (
+              {paints.map((paint) => (
                 <div key={paint.id} className="flex items-center gap-2">
                   <PigmentSelector
                     pigments={pigments}
                     value={paint.pigmentId}
-                    onChange={newId => updatePaint(paint.id, 'pigmentId', newId)}
+                    onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
                     lang={lang}
                   />
                   <input
-                    ref={el => { amountRefs.current[paint.id] = el }}
+                    ref={(el) => { amountRefs.current[paint.id] = el }}
                     type="text"
                     inputMode="decimal"
                     enterKeyHint="done"
@@ -635,7 +626,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     autoCorrect="off"
                     spellCheck={false}
                     value={paint.amount}
-                    onChange={e => {
+                    onChange={(e) => {
                       let val = e.target.value.replace(',', '.')
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         const num = parseFloat(val)
@@ -643,7 +634,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         updatePaint(paint.id, 'amount', val)
                       }
                     }}
-                    onBlur={e => {
+                    onBlur={(e) => {
                       let val = e.target.value.replace(',', '.')
                       if (val === '.' || val === '') {
                         updatePaint(paint.id, 'amount', '')
@@ -681,7 +672,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </button>
         </div>
 
-        {/* Результат */}
         <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md">
           <div className="flex gap-2 mb-5">
             <button
@@ -698,7 +688,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </button>
           </div>
 
-          {/* ===== УКРИВИСТІСТЬ ===== */}
           {mode === 'coverage' && (
             <div className="flex flex-col gap-5">
               <div>
@@ -782,7 +771,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
           )}
 
-          {/* ===== НЕЙТРАЛІЗАЦІЯ ===== */}
           {mode === 'neutralize' && (
             <div className="flex flex-col gap-5">
               <p className="text-[13px] opacity-70 leading-relaxed">
@@ -798,7 +786,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <PigmentSelector
                   pigments={pigments}
                   value={unwantedPigmentId}
-                  onChange={id => {
+                  onChange={(id) => {
                     setUnwantedPigmentId(id)
                     setAutoNeutralizer(true)
                     setShowRecipe(false)
@@ -821,7 +809,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <PigmentSelector
                   pigments={pigments}
                   value={neutralizerPigmentId}
-                  onChange={id => {
+                  onChange={(id) => {
                     setNeutralizerPigmentId(id)
                     setAutoNeutralizer(false)
                     setShowRecipe(false)
@@ -866,7 +854,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </button>
                   </div>
 
-                  {/* Кнопка рецепта */}
                   <button
                     onClick={handleShowRecipe}
                     className="w-full py-3 rounded-xl border border-dashed border-[#D8A35C] text-[#D8A35C] text-sm font-medium hover:bg-[#D8A35C]/10 transition-colors"
@@ -876,7 +863,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               )}
 
-              {/* Рецепт */}
               {showRecipe && basicRecipe && (
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                   <div className="flex items-center justify-between mb-3">
@@ -887,7 +873,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </div>
 
                   <div className="flex flex-col gap-2 mb-4">
-                    {basicRecipe.recipe.map(item => (
+                    {basicRecipe.recipe.map((item) => (
                       <div key={item.pigment.id} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: item.pigment.hex }} />
@@ -926,10 +912,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
 
               <div className="flex flex-col gap-3">
-                {paints.map(paint => {
+                {paints.map((paint) => {
                   const paintAmount = parseFloat(paint.amount) || 0
                   const percentage = totalAmount > 0 ? (paintAmount / totalAmount) * 100 : 0
-                  const pigment = pigments.find(p => p.id === paint.pigmentId)
+                  const pigment = pigments.find((p) => p.id === paint.pigmentId)
                   const displayPercent = percentage === 0 ? '0%' : percentage < 0.1 ? '<0.1%' : percentage.toFixed(1) + '%'
 
                   return (
