@@ -14,24 +14,17 @@ interface ColorCalcPageProps {
   onBack: () => void
 }
 
-function normalizeHex(raw: string): string | null {
-  let v = raw.trim().replace(/^#/, '').toUpperCase()
-  if (/^[0-9A-F]{3}$/.test(v)) {
-    v = v[0] + v[0] + v[1] + v[1] + v[2] + v[2]
-  }
-  if (/^[0-9A-F]{6}$/.test(v)) {
-    return `#${v}`
-  }
-  return null
-}
-
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [isCalculating, setIsCalculating] = useState(false)
   const [copied, setCopied] = useState(false)
+  
+  // Состояния для ввода
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
+  
   const userEdited = useRef(false)
 
   const {
@@ -54,16 +47,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   // Реакция на изменение объемов руками
   useEffect(() => {
-    if (mixedColor?.hex && !userEdited.current) {
+    // Обновляем инпут ТОЛЬКО если пользователь не держит его в фокусе (не печатает прямо сейчас)
+    if (mixedColor?.hex && !isFocused && !userEdited.current) {
       const hex = mixedColor.hex.toUpperCase()
       setHexInput(hex)
       setValidHex(hex)
     }
-    if (!mixedColor?.hex && !userEdited.current) {
+    if (!mixedColor?.hex && !isFocused && !userEdited.current) {
       setHexInput('')
       setValidHex(null)
     }
-  }, [mixedColor?.hex])
+  }, [mixedColor?.hex, isFocused])
 
   useEffect(() => {
     userEdited.current = false
@@ -84,12 +78,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   // === Расчет рецепта по введенному HEX ===
   useEffect(() => {
+    // Считаем только если есть validHex (полные 6 символов)
     if (userEdited.current && validHex && pigments.length > 0 && !loading) {
       setIsCalculating(true)
       
       const timeoutId = setTimeout(() => {
         const basicPigments = getPureBasicPigments(pigments)
-        // Вызываем нашу новую функцию
         const recipeData = findRecipeByHex(validHex, basicPigments, 4)
 
         if (recipeData && recipeData.recipe.length > 0 && setPaints) {
@@ -105,25 +99,45 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }, 50)
 
       return () => clearTimeout(timeoutId)
+    } else if (!validHex) {
+      // Если стерли поле, останавливаем спиннер загрузки
+      setIsCalculating(false) 
     }
   }, [validHex, pigments, loading, setPaints])
   // =========================================
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
-    const cleaned = raw.replace(/[^#0-9A-Fa-f]/g, '').slice(0, 7)
-    setHexInput(cleaned)
     
-    const normalized = normalizeHex(cleaned)
-    if (normalized) {
-      setValidHex(normalized)
+    // Оставляем только HEX символы, максимум 6.
+    let val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
+    
+    if (val.length === 0) {
+      setHexInput('')
+      setValidHex(null) // Блокируем расчет
+      return
+    }
+    
+    setHexInput('#' + val)
+    
+    // Запускаем алгоритм ТОЛЬКО когда введено ровно 6 символов
+    if (val.length === 6) {
+      setValidHex('#' + val.toUpperCase())
     } else {
-      setValidHex(null)
+      setValidHex(null) // Во время печати 3-х, 4-х символов - не считаем
     }
   }
 
   const handleHexBlur = () => {
-    if (validHex) setHexInput(validHex)
+    setIsFocused(false)
+    if (validHex) {
+      setHexInput(validHex)
+    } else if (mixedColor?.hex) {
+      // Если ввели неполный HEX (например #5b) и убрали фокус — возвращаем текущий цвет 
+      setHexInput(mixedColor.hex.toUpperCase())
+      setValidHex(mixedColor.hex.toUpperCase())
+      userEdited.current = false
+    }
   }
 
   const copyHex = async () => {
@@ -294,8 +308,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 autoCorrect="off"
                 spellCheck={false}
                 value={hexInput}
-                onChange={(e) => handleHexChange(e.target.value)}
+                onFocus={() => setIsFocused(true)}
                 onBlur={handleHexBlur}
+                onChange={(e) => handleHexChange(e.target.value)}
                 placeholder="#000000"
                 className="flex-1 min-w-0 bg-white/10 text-[#F5F1EA] border-0 rounded-xl px-3 py-3 text-center font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-[#D8A35C]/50"
                 style={{ fontSize: '16px' }}
@@ -312,8 +327,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <p className="mt-2.5 text-[12px] text-center text-[#F5F1EA]/35">
               {hasColor
                 ? isUk
-                  ? 'Змінюйте код — квадрат оновиться одразу'
-                  : 'Меняйте код — квадрат обновится сразу'
+                  ? 'Введіть код — квадрат оновиться одразу'
+                  : 'Введите код — квадрат обновится сразу'
                 : isUk
                   ? 'Вкажіть обсяги або введіть HEX'
                   : 'Укажите объёмы или введите HEX'}
