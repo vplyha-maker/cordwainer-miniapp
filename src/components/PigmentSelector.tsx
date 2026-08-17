@@ -13,6 +13,20 @@ interface PigmentSelectorProps {
   placeholder?: string
 }
 
+/** WCAG relative luminance → контрастный цвет текста */
+function getContrastText(hex: string): string {
+  const c = hex.replace('#', '')
+  if (c.length !== 6) return '#000000'
+  const r = parseInt(c.slice(0, 2), 16) / 255
+  const g = parseInt(c.slice(2, 4), 16) / 255
+  const b = parseInt(c.slice(4, 6), 16) / 255
+  const toLin = (v: number) =>
+    v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+  const L = 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b)
+  // порог \~0.179 ≈ контраст 4.5:1 к белому/чёрному
+  return L > 0.179 ? '#1A1A1A' : '#FFFFFF'
+}
+
 export function PigmentSelector({
   pigments,
   value,
@@ -27,6 +41,9 @@ export function PigmentSelector({
 
   const selectedPigment = pigments.find((p) => p.id === value)
   const isUk = lang === 'uk'
+
+  const bgColor = selectedPigment?.hex || '#2A2522'
+  const textColor = selectedPigment?.hex ? getContrastText(selectedPigment.hex) : '#F5F1EA'
 
   const filteredPigments = useMemo(() => {
     const term = search.toLowerCase()
@@ -53,26 +70,35 @@ export function PigmentSelector({
   return (
     <div className="relative flex-1 min-w-0" ref={wrapperRef}>
       <div
-        className="flex items-center gap-2 bg-white text-black border border-gray-200 rounded-lg px-3 py-2.5 text-sm cursor-text focus-within:border-[#D8A35C] transition-colors"
+        className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm cursor-text transition-colors border border-white/10"
+        style={{ backgroundColor: bgColor, color: textColor }}
         onClick={() => setIsOpen(true)}
       >
         <div
-          className="w-5 h-5 rounded-full border border-gray-300 flex-shrink-0 shadow-inner"
-          style={{ backgroundColor: selectedPigment?.hex || '#ccc' }}
+          className="w-5 h-5 rounded-full flex-shrink-0 shadow-inner border border-black/20"
+          style={{ backgroundColor: selectedPigment?.hex || '#666' }}
         />
         <input
           type="text"
-          value={isOpen ? search : selectedPigment ? (isUk ? selectedPigment.name.uk : selectedPigment.name.ru) : ''}
+          value={
+            isOpen
+              ? search
+              : selectedPigment
+                ? isUk
+                  ? selectedPigment.name.uk
+                  : selectedPigment.name.ru
+                : ''
+          }
           onChange={(e) => {
             setSearch(e.target.value)
             setIsOpen(true)
           }}
           placeholder={placeholder || (isUk ? 'Пошук кольору...' : 'Поиск цвета...')}
-          className="flex-1 w-full bg-transparent outline-none truncate"
-          style={{ fontSize: '16px' }}
+          className="flex-1 w-full bg-transparent outline-none truncate placeholder:opacity-50"
+          style={{ fontSize: '16px', color: textColor }}
         />
         <svg
-          className={`w-4 h-4 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-4 h-4 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -89,17 +115,17 @@ export function PigmentSelector({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
             transition={{ duration: 0.15 }}
-            className="absolute z-50 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-y-auto"
+            className="absolute z-50 left-0 right-0 mt-2 bg-[#1C1816] border border-white/10 rounded-xl shadow-xl max-h-72 overflow-y-auto"
           >
             {filteredPigments.length === 0 ? (
-              <div className="p-4 text-center text-sm text-gray-500">
+              <div className="p-4 text-center text-sm text-[#F5F1EA]/50">
                 {isUk ? 'Нічого не знайдено' : 'Ничего не найдено'}
               </div>
             ) : (
               filteredPigments.map((p) => (
-                <div key={p.id} className="border-b border-gray-100 last:border-0">
+                <div key={p.id} className="border-b border-white/5 last:border-0">
                   <div
-                    className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center justify-between p-3 hover:bg-white/5 cursor-pointer"
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest('.info-btn')) return
                       onChange(p.id)
@@ -109,20 +135,20 @@ export function PigmentSelector({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="w-7 h-7 rounded-md border border-gray-300 shadow-sm flex-shrink-0"
-                        style={{ backgroundColor: p.hex || '#e5e7eb' }}
+                        className="w-7 h-7 rounded-md border border-white/15 shadow-sm flex-shrink-0"
+                        style={{ backgroundColor: p.hex || '#444' }}
                       />
                       <div className="flex flex-col truncate pr-2">
-                        <span className="text-sm font-medium text-gray-900 truncate">
+                        <span className="text-sm font-medium text-[#F5F1EA] truncate">
                           {isUk ? p.name.uk : p.name.ru}
                         </span>
-                        <span className="text-xs text-gray-500 truncate">
+                        <span className="text-xs text-[#F5F1EA]/45 truncate">
                           {getPigmentCategory(p.id, lang)}
                         </span>
                       </div>
                     </div>
                     <button
-                      className="info-btn p-2 text-gray-400 hover:text-[#D8A35C] rounded-full"
+                      className="info-btn p-2 text-[#F5F1EA]/40 hover:text-[#D8A35C] rounded-full"
                       onClick={(e) => {
                         e.stopPropagation()
                         setExpandedId(expandedId === p.id ? null : p.id)
@@ -142,32 +168,32 @@ export function PigmentSelector({
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden bg-gray-50 text-xs text-gray-600 px-3"
+                        className="overflow-hidden bg-white/5 text-xs text-[#F5F1EA]/70 px-3"
                       >
-                        <div className="py-2 border-t border-gray-100 flex flex-col gap-1 pb-3">
+                        <div className="py-2 border-t border-white/5 flex flex-col gap-1 pb-3">
                           <div className="flex justify-between">
-                            <span className="opacity-70">ID:</span>
+                            <span className="opacity-60">ID:</span>
                             <span className="font-mono">{p.id}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="opacity-70">EN:</span>
+                            <span className="opacity-60">EN:</span>
                             <span>{p.name.en}</span>
                           </div>
                           {p.hex && (
                             <div className="flex justify-between">
-                              <span className="opacity-70">HEX:</span>
+                              <span className="opacity-60">HEX:</span>
                               <span className="font-mono uppercase">{p.hex}</span>
                             </div>
                           )}
                           {p.spectrum && p.spectrum.length > 0 && (
-                            <div className="mt-3 p-2 bg-black/5 rounded-lg">
-                              <p className="text-xs text-gray-500 mb-1">
+                            <div className="mt-3 p-2 bg-black/20 rounded-lg">
+                              <p className="text-xs text-[#F5F1EA]/50 mb-1">
                                 {isUk ? 'Спектр відбиття' : 'Спектр отражения'}
                               </p>
                               <SpectrumGraph
                                 spectrum={p.spectrum}
-                                className="h-20 w-full text-gray-300"
-                                lineColor={p.hex || '#666'}
+                                className="h-20 w-full text-[#F5F1EA]/30"
+                                lineColor={p.hex || '#888'}
                               />
                             </div>
                           )}
