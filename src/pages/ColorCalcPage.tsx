@@ -24,7 +24,28 @@ interface PaintPart {
 
 type Mode = 'coverage' | 'neutralize'
 type CoverageSystem = 'aniline' | 'acrylic'
+// Добавляем импорт наших вынесенных функций:
+import {
+  CoverageSystem,
+  getPureBasicPigments,
+  getPigmentCategory,
+  getOstwaldNeutralizer,
+  simulateLayersKM,
+  findBasicRecipe
+} from '../utils/calculatorLogic'
+
+interface ColorCalcPageProps {
+  lang: Lang
+  onBack: () => void
 }
+
+interface PaintPart {
+  id: string
+  pigmentId: string
+  amount: string
+}
+
+type Mode = 'coverage' | 'neutralize'
 
  const PigmentSelector = ({
   pigments,
