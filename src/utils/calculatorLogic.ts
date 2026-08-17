@@ -1,5 +1,3 @@
-// src/utils/calculatorLogic.ts
-
 import { Pigment } from '../data/pigments'
 import { Lang } from '../App'
 import {
@@ -164,22 +162,35 @@ export function simulateLayersKM(
   }
 }
 
+// Вспомогательная функция для преобразования HEX в RGB
+export function hexToRgbObj(hex: string) {
+  let c = hex.replace(/^#/, '')
+  if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
+  return {
+    r: parseInt(c.substring(0, 2), 16) || 0,
+    g: parseInt(c.substring(2, 4), 16) || 0,
+    b: parseInt(c.substring(4, 6), 16) || 0,
+  }
+}
+
+// Переписанная функция, принимающая targetHex и maxComponents (по умолчанию 4)
 export function findBasicRecipe(
-  targetSpectrum: SpectrumPoint[],
+  targetHex: string,
   basicPigments: Pigment[],
-  maxComponents = 3
+  maxComponents = 4
 ): {
   recipe: { pigment: Pigment; ml: number }[]
   resultRgb: { r: number; g: number; b: number }
   resultHex: string
   deltaE: number
 } | null {
-  if (!basicPigments.length || !targetSpectrum.length) return null
+  if (!basicPigments.length || !targetHex) return null
 
-  const targetRgb = spectrumToRGB(targetSpectrum)
+  const targetRgb = hexToRgbObj(targetHex)
 
   const scored = basicPigments.map((p) => {
-    const rgb = spectrumToRGB(p.spectrum!)
+    if (!p.spectrum) return { pigment: p, dist: 999 }
+    const rgb = spectrumToRGB(p.spectrum)
     const dist = Math.sqrt(
       (rgb.r - targetRgb.r) ** 2 +
       (rgb.g - targetRgb.g) ** 2 +
@@ -249,7 +260,7 @@ export function findBasicRecipe(
       pigment: p,
       ml: Math.round(best.volumes[i] * scale * 10) / 10,
     }))
-    .filter((r) => r.ml >= 0.5)
+    .filter((r) => r.ml > 0) // Оставляем все компоненты, объём которых больше 0
 
   return {
     recipe,
@@ -258,4 +269,3 @@ export function findBasicRecipe(
     deltaE: Math.round(best.deltaE),
   }
 }
-
