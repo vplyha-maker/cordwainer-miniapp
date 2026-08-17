@@ -8,8 +8,6 @@ import {
   spectrumToRGB,
   rgbToHex,
   SpectrumPoint,
-  spectrumToRGBWithIlluminant,
-  IlluminantType,
 } from '../utils/colorScience'
 import { SpectrumGraph } from '../components/SpectrumGraph'
 
@@ -24,7 +22,7 @@ interface PaintPart {
   amount: string
 }
 
-type BackgroundType = 'white' | 'lightgray' | 'darkgray' | 'black'
+type BaseColor = 'light' | 'beige' | 'russet' | 'brown' | 'black'
 
 const getPigmentCategory = (id: string, lang: Lang) => {
   const isUk = lang === 'uk'
@@ -213,19 +211,126 @@ const PigmentSelector = ({
   )
 }
 
+// ==========================================
+// Логика рекомендаций для сапожника
+// ==========================================
+
+function getLuminance(r: number, g: number, b: number): number {
+  // Относительная яркость (0–1)
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+}
+
+function getAdvice(
+  mixed: { r: number; g: number; b: number } | null,
+  base: BaseColor,
+  lang: Lang
+) {
+  const isUk = lang === 'uk'
+
+  if (!mixed) {
+    return {
+      opacity: isUk ? '—' : '—',
+      layers: isUk ? '—' : '—',
+      note: isUk
+        ? 'Введіть обсяги пігментів, щоб отримати рекомендацію'
+        : 'Введите объёмы пигментов, чтобы получить рекомендацию',
+      neutralize: null as string | null,
+    }
+  }
+
+  const lum = getLuminance(mixed.r, mixed.g, mixed.b)
+
+  // Яркость основ (приблизительно)
+  const baseLum: Record<BaseColor, number> = {
+    light: 0.85,
+    beige: 0.72,
+    russet: 0.38,
+    brown: 0.22,
+    black: 0.08,
+  }
+
+  const diff = lum - baseLum[base]
+
+  let opacity = ''
+  let layers = ''
+  let note = ''
+
+  if (diff > 0.35) {
+    // Очень светлый поверх тёмного
+    opacity = isUk ? 'Низька' : 'Низкая'
+    layers = isUk ? '3–4+ шари' : '3–4+ слоя'
+    note = isUk
+      ? 'Світлий колір погано перекриває темну основу. Рекомендується ґрунт або акрилова (покривна) система. Анілінові барвники майже не перекриють.'
+      : 'Светлый цвет плохо перекрывает тёмную основу. Рекомендуется грунт или акриловая (покрывная) система. Анилиновые красители почти не перекроют.'
+  } else if (diff > 0.15) {
+    opacity = isUk ? 'Середня' : 'Средняя'
+    layers = isUk ? '2–3 шари' : '2–3 слоя'
+    note = isUk
+      ? 'Потрібна помірна кількість шарів. Акрил перекриє краще, анілін збереже текстуру, але шарів знадобиться більше.'
+      : 'Потребуется умеренное количество слоёв. Акрил перекроет лучше, анилин сохранит текстуру, но слоёв понадобится больше.'
+  } else if (diff > -0.1) {
+    opacity = isUk ? 'Хороша' : 'Хорошая'
+    layers = isUk ? '1–2 шари' : '1–2 слоя'
+    note = isUk
+      ? 'Колір близький до основи або темніший. Можна працювати тонкими шарами, зберігаючи текстуру шкіри.'
+      : 'Цвет близок к основе или темнее. Можно работать тонкими слоями, сохраняя текстуру кожи.'
+  } else {
+    opacity = isUk ? 'Висока' : 'Высокая'
+    layers = isUk ? '1–2 шари' : '1–2 слоя'
+    note = isUk
+      ? 'Темний колір добре перекриває світлу основу. Достатньо 1–2 шарів.'
+      : 'Тёмный цвет хорошо перекрывает светлую основу. Достаточно 1–2 слоёв.'
+  }
+
+  // Нейтрализация по кругу Оствальда (упрощённо по доминирующему оттенку)
+  let neutralize: string | null = null
+
+  const { r, g, b } = mixed
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+
+  // Желтоватый / оливковый
+  if (r > 140 && g > 120 && b < 110 && r - b > 40) {
+    neutralize = isUk
+      ? 'Якщо основа дає жовтий відтінок — додайте фіолетовий пігмент (нейтралізація за Оствальдом).'
+      : 'Если основа даёт жёлтый оттенок — добавьте фиолетовый пигмент (нейтрализация по Оствальду).'
+  }
+  // Рыжий / оранжевый
+  else if (r > 150 && g > 80 && g < 140 && b < 90) {
+    neutralize = isUk
+      ? 'Рижий/оранжевий відтінок основи нейтралізується синім пігментом.'
+      : 'Рыжий/оранжевый оттенок основы нейтрализуется синим пигментом.'
+  }
+  // Зеленоватый
+  else if (g > r && g > b && g - r > 25) {
+    neutralize = isUk
+      ? 'Зелений відтінок нейтралізується червоним пігментом.'
+      : 'Зелёный оттенок нейтрализуется красным пигментом.'
+  }
+  // Общий совет
+  else {
+    neutralize = isUk
+      ? 'Завжди враховуйте колір основи. Небажаний жовтий нейтралізують фіолетовим, рижий — синім, зелений — червоним.'
+      : 'Всегда учитывайте цвет основы. Нежелательный жёлтый нейтрализуют фиолетовым, рыжий — синим, зелёный — красным.'
+  }
+
+  return { opacity, layers, note, neutralize }
+}
+
+// ==========================================
+// Основная страница
+// ==========================================
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [baseColor, setBaseColor] = useState<BaseColor>('brown')
 
   const [paints, setPaints] = useState<PaintPart[]>([
     { id: '1', pigmentId: 'titanium_white', amount: '' },
     { id: '2', pigmentId: 'cadmium_yellow', amount: '' },
   ])
-
-  // Новые состояния для превью
-  const [background, setBackground] = useState<BackgroundType>('white')
-  const [illuminant, setIlluminant] = useState<IlluminantType>('D65')
 
   const amountRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -243,8 +348,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const totalAmount = paints.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
 
-  // Смешанный спектр (считаем один раз)
-  const mixedSpectrum = useMemo(() => {
+  const mixedColor = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
 
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
@@ -261,18 +365,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
 
     if (components.length === 0) return null
-    return mixSpectra(components)
-  }, [paints, pigments, totalAmount])
 
-  // Цвет под выбранным освещением
-  const mixedColor = useMemo(() => {
-    if (!mixedSpectrum) return null
-    const rgb = spectrumToRGBWithIlluminant(mixedSpectrum, illuminant)
+    const mixedSpectrum = mixSpectra(components)
+    const rgb = spectrumToRGB(mixedSpectrum)
+
     return {
       rgb,
       hex: rgbToHex(rgb),
     }
-  }, [mixedSpectrum, illuminant])
+  }, [paints, pigments, totalAmount])
+
+  const advice = useMemo(
+    () => getAdvice(mixedColor?.rgb ?? null, baseColor, lang),
+    [mixedColor, baseColor, lang]
+  )
 
   const addPaint = () => {
     const newId = Math.random().toString(36).slice(2)
@@ -321,25 +427,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const isUk = lang === 'uk'
 
-  const bgColors: Record<BackgroundType, string> = {
-    white: '#F5F1EA',
-    lightgray: '#C8C4BC',
-    darkgray: '#4A4640',
-    black: '#151210',
-  }
-
-  const illuminantLabels: Record<IlluminantType, { uk: string; ru: string }> = {
-    D65: { uk: 'День', ru: 'День' },
-    A: { uk: 'Тёпла', ru: 'Тёплая' },
-    cool: { uk: 'Холодна', ru: 'Холодная' },
-    twilight: { uk: 'Сутінки', ru: 'Сумерки' },
-  }
-
-  const bgLabels: Record<BackgroundType, { uk: string; ru: string }> = {
-    white: { uk: 'Білий', ru: 'Белый' },
-    lightgray: { uk: 'Сірий', ru: 'Серый' },
-    darkgray: { uk: 'Темний', ru: 'Тёмный' },
-    black: { uk: 'Чорний', ru: 'Чёрный' },
+  const baseColors: Record<BaseColor, { hex: string; labelUk: string; labelRu: string }> = {
+    light: { hex: '#E8E0D5', labelUk: 'Світлий', labelRu: 'Светлый' },
+    beige: { hex: '#D2B48C', labelUk: 'Бежевий', labelRu: 'Бежевый' },
+    russet: { hex: '#A0522D', labelUk: 'Рижий', labelRu: 'Рыжий' },
+    brown: { hex: '#5C4033', labelUk: 'Коричневий', labelRu: 'Коричневый' },
+    black: { hex: '#1A1512', labelUk: 'Чорний', labelRu: 'Чёрный' },
   }
 
   return (
@@ -464,11 +557,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             {isUk ? 'Результат змішування' : 'Результат смешивания'}
           </h2>
 
-          {/* Большой цвет на выбранном фоне */}
+          {/* Большой цвет на фоне основы */}
           <div className="flex flex-col items-center mb-5">
             <div
-              className="w-full max-w-[280px] aspect-square rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-300 flex items-center justify-center p-6"
-              style={{ backgroundColor: bgColors[background] }}
+              className="w-full max-w-[280px] aspect-square rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-300 flex items-center justify-center p-5"
+              style={{ backgroundColor: baseColors[baseColor].hex }}
             >
               <div
                 className="w-full h-full rounded-xl shadow-inner transition-colors duration-300 relative overflow-hidden"
@@ -510,48 +603,71 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             )}
           </div>
 
-          {/* Выбор фона */}
+          {/* Выбор цвета основы */}
           <div className="mb-5">
             <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
-              {isUk ? 'Фон' : 'Фон'}
+              {isUk ? 'Колір основи (шкіри)' : 'Цвет основы (кожи)'}
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {(Object.keys(bgColors) as BackgroundType[]).map((bg) => (
+            <div className="grid grid-cols-5 gap-1.5">
+              {(Object.keys(baseColors) as BaseColor[]).map((key) => (
                 <button
-                  key={bg}
-                  onClick={() => setBackground(bg)}
-                  className={`py-2.5 rounded-xl text-xs font-medium transition-all active:scale-95 border ${
-                    background === bg
+                  key={key}
+                  onClick={() => setBaseColor(key)}
+                  className={`flex flex-col items-center gap-1.5 py-2 rounded-xl text-[10px] font-medium transition-all active:scale-95 border ${
+                    baseColor === key
                       ? 'border-[#D8A35C] bg-[#D8A35C]/15 text-[#D8A35C]'
                       : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
                   }`}
                 >
-                  {isUk ? bgLabels[bg].uk : bgLabels[bg].ru}
+                  <div
+                    className="w-6 h-6 rounded-full border border-white/20 shadow-sm"
+                    style={{ backgroundColor: baseColors[key].hex }}
+                  />
+                  <span>{isUk ? baseColors[key].labelUk : baseColors[key].labelRu}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Выбор освещения */}
-          <div className="mb-6">
-            <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
-              {isUk ? 'Освітлення' : 'Освещение'}
+          {/* Рекомендации мастеру */}
+          <div className="mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="text-xs opacity-50 mb-3 font-medium uppercase tracking-wider">
+              {isUk ? 'Рекомендація майстру' : 'Рекомендация мастеру'}
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {(Object.keys(illuminantLabels) as IlluminantType[]).map((ill) => (
-                <button
-                  key={ill}
-                  onClick={() => setIlluminant(ill)}
-                  className={`py-2.5 rounded-xl text-xs font-medium transition-all active:scale-95 border ${
-                    illuminant === ill
-                      ? 'border-[#D8A35C] bg-[#D8A35C]/15 text-[#D8A35C]'
-                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-                  }`}
-                >
-                  {isUk ? illuminantLabels[ill].uk : illuminantLabels[ill].ru}
-                </button>
-              ))}
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <div className="text-[11px] opacity-50 mb-0.5">
+                  {isUk ? 'Укривистість' : 'Укрывистость'}
+                </div>
+                <div className="text-sm font-semibold text-[#D8A35C]">
+                  {advice.opacity}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] opacity-50 mb-0.5">
+                  {isUk ? 'Кількість шарів' : 'Количество слоёв'}
+                </div>
+                <div className="text-sm font-semibold text-[#D8A35C]">
+                  {advice.layers}
+                </div>
+              </div>
             </div>
+
+            <p className="text-[13px] leading-relaxed opacity-80 mb-3">
+              {advice.note}
+            </p>
+
+            {advice.neutralize && (
+              <div className="pt-3 border-t border-white/10">
+                <div className="text-[11px] opacity-50 mb-1 font-medium">
+                  {isUk ? 'Нейтралізація (коло Оствальда)' : 'Нейтрализация (круг Оствальда)'}
+                </div>
+                <p className="text-[13px] leading-relaxed opacity-80">
+                  {advice.neutralize}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Общий объём */}
