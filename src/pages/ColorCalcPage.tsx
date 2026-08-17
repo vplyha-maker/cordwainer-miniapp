@@ -36,6 +36,71 @@ const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
+// Автоматический подбор нейтрализатора по кругу Оствальда
+function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
+  const pigment = pigments.find((p) => p.id === pigmentId)
+  if (!pigment?.hex) return 'ultramarine'
+
+  const hex = pigment.hex.replace('#', '')
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+
+  if (delta < 30) return 'ultramarine'
+
+  // Жёлтый / оливковый → фиолетовый / ультрамарин
+  if (r > 140 && g > 110 && b < 120 && r - b > 40) {
+    const violet = pigments.find((p) =>
+      p.id.includes('ultramarine') || p.id.includes('violet') || p.id.includes('purple')
+    )
+    return violet?.id || 'ultramarine'
+  }
+
+  // Рыжий / оранжевый → синий
+  if (r > 140 && g > 60 && g < 160 && b < 100) {
+    const blue = pigments.find((p) =>
+      p.id.includes('ultramarine') ||
+      p.id.includes('prussian') ||
+      p.id.includes('cobalt') ||
+      (p.id.includes('phthalo') && p.name.en.toLowerCase().includes('blue'))
+    )
+    return blue?.id || 'ultramarine'
+  }
+
+  // Зелёный → красный
+  if (g > r && g > b && g - Math.min(r, b) > 30) {
+    const red = pigments.find((p) =>
+      (p.id.includes('cadmium') && (p.id.includes('red') || p.id.includes('scarlet'))) ||
+      p.id.includes('iron_oxide') ||
+      p.id.includes('venetian')
+    )
+    return red?.id || 'cadmium_red'
+  }
+
+  // Синий → оранжевый / жёлтый
+  if (b > r && b > g) {
+    const orange = pigments.find((p) =>
+      (p.id.includes('cadmium') && (p.id.includes('orange') || p.id.includes('yellow'))) ||
+      p.id.includes('ochre')
+    )
+    return orange?.id || 'cadmium_yellow'
+  }
+
+  // Красный → зелёный
+  if (r > g && r > b && r - b > 40) {
+    const green = pigments.find((p) =>
+      p.id.includes('phthalo') || p.id.includes('green_earth') || p.id.includes('viridian')
+    )
+    return green?.id || 'green_earth'
+  }
+
+  return 'ultramarine'
+}
+
 const PigmentSelector = ({
   pigments,
   value,
@@ -212,11 +277,11 @@ const PigmentSelector = ({
   )
 }
 
-// ==========================================
-// Вспомогательные функции
-// ==========================================
-
-function lerpColor(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }, t: number) {
+function lerpColor(
+  a: { r: number; g: number; b: number },
+  b: { r: number; g: number; b: number },
+  t: number
+) {
   return {
     r: Math.round(a.r + (b.r - a.r) * t),
     g: Math.round(a.g + (b.g - a.g) * t),
@@ -229,11 +294,6 @@ function getLayerColors(
   targetRgb: { r: number; g: number; b: number } | null
 ) {
   if (!baseRgb || !targetRgb) return null
-
-  // Симуляция нарастания укрывистости
-  // 1 слой — сильно видно основу
-  // 2 слоя — уже ближе к целевому
-  // 3 слоя — почти целевой цвет
   return {
     layer1: lerpColor(baseRgb, targetRgb, 0.38),
     layer2: lerpColor(baseRgb, targetRgb, 0.68),
@@ -242,23 +302,17 @@ function getLayerColors(
   }
 }
 
-// ==========================================
-// Основная страница
-// ==========================================
-
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [mode, setMode] = useState<Mode>('coverage')
 
-  // Для режима Укривистість
   const [basePigmentId, setBasePigmentId] = useState('titanium_white')
-
-  // Для режима Нейтралізація
   const [unwantedPigmentId, setUnwantedPigmentId] = useState('cadmium_yellow')
   const [neutralizerPigmentId, setNeutralizerPigmentId] = useState('ultramarine')
-  const [neutralizeStrength, setNeutralizeStrength] = useState(35) // % нейтрализатора
+  const [neutralizeStrength, setNeutralizeStrength] = useState(35)
+  const [autoNeutralizer, setAutoNeutralizer] = useState(true)
 
   const [paints, setPaints] = useState<PaintPart[]>([
     { id: '1', pigmentId: 'titanium_white', amount: '' },
@@ -279,9 +333,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
+  // Автоподбор нейтрализатора
+  useEffect(() => {
+    if (!autoNeutralizer || pigments.length === 0) return
+    const recommended = getOstwaldNeutralizer(unwantedPigmentId, pigments)
+    setNeutralizerPigmentId(recommended)
+  }, [unwantedPigmentId, pigments, autoNeutralizer])
+
   const totalAmount = paints.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
 
-  // Основной смешанный цвет (целевой)
   const mixedColor = useMemo(() => {
     if (pigments.length === 0 || totalAmount <= 0) return null
 
@@ -302,7 +362,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     return { rgb, hex: rgbToHex(rgb), spectrum: mixedSpectrum }
   }, [paints, pigments, totalAmount])
 
-  // Цвет основы для режима Укривистість
   const baseColor = useMemo(() => {
     const p = pigments.find((x) => x.id === basePigmentId)
     if (!p?.spectrum) return null
@@ -310,19 +369,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     return { rgb, hex: rgbToHex(rgb) }
   }, [pigments, basePigmentId])
 
-  // Слои
   const layers = useMemo(() => {
     return getLayerColors(baseColor?.rgb ?? null, mixedColor?.rgb ?? null)
   }, [baseColor, mixedColor])
 
-  // Результат нейтрализации
   const neutralizeResult = useMemo(() => {
     const unwanted = pigments.find((p) => p.id === unwantedPigmentId)
     const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
 
     if (!unwanted?.spectrum || !neutralizer?.spectrum) return null
 
-    const strength = neutralizeStrength / 100
     const components = [
       { spectrum: unwanted.spectrum, volume: 100 - neutralizeStrength },
       { spectrum: neutralizer.spectrum, volume: neutralizeStrength },
@@ -375,6 +431,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     } catch (err) {
       console.error(err)
     }
+  }
+
+  const changeStrength = (delta: number) => {
+    setNeutralizeStrength((prev) => Math.min(60, Math.max(10, prev + delta)))
   }
 
   const isUk = lang === 'uk'
@@ -518,7 +578,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           {/* ========== РЕЖИМ: УКРИВИСТІСТЬ ========== */}
           {mode === 'coverage' && (
             <div className="flex flex-col gap-5">
-              {/* Выбор основы */}
               <div>
                 <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
                   {isUk ? 'Колір основи (шкіри)' : 'Цвет основы (кожи)'}
@@ -532,7 +591,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 />
               </div>
 
-              {/* Целевой цвет */}
               <div className="flex flex-col items-center">
                 <div className="text-xs opacity-50 mb-2">
                   {isUk ? 'Цільовий колір суміші' : 'Целевой цвет смеси'}
@@ -548,7 +606,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       onClick={() => copyHex()}
                       className="px-2.5 py-1 rounded-lg bg-white/10 text-xs"
                     >
-                      {copied ? (isUk ? '✓' : '✓') : (isUk ? 'Копіювати' : 'Копировать')}
+                      {copied ? '✓' : (isUk ? 'Копіювати' : 'Копировать')}
                     </button>
                   </div>
                 ) : (
@@ -558,7 +616,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 )}
               </div>
 
-              {/* Слои */}
               {layers && (
                 <div>
                   <div className="text-xs opacity-50 mb-3 font-medium uppercase tracking-wider">
@@ -590,12 +647,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </p>
                 </div>
               )}
-
-              {!layers && mixedColor && (
-                <p className="text-sm opacity-50 text-center py-4">
-                  {isUk ? 'Оберіть основу, щоб побачити шари' : 'Выберите основу, чтобы увидеть слои'}
-                </p>
-              )}
             </div>
           )}
 
@@ -604,8 +655,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <div className="flex flex-col gap-5">
               <p className="text-[13px] opacity-70 leading-relaxed">
                 {isUk
-                  ? 'Оберіть небажаний відтінок основи та пігмент-нейтралізатор. Результат — тонування, а не повне зафарбовування.'
-                  : 'Выберите нежелательный оттенок основы и пигмент-нейтрализатор. Результат — тонирование, а не полное закрашивание.'}
+                  ? 'Оберіть небажаний відтінок основи — система сама підбере нейтралізатор за колом Оствальда. Можна змінити вручну.'
+                  : 'Выберите нежелательный оттенок основы — система сама подберёт нейтрализатор по кругу Оствальда. Можно изменить вручную.'}
               </p>
 
               {/* Нежелательная основа */}
@@ -616,45 +667,72 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <PigmentSelector
                   pigments={pigments}
                   value={unwantedPigmentId}
-                  onChange={setUnwantedPigmentId}
+                  onChange={(id) => {
+                    setUnwantedPigmentId(id)
+                    setAutoNeutralizer(true)
+                  }}
                   lang={lang}
                 />
               </div>
 
               {/* Нейтрализатор */}
               <div>
-                <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
-                  {isUk ? 'Нейтралізатор' : 'Нейтрализатор'}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs opacity-50 font-medium uppercase tracking-wider">
+                    {isUk ? 'Нейтралізатор' : 'Нейтрализатор'}
+                  </div>
+                  {autoNeutralizer && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D8A35C]/20 text-[#D8A35C]">
+                      {isUk ? 'підібрано' : 'подобран'}
+                    </span>
+                  )}
                 </div>
                 <PigmentSelector
                   pigments={pigments}
                   value={neutralizerPigmentId}
-                  onChange={setNeutralizerPigmentId}
+                  onChange={(id) => {
+                    setNeutralizerPigmentId(id)
+                    setAutoNeutralizer(false)
+                  }}
                   lang={lang}
                 />
               </div>
 
-              {/* Сила нейтрализации */}
+              {/* Сила нейтрализации — кнопки + / − */}
               <div>
-                <div className="flex justify-between text-xs opacity-50 mb-2">
-                  <span>{isUk ? 'Сила нейтралізації' : 'Сила нейтрализации'}</span>
-                  <span className="font-mono text-[#D8A35C]">{neutralizeStrength}%</span>
+                <div className="text-xs opacity-50 mb-3 font-medium uppercase tracking-wider text-center">
+                  {isUk ? 'Сила нейтралізації' : 'Сила нейтрализации'}
                 </div>
-                <input
-                  type="range"
-                  min={10}
-                  max={60}
-                  value={neutralizeStrength}
-                  onChange={(e) => setNeutralizeStrength(Number(e.target.value))}
-                  className="w-full accent-[#D8A35C]"
-                />
-                <div className="flex justify-between text-[10px] opacity-40 mt-1">
+                <div className="flex items-center justify-center gap-5">
+                  <button
+                    onClick={() => changeStrength(-5)}
+                    disabled={neutralizeStrength <= 10}
+                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 flex items-center justify-center text-xl font-medium transition-all active:scale-90"
+                  >
+                    −
+                  </button>
+
+                  <div className="w-16 text-center">
+                    <span className="text-2xl font-bold text-[#D8A35C] tabular-nums">
+                      {neutralizeStrength}%
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => changeStrength(5)}
+                    disabled={neutralizeStrength >= 60}
+                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 flex items-center justify-center text-xl font-medium transition-all active:scale-90"
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="flex justify-between text-[10px] opacity-40 mt-2 px-6">
                   <span>{isUk ? 'слабко' : 'слабо'}</span>
                   <span>{isUk ? 'сильніше' : 'сильнее'}</span>
                 </div>
               </div>
 
-              {/* Результат нейтрализации */}
+              {/* Результат */}
               {neutralizeResult && (
                 <div className="flex flex-col items-center mt-2">
                   <div className="text-xs opacity-50 mb-2">
@@ -675,30 +753,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </div>
                 </div>
               )}
-
-              {/* Подсказки по кругу Оствальда */}
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-[12px] leading-relaxed opacity-80">
-                <div className="font-medium mb-1.5 text-[#D8A35C]">
-                  {isUk ? 'Коло Оствальда (підказка)' : 'Круг Оствальда (подсказка)'}
-                </div>
-                {isUk ? (
-                  <>
-                    • Жовтий відтінок → фіолетовий<br />
-                    • Рижий / оранжевий → синій<br />
-                    • Зелений → червоний
-                  </>
-                ) : (
-                  <>
-                    • Жёлтый оттенок → фиолетовый<br />
-                    • Рыжий / оранжевый → синий<br />
-                    • Зелёный → красный
-                  </>
-                )}
-              </div>
             </div>
           )}
 
-          {/* Общий объём + проценты (только в режиме coverage) */}
+          {/* Общий объём + проценты (только в coverage) */}
           {mode === 'coverage' && (
             <>
               <div className="flex justify-between items-end mt-6 mb-4 border-t border-white/10 pt-4">
