@@ -1,4 +1,3 @@
-// hooks/usePaintMix.ts
 import { useState, useRef, useMemo } from 'react'
 import { Pigment } from '../data/pigments'
 
@@ -57,19 +56,14 @@ export function usePaintMix(pigments: Pigment[]) {
     setPaints((prev) => prev.map((p) => ({ ...p, amount: '' })))
   }
 
-  // Добавляем функцию для полной перезаписи массива красок (нужна для генерации рецепта по HEX)
-  const setAllPaints = (newPaints: PaintPart[]) => {
-    setPaints(newPaints)
-  }
-
   return {
     paints,
+    setPaints, // Напрямую экспортируем setPaints для обновления строк при вводе HEX
     amountRefs,
     totalAmount,
     addPaint,
     removePaint,
     updatePaint,
     clearAllAmounts,
-    setAllPaints, // Экспортируем добавленную функцию
   }
 }
