@@ -23,6 +23,7 @@ interface PaintPart {
 }
 
 type Mode = 'coverage' | 'neutralize'
+type CoverageSystem = 'aniline' | 'acrylic'
 
 const getPigmentCategory = (id: string, lang: Lang) => {
   const isUk = lang === 'uk'
@@ -36,7 +37,7 @@ const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-// Автоматический подбор нейтрализатора по кругу Оствальда
+// Автоподбор нейтрализатора по кругу Оствальда
 function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   const pigment = pigments.find((p) => p.id === pigmentId)
   if (!pigment?.hex) return 'ultramarine'
@@ -52,7 +53,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
 
   if (delta < 30) return 'ultramarine'
 
-  // Жёлтый / оливковый → фиолетовый / ультрамарин
   if (r > 140 && g > 110 && b < 120 && r - b > 40) {
     const violet = pigments.find((p) =>
       p.id.includes('ultramarine') || p.id.includes('violet') || p.id.includes('purple')
@@ -60,7 +60,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return violet?.id || 'ultramarine'
   }
 
-  // Рыжий / оранжевый → синий
   if (r > 140 && g > 60 && g < 160 && b < 100) {
     const blue = pigments.find((p) =>
       p.id.includes('ultramarine') ||
@@ -71,7 +70,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return blue?.id || 'ultramarine'
   }
 
-  // Зелёный → красный
   if (g > r && g > b && g - Math.min(r, b) > 30) {
     const red = pigments.find((p) =>
       (p.id.includes('cadmium') && (p.id.includes('red') || p.id.includes('scarlet'))) ||
@@ -81,7 +79,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return red?.id || 'cadmium_red'
   }
 
-  // Синий → оранжевый / жёлтый
   if (b > r && b > g) {
     const orange = pigments.find((p) =>
       (p.id.includes('cadmium') && (p.id.includes('orange') || p.id.includes('yellow'))) ||
@@ -90,7 +87,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return orange?.id || 'cadmium_yellow'
   }
 
-  // Красный → зелёный
   if (r > g && r > b && r - b > 40) {
     const green = pigments.find((p) =>
       p.id.includes('phthalo') || p.id.includes('green_earth') || p.id.includes('viridian')
@@ -99,6 +95,49 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
   }
 
   return 'ultramarine'
+}
+
+/**
+ * Симуляція шарів через Kubelka-Munk
+ */
+function simulateLayersKM(
+  baseSpectrum: SpectrumPoint[],
+  paintSpectrum: SpectrumPoint[],
+  system: CoverageSystem
+) {
+  let strength = system === 'aniline' ? 27 : 46
+
+  const baseRgb = spectrumToRGB(baseSpectrum)
+  const paintRgb = spectrumToRGB(paintSpectrum)
+
+  const baseL = (0.2126 * baseRgb.r + 0.7152 * baseRgb.g + 0.0722 * baseRgb.b) / 255
+  const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
+  const deltaL = Math.abs(paintL - baseL)
+
+  if (deltaL > 0.42) strength *= 0.75
+  else if (deltaL < 0.14) strength *= 1.14
+
+  strength = Math.max(18, Math.min(55, strength))
+
+  const mixLayer = (current: SpectrumPoint[], paint: SpectrumPoint[], s: number) => {
+    return mixSpectra([
+      { spectrum: current, volume: 100 - s },
+      { spectrum: paint, volume: s },
+    ])
+  }
+
+  const layer1 = mixLayer(baseSpectrum, paintSpectrum, strength)
+  const layer2 = mixLayer(layer1, paintSpectrum, strength * 0.93)
+  const layer3 = mixLayer(layer2, paintSpectrum, strength * 0.90)
+
+  return {
+    layer1,
+    layer2,
+    layer3,
+    final: paintSpectrum,
+    strength: Math.round(strength),
+    deltaL,
+  }
 }
 
 const PigmentSelector = ({
@@ -277,36 +316,12 @@ const PigmentSelector = ({
   )
 }
 
-function lerpColor(
-  a: { r: number; g: number; b: number },
-  b: { r: number; g: number; b: number },
-  t: number
-) {
-  return {
-    r: Math.round(a.r + (b.r - a.r) * t),
-    g: Math.round(a.g + (b.g - a.g) * t),
-    b: Math.round(a.b + (b.b - a.b) * t),
-  }
-}
-
-function getLayerColors(
-  baseRgb: { r: number; g: number; b: number } | null,
-  targetRgb: { r: number; g: number; b: number } | null
-) {
-  if (!baseRgb || !targetRgb) return null
-  return {
-    layer1: lerpColor(baseRgb, targetRgb, 0.38),
-    layer2: lerpColor(baseRgb, targetRgb, 0.68),
-    layer3: lerpColor(baseRgb, targetRgb, 0.88),
-    final: targetRgb,
-  }
-}
-
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [mode, setMode] = useState<Mode>('coverage')
+  const [coverageSystem, setCoverageSystem] = useState<CoverageSystem>('acrylic')
 
   const [basePigmentId, setBasePigmentId] = useState('titanium_white')
   const [unwantedPigmentId, setUnwantedPigmentId] = useState('cadmium_yellow')
@@ -333,7 +348,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
-  // Автоподбор нейтрализатора
   useEffect(() => {
     if (!autoNeutralizer || pigments.length === 0) return
     const recommended = getOstwaldNeutralizer(unwantedPigmentId, pigments)
@@ -362,28 +376,67 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     return { rgb, hex: rgbToHex(rgb), spectrum: mixedSpectrum }
   }, [paints, pigments, totalAmount])
 
-  const baseColor = useMemo(() => {
-    const p = pigments.find((x) => x.id === basePigmentId)
-    if (!p?.spectrum) return null
-    const rgb = spectrumToRGB(p.spectrum)
-    return { rgb, hex: rgbToHex(rgb) }
-  }, [pigments, basePigmentId])
+  // Kubelka-Munk симуляция слоёв
+  const layerData = useMemo(() => {
+    if (!mixedColor?.spectrum) return null
+    const basePigment = pigments.find((p) => p.id === basePigmentId)
+    if (!basePigment?.spectrum) return null
+
+    return simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, coverageSystem)
+  }, [basePigmentId, mixedColor, pigments, coverageSystem])
 
   const layers = useMemo(() => {
-    return getLayerColors(baseColor?.rgb ?? null, mixedColor?.rgb ?? null)
-  }, [baseColor, mixedColor])
+    if (!layerData) return null
+    return {
+      layer1: spectrumToRGB(layerData.layer1),
+      layer2: spectrumToRGB(layerData.layer2),
+      layer3: spectrumToRGB(layerData.layer3),
+      final: spectrumToRGB(layerData.final),
+    }
+  }, [layerData])
+
+  // Рекомендация по укрывистости
+  const coverageAdvice = useMemo(() => {
+    if (!layerData) return null
+    const { deltaL, strength } = layerData
+    const isUk = lang === 'uk'
+
+    let opacityLabel = ''
+    let layersLabel = ''
+    let note = ''
+
+    if (deltaL > 0.4) {
+      opacityLabel = isUk ? 'Низька' : 'Низкая'
+      layersLabel = coverageSystem === 'aniline' ? (isUk ? '4–5+ шарів' : '4–5+ слоёв') : (isUk ? '3–4 шари' : '3–4 слоя')
+      note = isUk
+        ? 'Велика різниця яскравості. Рекомендується ґрунт + акрилова система.'
+        : 'Большая разница яркости. Рекомендуется грунт + акриловая система.'
+    } else if (deltaL > 0.22) {
+      opacityLabel = isUk ? 'Середня' : 'Средняя'
+      layersLabel = coverageSystem === 'aniline' ? (isUk ? '3–4 шари' : '3–4 слоя') : (isUk ? '2–3 шари' : '2–3 слоя')
+      note = isUk
+        ? 'Потрібна помірна кількість шарів. Акрил перекриє швидше.'
+        : 'Потребуется умеренное количество слоёв. Акрил перекроет быстрее.'
+    } else {
+      opacityLabel = isUk ? 'Висока' : 'Высокая'
+      layersLabel = isUk ? '1–2 шари' : '1–2 слоя'
+      note = isUk
+        ? 'Колір добре лягає на основу. Можна працювати тонкими шарами.'
+        : 'Цвет хорошо ложится на основу. Можно работать тонкими слоями.'
+    }
+
+    return { opacityLabel, layersLabel, note, strength }
+  }, [layerData, coverageSystem, lang])
 
   const neutralizeResult = useMemo(() => {
     const unwanted = pigments.find((p) => p.id === unwantedPigmentId)
     const neutralizer = pigments.find((p) => p.id === neutralizerPigmentId)
-
     if (!unwanted?.spectrum || !neutralizer?.spectrum) return null
 
     const components = [
       { spectrum: unwanted.spectrum, volume: 100 - neutralizeStrength },
       { spectrum: neutralizer.spectrum, volume: neutralizeStrength },
     ]
-
     const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
     return { rgb, hex: rgbToHex(rgb) }
@@ -393,11 +446,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     const newId = Math.random().toString(36).slice(2)
     setPaints([
       ...paints,
-      {
-        id: newId,
-        pigmentId: pigments[0]?.id || 'titanium_white',
-        amount: '',
-      },
+      { id: newId, pigmentId: pigments[0]?.id || 'titanium_white', amount: '' },
     ])
     setTimeout(() => amountRefs.current[newId]?.focus(), 50)
   }
@@ -446,7 +495,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       exit={{ opacity: 0, x: -20 }}
       className="min-h-screen flex flex-col pt-safe px-4 pb-10"
     >
-      {/* Header */}
       <div className="flex items-center mb-5 mt-4">
         <button
           onClick={onBack}
@@ -462,7 +510,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </div>
 
       <div className="flex-1 flex flex-col gap-4">
-        {/* ===== Состав смеси ===== */}
+        {/* Состав смеси */}
         <div className="bg-[var(--color-surface,#F5F1EA)] rounded-2xl p-4 shadow-sm z-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold opacity-80">
@@ -549,16 +597,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </button>
         </div>
 
-        {/* ===== Результат + Режимы ===== */}
+        {/* Результат */}
         <div className="bg-[#151210] text-[#F5F1EA] rounded-2xl p-5 shadow-md relative z-0">
-          {/* Переключатель режимов */}
           <div className="flex gap-2 mb-5">
             <button
               onClick={() => setMode('coverage')}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'coverage'
-                  ? 'bg-[#D8A35C] text-black'
-                  : 'bg-white/10 text-white/70 hover:bg-white/15'
+                mode === 'coverage' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70 hover:bg-white/15'
               }`}
             >
               {isUk ? 'Укривистість / Слої' : 'Укрывистость / Слои'}
@@ -566,16 +611,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <button
               onClick={() => setMode('neutralize')}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                mode === 'neutralize'
-                  ? 'bg-[#D8A35C] text-black'
-                  : 'bg-white/10 text-white/70 hover:bg-white/15'
+                mode === 'neutralize' ? 'bg-[#D8A35C] text-black' : 'bg-white/10 text-white/70 hover:bg-white/15'
               }`}
             >
               {isUk ? 'Нейтралізація' : 'Нейтрализация'}
             </button>
           </div>
 
-          {/* ========== РЕЖИМ: УКРИВИСТІСТЬ ========== */}
+          {/* ===== УКРИВИСТІСТЬ ===== */}
           {mode === 'coverage' && (
             <div className="flex flex-col gap-5">
               <div>
@@ -591,21 +634,48 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 />
               </div>
 
+              {/* Переключатель системы */}
+              <div>
+                <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
+                  {isUk ? 'Тип системи' : 'Тип системы'}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCoverageSystem('aniline')}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      coverageSystem === 'aniline'
+                        ? 'bg-[#D8A35C] text-black'
+                        : 'bg-white/10 text-white/70'
+                    }`}
+                  >
+                    {isUk ? 'Анілін' : 'Анилин'}
+                  </button>
+                  <button
+                    onClick={() => setCoverageSystem('acrylic')}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      coverageSystem === 'acrylic'
+                        ? 'bg-[#D8A35C] text-black'
+                        : 'bg-white/10 text-white/70'
+                    }`}
+                  >
+                    {isUk ? 'Акрил' : 'Акрил'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Целевой цвет */}
               <div className="flex flex-col items-center">
                 <div className="text-xs opacity-50 mb-2">
                   {isUk ? 'Цільовий колір суміші' : 'Целевой цвет смеси'}
                 </div>
                 <div
-                  className="w-28 h-28 rounded-2xl border-2 border-white/15 shadow-lg mb-2 transition-colors"
+                  className="w-28 h-28 rounded-2xl border-2 border-white/15 shadow-lg mb-2"
                   style={{ backgroundColor: mixedColor?.hex || '#2a2522' }}
                 />
                 {mixedColor ? (
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm">{mixedColor.hex.toUpperCase()}</span>
-                    <button
-                      onClick={() => copyHex()}
-                      className="px-2.5 py-1 rounded-lg bg-white/10 text-xs"
-                    >
+                    <button onClick={() => copyHex()} className="px-2.5 py-1 rounded-lg bg-white/10 text-xs">
                       {copied ? '✓' : (isUk ? 'Копіювати' : 'Копировать')}
                     </button>
                   </div>
@@ -616,10 +686,38 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 )}
               </div>
 
+              {/* Рекомендация */}
+              {coverageAdvice && (
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <div className="text-[11px] opacity-50 mb-0.5">
+                        {isUk ? 'Укривистість' : 'Укрывистость'}
+                      </div>
+                      <div className="text-sm font-semibold text-[#D8A35C]">
+                        {coverageAdvice.opacityLabel}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] opacity-50 mb-0.5">
+                        {isUk ? 'Рекомендовано шарів' : 'Рекомендуемо слоёв'}
+                      </div>
+                      <div className="text-sm font-semibold text-[#D8A35C]">
+                        {coverageAdvice.layersLabel}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[13px] leading-relaxed opacity-80">
+                    {coverageAdvice.note}
+                  </p>
+                </div>
+              )}
+
+              {/* Превью слоёв */}
               {layers && (
                 <div>
                   <div className="text-xs opacity-50 mb-3 font-medium uppercase tracking-wider">
-                    {isUk ? 'Як буде виглядати по шарах' : 'Как будет выглядеть по слоям'}
+                    {isUk ? 'Симуляція шарів (Kubelka-Munk)' : 'Симуляция слоёв (Kubelka-Munk)'}
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     {[
@@ -633,33 +731,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                           className="w-full aspect-square rounded-xl border border-white/15 shadow-sm"
                           style={{ backgroundColor: rgbToHex(item.color) }}
                         />
-                        <span className="text-[10px] opacity-60 text-center leading-tight">
-                          {item.label}
-                        </span>
+                        <span className="text-[10px] opacity-60 text-center">{item.label}</span>
                       </div>
                     ))}
                   </div>
-
-                  <p className="mt-4 text-[13px] leading-relaxed opacity-75">
-                    {isUk
-                      ? '1-й шар сильно залежить від основи. До 3-го шару колір наближається до цільового. Анілінові барвники потребують більше шарів, акрилові (покривні) — менше.'
-                      : '1-й слой сильно зависит от основы. К 3-му слою цвет приближается к целевому. Анилиновые красители требуют больше слоёв, акриловые (покрывные) — меньше.'}
-                  </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* ========== РЕЖИМ: НЕЙТРАЛІЗАЦІЯ ========== */}
+          {/* ===== НЕЙТРАЛІЗАЦІЯ ===== */}
           {mode === 'neutralize' && (
             <div className="flex flex-col gap-5">
               <p className="text-[13px] opacity-70 leading-relaxed">
                 {isUk
-                  ? 'Оберіть небажаний відтінок основи — система сама підбере нейтралізатор за колом Оствальда. Можна змінити вручну.'
-                  : 'Выберите нежелательный оттенок основы — система сама подберёт нейтрализатор по кругу Оствальда. Можно изменить вручную.'}
+                  ? 'Оберіть небажаний відтінок — система сама підбере нейтралізатор за колом Оствальда.'
+                  : 'Выберите нежелательный оттенок — система сама подберёт нейтрализатор по кругу Оствальда.'}
               </p>
 
-              {/* Нежелательная основа */}
               <div>
                 <div className="text-xs opacity-50 mb-2 font-medium uppercase tracking-wider">
                   {isUk ? 'Небажаний відтінок основи' : 'Нежелательный оттенок основы'}
@@ -675,7 +764,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 />
               </div>
 
-              {/* Нейтрализатор */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs opacity-50 font-medium uppercase tracking-wider">
@@ -698,7 +786,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 />
               </div>
 
-              {/* Сила нейтрализации — кнопки + / − */}
               <div>
                 <div className="text-xs opacity-50 mb-3 font-medium uppercase tracking-wider text-center">
                   {isUk ? 'Сила нейтралізації' : 'Сила нейтрализации'}
@@ -711,13 +798,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   >
                     −
                   </button>
-
                   <div className="w-16 text-center">
                     <span className="text-2xl font-bold text-[#D8A35C] tabular-nums">
                       {neutralizeStrength}%
                     </span>
                   </div>
-
                   <button
                     onClick={() => changeStrength(5)}
                     disabled={neutralizeStrength >= 60}
@@ -726,13 +811,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     +
                   </button>
                 </div>
-                <div className="flex justify-between text-[10px] opacity-40 mt-2 px-6">
-                  <span>{isUk ? 'слабко' : 'слабо'}</span>
-                  <span>{isUk ? 'сильніше' : 'сильнее'}</span>
-                </div>
               </div>
 
-              {/* Результат */}
               {neutralizeResult && (
                 <div className="flex flex-col items-center mt-2">
                   <div className="text-xs opacity-50 mb-2">
@@ -756,7 +836,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </div>
           )}
 
-          {/* Общий объём + проценты (только в coverage) */}
+          {/* Объём + проценты */}
           {mode === 'coverage' && (
             <>
               <div className="flex justify-between items-end mt-6 mb-4 border-t border-white/10 pt-4">
