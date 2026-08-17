@@ -94,9 +94,7 @@ function ksToReflectance(k: number, s: number): number {
   return Math.max(0, Math.min(1, r))
 }
 
-/** Простая конвертация 3-точечного спектра → приближённый RGB */
 function reflectanceToApproxRGB(r450: number, r550: number, r650: number) {
-  // Грубая, но стабильная аппроксимация
   const r = Math.round(r650 * 255)
   const g = Math.round(r550 * 255)
   const b = Math.round(r450 * 255)
@@ -111,7 +109,6 @@ function rgbToHex(rgb: { r: number; g: number; b: number }): string {
   return `#\( {toHex(rgb.r)} \){toHex(rgb.g)}${toHex(rgb.b)}`
 }
 
-/** Смешивание K/S по весам */
 function mixKS(weights: number[]): { r450: number; r550: number; r650: number } {
   let k450 = 0, s450 = 0
   let k550 = 0, s550 = 0
@@ -134,20 +131,17 @@ function mixKS(weights: number[]): { r450: number; r550: number; r650: number } 
   }
 }
 
-/** Простой подбор весов (случайный поиск + локальное улучшение) */
 function findWeights(targetR: { r450: number; r550: number; r650: number }) {
   const n = BASIC_PALETTE.length
   let bestWeights = new Array(n).fill(0)
-  bestWeights[0] = 1 // начинаем с белого
+  bestWeights[0] = 1
   let bestError = Infinity
 
-  // Несколько случайных стартов
   for (let trial = 0; trial < 80; trial++) {
     let weights = new Array(n).fill(0).map(() => Math.random())
     const sum = weights.reduce((a, b) => a + b, 0)
     weights = weights.map(w => w / sum)
 
-    // Локальное улучшение
     for (let iter = 0; iter < 40; iter++) {
       const mixed = mixKS(weights)
       const err =
@@ -160,7 +154,6 @@ function findWeights(targetR: { r450: number; r550: number; r650: number }) {
         bestWeights = [...weights]
       }
 
-      // Небольшой случайный шаг
       const idx = Math.floor(Math.random() * n)
       const delta = (Math.random() - 0.5) * 0.08
       weights[idx] = Math.max(0, weights[idx] + delta)
@@ -179,22 +172,20 @@ export interface BasicRecipeItem {
 
 export interface BasicRecipeResult {
   recipe: BasicRecipeItem[]
+  resultRgb: { r: number; g: number; b: number }   // ← добавили для совместимости
   resultHex: string
-  deltaE: number // условная ошибка (0–100)
+  deltaE: number
 }
 
 /**
- * Главная функция: по спектру нейтрализатора
- * возвращает рецепт из базовой палитры (±20 мл)
+ * По спектру нейтрализатора возвращает рецепт из базовой палитры (±20 мл)
  */
 export function findBasicPaletteRecipe(
   targetSpectrum: { wavelength: number; reflectance: number }[]
 ): BasicRecipeResult | null {
   if (!targetSpectrum || targetSpectrum.length === 0) return null
 
-  // Берём отражение в трёх ключевых точках
   const getR = (wl: number) => {
-    // ближайшая точка
     let closest = targetSpectrum[0]
     let minDiff = Infinity
     for (const p of targetSpectrum) {
@@ -214,14 +205,12 @@ export function findBasicPaletteRecipe(
   }
 
   const weights = findWeights(targetR)
-
-  // Переводим в миллилитры (сумма ≈ 20 мл)
   const totalMl = 20
   const recipe: BasicRecipeItem[] = []
 
   weights.forEach((w, i) => {
-    const ml = Math.round(w * totalMl * 10) / 10 // 0.1 мл точность
-    if (ml >= 0.3) { // игнорируем совсем мелкие
+    const ml = Math.round(w * totalMl * 10) / 10
+    if (ml >= 0.3) {
       recipe.push({
         pigment: BASIC_PALETTE[i],
         ml,
@@ -229,7 +218,6 @@ export function findBasicPaletteRecipe(
     }
   })
 
-  // Нормализуем, если после фильтрации сумма изменилась
   const currentSum = recipe.reduce((s, r) => s + r.ml, 0)
   if (currentSum > 0 && Math.abs(currentSum - totalMl) > 0.5) {
     const factor = totalMl / currentSum
@@ -238,16 +226,15 @@ export function findBasicPaletteRecipe(
     })
   }
 
-  // Считаем итоговый цвет
   const finalWeights = BASIC_PALETTE.map((_, i) => {
     const item = recipe.find(r => r.pigment.id === BASIC_PALETTE[i].id)
     return item ? item.ml / totalMl : 0
   })
-  const mixed = mixKS(finalWeights)
-  const rgb = reflectanceToApproxRGB(mixed.r450, mixed.r550, mixed.r650)
-  const resultHex = rgbToHex(rgb)
 
-  // Условная ошибка (чем меньше — тем лучше)
+  const mixed = mixKS(finalWeights)
+  const resultRgb = reflectanceToApproxRGB(mixed.r450, mixed.r550, mixed.r650)
+  const resultHex = rgbToHex(resultRgb)
+
   const deltaE = Math.round(
     Math.sqrt(
       Math.pow(mixed.r450 - targetR.r450, 2) +
@@ -258,6 +245,7 @@ export function findBasicPaletteRecipe(
 
   return {
     recipe,
+    resultRgb,
     resultHex,
     deltaE,
   }
