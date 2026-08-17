@@ -87,9 +87,13 @@ export function useColorCalculations({
 
         // Функция для оценки конкретной комбинации миллилитров
         const evaluateMix = (combo: { p: Pigment; v: number }[]) => {
-          const components = combo
-            .filter(c => c.v > 0)
-            .map(c => ({ spectrum: c.p.spectrum, volume: c.v }))
+          // ИСПРАВЛЕНИЕ: Отфильтровываем пигменты без спектра и приводим типы
+          const components: { spectrum: SpectrumPoint[]; volume: number }[] = combo
+            .filter(c => c.v > 0 && c.p.spectrum !== undefined)
+            .map(c => ({ 
+              spectrum: c.p.spectrum as SpectrumPoint[], 
+              volume: c.v 
+            }))
           
           if (components.length === 0) return Infinity
           const mixedSpec = mixSpectra(components)
