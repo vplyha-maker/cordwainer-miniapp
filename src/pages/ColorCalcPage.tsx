@@ -335,19 +335,44 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     lang={lang}
                   />
 
+                  {/* Улучшенный инпут для iPhone */}
                   <input
                     type="text"
                     inputMode="decimal"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={paint.amount}
                     onChange={(e) => {
+                      // Разрешаем цифры, точку и запятую
                       let val = e.target.value.replace(',', '.')
-                      if (/^\d*\.?\d*$/.test(val)) {
-                        if (parseFloat(val) > 5000) val = '5000'
+
+                      // Разрешаем пустое значение и промежуточные состояния (например "12." или ".5")
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        // Ограничиваем только когда число уже валидное
+                        const num = parseFloat(val)
+                        if (!isNaN(num) && num > 5000) {
+                          val = '5000'
+                        }
                         updatePaint(paint.id, 'amount', val)
                       }
                     }}
-                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#D8A35C] transition-colors"
+                    onBlur={(e) => {
+                      // На blur подчищаем значение
+                      let val = e.target.value.replace(',', '.')
+                      if (val === '.' || val === '') {
+                        updatePaint(paint.id, 'amount', '')
+                        return
+                      }
+                      const num = parseFloat(val)
+                      if (!isNaN(num)) {
+                        updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                      }
+                    }}
+                    className="w-16 md:w-20 flex-shrink-0 bg-white text-black border border-gray-200 rounded-lg px-2 py-2.5 text-base text-center focus:outline-none focus:border-[#D8A35C] transition-colors"
                     placeholder="0"
+                    style={{ fontSize: '16px' }} // Важно для iOS — предотвращает зум
                   />
 
                   <span className="text-xs opacity-50 flex-shrink-0">мл</span>
