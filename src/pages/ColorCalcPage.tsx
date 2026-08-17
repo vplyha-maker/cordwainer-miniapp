@@ -52,7 +52,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
 
   if (delta < 25) return 'ultramarine'
 
-  // Жёлтый → фиолетовый / ультрамарин
   if (r > 150 && g > 120 && b < 110) {
     const violet = pigments.find(p =>
       p.id.includes('ultramarine') || p.id.includes('violet') || p.id.includes('purple')
@@ -60,7 +59,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return violet?.id || 'ultramarine'
   }
 
-  // Оранжевый / рыжий → синий
   if (r > 160 && g > 70 && g < 150 && b < 90) {
     const blue = pigments.find(p =>
       p.id.includes('ultramarine') || p.id.includes('prussian') || p.id.includes('cobalt_blue') || p.id.includes('phthalo')
@@ -68,7 +66,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return blue?.id || 'ultramarine'
   }
 
-  // Зелёный → красный
   if (g > r + 20 && g > b + 20) {
     const red = pigments.find(p =>
       p.id.includes('cadmium_red') || p.id.includes('iron_oxide') || p.id.includes('venetian') || p.id.includes('scarlet')
@@ -76,7 +73,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return red?.id || 'cadmium_red'
   }
 
-  // Синий → оранжевый / жёлтый
   if (b > r + 15 && b > g + 10) {
     const warm = pigments.find(p =>
       p.id.includes('cadmium_orange') || p.id.includes('cadmium_yellow') || p.id.includes('ochre')
@@ -84,7 +80,6 @@ function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
     return warm?.id || 'cadmium_yellow'
   }
 
-  // Красный → зелёный
   if (r > g + 30 && r > b + 30) {
     const green = pigments.find(p =>
       p.id.includes('phthalo_green') || p.id.includes('green_earth') || p.id.includes('viridian')
@@ -184,13 +179,13 @@ function findBasicRecipe(
 
   if (candidates.length === 0) return null
 
-  type BestResult = {
+  interface BestResult {
     volumes: number[]
     rgb: { r: number; g: number; b: number }
     deltaE: number
   }
 
-  let best: BestResult | null = null
+  const bestHolder: { current: BestResult | null } = { current: null }
 
   const steps = [0, 15, 30, 50, 70, 100]
 
@@ -212,8 +207,12 @@ function findBasicRecipe(
         (rgb.b - targetRgb.b) ** 2
       )
 
-      if (!best || deltaE < best.deltaE) {
-        best = { volumes: [...vols], rgb, deltaE }
+      if (!bestHolder.current || deltaE < bestHolder.current.deltaE) {
+        bestHolder.current = {
+          volumes: [...vols],
+          rgb,
+          deltaE,
+        }
       }
       return
     }
@@ -226,6 +225,7 @@ function findBasicRecipe(
 
   search(0, new Array(candidates.length).fill(0))
 
+  const best = bestHolder.current
   if (!best) return null
 
   const total = best.volumes.reduce((s: number, v: number) => s + v, 0)
@@ -234,7 +234,7 @@ function findBasicRecipe(
   const recipe = candidates
     .map((p, i) => ({
       pigment: p,
-      ml: Math.round(best!.volumes[i] * scale * 10) / 10,
+      ml: Math.round(best.volumes[i] * scale * 10) / 10,
     }))
     .filter((r) => r.ml >= 0.5)
 
