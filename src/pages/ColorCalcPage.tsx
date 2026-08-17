@@ -1,9 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Lang } from '../App'
-import { Pigment } from '../data/pigments' // Ваш файл с интерфейсом Pigment
+import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
 import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint } from '../utils/colorScience'
+// Добавлен импорт графика (убедись, что путь к файлу верный)
+import { SpectrumGraph } from './SpectrumGraph' 
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -183,6 +185,20 @@ const PigmentSelector = ({
                             <div className="flex justify-between">
                               <span className="opacity-70">HEX:</span>
                               <span className="font-mono text-gray-800 uppercase">{p.hex}</span>
+                            </div>
+                          )}
+                          
+                          {/* Интеграция компонента спектра */}
+                          {p.spectrum && p.spectrum.length > 0 && (
+                            <div className="mt-3 p-2 bg-black/5 rounded-lg border border-black/5">
+                              <p className="text-xs text-gray-500 mb-1 font-medium">
+                                {isUk ? 'Спектр відбиття' : 'Спектр отражения'}
+                              </p>
+                              <SpectrumGraph 
+                                spectrum={p.spectrum} 
+                                className="h-20 w-full text-gray-300" 
+                                lineColor={p.hex || '#666'} 
+                              />
                             </div>
                           )}
                         </div>
