@@ -1,3 +1,5 @@
+// src/pages/ColorCalcPage.tsx
+
 import { motion } from 'framer-motion'
 import { useState, useEffect, useRef } from 'react'
 
@@ -7,6 +9,7 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
+import { findBasicRecipe, getPureBasicPigments } from '../utils/calculatorLogic' // ДОБАВЛЕН ИМПОРТ
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -15,23 +18,19 @@ interface ColorCalcPageProps {
 
 function normalizeHex(raw: string): string | null {
   let v = raw.trim().replace(/^#/, '').toUpperCase()
-  
-  // Если введено 3 символа, удваиваем их (например, F00 -> FF0000)
   if (/^[0-9A-F]{3}$/.test(v)) {
     v = v[0] + v[0] + v[1] + v[1] + v[2] + v[2]
   }
-  
-  // Если получилось 6 символов, возвращаем с решеткой
   if (/^[0-9A-F]{6}$/.test(v)) {
     return `#${v}`
   }
-  
   return null
 }
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
+  const [isCalculating, setIsCalculating] = useState(false) // СОСТОЯНИЕ ЗАГРУЗКИ ПОДБОРА
   const [copied, setCopied] = useState(false)
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
@@ -45,6 +44,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     removePaint,
     updatePaint,
     clearAllAmounts,
+    setPaints // ВАЖНО: Обязательно добавь экспорт setPaints в хук usePaintMix
   } = usePaintMix(pigments)
 
   const { mixedColor } = useColorCalculations({
@@ -84,6 +84,36 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
+  // === НОВАЯ ЛОГИКА: Реакция на ввод HEX пользователем ===
+  useEffect(() => {
+    if (userEdited.current && validHex && pigments.length > 0) {
+      setIsCalculating(true) // Включаем индикатор на квадрате
+      
+      // Используем setTimeout, чтобы React успел отрисовать индикатор загрузки (UI не зависал)
+      const timeoutId = setTimeout(() => {
+        const basicPigments = getPureBasicPigments(pigments)
+        // Ищем рецепт на 4 пигмента по введенному HEX
+        const recipeData = findBasicRecipe(validHex, basicPigments, 4)
+
+        if (recipeData && recipeData.recipe.length > 0 && setPaints) {
+          // Преобразуем ответ в формат хука usePaintMix
+          const newPaints = recipeData.recipe.map((r) => ({
+            id: Math.random().toString(36).substring(2, 9), // генерируем уникальный ID для строки
+            pigmentId: r.pigment.id,
+            amount: String(r.ml)
+          }))
+          
+          // Обновляем строки в верхнем баре
+          setPaints(newPaints)
+        }
+        setIsCalculating(false)
+      }, 50)
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [validHex, pigments, setPaints])
+  // ========================================================
+
   const handleHexChange = (raw: string) => {
     userEdited.current = true
     const cleaned = raw.replace(/[^#0-9A-Fa-f]/g, '').slice(0, 7)
@@ -93,7 +123,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (normalized) {
       setValidHex(normalized)
     } else {
-      setValidHex(null) // Сбрасываем валидный цвет, если код неполный
+      setValidHex(null)
     }
   }
 
@@ -248,10 +278,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </h2>
 
           <div className="flex flex-col items-center">
+            {/* КВАДРАТ С ИНДИКАТОРОМ ЗАГРУЗКИ */}
             <div
-              className="w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150"
+              className="relative w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150 overflow-hidden"
               style={{ backgroundColor: displayColor }}
-            />
+            >
+              {isCalculating && (
+                <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center z-10 transition-opacity">
+                   <svg className="animate-spin w-8 h-8 text-white mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                   </svg>
+                   <span className="text-[10px] text-white/90 font-medium">
+                     {isUk ? 'Рахуємо...' : 'Считаем...'}
+                   </span>
+                </div>
+              )}
+            </div>
 
             {/* HEX + копировать — в одну линию без переполнения */}
             <div className="w-full flex items-center gap-2">
