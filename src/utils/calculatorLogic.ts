@@ -96,7 +96,7 @@ function rgbToLab(r: number, g: number, b: number) {
 }
 
 // ==========================================
-// CIEDE2000
+// CIEDE2000 (точная формула)
 // ==========================================
 function calculateDeltaE2000(
   lab1: { L: number; a: number; b: number },
@@ -190,31 +190,6 @@ export function hexToRgbObj(hex: string) {
   }
 }
 
-// ==========================================
-// Вспомогательные функции поиска
-// ==========================================
-
-/** Генерирует все комбинации размера k из массива индексов */
-function combinations(n: number, k: number): number[][] {
-  const result: number[][] = []
-  const combo: number[] = []
-
-  function backtrack(start: number) {
-    if (combo.length === k) {
-      result.push([...combo])
-      return
-    }
-    for (let i = start; i < n; i++) {
-      combo.push(i)
-      backtrack(i + 1)
-      combo.pop()
-    }
-  }
-
-  backtrack(0)
-  return result
-}
-
 interface BestResult {
   volumes: number[]
   rgb: { r: number; g: number; b: number }
@@ -222,7 +197,7 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (быстрый + качественный)
+// ГЛАВНЫЙ АЛГОРИТМ (агрессивный, под Worker)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
@@ -238,34 +213,37 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Сортируем и берём топ-9
-  const scored = validPigments.map((p) => {
+  // Топ-10 ближайших пигментов
+  const scoredPigments = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
-  scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, 9).map((s) => s.pigment)
-  const n = candidates.length
+
+  scoredPigments.sort((a, b) => a.dist - b.dist)
+  const candidates = scoredPigments.slice(0, 10).map((s) => s.pigment)
 
   const best: BestResult = {
-    volumes: new Array(n).fill(0),
+    volumes: [],
     rgb: { r: 0, g: 0, b: 0 },
     deltaE: Infinity,
   }
 
-  // Оценка конкретной комбинации + объёмов
-  const evaluate = (indices: number[], vols: number[]) => {
+  const evaluateVolumes = (vols: number[]) => {
+    const total = vols.reduce((s, v) => s + v, 0)
+    if (total === 0) return
+
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
-    for (let i = 0; i < indices.length; i++) {
+    let activeCount = 0
+
+    for (let i = 0; i < candidates.length; i++) {
       if (vols[i] > 0) {
-        components.push({
-          spectrum: candidates[indices[i]].spectrum!,
-          volume: vols[i],
-        })
+        components.push({ spectrum: candidates[i].spectrum!, volume: vols[i] })
+        activeCount++
       }
     }
-    if (components.length === 0) return
+
+    if (activeCount === 0 || activeCount > maxComponents) return
 
     const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
@@ -273,112 +251,96 @@ export function findRecipeByHex(
     const deltaE = calculateDeltaE2000(targetLab, lab)
 
     if (deltaE < best.deltaE) {
-      best.deltaE = deltaE
+      best.volumes = [...vols]
       best.rgb = rgb
-      // Записываем в полный массив объёмов
-      const full = new Array(n).fill(0)
-      for (let i = 0; i < indices.length; i++) {
-        full[indices[i]] = vols[i]
-      }
-      best.volumes = full
+      best.deltaE = deltaE
     }
   }
 
-  // Плотный поиск объёмов для фиксированной комбинации
-  const volumeSteps = [8, 18, 32, 48, 65, 82, 100]
+  // ——— ЭТАП 1: ГРУБЫЙ ПОИСК (плотная сетка) ———
+  const coarseSteps = [0, 10, 20, 35, 50, 65, 80, 100]
 
-  const searchVolumes = (indices: number[]) => {
-    const k = indices.length
-    if (k === 0) return
-
-    // Рекурсивный перебор объёмов только по этой комбинации
-    const vols = new Array(k).fill(0)
-
-    const rec = (pos: number) => {
-      if (pos === k) {
-        evaluate(indices, vols)
-        return
-      }
-      for (const s of volumeSteps) {
-        vols[pos] = s
-        rec(pos + 1)
-      }
+  const searchCoarse = (idx: number, vols: number[]) => {
+    if (idx === candidates.length) {
+      evaluateVolumes(vols)
+      return
     }
-    rec(0)
-  }
 
-  // ——— Основной цикл по размеру комбинации ———
-  for (let k = 1; k <= Math.min(maxComponents, n); k++) {
-    const combos = combinations(n, k)
-    for (const combo of combos) {
-      searchVolumes(combo)
+    for (const s of coarseSteps) {
+      vols[idx] = s
+
+      let active = 0
+      for (let k = 0; k <= idx; k++) {
+        if (vols[k] > 0) active++
+      }
+      if (active > maxComponents) continue
+
+      searchCoarse(idx + 1, vols)
     }
   }
+
+  searchCoarse(0, new Array(candidates.length).fill(0))
 
   if (best.deltaE === Infinity) return null
 
-  // ——— Локальная доводка лучшего решения ———
-  const activeIndices = best.volumes
-    .map((v, i) => (v > 0 ? i : -1))
-    .filter((i) => i >= 0)
+  // ——— ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ ———
+  const bestCoarse = [...best.volumes]
+  const fineDeltas = [-20, -12, -8, -4, 4, 8, 12, 20]
 
-  if (activeIndices.length > 0) {
-    const fineDeltas = [-18, -10, -5, 5, 10, 18]
-    const baseVols = activeIndices.map((i) => best.volumes[i])
+  const searchFine = (idx: number, current: number[]) => {
+    if (idx === candidates.length) {
+      evaluateVolumes(current)
+      return
+    }
 
-    const fineRec = (pos: number, current: number[]) => {
-      if (pos === activeIndices.length) {
-        evaluate(activeIndices, current)
-        return
-      }
-      // оставляем
-      fineRec(pos + 1, current)
-      // пробуем отклонения
+    if (bestCoarse[idx] > 0) {
+      // оставляем как есть
+      searchFine(idx + 1, current)
+
       for (const d of fineDeltas) {
-        const v = baseVols[pos] + d
-        if (v > 3 && v <= 130) {
+        const v = bestCoarse[idx] + d
+        if (v > 0 && v <= 130) {
           const next = [...current]
-          next[pos] = v
-          fineRec(pos + 1, next)
+          next[idx] = v
+          searchFine(idx + 1, next)
         }
       }
+    } else {
+      searchFine(idx + 1, current)
     }
-    fineRec(0, [...baseVols])
   }
 
-  // ——— Лёгкая жадная доводка ———
-  const greedyDeltas = [-8, -4, -2, 2, 4, 8]
-  for (let pass = 0; pass < 3; pass++) {
-    let improved = false
+  searchFine(0, [...bestCoarse])
+
+  // ——— ЭТАП 3: ЖАДНАЯ ДОВОДКА (несколько проходов) ———
+  const greedyDeltas = [-10, -6, -3, -1, 1, 3, 6, 10]
+  let improved = true
+  let passes = 0
+
+  while (improved && passes < 4) {
+    improved = false
+    passes++
     const base = [...best.volumes]
 
-    for (const idx of activeIndices) {
+    for (let i = 0; i < candidates.length; i++) {
+      if (base[i] <= 0) continue
+
       for (const d of greedyDeltas) {
         const trial = [...base]
-        trial[idx] = Math.max(2, Math.min(130, base[idx] + d))
+        trial[i] = Math.max(1, Math.min(130, base[i] + d))
+
         const prev = best.deltaE
+        evaluateVolumes(trial)
 
-        // Собираем только активные
-        const inds: number[] = []
-        const vs: number[] = []
-        for (let i = 0; i < n; i++) {
-          if (trial[i] > 0) {
-            inds.push(i)
-            vs.push(trial[i])
-          }
+        if (best.deltaE < prev - 0.001) {
+          improved = true
         }
-        evaluate(inds, vs)
-
-        if (best.deltaE < prev - 0.0005) improved = true
       }
     }
-    if (!improved) break
   }
 
-  // ——— Масштабирование ———
+  // ——— Масштабирование к нужному объёму ———
   const total = best.volumes.reduce((s, v) => s + v, 0)
-  if (total <= 0) return null
-
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
   const scale = scaleTarget / total
 
@@ -399,7 +361,7 @@ export function findRecipeByHex(
 }
 
 // ==========================================
-// Симуляция слоёв
+// Симуляция слоёв (Kubelka-Munk)
 // ==========================================
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
