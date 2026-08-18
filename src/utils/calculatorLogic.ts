@@ -221,30 +221,48 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ — быстрый вариант на пропорциях
+// ГЛАВНЫЙ АЛГОРИТМ
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
-  basicPigments: Pigment[],
+  pigments: Pigment[],               // ← теперь передаём все 83
   maxComponents = 3,
   targetVolume = 20
 ) {
-  if (!basicPigments.length || !targetHex) return null
+  if (!pigments.length || !targetHex) return null
 
-  const validPigments = basicPigments.filter((p) => p.spectrum && p.spectrum.length > 0)
+  const validPigments = pigments.filter((p) => p.spectrum && p.spectrum.length > 0)
   if (validPigments.length === 0) return null
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // топ-6 кандидатов
+  // 1. Расстояние каждого пигмента до цели
   const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
   scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, 6).map((s) => s.pigment)
+
+  // 2. Топ-8 самых близких
+  let candidates = scored.slice(0, 8).map((s) => s.pigment)
+
+  // 3. Принудительно добавляем красный, синий и чёрный
+  const forceIds = [
+    ...PURE_BASIC_COLORS[2].sourceIds, // red
+    ...PURE_BASIC_COLORS[4].sourceIds, // blue
+    ...PURE_BASIC_COLORS[1].sourceIds, // black
+  ]
+  for (const id of forceIds) {
+    const p = validPigments.find((x) => x.id === id)
+    if (p && !candidates.some((c) => c.id === p.id)) {
+      candidates.push(p)
+    }
+  }
+
+  if (candidates.length > 12) candidates = candidates.slice(0, 12)
+
   const n = candidates.length
 
   const best: BestResult = {
@@ -281,7 +299,6 @@ export function findRecipeByHex(
     }
   }
 
-  // ——— Практические пропорции (вместо полного перебора) ———
   // k = 1
   for (let i = 0; i < n; i++) {
     evaluate([i], [100])
@@ -289,32 +306,33 @@ export function findRecipeByHex(
 
   // k = 2
   const ratios2 = [
-    [90, 10], [80, 20], [70, 30], [60, 40], [50, 50],
-    [85, 15], [75, 25],
+    [90, 10], [85, 15], [80, 20], [75, 25], [70, 30],
+    [65, 35], [60, 40], [55, 45], [50, 50],
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
       evaluate([i, j], [a, b])
-      evaluate([i, j], [b, a]) // симметрия
+      if (a !== b) evaluate([i, j], [b, a])
     }
   }
 
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
-      [80, 15, 5],   // классика для тёмных / чёрного
+      [80, 15, 5],
       [85, 10, 5],
       [75, 20, 5],
       [70, 20, 10],
-      [60, 30, 10],
-      [50, 30, 20],
       [70, 25, 5],
+      [65, 25, 10],
+      [60, 30, 10],
+      [60, 25, 15],
+      [50, 30, 20],
       [90, 5, 5],
-      [60, 20, 20],
+      [55, 30, 15],
     ]
     for (const combo of combinations(n, 3)) {
       for (const ratio of ratios3) {
-        // все перестановки пропорций
         evaluate(combo, ratio)
         evaluate(combo, [ratio[0], ratio[2], ratio[1]])
         evaluate(combo, [ratio[1], ratio[0], ratio[2]])
@@ -327,13 +345,13 @@ export function findRecipeByHex(
 
   if (best.deltaE === Infinity) return null
 
-  // ——— Локальная доводка только лучших 1–3 компонентов ———
+  // Локальная доводка
   const activeIndices = best.volumes
     .map((v, i) => (v > 0 ? i : -1))
     .filter((i) => i >= 0)
 
   if (activeIndices.length > 0 && activeIndices.length <= 3) {
-    const fineDeltas = [-12, -6, -3, 3, 6, 12]
+    const fineDeltas = [-10, -5, -2, 2, 5, 10]
     const baseVols = activeIndices.map((i) => best.volumes[i])
 
     const fineRec = (pos: number, current: number[]) => {
@@ -344,7 +362,7 @@ export function findRecipeByHex(
       fineRec(pos + 1, current)
       for (const d of fineDeltas) {
         const v = baseVols[pos] + d
-        if (v > 2 && v <= 110) {
+        if (v > 1.5 && v <= 110) {
           const next = [...current]
           next[pos] = v
           fineRec(pos + 1, next)
@@ -354,8 +372,8 @@ export function findRecipeByHex(
     fineRec(0, [...baseVols])
   }
 
-  // ——— Лёгкая жадная доводка ———
-  const greedyDeltas = [-5, -2, 2, 5]
+  // Жадная доводка
+  const greedyDeltas = [-4, -2, 2, 4]
   for (let pass = 0; pass < 2; pass++) {
     let improved = false
     const base = [...best.volumes]
@@ -363,7 +381,7 @@ export function findRecipeByHex(
     for (const idx of activeIndices) {
       for (const d of greedyDeltas) {
         const trial = [...base]
-        trial[idx] = Math.max(2, Math.min(110, base[idx] + d))
+        trial[idx] = Math.max(1.5, Math.min(110, base[idx] + d))
         const prev = best.deltaE
 
         const inds: number[] = []
@@ -382,7 +400,7 @@ export function findRecipeByHex(
     if (!improved) break
   }
 
-  // ——— Масштабирование ———
+  // Масштабирование
   const total = best.volumes.reduce((s, v) => s + v, 0)
   if (total <= 0) return null
 
