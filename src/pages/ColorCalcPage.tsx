@@ -45,22 +45,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   })
 
   useEffect(() => {
-    if (mixedColor?.hex && !isFocused && !userEdited.current) {
-      const hex = mixedColor.hex.toUpperCase()
-      setHexInput(hex)
-      setValidHex(hex)
-    }
-    if (!mixedColor?.hex && !isFocused && !userEdited.current) {
-      setHexInput('')
-      setValidHex(null)
-    }
-  }, [mixedColor?.hex, isFocused])
-
-  useEffect(() => {
-    userEdited.current = false
-  }, [paints, totalAmount])
-
-  useEffect(() => {
     loadAllPigments()
       .then((loaded) => {
         setPigments(loaded)
@@ -72,6 +56,38 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       })
   }, [])
 
+  // Синхронизация квадрата результата при ручном смешивании
+  useEffect(() => {
+    if (mixedColor?.hex && !isFocused && !userEdited.current) {
+      const hex = mixedColor.hex.toUpperCase()
+      setHexInput(hex)
+    }
+    if (!mixedColor?.hex && !isFocused && !userEdited.current) {
+      setHexInput('')
+    }
+  }, [mixedColor?.hex, isFocused])
+
+  useEffect(() => {
+    userEdited.current = false
+  }, [paints, totalAmount])
+
+  // === DEBOUNCE ЛОГИКА ===
+  // Ждем 500мс после окончания ввода, чтобы не вешать браузер на каждом символе
+  useEffect(() => {
+    if (!userEdited.current) return;
+    
+    if (hexInput.length === 7) { 
+      const timer = setTimeout(() => {
+        setValidHex(hexInput.toUpperCase());
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setValidHex(null);
+      setIsCalculating(false);
+    }
+  }, [hexInput]);
+
+
   // === Расчет рецепта по введенному HEX ===
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
@@ -81,12 +97,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
     setIsCalculating(true)
     
-    // Увеличен таймаут, чтобы React гарантированно успел отрендерить спиннер
-    const timeoutId = setTimeout(() => {
+    // Асинхронный таймаут дает React отрендерить спиннер до тяжелой математики
+    const calcTimer = setTimeout(() => {
       const basicPigments = getPureBasicPigments(pigments)
       
-      // Ограничиваем до 3 компонентов, чтобы избежать блокировки (freezing)
-      const recipeData = findRecipeByHex(validHex, basicPigments, 3)
+      // Передаем totalAmount, чтобы рецепт масштабировался под текущий объем (по умолчанию 20мл)
+      const recipeData = findRecipeByHex(validHex, basicPigments, 3, totalAmount)
 
       if (recipeData && recipeData.recipe.length > 0 && setPaints) {
         const newPaints = recipeData.recipe.map((r) => ({
@@ -98,32 +114,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         setPaints(newPaints)
       }
       setIsCalculating(false)
-    }, 120)
+    }, 150)
 
-    return () => clearTimeout(timeoutId)
-  }, [validHex, pigments, loading, setPaints])
+    return () => clearTimeout(calcTimer)
+  }, [validHex, pigments, loading, setPaints, totalAmount])
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
-    
     let val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
     
     if (val.length === 0) {
       setHexInput('')
       setValidHex(null)
-      setIsCalculating(false)
       return
     }
     
     setHexInput('#' + val)
-    
-    if (val.length === 6) {
-      setValidHex('#' + val.toUpperCase())
-    } else {
-      // Блокируем расчет и убираем спиннер, если HEX не полный
-      setValidHex(null) 
-      setIsCalculating(false)
-    }
   }
 
   const handleHexBlur = () => {
@@ -132,15 +138,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       setHexInput(validHex)
     } else if (mixedColor?.hex) {
       setHexInput(mixedColor.hex.toUpperCase())
-      setValidHex(mixedColor.hex.toUpperCase())
       userEdited.current = false
     }
   }
 
   const copyHex = async () => {
-    if (!validHex) return
+    const colorToCopy = validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null);
+    if (!colorToCopy) return
     try {
-      await navigator.clipboard.writeText(validHex)
+      await navigator.clipboard.writeText(colorToCopy)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch (err) {
@@ -149,8 +155,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const isUk = lang === 'uk'
-  const displayColor = validHex || '#2A2522'
-  const hasColor = Boolean(validHex)
+  
+  // Квадрат показывает либо валидный введенный хекс, либо результат смешивания, либо дефолт
+  const displayColor = validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : '#2A2522')
+  const hasColor = Boolean(validHex || mixedColor?.hex)
 
   return (
     <motion.div
