@@ -96,7 +96,7 @@ function rgbToLab(r: number, g: number, b: number) {
 }
 
 // ==========================================
-// CIEDE2000 (точная формула, kL=kC=kH=1)
+// CIEDE2000 (точная формула)
 // ==========================================
 function calculateDeltaE2000(
   lab1: { L: number; a: number; b: number },
@@ -105,9 +105,7 @@ function calculateDeltaE2000(
   const { L: L1, a: a1, b: b1 } = lab1
   const { L: L2, a: a2, b: b2 } = lab2
 
-  const kL = 1
-  const kC = 1
-  const kH = 1
+  const kL = 1, kC = 1, kH = 1
 
   const C1 = Math.sqrt(a1 * a1 + b1 * b1)
   const C2 = Math.sqrt(a2 * a2 + b2 * b2)
@@ -199,12 +197,12 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ ПОИСКА
+// ГЛАВНЫЙ АЛГОРИТМ (агрессивный, под Worker)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
   basicPigments: Pigment[],
-  maxComponents = 3,
+  maxComponents = 4,
   targetVolume = 20
 ) {
   if (!basicPigments.length || !targetHex) return null
@@ -215,7 +213,7 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // Сортировка кандидатов по CIEDE2000
+  // Топ-10 ближайших пигментов
   const scoredPigments = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
@@ -223,7 +221,7 @@ export function findRecipeByHex(
   })
 
   scoredPigments.sort((a, b) => a.dist - b.dist)
-  const candidates = scoredPigments.slice(0, 5).map((s) => s.pigment)
+  const candidates = scoredPigments.slice(0, 10).map((s) => s.pigment)
 
   const best: BestResult = {
     volumes: [],
@@ -235,8 +233,9 @@ export function findRecipeByHex(
     const total = vols.reduce((s, v) => s + v, 0)
     if (total === 0) return
 
-    const components = []
+    const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
     let activeCount = 0
+
     for (let i = 0; i < candidates.length; i++) {
       if (vols[i] > 0) {
         components.push({ spectrum: candidates[i].spectrum!, volume: vols[i] })
@@ -244,12 +243,11 @@ export function findRecipeByHex(
       }
     }
 
-    if (activeCount > maxComponents) return
+    if (activeCount === 0 || activeCount > maxComponents) return
 
     const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-
     const deltaE = calculateDeltaE2000(targetLab, lab)
 
     if (deltaE < best.deltaE) {
@@ -259,19 +257,24 @@ export function findRecipeByHex(
     }
   }
 
-  // ЭТАП 1: ГРУБЫЙ ПОИСК
-  const coarseSteps = [0, 20, 45, 75, 100]
+  // ——— ЭТАП 1: ГРУБЫЙ ПОИСК (плотная сетка) ———
+  const coarseSteps = [0, 10, 20, 35, 50, 65, 80, 100]
 
   const searchCoarse = (idx: number, vols: number[]) => {
     if (idx === candidates.length) {
       evaluateVolumes(vols)
       return
     }
+
     for (const s of coarseSteps) {
       vols[idx] = s
+
       let active = 0
-      for (let k = 0; k <= idx; k++) if (vols[k] > 0) active++
+      for (let k = 0; k <= idx; k++) {
+        if (vols[k] > 0) active++
+      }
       if (active > maxComponents) continue
+
       searchCoarse(idx + 1, vols)
     }
   }
@@ -280,34 +283,63 @@ export function findRecipeByHex(
 
   if (best.deltaE === Infinity) return null
 
-  // ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ
-  const bestCoarseVolumes = [...best.volumes]
-  const fineDeltas = [-10, -5, 5, 10]
+  // ——— ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ ———
+  const bestCoarse = [...best.volumes]
+  const fineDeltas = [-20, -12, -8, -4, 4, 8, 12, 20]
 
-  const searchFine = (idx: number, currentVols: number[]) => {
+  const searchFine = (idx: number, current: number[]) => {
     if (idx === candidates.length) {
-      evaluateVolumes(currentVols)
+      evaluateVolumes(current)
       return
     }
 
-    if (bestCoarseVolumes[idx] > 0) {
-      searchFine(idx + 1, currentVols)
-      for (const delta of fineDeltas) {
-        const newVal = bestCoarseVolumes[idx] + delta
-        if (newVal > 0 && newVal <= 110) {
-          const temp = [...currentVols]
-          temp[idx] = newVal
-          searchFine(idx + 1, temp)
+    if (bestCoarse[idx] > 0) {
+      // оставляем как есть
+      searchFine(idx + 1, current)
+
+      for (const d of fineDeltas) {
+        const v = bestCoarse[idx] + d
+        if (v > 0 && v <= 130) {
+          const next = [...current]
+          next[idx] = v
+          searchFine(idx + 1, next)
         }
       }
     } else {
-      searchFine(idx + 1, currentVols)
+      searchFine(idx + 1, current)
     }
   }
 
-  searchFine(0, [...bestCoarseVolumes])
+  searchFine(0, [...bestCoarse])
 
-  // Масштабирование к объёму
+  // ——— ЭТАП 3: ЖАДНАЯ ДОВОДКА (несколько проходов) ———
+  const greedyDeltas = [-10, -6, -3, -1, 1, 3, 6, 10]
+  let improved = true
+  let passes = 0
+
+  while (improved && passes < 4) {
+    improved = false
+    passes++
+    const base = [...best.volumes]
+
+    for (let i = 0; i < candidates.length; i++) {
+      if (base[i] <= 0) continue
+
+      for (const d of greedyDeltas) {
+        const trial = [...base]
+        trial[i] = Math.max(1, Math.min(130, base[i] + d))
+
+        const prev = best.deltaE
+        evaluateVolumes(trial)
+
+        if (best.deltaE < prev - 0.001) {
+          improved = true
+        }
+      }
+    }
+  }
+
+  // ——— Масштабирование к нужному объёму ———
   const total = best.volumes.reduce((s, v) => s + v, 0)
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
   const scale = scaleTarget / total
@@ -318,14 +350,13 @@ export function findRecipeByHex(
       ml: Math.round(best.volumes[i] * scale * 10) / 10,
     }))
     .filter((r) => r.ml > 0)
-
-  recipe.sort((a, b) => b.ml - a.ml)
+    .sort((a, b) => b.ml - a.ml)
 
   return {
     recipe,
     resultRgb: best.rgb,
     resultHex: rgbToHex(best.rgb),
-    deltaE: Math.round(best.deltaE * 10) / 10, // 1 знак после запятой
+    deltaE: Math.round(best.deltaE * 10) / 10,
   }
 }
 
