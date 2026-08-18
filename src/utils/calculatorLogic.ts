@@ -136,7 +136,8 @@ export function findRecipeByHex(
   // Берем топ 5 кандидатов, чтобы избежать взрыва комбинаторики (улучшает точность и не вешает браузер)
   const candidates = scoredPigments.slice(0, 5).map(s => s.pigment)
 
-  let best: BestResult | null = null
+  // Обертка в объект, чтобы обмануть контроль потока TypeScript и избежать ошибки типа 'never'
+  const bestState: { current: BestResult | null } = { current: null }
   
   // ФУНКЦИЯ ОЦЕНКИ
   const evaluateVolumes = (vols: number[]) => {
@@ -161,8 +162,8 @@ export function findRecipeByHex(
     // Внутренняя оценка БЕЗ округления
     const deltaE = calculateDeltaELab(targetLab, lab)
 
-    if (!best || deltaE < best.deltaE) {
-      best = { volumes: [...vols], rgb, deltaE }
+    if (!bestState.current || deltaE < bestState.current.deltaE) {
+      bestState.current = { volumes: [...vols], rgb, deltaE }
     }
   }
 
@@ -187,11 +188,11 @@ export function findRecipeByHex(
 
   searchCoarse(0, new Array(candidates.length).fill(0))
 
-  if (!best) return null
+  if (!bestState.current) return null
 
   // 4. ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ (Fine Tuning)
   // Делаем сетку вокруг лучших значений для уточнения рецепта
-  const bestCoarseVolumes = [...best.volumes]
+  const bestCoarseVolumes = [...bestState.current.volumes]
   const fineDeltas = [-10, -5, 5, 10]
   
   const searchFine = (idx: number, currentVols: number[]) => {
@@ -222,7 +223,7 @@ export function findRecipeByHex(
   searchFine(0, [...bestCoarseVolumes])
 
   // 5. МАСШТАБИРОВАНИЕ К ОБЪЕМУ
-  const finalBest = best as BestResult
+  const finalBest = bestState.current!
   const total = finalBest.volumes.reduce((s, v) => s + v, 0)
   
   // Если объем в UI нулевой, де-факто даем рецепт на 20 мл
@@ -246,7 +247,7 @@ export function findRecipeByHex(
   }
 }
 
-// ... Остальные функции (simulateLayersKM, findBasicRecipe) остаются как были ...
+// Симуляция Кубелки-Мунка
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
