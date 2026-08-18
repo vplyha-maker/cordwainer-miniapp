@@ -191,10 +191,8 @@ export function hexToRgbObj(hex: string) {
 }
 
 // ==========================================
-// Вспомогательные функции поиска
+// Вспомогательные
 // ==========================================
-
-/** Генерирует все комбинации размера k из массива индексов */
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = []
   const combo: number[] = []
@@ -210,9 +208,24 @@ function combinations(n: number, k: number): number[][] {
       combo.pop()
     }
   }
-
   backtrack(0)
   return result
+}
+
+function isBlack(p: Pigment) {
+  return (
+    p.id.includes('black') ||
+    p.id === 'bitumen' ||
+    (p.name?.en || '').toLowerCase().includes('black')
+  )
+}
+
+function isWhite(p: Pigment) {
+  return (
+    p.id.includes('white') ||
+    ['lithopone', 'chalk', 'gypsum'].includes(p.id) ||
+    (p.name?.en || '').toLowerCase().includes('white')
+  )
 }
 
 interface BestResult {
@@ -222,7 +235,7 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (быстрый + качественный)
+// ГЛАВНЫЙ АЛГОРИТМ
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
@@ -238,15 +251,32 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Сортируем и берём топ-9
-  const scored = validPigments.map((p) => {
-    const rgb = spectrumToRGB(p.spectrum!)
-    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
-  })
-  scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, 9).map((s) => s.pigment)
+  // ——— Умный выбор кандидатов ———
+  // Всегда включаем чёрный и белый (если есть)
+  const blackPigment = validPigments.find(isBlack) || null
+  const whitePigment = validPigments.find(isWhite) || null
+
+  const scored = validPigments
+    .filter((p) => p !== blackPigment && p !== whitePigment)
+    .map((p) => {
+      const rgb = spectrumToRGB(p.spectrum!)
+      const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+      return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
+    })
+    .sort((a, b) => a.dist - b.dist)
+
+  // Формируем список: чёрный + белый + топ хроматических
+  const candidates: Pigment[] = []
+  if (blackPigment) candidates.push(blackPigment)
+  if (whitePigment) candidates.push(whitePigment)
+
+  for (const s of scored) {
+    if (candidates.length >= 9) break
+    candidates.push(s.pigment)
+  }
+
   const n = candidates.length
+  if (n === 0) return null
 
   const best: BestResult = {
     volumes: new Array(n).fill(0),
@@ -254,11 +284,10 @@ export function findRecipeByHex(
     deltaE: Infinity,
   }
 
-  // Оценка конкретной комбинации + объёмов
   const evaluate = (indices: number[], vols: number[]) => {
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
     for (let i = 0; i < indices.length; i++) {
-      if (vols[i] > 0) {
+      if (vols[i] > 0.5) {
         components.push({
           spectrum: candidates[indices[i]].spectrum!,
           volume: vols[i],
@@ -275,7 +304,6 @@ export function findRecipeByHex(
     if (deltaE < best.deltaE) {
       best.deltaE = deltaE
       best.rgb = rgb
-      // Записываем в полный массив объёмов
       const full = new Array(n).fill(0)
       for (let i = 0; i < indices.length; i++) {
         full[indices[i]] = vols[i]
@@ -284,14 +312,11 @@ export function findRecipeByHex(
     }
   }
 
-  // Плотный поиск объёмов для фиксированной комбинации
-  const volumeSteps = [8, 18, 32, 48, 65, 82, 100]
+  // Более плотная сетка объёмов
+  const volumeSteps = [5, 12, 22, 35, 50, 68, 85, 100]
 
   const searchVolumes = (indices: number[]) => {
     const k = indices.length
-    if (k === 0) return
-
-    // Рекурсивный перебор объёмов только по этой комбинации
     const vols = new Array(k).fill(0)
 
     const rec = (pos: number) => {
@@ -307,7 +332,7 @@ export function findRecipeByHex(
     rec(0)
   }
 
-  // ——— Основной цикл по размеру комбинации ———
+  // Перебор комбинаций 1…maxComponents
   for (let k = 1; k <= Math.min(maxComponents, n); k++) {
     const combos = combinations(n, k)
     for (const combo of combos) {
@@ -317,13 +342,13 @@ export function findRecipeByHex(
 
   if (best.deltaE === Infinity) return null
 
-  // ——— Локальная доводка лучшего решения ———
+  // ——— Локальная доводка ———
   const activeIndices = best.volumes
-    .map((v, i) => (v > 0 ? i : -1))
+    .map((v, i) => (v > 0.5 ? i : -1))
     .filter((i) => i >= 0)
 
   if (activeIndices.length > 0) {
-    const fineDeltas = [-18, -10, -5, 5, 10, 18]
+    const fineDeltas = [-15, -8, -4, 4, 8, 15]
     const baseVols = activeIndices.map((i) => best.volumes[i])
 
     const fineRec = (pos: number, current: number[]) => {
@@ -331,12 +356,10 @@ export function findRecipeByHex(
         evaluate(activeIndices, current)
         return
       }
-      // оставляем
       fineRec(pos + 1, current)
-      // пробуем отклонения
       for (const d of fineDeltas) {
         const v = baseVols[pos] + d
-        if (v > 3 && v <= 130) {
+        if (v > 2 && v <= 130) {
           const next = [...current]
           next[pos] = v
           fineRec(pos + 1, next)
@@ -346,8 +369,8 @@ export function findRecipeByHex(
     fineRec(0, [...baseVols])
   }
 
-  // ——— Лёгкая жадная доводка ———
-  const greedyDeltas = [-8, -4, -2, 2, 4, 8]
+  // ——— Жадная доводка ———
+  const greedyDeltas = [-6, -3, -1, 1, 3, 6]
   for (let pass = 0; pass < 3; pass++) {
     let improved = false
     const base = [...best.volumes]
@@ -355,20 +378,19 @@ export function findRecipeByHex(
     for (const idx of activeIndices) {
       for (const d of greedyDeltas) {
         const trial = [...base]
-        trial[idx] = Math.max(2, Math.min(130, base[idx] + d))
-        const prev = best.deltaE
+        trial[idx] = Math.max(1, Math.min(130, base[idx] + d))
 
-        // Собираем только активные
         const inds: number[] = []
         const vs: number[] = []
         for (let i = 0; i < n; i++) {
-          if (trial[i] > 0) {
+          if (trial[i] > 0.5) {
             inds.push(i)
             vs.push(trial[i])
           }
         }
-        evaluate(inds, vs)
 
+        const prev = best.deltaE
+        evaluate(inds, vs)
         if (best.deltaE < prev - 0.0005) improved = true
       }
     }
@@ -387,7 +409,7 @@ export function findRecipeByHex(
       pigment: p,
       ml: Math.round(best.volumes[i] * scale * 10) / 10,
     }))
-    .filter((r) => r.ml > 0)
+    .filter((r) => r.ml >= 0.3) // убираем совсем крошечные
     .sort((a, b) => b.ml - a.ml)
 
   return {
