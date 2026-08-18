@@ -64,7 +64,6 @@ export const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-// Утилиты для перевода RGB в LAB для точного визуального сравнения (CIE76)
 function rgbToLab(r: number, g: number, b: number) {
   let r_ = r / 255, g_ = g / 255, b_ = b / 255;
   r_ = r_ > 0.04045 ? Math.pow((r_ + 0.055) / 1.055, 2.4) : r_ / 12.92;
@@ -84,11 +83,71 @@ function rgbToLab(r: number, g: number, b: number) {
   return { L: (116 * y) - 16, a: 500 * (x - y), b: 200 * (y - z) };
 }
 
-function calculateDeltaELab(lab1: {L: number, a: number, b: number}, lab2: {L: number, a: number, b: number}) {
+// Новая точная формула CIEDE2000
+function calculateDeltaE2000(lab1: {L: number, a: number, b: number}, lab2: {L: number, a: number, b: number}) {
+  const { L: L1, a: a1, b: b1 } = lab1;
+  const { L: L2, a: a2, b: b2 } = lab2;
+
+  const kL = 1, kC = 1, kH = 1;
+
+  const C1 = Math.sqrt(a1 * a1 + b1 * b1);
+  const C2 = Math.sqrt(a2 * a2 + b2 * b2);
+  const Cbar = (C1 + C2) / 2;
+
+  const G = 0.5 * (1 - Math.sqrt(Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))));
+
+  const a1Prime = a1 * (1 + G);
+  const a2Prime = a2 * (1 + G);
+
+  const C1Prime = Math.sqrt(a1Prime * a1Prime + b1 * b1);
+  const C2Prime = Math.sqrt(a2Prime * a2Prime + b2 * b2);
+  const CbarPrime = (C1Prime + C2Prime) / 2;
+
+  const h1Prime = (b1 === 0 && a1Prime === 0) ? 0 : (Math.atan2(b1, a1Prime) * 180 / Math.PI + 360) % 360;
+  const h2Prime = (b2 === 0 && a2Prime === 0) ? 0 : (Math.atan2(b2, a2Prime) * 180 / Math.PI + 360) % 360;
+
+  let HbarPrime = h1Prime + h2Prime;
+  if (C1Prime * C2Prime !== 0) {
+    if (Math.abs(h1Prime - h2Prime) > 180) {
+      HbarPrime = (h1Prime + h2Prime < 360) ? HbarPrime + 360 : HbarPrime - 360;
+    }
+    HbarPrime /= 2;
+  }
+
+  const T = 1 - 0.17 * Math.cos((HbarPrime - 30) * Math.PI / 180)
+              + 0.24 * Math.cos((2 * HbarPrime) * Math.PI / 180)
+              + 0.32 * Math.cos((3 * HbarPrime + 6) * Math.PI / 180)
+              - 0.20 * Math.cos((4 * HbarPrime - 63) * Math.PI / 180);
+
+  let deltahPrime = 0;
+  if (C1Prime * C2Prime !== 0) {
+    if (Math.abs(h2Prime - h1Prime) <= 180) {
+      deltahPrime = h2Prime - h1Prime;
+    } else if (h2Prime - h1Prime > 180) {
+      deltahPrime = h2Prime - h1Prime - 360;
+    } else if (h2Prime - h1Prime < -180) {
+      deltahPrime = h2Prime - h1Prime + 360;
+    }
+  }
+
+  const deltaLPrime = L2 - L1;
+  const deltaCPrime = C2Prime - C1Prime;
+  const deltaHPrime = 2 * Math.sqrt(C1Prime * C2Prime) * Math.sin((deltahPrime / 2) * Math.PI / 180);
+
+  const LbarPrime = (L1 + L2) / 2;
+  const S_L = 1 + (0.015 * Math.pow(LbarPrime - 50, 2)) / Math.sqrt(20 + Math.pow(LbarPrime - 50, 2));
+  const S_C = 1 + 0.045 * CbarPrime;
+  const S_H = 1 + 0.015 * CbarPrime * T;
+
+  const deltaTheta = 30 * Math.exp(-Math.pow((HbarPrime - 275) / 25, 2));
+  const R_C = 2 * Math.sqrt(Math.pow(CbarPrime, 7) / (Math.pow(CbarPrime, 7) + Math.pow(25, 7)));
+  const R_T = -Math.sin((2 * deltaTheta) * Math.PI / 180) * R_C;
+
   return Math.sqrt(
-    Math.pow(lab1.L - lab2.L, 2) + 
-    Math.pow(lab1.a - lab2.a, 2) + 
-    Math.pow(lab1.b - lab2.b, 2)
+    Math.pow(deltaLPrime / (kL * S_L), 2) +
+    Math.pow(deltaCPrime / (kC * S_C), 2) +
+    Math.pow(deltaHPrime / (kH * S_H), 2) +
+    R_T * (deltaCPrime / (kC * S_C)) * (deltaHPrime / (kH * S_H))
   );
 }
 
@@ -113,37 +172,32 @@ export function findRecipeByHex(
   targetHex: string,
   basicPigments: Pigment[],
   maxComponents = 3,
-  targetVolume = 20 // Масштабируем к объему пользователя
+  targetVolume = 20
 ) {
   if (!basicPigments.length || !targetHex) return null
 
-  // 1. ЖЕСТКАЯ ФИЛЬТРАЦИЯ: Убираем пигменты без спектра
   const validPigments = basicPigments.filter(p => p.spectrum && p.spectrum.length > 0)
   if (validPigments.length === 0) return null
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 2. УМНАЯ СОРТИРОВКА: Ищем топ N ближайших пигментов через LAB
+  // Используем CIEDE2000 для умной сортировки
   const scoredPigments = validPigments.map(p => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    return { pigment: p, dist: calculateDeltaELab(targetLab, lab) }
+    return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
   
   scoredPigments.sort((a, b) => a.dist - b.dist)
-  
-  // Берем топ 5 кандидатов, чтобы избежать взрыва комбинаторики (улучшает точность и не вешает браузер)
   const candidates = scoredPigments.slice(0, 5).map(s => s.pigment)
 
-  // Инициализируем объект сразу, чтобы обойти баг TypeScript с "недостижимым кодом" (never)
   const best: BestResult = {
     volumes: [],
     rgb: { r: 0, g: 0, b: 0 },
-    deltaE: Infinity // Бесконечность, чтобы первый же результат стал лучшим
+    deltaE: Infinity
   }
   
-  // ФУНКЦИЯ ОЦЕНКИ
   const evaluateVolumes = (vols: number[]) => {
     const total = vols.reduce((s, v) => s + v, 0)
     if (total === 0) return
@@ -163,8 +217,8 @@ export function findRecipeByHex(
     const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     
-    // Внутренняя оценка БЕЗ округления
-    const deltaE = calculateDeltaELab(targetLab, lab)
+    // Используем новую точную дельту
+    const deltaE = calculateDeltaE2000(targetLab, lab)
 
     if (deltaE < best.deltaE) {
       best.volumes = [...vols]
@@ -173,7 +227,7 @@ export function findRecipeByHex(
     }
   }
 
-  // 3. ЭТАП 1: ГРУБЫЙ ПОИСК (Coarse Search)
+  // ЭТАП 1: ГРУБЫЙ ПОИСК
   const coarseSteps = [0, 20, 45, 75, 100]
   
   const searchCoarse = (idx: number, vols: number[]) => {
@@ -183,22 +237,18 @@ export function findRecipeByHex(
     }
     for (const s of coarseSteps) {
       vols[idx] = s
-      
       let active = 0
       for (let k = 0; k <= idx; k++) if (vols[k] > 0) active++
-      if (active > maxComponents) continue // Pruning
-
+      if (active > maxComponents) continue
       searchCoarse(idx + 1, vols)
     }
   }
 
   searchCoarse(0, new Array(candidates.length).fill(0))
 
-  // Если deltaE так и осталась Infinity, значит рецепт не найден
   if (best.deltaE === Infinity) return null
 
-  // 4. ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ (Fine Tuning)
-  // Делаем сетку вокруг лучших значений для уточнения рецепта
+  // ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ
   const bestCoarseVolumes = [...best.volumes]
   const fineDeltas = [-10, -5, 5, 10]
   
@@ -208,12 +258,8 @@ export function findRecipeByHex(
       return
     }
     
-    // Оптимизируем только те пигменты, которые алгоритм выбрал на грубом этапе
     if (bestCoarseVolumes[idx] > 0) {
-      // Проверяем само значение
       searchFine(idx + 1, currentVols)
-      
-      // И его отклонения
       for (const delta of fineDeltas) {
         const newVal = bestCoarseVolumes[idx] + delta
         if (newVal > 0 && newVal <= 110) { 
@@ -229,10 +275,7 @@ export function findRecipeByHex(
 
   searchFine(0, [...bestCoarseVolumes])
 
-  // 5. МАСШТАБИРОВАНИЕ К ОБЪЕМУ
   const total = best.volumes.reduce((s, v) => s + v, 0)
-  
-  // Если объем в UI нулевой, де-факто даем рецепт на 20 мл
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
   const scale = scaleTarget / total
 
@@ -249,11 +292,10 @@ export function findRecipeByHex(
     recipe,
     resultRgb: best.rgb,
     resultHex: rgbToHex(best.rgb),
-    deltaE: Math.round(best.deltaE), // Округляем только для UI
+    deltaE: Math.round(best.deltaE * 10) / 10, // Округляем до 1 знака для аккуратного UI
   }
 }
 
-// Симуляция Кубелки-Мунка
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
