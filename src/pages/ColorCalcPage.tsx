@@ -37,6 +37,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [hexError, setHexError] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
 
+  // Последний целевой HEX, который ввёл пользователь
+  const lastTargetHex = useRef<string | null>(null)
+  // Флаг: краски только что пришли из воркера (рецепт)
+  const fromRecipeRef = useRef(false)
+
   const userEdited = useRef(false)
   const calcRef = useRef(0)
   const workerRef = useRef<Worker | null>(null)
@@ -98,6 +103,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }
 
       if (result?.recipe?.length > 0 && setPaints) {
+        // Запоминаем, что это рецепт от HEX
+        fromRecipeRef.current = true
+        lastTargetHex.current = validHex
+
         const newPaints = result.recipe.map(
           (r: { pigment: { id: string }; ml: number }) => ({
             id: generateId(),
@@ -121,10 +130,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       worker.terminate()
       workerRef.current = null
     }
-  }, [setPaints])
+  }, [setPaints, validHex])
 
   // Синхронизация HEX при ручном смешивании
+  // После рецепта НЕ перезаписываем поле ввода
   useEffect(() => {
+    if (fromRecipeRef.current) return
+
     if (mixedColor?.hex && !isFocused && !userEdited.current) {
       setHexInput(mixedColor.hex.toUpperCase())
     }
@@ -133,10 +145,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [mixedColor?.hex, isFocused])
 
-  // Когда пользователь меняет смесь вручную — выходим из режима HEX
+  // Когда меняются краски
   useEffect(() => {
+    if (fromRecipeRef.current) {
+      // Рецепт только что пришёл — оставляем целевой HEX
+      fromRecipeRef.current = false
+      if (lastTargetHex.current) {
+        setHexInput(lastTargetHex.current)
+      }
+      userEdited.current = false
+      setValidHex(null)
+      return
+    }
+
+    // Обычное ручное изменение смеси
     userEdited.current = false
-    setValidHex(null) // ← главное исправление бага
+    setValidHex(null)
   }, [paints, totalAmount])
 
   // Debounce HEX
@@ -192,6 +216,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       setHexInput('')
       setValidHex(null)
       setHexError(false)
+      lastTargetHex.current = null
       return
     }
 
@@ -202,6 +227,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setIsFocused(false)
     if (validHex) {
       setHexInput(validHex)
+    } else if (lastTargetHex.current) {
+      setHexInput(lastTargetHex.current)
     } else if (mixedColor?.hex) {
       setHexInput(mixedColor.hex.toUpperCase())
       userEdited.current = false
@@ -211,10 +238,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const copyHex = async () => {
+    // Копируем то, что сейчас в поле (целевой или смешанный)
     const colorToCopy =
+      hexInput ||
       (userEdited.current && validHex) ||
       (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null) ||
       validHex
+
     if (!colorToCopy) return
 
     if (!navigator.clipboard) {
@@ -233,18 +263,26 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const isUk = lang === 'uk'
 
-  // Правильный приоритет цвета:
-  // 1. Если пользователь сейчас вводит HEX → показываем validHex
-  // 2. Иначе всегда показываем живой цвет смеси
+  // Квадрат:
+  // - пока считаем → показываем целевой HEX
+  // - после расчёта → реальный цвет смеси
+  // - пока пользователь просто печатает → целевой HEX
   const displayColor =
-    userEdited.current && validHex
-      ? validHex
+    isCalculating && (validHex || lastTargetHex.current)
+      ? (validHex || lastTargetHex.current)!
       : mixedColor?.hex
         ? mixedColor.hex.toUpperCase()
-        : validHex || '#2A2522'
+        : (userEdited.current && validHex) ||
+          validHex ||
+          lastTargetHex.current ||
+          '#2A2522'
 
   const hasColor = Boolean(
-    (userEdited.current && validHex) || mixedColor?.hex || validHex
+    hexInput ||
+      (userEdited.current && validHex) ||
+      mixedColor?.hex ||
+      validHex ||
+      lastTargetHex.current
   )
 
   return (
@@ -534,7 +572,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <input
               type="text"
               readOnly
-              value={displayColor}
+              value={hexInput || displayColor}
               className="w-full bg-white/10 text-[#F5F1EA] rounded-xl px-3 py-3 text-center font-mono tracking-wider mb-4"
               onFocus={(e) => e.target.select()}
               autoFocus
