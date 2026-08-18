@@ -7,7 +7,6 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
-import { getPureBasicPigments } from '../utils/calculatorLogic'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -162,7 +161,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [hexInput])
 
-  // Расчёт через Worker
+  // Расчёт через Worker — теперь передаём ВСЕ 83 пигмента
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
       setIsCalculating(false)
@@ -174,12 +173,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     const id = ++calcRef.current
     setIsCalculating(true)
 
-    const basicPigments = getPureBasicPigments(pigments)
-
     workerRef.current.postMessage({
       id,
       targetHex: validHex,
-      basicPigments,
+      basicPigments: pigments, // ← все пигменты
       maxComponents: 3,
       targetVolume: totalAmount,
     })
