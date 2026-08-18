@@ -7,24 +7,40 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
-import { findRecipeByHex, getPureBasicPigments } from '../utils/calculatorLogic' 
+import { getPureBasicPigments } from '../utils/calculatorLogic'
 
 interface ColorCalcPageProps {
   lang: Lang
   onBack: () => void
 }
 
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [isCalculating, setIsCalculating] = useState(false)
   const [copied, setCopied] = useState(false)
-  
+  const [showCopyFallback, setShowCopyFallback] = useState(false)
+
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
+  const [hexError, setHexError] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
-  
+
   const userEdited = useRef(false)
+  const calcRef = useRef(0)
+  const workerRef = useRef<Worker | null>(null)
 
   const {
     paints,
@@ -34,7 +50,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     removePaint,
     updatePaint,
     clearAllAmounts,
-    setPaints
+    setPaints,
   } = usePaintMix(pigments)
 
   const { mixedColor } = useColorCalculations({
@@ -44,23 +60,74 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     lang,
   })
 
-  useEffect(() => {
+  const loadPigments = () => {
+    setLoading(true)
+    setLoadError(false)
     loadAllPigments()
       .then((loaded) => {
         setPigments(loaded)
         setLoading(false)
+        setLoadError(false)
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
+        setLoadError(true)
       })
+  }
+
+  useEffect(() => {
+    loadPigments()
   }, [])
 
-  // Синхронизация квадрата результата при ручном смешивании
+  // Web Worker
+  useEffect(() => {
+    const worker = new Worker(
+      new URL('../workers/recipeWorker.ts', import.meta.url),
+      { type: 'module' }
+    )
+
+    worker.onmessage = (e: MessageEvent) => {
+      const { id, result, error } = e.data
+
+      if (id !== calcRef.current) return
+
+      if (error) {
+        console.error('Worker error:', error)
+        setIsCalculating(false)
+        return
+      }
+
+      if (result?.recipe?.length > 0 && setPaints) {
+        const newPaints = result.recipe.map(
+          (r: { pigment: { id: string }; ml: number }) => ({
+            id: generateId(),
+            pigmentId: r.pigment.id,
+            amount: String(r.ml),
+          })
+        )
+        setPaints(newPaints)
+      }
+
+      setIsCalculating(false)
+    }
+
+    worker.onerror = () => {
+      setIsCalculating(false)
+    }
+
+    workerRef.current = worker
+
+    return () => {
+      worker.terminate()
+      workerRef.current = null
+    }
+  }, [setPaints])
+
+  // Синхронизация HEX при ручном смешивании
   useEffect(() => {
     if (mixedColor?.hex && !isFocused && !userEdited.current) {
-      const hex = mixedColor.hex.toUpperCase()
-      setHexInput(hex)
+      setHexInput(mixedColor.hex.toUpperCase())
     }
     if (!mixedColor?.hex && !isFocused && !userEdited.current) {
       setHexInput('')
@@ -71,64 +138,64 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     userEdited.current = false
   }, [paints, totalAmount])
 
-  // === DEBOUNCE ЛОГИКА ===
-  // Ждем 500мс после окончания ввода, чтобы не вешать браузер на каждом символе
+  // Debounce HEX
   useEffect(() => {
-    if (!userEdited.current) return;
-    
-    if (hexInput.length === 7) { 
-      const timer = setTimeout(() => {
-        setValidHex(hexInput.toUpperCase());
-      }, 500);
-      return () => clearTimeout(timer);
+    if (!userEdited.current) return
+
+    if (hexInput.length === 7) {
+      const isValid = /^#[0-9A-Fa-f]{6}$/.test(hexInput)
+      if (isValid) {
+        setHexError(false)
+        const timer = setTimeout(() => {
+          setValidHex(hexInput.toUpperCase())
+        }, 500)
+        return () => clearTimeout(timer)
+      } else {
+        setHexError(true)
+        setValidHex(null)
+        setIsCalculating(false)
+      }
     } else {
-      setValidHex(null);
-      setIsCalculating(false);
+      setHexError(hexInput.length > 0 && hexInput.length < 7)
+      setValidHex(null)
+      setIsCalculating(false)
     }
-  }, [hexInput]);
+  }, [hexInput])
 
-
-  // === Расчет рецепта по введенному HEX ===
+  // Расчёт через Worker
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
       setIsCalculating(false)
       return
     }
 
+    if (!workerRef.current) return
+
+    const id = ++calcRef.current
     setIsCalculating(true)
-    
-    // Асинхронный таймаут дает React отрендерить спиннер до тяжелой математики
-    const calcTimer = setTimeout(() => {
-      const basicPigments = getPureBasicPigments(pigments)
-      
-      // Передаем totalAmount, чтобы рецепт масштабировался под текущий объем (по умолчанию 20мл)
-      const recipeData = findRecipeByHex(validHex, basicPigments, 3, totalAmount)
 
-      if (recipeData && recipeData.recipe.length > 0 && setPaints) {
-        const newPaints = recipeData.recipe.map((r) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          pigmentId: r.pigment.id, 
-          amount: String(r.ml)
-        }))
-        
-        setPaints(newPaints)
-      }
-      setIsCalculating(false)
-    }, 150)
+    const basicPigments = getPureBasicPigments(pigments)
 
-    return () => clearTimeout(calcTimer)
-  }, [validHex, pigments, loading, setPaints, totalAmount])
+    workerRef.current.postMessage({
+      id,
+      targetHex: validHex,
+      basicPigments,
+      maxComponents: 3,
+      targetVolume: totalAmount,
+    })
+  }, [validHex, pigments, loading, totalAmount])
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
-    let val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
-    
+    const val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
+
     if (val.length === 0) {
       setHexInput('')
       setValidHex(null)
+      setHexError(false)
       return
     }
-    
+
     setHexInput('#' + val)
   }
 
@@ -139,25 +206,33 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     } else if (mixedColor?.hex) {
       setHexInput(mixedColor.hex.toUpperCase())
       userEdited.current = false
+    } else if (hexInput && !/^#[0-9A-Fa-f]{6}$/.test(hexInput)) {
+      setHexError(true)
     }
   }
 
   const copyHex = async () => {
-    const colorToCopy = validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null);
+    const colorToCopy =
+      validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null)
     if (!colorToCopy) return
+
+    if (!navigator.clipboard) {
+      setShowCopyFallback(true)
+      return
+    }
+
     try {
       await navigator.clipboard.writeText(colorToCopy)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
-    } catch (err) {
-      console.error(err)
+    } catch {
+      setShowCopyFallback(true)
     }
   }
 
   const isUk = lang === 'uk'
-  
-  // Квадрат показывает либо валидный введенный хекс, либо результат смешивания, либо дефолт
-  const displayColor = validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : '#2A2522')
+  const displayColor =
+    validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : '#2A2522')
   const hasColor = Boolean(validHex || mixedColor?.hex)
 
   return (
@@ -209,17 +284,40 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               <div className="py-8 text-center text-[13px] text-[#F5F1EA]/40">
                 {isUk ? 'Завантаження…' : 'Загрузка…'}
               </div>
+            ) : loadError ? (
+              <div className="py-6 flex flex-col items-center gap-3">
+                <p className="text-[13px] text-red-400/90 text-center">
+                  {isUk
+                    ? 'Помилка завантаження пігментів'
+                    : 'Ошибка загрузки пигментов'}
+                </p>
+                <button
+                  onClick={loadPigments}
+                  className="px-4 py-2 rounded-xl bg-[#D8A35C] text-black text-[13px] font-semibold active:scale-[0.97]"
+                >
+                  {isUk ? 'Спробувати знову' : 'Повторить'}
+                </button>
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {paints.map((paint) => (
                   <div key={paint.id} className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
-                      <PigmentSelector
-                        pigments={pigments}
-                        value={paint.pigmentId}
-                        onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
-                        lang={lang}
-                      />
+                      {pigments.length === 0 ? (
+                        <div
+                          className="h-12 rounded-xl bg-white/10 animate-pulse"
+                          aria-hidden
+                        />
+                      ) : (
+                        <PigmentSelector
+                          pigments={pigments}
+                          value={paint.pigmentId}
+                          onChange={(newId) =>
+                            updatePaint(paint.id, 'pigmentId', newId)
+                          }
+                          lang={lang}
+                        />
+                      )}
                     </div>
 
                     <input
@@ -250,21 +348,38 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         }
                         const num = parseFloat(val)
                         if (!isNaN(num))
-                          updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                          updatePaint(
+                            paint.id,
+                            'amount',
+                            String(Math.min(num, 5000))
+                          )
                       }}
                       className="w-[64px] flex-shrink-0 bg-white/10 text-[#F5F1EA] border-0 rounded-xl px-2 py-3 text-center font-medium focus:outline-none focus:ring-2 focus:ring-[#D8A35C]/50"
                       placeholder="0"
                       style={{ fontSize: '16px' }}
                     />
-                    <span className="text-[12px] text-[#F5F1EA]/40 w-5 flex-shrink-0">мл</span>
+                    <span className="text-[12px] text-[#F5F1EA]/40 w-5 flex-shrink-0">
+                      мл
+                    </span>
 
                     <button
                       onClick={() => removePaint(paint.id)}
                       disabled={paints.length <= 1}
                       className="w-10 h-10 -mr-1 flex items-center justify-center rounded-full text-[#F5F1EA]/30 active:bg-white/5 disabled:opacity-20"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M18 6L6 18M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -274,7 +389,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
             <button
               onClick={addPaint}
-              disabled={loading}
+              disabled={loading || loadError}
               className="mt-4 w-full py-3.5 rounded-xl border border-dashed border-[#D8A35C]/50 text-[#D8A35C] text-[14px] font-medium active:bg-[#D8A35C]/10 disabled:opacity-40"
             >
               {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
@@ -289,18 +404,38 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
           <div className="flex flex-col items-center">
             <div
+              role="status"
+              aria-live="polite"
+              aria-busy={isCalculating}
               className="relative w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150 overflow-hidden"
               style={{ backgroundColor: displayColor }}
             >
               {isCalculating && (
                 <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center z-10 transition-opacity">
-                   <svg className="animate-spin w-8 h-8 text-white mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                   </svg>
-                   <span className="text-[10px] text-white/90 font-medium">
-                     {isUk ? 'Рахуємо...' : 'Считаем...'}
-                   </span>
+                  <svg
+                    className="animate-spin w-8 h-8 text-white mb-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span className="text-[10px] text-white/90 font-medium">
+                    {isUk ? 'Рахуємо...' : 'Считаем...'}
+                  </span>
                 </div>
               )}
             </div>
@@ -317,17 +452,35 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 onBlur={handleHexBlur}
                 onChange={(e) => handleHexChange(e.target.value)}
                 placeholder="#000000"
-                className="flex-1 min-w-0 bg-white/10 text-[#F5F1EA] border-0 rounded-xl px-3 py-3 text-center font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-[#D8A35C]/50"
+                className={`flex-1 min-w-0 bg-white/10 text-[#F5F1EA] border-0 rounded-xl px-3 py-3 text-center font-mono tracking-wider focus:outline-none focus:ring-2 ${
+                  hexError
+                    ? 'ring-2 ring-red-500/70 focus:ring-red-500/70'
+                    : 'focus:ring-[#D8A35C]/50'
+                }`}
                 style={{ fontSize: '16px' }}
+                aria-invalid={hexError}
               />
               <button
                 onClick={copyHex}
                 disabled={!hasColor}
+                aria-label={
+                  isUk
+                    ? `Копіювати ${displayColor}`
+                    : `Копировать ${displayColor}`
+                }
                 className="flex-shrink-0 h-12 px-4 rounded-xl bg-[#D8A35C] text-black text-[13px] font-semibold disabled:opacity-35 active:scale-[0.97]"
               >
-                {copied ? '✓' : isUk ? 'Копіювати' : 'Копир.'}
+                {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
               </button>
             </div>
+
+            {hexError && (
+              <p className="mt-1.5 text-[12px] text-center text-red-400/90">
+                {isUk
+                  ? 'Некоректний HEX, очікується #RRGGBB'
+                  : 'Некорректный HEX, ожидается #RRGGBB'}
+              </p>
+            )}
 
             <p className="mt-2.5 text-[12px] text-center text-[#F5F1EA]/35">
               {hasColor
@@ -352,6 +505,37 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </span>
         </section>
       </div>
+
+      {showCopyFallback && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={isUk ? 'Копіювання' : 'Копирование'}
+        >
+          <div className="bg-[#1C1816] rounded-2xl p-5 w-full max-w-sm border border-white/10">
+            <p className="text-[14px] text-[#F5F1EA] mb-3 text-center">
+              {isUk
+                ? 'Буфер обміну недоступний. Виділіть і скопіюйте:'
+                : 'Буфер обмена недоступен. Выделите и скопируйте:'}
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={displayColor}
+              className="w-full bg-white/10 text-[#F5F1EA] rounded-xl px-3 py-3 text-center font-mono tracking-wider mb-4"
+              onFocus={(e) => e.target.select()}
+              autoFocus
+            />
+            <button
+              onClick={() => setShowCopyFallback(false)}
+              className="w-full py-3 rounded-xl bg-[#D8A35C] text-black text-[14px] font-semibold"
+            >
+              {isUk ? 'Закрити' : 'Закрыть'}
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
