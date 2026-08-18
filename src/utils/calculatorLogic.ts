@@ -56,16 +56,11 @@ export const getPigmentCategory = (id: string, lang: Lang) => {
   const isUk = lang === 'uk'
   if (id.includes('cadmium')) return isUk ? 'Кадмієва група' : 'Кадмиевая группа'
   if (id.includes('cobalt')) return isUk ? 'Кобальтова група' : 'Кобальтовая группа'
-  if (id.includes('white') || ['lithopone', 'chalk', 'gypsum'].includes(id))
-    return isUk ? 'Білила / Наповнювачі' : 'Белила / Наполнители'
-  if (id.includes('ochre') || id.includes('sienna') || id.includes('umber') || id === 'green_earth')
-    return isUk ? 'Земляні пігменти' : 'Земляные пигменты'
-  if (id.includes('black') || id === 'bitumen')
-    return isUk ? 'Чорні / Вуглецеві' : 'Черные / Углеродные'
-  if (id.includes('phthalo'))
-    return isUk ? 'Фталоціаніни (синтетика)' : 'Фталоцианины (синтетика)'
-  if (['ultramarine', 'ultramarine_nat', 'prussian_blue', 'azurite'].includes(id))
-    return isUk ? 'Традиційні сині' : 'Традиционные синие'
+  if (id.includes('white') || ['lithopone', 'chalk', 'gypsum'].includes(id)) return isUk ? 'Білила / Наповнювачі' : 'Белила / Наполнители'
+  if (id.includes('ochre') || id.includes('sienna') || id.includes('umber') || id === 'green_earth') return isUk ? 'Земляні пігменти' : 'Земляные пигменты'
+  if (id.includes('black') || id === 'bitumen') return isUk ? 'Чорні / Вуглецеві' : 'Черные / Углеродные'
+  if (id.includes('phthalo')) return isUk ? 'Фталоціаніни (синтетика)' : 'Фталоцианины (синтетика)'
+  if (['ultramarine', 'ultramarine_nat', 'prussian_blue', 'azurite'].includes(id)) return isUk ? 'Традиційні сині' : 'Традиционные синие'
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
@@ -196,8 +191,10 @@ export function hexToRgbObj(hex: string) {
 }
 
 // ==========================================
-// Вспомогательные
+// Вспомогательные функции поиска
 // ==========================================
+
+/** Генерирует все комбинации размера k из массива индексов */
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = []
   const combo: number[] = []
@@ -213,70 +210,19 @@ function combinations(n: number, k: number): number[][] {
       combo.pop()
     }
   }
+
   backtrack(0)
   return result
-}
-
-function isBlack(p: Pigment) {
-  return (
-    p.id.includes('black') ||
-    p.id === 'bitumen' ||
-    (p.name?.en || '').toLowerCase().includes('black')
-  )
-}
-
-function isWhite(p: Pigment) {
-  return (
-    p.id.includes('white') ||
-    ['lithopone', 'chalk', 'gypsum'].includes(p.id) ||
-    (p.name?.en || '').toLowerCase().includes('white')
-  )
-}
-
-/** Быстрый NNLS проекционного градиента для малых k */
-function nnlsProjectedGradient(A: number[][], b: number[], iters = 400, alpha = 0.07) {
-  const n = A[0].length
-  let x = new Array(n).fill(0.0)
-
-  // warm-start
-  const ATb = new Array(n).fill(0)
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < b.length; i++) ATb[j] += A[i][j] * b[i]
-  }
-  const maxAtb = Math.max(...ATb, 0)
-  if (maxAtb > 0) {
-    for (let j = 0; j < n; j++) x[j] = Math.max(0, ATb[j] / maxAtb)
-  }
-
-  for (let it = 0; it < iters; it++) {
-    const Ax = new Array(b.length).fill(0)
-    for (let i = 0; i < b.length; i++) {
-      for (let j = 0; j < n; j++) Ax[i] += A[i][j] * x[j]
-    }
-
-    const resid = b.map((bi, i) => Ax[i] - bi)
-    const grad = new Array(n).fill(0)
-    for (let j = 0; j < n; j++) {
-      for (let i = 0; i < b.length; i++) grad[j] += A[i][j] * resid[i]
-      grad[j] *= 2
-    }
-
-    for (let j = 0; j < n; j++) {
-      x[j] = Math.max(0, x[j] - alpha * grad[j])
-    }
-  }
-  return x
 }
 
 interface BestResult {
   volumes: number[]
   rgb: { r: number; g: number; b: number }
   deltaE: number
-  score: number
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (NNLS + спектральная оценка)
+// ГЛАВНЫЙ АЛГОРИТМ (быстрый + качественный)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
@@ -292,181 +238,168 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // кэш
-  const cache = validPigments.map((p) => {
+  // 1. Сортируем и берём топ-9
+  const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    return { p, rgb, lab }
+    return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
-
-  const blackPigment = validPigments.find(isBlack) || null
-  const whitePigment = validPigments.find(isWhite) || null
-
-  // скоринг по deltaE
-  const scored = cache
-    .filter((c) => c.p !== blackPigment && c.p !== whitePigment)
-    .map((c) => ({ ...c, dist: calculateDeltaE2000(targetLab, c.lab) }))
-    .sort((a, b) => a.dist - b.dist)
-
-  // кандидаты: чёрный + белый + топ хроматических
-  const TOP_M = 6
-  const candidates: Pigment[] = []
-  if (blackPigment) candidates.push(blackPigment)
-  if (whitePigment) candidates.push(whitePigment)
-  for (const s of scored) {
-    if (candidates.length >= 2 + TOP_M) break
-    candidates.push(s.p)
-  }
-
+  scored.sort((a, b) => a.dist - b.dist)
+  const candidates = scored.slice(0, 9).map((s) => s.pigment)
   const n = candidates.length
-  if (n === 0) return null
-
-  // предрасчёт данных кандидатов
-  const candData = candidates.map((p) => {
-    const rgb = spectrumToRGB(p.spectrum!)
-    return {
-      p,
-      spectrum: p.spectrum!,
-      rgb,
-      lab: rgbToLab(rgb.r, rgb.g, rgb.b),
-    }
-  })
 
   const best: BestResult = {
     volumes: new Array(n).fill(0),
     rgb: { r: 0, g: 0, b: 0 },
     deltaE: Infinity,
-    score: Infinity,
   }
 
-  // штраф за количество компонентов и крошечные доли
-  const scoreWithPenalties = (deltaE: number, volumes: number[]) => {
-    const comps = volumes.filter((v) => v > 0.5).length
-    const tinyCount = volumes.filter((v) => v > 0.5 && v < 1.1).length
-    const lambdaComp = 0.85
-    const lambdaTiny = 0.55
-    return deltaE + lambdaComp * Math.max(0, comps - 1) + lambdaTiny * tinyCount
-  }
-
-  const evaluateByVolumes = (volumesRaw: number[]) => {
-    const comps: { spectrum: SpectrumPoint[]; volume: number }[] = []
-    for (let i = 0; i < volumesRaw.length; i++) {
-      if (volumesRaw[i] > 0.4) {
-        comps.push({ spectrum: candData[i].spectrum, volume: volumesRaw[i] })
+  // Оценка конкретной комбинации + объёмов
+  const evaluate = (indices: number[], vols: number[]) => {
+    const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
+    for (let i = 0; i < indices.length; i++) {
+      if (vols[i] > 0) {
+        components.push({
+          spectrum: candidates[indices[i]].spectrum!,
+          volume: vols[i],
+        })
       }
     }
-    if (comps.length === 0) return
+    if (components.length === 0) return
 
-    const mixed = mixSpectra(comps)
+    const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     const deltaE = calculateDeltaE2000(targetLab, lab)
-    const sc = scoreWithPenalties(deltaE, volumesRaw)
 
-    if (sc < best.score) {
-      best.score = sc
+    if (deltaE < best.deltaE) {
       best.deltaE = deltaE
       best.rgb = rgb
-      best.volumes = [...volumesRaw]
+      // Записываем в полный массив объёмов
+      const full = new Array(n).fill(0)
+      for (let i = 0; i < indices.length; i++) {
+        full[indices[i]] = vols[i]
+      }
+      best.volumes = full
     }
   }
 
-  // NNLS для одной комбинации
-  const runCombinationNNLS = (indices: number[]) => {
+  // Плотный поиск объёмов для фиксированной комбинации
+  const volumeSteps = [8, 18, 32, 48, 65, 82, 100]
+
+  const searchVolumes = (indices: number[]) => {
     const k = indices.length
-    const A = [
-      new Array(k).fill(0),
-      new Array(k).fill(0),
-      new Array(k).fill(0),
-    ]
-    for (let j = 0; j < k; j++) {
-      const d = candData[indices[j]].rgb
-      A[0][j] = d.r / 255
-      A[1][j] = d.g / 255
-      A[2][j] = d.b / 255
-    }
-    const b = [targetRgb.r / 255, targetRgb.g / 255, targetRgb.b / 255]
+    if (k === 0) return
 
-    const x = nnlsProjectedGradient(A, b, 500, 0.065)
-    const sum = x.reduce((s, v) => s + v, 0)
-    if (sum <= 1e-6) return
+    // Рекурсивный перебор объёмов только по этой комбинации
+    const vols = new Array(k).fill(0)
 
-    const vols = new Array(n).fill(0)
-    for (let j = 0; j < k; j++) {
-      const abs = (x[j] / sum) * targetVolume
-      vols[indices[j]] = Math.max(0, Math.round(abs * 10) / 10)
-    }
-
-    evaluateByVolumes(vols)
-
-    // небольшая локальная доводка
-    const active = indices.filter((i) => vols[i] > 0.5)
-    for (let pass = 0; pass < 2; pass++) {
-      for (const idx of active) {
-        for (const d of [-1.5, -0.8, 0.8, 1.5]) {
-          const trial = [...vols]
-          trial[idx] = Math.max(0.3, Math.min(targetVolume * 1.15, Math.round((trial[idx] + d) * 10) / 10))
-          const total = trial.reduce((s, v) => s + v, 0)
-          if (total <= 0) continue
-          const scale = targetVolume / total
-          for (let i = 0; i < trial.length; i++) {
-            trial[i] = Math.round(trial[i] * scale * 10) / 10
-          }
-          evaluateByVolumes(trial)
-        }
+    const rec = (pos: number) => {
+      if (pos === k) {
+        evaluate(indices, vols)
+        return
+      }
+      for (const s of volumeSteps) {
+        vols[pos] = s
+        rec(pos + 1)
       }
     }
+    rec(0)
   }
 
-  // перебор комбинаций с ограничением
-  const maxCombosToTry = 900
-  let triedCombos = 0
-
+  // ——— Основной цикл по размеру комбинации ———
   for (let k = 1; k <= Math.min(maxComponents, n); k++) {
     const combos = combinations(n, k)
     for (const combo of combos) {
-      if (triedCombos++ > maxCombosToTry) break
-      runCombinationNNLS(combo)
+      searchVolumes(combo)
     }
-    if (triedCombos > maxCombosToTry) break
   }
 
-  if (best.score === Infinity) return null
+  if (best.deltaE === Infinity) return null
 
-  // финальная подготовка рецепта
+  // ——— Локальная доводка лучшего решения ———
+  const activeIndices = best.volumes
+    .map((v, i) => (v > 0 ? i : -1))
+    .filter((i) => i >= 0)
+
+  if (activeIndices.length > 0) {
+    const fineDeltas = [-18, -10, -5, 5, 10, 18]
+    const baseVols = activeIndices.map((i) => best.volumes[i])
+
+    const fineRec = (pos: number, current: number[]) => {
+      if (pos === activeIndices.length) {
+        evaluate(activeIndices, current)
+        return
+      }
+      // оставляем
+      fineRec(pos + 1, current)
+      // пробуем отклонения
+      for (const d of fineDeltas) {
+        const v = baseVols[pos] + d
+        if (v > 3 && v <= 130) {
+          const next = [...current]
+          next[pos] = v
+          fineRec(pos + 1, next)
+        }
+      }
+    }
+    fineRec(0, [...baseVols])
+  }
+
+  // ——— Лёгкая жадная доводка ———
+  const greedyDeltas = [-8, -4, -2, 2, 4, 8]
+  for (let pass = 0; pass < 3; pass++) {
+    let improved = false
+    const base = [...best.volumes]
+
+    for (const idx of activeIndices) {
+      for (const d of greedyDeltas) {
+        const trial = [...base]
+        trial[idx] = Math.max(2, Math.min(130, base[idx] + d))
+        const prev = best.deltaE
+
+        // Собираем только активные
+        const inds: number[] = []
+        const vs: number[] = []
+        for (let i = 0; i < n; i++) {
+          if (trial[i] > 0) {
+            inds.push(i)
+            vs.push(trial[i])
+          }
+        }
+        evaluate(inds, vs)
+
+        if (best.deltaE < prev - 0.0005) improved = true
+      }
+    }
+    if (!improved) break
+  }
+
+  // ——— Масштабирование ———
   const total = best.volumes.reduce((s, v) => s + v, 0)
   if (total <= 0) return null
 
-  const scale = targetVolume > 0 ? targetVolume / total : 1
+  const scaleTarget = targetVolume > 0 ? targetVolume : 20
+  const scale = scaleTarget / total
 
   const recipe = candidates
     .map((p, i) => ({
       pigment: p,
       ml: Math.round(best.volumes[i] * scale * 10) / 10,
     }))
-    .filter((r) => r.ml >= 0.3)
+    .filter((r) => r.ml > 0)
     .sort((a, b) => b.ml - a.ml)
-
-  // пересчитываем финальный цвет спектрально
-  const finalComps = recipe.map((r) => ({
-    spectrum: r.pigment.spectrum!,
-    volume: r.ml,
-  }))
-  const finalMix = mixSpectra(finalComps)
-  const finalRgb = spectrumToRGB(finalMix)
-  const finalLab = rgbToLab(finalRgb.r, finalRgb.g, finalRgb.b)
-  const finalDeltaE = calculateDeltaE2000(targetLab, finalLab)
 
   return {
     recipe,
-    resultRgb: finalRgb,
-    resultHex: rgbToHex(finalRgb),
-    deltaE: Math.round(finalDeltaE * 10) / 10,
+    resultRgb: best.rgb,
+    resultHex: rgbToHex(best.rgb),
+    deltaE: Math.round(best.deltaE * 10) / 10,
   }
 }
 
 // ==========================================
-// Симуляция слоёв (Kubelka-Munk)
+// Симуляция слоёв
 // ==========================================
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
