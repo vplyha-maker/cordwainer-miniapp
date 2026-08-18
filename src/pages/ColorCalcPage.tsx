@@ -7,7 +7,15 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
-import type { CoverageSystem } from '../utils/calculatorLogic'
+import {
+  spectrumToRGB,
+  rgbToHex,
+  type SpectrumPoint,
+} from '../utils/colorScience'
+import {
+  simulateLayersKM,
+  type CoverageSystem,
+} from '../utils/calculatorLogic'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -25,7 +33,6 @@ function generateId(): string {
   })
 }
 
-/** Доля биндера от объёма пигментов (акрил) */
 const BINDER_RATIO = 0.2 // 20%
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
@@ -36,8 +43,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [copied, setCopied] = useState(false)
   const [showCopyFallback, setShowCopyFallback] = useState(false)
 
-  // Система крашения
   const [system, setSystem] = useState<CoverageSystem>('acrylic')
+  const [anilineLayer, setAnilineLayer] = useState<1 | 2 | 3>(1)
 
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
@@ -68,13 +75,83 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     lang,
   })
 
-  // Биндер только для акрила (не входит в спектр смеси цвета)
   const binderMl = useMemo(() => {
     if (system !== 'acrylic' || totalAmount <= 0) return 0
     return Math.round(totalAmount * BINDER_RATIO * 10) / 10
   }, [system, totalAmount])
 
   const grandTotal = totalAmount + binderMl
+
+  // Условный спектр кожи для симуляции анилиновых слоёв
+  const leatherBaseSpectrum = useMemo((): SpectrumPoint[] => {
+    const points: SpectrumPoint[] = []
+    for (let wl = 380; wl <= 780; wl += 5) {
+      const t = (wl - 380) / 400
+      const refl = 45 + t * 25 + Math.sin(t * Math.PI) * 8
+      points.push({
+        wavelength: wl,
+        reflectance: Math.min(85, Math.max(25, refl)),
+      })
+    }
+    return points
+  }, [])
+
+  const anilineLayerColors = useMemo(() => {
+    if (system !== 'aniline' || !mixedColor?.spectrum) {
+      return {
+        layer1: null as string | null,
+        layer2: null as string | null,
+        layer3: null as string | null,
+      }
+    }
+
+    const sim = simulateLayersKM(
+      leatherBaseSpectrum,
+      mixedColor.spectrum,
+      'aniline'
+    )
+
+    const toHex = (spec: SpectrumPoint[]) =>
+      rgbToHex(spectrumToRGB(spec)).toUpperCase()
+
+    return {
+      layer1: toHex(sim.layer1),
+      layer2: toHex(sim.layer2),
+      layer3: toHex(sim.layer3),
+    }
+  }, [system, mixedColor, leatherBaseSpectrum])
+
+  const squareColor = useMemo(() => {
+    if (isCalculating && (validHex || lastTargetHex.current)) {
+      return (validHex || lastTargetHex.current)!
+    }
+
+    if (system === 'aniline' && mixedColor?.spectrum) {
+      if (anilineLayer === 1) return anilineLayerColors.layer1 || '#2A2522'
+      if (anilineLayer === 2) return anilineLayerColors.layer2 || '#2A2522'
+      return anilineLayerColors.layer3 || '#2A2522'
+    }
+
+    if (mixedColor?.hex) return mixedColor.hex.toUpperCase()
+    if (userEdited.current && validHex) return validHex
+    return validHex || lastTargetHex.current || '#2A2522'
+  }, [
+    isCalculating,
+    validHex,
+    system,
+    mixedColor,
+    anilineLayer,
+    anilineLayerColors,
+  ])
+
+  const anilineOpacity =
+    system === 'aniline' && mixedColor
+      ? anilineLayer === 1
+        ? 0.55
+        : anilineLayer === 2
+          ? 0.75
+          : 0.92
+      : 1
 
   const loadPigments = () => {
     setLoading(true)
@@ -96,7 +173,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
-  // Web Worker
   useEffect(() => {
     const worker = new Worker(
       new URL('../workers/recipeWorker.ts', import.meta.url),
@@ -142,7 +218,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [setPaints, validHex])
 
-  // Синхронизация HEX при ручном смешивании
   useEffect(() => {
     if (fromRecipeRef.current) return
     if (mixedColor?.hex && !isFocused && !userEdited.current) {
@@ -165,7 +240,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setValidHex(null)
   }, [paints, totalAmount])
 
-  // Debounce HEX
   useEffect(() => {
     if (!userEdited.current) return
     if (hexInput.length === 7) {
@@ -188,7 +262,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [hexInput])
 
-  // Расчёт через Worker
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
       setIsCalculating(false)
@@ -205,7 +278,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       basicPigments: pigments,
       maxComponents: 3,
       targetVolume: totalAmount > 0 ? totalAmount : 20,
-      system, // передаём систему
+      system,
     })
   }, [validHex, pigments, loading, totalAmount, system])
 
@@ -236,6 +309,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const copyHex = async () => {
     const colorToCopy =
+      (system === 'aniline' && squareColor !== '#2A2522'
+        ? squareColor
+        : null) ||
       hexInput ||
       (userEdited.current && validHex) ||
       (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null) ||
@@ -255,16 +331,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const isUk = lang === 'uk'
-
-  const displayColor =
-    isCalculating && (validHex || lastTargetHex.current)
-      ? (validHex || lastTargetHex.current)!
-      : mixedColor?.hex
-        ? mixedColor.hex.toUpperCase()
-        : (userEdited.current && validHex) ||
-          validHex ||
-          lastTargetHex.current ||
-          '#2A2522'
 
   const hasColor = Boolean(
     hexInput ||
@@ -321,7 +387,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-        {/* ===== СИСТЕМА ===== */}
+        {/* СИСТЕМА */}
         <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5">
           <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90 mb-3">
             {isUk ? 'Система фарбування' : 'Система крашения'}
@@ -357,7 +423,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </p>
         </section>
 
-        {/* ===== СОСТАВ ===== */}
+        {/* СОСТАВ */}
         <section className="bg-[#1C1816] rounded-2xl overflow-visible relative z-10">
           <div className="px-4 pt-4 pb-3 flex items-center justify-between">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
@@ -458,14 +524,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       disabled={paints.length <= 1}
                       className="w-10 h-10 -mr-1 flex items-center justify-center rounded-full text-[#F5F1EA]/30 active:bg-white/5 disabled:opacity-20"
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M18 6L6 18M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
                 ))}
 
-                {/* Биндер — только акрил */}
                 {system === 'acrylic' && totalAmount > 0 && (
                   <div className="flex items-center gap-2 mt-1 pt-3 border-t border-dashed border-[#D8A35C]/30">
                     <div className="flex-1 min-w-0 rounded-xl px-3 py-2.5 bg-[#D8A35C]/15 border border-[#D8A35C]/35">
@@ -500,7 +576,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* ===== РЕЗУЛЬТАТ ===== */}
+        {/* РЕЗУЛЬТАТ */}
         <section className="bg-[#1C1816] rounded-2xl px-4 pt-4 pb-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
@@ -512,13 +588,59 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
 
           <div className="flex flex-col items-center">
+            {/* Слои анилина */}
+            {system === 'aniline' && mixedColor && (
+              <div className="w-full flex gap-2 mb-3">
+                {([1, 2, 3] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setAnilineLayer(n)}
+                    className={`flex-1 py-2 rounded-xl text-[12px] font-semibold transition-colors ${
+                      anilineLayer === n
+                        ? 'bg-[#D8A35C] text-black'
+                        : 'bg-white/8 text-[#F5F1EA]/60 active:bg-white/12'
+                    }`}
+                  >
+                    {isUk ? `\( {n} шар` : ` \){n} слой`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Квадрат */}
             <div
               role="status"
               aria-live="polite"
               aria-busy={isCalculating}
-              className="relative w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-4 transition-colors duration-150 overflow-hidden"
-              style={{ backgroundColor: displayColor }}
+              className="relative w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-3 overflow-hidden"
             >
+              {/* Шахматка под анилином */}
+              {system === 'aniline' && (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundColor: '#2a2624',
+                    backgroundImage: `
+                      linear-gradient(45deg, #3a3532 25%, transparent 25%),
+                      linear-gradient(-45deg, #3a3532 25%, transparent 25%),
+                      linear-gradient(45deg, transparent 75%, #3a3532 75%),
+                      linear-gradient(-45deg, transparent 75%, #3a3532 75%)
+                    `,
+                    backgroundSize: '12px 12px',
+                    backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0',
+                  }}
+                />
+              )}
+
+              <div
+                className="absolute inset-0 transition-all duration-200"
+                style={{
+                  backgroundColor: squareColor,
+                  opacity: isCalculating ? 1 : anilineOpacity,
+                }}
+              />
+
               {isCalculating && (
                 <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center z-10">
                   <svg
@@ -527,8 +649,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     fill="none"
                     viewBox="0 0 24 24"
                   >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   <span className="text-[10px] text-white/90 font-medium">
                     {isUk ? 'Рахуємо...' : 'Считаем...'}
@@ -536,6 +669,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               )}
             </div>
+
+            {system === 'aniline' && mixedColor && (
+              <p className="mb-3 text-[11px] text-center text-[#F5F1EA]/40">
+                {isUk
+                  ? 'Шахматка = слабке укриття аніліну на шкірі'
+                  : 'Шахматка = слабое укрытие анилина на коже'}
+              </p>
+            )}
 
             <div className="w-full flex items-center gap-2">
               <input
@@ -586,7 +727,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* ===== ОБЪЁМ ===== */}
+        {/* ОБЪЁМ */}
         <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[14px] text-[#F5F1EA]/50">
@@ -632,7 +773,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <input
               type="text"
               readOnly
-              value={hexInput || displayColor}
+              value={hexInput || squareColor}
               className="w-full bg-white/10 text-[#F5F1EA] rounded-xl px-3 py-3 text-center font-mono tracking-wider mb-4"
               onFocus={(e) => e.target.select()}
               autoFocus
