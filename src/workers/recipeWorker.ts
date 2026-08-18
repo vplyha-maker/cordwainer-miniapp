@@ -22,14 +22,14 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     id,
     targetHex,
     basicPigments,
-    maxComponents = 4,
+    maxComponents = 3,
     targetVolume = 20,
   } = e.data
 
   try {
     const result = findRecipeByHex(
       targetHex,
-      basicPigments,
+      basicPigments, // теперь сюда приходит весь список из 83 пигментов
       maxComponents,
       targetVolume
     )
