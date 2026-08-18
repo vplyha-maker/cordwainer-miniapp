@@ -22,7 +22,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     id,
     targetHex,
     basicPigments,
-    maxComponents = 3,
+    maxComponents = 4,
     targetVolume = 20,
   } = e.data
 
