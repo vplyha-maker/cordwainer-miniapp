@@ -274,57 +274,34 @@ function linearToSrgb(c: number): number {
 }
 
 /**
- * Коррекция для тёмных насыщенных цветов
+ * Коррекция для тёмных насыщенных цветов 
+ * (Теперь без искажений с подменой targetHex и со строгим ограничением значений 0-255)
  */
-export function correctDarkColor(rgb: RGB, targetHex?: string): RGB {
-  if (!targetHex) {
-    const max = Math.max(rgb.r, rgb.g, rgb.b)
-    const min = Math.min(rgb.r, rgb.g, rgb.b)
-    const chroma = max - min
+export function correctDarkColor(rgb: RGB): RGB {
+  const max = Math.max(rgb.r, rgb.g, rgb.b)
+  const min = Math.min(rgb.r, rgb.g, rgb.b)
+  const chroma = max - min
 
-    if (max < 140 && chroma > 20) {
-      const factor = 1.25
-      const gray = (rgb.r + rgb.g + rgb.b) / 3
-      return {
-        r: Math.min(255, Math.round(gray + (rgb.r - gray) * factor)),
-        g: Math.min(255, Math.round(gray + (rgb.g - gray) * factor)),
-        b: Math.min(255, Math.round(gray + (rgb.b - gray) * factor)),
-      }
+  if (max < 140 && chroma > 20) {
+    const factor = 1.25
+    const gray = (rgb.r + rgb.g + rgb.b) / 3
+    return {
+      r: Math.max(0, Math.min(255, Math.round(gray + (rgb.r - gray) * factor))),
+      g: Math.max(0, Math.min(255, Math.round(gray + (rgb.g - gray) * factor))),
+      b: Math.max(0, Math.min(255, Math.round(gray + (rgb.b - gray) * factor))),
     }
-    return rgb
   }
 
-  const target = {
-    r: parseInt(targetHex.slice(1, 3), 16),
-    g: parseInt(targetHex.slice(3, 5), 16),
-    b: parseInt(targetHex.slice(5, 7), 16),
+  return {
+    r: Math.max(0, Math.min(255, Math.round(rgb.r))),
+    g: Math.max(0, Math.min(255, Math.round(rgb.g))),
+    b: Math.max(0, Math.min(255, Math.round(rgb.b)))
   }
-
-  const targetMax = Math.max(target.r, target.g, target.b)
-  const currentMax = Math.max(rgb.r, rgb.g, rgb.b)
-
-  let scale = 1
-  if (currentMax > targetMax + 15) {
-    scale = targetMax / Math.max(currentMax, 1)
-  }
-
-  let r = Math.round(rgb.r * scale)
-  let g = Math.round(rgb.g * scale)
-  let b = Math.round(rgb.b * scale)
-
-  const gray = (r + g + b) / 3
-  const factor = 1.35
-
-  r = Math.min(255, Math.round(gray + (r - gray) * factor))
-  g = Math.min(255, Math.round(gray + (g - gray) * factor))
-  b = Math.min(255, Math.round(gray + (b - gray) * factor))
-
-  return { r, g, b }
 }
 
-export function spectrumToRGB(spectrum: SpectrumPoint[], targetHex?: string): RGB {
+export function spectrumToRGB(spectrum: SpectrumPoint[]): RGB {
   const rgb = spectrumToRGBWithIlluminant(spectrum, 'D65')
-  return correctDarkColor(rgb, targetHex)
+  return correctDarkColor(rgb)
 }
 
 export function spectrumToRGBWithIlluminant(
