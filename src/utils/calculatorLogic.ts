@@ -227,7 +227,7 @@ interface BestResult {
 export function findRecipeByHex(
   targetHex: string,
   basicPigments: Pigment[],
-  maxComponents = 4,
+  maxComponents = 3,          // ← было 4, теперь 3 по умолчанию
   targetVolume = 20
 ) {
   if (!basicPigments.length || !targetHex) return null
@@ -238,14 +238,14 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Сортируем и берём топ-9
+  // 1. Сортируем и берём топ-7 (было 9)
   const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
   scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, 9).map((s) => s.pigment)
+  const candidates = scored.slice(0, 7).map((s) => s.pigment)
   const n = candidates.length
 
   const best: BestResult = {
@@ -275,7 +275,6 @@ export function findRecipeByHex(
     if (deltaE < best.deltaE) {
       best.deltaE = deltaE
       best.rgb = rgb
-      // Записываем в полный массив объёмов
       const full = new Array(n).fill(0)
       for (let i = 0; i < indices.length; i++) {
         full[indices[i]] = vols[i]
@@ -284,15 +283,15 @@ export function findRecipeByHex(
     }
   }
 
-  // Плотный поиск объёмов для фиксированной комбинации
-  // Более мелкий шаг, чтобы ловить малые доли (5 %)
-  const volumeSteps = [5, 10, 15, 25, 40, 55, 70, 85, 100]
+  // Быстрая сетка объёмов (5 значений вместо 9)
+  const volumeSteps = [8, 20, 40, 65, 100]
+  // Ещё грубее для k = 4 (если всё-таки передали maxComponents = 4)
+  const volumeStepsCoarse = [15, 40, 70, 100]
 
-  const searchVolumes = (indices: number[]) => {
+  const searchVolumes = (indices: number[], steps: number[]) => {
     const k = indices.length
     if (k === 0) return
 
-    // Рекурсивный перебор объёмов только по этой комбинации
     const vols = new Array(k).fill(0)
 
     const rec = (pos: number) => {
@@ -300,7 +299,7 @@ export function findRecipeByHex(
         evaluate(indices, vols)
         return
       }
-      for (const s of volumeSteps) {
+      for (const s of steps) {
         vols[pos] = s
         rec(pos + 1)
       }
@@ -308,18 +307,16 @@ export function findRecipeByHex(
     rec(0)
   }
 
-  // ——— Основной цикл по размеру комбинации ———
+  // ——— Основной цикл ———
   for (let k = 1; k <= Math.min(maxComponents, n); k++) {
     const combos = combinations(n, k)
+    const steps = k >= 4 ? volumeStepsCoarse : volumeSteps
     for (const combo of combos) {
-      searchVolumes(combo)
+      searchVolumes(combo, steps)
     }
   }
 
-  // ——— Специальная обработка почти-чёрных целей ———
-  // Причина бага: дискретная сетка + локальная доводка вокруг чистого чёрного
-  // никогда не попадала в бассейн «красный 80 % + ультрамарин 15 % + чёрный 5 %».
-  // Принудительно оцениваем известные рабочие соотношения, если цель тёмная и почти ахроматическая.
+  // ——— Специальная обработка почти-чёрных целей (оставлена) ———
   if (targetLab.L < 20 && Math.abs(targetLab.a) < 12 && Math.abs(targetLab.b) < 12) {
     const redIdx = candidates.findIndex((p) =>
       PURE_BASIC_COLORS[2].sourceIds.some((id) => id === p.id)
@@ -332,9 +329,7 @@ export function findRecipeByHex(
     )
 
     if (redIdx >= 0 && blueIdx >= 0 && blackIdx >= 0) {
-      // точные пропорции, которые пользователь указал как правильные
       evaluate([redIdx, blueIdx, blackIdx], [80, 15, 5])
-      // несколько соседних вариантов на случай, если спектральные данные чуть отличаются
       evaluate([redIdx, blueIdx, blackIdx], [85, 10, 5])
       evaluate([redIdx, blueIdx, blackIdx], [75, 20, 5])
       evaluate([redIdx, blueIdx, blackIdx], [70, 25, 5])
@@ -345,13 +340,13 @@ export function findRecipeByHex(
 
   if (best.deltaE === Infinity) return null
 
-  // ——— Локальная доводка лучшего решения ———
+  // ——— Локальная доводка (ограничена при > 3 компонентах) ———
   const activeIndices = best.volumes
     .map((v, i) => (v > 0 ? i : -1))
     .filter((i) => i >= 0)
 
-  if (activeIndices.length > 0) {
-    const fineDeltas = [-18, -10, -5, 5, 10, 18]
+  if (activeIndices.length > 0 && activeIndices.length <= 3) {
+    const fineDeltas = [-15, -8, -4, 4, 8, 15]
     const baseVols = activeIndices.map((i) => best.volumes[i])
 
     const fineRec = (pos: number, current: number[]) => {
@@ -359,12 +354,10 @@ export function findRecipeByHex(
         evaluate(activeIndices, current)
         return
       }
-      // оставляем
       fineRec(pos + 1, current)
-      // пробуем отклонения
       for (const d of fineDeltas) {
         const v = baseVols[pos] + d
-        if (v > 3 && v <= 130) {
+        if (v > 3 && v <= 120) {
           const next = [...current]
           next[pos] = v
           fineRec(pos + 1, next)
@@ -374,19 +367,18 @@ export function findRecipeByHex(
     fineRec(0, [...baseVols])
   }
 
-  // ——— Лёгкая жадная доводка ———
-  const greedyDeltas = [-8, -4, -2, 2, 4, 8]
-  for (let pass = 0; pass < 3; pass++) {
+  // ——— Жадная доводка ———
+  const greedyDeltas = [-6, -3, 3, 6]
+  for (let pass = 0; pass < 2; pass++) {
     let improved = false
     const base = [...best.volumes]
 
     for (const idx of activeIndices) {
       for (const d of greedyDeltas) {
         const trial = [...base]
-        trial[idx] = Math.max(2, Math.min(130, base[idx] + d))
+        trial[idx] = Math.max(2, Math.min(120, base[idx] + d))
         const prev = best.deltaE
 
-        // Собираем только активные
         const inds: number[] = []
         const vs: number[] = []
         for (let i = 0; i < n; i++) {
