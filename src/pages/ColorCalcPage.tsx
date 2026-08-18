@@ -133,8 +133,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [mixedColor?.hex, isFocused])
 
+  // Когда пользователь меняет смесь вручную — выходим из режима HEX
   useEffect(() => {
     userEdited.current = false
+    setValidHex(null) // ← главное исправление бага
   }, [paints, totalAmount])
 
   // Debounce HEX
@@ -161,7 +163,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [hexInput])
 
-  // Расчёт через Worker — теперь передаём ВСЕ 83 пигмента
+  // Расчёт через Worker
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
       setIsCalculating(false)
@@ -176,9 +178,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     workerRef.current.postMessage({
       id,
       targetHex: validHex,
-      basicPigments: pigments, // ← все пигменты
+      basicPigments: pigments,
       maxComponents: 3,
-      targetVolume: totalAmount,
+      targetVolume: totalAmount > 0 ? totalAmount : 20,
     })
   }, [validHex, pigments, loading, totalAmount])
 
@@ -210,7 +212,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const copyHex = async () => {
     const colorToCopy =
-      validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null)
+      (userEdited.current && validHex) ||
+      (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null) ||
+      validHex
     if (!colorToCopy) return
 
     if (!navigator.clipboard) {
@@ -228,9 +232,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const isUk = lang === 'uk'
+
+  // Правильный приоритет цвета:
+  // 1. Если пользователь сейчас вводит HEX → показываем validHex
+  // 2. Иначе всегда показываем живой цвет смеси
   const displayColor =
-    validHex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : '#2A2522')
-  const hasColor = Boolean(validHex || mixedColor?.hex)
+    userEdited.current && validHex
+      ? validHex
+      : mixedColor?.hex
+        ? mixedColor.hex.toUpperCase()
+        : validHex || '#2A2522'
+
+  const hasColor = Boolean(
+    (userEdited.current && validHex) || mixedColor?.hex || validHex
+  )
 
   return (
     <motion.div
