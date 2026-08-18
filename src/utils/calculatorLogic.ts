@@ -221,7 +221,7 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ — быстрый для 83 пигментов
+// ГЛАВНЫЙ АЛГОРИТМ
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
@@ -237,6 +237,12 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
+  // Тёмно-красный / почти чёрный с красным оттенком
+  const isDarkReddish =
+    targetLab.L < 38 &&
+    targetLab.a > 12 &&
+    Math.abs(targetLab.b) < 28
+
   // 1. Считаем расстояние
   const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
@@ -245,7 +251,7 @@ export function findRecipeByHex(
   })
   scored.sort((a, b) => a.dist - b.dist)
 
-  // 2. Берём только топ-6 самых близких (критично для скорости)
+  // 2. Топ-6
   let candidates = scored.slice(0, 6).map((s) => s.pigment)
 
   // 3. Принудительно добавляем красный / синий / чёрный
@@ -261,8 +267,40 @@ export function findRecipeByHex(
     }
   }
 
-  // максимум 8 кандидатов
-  if (candidates.length > 8) candidates = candidates.slice(0, 8)
+  // Ищем предпочтительные пигменты по id
+  const preferredRed = validPigments.find(
+    (p) =>
+      p.id.includes('carmine') ||
+      p.id.includes('кармин') ||
+      p.id.includes('cadmium_red') ||
+      p.id.includes('pyrrole_red') ||
+      p.id.includes('iron_oxide_red')
+  )
+  const preferredBlue = validPigments.find(
+    (p) =>
+      p.id.includes('ultramarine') ||
+      p.id.includes('ультрамарин')
+  )
+  const preferredBlack = validPigments.find(
+    (p) =>
+      p.id.includes('black') ||
+      p.id.includes('чёрн') ||
+      p.id.includes('carbon') ||
+      p.id.includes('ivory') ||
+      p.id.includes('lamp')
+  )
+
+  if (preferredRed && !candidates.some((c) => c.id === preferredRed.id)) {
+    candidates.push(preferredRed)
+  }
+  if (preferredBlue && !candidates.some((c) => c.id === preferredBlue.id)) {
+    candidates.push(preferredBlue)
+  }
+  if (preferredBlack && !candidates.some((c) => c.id === preferredBlack.id)) {
+    candidates.push(preferredBlack)
+  }
+
+  if (candidates.length > 9) candidates = candidates.slice(0, 9)
 
   const n = candidates.length
 
@@ -317,7 +355,7 @@ export function findRecipeByHex(
     }
   }
 
-  // ——— k = 3 (только самые полезные пропорции + минимум перестановок) ———
+  // ——— k = 3 ———
   if (maxComponents >= 3 && n >= 3) {
     const ratios3 = [
       [80, 15, 5],
@@ -329,30 +367,51 @@ export function findRecipeByHex(
       [90, 5, 5],
     ]
 
-    // Берём только комбинации из топ-6 (ещё быстрее)
-    const topN = Math.min(6, n)
+    const topN = Math.min(7, n)
     for (const combo of combinations(topN, 3)) {
       for (const ratio of ratios3) {
         evaluate(combo, ratio)
-        // только 2 дополнительные перестановки вместо 6
         evaluate(combo, [ratio[0], ratio[2], ratio[1]])
         evaluate(combo, [ratio[1], ratio[0], ratio[2]])
       }
     }
   }
 
+  // ==========================================
+  // ПРИОРИТЕТ правильной пропорции
+  // (красный 80% + ультрамарин 15% + чёрный 5%)
+  // ==========================================
+  if (isDarkReddish && preferredRed && preferredBlue && preferredBlack) {
+    const redIdx = candidates.findIndex((c) => c.id === preferredRed.id)
+    const blueIdx = candidates.findIndex((c) => c.id === preferredBlue.id)
+    const blackIdx = candidates.findIndex((c) => c.id === preferredBlack.id)
+
+    if (redIdx >= 0 && blueIdx >= 0 && blackIdx >= 0) {
+      // Основная правильная пропорция
+      evaluate([redIdx, blueIdx, blackIdx], [80, 15, 5])
+
+      // Близкие варианты
+      evaluate([redIdx, blueIdx, blackIdx], [82, 13, 5])
+      evaluate([redIdx, blueIdx, blackIdx], [78, 16, 6])
+      evaluate([redIdx, blueIdx, blackIdx], [85, 12, 3])
+      evaluate([redIdx, blueIdx, blackIdx], [75, 18, 7])
+      evaluate([redIdx, blueIdx, blackIdx], [80, 12, 8])
+      evaluate([redIdx, blueIdx, blackIdx], [80, 18, 2])
+      evaluate([redIdx, blueIdx, blackIdx], [83, 14, 3])
+    }
+  }
+
   if (best.deltaE === Infinity) return null
 
-  // ——— Лёгкая доводка только лучших ———
+  // ——— Лёгкая доводка ———
   const activeIndices = best.volumes
     .map((v, i) => (v > 0.5 ? i : -1))
     .filter((i) => i >= 0)
 
   if (activeIndices.length > 0 && activeIndices.length <= 3) {
-    const fineDeltas = [-8, -4, 4, 8]
+    const fineDeltas = [-6, -3, 3, 6]
     const baseVols = activeIndices.map((i) => best.volumes[i])
 
-    // неполная рекурсия — только один уровень отклонений
     for (let i = 0; i < activeIndices.length; i++) {
       for (const d of fineDeltas) {
         const trial = [...baseVols]
