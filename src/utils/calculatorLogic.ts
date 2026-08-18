@@ -96,7 +96,7 @@ function rgbToLab(r: number, g: number, b: number) {
 }
 
 // ==========================================
-// CIEDE2000
+// CIEDE2000 (Точная, но медленная дистанция)
 // ==========================================
 function calculateDeltaE2000(
   lab1: { L: number; a: number; b: number },
@@ -180,6 +180,20 @@ function calculateDeltaE2000(
   )
 }
 
+// ==========================================
+// Быстрая Евклидова дистанция для грубого перебора
+// ==========================================
+function fastDeltaE(
+  lab1: { L: number; a: number; b: number },
+  lab2: { L: number; a: number; b: number }
+): number {
+  return (
+    Math.pow(lab1.L - lab2.L, 2) +
+    Math.pow(lab1.a - lab2.a, 2) +
+    Math.pow(lab1.b - lab2.b, 2)
+  )
+}
+
 export function hexToRgbObj(hex: string) {
   let c = hex.replace(/^#/, '')
   if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
@@ -193,7 +207,6 @@ export function hexToRgbObj(hex: string) {
 // ==========================================
 // Вспомогательные функции поиска
 // ==========================================
-
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = []
   const combo: number[] = []
@@ -221,11 +234,11 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ
+// ГЛАВНЫЙ АЛГОРИТМ (ОПТИМИЗИРОВАННЫЙ)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
-  pigments: Pigment[],               // ← теперь передаём все 83
+  pigments: Pigment[],               
   maxComponents = 3,
   targetVolume = 20
 ) {
@@ -237,7 +250,7 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Расстояние каждого пигмента до цели
+  // 1. Расстояние каждого пигмента до цели (здесь используем точный DeltaE2000, так как вызовов мало)
   const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
@@ -245,8 +258,8 @@ export function findRecipeByHex(
   })
   scored.sort((a, b) => a.dist - b.dist)
 
-  // 2. Топ-8 самых близких
-  let candidates = scored.slice(0, 8).map((s) => s.pigment)
+  // 2. Берем топ-6 самых близких кандидатов
+  let candidates = scored.slice(0, 6).map((s) => s.pigment)
 
   // 3. Принудительно добавляем красный, синий и чёрный
   const forceIds = [
@@ -261,17 +274,19 @@ export function findRecipeByHex(
     }
   }
 
-  if (candidates.length > 12) candidates = candidates.slice(0, 12)
+  // ОГРАНИЧЕНИЕ КОМБИНАТОРНОГО ВЗРЫВА: Максимум 9 пигментов в пуле
+  if (candidates.length > 9) candidates = candidates.slice(0, 9)
 
   const n = candidates.length
 
   const best: BestResult = {
     volumes: new Array(n).fill(0),
     rgb: { r: 0, g: 0, b: 0 },
-    deltaE: Infinity,
+    deltaE: Infinity, // Для грубого перебора будем хранить fastDeltaE
   }
 
-  const evaluate = (indices: number[], vols: number[]) => {
+  // БЫСТРАЯ ФУНКЦИЯ ОЦЕНКИ
+  const evaluateFast = (indices: number[], vols: number[]) => {
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
     for (let i = 0; i < indices.length; i++) {
       if (vols[i] > 0) {
@@ -286,10 +301,12 @@ export function findRecipeByHex(
     const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    const deltaE = calculateDeltaE2000(targetLab, lab)
+    
+    // ИСПОЛЬЗУЕМ БЫСТРУЮ ДИСТАНЦИЮ
+    const dist = fastDeltaE(targetLab, lab)
 
-    if (deltaE < best.deltaE) {
-      best.deltaE = deltaE
+    if (dist < best.deltaE) {
+      best.deltaE = dist
       best.rgb = rgb
       const full = new Array(n).fill(0)
       for (let i = 0; i < indices.length; i++) {
@@ -299,81 +316,81 @@ export function findRecipeByHex(
     }
   }
 
+  // --- ГРУБЫЙ ПЕРЕБОР С БЫСТРОЙ ДИСТАНЦИЕЙ ---
+
   // k = 1
   for (let i = 0; i < n; i++) {
-    evaluate([i], [100])
+    evaluateFast([i], [100])
   }
 
   // k = 2
   const ratios2 = [
-    [90, 10], [85, 15], [80, 20], [75, 25], [70, 30],
-    [65, 35], [60, 40], [55, 45], [50, 50],
+    [90, 10], [80, 20], [70, 30], [60, 40], [50, 50]
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
-      evaluate([i, j], [a, b])
-      if (a !== b) evaluate([i, j], [b, a])
+      evaluateFast([i, j], [a, b])
+      if (a !== b) evaluateFast([i, j], [b, a])
     }
   }
 
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
-      [80, 15, 5],
-      [85, 10, 5],
-      [75, 20, 5],
-      [70, 20, 10],
-      [70, 25, 5],
-      [65, 25, 10],
-      [60, 30, 10],
-      [60, 25, 15],
-      [50, 30, 20],
-      [90, 5, 5],
-      [55, 30, 15],
+      [80, 10, 10], [60, 30, 10], [50, 30, 20], [40, 40, 20], [34, 33, 33]
     ]
     for (const combo of combinations(n, 3)) {
       for (const ratio of ratios3) {
-        evaluate(combo, ratio)
-        evaluate(combo, [ratio[0], ratio[2], ratio[1]])
-        evaluate(combo, [ratio[1], ratio[0], ratio[2]])
-        evaluate(combo, [ratio[1], ratio[2], ratio[0]])
-        evaluate(combo, [ratio[2], ratio[0], ratio[1]])
-        evaluate(combo, [ratio[2], ratio[1], ratio[0]])
+        evaluateFast(combo, ratio)
+        evaluateFast(combo, [ratio[0], ratio[2], ratio[1]])
+        evaluateFast(combo, [ratio[1], ratio[0], ratio[2]])
+        evaluateFast(combo, [ratio[1], ratio[2], ratio[0]])
+        evaluateFast(combo, [ratio[2], ratio[0], ratio[1]])
+        evaluateFast(combo, [ratio[2], ratio[1], ratio[0]])
       }
     }
   }
 
   if (best.deltaE === Infinity) return null
 
-  // Локальная доводка
+  // --- ПЕРЕХОД НА ТОЧНЫЙ DeltaE2000 ДЛЯ ЛОКАЛЬНОЙ ДОВОДКИ ---
+  best.deltaE = calculateDeltaE2000(targetLab, rgbToLab(best.rgb.r, best.rgb.g, best.rgb.b))
+
   const activeIndices = best.volumes
     .map((v, i) => (v > 0 ? i : -1))
     .filter((i) => i >= 0)
 
-  if (activeIndices.length > 0 && activeIndices.length <= 3) {
-    const fineDeltas = [-10, -5, -2, 2, 5, 10]
-    const baseVols = activeIndices.map((i) => best.volumes[i])
-
-    const fineRec = (pos: number, current: number[]) => {
-      if (pos === activeIndices.length) {
-        evaluate(activeIndices, current)
-        return
-      }
-      fineRec(pos + 1, current)
-      for (const d of fineDeltas) {
-        const v = baseVols[pos] + d
-        if (v > 1.5 && v <= 110) {
-          const next = [...current]
-          next[pos] = v
-          fineRec(pos + 1, next)
-        }
+  // ТОЧНАЯ ФУНКЦИЯ ОЦЕНКИ
+  const evaluatePrecise = (indices: number[], vols: number[]): boolean => {
+    const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
+    for (let i = 0; i < indices.length; i++) {
+      if (vols[i] > 0) {
+        components.push({
+          spectrum: candidates[indices[i]].spectrum!,
+          volume: vols[i],
+        })
       }
     }
-    fineRec(0, [...baseVols])
+    if (components.length === 0) return false
+
+    const mixed = mixSpectra(components)
+    const rgb = spectrumToRGB(mixed)
+    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+    const deltaE = calculateDeltaE2000(targetLab, lab) // ТУТ ТОЧНАЯ ДИСТАНЦИЯ
+
+    if (deltaE < best.deltaE - 0.0005) {
+      best.deltaE = deltaE
+      best.rgb = rgb
+      const full = new Array(n).fill(0)
+      for (let i = 0; i < indices.length; i++) full[indices[i]] = vols[i]
+      best.volumes = full
+      return true
+    }
+    return false
   }
 
   // Жадная доводка
-  const greedyDeltas = [-4, -2, 2, 4]
+  const greedyDeltas = [-5, -2, 2, 5]
   for (let pass = 0; pass < 2; pass++) {
     let improved = false
     const base = [...best.volumes]
@@ -382,7 +399,6 @@ export function findRecipeByHex(
       for (const d of greedyDeltas) {
         const trial = [...base]
         trial[idx] = Math.max(1.5, Math.min(110, base[idx] + d))
-        const prev = best.deltaE
 
         const inds: number[] = []
         const vs: number[] = []
@@ -392,9 +408,10 @@ export function findRecipeByHex(
             vs.push(trial[i])
           }
         }
-        evaluate(inds, vs)
-
-        if (best.deltaE < prev - 0.0005) improved = true
+        
+        if (evaluatePrecise(inds, vs)) {
+          improved = true
+        }
       }
     }
     if (!improved) break
