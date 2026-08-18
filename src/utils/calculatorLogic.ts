@@ -228,13 +228,14 @@ function combinations(n: number, k: number): number[][] {
 }
 
 interface BestResult {
+  indices: number[]
   volumes: number[]
   rgb: { r: number; g: number; b: number }
   deltaE: number
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (ОПТИМИЗИРОВАННЫЙ)
+// ГЛАВНЫЙ АЛГОРИТМ (ОПТИМИЗИРОВАННЫЙ И ТОЧНЫЙ)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
@@ -250,7 +251,7 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Расстояние каждого пигмента до цели (здесь используем точный DeltaE2000, так как вызовов мало)
+  // 1. Оцениваем каждый пигмент точно
   const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
@@ -258,185 +259,161 @@ export function findRecipeByHex(
   })
   scored.sort((a, b) => a.dist - b.dist)
 
-  // 2. Берем топ-6 самых близких кандидатов
-  let candidates = scored.slice(0, 6).map((s) => s.pigment)
+  // 2. Умная выборка кандидатов (Максимум 8, чтобы работало быстро)
+  const candidatesSet = new Set<Pigment>()
+  
+  // Берем топ-3 самых близких (обычно это база)
+  scored.slice(0, 3).forEach(s => candidatesSet.add(s.pigment))
+  
+  // Обязательно добавляем чистый белый и чистый черный (для высветления/затемнения)
+  const bwIds = [...PURE_BASIC_COLORS[0].sourceIds, ...PURE_BASIC_COLORS[1].sourceIds]
+  validPigments.filter(p => bwIds.includes(p.id)).forEach(p => candidatesSet.add(p))
 
-  // 3. Принудительно добавляем красный, синий и чёрный
-  const forceIds = [
-    ...PURE_BASIC_COLORS[2].sourceIds, // red
-    ...PURE_BASIC_COLORS[4].sourceIds, // blue
-    ...PURE_BASIC_COLORS[1].sourceIds, // black
-  ]
-  for (const id of forceIds) {
-    const p = validPigments.find((x) => x.id === id)
-    if (p && !candidates.some((c) => c.id === p.id)) {
-      candidates.push(p)
-    }
+  // Если цель очень темная (L < 40), принудительно ищем синий (для глубоких теней)
+  if (targetLab.L < 40) {
+    const blueIds = PURE_BASIC_COLORS[4].sourceIds
+    const blueP = validPigments.find(p => blueIds.includes(p.id))
+    if (blueP) candidatesSet.add(blueP)
   }
 
-  // ОГРАНИЧЕНИЕ КОМБИНАТОРНОГО ВЗРЫВА: Максимум 9 пигментов в пуле
-  if (candidates.length > 9) candidates = candidates.slice(0, 9)
-
+  const candidates = Array.from(candidatesSet).slice(0, 8)
   const n = candidates.length
 
-  const best: BestResult = {
-    volumes: new Array(n).fill(0),
-    rgb: { r: 0, g: 0, b: 0 },
-    deltaE: Infinity, // Для грубого перебора будем хранить fastDeltaE
-  }
+  // Храним ТОП-5 лучших вариантов из быстрого перебора
+  let topResults: BestResult[] = []
 
-  // БЫСТРАЯ ФУНКЦИЯ ОЦЕНКИ
-  const evaluateFast = (indices: number[], vols: number[]) => {
-    const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
-    for (let i = 0; i < indices.length; i++) {
-      if (vols[i] > 0) {
-        components.push({
-          spectrum: candidates[indices[i]].spectrum!,
-          volume: vols[i],
-        })
-      }
-    }
-    if (components.length === 0) return
+  const tryAddResult = (indices: number[], vols: number[]) => {
+    const components = indices.map((idx, i) => ({
+      spectrum: candidates[idx].spectrum!,
+      volume: vols[i],
+    }))
 
     const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    
-    // ИСПОЛЬЗУЕМ БЫСТРУЮ ДИСТАНЦИЮ
     const dist = fastDeltaE(targetLab, lab)
 
-    if (dist < best.deltaE) {
-      best.deltaE = dist
-      best.rgb = rgb
-      const full = new Array(n).fill(0)
-      for (let i = 0; i < indices.length; i++) {
-        full[indices[i]] = vols[i]
-      }
-      best.volumes = full
-    }
+    topResults.push({ indices, volumes: [...vols], rgb, deltaE: dist })
+    topResults.sort((a, b) => a.deltaE - b.deltaE)
+    if (topResults.length > 5) topResults.pop()
   }
 
-  // --- ГРУБЫЙ ПЕРЕБОР С БЫСТРОЙ ДИСТАНЦИЕЙ ---
+  // --- 3. ГРУБЫЙ ПЕРЕБОР С РАСШИРЕННОЙ СЕТКОЙ ---
 
   // k = 1
-  for (let i = 0; i < n; i++) {
-    evaluateFast([i], [100])
-  }
+  for (let i = 0; i < n; i++) tryAddResult([i], [100])
 
-  // k = 2
+  // k = 2 (Включая микродозы 98/2 и 95/5 для черного/темного)
   const ratios2 = [
-    [90, 10], [80, 20], [70, 30], [60, 40], [50, 50]
+    [98, 2], [95, 5], [90, 10], [80, 20], [70, 30], [60, 40], [50, 50]
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
-      evaluateFast([i, j], [a, b])
-      if (a !== b) evaluateFast([i, j], [b, a])
+      tryAddResult([i, j], [a, b])
+      if (a !== b) tryAddResult([i, j], [b, a])
     }
   }
 
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
-      [80, 10, 10], [60, 30, 10], [50, 30, 20], [40, 40, 20], [34, 33, 33]
+      [90, 8, 2], [85, 10, 5], [80, 15, 5], [70, 20, 10], 
+      [60, 30, 10], [50, 30, 20], [40, 40, 20], [34, 33, 33]
     ]
     for (const combo of combinations(n, 3)) {
       for (const ratio of ratios3) {
-        evaluateFast(combo, ratio)
-        evaluateFast(combo, [ratio[0], ratio[2], ratio[1]])
-        evaluateFast(combo, [ratio[1], ratio[0], ratio[2]])
-        evaluateFast(combo, [ratio[1], ratio[2], ratio[0]])
-        evaluateFast(combo, [ratio[2], ratio[0], ratio[1]])
-        evaluateFast(combo, [ratio[2], ratio[1], ratio[0]])
+        // Проверяем все перестановки для 3 элементов
+        const perms = [
+          [ratio[0], ratio[1], ratio[2]], [ratio[0], ratio[2], ratio[1]],
+          [ratio[1], ratio[0], ratio[2]], [ratio[1], ratio[2], ratio[0]],
+          [ratio[2], ratio[0], ratio[1]], [ratio[2], ratio[1], ratio[0]]
+        ]
+        const uniquePerms = Array.from(new Set(perms.map(JSON.stringify))).map(s => JSON.parse(s))
+        for (const p of uniquePerms) tryAddResult(combo, p)
       }
     }
   }
 
-  if (best.deltaE === Infinity) return null
+  if (topResults.length === 0) return null
 
-  // --- ПЕРЕХОД НА ТОЧНЫЙ DeltaE2000 ДЛЯ ЛОКАЛЬНОЙ ДОВОДКИ ---
-  best.deltaE = calculateDeltaE2000(targetLab, rgbToLab(best.rgb.r, best.rgb.g, best.rgb.b))
+  // --- 4. ТОЧНАЯ ДОВОДКА (CIEDE2000 + ПРОПОРЦИОНАЛЬНЫЙ ГРАДИЕНТ) ---
+  
+  let absoluteBest: BestResult = topResults[0]
+  absoluteBest.deltaE = Infinity // Сбросим для точного пересчета
 
-  const activeIndices = best.volumes
-    .map((v, i) => (v > 0 ? i : -1))
-    .filter((i) => i >= 0)
+  // Множители для плавной корректировки объемов (микро-шаги)
+  const adjustments = [0.85, 0.95, 1.05, 1.15]
 
-  // ТОЧНАЯ ФУНКЦИЯ ОЦЕНКИ
-  const evaluatePrecise = (indices: number[], vols: number[]): boolean => {
-    const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
-    for (let i = 0; i < indices.length; i++) {
-      if (vols[i] > 0) {
-        components.push({
-          spectrum: candidates[indices[i]].spectrum!,
-          volume: vols[i],
-        })
-      }
+  for (let candidate of topResults) {
+    // Пересчитываем точный DeltaE2000 для старта
+    let currentVols = [...candidate.volumes]
+    
+    const evaluate = (vols: number[]) => {
+      const components = candidate.indices.map((idx, i) => ({
+        spectrum: candidates[idx].spectrum!,
+        volume: vols[i]
+      }))
+      const mixed = mixSpectra(components)
+      const rgb = spectrumToRGB(mixed)
+      const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+      return { rgb, deltaE: calculateDeltaE2000(targetLab, lab) }
     }
-    if (components.length === 0) return false
 
-    const mixed = mixSpectra(components)
-    const rgb = spectrumToRGB(mixed)
-    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    const deltaE = calculateDeltaE2000(targetLab, lab) // ТУТ ТОЧНАЯ ДИСТАНЦИЯ
+    let currentRes = evaluate(currentVols)
 
-    if (deltaE < best.deltaE - 0.0005) {
-      best.deltaE = deltaE
-      best.rgb = rgb
-      const full = new Array(n).fill(0)
-      for (let i = 0; i < indices.length; i++) full[indices[i]] = vols[i]
-      best.volumes = full
-      return true
-    }
-    return false
-  }
+    // Пытаемся улучшить результат 3 раза (эпохи)
+    for (let pass = 0; pass < 3; pass++) {
+      let improved = false
 
-  // Жадная доводка
-  const greedyDeltas = [-5, -2, 2, 5]
-  for (let pass = 0; pass < 2; pass++) {
-    let improved = false
-    const base = [...best.volumes]
-
-    for (const idx of activeIndices) {
-      for (const d of greedyDeltas) {
-        const trial = [...base]
-        trial[idx] = Math.max(1.5, Math.min(110, base[idx] + d))
-
-        const inds: number[] = []
-        const vs: number[] = []
-        for (let i = 0; i < n; i++) {
-          if (trial[i] > 0) {
-            inds.push(i)
-            vs.push(trial[i])
+      for (let i = 0; i < currentVols.length; i++) {
+        for (const adj of adjustments) {
+          const trialVols = [...currentVols]
+          // Умножаем, а не прибавляем. Минимум 0.1, Максимум 100
+          trialVols[i] = Math.max(0.1, Math.min(100, trialVols[i] * adj))
+          
+          const trialRes = evaluate(trialVols)
+          
+          if (trialRes.deltaE < currentRes.deltaE - 0.001) {
+            currentRes = trialRes
+            currentVols = trialVols
+            improved = true
           }
         }
-        
-        if (evaluatePrecise(inds, vs)) {
-          improved = true
-        }
+      }
+      if (!improved) break
+    }
+
+    // Сохраняем, если это лучший результат среди всех Топ-5
+    if (currentRes.deltaE < absoluteBest.deltaE) {
+      absoluteBest = {
+        indices: candidate.indices,
+        volumes: currentVols,
+        rgb: currentRes.rgb,
+        deltaE: currentRes.deltaE
       }
     }
-    if (!improved) break
   }
 
-  // Масштабирование
-  const total = best.volumes.reduce((s, v) => s + v, 0)
-  if (total <= 0) return null
+  // --- 5. ФИНАЛЬНОЕ МАСШТАБИРОВАНИЕ И ВЫВОД ---
+  const totalWeight = absoluteBest.volumes.reduce((sum, v) => sum + v, 0)
+  if (totalWeight <= 0) return null
 
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
-  const scale = scaleTarget / total
+  const scale = scaleTarget / totalWeight
 
-  const recipe = candidates
-    .map((p, i) => ({
-      pigment: p,
-      ml: Math.round(best.volumes[i] * scale * 10) / 10,
+  const recipe = absoluteBest.indices
+    .map((candidateIdx, i) => ({
+      pigment: candidates[candidateIdx],
+      ml: Math.round(absoluteBest.volumes[i] * scale * 10) / 10,
     }))
-    .filter((r) => r.ml > 0)
+    .filter((r) => r.ml > 0) // Убираем компоненты, которых < 0.1 мл
     .sort((a, b) => b.ml - a.ml)
 
   return {
     recipe,
-    resultRgb: best.rgb,
-    resultHex: rgbToHex(best.rgb),
-    deltaE: Math.round(best.deltaE * 10) / 10,
+    resultRgb: absoluteBest.rgb,
+    resultHex: rgbToHex(absoluteBest.rgb),
+    deltaE: Math.round(absoluteBest.deltaE * 10) / 10,
   }
 }
 
