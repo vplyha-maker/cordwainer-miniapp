@@ -64,49 +64,189 @@ export const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-export function getOstwaldNeutralizer(pigmentId: string, pigments: Pigment[]): string {
-  const pigment = pigments.find((p) => p.id === pigmentId)
-  if (!pigment?.hex) return 'ultramarine'
-
-  const hex = pigment.hex.replace('#', '')
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  const delta = max - min
-
-  if (delta < 25) return 'ultramarine'
-
-  if (r > 150 && g > 120 && b < 110) {
-    const violet = pigments.find(p => p.id.includes('ultramarine') || p.id.includes('violet') || p.id.includes('purple'))
-    return violet?.id || 'ultramarine'
-  }
-
-  if (r > 160 && g > 70 && g < 150 && b < 90) {
-    const blue = pigments.find(p => p.id.includes('ultramarine') || p.id.includes('prussian') || p.id.includes('cobalt_blue') || p.id.includes('phthalo'))
-    return blue?.id || 'ultramarine'
-  }
-
-  if (g > r + 20 && g > b + 20) {
-    const red = pigments.find(p => p.id.includes('cadmium_red') || p.id.includes('iron_oxide') || p.id.includes('venetian') || p.id.includes('scarlet'))
-    return red?.id || 'cadmium_red'
-  }
-
-  if (b > r + 15 && b > g + 10) {
-    const warm = pigments.find(p => p.id.includes('cadmium_orange') || p.id.includes('cadmium_yellow') || p.id.includes('ochre'))
-    return warm?.id || 'cadmium_yellow'
-  }
-
-  if (r > g + 30 && r > b + 30) {
-    const green = pigments.find(p => p.id.includes('phthalo_green') || p.id.includes('green_earth') || p.id.includes('viridian'))
-    return green?.id || 'green_earth'
-  }
-
-  return 'ultramarine'
+// Утилиты для перевода RGB в LAB для точного визуального сравнения (CIE76)
+function rgbToLab(r: number, g: number, b: number) {
+  let r_ = r / 255, g_ = g / 255, b_ = b / 255;
+  r_ = r_ > 0.04045 ? Math.pow((r_ + 0.055) / 1.055, 2.4) : r_ / 12.92;
+  g_ = g_ > 0.04045 ? Math.pow((g_ + 0.055) / 1.055, 2.4) : g_ / 12.92;
+  b_ = b_ > 0.04045 ? Math.pow((b_ + 0.055) / 1.055, 2.4) : b_ / 12.92;
+  
+  let x = (r_ * 0.4124 + g_ * 0.3576 + b_ * 0.1805) * 100;
+  let y = (r_ * 0.2126 + g_ * 0.7152 + b_ * 0.0722) * 100;
+  let z = (r_ * 0.0193 + g_ * 0.1192 + b_ * 0.9505) * 100;
+  
+  x /= 95.047; y /= 100.000; z /= 108.883;
+  
+  x = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + (16 / 116);
+  y = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + (16 / 116);
+  z = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + (16 / 116);
+  
+  return { L: (116 * y) - 16, a: 500 * (x - y), b: 200 * (y - z) };
 }
 
+function calculateDeltaELab(lab1: {L: number, a: number, b: number}, lab2: {L: number, a: number, b: number}) {
+  return Math.sqrt(
+    Math.pow(lab1.L - lab2.L, 2) + 
+    Math.pow(lab1.a - lab2.a, 2) + 
+    Math.pow(lab1.b - lab2.b, 2)
+  );
+}
+
+export function hexToRgbObj(hex: string) {
+  let c = hex.replace(/^#/, '')
+  if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
+  return {
+    r: parseInt(c.substring(0, 2), 16) || 0,
+    g: parseInt(c.substring(2, 4), 16) || 0,
+    b: parseInt(c.substring(4, 6), 16) || 0,
+  }
+}
+
+interface BestResult {
+  volumes: number[]
+  rgb: { r: number; g: number; b: number }
+  deltaE: number
+}
+
+// ГЛАВНЫЙ АЛГОРИТМ ПОИСКА
+export function findRecipeByHex(
+  targetHex: string,
+  basicPigments: Pigment[],
+  maxComponents = 3,
+  targetVolume = 20 // Масштабируем к объему пользователя
+) {
+  if (!basicPigments.length || !targetHex) return null
+
+  // 1. ЖЕСТКАЯ ФИЛЬТРАЦИЯ: Убираем пигменты без спектра
+  const validPigments = basicPigments.filter(p => p.spectrum && p.spectrum.length > 0)
+  if (validPigments.length === 0) return null
+
+  const targetRgb = hexToRgbObj(targetHex)
+  const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
+
+  // 2. УМНАЯ СОРТИРОВКА: Ищем топ N ближайших пигментов через LAB
+  const scoredPigments = validPigments.map(p => {
+    const rgb = spectrumToRGB(p.spectrum!)
+    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+    return { pigment: p, dist: calculateDeltaELab(targetLab, lab) }
+  })
+  
+  scoredPigments.sort((a, b) => a.dist - b.dist)
+  
+  // Берем топ 5 кандидатов, чтобы избежать взрыва комбинаторики (улучшает точность и не вешает браузер)
+  const candidates = scoredPigments.slice(0, 5).map(s => s.pigment)
+
+  let best: BestResult | null = null
+  
+  // ФУНКЦИЯ ОЦЕНКИ
+  const evaluateVolumes = (vols: number[]) => {
+    const total = vols.reduce((s, v) => s + v, 0)
+    if (total === 0) return
+
+    const components = []
+    let activeCount = 0
+    for (let i = 0; i < candidates.length; i++) {
+      if (vols[i] > 0) {
+        components.push({ spectrum: candidates[i].spectrum!, volume: vols[i] })
+        activeCount++
+      }
+    }
+
+    if (activeCount > maxComponents) return
+
+    const mixed = mixSpectra(components)
+    const rgb = spectrumToRGB(mixed)
+    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+    
+    // Внутренняя оценка БЕЗ округления
+    const deltaE = calculateDeltaELab(targetLab, lab)
+
+    if (!best || deltaE < best.deltaE) {
+      best = { volumes: [...vols], rgb, deltaE }
+    }
+  }
+
+  // 3. ЭТАП 1: ГРУБЫЙ ПОИСК (Coarse Search)
+  const coarseSteps = [0, 20, 45, 75, 100]
+  
+  const searchCoarse = (idx: number, vols: number[]) => {
+    if (idx === candidates.length) {
+      evaluateVolumes(vols)
+      return
+    }
+    for (const s of coarseSteps) {
+      vols[idx] = s
+      
+      let active = 0
+      for (let k = 0; k <= idx; k++) if (vols[k] > 0) active++
+      if (active > maxComponents) continue // Pruning
+
+      searchCoarse(idx + 1, vols)
+    }
+  }
+
+  searchCoarse(0, new Array(candidates.length).fill(0))
+
+  if (!best) return null
+
+  // 4. ЭТАП 2: ЛОКАЛЬНАЯ ОПТИМИЗАЦИЯ (Fine Tuning)
+  // Делаем сетку вокруг лучших значений для уточнения рецепта
+  const bestCoarseVolumes = [...best.volumes]
+  const fineDeltas = [-10, -5, 5, 10]
+  
+  const searchFine = (idx: number, currentVols: number[]) => {
+    if (idx === candidates.length) {
+      evaluateVolumes(currentVols)
+      return
+    }
+    
+    // Оптимизируем только те пигменты, которые алгоритм выбрал на грубом этапе
+    if (bestCoarseVolumes[idx] > 0) {
+      // Проверяем само значение
+      searchFine(idx + 1, currentVols)
+      
+      // И его отклонения
+      for (const delta of fineDeltas) {
+        const newVal = bestCoarseVolumes[idx] + delta
+        if (newVal > 0 && newVal <= 110) { 
+          const temp = [...currentVols]
+          temp[idx] = newVal
+          searchFine(idx + 1, temp)
+        }
+      }
+    } else {
+      searchFine(idx + 1, currentVols)
+    }
+  }
+
+  searchFine(0, [...bestCoarseVolumes])
+
+  // 5. МАСШТАБИРОВАНИЕ К ОБЪЕМУ
+  const finalBest = best as BestResult
+  const total = finalBest.volumes.reduce((s, v) => s + v, 0)
+  
+  // Если объем в UI нулевой, де-факто даем рецепт на 20 мл
+  const scaleTarget = targetVolume > 0 ? targetVolume : 20
+  const scale = scaleTarget / total
+
+  const recipe = candidates
+    .map((p, i) => ({
+      pigment: p,
+      ml: Math.round(finalBest.volumes[i] * scale * 10) / 10, 
+    }))
+    .filter((r) => r.ml > 0)
+
+  recipe.sort((a, b) => b.ml - a.ml)
+
+  return {
+    recipe,
+    resultRgb: finalBest.rgb,
+    resultHex: rgbToHex(finalBest.rgb),
+    deltaE: Math.round(finalBest.deltaE), // Округляем только для UI
+  }
+}
+
+// ... Остальные функции (simulateLayersKM, findBasicRecipe) остаются как были ...
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
@@ -145,208 +285,5 @@ export function simulateLayersKM(
     final: paintSpectrum,
     strength: Math.round(strength),
     deltaL,
-  }
-}
-
-export function findBasicRecipe(
-  targetSpectrum: SpectrumPoint[],
-  basicPigments: Pigment[],
-  maxComponents = 3
-): {
-  recipe: { pigment: Pigment; ml: number }[]
-  resultRgb: { r: number; g: number; b: number }
-  resultHex: string
-  deltaE: number
-} | null {
-  if (!basicPigments.length || !targetSpectrum.length) return null
-
-  const targetRgb = spectrumToRGB(targetSpectrum)
-
-  const scored = basicPigments.map((p) => {
-    const rgb = spectrumToRGB(p.spectrum!)
-    const dist = Math.sqrt(
-      (rgb.r - targetRgb.r) ** 2 +
-      (rgb.g - targetRgb.g) ** 2 +
-      (rgb.b - targetRgb.b) ** 2
-    )
-    return { pigment: p, dist }
-  })
-
-  scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, Math.min(maxComponents, scored.length)).map((s) => s.pigment)
-
-  if (candidates.length === 0) return null
-
-  interface BestResult {
-    volumes: number[]
-    rgb: { r: number; g: number; b: number }
-    deltaE: number
-  }
-
-  const bestHolder: { current: BestResult | null } = { current: null }
-  const steps = [0, 15, 30, 50, 70, 100]
-
-  const search = (idx: number, vols: number[]) => {
-    if (idx === candidates.length) {
-      const total = vols.reduce((s: number, v: number) => s + v, 0)
-      if (total < 8) return
-
-      const components = candidates.map((p, i) => ({
-        spectrum: p.spectrum!,
-        volume: vols[i],
-      }))
-
-      const mixed = mixSpectra(components)
-      const rgb = spectrumToRGB(mixed)
-      const deltaE = Math.sqrt(
-        (rgb.r - targetRgb.r) ** 2 +
-        (rgb.g - targetRgb.g) ** 2 +
-        (rgb.b - targetRgb.b) ** 2
-      )
-
-      if (!bestHolder.current || deltaE < bestHolder.current.deltaE) {
-        bestHolder.current = {
-          volumes: [...vols],
-          rgb,
-          deltaE,
-        }
-      }
-      return
-    }
-
-    for (const s of steps) {
-      vols[idx] = s
-      search(idx + 1, vols)
-    }
-  }
-
-  search(0, new Array(candidates.length).fill(0))
-
-  const best = bestHolder.current
-  if (!best) return null
-
-  const total = best.volumes.reduce((s: number, v: number) => s + v, 0)
-  const scale = 20 / total
-
-  const recipe = candidates
-    .map((p, i) => ({
-      pigment: p,
-      ml: Math.round(best.volumes[i] * scale * 10) / 10,
-    }))
-    .filter((r) => r.ml >= 0.5)
-
-  return {
-    recipe,
-    resultRgb: best.rgb,
-    resultHex: rgbToHex(best.rgb),
-    deltaE: Math.round(best.deltaE),
-  }
-}
-
-export function hexToRgbObj(hex: string) {
-  let c = hex.replace(/^#/, '')
-  if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
-  return {
-    r: parseInt(c.substring(0, 2), 16) || 0,
-    g: parseInt(c.substring(2, 4), 16) || 0,
-    b: parseInt(c.substring(4, 6), 16) || 0,
-  }
-}
-
-// НОВАЯ ФУНКЦИЯ: Оптимизирована производительность и точность цвета
-export function findRecipeByHex(
-  targetHex: string,
-  basicPigments: Pigment[],
-  maxComponents = 3 // Снижено до 3, чтобы алгоритм не вешал браузер
-) {
-  if (!basicPigments.length || !targetHex) return null
-
-  const targetRgb = hexToRgbObj(targetHex)
-  const candidates = basicPigments.slice(0, 6)
-  
-  if (candidates.length === 0) return null
-
-  interface BestResult {
-    volumes: number[]
-    rgb: { r: number; g: number; b: number }
-    deltaE: number
-  }
-
-  let best: BestResult | null = null
-  
-  // Уменьшенное количество шагов для быстродействия без потери точности
-  const steps = [0, 8, 20, 45, 75, 100]
-
-  const search = (idx: number, vols: number[]) => {
-    if (idx === candidates.length) {
-      const total = vols.reduce((s, v) => s + v, 0)
-      if (total === 0) return
-
-      const components = []
-      for (let i = 0; i < candidates.length; i++) {
-        if (vols[i] > 0) {
-          components.push({ spectrum: candidates[i].spectrum!, volume: vols[i] })
-        }
-      }
-
-      // Страховка от превышения компонентов
-      if (components.length === 0 || components.length > maxComponents) return
-
-      const mixed = mixSpectra(components)
-      const rgb = spectrumToRGB(mixed)
-      
-      // ИСПОЛЬЗУЕМ REDMEAN ALGORITHM: Лучшая формула для визуального сходства HEX
-      const rMean = (rgb.r + targetRgb.r) / 2
-      const rDiff = rgb.r - targetRgb.r
-      const gDiff = rgb.g - targetRgb.g
-      const bDiff = rgb.b - targetRgb.b
-      
-      const deltaE = Math.sqrt(
-        ((2 + rMean / 256) * rDiff * rDiff) + 
-        (4 * gDiff * gDiff) + 
-        ((2 + (255 - rMean) / 256) * bDiff * bDiff)
-      )
-
-      if (!best || deltaE < (best as BestResult).deltaE) {
-        best = { volumes: [...vols], rgb, deltaE }
-      }
-      return
-    }
-
-    for (const s of steps) {
-      vols[idx] = s
-
-      // ЖЕСТКОЕ ОТСЕЧЕНИЕ (Pruning): Не идём глубже, если компонентов уже больше максимума
-      let active = 0
-      for (let k = 0; k <= idx; k++) {
-        if (vols[k] > 0) active++
-      }
-      if (active > maxComponents) continue
-
-      search(idx + 1, vols)
-    }
-  }
-
-  search(0, new Array(candidates.length).fill(0))
-
-  if (!best) return null
-
-  const total = best.volumes.reduce((s, v) => s + v, 0)
-  const scale = 20 / total
-
-  const recipe = candidates
-    .map((p, i) => ({
-      pigment: p,
-      ml: Math.round(best!.volumes[i] * scale * 10) / 10, 
-    }))
-    .filter((r) => r.ml > 0)
-
-  recipe.sort((a, b) => b.ml - a.ml)
-
-  return {
-    recipe,
-    resultRgb: best.rgb,
-    resultHex: rgbToHex(best.rgb),
-    deltaE: Math.round(best.deltaE),
   }
 }
