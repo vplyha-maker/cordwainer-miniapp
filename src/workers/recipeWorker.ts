@@ -2,6 +2,7 @@
 
 import { findRecipeByHex } from '../utils/calculatorLogic'
 import type { Pigment } from '../data/pigments'
+import type { CoverageSystem } from '../utils/calculatorLogic'
 
 interface WorkerRequest {
   id: number
@@ -9,6 +10,7 @@ interface WorkerRequest {
   basicPigments: Pigment[]
   maxComponents?: number
   targetVolume?: number
+  system?: CoverageSystem
 }
 
 interface WorkerResponse {
@@ -24,12 +26,19 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     basicPigments,
     maxComponents = 3,
     targetVolume = 20,
+    // system пока не влияет на алгоритм подбора цвета —
+    // биндер и подсказки считаются на стороне UI
   } = e.data
 
   try {
+    // Исключаем биндер из подбора цвета (он не должен влиять на оттенок)
+    const colorPigments = basicPigments.filter(
+      (p) => p.id !== 'acrylic_binder' && p.id !== 'cardboard'
+    )
+
     const result = findRecipeByHex(
       targetHex,
-      basicPigments, // теперь сюда приходит весь список из 83 пигментов
+      colorPigments,
       maxComponents,
       targetVolume
     )
