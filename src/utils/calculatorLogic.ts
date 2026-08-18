@@ -194,7 +194,6 @@ export function hexToRgbObj(hex: string) {
 // Вспомогательные функции поиска
 // ==========================================
 
-/** Генерирует все комбинации размера k из массива индексов */
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = []
   const combo: number[] = []
@@ -222,12 +221,12 @@ interface BestResult {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (быстрый + качественный)
+// ГЛАВНЫЙ АЛГОРИТМ — быстрый вариант на пропорциях
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
   basicPigments: Pigment[],
-  maxComponents = 3,          // ← было 4, теперь 3 по умолчанию
+  maxComponents = 3,
   targetVolume = 20
 ) {
   if (!basicPigments.length || !targetHex) return null
@@ -238,14 +237,14 @@ export function findRecipeByHex(
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Сортируем и берём топ-7 (было 9)
+  // топ-6 кандидатов
   const scored = validPigments.map((p) => {
     const rgb = spectrumToRGB(p.spectrum!)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
   scored.sort((a, b) => a.dist - b.dist)
-  const candidates = scored.slice(0, 7).map((s) => s.pigment)
+  const candidates = scored.slice(0, 6).map((s) => s.pigment)
   const n = candidates.length
 
   const best: BestResult = {
@@ -254,7 +253,6 @@ export function findRecipeByHex(
     deltaE: Infinity,
   }
 
-  // Оценка конкретной комбинации + объёмов
   const evaluate = (indices: number[], vols: number[]) => {
     const components: { spectrum: SpectrumPoint[]; volume: number }[] = []
     for (let i = 0; i < indices.length; i++) {
@@ -283,70 +281,59 @@ export function findRecipeByHex(
     }
   }
 
-  // Быстрая сетка объёмов (5 значений вместо 9)
-  const volumeSteps = [8, 20, 40, 65, 100]
-  // Ещё грубее для k = 4 (если всё-таки передали maxComponents = 4)
-  const volumeStepsCoarse = [15, 40, 70, 100]
-
-  const searchVolumes = (indices: number[], steps: number[]) => {
-    const k = indices.length
-    if (k === 0) return
-
-    const vols = new Array(k).fill(0)
-
-    const rec = (pos: number) => {
-      if (pos === k) {
-        evaluate(indices, vols)
-        return
-      }
-      for (const s of steps) {
-        vols[pos] = s
-        rec(pos + 1)
-      }
-    }
-    rec(0)
+  // ——— Практические пропорции (вместо полного перебора) ———
+  // k = 1
+  for (let i = 0; i < n; i++) {
+    evaluate([i], [100])
   }
 
-  // ——— Основной цикл ———
-  for (let k = 1; k <= Math.min(maxComponents, n); k++) {
-    const combos = combinations(n, k)
-    const steps = k >= 4 ? volumeStepsCoarse : volumeSteps
-    for (const combo of combos) {
-      searchVolumes(combo, steps)
+  // k = 2
+  const ratios2 = [
+    [90, 10], [80, 20], [70, 30], [60, 40], [50, 50],
+    [85, 15], [75, 25],
+  ]
+  for (const [i, j] of combinations(n, 2)) {
+    for (const [a, b] of ratios2) {
+      evaluate([i, j], [a, b])
+      evaluate([i, j], [b, a]) // симметрия
     }
   }
 
-  // ——— Специальная обработка почти-чёрных целей (оставлена) ———
-  if (targetLab.L < 20 && Math.abs(targetLab.a) < 12 && Math.abs(targetLab.b) < 12) {
-    const redIdx = candidates.findIndex((p) =>
-      PURE_BASIC_COLORS[2].sourceIds.some((id) => id === p.id)
-    )
-    const blueIdx = candidates.findIndex((p) =>
-      PURE_BASIC_COLORS[4].sourceIds.some((id) => id === p.id)
-    )
-    const blackIdx = candidates.findIndex((p) =>
-      PURE_BASIC_COLORS[1].sourceIds.some((id) => id === p.id)
-    )
-
-    if (redIdx >= 0 && blueIdx >= 0 && blackIdx >= 0) {
-      evaluate([redIdx, blueIdx, blackIdx], [80, 15, 5])
-      evaluate([redIdx, blueIdx, blackIdx], [85, 10, 5])
-      evaluate([redIdx, blueIdx, blackIdx], [75, 20, 5])
-      evaluate([redIdx, blueIdx, blackIdx], [70, 25, 5])
-      evaluate([redIdx, blueIdx, blackIdx], [80, 10, 10])
-      evaluate([redIdx, blueIdx, blackIdx], [90, 5, 5])
+  // k = 3
+  if (maxComponents >= 3) {
+    const ratios3 = [
+      [80, 15, 5],   // классика для тёмных / чёрного
+      [85, 10, 5],
+      [75, 20, 5],
+      [70, 20, 10],
+      [60, 30, 10],
+      [50, 30, 20],
+      [70, 25, 5],
+      [90, 5, 5],
+      [60, 20, 20],
+    ]
+    for (const combo of combinations(n, 3)) {
+      for (const ratio of ratios3) {
+        // все перестановки пропорций
+        evaluate(combo, ratio)
+        evaluate(combo, [ratio[0], ratio[2], ratio[1]])
+        evaluate(combo, [ratio[1], ratio[0], ratio[2]])
+        evaluate(combo, [ratio[1], ratio[2], ratio[0]])
+        evaluate(combo, [ratio[2], ratio[0], ratio[1]])
+        evaluate(combo, [ratio[2], ratio[1], ratio[0]])
+      }
     }
   }
 
   if (best.deltaE === Infinity) return null
 
-  // ——— Локальная доводка (ограничена при > 3 компонентах) ———
+  // ——— Локальная доводка только лучших 1–3 компонентов ———
   const activeIndices = best.volumes
     .map((v, i) => (v > 0 ? i : -1))
     .filter((i) => i >= 0)
 
   if (activeIndices.length > 0 && activeIndices.length <= 3) {
-    const fineDeltas = [-15, -8, -4, 4, 8, 15]
+    const fineDeltas = [-12, -6, -3, 3, 6, 12]
     const baseVols = activeIndices.map((i) => best.volumes[i])
 
     const fineRec = (pos: number, current: number[]) => {
@@ -357,7 +344,7 @@ export function findRecipeByHex(
       fineRec(pos + 1, current)
       for (const d of fineDeltas) {
         const v = baseVols[pos] + d
-        if (v > 3 && v <= 120) {
+        if (v > 2 && v <= 110) {
           const next = [...current]
           next[pos] = v
           fineRec(pos + 1, next)
@@ -367,8 +354,8 @@ export function findRecipeByHex(
     fineRec(0, [...baseVols])
   }
 
-  // ——— Жадная доводка ———
-  const greedyDeltas = [-6, -3, 3, 6]
+  // ——— Лёгкая жадная доводка ———
+  const greedyDeltas = [-5, -2, 2, 5]
   for (let pass = 0; pass < 2; pass++) {
     let improved = false
     const base = [...best.volumes]
@@ -376,7 +363,7 @@ export function findRecipeByHex(
     for (const idx of activeIndices) {
       for (const d of greedyDeltas) {
         const trial = [...base]
-        trial[idx] = Math.max(2, Math.min(120, base[idx] + d))
+        trial[idx] = Math.max(2, Math.min(110, base[idx] + d))
         const prev = best.deltaE
 
         const inds: number[] = []
