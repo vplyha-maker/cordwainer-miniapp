@@ -1,13 +1,49 @@
 // src/workers/recipeWorker.ts
 
-// Пока без логики — только приём/ответ
-self.onmessage = (e: MessageEvent) => {
-  const { id, targetHex, basicPigments, maxComponents, targetVolume } = e.data
+import { findRecipeByHex } from '../utils/calculatorLogic'
+import type { Pigment } from '../data/pigments'
 
-  // Сюда потом вставим findRecipeByHex
-  const result = null // заглушка
-
-  self.postMessage({ id, result })
+interface WorkerRequest {
+  id: number
+  targetHex: string
+  basicPigments: Pigment[]
+  maxComponents?: number
+  targetVolume?: number
 }
 
-export {} // чтобы TypeScript не ругался
+interface WorkerResponse {
+  id: number
+  result: ReturnType<typeof findRecipeByHex>
+  error?: string
+}
+
+self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  const {
+    id,
+    targetHex,
+    basicPigments,
+    maxComponents = 3,
+    targetVolume = 20,
+  } = e.data
+
+  try {
+    const result = findRecipeByHex(
+      targetHex,
+      basicPigments,
+      maxComponents,
+      targetVolume
+    )
+
+    const response: WorkerResponse = { id, result }
+    self.postMessage(response)
+  } catch (err) {
+    const response: WorkerResponse = {
+      id,
+      result: null,
+      error: err instanceof Error ? err.message : String(err),
+    }
+    self.postMessage(response)
+  }
+}
+
+export {}
