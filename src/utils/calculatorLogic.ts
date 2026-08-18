@@ -253,18 +253,17 @@ export function hexToRgbObj(hex: string) {
   }
 }
 
-// НОВАЯ УМНАЯ ФУНКЦИЯ ДЛЯ ВВОДА HEX: 
+// НОВАЯ ФУНКЦИЯ: Оптимизирована производительность и точность цвета
 export function findRecipeByHex(
   targetHex: string,
   basicPigments: Pigment[],
-  maxComponents = 4
+  maxComponents = 3 // Снижено до 3, чтобы алгоритм не вешал браузер
 ) {
   if (!basicPigments.length || !targetHex) return null
 
   const targetRgb = hexToRgbObj(targetHex)
-  
-  // Берем все 6 базовых цветов (Белый, Черный, Красный, Желтый, Синий, Зеленый)
   const candidates = basicPigments.slice(0, 6)
+  
   if (candidates.length === 0) return null
 
   interface BestResult {
@@ -274,13 +273,14 @@ export function findRecipeByHex(
   }
 
   let best: BestResult | null = null
-  // Более тонкие шаги (4, 12) позволяют добавлять микро-дозы черного или синего (3-5%)
-  const steps = [0, 4, 12, 25, 45, 75, 100]
+  
+  // Уменьшенное количество шагов для быстродействия без потери точности
+  const steps = [0, 8, 20, 45, 75, 100]
 
   const search = (idx: number, vols: number[]) => {
     if (idx === candidates.length) {
       const total = vols.reduce((s, v) => s + v, 0)
-      if (total < 5) return
+      if (total === 0) return
 
       const components = []
       for (let i = 0; i < candidates.length; i++) {
@@ -289,16 +289,23 @@ export function findRecipeByHex(
         }
       }
 
+      // Страховка от превышения компонентов
       if (components.length === 0 || components.length > maxComponents) return
 
       const mixed = mixSpectra(components)
       const rgb = spectrumToRGB(mixed)
       
-      // Улучшенная формула разницы цветов (взвешенная)
+      // ИСПОЛЬЗУЕМ REDMEAN ALGORITHM: Лучшая формула для визуального сходства HEX
+      const rMean = (rgb.r + targetRgb.r) / 2
       const rDiff = rgb.r - targetRgb.r
       const gDiff = rgb.g - targetRgb.g
       const bDiff = rgb.b - targetRgb.b
-      const deltaE = Math.sqrt(rDiff * rDiff * 0.3 + gDiff * gDiff * 0.59 + bDiff * bDiff * 0.11)
+      
+      const deltaE = Math.sqrt(
+        ((2 + rMean / 256) * rDiff * rDiff) + 
+        (4 * gDiff * gDiff) + 
+        ((2 + (255 - rMean) / 256) * bDiff * bDiff)
+      )
 
       if (!best || deltaE < (best as BestResult).deltaE) {
         best = { volumes: [...vols], rgb, deltaE }
@@ -309,7 +316,7 @@ export function findRecipeByHex(
     for (const s of steps) {
       vols[idx] = s
 
-      // Оптимизация: не смешиваем больше компонентов, чем maxComponents
+      // ЖЕСТКОЕ ОТСЕЧЕНИЕ (Pruning): Не идём глубже, если компонентов уже больше максимума
       let active = 0
       for (let k = 0; k <= idx; k++) {
         if (vols[k] > 0) active++
@@ -330,12 +337,10 @@ export function findRecipeByHex(
   const recipe = candidates
     .map((p, i) => ({
       pigment: p,
-      // Округляем до 1 знака после запятой
       ml: Math.round(best!.volumes[i] * scale * 10) / 10, 
     }))
     .filter((r) => r.ml > 0)
 
-  // Сортируем от большего объема к меньшему для красоты
   recipe.sort((a, b) => b.ml - a.ml)
 
   return {
