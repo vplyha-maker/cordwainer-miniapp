@@ -109,7 +109,7 @@ const CIE_CMF = [
   { wl: 780, x: 0.000042, y: 0.000015, z: 0.000000 },
 ]
 
-// Illuminant D65 (каждые 5 нм, 380–780)
+// Illuminant D65
 const D65 = [
   49.9755, 52.3118, 54.6482, 68.7015, 82.7549, 87.1204, 91.486, 92.4589, 93.4318,
   90.057, 86.6823, 95.7736, 104.865, 110.936, 117.008, 117.41, 117.812, 116.336,
@@ -122,7 +122,6 @@ const D65 = [
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
 ]
 
-// Illuminant A (тёплая лампа накаливания \~2856K)
 const ILLUMINANT_A = [
   9.7951, 10.863, 12.052, 13.786, 15.452, 16.236, 17.507, 18.912, 20.46,
   22.156, 23.999, 25.991, 28.125, 30.397, 32.809, 35.358, 38.038, 40.84,
@@ -135,7 +134,6 @@ const ILLUMINANT_A = [
   22.662, 21.225, 19.892, 18.657, 17.515, 16.458, 15.481, 14.578, 13.743,
 ]
 
-// Холодный белый (приближение LED / F7 \~5000K)
 const ILLUMINANT_COOL = [
   55.2, 58.1, 61.0, 72.5, 84.1, 87.9, 91.8, 92.4, 93.0,
   90.8, 88.6, 96.2, 103.8, 108.5, 113.2, 113.5, 113.8, 112.6,
@@ -148,7 +146,6 @@ const ILLUMINANT_COOL = [
   77.8, 72.5, 67.2, 68.4, 69.6, 68.7, 67.8, 65.2, 62.6,
 ]
 
-// Сумерки (смещение в сине-фиолетовую область + общее затемнение)
 const ILLUMINANT_TWILIGHT = [
   38.0, 42.0, 48.0, 62.0, 78.0, 85.0, 92.0, 95.0, 98.0,
   96.0, 94.0, 102.0, 110.0, 112.0, 114.0, 110.0, 106.0, 100.0,
@@ -168,8 +165,6 @@ const ILLUMINANTS: Record<IlluminantType, number[]> = {
   twilight: ILLUMINANT_TWILIGHT,
 }
 
-// --- Вспомогательные функции для физики смешивания (Кубелка-Мунк) ---
-
 function reflectanceToKS(r: number): number {
   const clampedR = Math.max(0.0001, Math.min(0.9999, r))
   return Math.pow(1 - clampedR, 2) / (2 * clampedR)
@@ -179,8 +174,6 @@ function ksToReflectance(ks: number): number {
   const r = 1 + ks - Math.sqrt(Math.pow(ks, 2) + 2 * ks)
   return Math.max(0, Math.min(1, r))
 }
-
-// --------------------------------------------------------------------
 
 export function parseSpectrum(text: string): SpectrumPoint[] {
   const lines = text.trim().split(/\r?\n/)
@@ -224,16 +217,10 @@ function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): 
   return p1.reflectance + t * (p2.reflectance - p1.reflectance)
 }
 
-/**
- * Старая функция (для обратной совместимости) — всегда D65
- */
 export function spectrumToXYZ(spectrum: SpectrumPoint[]): XYZ {
   return spectrumToXYZWithIlluminant(spectrum, 'D65')
 }
 
-/**
- * Пересчёт спектра в XYZ под выбранным осветителем
- */
 export function spectrumToXYZWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
@@ -287,15 +274,59 @@ function linearToSrgb(c: number): number {
 }
 
 /**
- * Старая функция (для обратной совместимости) — всегда D65
+ * Коррекция для тёмных насыщенных цветов
  */
-export function spectrumToRGB(spectrum: SpectrumPoint[]): RGB {
-  return spectrumToRGBWithIlluminant(spectrum, 'D65')
+export function correctDarkColor(rgb: RGB, targetHex?: string): RGB {
+  if (!targetHex) {
+    const max = Math.max(rgb.r, rgb.g, rgb.b)
+    const min = Math.min(rgb.r, rgb.g, rgb.b)
+    const chroma = max - min
+
+    if (max < 140 && chroma > 20) {
+      const factor = 1.25
+      const gray = (rgb.r + rgb.g + rgb.b) / 3
+      return {
+        r: Math.min(255, Math.round(gray + (rgb.r - gray) * factor)),
+        g: Math.min(255, Math.round(gray + (rgb.g - gray) * factor)),
+        b: Math.min(255, Math.round(gray + (rgb.b - gray) * factor)),
+      }
+    }
+    return rgb
+  }
+
+  const target = {
+    r: parseInt(targetHex.slice(1, 3), 16),
+    g: parseInt(targetHex.slice(3, 5), 16),
+    b: parseInt(targetHex.slice(5, 7), 16),
+  }
+
+  const targetMax = Math.max(target.r, target.g, target.b)
+  const currentMax = Math.max(rgb.r, rgb.g, rgb.b)
+
+  let scale = 1
+  if (currentMax > targetMax + 15) {
+    scale = targetMax / Math.max(currentMax, 1)
+  }
+
+  let r = Math.round(rgb.r * scale)
+  let g = Math.round(rgb.g * scale)
+  let b = Math.round(rgb.b * scale)
+
+  const gray = (r + g + b) / 3
+  const factor = 1.35
+
+  r = Math.min(255, Math.round(gray + (r - gray) * factor))
+  g = Math.min(255, Math.round(gray + (g - gray) * factor))
+  b = Math.min(255, Math.round(gray + (b - gray) * factor))
+
+  return { r, g, b }
 }
 
-/**
- * Полный путь: спектр → RGB под выбранным освещением
- */
+export function spectrumToRGB(spectrum: SpectrumPoint[], targetHex?: string): RGB {
+  const rgb = spectrumToRGBWithIlluminant(spectrum, 'D65')
+  return correctDarkColor(rgb, targetHex)
+}
+
 export function spectrumToRGBWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
