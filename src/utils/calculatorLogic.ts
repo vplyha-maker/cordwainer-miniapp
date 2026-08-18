@@ -273,7 +273,7 @@ export function findRecipeByHex(
         { spectrum: preferredBlue.spectrum!, volume: b },
         { spectrum: preferredBlack.spectrum!, volume: k },
       ])
-      const rgb = spectrumToRGB(mixed, targetHex)
+      const rgb = spectrumToRGB(mixed)
       const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
       const deltaE = calculateDeltaE2000(targetLab, lab)
 
@@ -346,7 +346,7 @@ export function findRecipeByHex(
     if (components.length === 0) return
 
     const mixed = mixSpectra(components)
-    const rgb = spectrumToRGB(mixed, targetHex)
+    const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     const deltaE = calculateDeltaE2000(targetLab, lab)
 
