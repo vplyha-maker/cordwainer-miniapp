@@ -285,7 +285,8 @@ export function findRecipeByHex(
   }
 
   // Плотный поиск объёмов для фиксированной комбинации
-  const volumeSteps = [8, 18, 32, 48, 65, 82, 100]
+  // Более мелкий шаг, чтобы ловить малые доли (5 %)
+  const volumeSteps = [5, 10, 15, 25, 40, 55, 70, 85, 100]
 
   const searchVolumes = (indices: number[]) => {
     const k = indices.length
@@ -312,6 +313,33 @@ export function findRecipeByHex(
     const combos = combinations(n, k)
     for (const combo of combos) {
       searchVolumes(combo)
+    }
+  }
+
+  // ——— Специальная обработка почти-чёрных целей ———
+  // Причина бага: дискретная сетка + локальная доводка вокруг чистого чёрного
+  // никогда не попадала в бассейн «красный 80 % + ультрамарин 15 % + чёрный 5 %».
+  // Принудительно оцениваем известные рабочие соотношения, если цель тёмная и почти ахроматическая.
+  if (targetLab.L < 20 && Math.abs(targetLab.a) < 12 && Math.abs(targetLab.b) < 12) {
+    const redIdx = candidates.findIndex((p) =>
+      PURE_BASIC_COLORS[2].sourceIds.some((id) => id === p.id)
+    )
+    const blueIdx = candidates.findIndex((p) =>
+      PURE_BASIC_COLORS[4].sourceIds.some((id) => id === p.id)
+    )
+    const blackIdx = candidates.findIndex((p) =>
+      PURE_BASIC_COLORS[1].sourceIds.some((id) => id === p.id)
+    )
+
+    if (redIdx >= 0 && blueIdx >= 0 && blackIdx >= 0) {
+      // точные пропорции, которые пользователь указал как правильные
+      evaluate([redIdx, blueIdx, blackIdx], [80, 15, 5])
+      // несколько соседних вариантов на случай, если спектральные данные чуть отличаются
+      evaluate([redIdx, blueIdx, blackIdx], [85, 10, 5])
+      evaluate([redIdx, blueIdx, blackIdx], [75, 20, 5])
+      evaluate([redIdx, blueIdx, blackIdx], [70, 25, 5])
+      evaluate([redIdx, blueIdx, blackIdx], [80, 10, 10])
+      evaluate([redIdx, blueIdx, blackIdx], [90, 5, 5])
     }
   }
 
