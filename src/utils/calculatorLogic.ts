@@ -239,35 +239,11 @@ export function findRecipeByHex(
 
   // Тёмно-красный / почти чёрный с красным оттенком
   const isDarkReddish =
-    targetLab.L < 38 &&
-    targetLab.a > 12 &&
-    Math.abs(targetLab.b) < 28
+    targetLab.L < 40 &&
+    targetLab.a > 10 &&
+    Math.abs(targetLab.b) < 30
 
-  // 1. Считаем расстояние
-  const scored = validPigments.map((p) => {
-    const rgb = spectrumToRGB(p.spectrum!)
-    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
-  })
-  scored.sort((a, b) => a.dist - b.dist)
-
-  // 2. Топ-6
-  let candidates = scored.slice(0, 6).map((s) => s.pigment)
-
-  // 3. Принудительно добавляем красный / синий / чёрный
-  const forceIds = [
-    ...PURE_BASIC_COLORS[2].sourceIds,
-    ...PURE_BASIC_COLORS[4].sourceIds,
-    ...PURE_BASIC_COLORS[1].sourceIds,
-  ]
-  for (const id of forceIds) {
-    const p = validPigments.find((x) => x.id === id)
-    if (p && !candidates.some((c) => c.id === p.id)) {
-      candidates.push(p)
-    }
-  }
-
-  // Ищем предпочтительные пигменты по id
+  // Ищем нужные пигменты
   const preferredRed = validPigments.find(
     (p) =>
       p.id.includes('carmine') ||
@@ -290,15 +266,99 @@ export function findRecipeByHex(
       p.id.includes('lamp')
   )
 
-  if (preferredRed && !candidates.some((c) => c.id === preferredRed.id)) {
-    candidates.push(preferredRed)
+  // ==========================================
+  // ЖЁСТКИЙ ПРИОРИТЕТ правильной пропорции
+  // ==========================================
+  if (isDarkReddish && preferredRed && preferredBlue && preferredBlack) {
+    const variants = [
+      [80, 15, 5],
+      [82, 13, 5],
+      [78, 16, 6],
+      [85, 12, 3],
+      [75, 18, 7],
+      [80, 12, 8],
+      [83, 14, 3],
+      [79, 15, 6],
+    ]
+
+    let bestForced: {
+      volumes: number[]
+      rgb: { r: number; g: number; b: number }
+      deltaE: number
+    } | null = null
+
+    for (const [r, b, k] of variants) {
+      const mixed = mixSpectra([
+        { spectrum: preferredRed.spectrum!, volume: r },
+        { spectrum: preferredBlue.spectrum!, volume: b },
+        { spectrum: preferredBlack.spectrum!, volume: k },
+      ])
+      const rgb = spectrumToRGB(mixed)
+      const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+      const deltaE = calculateDeltaE2000(targetLab, lab)
+
+      if (!bestForced || deltaE < bestForced.deltaE) {
+        bestForced = {
+          volumes: [r, b, k],
+          rgb,
+          deltaE,
+        }
+      }
+    }
+
+    // Если нашлась приемлемая комбинация — сразу возвращаем её
+    if (bestForced && bestForced.deltaE < 25) {
+      const total = bestForced.volumes.reduce((s, v) => s + v, 0)
+      const scale = (targetVolume > 0 ? targetVolume : 20) / total
+
+      return {
+        recipe: [
+          {
+            pigment: preferredRed,
+            ml: Math.round(bestForced.volumes[0] * scale * 10) / 10,
+          },
+          {
+            pigment: preferredBlue,
+            ml: Math.round(bestForced.volumes[1] * scale * 10) / 10,
+          },
+          {
+            pigment: preferredBlack,
+            ml: Math.round(bestForced.volumes[2] * scale * 10) / 10,
+          },
+        ].sort((a, b) => b.ml - a.ml),
+        resultRgb: bestForced.rgb,
+        resultHex: rgbToHex(bestForced.rgb),
+        deltaE: Math.round(bestForced.deltaE * 10) / 10,
+      }
+    }
   }
-  if (preferredBlue && !candidates.some((c) => c.id === preferredBlue.id)) {
-    candidates.push(preferredBlue)
+
+  // ——— Обычный поиск (если приоритетная комбинация не сработала) ———
+
+  const scored = validPigments.map((p) => {
+    const rgb = spectrumToRGB(p.spectrum!)
+    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
+    return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
+  })
+  scored.sort((a, b) => a.dist - b.dist)
+
+  let candidates = scored.slice(0, 6).map((s) => s.pigment)
+
+  const forceIds = [
+    ...PURE_BASIC_COLORS[2].sourceIds,
+    ...PURE_BASIC_COLORS[4].sourceIds,
+    ...PURE_BASIC_COLORS[1].sourceIds,
+  ]
+  for (const id of forceIds) {
+    const p = validPigments.find((x) => x.id === id)
+    if (p && !candidates.some((c) => c.id === p.id)) {
+      candidates.push(p)
+    }
   }
-  if (preferredBlack && !candidates.some((c) => c.id === preferredBlack.id)) {
-    candidates.push(preferredBlack)
-  }
+
+  if (preferredRed && !candidates.some((c) => c.id === preferredRed.id)) candidates.push(preferredRed)
+  if (preferredBlue && !candidates.some((c) => c.id === preferredBlue.id)) candidates.push(preferredBlue)
+  if (preferredBlack && !candidates.some((c) => c.id === preferredBlack.id)) candidates.push(preferredBlack)
 
   if (candidates.length > 9) candidates = candidates.slice(0, 9)
 
@@ -338,12 +398,12 @@ export function findRecipeByHex(
     }
   }
 
-  // ——— k = 1 ———
+  // k = 1
   for (let i = 0; i < n; i++) {
     evaluate([i], [100])
   }
 
-  // ——— k = 2 ———
+  // k = 2
   const ratios2 = [
     [90, 10], [85, 15], [80, 20], [75, 25], [70, 30],
     [65, 35], [60, 40], [50, 50],
@@ -355,7 +415,7 @@ export function findRecipeByHex(
     }
   }
 
-  // ——— k = 3 ———
+  // k = 3
   if (maxComponents >= 3 && n >= 3) {
     const ratios3 = [
       [80, 15, 5],
@@ -377,33 +437,9 @@ export function findRecipeByHex(
     }
   }
 
-  // ==========================================
-  // ПРИОРИТЕТ правильной пропорции
-  // (красный 80% + ультрамарин 15% + чёрный 5%)
-  // ==========================================
-  if (isDarkReddish && preferredRed && preferredBlue && preferredBlack) {
-    const redIdx = candidates.findIndex((c) => c.id === preferredRed.id)
-    const blueIdx = candidates.findIndex((c) => c.id === preferredBlue.id)
-    const blackIdx = candidates.findIndex((c) => c.id === preferredBlack.id)
-
-    if (redIdx >= 0 && blueIdx >= 0 && blackIdx >= 0) {
-      // Основная правильная пропорция
-      evaluate([redIdx, blueIdx, blackIdx], [80, 15, 5])
-
-      // Близкие варианты
-      evaluate([redIdx, blueIdx, blackIdx], [82, 13, 5])
-      evaluate([redIdx, blueIdx, blackIdx], [78, 16, 6])
-      evaluate([redIdx, blueIdx, blackIdx], [85, 12, 3])
-      evaluate([redIdx, blueIdx, blackIdx], [75, 18, 7])
-      evaluate([redIdx, blueIdx, blackIdx], [80, 12, 8])
-      evaluate([redIdx, blueIdx, blackIdx], [80, 18, 2])
-      evaluate([redIdx, blueIdx, blackIdx], [83, 14, 3])
-    }
-  }
-
   if (best.deltaE === Infinity) return null
 
-  // ——— Лёгкая доводка ———
+  // Лёгкая доводка
   const activeIndices = best.volumes
     .map((v, i) => (v > 0.5 ? i : -1))
     .filter((i) => i >= 0)
@@ -421,7 +457,7 @@ export function findRecipeByHex(
     }
   }
 
-  // ——— Масштабирование ———
+  // Масштабирование
   const total = best.volumes.reduce((s, v) => s + v, 0)
   if (total <= 0) return null
 
