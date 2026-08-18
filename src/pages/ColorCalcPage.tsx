@@ -20,7 +20,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [isCalculating, setIsCalculating] = useState(false)
   const [copied, setCopied] = useState(false)
   
-  // Состояния для ввода
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
   const [isFocused, setIsFocused] = useState(false)
@@ -45,9 +44,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     lang,
   })
 
-  // Реакция на изменение объемов руками
   useEffect(() => {
-    // Обновляем инпут ТОЛЬКО если пользователь не держит его в фокусе (не печатает прямо сейчас)
     if (mixedColor?.hex && !isFocused && !userEdited.current) {
       const hex = mixedColor.hex.toUpperCase()
       setHexInput(hex)
@@ -63,7 +60,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     userEdited.current = false
   }, [paints, totalAmount])
 
-  // Загрузка пигментов при старте
   useEffect(() => {
     loadAllPigments()
       .then((loaded) => {
@@ -78,53 +74,55 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   // === Расчет рецепта по введенному HEX ===
   useEffect(() => {
-    // Считаем только если есть validHex (полные 6 символов)
-    if (userEdited.current && validHex && pigments.length > 0 && !loading) {
-      setIsCalculating(true)
-      
-      const timeoutId = setTimeout(() => {
-        const basicPigments = getPureBasicPigments(pigments)
-        const recipeData = findRecipeByHex(validHex, basicPigments, 4)
-
-        if (recipeData && recipeData.recipe.length > 0 && setPaints) {
-          const newPaints = recipeData.recipe.map((r) => ({
-            id: Math.random().toString(36).substring(2, 9),
-            pigmentId: r.pigment.id, 
-            amount: String(r.ml)
-          }))
-          
-          setPaints(newPaints)
-        }
-        setIsCalculating(false)
-      }, 50)
-
-      return () => clearTimeout(timeoutId)
-    } else if (!validHex) {
-      // Если стерли поле, останавливаем спиннер загрузки
-      setIsCalculating(false) 
+    if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
+      setIsCalculating(false)
+      return
     }
+
+    setIsCalculating(true)
+    
+    // Увеличен таймаут, чтобы React гарантированно успел отрендерить спиннер
+    const timeoutId = setTimeout(() => {
+      const basicPigments = getPureBasicPigments(pigments)
+      
+      // Ограничиваем до 3 компонентов, чтобы избежать блокировки (freezing)
+      const recipeData = findRecipeByHex(validHex, basicPigments, 3)
+
+      if (recipeData && recipeData.recipe.length > 0 && setPaints) {
+        const newPaints = recipeData.recipe.map((r) => ({
+          id: Math.random().toString(36).substring(2, 9),
+          pigmentId: r.pigment.id, 
+          amount: String(r.ml)
+        }))
+        
+        setPaints(newPaints)
+      }
+      setIsCalculating(false)
+    }, 120)
+
+    return () => clearTimeout(timeoutId)
   }, [validHex, pigments, loading, setPaints])
-  // =========================================
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
     
-    // Оставляем только HEX символы, максимум 6.
     let val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
     
     if (val.length === 0) {
       setHexInput('')
-      setValidHex(null) // Блокируем расчет
+      setValidHex(null)
+      setIsCalculating(false)
       return
     }
     
     setHexInput('#' + val)
     
-    // Запускаем алгоритм ТОЛЬКО когда введено ровно 6 символов
     if (val.length === 6) {
       setValidHex('#' + val.toUpperCase())
     } else {
-      setValidHex(null) // Во время печати 3-х, 4-х символов - не считаем
+      // Блокируем расчет и убираем спиннер, если HEX не полный
+      setValidHex(null) 
+      setIsCalculating(false)
     }
   }
 
@@ -133,7 +131,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (validHex) {
       setHexInput(validHex)
     } else if (mixedColor?.hex) {
-      // Если ввели неполный HEX (например #5b) и убрали фокус — возвращаем текущий цвет 
       setHexInput(mixedColor.hex.toUpperCase())
       setValidHex(mixedColor.hex.toUpperCase())
       userEdited.current = false
