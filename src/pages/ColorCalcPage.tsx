@@ -447,7 +447,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        <section className="bg-[#1C1816] rounded-2xl px-4 pt-4 pb-5">
+        <section className="bg-[#1C1816] rounded-2xl overflow-visible relative z-10">
           <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90 mb-4">
             {isUk ? 'Результат' : 'Результат'}
           </h2>
