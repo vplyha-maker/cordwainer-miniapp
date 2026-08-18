@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
@@ -7,6 +7,7 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
+import type { CoverageSystem } from '../utils/calculatorLogic'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -24,6 +25,9 @@ function generateId(): string {
   })
 }
 
+/** Доля биндера от объёма пигментов (акрил) */
+const BINDER_RATIO = 0.2 // 20%
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,16 +36,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [copied, setCopied] = useState(false)
   const [showCopyFallback, setShowCopyFallback] = useState(false)
 
+  // Система крашения
+  const [system, setSystem] = useState<CoverageSystem>('acrylic')
+
   const [hexInput, setHexInput] = useState('')
   const [validHex, setValidHex] = useState<string | null>(null)
   const [hexError, setHexError] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
 
-  // Последний целевой HEX, который ввёл пользователь
   const lastTargetHex = useRef<string | null>(null)
-  // Флаг: краски только что пришли из воркера (рецепт)
   const fromRecipeRef = useRef(false)
-
   const userEdited = useRef(false)
   const calcRef = useRef(0)
   const workerRef = useRef<Worker | null>(null)
@@ -63,6 +67,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     totalAmount,
     lang,
   })
+
+  // Биндер только для акрила (не входит в спектр смеси цвета)
+  const binderMl = useMemo(() => {
+    if (system !== 'acrylic' || totalAmount <= 0) return 0
+    return Math.round(totalAmount * BINDER_RATIO * 10) / 10
+  }, [system, totalAmount])
+
+  const grandTotal = totalAmount + binderMl
 
   const loadPigments = () => {
     setLoading(true)
@@ -93,7 +105,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
     worker.onmessage = (e: MessageEvent) => {
       const { id, result, error } = e.data
-
       if (id !== calcRef.current) return
 
       if (error) {
@@ -103,27 +114,26 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }
 
       if (result?.recipe?.length > 0 && setPaints) {
-        // Запоминаем, что это рецепт от HEX
         fromRecipeRef.current = true
         lastTargetHex.current = validHex
 
-        const newPaints = result.recipe.map(
-          (r: { pigment: { id: string }; ml: number }) => ({
+        const newPaints = result.recipe
+          .filter(
+            (r: { pigment: { id: string } }) =>
+              r.pigment.id !== 'acrylic_binder'
+          )
+          .map((r: { pigment: { id: string }; ml: number }) => ({
             id: generateId(),
             pigmentId: r.pigment.id,
             amount: String(r.ml),
-          })
-        )
+          }))
         setPaints(newPaints)
       }
 
       setIsCalculating(false)
     }
 
-    worker.onerror = () => {
-      setIsCalculating(false)
-    }
-
+    worker.onerror = () => setIsCalculating(false)
     workerRef.current = worker
 
     return () => {
@@ -133,10 +143,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }, [setPaints, validHex])
 
   // Синхронизация HEX при ручном смешивании
-  // После рецепта НЕ перезаписываем поле ввода
   useEffect(() => {
     if (fromRecipeRef.current) return
-
     if (mixedColor?.hex && !isFocused && !userEdited.current) {
       setHexInput(mixedColor.hex.toUpperCase())
     }
@@ -145,20 +153,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [mixedColor?.hex, isFocused])
 
-  // Когда меняются краски
   useEffect(() => {
     if (fromRecipeRef.current) {
-      // Рецепт только что пришёл — оставляем целевой HEX
       fromRecipeRef.current = false
-      if (lastTargetHex.current) {
-        setHexInput(lastTargetHex.current)
-      }
+      if (lastTargetHex.current) setHexInput(lastTargetHex.current)
       userEdited.current = false
       setValidHex(null)
       return
     }
-
-    // Обычное ручное изменение смеси
     userEdited.current = false
     setValidHex(null)
   }, [paints, totalAmount])
@@ -166,7 +168,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   // Debounce HEX
   useEffect(() => {
     if (!userEdited.current) return
-
     if (hexInput.length === 7) {
       const isValid = /^#[0-9A-Fa-f]{6}$/.test(hexInput)
       if (isValid) {
@@ -193,7 +194,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       setIsCalculating(false)
       return
     }
-
     if (!workerRef.current) return
 
     const id = ++calcRef.current
@@ -205,13 +205,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       basicPigments: pigments,
       maxComponents: 3,
       targetVolume: totalAmount > 0 ? totalAmount : 20,
+      system, // передаём систему
     })
-  }, [validHex, pigments, loading, totalAmount])
+  }, [validHex, pigments, loading, totalAmount, system])
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
     const val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
-
     if (val.length === 0) {
       setHexInput('')
       setValidHex(null)
@@ -219,17 +219,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       lastTargetHex.current = null
       return
     }
-
     setHexInput('#' + val)
   }
 
   const handleHexBlur = () => {
     setIsFocused(false)
-    if (validHex) {
-      setHexInput(validHex)
-    } else if (lastTargetHex.current) {
-      setHexInput(lastTargetHex.current)
-    } else if (mixedColor?.hex) {
+    if (validHex) setHexInput(validHex)
+    else if (lastTargetHex.current) setHexInput(lastTargetHex.current)
+    else if (mixedColor?.hex) {
       setHexInput(mixedColor.hex.toUpperCase())
       userEdited.current = false
     } else if (hexInput && !/^#[0-9A-Fa-f]{6}$/.test(hexInput)) {
@@ -238,20 +235,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const copyHex = async () => {
-    // Копируем то, что сейчас в поле (целевой или смешанный)
     const colorToCopy =
       hexInput ||
       (userEdited.current && validHex) ||
       (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null) ||
       validHex
-
     if (!colorToCopy) return
-
     if (!navigator.clipboard) {
       setShowCopyFallback(true)
       return
     }
-
     try {
       await navigator.clipboard.writeText(colorToCopy)
       setCopied(true)
@@ -263,10 +256,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const isUk = lang === 'uk'
 
-  // Квадрат:
-  // - пока считаем → показываем целевой HEX
-  // - после расчёта → реальный цвет смеси
-  // - пока пользователь просто печатает → целевой HEX
   const displayColor =
     isCalculating && (validHex || lastTargetHex.current)
       ? (validHex || lastTargetHex.current)!
@@ -284,6 +273,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       validHex ||
       lastTargetHex.current
   )
+
+  const systemLabel =
+    system === 'aniline'
+      ? isUk
+        ? 'Анілінова система'
+        : 'Анилиновая система'
+      : isUk
+        ? 'Акрилова / пігментна'
+        : 'Акриловая / пигментная'
+
+  const systemHint =
+    system === 'aniline'
+      ? isUk
+        ? 'Прозорі барвники, слабке укриття. Краще 2–3 тонкі шари.'
+        : 'Прозрачные красители, слабое укрытие. Лучше 2–3 тонких слоя.'
+      : isUk
+        ? 'Криючі пігменти + біндер. Сильне укриття, один шар часто достатній.'
+        : 'Кроющие пигменты + биндер. Сильное укрытие, часто хватает одного слоя.'
 
   return (
     <motion.div
@@ -314,7 +321,44 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-        <section className="bg-[#1C1816] rounded-2xl overflow-hidden">
+        {/* ===== СИСТЕМА ===== */}
+        <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5">
+          <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90 mb-3">
+            {isUk ? 'Система фарбування' : 'Система крашения'}
+          </h2>
+
+          <div className="flex gap-2 p-1 bg-black/30 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setSystem('aniline')}
+              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors ${
+                system === 'aniline'
+                  ? 'bg-[#D8A35C] text-black'
+                  : 'text-[#F5F1EA]/60 active:bg-white/5'
+              }`}
+            >
+              {isUk ? 'Анілін' : 'Анилин'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSystem('acrylic')}
+              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors ${
+                system === 'acrylic'
+                  ? 'bg-[#D8A35C] text-black'
+                  : 'text-[#F5F1EA]/60 active:bg-white/5'
+              }`}
+            >
+              {isUk ? 'Акрил / пігмент' : 'Акрил / пигмент'}
+            </button>
+          </div>
+
+          <p className="mt-2.5 text-[12px] leading-snug text-[#F5F1EA]/45">
+            {systemHint}
+          </p>
+        </section>
+
+        {/* ===== СОСТАВ ===== */}
+        <section className="bg-[#1C1816] rounded-2xl overflow-visible relative z-10">
           <div className="px-4 pt-4 pb-3 flex items-center justify-between">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
               {isUk ? 'Склад суміші' : 'Состав смеси'}
@@ -354,10 +398,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <div key={paint.id} className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       {pigments.length === 0 ? (
-                        <div
-                          className="h-12 rounded-xl bg-white/10 animate-pulse"
-                          aria-hidden
-                        />
+                        <div className="h-12 rounded-xl bg-white/10 animate-pulse" />
                       ) : (
                         <PigmentSelector
                           pigments={pigments}
@@ -417,23 +458,35 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       disabled={paints.length <= 1}
                       className="w-10 h-10 -mr-1 flex items-center justify-center rounded-full text-[#F5F1EA]/30 active:bg-white/5 disabled:opacity-20"
                     >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M18 6L6 18M6 6l12 12"
-                        />
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
                 ))}
+
+                {/* Биндер — только акрил */}
+                {system === 'acrylic' && totalAmount > 0 && (
+                  <div className="flex items-center gap-2 mt-1 pt-3 border-t border-dashed border-[#D8A35C]/30">
+                    <div className="flex-1 min-w-0 rounded-xl px-3 py-2.5 bg-[#D8A35C]/15 border border-[#D8A35C]/35">
+                      <p className="text-[13px] font-semibold text-[#D8A35C]">
+                        {isUk ? 'Акриловий біндер' : 'Акриловый биндер'}
+                      </p>
+                      <p className="text-[10px] text-[#F5F1EA]/45 mt-0.5">
+                        {isUk
+                          ? `авто: ${Math.round(BINDER_RATIO * 100)}% від пігментів`
+                          : `авто: ${Math.round(BINDER_RATIO * 100)}% от пигментов`}
+                      </p>
+                    </div>
+                    <div className="w-[64px] flex-shrink-0 bg-[#D8A35C]/20 text-[#D8A35C] rounded-xl px-2 py-3 text-center font-semibold text-[15px]">
+                      {binderMl}
+                    </div>
+                    <span className="text-[12px] text-[#D8A35C]/70 w-5 flex-shrink-0">
+                      мл
+                    </span>
+                    <div className="w-10 flex-shrink-0" />
+                  </div>
+                )}
               </div>
             )}
 
@@ -447,10 +500,16 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        <section className="bg-[#1C1816] rounded-2xl overflow-visible relative z-10">
-          <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90 mb-4">
-            {isUk ? 'Результат' : 'Результат'}
-          </h2>
+        {/* ===== РЕЗУЛЬТАТ ===== */}
+        <section className="bg-[#1C1816] rounded-2xl px-4 pt-4 pb-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
+              {isUk ? 'Результат' : 'Результат'}
+            </h2>
+            <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#D8A35C]/20 text-[#D8A35C] font-medium">
+              {systemLabel}
+            </span>
+          </div>
 
           <div className="flex flex-col items-center">
             <div
@@ -461,27 +520,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               style={{ backgroundColor: displayColor }}
             >
               {isCalculating && (
-                <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center z-10 transition-opacity">
+                <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center z-10">
                   <svg
                     className="animate-spin w-8 h-8 text-white mb-2"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
-                    aria-hidden="true"
                   >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                   <span className="text-[10px] text-white/90 font-medium">
                     {isUk ? 'Рахуємо...' : 'Считаем...'}
@@ -513,11 +560,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               <button
                 onClick={copyHex}
                 disabled={!hasColor}
-                aria-label={
-                  isUk
-                    ? `Копіювати ${displayColor}`
-                    : `Копировать ${displayColor}`
-                }
                 className="flex-shrink-0 h-12 px-4 rounded-xl bg-[#D8A35C] text-black text-[13px] font-semibold disabled:opacity-35 active:scale-[0.97]"
               >
                 {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
@@ -544,25 +586,43 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5 flex items-center justify-between">
-          <span className="text-[14px] text-[#F5F1EA]/50">
-            {isUk ? 'Загальний об’єм' : 'Общий объём'}
-          </span>
-          <span className="text-[17px] font-semibold tabular-nums text-[#F5F1EA]">
-            {totalAmount > 1000
-              ? `${(totalAmount / 1000).toFixed(2)} л`
-              : `${totalAmount.toFixed(1)} мл`}
-          </span>
+        {/* ===== ОБЪЁМ ===== */}
+        <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[14px] text-[#F5F1EA]/50">
+              {isUk ? 'Пігменти' : 'Пигменты'}
+            </span>
+            <span className="text-[15px] font-semibold tabular-nums text-[#F5F1EA]">
+              {totalAmount.toFixed(1)} мл
+            </span>
+          </div>
+
+          {system === 'acrylic' && binderMl > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] text-[#D8A35C]/80">
+                {isUk ? 'Біндер (20%)' : 'Биндер (20%)'}
+              </span>
+              <span className="text-[15px] font-semibold tabular-nums text-[#D8A35C]">
+                {binderMl.toFixed(1)} мл
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2 border-t border-white/8">
+            <span className="text-[14px] text-[#F5F1EA]/70 font-medium">
+              {isUk ? 'Загальний об’єм' : 'Общий объём'}
+            </span>
+            <span className="text-[17px] font-semibold tabular-nums text-[#F5F1EA]">
+              {grandTotal > 1000
+                ? `${(grandTotal / 1000).toFixed(2)} л`
+                : `${grandTotal.toFixed(1)} мл`}
+            </span>
+          </div>
         </section>
       </div>
 
       {showCopyFallback && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={isUk ? 'Копіювання' : 'Копирование'}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-[#1C1816] rounded-2xl p-5 w-full max-w-sm border border-white/10">
             <p className="text-[14px] text-[#F5F1EA] mb-3 text-center">
               {isUk
