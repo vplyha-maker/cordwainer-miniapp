@@ -147,44 +147,87 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden"
+      className="relative flex flex-col h-[100dvh] overflow-hidden"
+      style={{
+        background: 'var(--color-bg, #1C1816)',
+        color: 'var(--color-ink, #F5F1EA)',
+      }}
     >
-      <div className="relative z-20 flex items-center justify-between px-4 py-2 bg-[#151210]/95 backdrop-blur">
+      {/* Header */}
+      <div
+        className="relative z-20 flex items-center justify-between px-4 py-2 backdrop-blur"
+        style={{ background: 'color-mix(in srgb, var(--color-bg, #1C1816) 95%, transparent)' }}
+      >
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1D1815] border border-white/10 active:scale-95 transition-transform"
+          className="w-9 h-9 flex items-center justify-center rounded-full active:scale-95 transition-transform"
+          style={{
+            background: 'var(--color-surface, #25201C)',
+            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+          }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="text-center">
           <h1 className="text-[14px] font-semibold tracking-wide">{t.title}</h1>
-          <p className="text-[10px] text-[#8F867E] leading-none mt-0.5">{t.subtitle}</p>
+          <p className="text-[10px] leading-none mt-0.5" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+            {t.subtitle}
+          </p>
         </div>
         <div className="w-9 h-9" />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-hide">
         
-        <div className="bg-[#1D1815] rounded-3xl p-3.5 border border-white/5 space-y-4">
-          <div className="flex p-1 rounded-2xl bg-[#151210] border border-white/5">
+        {/* Main controls card */}
+        <div
+          className="rounded-3xl p-3.5 space-y-4"
+          style={{
+            background: 'var(--color-surface, #25201C)',
+            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 50%, transparent)',
+          }}
+        >
+          {/* Gender segmented */}
+          <div
+            className="flex p-1 rounded-2xl"
+            style={{
+              background: 'var(--color-bg, #1C1816)',
+              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+            }}
+          >
             {(['men', 'women', 'kids'] as Gender[]).map((g) => (
               <button
                 key={g} onClick={() => handleGender(g)}
                 className="flex-1 py-1.5 rounded-[12px] text-[12px] font-medium transition-all"
-                style={gender === g ? { background: THEMES[g].accentBg, color: THEMES[g].accentSoft } : { color: '#8F867E' }}
+                style={
+                  gender === g
+                    ? { background: THEMES[g].accentBg, color: THEMES[g].accentSoft }
+                    : { color: 'var(--color-muted, #B9ACA0)' }
+                }
               >
                 {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
               </button>
             ))}
           </div>
 
+          {/* Size stepper */}
           <div className="flex items-center justify-between px-1">
             <div className="flex flex-col">
-              <span className="text-[13px] font-medium text-[#F5F1EB]">{t.step1}</span>
-              <span className="text-[10px] text-[#8F867E]">({limits.min} - {limits.max})</span>
+              <span className="text-[13px] font-medium" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+                {t.step1}
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                ({limits.min} - {limits.max})
+              </span>
             </div>
             
-            <div className="flex items-center gap-3 bg-[#151210] p-1.5 rounded-full border border-white/5">
+            <div
+              className="flex items-center gap-3 p-1.5 rounded-full"
+              style={{
+                background: 'var(--color-bg, #1C1816)',
+                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+              }}
+            >
               <button
                 disabled={sizeEu <= limits.min} onClick={() => handleSizeChange(sizeEu - 1)}
                 className="w-9 h-9 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
@@ -205,8 +248,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             </div>
           </div>
 
+          {/* Width categories */}
           <div>
-            <span className="text-[13px] font-medium text-[#F5F1EB] block mb-2 px-1">{t.step2}</span>
+            <span className="text-[13px] font-medium block mb-2 px-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              {t.step2}
+            </span>
             <div className="grid grid-cols-4 gap-1.5">
               {(Object.keys(t.cats) as WidthCategory[]).map(cat => {
                 const isSelected = widthCat === cat
@@ -217,7 +263,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                     className="py-2 px-1 rounded-xl text-[11px] font-medium transition-all text-center leading-tight"
                     style={isSelected 
                       ? { background: theme.accentBg, color: theme.accentSoft, border: `1px solid ${theme.border}` }
-                      : { background: '#151210', color: '#8F867E', border: '1px solid transparent' }}
+                      : {
+                          background: 'var(--color-bg, #1C1816)',
+                          color: 'var(--color-muted, #B9ACA0)',
+                          border: '1px solid transparent',
+                        }}
                   >
                     {t.cats[cat]}
                   </button>
@@ -227,24 +277,42 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* ОСНОВНЫЕ РЕЗУЛЬТАТЫ - Максимальный контраст */}
+        {/* US / UK result cards */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
-            <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">US SIZE</span>
+          <div
+            className="rounded-2xl py-3 flex flex-col items-center justify-center"
+            style={{
+              background: 'var(--color-surface, #25201C)',
+              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+            }}
+          >
+            <span className="text-[10px] mb-0.5 font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+              US SIZE
+            </span>
             <motion.span 
-              key={`${result.us}-${widthCat}`}
+              key={`\( {result.us}- \){widthCat}`}
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="text-[28px] font-medium text-[#F5F1EB] leading-none"
+              className="text-[28px] font-medium leading-none"
+              style={{ color: 'var(--color-ink, #F5F1EA)' }}
             >
               {result.us}
             </motion.span>
           </div>
-          <div className="rounded-2xl bg-[#1D1815] border border-white/5 py-3 flex flex-col items-center justify-center">
-            <span className="text-[10px] text-[#8F867E] mb-0.5 font-medium">UK SIZE</span>
+          <div
+            className="rounded-2xl py-3 flex flex-col items-center justify-center"
+            style={{
+              background: 'var(--color-surface, #25201C)',
+              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+            }}
+          >
+            <span className="text-[10px] mb-0.5 font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+              UK SIZE
+            </span>
             <motion.span 
-              key={`${result.uk}-${widthCat}`}
+              key={`\( {result.uk}- \){widthCat}`}
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="text-[28px] font-medium text-[#F5F1EB] leading-none"
+              className="text-[28px] font-medium leading-none"
+              style={{ color: 'var(--color-ink, #F5F1EA)' }}
             >
               {result.uk}
             </motion.span>
@@ -252,16 +320,31 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
 
         {/* PRO DATA */}
-        <div className="rounded-3xl bg-[#1D1815] border border-white/5 p-3.5">
+        <div
+          className="rounded-3xl p-3.5"
+          style={{
+            background: 'var(--color-surface, #25201C)',
+            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+          }}
+        >
            <button
             onClick={() => { triggerHaptic(); setShowPro(!showPro) }}
             className="flex items-center justify-between w-full group"
           >
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium text-[#F5F1EB] group-hover:text-white transition-colors">{t.proModules}</span>
+              <span
+                className="text-[13px] font-medium transition-colors"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
+                {t.proModules}
+              </span>
               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={result.colorName[lang]} />
             </div>
-            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.2 }} className="text-[#8F867E]">
+            <motion.div
+              animate={{ rotate: showPro ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ color: 'var(--color-muted, #B9ACA0)' }}
+            >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
             </motion.div>
           </button>
@@ -276,40 +359,78 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* МАРКИРОВКИ: 3 блока */}
+                  {/* Маркировки */}
                   <div className="grid grid-cols-3 gap-1.5">
-                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.gostNum}</span>
-                      <motion.span key={result.gostNum} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[15px] font-medium text-[#F5F1EB] leading-none">
-                        {result.gostNum}
-                      </motion.span>
-                    </div>
-                    
-                    <div onClick={() => setActiveInfo('gostNum')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.gostLet}</span>
-                      <motion.span key={result.gostLetter} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[15px] font-medium text-[#F5F1EB] leading-none">
-                        {result.gostLetter}
-                      </motion.span>
-                    </div>
-                    
-                    <div onClick={() => setActiveInfo('iso')} className="bg-[#151210] rounded-xl p-2 flex flex-col items-center justify-center border border-white/5 cursor-pointer active:scale-95 transition-transform">
-                      <span className="text-[9px] text-[#8F867E] mb-1 text-center leading-tight whitespace-nowrap">{t.iso}</span>
-                      <motion.span key={result.euCode} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[15px] font-medium text-[#F5F1EB] leading-none">
-                        {result.euCode}
-                      </motion.span>
-                    </div>
+                    {([
+                      { key: 'gostNum' as const, label: t.gostNum, value: result.gostNum },
+                      { key: 'gostNum' as const, label: t.gostLet, value: result.gostLetter },
+                      { key: 'iso' as const, label: t.iso, value: result.euCode },
+                    ]).map((item, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setActiveInfo(item.key)}
+                        className="rounded-xl p-2 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                        style={{
+                          background: 'var(--color-bg, #1C1816)',
+                          border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+                        }}
+                      >
+                        <span
+                          className="text-[9px] mb-1 text-center leading-tight whitespace-nowrap"
+                          style={{ color: 'var(--color-muted, #B9ACA0)' }}
+                        >
+                          {item.label}
+                        </span>
+                        <motion.span
+                          key={String(item.value)}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-[15px] font-medium leading-none"
+                          style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                        >
+                          {item.value}
+                        </motion.span>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* ТАБЛИЦА ФИЗИЧЕСКИХ ПАРАМЕТРОВ */}
-                  <div className="bg-[#151210] rounded-xl border border-white/5 p-2.5">
-                    <div className="flex justify-between items-center pb-2 mb-2 border-b border-white/5">
-                      <span className="text-[11px] font-medium text-[#8F867E]">Mondopoint (мм/дюймы)</span>
-                      <div className="flex bg-[#1D1815] rounded-md p-0.5">
+                  {/* Таблица физических параметров */}
+                  <div
+                    className="rounded-xl p-2.5"
+                    style={{
+                      background: 'var(--color-bg, #1C1816)',
+                      border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+                    }}
+                  >
+                    <div
+                      className="flex justify-between items-center pb-2 mb-2"
+                      style={{
+                        borderBottom: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+                      }}
+                    >
+                      <span className="text-[11px] font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                        Mondopoint (мм/дюймы)
+                      </span>
+                      <div
+                        className="flex rounded-md p-0.5"
+                        style={{ background: 'var(--color-surface, #25201C)' }}
+                      >
                         {(['mm', 'in'] as Unit[]).map(u => (
                           <button 
-                            key={u} onClick={() => { triggerHaptic('light'); setUnit(u) }}
-                            className={`px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors ${unit === u ? 'bg-white/10 text-white' : 'text-[#8F867E]'}`}
-                          >{u}</button>
+                            key={u}
+                            onClick={() => { triggerHaptic('light'); setUnit(u) }}
+                            className="px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors"
+                            style={
+                              unit === u
+                                ? {
+                                    background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                                    color: 'var(--color-ink, #F5F1EA)',
+                                  }
+                                : { color: 'var(--color-muted, #B9ACA0)' }
+                            }
+                          >
+                            {u}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -323,15 +444,19 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
-                            <span className="text-[12px] text-white/90">{row.label}</span>
+                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`\( {row.valMm}- \){unit}`} />
+                            <span className="text-[12px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
+                              {row.label}
+                            </span>
                           </div>
                           <motion.span 
-                            key={`${row.valMm}-${unit}`}
+                            key={`\( {row.valMm}- \){unit}`}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-[14px] font-medium text-[#F5F1EB]"
+                            className="text-[14px] font-medium"
+                            style={{ color: 'var(--color-ink, #F5F1EA)' }}
                           >
-                            {unit === 'mm' ? row.valMm : row.valIn} <span className="text-[10px] font-normal opacity-50">{unit}</span>
+                            {unit === 'mm' ? row.valMm : row.valIn}{' '}
+                            <span className="text-[10px] font-normal opacity-50">{unit}</span>
                           </motion.span>
                         </div>
                       ))}
@@ -345,23 +470,36 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
       </div>
 
-      {/* Модальное окно */}
+      {/* Modal */}
       <AnimatePresence>
         {activeInfo && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            style={{ background: 'color-mix(in srgb, var(--color-bg, #1C1816) 80%, transparent)' }}
             onClick={() => setActiveInfo(null)}
           >
             <motion.div
               ref={modalRef}
               initial={prefersReducedMotion ? { scale: 1 } : { scale: 0.95, y: 10 }} 
-              animate={{ scale: 1, y: 0 }} exit={prefersReducedMotion ? { scale: 1 } : { scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={prefersReducedMotion ? { scale: 1 } : { scale: 0.95, y: 10 }}
               onClick={e => e.stopPropagation()}
-              className="w-full max-w-[280px] bg-[#1D1815] border border-white/10 rounded-3xl p-5 shadow-2xl"
+              className="w-full max-w-[280px] rounded-3xl p-5 shadow-2xl"
+              style={{
+                background: 'var(--color-surface, #25201C)',
+                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+              }}
             >
-              <h3 className="text-[15px] font-medium text-white mb-2">{t.modal[activeInfo].title}</h3>
-              <p className="text-[12px] text-[#8F867E] leading-relaxed mb-5">{t.modal[activeInfo].text}</p>
+              <h3 className="text-[15px] font-medium mb-2" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+                {t.modal[activeInfo].title}
+              </h3>
+              <p
+                className="text-[12px] leading-relaxed mb-5"
+                style={{ color: 'var(--color-muted, #B9ACA0)' }}
+              >
+                {t.modal[activeInfo].text}
+              </p>
               
               <button
                 onClick={() => setActiveInfo(null)}
@@ -381,4 +519,4 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       `}} />
     </motion.div>
   )
-}
+ }
