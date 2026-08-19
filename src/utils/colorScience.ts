@@ -1,13 +1,12 @@
 /**
  * colorScience.ts
- * Reflectance spectrum → XYZ → sRGB
- * CIE 1931 2° + Illuminant D65 / A / Cool / Twilight
- * Subtractive mixing via Kubelka-Munk theory
+ * Spectrophotometric processing, CIE XYZ / sRGB conversion, 
+ * and Two-Constant Kubelka-Munk Subtractive Color Mixing.
  */
 
 export interface SpectrumPoint {
-  wavelength: number // нм
-  reflectance: number // 0–100
+  wavelength: number // нм (380–780)
+  reflectance: number // 0–100 %
 }
 
 export interface RGB {
@@ -24,7 +23,13 @@ export interface XYZ {
 
 export type IlluminantType = 'D65' | 'A' | 'cool' | 'twilight'
 
-// CIE 1931 2° Color Matching Functions (каждые 5 нм, 380–780)
+export interface MixComponent {
+  spectrum: SpectrumPoint[]
+  volume: number
+  isBinder?: boolean // Флаг прозрачного связующего/лака
+}
+
+// CIE 1931 2° Color Matching Functions (380–780 нм, шаг 5 нм)
 const CIE_CMF = [
   { wl: 380, x: 0.001368, y: 0.000039, z: 0.006450 },
   { wl: 385, x: 0.002236, y: 0.000064, z: 0.010550 },
@@ -109,7 +114,7 @@ const CIE_CMF = [
   { wl: 780, x: 0.000042, y: 0.000015, z: 0.000000 },
 ]
 
-// Illuminant D65 (каждые 5 нм, 380–780)
+// Источники освещения (D65, A, Cool, Twilight)
 const D65 = [
   49.9755, 52.3118, 54.6482, 68.7015, 82.7549, 87.1204, 91.486, 92.4589, 93.4318,
   90.057, 86.6823, 95.7736, 104.865, 110.936, 117.008, 117.41, 117.812, 116.336,
@@ -122,7 +127,6 @@ const D65 = [
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
 ]
 
-// Illuminant A (тёплая лампа накаливания \~2856K)
 const ILLUMINANT_A = [
   9.7951, 10.863, 12.052, 13.786, 15.452, 16.236, 17.507, 18.912, 20.46,
   22.156, 23.999, 25.991, 28.125, 30.397, 32.809, 35.358, 38.038, 40.84,
@@ -135,7 +139,6 @@ const ILLUMINANT_A = [
   22.662, 21.225, 19.892, 18.657, 17.515, 16.458, 15.481, 14.578, 13.743,
 ]
 
-// Холодный белый (приближение LED / F7 \~5000K)
 const ILLUMINANT_COOL = [
   55.2, 58.1, 61.0, 72.5, 84.1, 87.9, 91.8, 92.4, 93.0,
   90.8, 88.6, 96.2, 103.8, 108.5, 113.2, 113.5, 113.8, 112.6,
@@ -148,7 +151,6 @@ const ILLUMINANT_COOL = [
   77.8, 72.5, 67.2, 68.4, 69.6, 68.7, 67.8, 65.2, 62.6,
 ]
 
-// Сумерки (смещение в сине-фиолетовую область + общее затемнение)
 const ILLUMINANT_TWILIGHT = [
   38.0, 42.0, 48.0, 62.0, 78.0, 85.0, 92.0, 95.0, 98.0,
   96.0, 94.0, 102.0, 110.0, 112.0, 114.0, 110.0, 106.0, 100.0,
@@ -168,42 +170,22 @@ const ILLUMINANTS: Record<IlluminantType, number[]> = {
   twilight: ILLUMINANT_TWILIGHT,
 }
 
-// --- Вспомогательные функции для физики смешивания (Кубелка-Мунк) ---
+// --- Вспомогательные функции теории Кубелки-Мунка ---
 
-function reflectanceToKS(r: number): number {
+export function reflectanceToKS(r: number): number {
   const clampedR = Math.max(0.0001, Math.min(0.9999, r))
   return Math.pow(1 - clampedR, 2) / (2 * clampedR)
 }
 
-function ksToReflectance(ks: number): number {
+export function ksToReflectance(ks: number): number {
   const r = 1 + ks - Math.sqrt(Math.pow(ks, 2) + 2 * ks)
   return Math.max(0, Math.min(1, r))
 }
 
-// --------------------------------------------------------------------
+// --- Линейная интерполяция и нормализация ---
 
-export function parseSpectrum(text: string): SpectrumPoint[] {
-  const lines = text.trim().split(/\r?\n/)
-  const points: SpectrumPoint[] = []
-
-  for (const line of lines) {
-    const parts = line.trim().split(/[\s,;]+/)
-    if (parts.length < 2) continue
-
-    const wl = parseFloat(parts[0])
-    const refl = parseFloat(parts[1])
-
-    if (!isNaN(wl) && !isNaN(refl)) {
-      points.push({ wavelength: wl, reflectance: refl })
-    }
-  }
-
-  points.sort((a, b) => a.wavelength - b.wavelength)
-  return points
-}
-
-function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): number {
-  if (spectrum.length === 0) return 0
+export function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): number {
+  if (!spectrum || spectrum.length === 0) return 0
   if (wavelength <= spectrum[0].wavelength) return spectrum[0].reflectance
   if (wavelength >= spectrum[spectrum.length - 1].wavelength) {
     return spectrum[spectrum.length - 1].reflectance
@@ -225,15 +207,103 @@ function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): 
 }
 
 /**
- * Старая функция (для обратной совместимости) — всегда D65
+ * Приведение сырого спектра любого разрешения (даже с шагом 0.18 нм или УФ)
+ * к стандартному колориметрическому сетку CIE 380–780 нм с шагом 5 нм.
  */
-export function spectrumToXYZ(spectrum: SpectrumPoint[]): XYZ {
-  return spectrumToXYZWithIlluminant(spectrum, 'D65')
+export function normalizeSpectrumToCIE(rawSpectrum: SpectrumPoint[]): SpectrumPoint[] {
+  if (!rawSpectrum || rawSpectrum.length === 0) return []
+  
+  const normalized: SpectrumPoint[] = []
+  for (const cmfPoint of CIE_CMF) {
+    normalized.push({
+      wavelength: cmfPoint.wl,
+      reflectance: interpolateReflectance(rawSpectrum, cmfPoint.wl)
+    })
+  }
+  return normalized
 }
 
 /**
- * Пересчёт спектра в XYZ под выбранным осветителем
+ * Парсинг текста спектрометра с авто-фильтрацией и приведением к стандарту CIE
  */
+export function parseSpectrum(text: string): SpectrumPoint[] {
+  const lines = text.trim().split(/\r?\n/)
+  const points: SpectrumPoint[] = []
+
+  for (const line of lines) {
+    const parts = line.trim().split(/[\s,;]+/)
+    if (parts.length < 2) continue
+
+    const wl = parseFloat(parts[0])
+    const refl = parseFloat(parts[1])
+
+    if (!isNaN(wl) && !isNaN(refl)) {
+      points.push({ wavelength: wl, reflectance: refl })
+    }
+  }
+
+  points.sort((a, b) => a.wavelength - b.wavelength)
+
+  // Автоматическая очистка от UV/IR и привести к шагу CIE 5 нм
+  return normalizeSpectrumToCIE(points)
+}
+
+// --- Субтрактивное смешивание красок (Two-Constant Kubelka-Munk) ---
+
+/**
+ * Двухконстантная модель смешивания пигментов и биндеров.
+ * K = (K/S) * S, где S (рассеяние) аппроксимируется коэффициентом отражения.
+ */
+export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
+  const totalVolume = components.reduce((sum, c) => sum + c.volume, 0)
+  if (totalVolume <= 0) return []
+
+  const result: SpectrumPoint[] = []
+
+  for (const cmfPoint of CIE_CMF) {
+    const wl = cmfPoint.wl
+    let totalK = 0
+    let totalS = 0
+
+    for (const comp of components) {
+      const weight = comp.volume / totalVolume
+      const rawRefl = interpolateReflectance(comp.spectrum, wl) / 100
+      const refl = Math.max(0.0001, Math.min(0.9999, rawRefl))
+
+      let S: number
+      let K: number
+
+      if (comp.isBinder) {
+        // Прозрачный акриловый лак/биндер: 
+        // Минимальное рассеяние (прозрачность) и почти нулевое поглощение.
+        S = 0.01 
+        K = 0.001
+      } else {
+        // Обычные пигменты: Двухконстантная аппроксимация (S ≈ R)
+        S = refl 
+        const KS = reflectanceToKS(refl)
+        K = KS * S
+      }
+
+      totalK += weight * K
+      totalS += weight * S
+    }
+
+    // Рассчитываем итоговое отношение K/S и отражение смеси
+    const mixedKS = totalS > 0.00001 ? (totalK / totalS) : reflectanceToKS(0.0001)
+    const finalRefl = ksToReflectance(mixedKS) * 100
+
+    result.push({
+      wavelength: wl,
+      reflectance: finalRefl,
+    })
+  }
+
+  return result
+}
+
+// --- Расчет CIE XYZ и sRGB ---
+
 export function spectrumToXYZWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
@@ -260,7 +330,7 @@ export function spectrumToXYZWithIlluminant(
     N += S[i] * yBar * step
   }
 
-  const k = 100 / N
+  const k = N > 0 ? 100 / N : 0
 
   return {
     x: X * k,
@@ -269,7 +339,11 @@ export function spectrumToXYZWithIlluminant(
   }
 }
 
-function xyzToLinearRGB(xyz: XYZ) {
+export function spectrumToXYZ(spectrum: SpectrumPoint[]): XYZ {
+  return spectrumToXYZWithIlluminant(spectrum, 'D65')
+}
+
+function xyzToLinearRGB(xyz: XYZ): { r: number; g: number; b: number } {
   const r = 3.2404542 * xyz.x - 1.5371385 * xyz.y - 0.4985314 * xyz.z
   const g = -0.9692660 * xyz.x + 1.8760108 * xyz.y + 0.0415560 * xyz.z
   const b = 0.0556434 * xyz.x - 0.2040259 * xyz.y + 1.0572252 * xyz.z
@@ -286,16 +360,6 @@ function linearToSrgb(c: number): number {
   return Math.round(encoded * 255)
 }
 
-/**
- * Старая функция (для обратной совместимости) — всегда D65
- */
-export function spectrumToRGB(spectrum: SpectrumPoint[]): RGB {
-  return spectrumToRGBWithIlluminant(spectrum, 'D65')
-}
-
-/**
- * Полный путь: спектр → RGB под выбранным освещением
- */
 export function spectrumToRGBWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
@@ -310,6 +374,10 @@ export function spectrumToRGBWithIlluminant(
   }
 }
 
+export function spectrumToRGB(spectrum: SpectrumPoint[]): RGB {
+  return spectrumToRGBWithIlluminant(spectrum, 'D65')
+}
+
 export function rgbToHex(rgb: RGB): string {
   const toHex = (n: number): string => {
     const value = Math.max(0, Math.min(255, Math.round(n)))
@@ -318,33 +386,4 @@ export function rgbToHex(rgb: RGB): string {
   }
 
   return '#' + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b)
-}
-
-export function mixSpectra(
-  components: { spectrum: SpectrumPoint[]; volume: number }[]
-): SpectrumPoint[] {
-  const totalVolume = components.reduce((sum, c) => sum + c.volume, 0)
-  if (totalVolume <= 0) return []
-
-  const base = components[0].spectrum
-  const result: SpectrumPoint[] = []
-
-  for (const point of base) {
-    let mixedKS = 0
-
-    for (const comp of components) {
-      const weight = comp.volume / totalVolume
-      const refl = interpolateReflectance(comp.spectrum, point.wavelength) / 100
-      mixedKS += weight * reflectanceToKS(refl)
-    }
-
-    const finalRefl = ksToReflectance(mixedKS) * 100
-
-    result.push({
-      wavelength: point.wavelength,
-      reflectance: finalRefl,
-    })
-  }
-
-  return result
 }
