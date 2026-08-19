@@ -33,7 +33,7 @@ function generateId(): string {
   })
 }
 
-const BINDER_RATIO = 0.2 // 20%
+const BINDER_RATIO = 0.2
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
@@ -82,7 +82,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const grandTotal = totalAmount + binderMl
 
-  // Условный спектр кожи для симуляции анилиновых слоёв
   const leatherBaseSpectrum = useMemo((): SpectrumPoint[] => {
     const points: SpectrumPoint[] = []
     for (let wl = 380; wl <= 780; wl += 5) {
@@ -358,6 +357,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         ? 'Криючі пігменти + біндер. Сильне укриття, один шар часто достатній.'
         : 'Кроющие пигменты + биндер. Сильное укрытие, часто хватает одного слоя.'
 
+  const layerWord = isUk ? ' шар' : ' слой'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -387,7 +388,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-        {/* СИСТЕМА */}
         <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5">
           <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90 mb-3">
             {isUk ? 'Система фарбування' : 'Система крашения'}
@@ -397,22 +397,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <button
               type="button"
               onClick={() => setSystem('aniline')}
-              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors ${
-                system === 'aniline'
+              className={
+                'flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors ' +
+                (system === 'aniline'
                   ? 'bg-[#D8A35C] text-black'
-                  : 'text-[#F5F1EA]/60 active:bg-white/5'
-              }`}
+                  : 'text-[#F5F1EA]/60 active:bg-white/5')
+              }
             >
               {isUk ? 'Анілін' : 'Анилин'}
             </button>
             <button
               type="button"
               onClick={() => setSystem('acrylic')}
-              className={`flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors ${
-                system === 'acrylic'
+              className={
+                'flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors ' +
+                (system === 'acrylic'
                   ? 'bg-[#D8A35C] text-black'
-                  : 'text-[#F5F1EA]/60 active:bg-white/5'
-              }`}
+                  : 'text-[#F5F1EA]/60 active:bg-white/5')
+              }
             >
               {isUk ? 'Акрил / пігмент' : 'Акрил / пигмент'}
             </button>
@@ -423,7 +425,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </p>
         </section>
 
-        {/* СОСТАВ */}
         <section className="bg-[#1C1816] rounded-2xl overflow-visible relative z-10">
           <div className="px-4 pt-4 pb-3 flex items-center justify-between">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
@@ -550,8 +551,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       </p>
                       <p className="text-[10px] text-[#F5F1EA]/45 mt-0.5">
                         {isUk
-                          ? `авто: ${Math.round(BINDER_RATIO * 100)}% від пігментів`
-                          : `авто: ${Math.round(BINDER_RATIO * 100)}% от пигментов`}
+                          ? 'авто: 20% від пігментів'
+                          : 'авто: 20% от пигментов'}
                       </p>
                     </div>
                     <div className="w-[64px] flex-shrink-0 bg-[#D8A35C]/20 text-[#D8A35C] rounded-xl px-2 py-3 text-center font-semibold text-[15px]">
@@ -576,7 +577,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* РЕЗУЛЬТАТ */}
         <section className="bg-[#1C1816] rounded-2xl px-4 pt-4 pb-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
@@ -588,45 +588,60 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
 
           <div className="flex flex-col items-center">
-            {/* Слои анилина */}
             {system === 'aniline' && mixedColor && (
               <div className="w-full flex gap-2 mb-3">
-                {([1, 2, 3] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setAnilineLayer(n)}
-                    className={`flex-1 py-2 rounded-xl text-[12px] font-semibold transition-colors ${
-                      anilineLayer === n
-                        ? 'bg-[#D8A35C] text-black'
-                        : 'bg-white/8 text-[#F5F1EA]/60 active:bg-white/12'
-                    }`}
-                  >
-                    {isUk ? `\( {n} шар` : ` \){n} слой`}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setAnilineLayer(1)}
+                  className={
+                    'flex-1 py-2 rounded-xl text-[12px] font-semibold transition-colors ' +
+                    (anilineLayer === 1
+                      ? 'bg-[#D8A35C] text-black'
+                      : 'bg-white/8 text-[#F5F1EA]/60 active:bg-white/12')
+                  }
+                >
+                  {'1' + layerWord}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnilineLayer(2)}
+                  className={
+                    'flex-1 py-2 rounded-xl text-[12px] font-semibold transition-colors ' +
+                    (anilineLayer === 2
+                      ? 'bg-[#D8A35C] text-black'
+                      : 'bg-white/8 text-[#F5F1EA]/60 active:bg-white/12')
+                  }
+                >
+                  {'2' + layerWord}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnilineLayer(3)}
+                  className={
+                    'flex-1 py-2 rounded-xl text-[12px] font-semibold transition-colors ' +
+                    (anilineLayer === 3
+                      ? 'bg-[#D8A35C] text-black'
+                      : 'bg-white/8 text-[#F5F1EA]/60 active:bg-white/12')
+                  }
+                >
+                  {'3' + layerWord}
+                </button>
               </div>
             )}
 
-            {/* Квадрат */}
             <div
               role="status"
               aria-live="polite"
               aria-busy={isCalculating}
               className="relative w-36 h-36 rounded-2xl border border-white/10 shadow-lg mb-3 overflow-hidden"
             >
-              {/* Шахматка под анилином */}
               {system === 'aniline' && (
                 <div
                   className="absolute inset-0"
                   style={{
                     backgroundColor: '#2a2624',
-                    backgroundImage: `
-                      linear-gradient(45deg, #3a3532 25%, transparent 25%),
-                      linear-gradient(-45deg, #3a3532 25%, transparent 25%),
-                      linear-gradient(45deg, transparent 75%, #3a3532 75%),
-                      linear-gradient(-45deg, transparent 75%, #3a3532 75%)
-                    `,
+                    backgroundImage:
+                      'linear-gradient(45deg, #3a3532 25%, transparent 25%), linear-gradient(-45deg, #3a3532 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #3a3532 75%), linear-gradient(-45deg, transparent 75%, #3a3532 75%)',
                     backgroundSize: '12px 12px',
                     backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0',
                   }}
@@ -690,11 +705,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 onBlur={handleHexBlur}
                 onChange={(e) => handleHexChange(e.target.value)}
                 placeholder="#000000"
-                className={`flex-1 min-w-0 bg-white/10 text-[#F5F1EA] border-0 rounded-xl px-3 py-3 text-center font-mono tracking-wider focus:outline-none focus:ring-2 ${
-                  hexError
+                className={
+                  'flex-1 min-w-0 bg-white/10 text-[#F5F1EA] border-0 rounded-xl px-3 py-3 text-center font-mono tracking-wider focus:outline-none focus:ring-2 ' +
+                  (hexError
                     ? 'ring-2 ring-red-500/70 focus:ring-red-500/70'
-                    : 'focus:ring-[#D8A35C]/50'
-                }`}
+                    : 'focus:ring-[#D8A35C]/50')
+                }
                 style={{ fontSize: '16px' }}
                 aria-invalid={hexError}
               />
@@ -703,7 +719,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 disabled={!hasColor}
                 className="flex-shrink-0 h-12 px-4 rounded-xl bg-[#D8A35C] text-black text-[13px] font-semibold disabled:opacity-35 active:scale-[0.97]"
               >
-                {copied ? '✓' : isUk ? 'Копіювати' : 'Копировать'}
+                {copied ? 'OK' : isUk ? 'Копіювати' : 'Копировать'}
               </button>
             </div>
 
@@ -727,7 +743,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* ОБЪЁМ */}
         <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[14px] text-[#F5F1EA]/50">
@@ -755,8 +770,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </span>
             <span className="text-[17px] font-semibold tabular-nums text-[#F5F1EA]">
               {grandTotal > 1000
-                ? `${(grandTotal / 1000).toFixed(2)} л`
-                : `${grandTotal.toFixed(1)} мл`}
+                ? (grandTotal / 1000).toFixed(2) + ' л'
+                : grandTotal.toFixed(1) + ' мл'}
             </span>
           </div>
         </section>
