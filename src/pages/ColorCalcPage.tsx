@@ -98,7 +98,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [hexError, setHexError] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
 
-  // Цель (введённый HEX) и ΔE рецепта
   const [targetHex, setTargetHex] = useState<string | null>(null)
   const [recipeDeltaE, setRecipeDeltaE] = useState<number | null>(null)
 
@@ -107,6 +106,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const userEdited = useRef(false)
   const calcRef = useRef(0)
   const workerRef = useRef<Worker | null>(null)
+  const currentExcludeRef = useRef<string[]>([])
 
   const {
     paints,
@@ -133,12 +133,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const grandTotal = totalAmount + binderMl
 
-  // Фактический HEX смеси
-  const actualHex = mixedColor?.hex
-    ? mixedColor.hex.toUpperCase()
-    : null
+  const actualHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
 
-  // ΔE между целью и фактом (если есть оба)
   const liveDeltaE = useMemo(() => {
     if (!targetHex || !actualHex) return recipeDeltaE
     try {
@@ -234,6 +230,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
+  // ===== WORKER створюється ОДИН раз =====
   useEffect(() => {
     const worker = new Worker(
       new URL('../workers/recipeWorker.ts', import.meta.url),
@@ -252,14 +249,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
       if (result?.recipe?.length > 0 && setPaints) {
         fromRecipeRef.current = true
-        const tgt = validHex || lastTargetHex.current
-        lastTargetHex.current = tgt
+        const tgt = lastTargetHex.current
         setTargetHex(tgt)
         setRecipeDeltaE(
           typeof result.deltaE === 'number' ? result.deltaE : null
         )
 
-        // 2 знака после запятой — меньше ошибка округления
         const newPaints = result.recipe
           .filter(
             (r: { pigment: { id: string } }) =>
@@ -272,10 +267,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           }))
         setPaints(newPaints)
 
-        // В поле — фактический цвет рецепта, не только цель
         if (result.resultHex) {
           setHexInput(String(result.resultHex).toUpperCase())
         }
+
+        // після успішного рецепту скидаємо exclude
+        currentExcludeRef.current = []
       }
 
       setIsCalculating(false)
@@ -288,9 +285,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       worker.terminate()
       workerRef.current = null
     }
-  }, [setPaints, validHex])
+  }, [setPaints]) // ← тільки setPaints
 
-  // Синхронизация HEX при ручном смешивании
+  // Синхронізація HEX при ручному змішуванні
   useEffect(() => {
     if (fromRecipeRef.current) return
     if (mixedColor?.hex && !isFocused && !userEdited.current) {
@@ -304,12 +301,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   useEffect(() => {
     if (fromRecipeRef.current) {
       fromRecipeRef.current = false
-      // после рецепта: цель сохранена в targetHex, поле = факт (уже задан в onmessage)
       userEdited.current = false
       setValidHex(null)
       return
     }
-    // ручное изменение смеси — сбрасываем цель рецепта
+    // ручна зміна суміші — скидаємо ціль
     userEdited.current = false
     setValidHex(null)
     if (!isFocused) {
@@ -340,6 +336,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [hexInput])
 
+  // Головний запуск пошуку рецепту
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
       setIsCalculating(false)
@@ -359,31 +356,43 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       maxComponents: 3,
       targetVolume: totalAmount > 0 ? totalAmount : 20,
       system,
+      excludeIds: currentExcludeRef.current,
     })
   }, [validHex, pigments, loading, totalAmount, system])
 
+  // ===== УТОЧНИТИ РЕЦЕПТ =====
   const runRefine = () => {
     const tgt = targetHex || lastTargetHex.current
     if (!tgt || !workerRef.current || pigments.length === 0) return
 
+    // Виключаємо поточні пігменти, щоб алгоритм шукав інші
+    const currentIds = paints
+      .map((p) => p.pigmentId)
+      .filter(Boolean) as string[]
+
+    currentExcludeRef.current = currentIds
+
     const id = ++calcRef.current
     setIsCalculating(true)
     userEdited.current = true
+    lastTargetHex.current = tgt
     setValidHex(tgt)
 
+    // Відразу відправляємо з maxComponents: 4 + exclude
     workerRef.current.postMessage({
       id,
       targetHex: tgt,
       basicPigments: pigments,
-      maxComponents: 3,
-      // текущий объём пигментов (уже округлённые мл)
+      maxComponents: 4,
       targetVolume: totalAmount > 0 ? totalAmount : 20,
       system,
+      excludeIds: currentIds,
     })
   }
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
+    currentExcludeRef.current = [] // новий HEX — скидаємо exclude
     const val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
     if (val.length === 0) {
       setHexInput('')
@@ -525,7 +534,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </p>
         </section>
 
-        {/* Состав */}
+        {/* Склад */}
         <section className="bg-[#1C1816] rounded-2xl overflow-visible relative z-10">
           <div className="px-4 pt-4 pb-3 flex items-center justify-between">
             <h2 className="text-[13px] font-semibold text-[#F5F1EA]/90">
@@ -729,7 +738,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     viewBox="0 0 24 24"
                   >
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   <span className="text-[10px] text-white/90 font-medium">
                     {isUk ? 'Рахуємо...' : 'Считаем...'}
@@ -738,7 +751,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               )}
             </div>
 
-            {/* Цель / факт / ΔE */}
+            {/* Ціль / факт / ΔE */}
             {targetHex && actualHex && (
               <div className="w-full mb-3 rounded-xl bg-black/25 border border-white/8 px-3 py-2.5 space-y-1.5">
                 <div className="flex items-center justify-between text-[12px]">
@@ -853,7 +866,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* Объём */}
+        {/* Об’єм */}
         <section className="bg-[#1C1816] rounded-2xl px-4 py-3.5 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[14px] text-[#F5F1EA]/50">
@@ -925,8 +938,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </ul>
             <p className="text-[12px] text-[#F5F1EA]/45 mb-4 leading-snug">
               {isUk
-                ? 'Мета: ΔE якомога ближче до 0. Після округлення мл колір може трохи «поїхати» — «Уточнити» запускає новий підбір під той самий цільовий HEX.'
-                : 'Цель: ΔE как можно ближе к 0. После округления мл цвет может чуть «уехать» — «Уточнить» запускает новый подбор под тот же целевой HEX.'}
+                ? 'Мета: ΔE якомога ближче до 0. Після округлення мл колір може трохи «поїхати» — «Уточнити» запускає новий підбір під той самий цільовий HEX (з виключенням поточних пігментів).'
+                : 'Цель: ΔE как можно ближе к 0. После округления мл цвет может чуть «уехать» — «Уточнить» запускает новый подбор под тот же целевой HEX (исключая текущие пигменты).'}
             </p>
             <button
               onClick={() => setShowDeltaInfo(false)}
