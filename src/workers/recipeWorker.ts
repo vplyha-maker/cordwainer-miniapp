@@ -11,6 +11,7 @@ interface WorkerRequest {
   maxComponents?: number
   targetVolume?: number
   system?: CoverageSystem
+  excludeIds?: string[]
 }
 
 interface WorkerResponse {
@@ -26,12 +27,12 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     basicPigments,
     maxComponents = 3,
     targetVolume = 20,
-    // system пока не влияет на алгоритм подбора цвета —
-    // биндер и подсказки считаются на стороне UI
+    system = 'acrylic',
+    excludeIds = [],
   } = e.data
 
   try {
-    // Исключаем биндер из подбора цвета (он не должен влиять на оттенок)
+    // Виключаємо біндер і "cardboard" з підбору кольору
     const colorPigments = basicPigments.filter(
       (p) => p.id !== 'acrylic_binder' && p.id !== 'cardboard'
     )
@@ -40,7 +41,9 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       targetHex,
       colorPigments,
       maxComponents,
-      targetVolume
+      targetVolume,
+      system,
+      excludeIds
     )
 
     const response: WorkerResponse = { id, result }
