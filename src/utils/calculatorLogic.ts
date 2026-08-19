@@ -10,9 +10,6 @@ import {
 
 export type CoverageSystem = 'aniline' | 'acrylic'
 
-// ==========================================
-// Чистые базовые цвета
-// ==========================================
 export const PURE_BASIC_COLORS = [
   {
     id: 'pure_white',
@@ -77,9 +74,6 @@ export const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
-// ==========================================
-// RGB → Lab (D65)
-// ==========================================
 function rgbToLab(r: number, g: number, b: number) {
   let r_ = r / 255
   let g_ = g / 255
@@ -108,9 +102,6 @@ function rgbToLab(r: number, g: number, b: number) {
   }
 }
 
-// ==========================================
-// CIEDE2000
-// ==========================================
 function calculateDeltaE2000(
   lab1: { L: number; a: number; b: number },
   lab2: { L: number; a: number; b: number }
@@ -118,17 +109,13 @@ function calculateDeltaE2000(
   const { L: L1, a: a1, b: b1 } = lab1
   const { L: L2, a: a2, b: b2 } = lab2
 
-  const kL = 1,
-    kC = 1,
-    kH = 1
+  const kL = 1, kC = 1, kH = 1
 
   const C1 = Math.sqrt(a1 * a1 + b1 * b1)
   const C2 = Math.sqrt(a2 * a2 + b2 * b2)
   const Cbar = (C1 + C2) / 2
 
-  const G =
-    0.5 *
-    (1 - Math.sqrt(Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))))
+  const G = 0.5 * (1 - Math.sqrt(Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))))
 
   const a1Prime = a1 * (1 + G)
   const a2Prime = a2 * (1 + G)
@@ -137,14 +124,8 @@ function calculateDeltaE2000(
   const C2Prime = Math.sqrt(a2Prime * a2Prime + b2 * b2)
   const CbarPrime = (C1Prime + C2Prime) / 2
 
-  let h1Prime =
-    b1 === 0 && a1Prime === 0
-      ? 0
-      : ((Math.atan2(b1, a1Prime) * 180) / Math.PI + 360) % 360
-  let h2Prime =
-    b2 === 0 && a2Prime === 0
-      ? 0
-      : ((Math.atan2(b2, a2Prime) * 180) / Math.PI + 360) % 360
+  let h1Prime = b1 === 0 && a1Prime === 0 ? 0 : ((Math.atan2(b1, a1Prime) * 180) / Math.PI + 360) % 360
+  let h2Prime = b2 === 0 && a2Prime === 0 ? 0 : ((Math.atan2(b2, a2Prime) * 180) / Math.PI + 360) % 360
 
   let HbarPrime = h1Prime + h2Prime
   if (C1Prime * C2Prime !== 0) {
@@ -174,14 +155,10 @@ function calculateDeltaE2000(
 
   const deltaLPrime = L2 - L1
   const deltaCPrime = C2Prime - C1Prime
-  const deltaHPrime =
-    2 * Math.sqrt(C1Prime * C2Prime) * Math.sin((deltahPrime * Math.PI) / 360)
+  const deltaHPrime = 2 * Math.sqrt(C1Prime * C2Prime) * Math.sin((deltahPrime * Math.PI) / 360)
 
   const LbarPrime = (L1 + L2) / 2
-  const S_L =
-    1 +
-    (0.015 * Math.pow(LbarPrime - 50, 2)) /
-      Math.sqrt(20 + Math.pow(LbarPrime - 50, 2))
+  const S_L = 1 + (0.015 * Math.pow(LbarPrime - 50, 2)) / Math.sqrt(20 + Math.pow(LbarPrime - 50, 2))
   const S_C = 1 + 0.045 * CbarPrime
   const S_H = 1 + 0.015 * CbarPrime * T
 
@@ -251,9 +228,6 @@ export interface RecipeItem {
   isBinder?: boolean
 }
 
-// ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (з примусовим темним компонентом)
-// ==========================================
 export function findRecipeByHex(
   targetHex: string,
   pigments: Pigment[],
@@ -304,7 +278,6 @@ export function findRecipeByHex(
     return components
   }
 
-  // 1. Оцінка кожного пігмента
   const scored = validPigments.map((p) => {
     const components = buildComponentsWithBinder([p], [100])
     const rgb = spectrumToRGB(mixSpectra(components))
@@ -313,37 +286,20 @@ export function findRecipeByHex(
   })
   scored.sort((a, b) => a.dist - b.dist)
 
-  // 2. Розумний набір кандидатів
   const candidatesSet = new Set<Pigment>()
 
-  // Топ-6 найближчих
   scored.slice(0, 6).forEach((s) => candidatesSet.add(s.pigment))
 
-  // Усі базові
-  const allBasicIds = PURE_BASIC_COLORS.flatMap(
-    (b) => b.sourceIds as readonly string[]
-  )
+  const allBasicIds = PURE_BASIC_COLORS.flatMap((b) => b.sourceIds as readonly string[])
   validPigments
     .filter((p) => allBasicIds.includes(p.id))
     .forEach((p) => candidatesSet.add(p))
 
-  // Земляні + червоні/коричневі
   const earthAndWarmIds = [
-    'yellow_ochre',
-    'red_ochre',
-    'raw_sienna',
-    'burnt_sienna',
-    'raw_umber',
-    'burnt_umber',
-    'green_earth',
-    'cadmium_red',
-    'pyrrole_red',
-    'carmine_lake',
-    'venetian_red',
-    'indian_red',
-    'mars_red',
-    'quinacridone_red',
-    'permanent_red',
+    'yellow_ochre', 'red_ochre', 'raw_sienna', 'burnt_sienna',
+    'raw_umber', 'burnt_umber', 'green_earth',
+    'cadmium_red', 'pyrrole_red', 'carmine_lake', 'venetian_red',
+    'indian_red', 'mars_red', 'quinacridone_red', 'permanent_red',
   ]
   validPigments
     .filter(
@@ -356,9 +312,7 @@ export function findRecipeByHex(
     )
     .forEach((p) => candidatesSet.add(p))
 
-  // ===== ПРИМУСОВО ДОДАЄМО ТЕМНИЙ КОМПОНЕНТ для L < 45 =====
   if (isDarkTarget) {
-    // Чорні
     const blackIds = PURE_BASIC_COLORS[1].sourceIds as readonly string[]
     validPigments
       .filter(
@@ -371,7 +325,6 @@ export function findRecipeByHex(
       )
       .forEach((p) => candidatesSet.add(p))
 
-    // Темні землі (умбра, палена сієна тощо)
     validPigments
       .filter(
         (p) =>
@@ -383,7 +336,6 @@ export function findRecipeByHex(
       .forEach((p) => candidatesSet.add(p))
   }
 
-  // Для дуже темних — ще сині (допомагають «приглушити»)
   if (targetLab.L < 35) {
     const blueIds = PURE_BASIC_COLORS[4].sourceIds as readonly string[]
     validPigments
@@ -394,7 +346,6 @@ export function findRecipeByHex(
   const candidates = Array.from(candidatesSet).slice(0, 14)
   const n = candidates.length
 
-  // Знаходимо індекси чорних/темних для пріоритетних співвідношень
   const darkIndices: number[] = []
   candidates.forEach((p, idx) => {
     if (
@@ -423,23 +374,13 @@ export function findRecipeByHex(
     if (topResults.length > 10) topResults.pop()
   }
 
-  // --- 3. ГРУБИЙ ПЕРЕБІР ---
-
   // k = 1
   for (let i = 0; i < n; i++) tryAddResult([i], [100])
 
   // k = 2
   const ratios2 = [
-    [98, 2],
-    [96, 4],
-    [95, 5],
-    [92, 8],
-    [90, 10],
-    [85, 15],
-    [80, 20],
-    [70, 30],
-    [60, 40],
-    [50, 50],
+    [98, 2], [96, 4], [95, 5], [92, 8], [90, 10],
+    [85, 15], [80, 20], [70, 30], [60, 40], [50, 50],
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
@@ -448,18 +389,12 @@ export function findRecipeByHex(
     }
   }
 
-  // Додаткові мікро-дози чорного для темних цілей (k=2)
   if (isDarkTarget && darkIndices.length > 0) {
     for (let i = 0; i < n; i++) {
       if (darkIndices.includes(i)) continue
       for (const dIdx of darkIndices) {
-        // 97/3, 95/5, 93/7, 90/10 — червоний + мікро-сажа
         for (const [main, dark] of [
-          [97, 3],
-          [95, 5],
-          [93, 7],
-          [90, 10],
-          [85, 15],
+          [97, 3], [95, 5], [93, 7], [90, 10], [85, 15],
         ]) {
           tryAddResult([i, dIdx], [main, dark])
         }
@@ -470,22 +405,10 @@ export function findRecipeByHex(
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
-      [90, 8, 2],
-      [88, 9, 3],
-      [85, 10, 5],
-      [82, 12, 6],
-      [80, 15, 5],
-      [75, 15, 10],
-      [70, 20, 10],
-      [65, 25, 10],
-      [60, 30, 10],
-      [55, 30, 15],
-      [50, 30, 20],
-      [45, 35, 20],
-      [40, 40, 20],
-      [40, 35, 25],
-      [34, 33, 33],
-      [50, 25, 25],
+      [90, 8, 2], [88, 9, 3], [85, 10, 5], [82, 12, 6],
+      [80, 15, 5], [75, 15, 10], [70, 20, 10], [65, 25, 10],
+      [60, 30, 10], [55, 30, 15], [50, 30, 20], [45, 35, 20],
+      [40, 40, 20], [40, 35, 25], [34, 33, 33], [50, 25, 25],
       [60, 25, 15],
     ]
     for (const combo of combinations(n, 3)) {
@@ -505,18 +428,12 @@ export function findRecipeByHex(
       }
     }
 
-    // Спеціальні трійки з мікро-чорним для темних цілей
     if (isDarkTarget && darkIndices.length > 0) {
       for (const combo of combinations(n, 3)) {
         const hasDark = combo.some((idx) => darkIndices.includes(idx))
         if (!hasDark) continue
-        // Основний колір + другий + дуже мало чорного
         for (const ratio of [
-          [90, 7, 3],
-          [88, 8, 4],
-          [85, 10, 5],
-          [80, 15, 5],
-          [75, 18, 7],
+          [90, 7, 3], [88, 8, 4], [85, 10, 5], [80, 15, 5], [75, 18, 7],
         ]) {
           tryAddResult(combo, ratio)
           tryAddResult(combo, [ratio[0], ratio[2], ratio[1]])
@@ -528,15 +445,9 @@ export function findRecipeByHex(
   // k = 4
   if (maxComponents >= 4 && n >= 4) {
     const ratios4 = [
-      [70, 15, 10, 5],
-      [65, 18, 12, 5],
-      [60, 20, 15, 5],
-      [55, 25, 15, 5],
-      [50, 25, 15, 10],
-      [45, 25, 20, 10],
-      [40, 30, 20, 10],
-      [40, 25, 20, 15],
-      [35, 30, 20, 15],
+      [70, 15, 10, 5], [65, 18, 12, 5], [60, 20, 15, 5],
+      [55, 25, 15, 5], [50, 25, 15, 10], [45, 25, 20, 10],
+      [40, 30, 20, 10], [40, 25, 20, 15], [35, 30, 20, 15],
     ]
     for (const combo of combinations(n, 4)) {
       for (const ratio of ratios4) {
@@ -547,7 +458,7 @@ export function findRecipeByHex(
 
   if (topResults.length === 0) return null
 
-  // --- 4. ТОЧНА ДОВОДКА (більш агресивна для темних) ---
+  // Точна доводка
   let absoluteBest: BestResult = { ...topResults[0], deltaE: Infinity }
 
   const adjustments = isDarkTarget
@@ -596,7 +507,6 @@ export function findRecipeByHex(
     }
   }
 
-  // --- 5. МАСШТАБУВАННЯ ---
   const totalWeight = absoluteBest.volumes.reduce((sum, v) => sum + v, 0)
   if (totalWeight <= 0) return null
 
@@ -632,9 +542,6 @@ export function findRecipeByHex(
   }
 }
 
-// ==========================================
-// Симуляція шарів
-// ==========================================
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
@@ -645,10 +552,8 @@ export function simulateLayersKM(
   const baseRgb = spectrumToRGB(baseSpectrum)
   const paintRgb = spectrumToRGB(paintSpectrum)
 
-  const baseL =
-    (0.2126 * baseRgb.r + 0.7152 * baseRgb.g + 0.0722 * baseRgb.b) / 255
-  const paintL =
-    (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
+  const baseL = (0.2126 * baseRgb.r + 0.7152 * baseRgb.g + 0.0722 * baseRgb.b) / 255
+  const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
   const deltaL = Math.abs(paintL - baseL)
 
   if (deltaL > 0.45) strength *= 0.72
@@ -657,11 +562,7 @@ export function simulateLayersKM(
 
   strength = Math.max(16, Math.min(58, strength))
 
-  const mixLayer = (
-    current: SpectrumPoint[],
-    paint: SpectrumPoint[],
-    s: number
-  ) => {
+  const mixLayer = (current: SpectrumPoint[], paint: SpectrumPoint[], s: number) => {
     return mixSpectra([
       { spectrum: current, volume: 100 - s },
       { spectrum: paint, volume: s },
