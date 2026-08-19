@@ -1,5 +1,3 @@
-// src/workers/recipeWorker.ts
-
 import { findRecipeByHex } from '../utils/calculatorLogic'
 import type { Pigment } from '../data/pigments'
 import type { CoverageSystem } from '../utils/calculatorLogic'
@@ -32,7 +30,6 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   } = e.data
 
   try {
-    // Виключаємо біндер і "cardboard" з підбору кольору
     const colorPigments = basicPigments.filter(
       (p) => p.id !== 'acrylic_binder' && p.id !== 'cardboard'
     )
@@ -46,15 +43,13 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       excludeIds
     )
 
-    const response: WorkerResponse = { id, result }
-    self.postMessage(response)
+    self.postMessage({ id, result } as WorkerResponse)
   } catch (err) {
-    const response: WorkerResponse = {
+    self.postMessage({
       id,
       result: null,
       error: err instanceof Error ? err.message : String(err),
-    }
-    self.postMessage(response)
+    } as WorkerResponse)
   }
 }
 
