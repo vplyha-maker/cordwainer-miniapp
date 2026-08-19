@@ -74,21 +74,29 @@ export function CalcMenuPage({
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1a1a1a)] text-[var(--color-ink,#ffffff)] overflow-hidden justify-between transform-gpu"
     >
-      {/* Стабильный фон без мигания (убран класс dark:opacity) */}
+      {/* Стабильный фон без мигания и без отложенного «приглушения» */}
       <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none bg-[var(--color-bg,#1a1a1a)]">
         <img
           src="/CalcMenuPage/size.jpg"
-          alt="Calculators Background"
-          className="w-full h-full object-cover object-[center_top] opacity-[0.15]"
+          alt=""
+          className="w-full h-full object-cover object-[center_top] opacity-[0.08]"
+          style={{ transition: 'none' }}
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
         />
+        {/* Более плотный градиент — сразу приглушает картинку */}
         <div
           className="absolute inset-0"
           style={{
-            background:
-              'linear-gradient(to bottom, color-mix(in srgb, var(--color-bg, #1a1a1a) 60%, transparent) 0%, color-mix(in srgb, var(--color-bg, #1a1a1a) 90%, transparent) 70%, var(--color-bg, #1a1a1a) 100%)',
+            background: `
+              linear-gradient(
+                to bottom,
+                color-mix(in srgb, var(--color-bg, #1a1a1a) 75%, transparent) 0%,
+                color-mix(in srgb, var(--color-bg, #1a1a1a) 92%, transparent) 55%,
+                var(--color-bg, #1a1a1a) 100%
+              )
+            `,
           }}
         />
       </div>
