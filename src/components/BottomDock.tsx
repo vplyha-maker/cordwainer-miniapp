@@ -45,7 +45,6 @@ export function BottomDock({
       id: 'workspace',
       label: labels.workspace,
       icon: (
-        // Заменил "плюс" на элегантную иконку инструментов/слоев
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
           <path d="M12 12l8-4.5" />
@@ -77,18 +76,17 @@ export function BottomDock({
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 pointer-events-none">
-      {/* Container */}
       <div
         className="pointer-events-auto relative mx-auto max-w-[360px] overflow-hidden rounded-[24px] p-1.5 flex items-center justify-between"
         style={{
-          background: 'rgba(25, 20, 18, 0.85)', // Глубокий кофейно-угольный оттенок
+          background: 'color-mix(in srgb, var(--color-surface, #25201C) 88%, transparent)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(216, 163, 92, 0.12)', // Тончайшая золотистая окантовка
+          border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)',
           boxShadow: `
-            0 24px 48px rgba(0,0,0,0.6), /* Глубокая тень для эффекта левитации */
-            0 0 0 1px rgba(0,0,0,0.8), /* Темный ободок для контраста */
-            inset 0 1px 1px rgba(255,255,255,0.08) /* Верхний светлый блик (bevel) */
+            0 24px 48px color-mix(in srgb, var(--color-bg, #1C1816) 70%, transparent),
+            0 0 0 1px color-mix(in srgb, var(--color-bg, #1C1816) 85%, transparent),
+            inset 0 1px 1px color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)
           `,
         }}
       >
@@ -103,10 +101,11 @@ export function BottomDock({
                 onClick={() => onChange?.(tab.id)}
                 className="relative flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-[18px] cursor-pointer"
                 style={{
-                  color: isActive ? '#D8A35C' : '#8A7A6E',
+                  color: isActive
+                    ? 'var(--color-accent, #D8A35C)'
+                    : 'var(--color-muted, #8A7A6E)',
                 }}
               >
-                {/* Active Indicator (Pill) */}
                 {isActive && (
                   <motion.div
                     layoutId="activeDock"
@@ -114,23 +113,21 @@ export function BottomDock({
                       type: 'spring',
                       stiffness: 500,
                       damping: 35,
-                      mass: 0.8
+                      mass: 0.8,
                     }}
                     className="absolute inset-0 rounded-[18px] z-0"
                     style={{
-                      background: 'linear-gradient(180deg, rgba(216,163,92,0.15) 0%, rgba(216,163,92,0.03) 100%)',
-                      border: '1px solid rgba(216,163,92,0.15)',
-                      boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05)',
+                      background:
+                        'linear-gradient(180deg, color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent) 0%, color-mix(in srgb, var(--color-accent, #D8A35C) 4%, transparent) 100%)',
+                      border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)',
+                      boxShadow: 'inset 0 1px 1px color-mix(in srgb, var(--color-ink, #F5F1EA) 6%, transparent)',
                     }}
                   />
                 )}
 
-                {/* Icon */}
                 <motion.div
                   className="relative z-10 flex items-center justify-center"
-                  animate={{
-                    y: isActive ? -2 : 0,
-                  }}
+                  animate={{ y: isActive ? -2 : 0 }}
                   transition={{
                     type: 'spring',
                     stiffness: 400,
@@ -138,14 +135,13 @@ export function BottomDock({
                   }}
                   style={{
                     filter: isActive
-                      ? 'drop-shadow(0 4px 6px rgba(216,163,92,0.25)) drop-shadow(0 0 12px rgba(216,163,92,0.15))'
+                      ? 'drop-shadow(0 4px 6px color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)) drop-shadow(0 0 12px color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent))'
                       : 'none',
                   }}
                 >
                   {tab.icon}
                 </motion.div>
 
-                {/* Label */}
                 <motion.span
                   className="relative z-10 text-[9.5px] font-medium tracking-[0.02em]"
                   animate={{
@@ -156,12 +152,14 @@ export function BottomDock({
                   {tab.label}
                 </motion.span>
 
-                {/* Active dot below text */}
                 {isActive && (
                   <motion.div
                     layoutId="activeDot"
-                    className="absolute -bottom-1 w-1 h-1 rounded-full bg-[#D8A35C]"
-                    style={{ boxShadow: '0 0 6px rgba(216,163,92,0.6)' }}
+                    className="absolute -bottom-1 w-1 h-1 rounded-full"
+                    style={{
+                      background: 'var(--color-accent, #D8A35C)',
+                      boxShadow: '0 0 6px color-mix(in srgb, var(--color-accent, #D8A35C) 60%, transparent)',
+                    }}
                   />
                 )}
               </motion.button>
@@ -171,4 +169,4 @@ export function BottomDock({
       </div>
     </div>
   )
-}
+ }
