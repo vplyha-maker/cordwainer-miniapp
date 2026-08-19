@@ -593,4 +593,4 @@ export function simulateLayersKM(
     strength: Math.round(strength),
     deltaL,
   }
-                                                  }
+}
