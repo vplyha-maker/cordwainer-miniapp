@@ -230,7 +230,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
-  // ===== WORKER створюється ОДИН раз =====
+  // Worker створюється ОДИН раз
   useEffect(() => {
     const worker = new Worker(
       new URL('../workers/recipeWorker.ts', import.meta.url),
@@ -271,7 +271,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           setHexInput(String(result.resultHex).toUpperCase())
         }
 
-        // після успішного рецепту скидаємо exclude
         currentExcludeRef.current = []
       }
 
@@ -285,7 +284,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       worker.terminate()
       workerRef.current = null
     }
-  }, [setPaints]) // ← тільки setPaints
+  }, [setPaints])
 
   // Синхронізація HEX при ручному змішуванні
   useEffect(() => {
@@ -305,7 +304,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       setValidHex(null)
       return
     }
-    // ручна зміна суміші — скидаємо ціль
     userEdited.current = false
     setValidHex(null)
     if (!isFocused) {
@@ -336,7 +334,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [hexInput])
 
-  // Головний запуск пошуку рецепту
+  // Головний запуск пошуку
   useEffect(() => {
     if (!validHex || !userEdited.current || pigments.length === 0 || loading) {
       setIsCalculating(false)
@@ -360,12 +358,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     })
   }, [validHex, pigments, loading, totalAmount, system])
 
-  // ===== УТОЧНИТИ РЕЦЕПТ =====
+  // Уточнити рецепт
   const runRefine = () => {
     const tgt = targetHex || lastTargetHex.current
     if (!tgt || !workerRef.current || pigments.length === 0) return
 
-    // Виключаємо поточні пігменти, щоб алгоритм шукав інші
     const currentIds = paints
       .map((p) => p.pigmentId)
       .filter(Boolean) as string[]
@@ -378,7 +375,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     lastTargetHex.current = tgt
     setValidHex(tgt)
 
-    // Відразу відправляємо з maxComponents: 4 + exclude
     workerRef.current.postMessage({
       id,
       targetHex: tgt,
@@ -392,7 +388,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const handleHexChange = (raw: string) => {
     userEdited.current = true
-    currentExcludeRef.current = [] // новий HEX — скидаємо exclude
+    currentExcludeRef.current = []
     const val = raw.replace(/[^0-9A-Fa-f]/gi, '').slice(0, 6)
     if (val.length === 0) {
       setHexInput('')
@@ -751,7 +747,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               )}
             </div>
 
-            {/* Ціль / факт / ΔE */}
             {targetHex && actualHex && (
               <div className="w-full mb-3 rounded-xl bg-black/25 border border-white/8 px-3 py-2.5 space-y-1.5">
                 <div className="flex items-center justify-between text-[12px]">
@@ -982,4 +977,4 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       )}
     </motion.div>
   )
- }
+}
