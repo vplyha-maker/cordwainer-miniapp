@@ -35,7 +35,6 @@ export function CalcMenuPage({
     ru: {
       category: 'БЛОГ И СТАТЬИ',
       title: 'PRO Расчёты',
-      desc: 'Изнанка обувной индустрии. Дизайн, технологии и секреты производства',
       sizeTitle: 'Размеры',
       sizeSub: 'UK, US, EU, UKR',
       widthTitle: 'Полнота',
@@ -53,7 +52,6 @@ export function CalcMenuPage({
     uk: {
       category: 'БЛОГ ТА СТАТТІ',
       title: 'PRO Розрахунки',
-      desc: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
       sizeTitle: 'Розміри',
       sizeSub: 'UK, US, EU, UKR',
       widthTitle: 'Повнота',
@@ -78,22 +76,22 @@ export function CalcMenuPage({
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="relative flex flex-col h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden justify-between transform-gpu"
     >
-      {/* Фон */}
+      {/* Фон с сильно пониженной прозрачностью для устранения визуального конфликта */}
       <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none">
         <img
           src="/CalcMenuPage/size.jpg"
           alt="Calculators Background"
-          className="w-full h-full object-cover object-[center_top] opacity-70 dark:opacity-80"
+          className="w-full h-full object-cover object-[center_top] opacity-10 dark:opacity-20"
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
         />
-        {/* Градієнт підлаштовується під тему */}
+        {/* Градиент для мягкого перехода к нижнему бару */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              'linear-gradient(to bottom, color-mix(in srgb, var(--color-bg) 25%, transparent) 0%, color-mix(in srgb, var(--color-bg) 75%, transparent) 45%, var(--color-bg) 88%)',
+              'linear-gradient(to bottom, color-mix(in srgb, var(--color-bg) 60%, transparent) 0%, color-mix(in srgb, var(--color-bg) 90%, transparent) 70%, var(--color-bg) 100%)',
           }}
         />
       </div>
@@ -105,7 +103,7 @@ export function CalcMenuPage({
             triggerHaptic('light')
             onBack()
           }}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-90 transition-transform text-[var(--color-ink)]"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-90 transition-transform shadow-sm text-[var(--color-ink)]"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
@@ -115,31 +113,31 @@ export function CalcMenuPage({
 
       <div className="relative z-10 px-5 flex flex-col justify-end pb-28 flex-1">
         <div className="mb-6">
-          <span className="text-[11px] font-semibold text-[var(--color-accent)] tracking-[0.15em] uppercase block mb-2">
-            {t.category}
-          </span>
-          <h1 className="text-[32px] font-serif font-normal tracking-wide mb-2 leading-none text-[var(--color-ink)]">
+          {/* Плашка для категории - решает проблему с контрастностью */}
+          <div className="inline-block bg-[var(--color-accent)]/15 px-3 py-1.5 rounded-full mb-3">
+            <span className="text-[10px] font-bold text-[var(--color-accent)] tracking-[0.15em] uppercase block">
+              {t.category}
+            </span>
+          </div>
+          <h1 className="text-[34px] font-serif font-normal tracking-wide mb-1 leading-none text-[var(--color-ink)]">
             {t.title}
           </h1>
-          <p className="text-[13px] text-[var(--color-muted)] leading-relaxed max-w-[280px]">
-            {t.desc}
-          </p>
         </div>
 
         {/* Сітка карток */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {/* Розміри */}
+          {/* Розміри - Заменена иконка на "линейку" */}
           <button
             onClick={() => {
               triggerHaptic('medium')
               onOpenSizeCalc?.()
             }}
-            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95"
+            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
             <div className="w-8 h-8 rounded-[10px] bg-[var(--color-accent)]/15 text-[var(--color-accent)] flex items-center justify-center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 9h18M9 21V9M15 21V9" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16H3V8h18v8z" />
+                <path d="M7 16v-4m4 4v-2m4 2v-4" />
               </svg>
             </div>
             <div>
@@ -150,17 +148,19 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Повнота */}
+          {/* Повнота - Заменена иконка на "измерение ширины" */}
           <button
             onClick={() => {
               triggerHaptic('medium')
               onOpenWidthCalc?.()
             }}
-            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95"
+            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
             <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-egyptian-blue)]/15 text-[var(--pigment-egyptian-blue)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72" />
+                <path d="M22 12H2" />
+                <path d="M18 8l4 4-4 4" />
+                <path d="M6 8l-4 4 4 4" />
               </svg>
             </div>
             <div>
@@ -177,7 +177,7 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenHeelCalc?.()
             }}
-            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95"
+            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
             <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-azurite)]/15 text-[var(--pigment-azurite)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -193,13 +193,13 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Обране */}
+          {/* Обране / На головну */}
           <button
             onClick={() => {
               triggerHaptic(isFavorite ? 'light' : 'medium')
               onToggleFavorite?.()
             }}
-            className={`h-[104px] p-3.5 rounded-[18px] transition-all active:scale-95 flex flex-col justify-between text-left bg-[var(--color-surface)] ${
+            className={`h-[104px] p-3.5 rounded-[18px] transition-all active:scale-95 flex flex-col justify-between text-left bg-[var(--color-surface)] shadow-sm hover:shadow-md ${
               isFavorite
                 ? 'border border-[var(--pigment-lac-dye)]/50 shadow-[0_0_15px_color-mix(in_srgb,var(--pigment-lac-dye)_20%,transparent)]'
                 : 'border border-[var(--color-border)]'
@@ -239,7 +239,7 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenColorCalc?.()
             }}
-            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95"
+            className="h-[104px] p-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
             <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-malachite)]/15 text-[var(--pigment-malachite)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -271,4 +271,4 @@ export function CalcMenuPage({
       </div>
     </motion.div>
   )
- }
+}
