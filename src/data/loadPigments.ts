@@ -1,5 +1,6 @@
 import { Pigment, PIGMENTS, initPigment } from './pigments'
 import { SpectrumPoint, parseSpectrum, spectrumToRGB, rgbToHex } from '../utils/colorScience'
+import { THEME_PIGMENT_IDS } from '../theme/pigmentTheme'
 
 const SPECTRUM_FILES: Record<string, string> = {
   // === Классические ===
@@ -154,40 +155,51 @@ const SPECTRUM_FILES: Record<string, string> = {
   pbr_25_benzimidazolone_brown: 'pbr_25_benzimidazolone_brown.txt',
 }
 
-export async function loadSpectrum(filename: string): Promise<SpectrumPoint[]> {
-  const response = await fetch(`/spectra/${filename}`)
-  if (!response.ok) {
-    throw new Error(`Не удалось загрузить спектр: ${filename}`)
+async function loadOnePigment(pigment: Pigment): Promise<Pigment> {
+  const filename = SPECTRUM_FILES[pigment.id]
+  if (!filename) {
+    console.warn(`Нет файла спектра для: ${pigment.id}`)
+    return pigment
   }
-  const text = await response.text()
-  return parseSpectrum(text)
+
+  try {
+    const response = await fetch(`/spectra/${filename}`)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const text = await response.text()
+    const initialized = initPigment(pigment, text)
+    console.log(`✓ ${pigment.name.ru} → ${initialized.hex}`)
+    return initialized
+  } catch (err) {
+    console.error(`Ошибка загрузки ${pigment.id}:`, err)
+    return pigment
+  }
 }
 
+/** Быстрая загрузка только пигментов, нужных для темы (параллельно) */
+export async function loadThemePigments(): Promise<Pigment[]> {
+  const themeIds = new Set(THEME_PIGMENT_IDS as readonly string[])
+  const themePigments = PIGMENTS.filter((p) => themeIds.has(p.id))
+
+  const results = await Promise.all(themePigments.map(loadOnePigment))
+  return results
+}
+
+/** Полная загрузка всех пигментов (для колористики и т.д.) */
 export async function loadAllPigments(): Promise<Pigment[]> {
-  const result: Pigment[] = []
+  // Сначала быстро тема
+  const theme = await loadThemePigments()
 
-  for (const pigment of PIGMENTS) {
-    const filename = SPECTRUM_FILES[pigment.id]
+  // Потом остальные в фоне
+  const themeIds = new Set(THEME_PIGMENT_IDS as readonly string[])
+  const rest = PIGMENTS.filter((p) => !themeIds.has(p.id))
 
-    if (!filename) {
-      console.warn(`Нет файла спектра для: ${pigment.id}`)
-      result.push(pigment)
-      continue
-    }
+  const restResults = await Promise.all(rest.map(loadOnePigment))
 
-    try {
-      const response = await fetch(`/spectra/${filename}`)
-      const text = await response.text()
-      const initialized = initPigment(pigment, text)
-      result.push(initialized)
-      console.log(`✓ ${pigment.name.ru} → ${initialized.hex}`)
-    } catch (err) {
-      console.error(`Ошибка загрузки ${pigment.id}:`, err)
-      result.push(pigment)
-    }
-  }
+  // Собираем полный список в том же порядке, что и PIGMENTS
+  const map = new Map<string, Pigment>()
+  ;[...theme, ...restResults].forEach((p) => map.set(p.id, p))
 
-  return result
+  return PIGMENTS.map((p) => map.get(p.id) || p)
 }
 
 export function getColorFromSpectrumText(text: string) {
