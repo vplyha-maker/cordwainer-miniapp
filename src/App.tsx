@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
@@ -12,6 +12,7 @@ import { ColorCalcPage } from './pages/ColorCalcPage'
 
 import { loadAllPigments } from './data/loadPigments'
 import { applyPigmentTheme } from './theme/pigmentTheme'
+import type { Pigment } from './data/pigments'
 
 import {
   getSavedPerfMode,
@@ -82,6 +83,9 @@ export default function App() {
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
+  // Зберігаємо пігменти, щоб перезастосовувати тему при зміні day/night
+  const pigmentsRef = useRef<Pigment[]>([])
+
   const handleSetLang = (next: Lang) => {
     setLang(next)
     try {
@@ -108,18 +112,22 @@ export default function App() {
     })
   }
 
-  // === Завантаження пігментів і застосування теми ===
+  // === 1. Завантаження пігментів ===
   useEffect(() => {
     loadAllPigments()
       .then((loaded) => {
-        applyPigmentTheme(loaded)
+        pigmentsRef.current = loaded
+
+        const tg = window.Telegram?.WebApp
+        const isDark = tg ? tg.colorScheme === 'dark' : true
+        applyPigmentTheme(loaded, isDark)
       })
       .catch((err) => {
         console.error('Failed to load pigments for theme:', err)
       })
   }, [])
 
-  // Telegram theme (залишаємо як fallback)
+  // === 2. Telegram theme + перемикання день/ніч ===
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -129,17 +137,23 @@ export default function App() {
 
     const applyTheme = () => {
       const isDark = tg.colorScheme === 'dark'
-      document.documentElement.classList.toggle('dark', isDark)
 
-      try {
-        if (isDark) {
-          tg.setHeaderColor('#151210')
-          tg.setBackgroundColor('#151210')
-        } else {
-          tg.setHeaderColor('#F5F1EA')
-          tg.setBackgroundColor('#F5F1EA')
-        }
-      } catch {}
+      // Якщо пігменти вже завантажені — застосовуємо тему з них
+      if (pigmentsRef.current.length > 0) {
+        applyPigmentTheme(pigmentsRef.current, isDark)
+      } else {
+        // Fallback, поки пігменти ще вантажаться
+        document.documentElement.classList.toggle('dark', isDark)
+        try {
+          if (isDark) {
+            tg.setHeaderColor('#1C1816')
+            tg.setBackgroundColor('#1C1816')
+          } else {
+            tg.setHeaderColor('#F5F1EA')
+            tg.setBackgroundColor('#F5F1EA')
+          }
+        } catch {}
+      }
     }
 
     applyTheme()
@@ -150,7 +164,7 @@ export default function App() {
     }
   }, [])
 
-  // Performance mode
+  // === 3. Performance mode ===
   useEffect(() => {
     let cancelled = false
 
