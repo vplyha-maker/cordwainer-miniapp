@@ -83,12 +83,27 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col h-[100dvh] bg-[#110F0E] text-[#F3EFEA] overflow-hidden"
+      className="flex flex-col h-[100dvh] overflow-hidden"
+      style={{
+        background: 'var(--color-bg, #1C1816)',
+        color: 'var(--color-ink, #F5F1EA)',
+      }}
     >
-      <div className="flex-shrink-0 p-3 flex items-center justify-between border-b border-white/5 bg-[#110F0E]/80 backdrop-blur-md z-10">
+      {/* Header */}
+      <div
+        className="flex-shrink-0 p-3 flex items-center justify-between backdrop-blur-md z-10"
+        style={{
+          background: 'color-mix(in srgb, var(--color-bg, #1C1816) 80%, transparent)',
+          borderBottom: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+        }}
+      >
         <button
           onClick={() => { haptic(); onBack() }}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-[#1C1816] border border-white/5 active:scale-90"
+          className="w-9 h-9 flex items-center justify-center rounded-full active:scale-90"
+          style={{
+            background: 'var(--color-surface, #25201C)',
+            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
@@ -96,7 +111,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </button>
         <div className="text-right">
           <h1 className="text-[14px] font-medium leading-none mb-1">{t.title}</h1>
-          <p className="text-[10px] text-[#A3988E]">{t.desc}</p>
+          <p className="text-[10px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+            {t.desc}
+          </p>
         </div>
       </div>
 
@@ -116,14 +133,26 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         />
 
         {/* Стандарт / Рокер */}
-        <div className="flex bg-[#1C1816] p-1 rounded-xl border border-white/5">
+        <div
+          className="flex p-1 rounded-xl"
+          style={{
+            background: 'var(--color-surface, #25201C)',
+            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+          }}
+        >
           {(['flat', 'rocker'] as const).map((type) => (
             <button
               key={type}
               onClick={() => { haptic(); setSoleType(type) }}
-              className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg ${
-                soleType === type ? 'bg-[#8B5CF6] text-white' : 'text-[#A3988E]'
-              }`}
+              className="flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-colors"
+              style={
+                soleType === type
+                  ? {
+                      background: 'var(--color-accent, #D8A35C)',
+                      color: 'var(--color-bg, #1C1816)',
+                    }
+                  : { color: 'var(--color-muted, #B9ACA0)' }
+              }
             >
               {t[type]}
             </button>
@@ -132,14 +161,26 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
         {/* Типы каблука — только Стандарт */}
         {soleType === 'flat' && (
-          <div className="grid grid-cols-2 gap-1 bg-[#1C1816] p-1 rounded-xl border border-white/5">
+          <div
+            className="grid grid-cols-2 gap-1 p-1 rounded-xl"
+            style={{
+              background: 'var(--color-surface, #25201C)',
+              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+            }}
+          >
             {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => { haptic(); setHeelType(type) }}
-                className={`py-1.5 text-[11px] font-medium rounded-lg ${
-                  heelType === type ? 'bg-[#8B5CF6] text-white' : 'text-[#A3988E]'
-                }`}
+                className="py-1.5 text-[11px] font-medium rounded-lg transition-colors"
+                style={
+                  heelType === type
+                    ? {
+                        background: 'var(--color-accent, #D8A35C)',
+                        color: 'var(--color-bg, #1C1816)',
+                      }
+                    : { color: 'var(--color-muted, #B9ACA0)' }
+                }
               >
                 {t[type]}
               </button>
@@ -207,11 +248,16 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         {/* Спека */}
         <button
           onClick={() => { haptic(); setShowSpecs(!showSpecs) }}
-          className="w-full py-2 px-3 bg-[#1C1816] rounded-xl text-[11px] font-medium flex items-center justify-between border border-white/5"
+          className="w-full py-2 px-3 rounded-xl text-[11px] font-medium flex items-center justify-between"
+          style={{
+            background: 'var(--color-surface, #25201C)',
+            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+          }}
         >
           <span>{t.specsBtn}</span>
           <svg
-            className={`w-3.5 h-3.5 text-[#A3988E] transition-transform ${showSpecs ? 'rotate-180' : ''}`}
+            className={`w-3.5 h-3.5 transition-transform ${showSpecs ? 'rotate-180' : ''}`}
+            style={{ color: 'var(--color-muted, #B9ACA0)' }}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -227,7 +273,14 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="bg-[#1C1816] p-2.5 rounded-xl border border-white/5 text-[10px] text-[#A3988E] space-y-1.5">
+              <div
+                className="p-2.5 rounded-xl text-[10px] space-y-1.5"
+                style={{
+                  background: 'var(--color-surface, #25201C)',
+                  border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+                  color: 'var(--color-muted, #B9ACA0)',
+                }}
+              >
                 <Row label="Перекат" value={`${rockerStartPct}%`} />
                 <Row label="Геленок" value={`${eng.shankLength} мм`} />
                 <Row label="Сталь 65Г" value={`${eng.steelThickness.toFixed(1)} мм`} />
@@ -247,7 +300,14 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     )}
                   </>
                 )}
-                <div className="pt-1.5 mt-1 border-t border-white/5 font-mono text-[9px] text-[#D49A5C] bg-black/20 p-1.5 rounded-lg text-center">
+                <div
+                  className="pt-1.5 mt-1 font-mono text-[9px] p-1.5 rounded-lg text-center"
+                  style={{
+                    borderTop: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+                    color: 'var(--color-accent, #D8A35C)',
+                    background: 'color-mix(in srgb, var(--color-bg, #1C1816) 40%, transparent)',
+                  }}
+                >
                   Angle = arcsin((H − T) / L_eff)
                 </div>
               </div>
@@ -263,7 +323,15 @@ function Row({ label, value, danger }: { label: string; value: string; danger?: 
   return (
     <div className="flex justify-between">
       <span>{label}:</span>
-      <strong className={danger ? 'text-red-400' : 'text-[#F3EFEA]'}>{value}</strong>
+      <strong
+        style={{
+          color: danger
+            ? 'var(--color-danger, #f87171)'
+            : 'var(--color-ink, #F5F1EA)',
+        }}
+      >
+        {value}
+      </strong>
     </div>
   )
 }
