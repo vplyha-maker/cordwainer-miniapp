@@ -2,25 +2,19 @@ import { Pigment } from '../data/pigments'
 import { spectrumToRGB, rgbToHex } from '../utils/colorScience'
 
 export const THEME_PIGMENT_IDS = [
-  'titanium_white',
-  'bone_black',
-  'ivory_black',
-  'yellow_ochre',
-  'red_ochre',
-  'burnt_sienna',
-  'raw_sienna',
-  'burnt_umber',
-  'raw_umber',
-  'cadmium_red',
-  'pyrrole_red',
-  'carmine_lake',
-  'ultramarine',
-  'prussian_blue',
-  'green_earth',
-  'van_dyke_brown',
+  'lac_dye',           // Лак-дай
+  'egyptian_blue',     // Єгипетський синій
+  'orpiment',          // Аурипігмент
+  'realgar',           // Реальгар
+  'verdigris',         // Ярь-медянка
+  'malachite',         // Малахіт
+  'azurite',           // Азурит
+  'smalt',             // Смальта
+  'indigo',            // Індиго
+  'madder_lake',       // Крап-лак
+  'lead_white',        // Свинцеві білила
+  'bone_black',        // Кісткова сажа
 ] as const
-
-export type ThemePigmentId = typeof THEME_PIGMENT_IDS[number]
 
 export function applyPigmentTheme(pigments: Pigment[]) {
   const root = document.documentElement
@@ -38,50 +32,48 @@ export function applyPigmentTheme(pigments: Pigment[]) {
     return fallback
   }
 
-  // Справжні кольори пігментів
-  const white     = getHex('titanium_white', '#F5F1EA')
-  const boneBlack = getHex('bone_black', '#1C1816')
-  const ivory     = getHex('ivory_black', '#2A2522')
-  const ochre     = getHex('yellow_ochre', '#C4A35A')
-  const redOchre  = getHex('red_ochre', '#A65A3A')
-  const sienna    = getHex('burnt_sienna', '#8B4513')
-  const umber     = getHex('burnt_umber', '#3D2B1F')
-  const cadmium   = getHex('cadmium_red', '#E34234')
-  const pyrrole   = getHex('pyrrole_red', '#C41E3A')
-  const carmine   = getHex('carmine_lake', '#960018')
-  const ultra     = getHex('ultramarine', '#3F51B5')
-  const prussian  = getHex('prussian_blue', '#003153')
-  const greenE    = getHex('green_earth', '#556B2F')
-  const vandyke   = getHex('van_dyke_brown', '#4A3728')
+  // Справжні кольори 12 історичних пігментів
+  const lacDye      = getHex('lac_dye', '#8B0000')
+  const egyptianBlue = getHex('egyptian_blue', '#1034A6')
+  const orpiment    = getHex('orpiment', '#E4D00A')
+  const realgar     = getHex('realgar', '#E34234')
+  const verdigris   = getHex('verdigris', '#43B3AE')
+  const malachite   = getHex('malachite', '#0BDA51')
+  const azurite     = getHex('azurite', '#007FFF')
+  const smalt       = getHex('smalt', '#003399')
+  const indigo      = getHex('indigo', '#4B0082')
+  const madder      = getHex('madder_lake', '#A52A2A')
+  const leadWhite   = getHex('lead_white', '#F5F1EA')
+  const boneBlack   = getHex('bone_black', '#1C1816')
 
-  // Записуємо в CSS-змінні
-  root.style.setProperty('--pigment-white', white)
+  // Записуємо всі пігменти в CSS-змінні
+  root.style.setProperty('--pigment-lac-dye', lacDye)
+  root.style.setProperty('--pigment-egyptian-blue', egyptianBlue)
+  root.style.setProperty('--pigment-orpiment', orpiment)
+  root.style.setProperty('--pigment-realgar', realgar)
+  root.style.setProperty('--pigment-verdigris', verdigris)
+  root.style.setProperty('--pigment-malachite', malachite)
+  root.style.setProperty('--pigment-azurite', azurite)
+  root.style.setProperty('--pigment-smalt', smalt)
+  root.style.setProperty('--pigment-indigo', indigo)
+  root.style.setProperty('--pigment-madder', madder)
+  root.style.setProperty('--pigment-lead-white', leadWhite)
   root.style.setProperty('--pigment-bone-black', boneBlack)
-  root.style.setProperty('--pigment-ivory-black', ivory)
-  root.style.setProperty('--pigment-ochre', ochre)
-  root.style.setProperty('--pigment-red-ochre', redOchre)
-  root.style.setProperty('--pigment-sienna', sienna)
-  root.style.setProperty('--pigment-umber', umber)
-  root.style.setProperty('--pigment-cadmium-red', cadmium)
-  root.style.setProperty('--pigment-pyrrole-red', pyrrole)
-  root.style.setProperty('--pigment-carmine', carmine)
-  root.style.setProperty('--pigment-ultramarine', ultra)
-  root.style.setProperty('--pigment-prussian', prussian)
-  root.style.setProperty('--pigment-green-earth', greenE)
-  root.style.setProperty('--pigment-vandyke', vandyke)
 
-  // Основна тема додатку (формується з пігментів)
-  root.style.setProperty('--color-bg', boneBlack)           // фон = кісткова сажа
-  root.style.setProperty('--color-surface', umber)          // поверхні = палена умбра
-  root.style.setProperty('--color-surface-2', ivory)        // друга поверхня
-  root.style.setProperty('--color-ink', white)              // текст = білила
-  root.style.setProperty('--color-muted', ochre)            // приглушений текст
-  root.style.setProperty('--color-accent', ochre)           // головний акцент = вохра
-  root.style.setProperty('--color-accent-strong', cadmium)  // сильний акцент = кадмій
-  root.style.setProperty('--color-danger', pyrrole)         // небезпека / важливі кнопки
-  root.style.setProperty('--color-border', sienna)          // бордери
+  // Основна тема додатку (сформована з історичних пігментів)
+  root.style.setProperty('--color-bg', boneBlack)              // фон = кісткова сажа
+  root.style.setProperty('--color-surface', indigo)            // поверхні = індиго
+  root.style.setProperty('--color-surface-2', smalt)           // друга поверхня = смальта
+  root.style.setProperty('--color-ink', leadWhite)             // текст = свинцеві білила
+  root.style.setProperty('--color-muted', madder)              // приглушений = крап-лак
+  root.style.setProperty('--color-accent', orpiment)           // головний акцент = аурипігмент
+  root.style.setProperty('--color-accent-strong', realgar)     // сильний акцент = реальгар
+  root.style.setProperty('--color-danger', lacDye)             // небезпека = лак-дай
+  root.style.setProperty('--color-border', azurite)            // бордери = азурит
+  root.style.setProperty('--color-info', egyptianBlue)         // інформація = єгипетський синій
+  root.style.setProperty('--color-success', malachite)         // успіх = малахіт
 
-  // Для Telegram WebApp
+  // Telegram WebApp
   try {
     const tg = (window as any).Telegram?.WebApp
     if (tg) {
@@ -89,4 +81,15 @@ export function applyPigmentTheme(pigments: Pigment[]) {
       tg.setBackgroundColor(boneBlack)
     }
   } catch {}
+
+  // Для дебагу (можна потім прибрати)
+  console.log('%c🎨 Historical Pigment Theme applied', 'color: #E4D00A; font-weight: bold')
+  console.log({
+    lacDye,
+    egyptianBlue,
+    orpiment,
+    realgar,
+    boneBlack,
+    leadWhite,
+  })
 }
