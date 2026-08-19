@@ -8,7 +8,10 @@ import { CalcMenuPage } from './pages/CalcMenuPage'
 import { SizeCalcPage } from './pages/SizeCalcPage'
 import { WidthCalcPage } from './pages/WidthCalcPage'
 import { HeelCalcPage } from './pages/HeelCalcPage'
-import { ColorCalcPage } from './pages/ColorCalcPage' // <-- 1. Импорт нового калькулятора цветов
+import { ColorCalcPage } from './pages/ColorCalcPage'
+
+import { loadAllPigments } from './data/loadPigments'
+import { applyPigmentTheme } from './theme/pigmentTheme'
 
 import {
   getSavedPerfMode,
@@ -24,8 +27,16 @@ declare global {
   }
 }
 
-// <-- 2. Добавлен 'color-calc' в типы экранов
-export type Screen = 'welcome' | 'home' | 'blog' | 'calc-menu' | 'size-calc' | 'width-calc' | 'heel-calc' | 'color-calc'
+export type Screen =
+  | 'welcome'
+  | 'home'
+  | 'blog'
+  | 'calc-menu'
+  | 'size-calc'
+  | 'width-calc'
+  | 'heel-calc'
+  | 'color-calc'
+
 export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
@@ -97,7 +108,18 @@ export default function App() {
     })
   }
 
-  // Telegram theme
+  // === Завантаження пігментів і застосування теми ===
+  useEffect(() => {
+    loadAllPigments()
+      .then((loaded) => {
+        applyPigmentTheme(loaded)
+      })
+      .catch((err) => {
+        console.error('Failed to load pigments for theme:', err)
+      })
+  }, [])
+
+  // Telegram theme (залишаємо як fallback)
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -285,7 +307,7 @@ export default function App() {
             onOpenSizeCalc={() => setScreen('size-calc')}
             onOpenWidthCalc={() => setScreen('width-calc')}
             onOpenHeelCalc={() => setScreen('heel-calc')}
-            onOpenColorCalc={() => setScreen('color-calc')} // <-- 3. Проброс для вызова калькулятора цветов
+            onOpenColorCalc={() => setScreen('color-calc')}
           />
         )}
 
@@ -313,7 +335,6 @@ export default function App() {
           />
         )}
 
-        {/* <-- 4. Новый экран калькулятора цветов */}
         {screen === 'color-calc' && (
           <ColorCalcPage
             key="color-calc"
