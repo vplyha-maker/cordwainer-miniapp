@@ -10,7 +10,7 @@ import {
 export type CoverageSystem = 'aniline' | 'acrylic'
 
 // ==========================================
-// Чистые базовые цвета (канцтовары)
+// Чистые базовые цвета
 // ==========================================
 export const PURE_BASIC_COLORS = [
   {
@@ -196,9 +196,6 @@ function calculateDeltaE2000(
   )
 }
 
-// ==========================================
-// Быстрая Евклидова дистанция
-// ==========================================
 function fastDeltaE(
   lab1: { L: number; a: number; b: number },
   lab2: { L: number; a: number; b: number }
@@ -220,9 +217,6 @@ export function hexToRgbObj(hex: string) {
   }
 }
 
-// ==========================================
-// Вспомогательные функции поиска
-// ==========================================
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = []
   const combo: number[] = []
@@ -257,59 +251,58 @@ export interface RecipeItem {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ
+// ГЛАВНЫЙ АЛГОРИТМ (покращений)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
   pigments: Pigment[],
   maxComponents = 3,
   targetVolume = 20,
-  system: CoverageSystem = 'acrylic' // ← по умолчанию акрил
+  system: CoverageSystem = 'acrylic',
+  excludeIds: string[] = []
 ) {
   if (!pigments.length || !targetHex) return null
 
-  // Ищем биндер (только для acrylic)
   const binderPigment =
     system === 'acrylic'
       ? pigments.find((p) => p.id === 'acrylic_binder' || (p as any).isBinder === true)
       : undefined
 
-  // Рабочие пигменты (без биндера)
   const validPigments = pigments.filter(
     (p) =>
       p.id !== 'acrylic_binder' &&
       !(p as any).isBinder &&
       p.spectrum &&
-      p.spectrum.length > 0
+      p.spectrum.length > 0 &&
+      !excludeIds.includes(p.id)
   )
   if (validPigments.length === 0) return null
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // Формируем компоненты с учётом биндера (20% только для acrylic)
   const buildComponentsWithBinder = (
     selectedPigments: Pigment[],
     vols: number[]
-  ): { spectrum: SpectrumPoint[]; volume: number }[] => {
+  ): { spectrum: SpectrumPoint[]; volume: number; isBinder?: boolean }[] => {
     const components = selectedPigments.map((pigment, i) => ({
       spectrum: pigment.spectrum!,
       volume: vols[i],
     }))
 
-    // Добавляем биндер только если система acrylic и биндер найден
     if (binderPigment?.spectrum) {
       const totalPigmentVol = vols.reduce((sum, v) => sum + v, 0)
       components.push({
         spectrum: binderPigment.spectrum,
-        volume: totalPigmentVol * 0.2, // 20% от суммы пигментов
+        volume: totalPigmentVol * 0.2,
+        isBinder: true,
       })
     }
 
     return components
   }
 
-  // 1. Оценка каждого пигмента
+  // 1. Оцінка кожного пігмента
   const scored = validPigments.map((p) => {
     const components = buildComponentsWithBinder([p], [100])
     const rgb = spectrumToRGB(mixSpectra(components))
@@ -318,28 +311,38 @@ export function findRecipeByHex(
   })
   scored.sort((a, b) => a.dist - b.dist)
 
-  // 2. Умная выборка кандидатов (макс. 8)
+  // 2. Розумний набір кандидатів (значно ширший)
   const candidatesSet = new Set<Pigment>()
 
-  scored.slice(0, 3).forEach((s) => candidatesSet.add(s.pigment))
+  // Топ-6 найближчих
+  scored.slice(0, 6).forEach((s) => candidatesSet.add(s.pigment))
 
-  // Белый + чёрный
-  const bwIds: string[] = [
-    ...PURE_BASIC_COLORS[0].sourceIds,
-    ...PURE_BASIC_COLORS[1].sourceIds,
-  ]
+  // Усі базові (білий, чорний, червоний, жовтий…)
+  const allBasicIds = PURE_BASIC_COLORS.flatMap((b) => b.sourceIds as readonly string[])
   validPigments
-    .filter((p) => bwIds.includes(p.id))
+    .filter((p) => allBasicIds.includes(p.id))
     .forEach((p) => candidatesSet.add(p))
 
-  // Для тёмных целей — синий
-  if (targetLab.L < 40) {
-    const blueIds: string[] = [...PURE_BASIC_COLORS[4].sourceIds]
-    const blueP = validPigments.find((p) => blueIds.includes(p.id))
-    if (blueP) candidatesSet.add(blueP)
+  // Земляні + червоні/коричневі (дуже важливо для #642226 тощо)
+  const earthAndWarmIds = [
+    'yellow_ochre', 'red_ochre', 'raw_sienna', 'burnt_sienna',
+    'raw_umber', 'burnt_umber', 'green_earth',
+    'cadmium_red', 'pyrrole_red', 'carmine_lake', 'venetian_red',
+    'indian_red', 'mars_red', 'quinacridone_red', 'permanent_red',
+  ]
+  validPigments
+    .filter((p) => earthAndWarmIds.includes(p.id) || p.id.includes('ochre') || p.id.includes('sienna') || p.id.includes('umber') || p.id.includes('red'))
+    .forEach((p) => candidatesSet.add(p))
+
+  // Для дуже темних цілей — додатково сині
+  if (targetLab.L < 35) {
+    const blueIds = [...PURE_BASIC_COLORS[4].sourceIds]
+    validPigments
+      .filter((p) => blueIds.includes(p.id))
+      .forEach((p) => candidatesSet.add(p))
   }
 
-  const candidates = Array.from(candidatesSet).slice(0, 8)
+  const candidates = Array.from(candidatesSet).slice(0, 12) // максимум 12
   const n = candidates.length
 
   let topResults: BestResult[] = []
@@ -355,23 +358,18 @@ export function findRecipeByHex(
 
     topResults.push({ indices, volumes: [...vols], rgb, deltaE: dist })
     topResults.sort((a, b) => a.deltaE - b.deltaE)
-    if (topResults.length > 5) topResults.pop()
+    if (topResults.length > 8) topResults.pop()
   }
 
-  // --- 3. ГРУБЫЙ ПЕРЕБОР ---
+  // --- 3. ГРУБИЙ ПЕРЕБІР ---
 
   // k = 1
   for (let i = 0; i < n; i++) tryAddResult([i], [100])
 
   // k = 2
   const ratios2 = [
-    [98, 2],
-    [95, 5],
-    [90, 10],
-    [80, 20],
-    [70, 30],
-    [60, 40],
-    [50, 50],
+    [98, 2], [95, 5], [90, 10], [85, 15], [80, 20],
+    [70, 30], [60, 40], [50, 50], [40, 60], [30, 70],
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
@@ -383,14 +381,10 @@ export function findRecipeByHex(
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
-      [90, 8, 2],
-      [85, 10, 5],
-      [80, 15, 5],
-      [70, 20, 10],
-      [60, 30, 10],
-      [50, 30, 20],
-      [40, 40, 20],
-      [34, 33, 33],
+      [90, 8, 2], [85, 10, 5], [80, 15, 5], [75, 15, 10],
+      [70, 20, 10], [65, 25, 10], [60, 30, 10], [55, 30, 15],
+      [50, 30, 20], [45, 35, 20], [40, 40, 20], [40, 35, 25],
+      [34, 33, 33], [50, 25, 25], [60, 25, 15],
     ]
     for (const combo of combinations(n, 3)) {
       for (const ratio of ratios3) {
@@ -410,14 +404,25 @@ export function findRecipeByHex(
     }
   }
 
+  // k = 4 (тільки якщо явно попросили)
+  if (maxComponents >= 4 && n >= 4) {
+    const ratios4 = [
+      [70, 15, 10, 5], [60, 20, 15, 5], [50, 25, 15, 10],
+      [40, 30, 20, 10], [40, 25, 20, 15], [35, 30, 20, 15],
+    ]
+    for (const combo of combinations(n, 4)) {
+      for (const ratio of ratios4) {
+        tryAddResult(combo, ratio)
+      }
+    }
+  }
+
   if (topResults.length === 0) return null
 
-  // --- 4. ТОЧНАЯ ДОВОДКА ---
+  // --- 4. ТОЧНА ДОВОДКА ---
+  let absoluteBest: BestResult = { ...topResults[0], deltaE: Infinity }
 
-  let absoluteBest: BestResult = topResults[0]
-  absoluteBest.deltaE = Infinity
-
-  const adjustments = [0.85, 0.95, 1.05, 1.15]
+  const adjustments = [0.75, 0.85, 0.92, 0.97, 1.03, 1.08, 1.15, 1.25]
 
   for (const candidate of topResults) {
     let currentVols = [...candidate.volumes]
@@ -425,7 +430,6 @@ export function findRecipeByHex(
     const evaluate = (vols: number[]) => {
       const selectedPigments = candidate.indices.map((idx) => candidates[idx])
       const components = buildComponentsWithBinder(selectedPigments, vols)
-
       const mixed = mixSpectra(components)
       const rgb = spectrumToRGB(mixed)
       const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
@@ -434,17 +438,14 @@ export function findRecipeByHex(
 
     let currentRes = evaluate(currentVols)
 
-    for (let pass = 0; pass < 3; pass++) {
+    for (let pass = 0; pass < 4; pass++) {
       let improved = false
-
       for (let i = 0; i < currentVols.length; i++) {
         for (const adj of adjustments) {
           const trialVols = [...currentVols]
-          trialVols[i] = Math.max(0.1, Math.min(100, trialVols[i] * adj))
-
+          trialVols[i] = Math.max(0.15, Math.min(100, trialVols[i] * adj))
           const trialRes = evaluate(trialVols)
-
-          if (trialRes.deltaE < currentRes.deltaE - 0.001) {
+          if (trialRes.deltaE < currentRes.deltaE - 0.0005) {
             currentRes = trialRes
             currentVols = trialVols
             improved = true
@@ -464,27 +465,24 @@ export function findRecipeByHex(
     }
   }
 
-  // --- 5. МАСШТАБИРОВАНИЕ ---
+  // --- 5. МАСШТАБУВАННЯ ---
   const totalWeight = absoluteBest.volumes.reduce((sum, v) => sum + v, 0)
   if (totalWeight <= 0) return null
 
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
   const scale = scaleTarget / totalWeight
 
-  // Пигменты
   const recipe: RecipeItem[] = absoluteBest.indices
     .map((candidateIdx, i) => ({
       pigment: candidates[candidateIdx],
-      ml: Math.round(absoluteBest.volumes[i] * scale * 10) / 10,
+      ml: Math.round(absoluteBest.volumes[i] * scale * 100) / 100,
     }))
-    .filter((r) => r.ml > 0)
+    .filter((r) => r.ml > 0.05)
     .sort((a, b) => b.ml - a.ml)
 
-  // Добавляем биндер в рецепт (только для acrylic)
   if (binderPigment && system === 'acrylic') {
     const totalPigmentMl = recipe.reduce((sum, r) => sum + r.ml, 0)
-    const binderMl = Math.round(totalPigmentMl * 0.2 * 10) / 10
-
+    const binderMl = Math.round(totalPigmentMl * 0.2 * 100) / 100
     if (binderMl > 0) {
       recipe.push({
         pigment: binderPigment,
@@ -499,12 +497,12 @@ export function findRecipeByHex(
     resultRgb: absoluteBest.rgb,
     resultHex: rgbToHex(absoluteBest.rgb),
     deltaE: Math.round(absoluteBest.deltaE * 10) / 10,
-    system, // возвращаем систему для удобства
+    system,
   }
 }
 
 // ==========================================
-// Симуляция слоёв
+// Симуляція шарів
 // ==========================================
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
