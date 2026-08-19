@@ -15,7 +15,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
   const blogFavorites = favorites.filter((f) => f.type === 'blog')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
-  // Инициализация языка из localStorage (если есть логика на уровне App, это дополнительная страховка)
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
     if (savedLang && (savedLang === 'ru' || savedLang === 'uk')) {
@@ -79,7 +78,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     {
       title: t.materials,
       sub: t.materialsSub,
-      accent: '#D8A35C',
+      accent: 'var(--color-accent, #D8A35C)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
@@ -103,7 +102,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     {
       title: t.styles,
       sub: t.stylesSub,
-      accent: '#60A5FA',
+      accent: 'var(--color-info, #60A5FA)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
@@ -142,7 +141,13 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
+    <div
+      className="relative flex flex-col h-[100dvh] overflow-hidden"
+      style={{
+        background: 'var(--color-bg, #1C1816)',
+        color: 'var(--color-ink, #F5F1EA)',
+      }}
+    >
       {/* Hero */}
       <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] overflow-hidden z-20">
         <img
@@ -153,28 +158,44 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background:
-              'linear-gradient(to bottom, rgba(21,18,16,.20) 0%, rgba(21,18,16,.50) 60%, #151210 100%)',
+            background: `linear-gradient(
+              to bottom,
+              color-mix(in srgb, var(--color-bg, #1C1816) 20%, transparent) 0%,
+              color-mix(in srgb, var(--color-bg, #1C1816) 50%, transparent) 60%,
+              var(--color-bg, #1C1816) 100%
+            )`,
           }}
         />
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
           <div className="flex items-start justify-between">
-            {/* Крупный логотип */}
             <div className="flex-1 pr-2">
               <h1
-                className="font-display text-[2.5rem] leading-[0.9] text-[#F5F1EB]"
-                style={{ textShadow: '0 2px 20px rgba(0,0,0,.6)' }}
+                className="font-display text-[2.5rem] leading-[0.9]"
+                style={{
+                  color: 'var(--color-ink, #F5F1EA)',
+                  textShadow: '0 2px 20px color-mix(in srgb, var(--color-bg, #1C1816) 60%, transparent)',
+                }}
               >
                 Cordwainer
               </h1>
-              <p className="mt-2 text-[10px] tracking-[0.2em] uppercase text-[#B9ACA0]">
+              <p
+                className="mt-2 text-[10px] tracking-[0.2em] uppercase"
+                style={{ color: 'var(--color-muted, #B9ACA0)' }}
+              >
                 {t.tagline}
               </p>
             </div>
 
-            {/* Блок переключателя языков и кнопки установки */}
             <div className="flex flex-col items-end gap-2 shrink-0">
-              <div className="flex bg-[#1D1815]/80 rounded-full p-1 border border-[#C6A47A]/20" role="group" aria-label="Language selection">
+              <div
+                className="flex rounded-full p-1"
+                style={{
+                  background: 'color-mix(in srgb, var(--color-surface, #25201C) 80%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
+                }}
+                role="group"
+                aria-label="Language selection"
+              >
                 <button
                   onClick={() => handleLangChange('ru')}
                   className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
@@ -193,8 +214,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 </button>
               </div>
 
-              {/* Мини-кнопка установки в едином стиле */}
-              <button 
+              <button
                 onClick={handleAddToHome}
                 className="action-pill w-full flex items-center justify-center"
                 aria-label={t.addToHomeShort}
@@ -210,10 +230,16 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           </div>
 
           <div className="pointer-events-none pb-2">
-            <p className="text-[9px] tracking-[0.2em] uppercase text-[#B9ACA0]/80 mb-2">
+            <p
+              className="text-[9px] tracking-[0.2em] uppercase mb-2"
+              style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 80%, transparent)' }}
+            >
               Issue 01 · 2026
             </p>
-            <div className="flex flex-col gap-0.5 text-[8px] tracking-[0.12em] uppercase text-[#B9ACA0]/50 leading-tight">
+            <div
+              className="flex flex-col gap-0.5 text-[8px] tracking-[0.12em] uppercase leading-tight"
+              style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 50%, transparent)' }}
+            >
               <span>{t.idea1}</span>
               <span>{t.idea2}</span>
               <span>{t.idea3}</span>
@@ -224,8 +250,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
       {/* Content */}
       <div className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3">
-        
-        {/* Categories (Optimized visual details) */}
+        {/* Categories */}
         <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
           {categories.map((item) => (
             <button
@@ -235,17 +260,23 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
                 style={{
-                  background: `${item.accent}20`,
+                  background: `color-mix(in srgb, ${item.accent} 20%, transparent)`,
                   color: item.accent,
                 }}
               >
                 {item.icon}
               </div>
               <div className="relative z-10 flex-1 flex flex-col justify-end">
-                <div className="text-[11px] font-semibold leading-tight text-[#F5F1EB] whitespace-pre-line">
+                <div
+                  className="text-[11px] font-semibold leading-tight whitespace-pre-line"
+                  style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                >
                   {item.title}
                 </div>
-                <div className="text-[9px] mt-1.5 leading-snug text-[#B9ACA0] whitespace-pre-line">
+                <div
+                  className="text-[9px] mt-1.5 leading-snug whitespace-pre-line"
+                  style={{ color: 'var(--color-muted, #B9ACA0)' }}
+                >
                   {item.sub}
                 </div>
               </div>
@@ -253,7 +284,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           ))}
         </div>
 
-        {/* Primary Start button (Moved to index.css) */}
+        {/* Primary Start button */}
         <button
           onClick={onStart}
           className="btn-primary mb-6"
@@ -262,24 +293,41 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         >
           <div className="relative h-full flex items-center justify-between px-6">
             <div className="flex flex-col text-left">
-              <span className="uppercase text-[10px] tracking-[.30em] text-[#8F6A42] font-bold">
+              <span
+                className="uppercase text-[10px] tracking-[.30em] font-bold"
+                style={{ color: 'color-mix(in srgb, var(--color-accent, #D8A35C) 70%, #000)' }}
+              >
                 ISSUE 01
               </span>
-              <span className="mt-1 text-[20px] font-bold text-[#1A1612]">
+              <span
+                className="mt-1 text-[20px] font-bold"
+                style={{ color: 'var(--color-bg, #1C1816)' }}
+              >
                 {t.start}
               </span>
             </div>
-            <div className="text-[28px] text-[#8F6A42]">→</div>
+            <div
+              className="text-[28px]"
+              style={{ color: 'color-mix(in srgb, var(--color-accent, #D8A35C) 70%, #000)' }}
+            >
+              →
+            </div>
           </div>
         </button>
 
         {/* Favorites */}
         <div className="mb-2">
           <div className="flex items-center justify-between mb-2 px-0.5">
-            <span className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0]">
+            <span
+              className="text-[10px] tracking-[0.14em] uppercase"
+              style={{ color: 'var(--color-muted, #B9ACA0)' }}
+            >
               {t.favorites}
             </span>
-            <button className="text-[11px] text-[#D8A35C] active:opacity-70 cursor-pointer">
+            <button
+              className="text-[11px] active:opacity-70 cursor-pointer"
+              style={{ color: 'var(--color-accent, #D8A35C)' }}
+            >
               {t.seeAll}
             </button>
           </div>
@@ -308,7 +356,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                       draggable={false}
                     />
                   ) : (
-                    <span className="text-[16px] font-light text-[#B9ACA0]/30">+</span>
+                    <span
+                      className="text-[16px] font-light"
+                      style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 30%, transparent)' }}
+                    >
+                      +
+                    </span>
                   )}
                 </div>
               )
@@ -332,7 +385,10 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
             className="fixed inset-0 z-[100] flex items-end justify-center"
             onClick={() => setShowWidgetHint(false)}
           >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div
+              className="absolute inset-0 backdrop-blur-sm"
+              style={{ background: 'color-mix(in srgb, var(--color-bg, #1C1816) 60%, transparent)' }}
+            />
 
             <motion.div
               initial={{ y: 80, opacity: 0 }}
@@ -342,37 +398,66 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
               onClick={(e) => e.stopPropagation()}
               className="relative w-full max-w-md mx-4 mb-6 rounded-3xl overflow-hidden"
               style={{
-                background: 'linear-gradient(180deg, #2A231D 0%, #1A1612 100%)',
-                border: '1px solid rgba(198,164,122,0.25)',
-                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                background: `linear-gradient(180deg, var(--color-surface, #25201C) 0%, var(--color-bg, #1C1816) 100%)`,
+                border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 25%, transparent)',
+                boxShadow: '0 20px 50px color-mix(in srgb, var(--color-bg, #1C1816) 50%, transparent)',
               }}
             >
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C]">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)',
+                      color: 'var(--color-accent, #D8A35C)',
+                    }}
+                  >
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
                       <rect x="5" y="2" width="14" height="20" rx="2" />
                       <path d="M12 18h.01" />
                     </svg>
                   </div>
                   <div>
-                    <div className="text-[16px] font-semibold text-[#F5F1EB]">{t.widgetTitle}</div>
+                    <div
+                      className="text-[16px] font-semibold"
+                      style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                    >
+                      {t.widgetTitle}
+                    </div>
                   </div>
                 </div>
 
-                <p className="text-[13px] text-[#B9ACA0] leading-relaxed mb-5">
+                <p
+                  className="text-[13px] leading-relaxed mb-5"
+                  style={{ color: 'var(--color-muted, #B9ACA0)' }}
+                >
                   {t.widgetText}
                 </p>
 
                 <div className="space-y-3 mb-6">
-                  <div className="text-[13px] text-[#F5F1EB]/90">
-                    <span className="text-[#D8A35C] font-medium">{t.widgetStep1}</span>
+                  <div
+                    className="text-[13px]"
+                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
+                  >
+                    <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+                      {t.widgetStep1}
+                    </span>
                   </div>
-                  <div className="text-[13px] text-[#F5F1EB]/90">
-                    <span className="text-[#D8A35C] font-medium">{t.widgetStep2}</span>
+                  <div
+                    className="text-[13px]"
+                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
+                  >
+                    <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+                      {t.widgetStep2}
+                    </span>
                   </div>
-                  <div className="text-[13px] text-[#F5F1EB]/90">
-                    <span className="text-[#D8A35C] font-medium">{t.widgetStep3}</span>
+                  <div
+                    className="text-[13px]"
+                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
+                  >
+                    <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+                      {t.widgetStep3}
+                    </span>
                   </div>
                 </div>
 
@@ -380,8 +465,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                   onClick={handleOpenInBrowser}
                   className="w-full py-3.5 rounded-2xl text-[13px] font-semibold uppercase tracking-wider active:scale-[0.98] transition-transform cursor-pointer"
                   style={{
-                    background: 'linear-gradient(180deg, #D8A35C 0%, #C08A3E 100%)',
-                    color: '#1A1612',
+                    background: 'linear-gradient(180deg, var(--color-accent, #D8A35C) 0%, color-mix(in srgb, var(--color-accent, #D8A35C) 85%, #000) 100%)',
+                    color: 'var(--color-bg, #1C1816)',
                   }}
                 >
                   {t.widgetAction}
@@ -393,4 +478,4 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       </AnimatePresence>
     </div>
   )
-}
+ }
