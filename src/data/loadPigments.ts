@@ -179,9 +179,7 @@ async function loadOnePigment(pigment: Pigment): Promise<Pigment> {
 export async function loadThemePigments(): Promise<Pigment[]> {
   const themeIds = new Set(THEME_PIGMENT_IDS as readonly string[])
   const themePigments = PIGMENTS.filter((p) => themeIds.has(p.id))
-
-  const results = await Promise.all(themePigments.map(loadOnePigment))
-  return results
+  return Promise.all(themePigments.map(loadOnePigment))
 }
 
 /** Полная загрузка всех пигментов (для колористики и т.д.) */
@@ -189,10 +187,9 @@ export async function loadAllPigments(): Promise<Pigment[]> {
   // Сначала быстро тема
   const theme = await loadThemePigments()
 
-  // Потом остальные в фоне
+  // Потом остальные
   const themeIds = new Set(THEME_PIGMENT_IDS as readonly string[])
   const rest = PIGMENTS.filter((p) => !themeIds.has(p.id))
-
   const restResults = await Promise.all(rest.map(loadOnePigment))
 
   // Собираем полный список в том же порядке, что и PIGMENTS
