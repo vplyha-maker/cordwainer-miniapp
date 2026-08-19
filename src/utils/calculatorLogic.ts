@@ -373,8 +373,12 @@ export function findRecipeByHex(
 
   // --- 4. ТОЧНАЯ ДОВОДКА ---
 
-  let absoluteBest: BestResult = topResults[0]
-  absoluteBest.deltaE = Infinity
+  let absoluteBest: BestResult = {
+    indices: [...topResults[0].indices],
+    volumes: [...topResults[0].volumes],
+    rgb: { ...topResults[0].rgb },
+    deltaE: Infinity,
+  }
 
   const adjustments = [0.85, 0.95, 1.05, 1.15]
 
