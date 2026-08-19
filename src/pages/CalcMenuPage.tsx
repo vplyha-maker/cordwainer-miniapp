@@ -72,10 +72,10 @@ export function CalcMenuPage({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1a1a1a)] text-[var(--color-ink,#ffffff)] overflow-hidden justify-between transform-gpu"
+      className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden justify-between transform-gpu"
     >
       {/* Стабильный фон без мигания и без отложенного «приглушения» */}
-      <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none bg-[var(--color-bg,#1a1a1a)]">
+      <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none bg-[var(--color-bg,#1C1816)]">
         <img
           src="/CalcMenuPage/size.jpg"
           alt=""
@@ -92,9 +92,9 @@ export function CalcMenuPage({
             background: `
               linear-gradient(
                 to bottom,
-                color-mix(in srgb, var(--color-bg, #1a1a1a) 75%, transparent) 0%,
-                color-mix(in srgb, var(--color-bg, #1a1a1a) 92%, transparent) 55%,
-                var(--color-bg, #1a1a1a) 100%
+                color-mix(in srgb, var(--color-bg, #1C1816) 75%, transparent) 0%,
+                color-mix(in srgb, var(--color-bg, #1C1816) 92%, transparent) 55%,
+                var(--color-bg, #1C1816) 100%
               )
             `,
           }}
@@ -108,7 +108,7 @@ export function CalcMenuPage({
             triggerHaptic('light')
             onBack()
           }}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-surface,rgba(255,255,255,0.05))] border border-[var(--color-border,rgba(255,255,255,0.1))] active:scale-90 transition-transform shadow-sm text-[var(--color-ink,#fff)]"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform shadow-sm text-[var(--color-ink,#F5F1EA)]"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
@@ -118,7 +118,7 @@ export function CalcMenuPage({
 
       <div className="relative z-10 px-5 flex flex-col justify-end pb-32 flex-1">
         <div className="mb-6">
-          <h1 className="text-[34px] font-serif font-normal tracking-wide mb-1 leading-none text-[var(--color-ink,#fff)]">
+          <h1 className="text-[34px] font-serif font-normal tracking-wide mb-1 leading-none text-[var(--color-ink,#F5F1EA)]">
             {t.title}
           </h1>
         </div>
@@ -131,19 +131,19 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenSizeCalc?.()
             }}
-            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,rgba(255,255,255,0.05))] border border-[var(--color-border,rgba(255,255,255,0.1))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
+            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
-            <div className="w-8 h-8 rounded-[10px] bg-[var(--color-accent,#d4af37)]/15 text-[var(--color-accent,#d4af37)] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-[10px] bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 16H3V8h18v8z" />
                 <path d="M7 16v-4m4 4v-2m4 2v-4" />
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#fff)]">
+              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
                 {t.sizeTitle}
               </div>
-              <div className="text-[11px] text-[var(--color-muted,rgba(255,255,255,0.5))] truncate">{t.sizeSub}</div>
+              <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{t.sizeSub}</div>
             </div>
           </button>
 
@@ -153,9 +153,9 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenWidthCalc?.()
             }}
-            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,rgba(255,255,255,0.05))] border border-[var(--color-border,rgba(255,255,255,0.1))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
+            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
-            <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-egyptian-blue,#3b82f6)]/15 text-[var(--pigment-egyptian-blue,#3b82f6)] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-egyptian-blue,#1034A6)]/15 text-[var(--pigment-egyptian-blue,#1034A6)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 12H2" />
                 <path d="M18 8l4 4-4 4" />
@@ -163,10 +163,10 @@ export function CalcMenuPage({
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#fff)]">
+              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
                 {t.widthTitle}
               </div>
-              <div className="text-[11px] text-[var(--color-muted,rgba(255,255,255,0.5))] truncate">{t.widthSub}</div>
+              <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{t.widthSub}</div>
             </div>
           </button>
 
@@ -176,19 +176,19 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenHeelCalc?.()
             }}
-            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,rgba(255,255,255,0.05))] border border-[var(--color-border,rgba(255,255,255,0.1))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
+            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
-            <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-azurite,#60a5fa)]/15 text-[var(--pigment-azurite,#60a5fa)] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-azurite,#007FFF)]/15 text-[var(--pigment-azurite,#007FFF)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 20h18L12 4 3 20z" />
                 <path d="M12 15v.01" />
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#fff)]">
+              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
                 {t.heelTitle}
               </div>
-              <div className="text-[11px] text-[var(--color-muted,rgba(255,255,255,0.5))] truncate">{t.heelSub}</div>
+              <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{t.heelSub}</div>
             </div>
           </button>
 
@@ -198,13 +198,13 @@ export function CalcMenuPage({
               triggerHaptic(isFavorite ? 'light' : 'medium')
               onToggleFavorite?.()
             }}
-            className={`h-[116px] p-4 rounded-[18px] transition-all active:scale-95 flex flex-col justify-between text-left shadow-sm hover:shadow-md bg-[var(--color-surface,rgba(255,255,255,0.05))] ${
+            className={`h-[116px] p-4 rounded-[18px] transition-all active:scale-95 flex flex-col justify-between text-left shadow-sm hover:shadow-md bg-[var(--color-surface,#25201C)] ${
               isFavorite
-                ? 'border border-[var(--pigment-lac-dye,#ef4444)]/50 shadow-[0_0_15px_color-mix(in_srgb,var(--pigment-lac-dye,#ef4444)_20%,transparent)]'
-                : 'border border-[var(--color-border,rgba(255,255,255,0.1))]'
+                ? 'border border-[var(--pigment-lac-dye,#8B0000)]/50 shadow-[0_0_15px_color-mix(in_srgb,var(--pigment-lac-dye,#8B0000)_20%,transparent)]'
+                : 'border border-[var(--color-border,rgba(255,255,255,0.12))]'
             }`}
           >
-            <div className="w-8 h-8 rounded-[10px] flex items-center justify-center bg-[var(--pigment-lac-dye,#ef4444)]/15 text-[var(--pigment-lac-dye,#ef4444)]">
+            <div className="w-8 h-8 rounded-[10px] flex items-center justify-center bg-[var(--pigment-lac-dye,#8B0000)]/15 text-[var(--pigment-lac-dye,#8B0000)]">
               <svg
                 width="18"
                 height="18"
@@ -219,12 +219,12 @@ export function CalcMenuPage({
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#fff)]">
+              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
                 {isFavorite ? t.saveRemoveTitle : t.saveAddTitle}
               </div>
               <div
                 className={`text-[11px] truncate ${
-                  isFavorite ? 'text-[var(--pigment-lac-dye,#ef4444)]' : 'text-[var(--color-muted,rgba(255,255,255,0.5))]'
+                  isFavorite ? 'text-[var(--pigment-lac-dye,#8B0000)]' : 'text-[var(--color-muted,#B9ACA0)]'
                 }`}
               >
                 {isFavorite ? t.saveRemoveSub : t.saveAddSub}
@@ -238,18 +238,18 @@ export function CalcMenuPage({
               triggerHaptic('medium')
               onOpenColorCalc?.()
             }}
-            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,rgba(255,255,255,0.05))] border border-[var(--color-border,rgba(255,255,255,0.1))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
+            className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm hover:shadow-md"
           >
-            <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-malachite,#10b981)]/15 text-[var(--pigment-malachite,#10b981)] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-[10px] bg-[var(--pigment-malachite,#0BDA51)]/15 text-[var(--pigment-malachite,#0BDA51)] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
               </svg>
             </div>
             <div>
-              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#fff)]">
+              <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
                 {t.colorTitle}
               </div>
-              <div className="text-[11px] text-[var(--color-muted,rgba(255,255,255,0.5))] truncate">{t.colorSub}</div>
+              <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{t.colorSub}</div>
             </div>
           </button>
         </div>
@@ -259,7 +259,7 @@ export function CalcMenuPage({
             triggerHaptic('light')
             onBack()
           }}
-          className="text-center text-[13px] text-[var(--color-muted,rgba(255,255,255,0.5))] hover:text-[var(--color-ink,#fff)] active:opacity-60 transition-opacity font-medium py-2"
+          className="text-center text-[13px] text-[var(--color-muted,#B9ACA0)] hover:text-[var(--color-ink,#F5F1EA)] active:opacity-60 transition-opacity font-medium py-2"
         >
           {t.backMenu}
         </button>
