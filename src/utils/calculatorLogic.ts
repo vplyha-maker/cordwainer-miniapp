@@ -373,12 +373,8 @@ export function findRecipeByHex(
 
   // --- 4. ТОЧНАЯ ДОВОДКА ---
 
-  let absoluteBest: BestResult = {
-    indices: [...topResults[0].indices],
-    volumes: [...topResults[0].volumes],
-    rgb: { ...topResults[0].rgb },
-    deltaE: Infinity,
-  }
+  let absoluteBest: BestResult = topResults[0]
+  absoluteBest.deltaE = Infinity
 
   const adjustments = [0.85, 0.95, 1.05, 1.15]
 
@@ -498,79 +494,5 @@ export function simulateLayersKM(
     final: paintSpectrum,
     strength: Math.round(strength),
     deltaL,
-  }
-}
-
-/** Доводка мл уже выбранных пигментов под целевой HEX */
-export function refineRecipeVolumes(
-  targetHex: string,
-  parts: { pigment: Pigment; ml: number }[],
-  targetVolume = 20
-) {
-  const valid = parts.filter(
-    (p) => p.pigment.spectrum && p.pigment.spectrum.length > 0 && p.ml > 0
-  )
-  if (valid.length === 0 || !targetHex) return null
-
-  const targetRgb = hexToRgbObj(targetHex)
-  const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
-
-  let volumes = valid.map((p) => Math.max(0.1, p.ml))
-
-  const evaluate = (vols: number[]) => {
-    const components = valid.map((p, i) => ({
-      spectrum: p.pigment.spectrum!,
-      volume: vols[i],
-    }))
-    const mixed = mixSpectra(components)
-    const rgb = spectrumToRGB(mixed)
-    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    return {
-      rgb,
-      deltaE: calculateDeltaE2000(targetLab, lab),
-    }
-  }
-
-  let best = evaluate(volumes)
-  const adjustments = [0.7, 0.85, 0.92, 0.96, 1.04, 1.08, 1.15, 1.3]
-
-  // Несколько проходов по каждому компоненту
-  for (let pass = 0; pass < 8; pass++) {
-    let improved = false
-    for (let i = 0; i < volumes.length; i++) {
-      for (const adj of adjustments) {
-        const trial = [...volumes]
-        trial[i] = Math.max(0.05, Math.min(200, trial[i] * adj))
-        const res = evaluate(trial)
-        if (res.deltaE < best.deltaE - 0.0005) {
-          best = res
-          volumes = trial
-          improved = true
-        }
-      }
-    }
-    if (!improved) break
-  }
-
-  // Масштаб к targetVolume
-  const sum = volumes.reduce((a, b) => a + b, 0)
-  if (sum <= 0) return null
-  const scale = (targetVolume > 0 ? targetVolume : 20) / sum
-  const recipe = valid
-    .map((p, i) => ({
-      pigment: p.pigment,
-      ml: Math.round(volumes[i] * scale * 100) / 100,
-    }))
-    .filter((r) => r.ml > 0)
-    .sort((a, b) => b.ml - a.ml)
-
-  // Пересчёт после округления
-  const finalEval = evaluate(recipe.map((r) => r.ml))
-
-  return {
-    recipe,
-    resultRgb: finalEval.rgb,
-    resultHex: rgbToHex(finalEval.rgb),
-    deltaE: Math.round(finalEval.deltaE * 10) / 10,
   }
 }
