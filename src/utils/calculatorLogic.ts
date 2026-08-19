@@ -5,6 +5,7 @@ import {
   spectrumToRGB,
   rgbToHex,
   SpectrumPoint,
+  MixComponent,
 } from './colorScience'
 
 export type CoverageSystem = 'aniline' | 'acrylic'
@@ -284,8 +285,8 @@ export function findRecipeByHex(
   const buildComponentsWithBinder = (
     selectedPigments: Pigment[],
     vols: number[]
-  ): { spectrum: SpectrumPoint[]; volume: number; isBinder?: boolean }[] => {
-    const components = selectedPigments.map((pigment, i) => ({
+  ): MixComponent[] => {
+    const components: MixComponent[] = selectedPigments.map((pigment, i) => ({
       spectrum: pigment.spectrum!,
       volume: vols[i],
     }))
@@ -318,25 +319,45 @@ export function findRecipeByHex(
   scored.slice(0, 6).forEach((s) => candidatesSet.add(s.pigment))
 
   // Усі базові (білий, чорний, червоний, жовтий…)
-  const allBasicIds = PURE_BASIC_COLORS.flatMap((b) => b.sourceIds as readonly string[])
+  const allBasicIds = PURE_BASIC_COLORS.flatMap(
+    (b) => b.sourceIds as readonly string[]
+  )
   validPigments
     .filter((p) => allBasicIds.includes(p.id))
     .forEach((p) => candidatesSet.add(p))
 
   // Земляні + червоні/коричневі (дуже важливо для #642226 тощо)
   const earthAndWarmIds = [
-    'yellow_ochre', 'red_ochre', 'raw_sienna', 'burnt_sienna',
-    'raw_umber', 'burnt_umber', 'green_earth',
-    'cadmium_red', 'pyrrole_red', 'carmine_lake', 'venetian_red',
-    'indian_red', 'mars_red', 'quinacridone_red', 'permanent_red',
+    'yellow_ochre',
+    'red_ochre',
+    'raw_sienna',
+    'burnt_sienna',
+    'raw_umber',
+    'burnt_umber',
+    'green_earth',
+    'cadmium_red',
+    'pyrrole_red',
+    'carmine_lake',
+    'venetian_red',
+    'indian_red',
+    'mars_red',
+    'quinacridone_red',
+    'permanent_red',
   ]
   validPigments
-    .filter((p) => earthAndWarmIds.includes(p.id) || p.id.includes('ochre') || p.id.includes('sienna') || p.id.includes('umber') || p.id.includes('red'))
+    .filter(
+      (p) =>
+        earthAndWarmIds.includes(p.id) ||
+        p.id.includes('ochre') ||
+        p.id.includes('sienna') ||
+        p.id.includes('umber') ||
+        p.id.includes('red')
+    )
     .forEach((p) => candidatesSet.add(p))
 
   // Для дуже темних цілей — додатково сині
   if (targetLab.L < 35) {
-    const blueIds = [...PURE_BASIC_COLORS[4].sourceIds]
+    const blueIds = PURE_BASIC_COLORS[4].sourceIds as readonly string[]
     validPigments
       .filter((p) => blueIds.includes(p.id))
       .forEach((p) => candidatesSet.add(p))
@@ -368,8 +389,16 @@ export function findRecipeByHex(
 
   // k = 2
   const ratios2 = [
-    [98, 2], [95, 5], [90, 10], [85, 15], [80, 20],
-    [70, 30], [60, 40], [50, 50], [40, 60], [30, 70],
+    [98, 2],
+    [95, 5],
+    [90, 10],
+    [85, 15],
+    [80, 20],
+    [70, 30],
+    [60, 40],
+    [50, 50],
+    [40, 60],
+    [30, 70],
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
@@ -381,10 +410,21 @@ export function findRecipeByHex(
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
-      [90, 8, 2], [85, 10, 5], [80, 15, 5], [75, 15, 10],
-      [70, 20, 10], [65, 25, 10], [60, 30, 10], [55, 30, 15],
-      [50, 30, 20], [45, 35, 20], [40, 40, 20], [40, 35, 25],
-      [34, 33, 33], [50, 25, 25], [60, 25, 15],
+      [90, 8, 2],
+      [85, 10, 5],
+      [80, 15, 5],
+      [75, 15, 10],
+      [70, 20, 10],
+      [65, 25, 10],
+      [60, 30, 10],
+      [55, 30, 15],
+      [50, 30, 20],
+      [45, 35, 20],
+      [40, 40, 20],
+      [40, 35, 25],
+      [34, 33, 33],
+      [50, 25, 25],
+      [60, 25, 15],
     ]
     for (const combo of combinations(n, 3)) {
       for (const ratio of ratios3) {
@@ -407,8 +447,12 @@ export function findRecipeByHex(
   // k = 4 (тільки якщо явно попросили)
   if (maxComponents >= 4 && n >= 4) {
     const ratios4 = [
-      [70, 15, 10, 5], [60, 20, 15, 5], [50, 25, 15, 10],
-      [40, 30, 20, 10], [40, 25, 20, 15], [35, 30, 20, 15],
+      [70, 15, 10, 5],
+      [60, 20, 15, 5],
+      [50, 25, 15, 10],
+      [40, 30, 20, 10],
+      [40, 25, 20, 15],
+      [35, 30, 20, 15],
     ]
     for (const combo of combinations(n, 4)) {
       for (const ratio of ratios4) {
@@ -549,4 +593,4 @@ export function simulateLayersKM(
     strength: Math.round(strength),
     deltaL,
   }
-}
+                                                  }
