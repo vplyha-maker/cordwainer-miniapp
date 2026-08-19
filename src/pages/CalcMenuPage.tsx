@@ -77,7 +77,7 @@ export function CalcMenuPage({
       {/* Стабильный фон без мигания и без отложенного «приглушения» */}
       <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none bg-[var(--color-bg,#1C1816)]">
         <img
-          src="/CalcMenuPage/size.jpg"
+          src="/CalcMenuPage/size.Jpg"
           alt=""
           className="w-full h-full object-cover object-[center_top] opacity-[0.08]"
           style={{ transition: 'none' }}
