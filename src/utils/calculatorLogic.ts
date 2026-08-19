@@ -250,6 +250,12 @@ interface BestResult {
   deltaE: number
 }
 
+export interface RecipeItem {
+  pigment: Pigment
+  ml: number
+  isBinder?: boolean
+}
+
 // ==========================================
 // ГЛАВНЫЙ АЛГОРИТМ
 // ==========================================
@@ -257,19 +263,56 @@ export function findRecipeByHex(
   targetHex: string,
   pigments: Pigment[],
   maxComponents = 3,
-  targetVolume = 20
+  targetVolume = 20,
+  system: CoverageSystem = 'acrylic' // ← по умолчанию акрил
 ) {
   if (!pigments.length || !targetHex) return null
 
-  const validPigments = pigments.filter((p) => p.spectrum && p.spectrum.length > 0)
+  // Ищем биндер (только для acrylic)
+  const binderPigment =
+    system === 'acrylic'
+      ? pigments.find((p) => p.id === 'acrylic_binder' || (p as any).isBinder === true)
+      : undefined
+
+  // Рабочие пигменты (без биндера)
+  const validPigments = pigments.filter(
+    (p) =>
+      p.id !== 'acrylic_binder' &&
+      !(p as any).isBinder &&
+      p.spectrum &&
+      p.spectrum.length > 0
+  )
   if (validPigments.length === 0) return null
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
 
-  // 1. Оцениваем каждый пигмент
+  // Формируем компоненты с учётом биндера (20% только для acrylic)
+  const buildComponentsWithBinder = (
+    selectedPigments: Pigment[],
+    vols: number[]
+  ): { spectrum: SpectrumPoint[]; volume: number }[] => {
+    const components = selectedPigments.map((pigment, i) => ({
+      spectrum: pigment.spectrum!,
+      volume: vols[i],
+    }))
+
+    // Добавляем биндер только если система acrylic и биндер найден
+    if (binderPigment?.spectrum) {
+      const totalPigmentVol = vols.reduce((sum, v) => sum + v, 0)
+      components.push({
+        spectrum: binderPigment.spectrum,
+        volume: totalPigmentVol * 0.2, // 20% от суммы пигментов
+      })
+    }
+
+    return components
+  }
+
+  // 1. Оценка каждого пигмента
   const scored = validPigments.map((p) => {
-    const rgb = spectrumToRGB(p.spectrum!)
+    const components = buildComponentsWithBinder([p], [100])
+    const rgb = spectrumToRGB(mixSpectra(components))
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
   })
@@ -302,10 +345,8 @@ export function findRecipeByHex(
   let topResults: BestResult[] = []
 
   const tryAddResult = (indices: number[], vols: number[]) => {
-    const components = indices.map((idx, i) => ({
-      spectrum: candidates[idx].spectrum!,
-      volume: vols[i],
-    }))
+    const selectedPigments = indices.map((idx) => candidates[idx])
+    const components = buildComponentsWithBinder(selectedPigments, vols)
 
     const mixed = mixSpectra(components)
     const rgb = spectrumToRGB(mixed)
@@ -382,10 +423,9 @@ export function findRecipeByHex(
     let currentVols = [...candidate.volumes]
 
     const evaluate = (vols: number[]) => {
-      const components = candidate.indices.map((idx, i) => ({
-        spectrum: candidates[idx].spectrum!,
-        volume: vols[i],
-      }))
+      const selectedPigments = candidate.indices.map((idx) => candidates[idx])
+      const components = buildComponentsWithBinder(selectedPigments, vols)
+
       const mixed = mixSpectra(components)
       const rgb = spectrumToRGB(mixed)
       const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
@@ -431,7 +471,8 @@ export function findRecipeByHex(
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
   const scale = scaleTarget / totalWeight
 
-  const recipe = absoluteBest.indices
+  // Пигменты
+  const recipe: RecipeItem[] = absoluteBest.indices
     .map((candidateIdx, i) => ({
       pigment: candidates[candidateIdx],
       ml: Math.round(absoluteBest.volumes[i] * scale * 10) / 10,
@@ -439,11 +480,26 @@ export function findRecipeByHex(
     .filter((r) => r.ml > 0)
     .sort((a, b) => b.ml - a.ml)
 
+  // Добавляем биндер в рецепт (только для acrylic)
+  if (binderPigment && system === 'acrylic') {
+    const totalPigmentMl = recipe.reduce((sum, r) => sum + r.ml, 0)
+    const binderMl = Math.round(totalPigmentMl * 0.2 * 10) / 10
+
+    if (binderMl > 0) {
+      recipe.push({
+        pigment: binderPigment,
+        ml: binderMl,
+        isBinder: true,
+      })
+    }
+  }
+
   return {
     recipe,
     resultRgb: absoluteBest.rgb,
     resultHex: rgbToHex(absoluteBest.rgb),
     deltaE: Math.round(absoluteBest.deltaE * 10) / 10,
+    system, // возвращаем систему для удобства
   }
 }
 
