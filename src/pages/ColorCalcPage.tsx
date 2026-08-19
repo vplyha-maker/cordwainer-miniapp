@@ -7,6 +7,7 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
+import { ColorMethodology } from '../components/ColorMethodology'
 import {
   spectrumToRGB,
   rgbToHex,
@@ -42,6 +43,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [isCalculating, setIsCalculating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showCopyFallback, setShowCopyFallback] = useState(false)
+  const [showMethod, setShowMethod] = useState(false)
 
   const [system, setSystem] = useState<CoverageSystem>('acrylic')
   const [anilineLayer, setAnilineLayer] = useState<1 | 2 | 3>(1)
@@ -382,9 +384,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             />
           </svg>
         </button>
-        <h1 className="text-[17px] font-semibold tracking-tight text-[var(--color-ink)]">
+
+        <h1 className="flex-1 text-[17px] font-semibold tracking-tight text-[var(--color-ink)] truncate">
           {isUk ? 'Калькулятор кольору' : 'Калькулятор цвета'}
         </h1>
+
+        <button
+          type="button"
+          onClick={() => setShowMethod(true)}
+          className="h-9 px-3 rounded-full border border-[#C4A35A]/45 text-[#C4A35A] text-[12px] font-semibold active:bg-[#C4A35A]/15 flex-shrink-0"
+        >
+          {isUk ? 'Методологія' : 'Методология'}
+        </button>
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
@@ -801,6 +812,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {showMethod && (
+        <ColorMethodology lang={lang} onClose={() => setShowMethod(false)} />
       )}
     </motion.div>
   )
