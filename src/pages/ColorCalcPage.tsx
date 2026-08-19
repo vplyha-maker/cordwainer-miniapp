@@ -16,7 +16,6 @@ import {
 import {
   simulateLayersKM,
   hexToRgbObj,
-  refineRecipeVolumes,
   type CoverageSystem,
 } from '../utils/calculatorLogic'
 
@@ -365,50 +364,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const runRefine = () => {
     const tgt = targetHex || lastTargetHex.current
-    if (!tgt || pigments.length === 0) return
+    if (!tgt || !workerRef.current || pigments.length === 0) return
 
-    const parts = paints
-      .map((p) => {
-        const pigment = pigments.find((x) => x.id === p.pigmentId)
-        const ml = parseFloat(p.amount) || 0
-        if (!pigment || ml <= 0) return null
-        return { pigment, ml }
-      })
-      .filter(Boolean) as { pigment: Pigment; ml: number }[]
-
-    if (parts.length === 0) return
-
+    const id = ++calcRef.current
     setIsCalculating(true)
+    userEdited.current = true
+    setValidHex(tgt)
 
-    // Небольшая задержка, чтобы спиннер успел отрисоваться
-    setTimeout(() => {
-      const refined = refineRecipeVolumes(
-        tgt,
-        parts,
-        totalAmount > 0 ? totalAmount : 20
-      )
-
-      if (refined?.recipe?.length) {
-        fromRecipeRef.current = true
-        setTargetHex(tgt)
-        lastTargetHex.current = tgt
-        setRecipeDeltaE(refined.deltaE)
-
-        setPaints(
-          refined.recipe.map((r) => ({
-            id: generateId(),
-            pigmentId: r.pigment.id,
-            amount: String(r.ml),
-          }))
-        )
-
-        if (refined.resultHex) {
-          setHexInput(refined.resultHex.toUpperCase())
-        }
-      }
-
-      setIsCalculating(false)
-    }, 30)
+    workerRef.current.postMessage({
+      id,
+      targetHex: tgt,
+      basicPigments: pigments,
+      maxComponents: 3,
+      // текущий объём пигментов (уже округлённые мл)
+      targetVolume: totalAmount > 0 ? totalAmount : 20,
+      system,
+    })
   }
 
   const handleHexChange = (raw: string) => {
@@ -998,4 +969,4 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       )}
     </motion.div>
   )
-}
+ }
