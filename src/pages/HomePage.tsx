@@ -111,7 +111,7 @@ export function HomePage({
       title: t.materials,
       subtitle: t.materialsSub,
       count: t.materialsCount,
-      accent: '#D8A35C',
+      accent: 'var(--color-accent, #E4D00A)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
@@ -123,7 +123,7 @@ export function HomePage({
       title: t.colors,
       subtitle: t.colorsSub,
       count: t.colorsCount,
-      accent: '#A78BFA',
+      accent: 'var(--pigment-azurite, #007FFF)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
@@ -139,7 +139,7 @@ export function HomePage({
       title: t.styles,
       subtitle: t.stylesSub,
       count: t.stylesCount,
-      accent: '#60A5FA',
+      accent: 'var(--pigment-egyptian-blue, #1034A6)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
@@ -153,7 +153,7 @@ export function HomePage({
       title: t.sizes,
       subtitle: t.sizesSub,
       count: t.sizesCount,
-      accent: '#34D399',
+      accent: 'var(--pigment-malachite, #0BDA51)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19.875 6.27L17.73 4.125a2.25 2.25 0 00-3.18 0L3.375 15.3a2.25 2.25 0 000 3.18l2.145 2.145a2.25 2.25 0 003.18 0l11.175-11.175a2.25 2.25 0 000-3.18z" />
@@ -168,7 +168,7 @@ export function HomePage({
       id: 'calc',
       title: t.calc,
       subtitle: t.calcSub,
-      accent: '#F59E0B',
+      accent: 'var(--color-accent, #E4D00A)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="2" width="16" height="20" rx="3" />
@@ -180,7 +180,7 @@ export function HomePage({
       id: 'blog',
       title: t.blog,
       subtitle: t.blogSub,
-      accent: '#F472B6',
+      accent: 'var(--pigment-lac-dye, #8B0000)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
@@ -192,7 +192,7 @@ export function HomePage({
       id: 'glossary',
       title: t.glossary,
       subtitle: t.glossarySub,
-      accent: '#38BDF8',
+      accent: 'var(--pigment-azurite, #007FFF)',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
@@ -202,16 +202,20 @@ export function HomePage({
   ]
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[#151210] text-[#F5F1EB] overflow-hidden">
+    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
       {/* Header */}
       <div className="px-4 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <h1 className="font-display text-[1.65rem] leading-none text-[#F5F1EB]">
+        <h1 className="font-display text-[1.65rem] leading-none text-[var(--color-ink,#F5F1EA)]">
           {t.menu}
         </h1>
 
         <div className="flex items-center gap-2">
           {/* Segmented Language Toggle (Compact Pill) */}
-          <div className="flex bg-[#1D1815]/80 rounded-full p-1 border border-[#C6A47A]/20" role="group" aria-label="Language selection">
+          <div
+            className="flex rounded-full p-1 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]"
+            role="group"
+            aria-label="Language selection"
+          >
             <button
               onClick={() => handleLangChange('ru')}
               className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
@@ -233,7 +237,7 @@ export function HomePage({
           {onBack && (
             <button
               onClick={onBack}
-              className="card-simplified w-9 h-9 rounded-full flex items-center justify-center text-[#B9ACA0] active:scale-90 transition-transform overflow-hidden cursor-pointer"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--color-muted,#B9ACA0)] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform overflow-hidden cursor-pointer"
               aria-label="Go back"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -248,46 +252,50 @@ export function HomePage({
       <div className="flex-1 px-4 overflow-y-auto pb-[110px] overscroll-none">
         {/* Search */}
         <div className="mb-4">
-          <div
-            className="card-simplified rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[#B9ACA0] shrink-0">
+          <div className="rounded-[16px] px-3.5 py-2.5 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted,#B9ACA0)] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
-            <span className="text-[12.5px] text-[#B9ACA0] truncate">{t.search}</span>
+            <span className="text-[12.5px] text-[var(--color-muted,#B9ACA0)] truncate">{t.search}</span>
           </div>
         </div>
 
         {/* Learning */}
-        <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
+        <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2 px-0.5">
           {t.learning}
         </p>
         <div className="grid grid-cols-2 gap-2 mb-5">
           {LEARNING.map((item) => (
             <button
               key={item.id}
-              className="card-simplified relative rounded-2xl p-3 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer"
+              className="relative rounded-2xl p-3 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]"
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 shrink-0"
                 style={{
-                  background: `${item.accent}20`,
+                  background: `color-mix(in srgb, ${item.accent} 20%, transparent)`,
                   color: item.accent,
-                  boxShadow: `0 0 16px ${item.accent}30`,
+                  boxShadow: `0 0 16px color-mix(in srgb, ${item.accent} 30%, transparent)`,
                 }}
               >
                 {item.icon}
               </div>
-              <div className="text-[13px] font-semibold text-[#F5F1EB] leading-tight mb-1">{item.title}</div>
-              <div className="text-[10px] text-[#B9ACA0] leading-snug mb-2">{item.subtitle}</div>
-              <div className="mt-auto text-[9px] text-[#B9ACA0]/70 pt-1">{item.count}</div>
+              <div className="text-[13px] font-semibold text-[var(--color-ink,#F5F1EA)] leading-tight mb-1">
+                {item.title}
+              </div>
+              <div className="text-[10px] text-[var(--color-muted,#B9ACA0)] leading-snug mb-2">
+                {item.subtitle}
+              </div>
+              <div className="mt-auto text-[9px] text-[var(--color-muted,#B9ACA0)]/70 pt-1">
+                {item.count}
+              </div>
             </button>
           ))}
         </div>
 
         {/* Tools */}
-        <p className="text-[10px] tracking-[0.14em] uppercase text-[#B9ACA0] mb-2 px-0.5">
+        <p className="text-[10px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2 px-0.5">
           {t.tools}
         </p>
         <div className="grid grid-cols-3 gap-2 mb-5">
@@ -298,39 +306,40 @@ export function HomePage({
               <button
                 key={item.id}
                 onClick={
-                  isBlog 
-                    ? onOpenBlog 
-                    : isCalc 
-                    ? onOpenCalcMenu 
+                  isBlog
+                    ? onOpenBlog
+                    : isCalc
+                    ? onOpenCalcMenu
                     : undefined
                 }
-                className="card-simplified relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full"
+                className="relative rounded-2xl p-2.5 text-left active:scale-[0.96] transition-transform flex flex-col overflow-hidden cursor-pointer h-full bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]"
               >
                 {isBlog && hasNewBlog && (
                   <div
                     className="absolute inset-0 rounded-2xl pointer-events-none"
                     style={{
-                      boxShadow: 'inset 0 0 0 1px rgba(244,114,182,0.5), 0 0 16px rgba(244,114,182,0.2)',
+                      boxShadow:
+                        'inset 0 0 0 1px color-mix(in srgb, var(--pigment-lac-dye, #8B0000) 50%, transparent), 0 0 16px color-mix(in srgb, var(--pigment-lac-dye, #8B0000) 20%, transparent)',
                     }}
                   />
                 )}
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center mb-2 shrink-0 relative z-10"
                   style={{
-                    background: `${item.accent}20`,
+                    background: `color-mix(in srgb, ${item.accent} 20%, transparent)`,
                     color: item.accent,
-                    boxShadow: `0 0 14px ${item.accent}30`,
+                    boxShadow: `0 0 14px color-mix(in srgb, ${item.accent} 30%, transparent)`,
                   }}
                 >
                   {item.icon}
                 </div>
-                <div className="text-[11px] font-semibold text-[#F5F1EB] leading-tight mb-0.5 mt-auto relative z-10 flex items-center gap-1">
+                <div className="text-[11px] font-semibold text-[var(--color-ink,#F5F1EA)] leading-tight mb-0.5 mt-auto relative z-10 flex items-center gap-1">
                   {item.title}
                   {isBlog && hasNewBlog && (
-                    <span className="text-[8px] font-bold text-[#F472B6]">•</span>
+                    <span className="text-[8px] font-bold text-[var(--pigment-lac-dye,#8B0000)]">•</span>
                   )}
                 </div>
-                <div className="text-[9px] text-[#B9ACA0] leading-snug mt-1 relative z-10">
+                <div className="text-[9px] text-[var(--color-muted,#B9ACA0)] leading-snug mt-1 relative z-10">
                   {item.subtitle}
                 </div>
               </button>
@@ -340,7 +349,7 @@ export function HomePage({
 
         {/* Избранное */}
         <div
-          className="card-simplified relative rounded-2xl px-4 py-4 flex items-center gap-4 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden"
+          className="relative rounded-2xl px-4 py-4 flex items-center gap-4 mb-4 cursor-pointer active:scale-[0.98] transition-transform overflow-hidden bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]"
           onClick={() => {
             if (articleFavorites.length === 0) return
             if (articleFavorites.length === 1) {
@@ -351,19 +360,19 @@ export function HomePage({
           }}
         >
           {/* Звезда */}
-          <div className="w-12 h-12 rounded-full bg-[#D8A35C]/15 flex items-center justify-center text-[#D8A35C] text-2xl shrink-0">
+          <div className="w-12 h-12 rounded-full bg-[var(--color-accent,#E4D00A)]/15 flex items-center justify-center text-[var(--color-accent,#E4D00A)] text-2xl shrink-0">
             ★
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="text-[15px] font-semibold text-[#F5F1EB]">{t.favorites}</div>
-            <div className="text-[12px] text-[#B9ACA0] mt-0.5">{t.favoritesSub}</div>
+            <div className="text-[15px] font-semibold text-[var(--color-ink,#F5F1EA)]">{t.favorites}</div>
+            <div className="text-[12px] text-[var(--color-muted,#B9ACA0)] mt-0.5">{t.favoritesSub}</div>
           </div>
 
           {/* Аватарки статей */}
           <div className="flex -space-x-3 shrink-0">
             {articleFavorites.length === 0 && (
-              <div className="w-10 h-10 rounded-full bg-[#1D1815] border border-[#2A231D] border-dashed flex items-center justify-center text-[#B9ACA0]/40">
+              <div className="w-10 h-10 rounded-full bg-[var(--color-surface-2,#2F2924)] border border-[var(--color-border,rgba(255,255,255,0.12))] border-dashed flex items-center justify-center text-[var(--color-muted,#B9ACA0)]/40">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
                 </svg>
@@ -379,7 +388,7 @@ export function HomePage({
                   onOpenArticle?.(item.id)
                 }}
                 onContextMenu={(e) => e.preventDefault()}
-                className="w-10 h-10 rounded-full border-2 border-[#151210] flex items-center justify-center overflow-hidden bg-[#27211D] relative active:scale-90 transition-transform"
+                className="w-10 h-10 rounded-full border-2 border-[var(--color-bg,#1C1816)] flex items-center justify-center overflow-hidden bg-[var(--color-surface-2,#2F2924)] relative active:scale-90 transition-transform"
                 style={{ zIndex: 10 - idx }}
               >
                 <img
@@ -398,7 +407,7 @@ export function HomePage({
                   e.stopPropagation()
                   onOpenFavorites?.()
                 }}
-                className="w-10 h-10 rounded-full border-2 border-[#151210] flex items-center justify-center bg-[#1D1815] relative text-[11px] font-bold text-[#D8A35C] active:scale-90 transition-transform"
+                className="w-10 h-10 rounded-full border-2 border-[var(--color-bg,#1C1816)] flex items-center justify-center bg-[var(--color-surface,#25201C)] relative text-[11px] font-bold text-[var(--color-accent,#E4D00A)] active:scale-90 transition-transform"
                 style={{ zIndex: 0 }}
               >
                 +{articleFavorites.length - 4}
@@ -408,9 +417,9 @@ export function HomePage({
         </div>
 
         {/* Quote */}
-        <div className="card-simplified relative rounded-2xl p-4 overflow-hidden">
-          <p className="text-[12.5px] leading-relaxed text-[#F5F1EB]/80 italic">{t.quote}</p>
-          <p className="mt-2 text-[11px] text-[#D8A35C] font-display">Cordwainer</p>
+        <div className="relative rounded-2xl p-4 overflow-hidden bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+          <p className="text-[12.5px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
+          <p className="mt-2 text-[11px] text-[var(--color-accent,#E4D00A)] font-display">Cordwainer</p>
         </div>
       </div>
 
