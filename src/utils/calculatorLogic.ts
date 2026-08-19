@@ -252,7 +252,7 @@ export interface RecipeItem {
 }
 
 // ==========================================
-// ГЛАВНЫЙ АЛГОРИТМ (покращений)
+// ГЛАВНЫЙ АЛГОРИТМ (з примусовим темним компонентом)
 // ==========================================
 export function findRecipeByHex(
   targetHex: string,
@@ -281,6 +281,7 @@ export function findRecipeByHex(
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
+  const isDarkTarget = targetLab.L < 45
 
   const buildComponentsWithBinder = (
     selectedPigments: Pigment[],
@@ -312,13 +313,13 @@ export function findRecipeByHex(
   })
   scored.sort((a, b) => a.dist - b.dist)
 
-  // 2. Розумний набір кандидатів (значно ширший)
+  // 2. Розумний набір кандидатів
   const candidatesSet = new Set<Pigment>()
 
   // Топ-6 найближчих
   scored.slice(0, 6).forEach((s) => candidatesSet.add(s.pigment))
 
-  // Усі базові (білий, чорний, червоний, жовтий…)
+  // Усі базові
   const allBasicIds = PURE_BASIC_COLORS.flatMap(
     (b) => b.sourceIds as readonly string[]
   )
@@ -326,7 +327,7 @@ export function findRecipeByHex(
     .filter((p) => allBasicIds.includes(p.id))
     .forEach((p) => candidatesSet.add(p))
 
-  // Земляні + червоні/коричневі (дуже важливо для #642226 тощо)
+  // Земляні + червоні/коричневі
   const earthAndWarmIds = [
     'yellow_ochre',
     'red_ochre',
@@ -355,7 +356,34 @@ export function findRecipeByHex(
     )
     .forEach((p) => candidatesSet.add(p))
 
-  // Для дуже темних цілей — додатково сині
+  // ===== ПРИМУСОВО ДОДАЄМО ТЕМНИЙ КОМПОНЕНТ для L < 45 =====
+  if (isDarkTarget) {
+    // Чорні
+    const blackIds = PURE_BASIC_COLORS[1].sourceIds as readonly string[]
+    validPigments
+      .filter(
+        (p) =>
+          blackIds.includes(p.id) ||
+          p.id.includes('black') ||
+          p.id === 'bone_black' ||
+          p.id === 'ivory_black' ||
+          p.id === 'lamp_black'
+      )
+      .forEach((p) => candidatesSet.add(p))
+
+    // Темні землі (умбра, палена сієна тощо)
+    validPigments
+      .filter(
+        (p) =>
+          p.id.includes('umber') ||
+          p.id.includes('burnt') ||
+          p.id === 'bitumen' ||
+          p.id.includes('mars_black')
+      )
+      .forEach((p) => candidatesSet.add(p))
+  }
+
+  // Для дуже темних — ще сині (допомагають «приглушити»)
   if (targetLab.L < 35) {
     const blueIds = PURE_BASIC_COLORS[4].sourceIds as readonly string[]
     validPigments
@@ -363,8 +391,21 @@ export function findRecipeByHex(
       .forEach((p) => candidatesSet.add(p))
   }
 
-  const candidates = Array.from(candidatesSet).slice(0, 12) // максимум 12
+  const candidates = Array.from(candidatesSet).slice(0, 14)
   const n = candidates.length
+
+  // Знаходимо індекси чорних/темних для пріоритетних співвідношень
+  const darkIndices: number[] = []
+  candidates.forEach((p, idx) => {
+    if (
+      p.id.includes('black') ||
+      p.id.includes('umber') ||
+      p.id.includes('burnt') ||
+      p.id === 'bitumen'
+    ) {
+      darkIndices.push(idx)
+    }
+  })
 
   let topResults: BestResult[] = []
 
@@ -379,7 +420,7 @@ export function findRecipeByHex(
 
     topResults.push({ indices, volumes: [...vols], rgb, deltaE: dist })
     topResults.sort((a, b) => a.deltaE - b.deltaE)
-    if (topResults.length > 8) topResults.pop()
+    if (topResults.length > 10) topResults.pop()
   }
 
   // --- 3. ГРУБИЙ ПЕРЕБІР ---
@@ -390,15 +431,15 @@ export function findRecipeByHex(
   // k = 2
   const ratios2 = [
     [98, 2],
+    [96, 4],
     [95, 5],
+    [92, 8],
     [90, 10],
     [85, 15],
     [80, 20],
     [70, 30],
     [60, 40],
     [50, 50],
-    [40, 60],
-    [30, 70],
   ]
   for (const [i, j] of combinations(n, 2)) {
     for (const [a, b] of ratios2) {
@@ -407,11 +448,32 @@ export function findRecipeByHex(
     }
   }
 
+  // Додаткові мікро-дози чорного для темних цілей (k=2)
+  if (isDarkTarget && darkIndices.length > 0) {
+    for (let i = 0; i < n; i++) {
+      if (darkIndices.includes(i)) continue
+      for (const dIdx of darkIndices) {
+        // 97/3, 95/5, 93/7, 90/10 — червоний + мікро-сажа
+        for (const [main, dark] of [
+          [97, 3],
+          [95, 5],
+          [93, 7],
+          [90, 10],
+          [85, 15],
+        ]) {
+          tryAddResult([i, dIdx], [main, dark])
+        }
+      }
+    }
+  }
+
   // k = 3
   if (maxComponents >= 3) {
     const ratios3 = [
       [90, 8, 2],
+      [88, 9, 3],
       [85, 10, 5],
+      [82, 12, 6],
       [80, 15, 5],
       [75, 15, 10],
       [70, 20, 10],
@@ -442,14 +504,36 @@ export function findRecipeByHex(
         for (const p of uniquePerms) tryAddResult(combo, p)
       }
     }
+
+    // Спеціальні трійки з мікро-чорним для темних цілей
+    if (isDarkTarget && darkIndices.length > 0) {
+      for (const combo of combinations(n, 3)) {
+        const hasDark = combo.some((idx) => darkIndices.includes(idx))
+        if (!hasDark) continue
+        // Основний колір + другий + дуже мало чорного
+        for (const ratio of [
+          [90, 7, 3],
+          [88, 8, 4],
+          [85, 10, 5],
+          [80, 15, 5],
+          [75, 18, 7],
+        ]) {
+          tryAddResult(combo, ratio)
+          tryAddResult(combo, [ratio[0], ratio[2], ratio[1]])
+        }
+      }
+    }
   }
 
-  // k = 4 (тільки якщо явно попросили)
+  // k = 4
   if (maxComponents >= 4 && n >= 4) {
     const ratios4 = [
       [70, 15, 10, 5],
+      [65, 18, 12, 5],
       [60, 20, 15, 5],
+      [55, 25, 15, 5],
       [50, 25, 15, 10],
+      [45, 25, 20, 10],
       [40, 30, 20, 10],
       [40, 25, 20, 15],
       [35, 30, 20, 15],
@@ -463,10 +547,12 @@ export function findRecipeByHex(
 
   if (topResults.length === 0) return null
 
-  // --- 4. ТОЧНА ДОВОДКА ---
+  // --- 4. ТОЧНА ДОВОДКА (більш агресивна для темних) ---
   let absoluteBest: BestResult = { ...topResults[0], deltaE: Infinity }
 
-  const adjustments = [0.75, 0.85, 0.92, 0.97, 1.03, 1.08, 1.15, 1.25]
+  const adjustments = isDarkTarget
+    ? [0.7, 0.8, 0.88, 0.94, 0.97, 1.03, 1.06, 1.12, 1.2, 1.3]
+    : [0.75, 0.85, 0.92, 0.97, 1.03, 1.08, 1.15, 1.25]
 
   for (const candidate of topResults) {
     let currentVols = [...candidate.volumes]
@@ -482,14 +568,15 @@ export function findRecipeByHex(
 
     let currentRes = evaluate(currentVols)
 
-    for (let pass = 0; pass < 4; pass++) {
+    const passes = isDarkTarget ? 5 : 4
+    for (let pass = 0; pass < passes; pass++) {
       let improved = false
       for (let i = 0; i < currentVols.length; i++) {
         for (const adj of adjustments) {
           const trialVols = [...currentVols]
-          trialVols[i] = Math.max(0.15, Math.min(100, trialVols[i] * adj))
+          trialVols[i] = Math.max(0.1, Math.min(100, trialVols[i] * adj))
           const trialRes = evaluate(trialVols)
-          if (trialRes.deltaE < currentRes.deltaE - 0.0005) {
+          if (trialRes.deltaE < currentRes.deltaE - 0.0003) {
             currentRes = trialRes
             currentVols = trialVols
             improved = true
