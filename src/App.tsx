@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useLayoutEffect, useState, useRef } from 'react'
 
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
@@ -10,7 +10,7 @@ import { WidthCalcPage } from './pages/WidthCalcPage'
 import { HeelCalcPage } from './pages/HeelCalcPage'
 import { ColorCalcPage } from './pages/ColorCalcPage'
 
-import { loadAllPigments } from './data/loadPigments'
+import { loadThemePigments, loadAllPigments } from './data/loadPigments'
 import { applyPigmentTheme } from './theme/pigmentTheme'
 import type { Pigment } from './data/pigments'
 
@@ -48,6 +48,57 @@ export interface FavoriteItem {
   imagePng: string
 }
 
+/** Мгновенный приглушённый fallback (до загрузки спектров) */
+function applyImmediateMutedTheme(isDark: boolean) {
+  const root = document.documentElement
+
+  if (isDark) {
+    root.classList.add('dark')
+    root.classList.remove('light')
+    root.style.setProperty('--color-bg', '#1C1816')
+    root.style.setProperty('--color-surface', '#25201C')
+    root.style.setProperty('--color-surface-2', '#2F2924')
+    root.style.setProperty('--color-ink', '#F5F1EA')
+    root.style.setProperty('--color-muted', '#B9ACA0')
+    root.style.setProperty('--color-accent', '#E4D00A')
+    root.style.setProperty('--color-accent-strong', '#E34234')
+    root.style.setProperty('--color-danger', '#8B0000')
+    root.style.setProperty('--color-border', 'rgba(255,255,255,0.12)')
+    root.style.setProperty('--color-info', '#1034A6')
+    root.style.setProperty('--color-success', '#0BDA51')
+    root.style.setProperty('--pigment-lac-dye', '#8B0000')
+    root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
+    root.style.setProperty('--pigment-orpiment', '#E4D00A')
+    root.style.setProperty('--pigment-realgar', '#E34234')
+    root.style.setProperty('--pigment-malachite', '#0BDA51')
+    root.style.setProperty('--pigment-azurite', '#007FFF')
+    root.style.setProperty('--pigment-lead-white', '#F5F1EA')
+    root.style.setProperty('--pigment-bone-black', '#1C1816')
+  } else {
+    root.classList.add('light')
+    root.classList.remove('dark')
+    root.style.setProperty('--color-bg', '#F5F1EA')
+    root.style.setProperty('--color-surface', '#F0EBE3')
+    root.style.setProperty('--color-surface-2', '#E8E2D9')
+    root.style.setProperty('--color-ink', '#1C1816')
+    root.style.setProperty('--color-muted', '#6B5E54')
+    root.style.setProperty('--color-accent', '#A52A2A')
+    root.style.setProperty('--color-accent-strong', '#E34234')
+    root.style.setProperty('--color-danger', '#8B0000')
+    root.style.setProperty('--color-border', 'rgba(0,0,0,0.12)')
+    root.style.setProperty('--color-info', '#1034A6')
+    root.style.setProperty('--color-success', '#0BDA51')
+    root.style.setProperty('--pigment-lac-dye', '#8B0000')
+    root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
+    root.style.setProperty('--pigment-orpiment', '#E4D00A')
+    root.style.setProperty('--pigment-realgar', '#E34234')
+    root.style.setProperty('--pigment-malachite', '#0BDA51')
+    root.style.setProperty('--pigment-azurite', '#007FFF')
+    root.style.setProperty('--pigment-lead-white', '#F5F1EA')
+    root.style.setProperty('--pigment-bone-black', '#1C1816')
+  }
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('welcome')
   const [lang, setLang] = useState<Lang>(() => {
@@ -83,7 +134,6 @@ export default function App() {
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
-  // Зберігаємо пігменти, щоб перезастосовувати тему при зміні day/night
   const pigmentsRef = useRef<Pigment[]>([])
 
   const handleSetLang = (next: Lang) => {
@@ -112,19 +162,50 @@ export default function App() {
     })
   }
 
-  // === 1. Завантаження пігментів ===
+  // === 0. Мгновенный fallback (до первой отрисовки) ===
+  useLayoutEffect(() => {
+    const tg = window.Telegram?.WebApp
+    const isDark = tg ? tg.colorScheme === 'dark' : true
+    applyImmediateMutedTheme(isDark)
+
+    try {
+      if (tg) {
+        const bg = isDark ? '#1C1816' : '#F5F1EA'
+        tg.setHeaderColor(bg)
+        tg.setBackgroundColor(bg)
+      }
+    } catch {}
+  }, [])
+
+  // === 1. Завантаження пігментів (сначала тема — быстро) ===
   useEffect(() => {
-    loadAllPigments()
-      .then((loaded) => {
-        pigmentsRef.current = loaded
+    let cancelled = false
+
+    const run = async () => {
+      try {
+        // 1. Быстро — только 12 пигментов для темы
+        const themePigments = await loadThemePigments()
+        if (cancelled) return
+
+        pigmentsRef.current = themePigments
 
         const tg = window.Telegram?.WebApp
         const isDark = tg ? tg.colorScheme === 'dark' : true
-        applyPigmentTheme(loaded, isDark)
-      })
-      .catch((err) => {
+        applyPigmentTheme(themePigments, isDark)
+
+        // 2. В фоне догружаем остальные (для колористики)
+        const all = await loadAllPigments()
+        if (cancelled) return
+        pigmentsRef.current = all
+      } catch (err) {
         console.error('Failed to load pigments for theme:', err)
-      })
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // === 2. Telegram theme + перемикання день/ніч ===
@@ -138,20 +219,14 @@ export default function App() {
     const applyTheme = () => {
       const isDark = tg.colorScheme === 'dark'
 
-      // Якщо пігменти вже завантажені — застосовуємо тему з них
       if (pigmentsRef.current.length > 0) {
         applyPigmentTheme(pigmentsRef.current, isDark)
       } else {
-        // Fallback, поки пігменти ще вантажаться
-        document.documentElement.classList.toggle('dark', isDark)
+        applyImmediateMutedTheme(isDark)
         try {
-          if (isDark) {
-            tg.setHeaderColor('#1C1816')
-            tg.setBackgroundColor('#1C1816')
-          } else {
-            tg.setHeaderColor('#F5F1EA')
-            tg.setBackgroundColor('#F5F1EA')
-          }
+          const bg = isDark ? '#1C1816' : '#F5F1EA'
+          tg.setHeaderColor(bg)
+          tg.setBackgroundColor(bg)
         } catch {}
       }
     }
