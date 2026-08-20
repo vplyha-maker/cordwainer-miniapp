@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Lang } from '../App'
 
 type ColorsPageProps = {
@@ -12,16 +12,21 @@ type Scheme = 'complementary' | 'analogous' | 'triadic' | 'tetradic' | 'monochro
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
   const [baseHue, setBaseHue] = useState(30)
-  const [whiteAmount, setWhiteAmount] = useState(0.25) // 0 = pure, 1 = white
-  const [blackAmount, setBlackAmount] = useState(0.15) // 0 = pure, 1 = black
+  const [whiteAmount, setWhiteAmount] = useState(0.2)
+  const [blackAmount, setBlackAmount] = useState(0.15)
+
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
+  const rafId = useRef<number | null>(null)
+  const pendingHue = useRef<number | null>(null)
 
+  // Читаем язык только один раз при монтировании
   useEffect(() => {
-    const savedLang = localStorage.getItem('app_lang') as Lang
-    if (savedLang && (savedLang === 'ru' || savedLang === 'uk') && savedLang !== lang) {
-      setLang(savedLang)
+    const saved = localStorage.getItem('app_lang') as Lang | null
+    if (saved === 'ru' || saved === 'uk') {
+      if (saved !== lang) setLang(saved)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleLangChange = (newLang: Lang) => {
@@ -70,30 +75,37 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
-  // Оствальд: цвет = чистый + белый + чёрный
-  const makeOstwaldColor = (hue: number, white: number, black: number, sat = 55) => {
-    // Упрощённая модель Оствальда
-    const lightness = 50 * (1 - black) * (1 - white * 0.7) + white * 45
-    const saturation = sat * (1 - white) * (1 - black * 0.8)
-    return `hsl(${hue}, ${Math.max(5, saturation)}%, ${Math.max(8, Math.min(92, lightness))}%)`
+  // ========== Оствальд ==========
+  const makeOstwaldColor = (
+    hue: number,
+    white: number,
+    black: number,
+    satBase = 58
+  ): string => {
+    // Упрощённая, но рабочая модель Оствальда
+    // white → добавляет белизну, black → добавляет черноту
+    const lightness = 48 * (1 - black) * (1 - white * 0.65) + white * 42
+    const saturation = satBase * (1 - white * 0.9) * (1 - black * 0.75)
+
+    return `hsl(${hue}, ${Math.max(4, Math.min(80, saturation))}%, ${Math.max(7, Math.min(93, lightness))}%)`
   }
 
-  const getColors = () => {
+  const getColors = useCallback(() => {
     const h = ((baseHue % 360) + 360) % 360
 
     if (scheme === 'grayscale') {
       return {
-        main: `hsl(0, 0%, 22%)`,
-        secondary: `hsl(0, 0%, 78%)`,
-        accent: `hsl(0, 0%, 8%)`,
+        main: 'hsl(0, 0%, 20%)',
+        secondary: 'hsl(0, 0%, 78%)',
+        accent: 'hsl(0, 0%, 8%)',
       }
     }
 
     if (scheme === 'monochromatic') {
       return {
-        main: makeOstwaldColor(h, whiteAmount * 0.3, blackAmount + 0.25, 40),
-        secondary: makeOstwaldColor(h, whiteAmount + 0.45, blackAmount * 0.3, 25),
-        accent: makeOstwaldColor(h, whiteAmount * 0.1, blackAmount + 0.55, 35),
+        main: makeOstwaldColor(h, whiteAmount * 0.25, blackAmount + 0.22, 38),
+        secondary: makeOstwaldColor(h, whiteAmount + 0.4, blackAmount * 0.25, 22),
+        accent: makeOstwaldColor(h, whiteAmount * 0.08, blackAmount + 0.5, 32),
       }
     }
 
@@ -101,65 +113,79 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       case 'complementary':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.7, blackAmount * 0.6),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.2, blackAmount * 0.3, 70),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
         }
       case 'analogous':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 30) % 360, whiteAmount * 0.8, blackAmount * 0.5),
-          accent: makeOstwaldColor((h - 30 + 360) % 360, whiteAmount * 0.3, blackAmount * 0.4, 65),
+          secondary: makeOstwaldColor((h + 28) % 360, whiteAmount * 0.7, blackAmount * 0.45),
+          accent: makeOstwaldColor((h - 28 + 360) % 360, whiteAmount * 0.2, blackAmount * 0.35, 62),
         }
       case 'triadic':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.7, blackAmount * 0.5),
-          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.25, blackAmount * 0.35, 65),
+          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.65, blackAmount * 0.45),
+          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
         }
       case 'tetradic':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.7, blackAmount * 0.5),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.25, blackAmount * 0.35, 65),
+          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.65, blackAmount * 0.45),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
         }
       default:
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.7, blackAmount * 0.6),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.2, blackAmount * 0.3, 70),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
         }
     }
-  }
+  }, [baseHue, whiteAmount, blackAmount, scheme])
 
   const colors = getColors()
+
+  // ========== Управление кругом (с throttling) ==========
+  const updateHue = useCallback((clientX: number, clientY: number) => {
+    const el = wheelRef.current
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const dx = clientX - cx
+    const dy = clientY - cy
+
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI)
+    angle = (angle + 90 + 360) % 360
+
+    pendingHue.current = Math.round(angle)
+
+    if (rafId.current === null) {
+      rafId.current = requestAnimationFrame(() => {
+        if (pendingHue.current !== null) {
+          setBaseHue(pendingHue.current)
+          pendingHue.current = null
+        }
+        rafId.current = null
+      })
+    }
+  }, [])
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    updateHueFromEvent(e)
+    updateHue(e.clientX, e.clientY)
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging.current) return
-    updateHueFromEvent(e)
+    updateHue(e.clientX, e.clientY)
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
     isDragging.current = false
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
-  }
-
-  const updateHueFromEvent = (e: React.PointerEvent) => {
-    const el = wheelRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const dx = e.clientX - cx
-    const dy = e.clientY - cy
-    let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = (angle + 90 + 360) % 360
-    setBaseHue(Math.round(angle))
   }
 
   return (
@@ -199,7 +225,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       {/* Content */}
       <div className="flex-1 px-5 overflow-y-auto pb-8 overscroll-none">
-
         {/* Схемы */}
         <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
           {t.schemes}
@@ -253,29 +278,30 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
-            {/* Центральный круг (сечение Оствальда) */}
+            {/* Центральный круг — теперь использует реальный colors.main */}
             <div
               className="absolute inset-[26%] rounded-full border border-white/20"
               style={{
-                background: `radial-gradient(circle at 50% 30%, 
-                  white 0%, 
-                  hsl(${baseHue}, 60%, 55%) 45%, 
+                background: `radial-gradient(circle at 50% 30%,
+                  white 0%,
+                  ${colors.main} 45%,
                   black 100%)`,
               }}
             />
-            {/* Указатель */}
+
+            {/* Указатель — точный центр вращения 109px */}
             <div
-              className="absolute top-1.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full border-2 border-white shadow-lg"
+              className="absolute top-1.5 left-1/2 w-5 h-5 rounded-full border-2 border-white shadow-lg pointer-events-none"
               style={{
                 backgroundColor: `hsl(${baseHue}, 70%, 50%)`,
                 transform: `translateX(-50%) rotate(${baseHue}deg)`,
-                transformOrigin: '50% 107px',
+                transformOrigin: '50% 109px',
               }}
             />
           </div>
         </div>
 
-        {/* Ползунки Оствальда (белый / чёрный) */}
+        {/* Ползунки Оствальда */}
         {scheme !== 'grayscale' && (
           <div className="space-y-4 mb-6">
             <div>
@@ -311,7 +337,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         )}
 
-        {/* Соотношение цветов */}
+        {/* Соотношение */}
         <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
           {t.ratio}
         </p>
@@ -333,7 +359,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         {/* Модель кроссовка */}
         <div className="rounded-[18px] p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-5 flex justify-center">
           <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="160" style={{ maxWidth: 340 }}>
-            {/* Подошва */}
             <path
               d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
               fill={colors.secondary}
@@ -341,7 +366,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-            {/* Основная часть */}
             <path
               d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
               fill={colors.main}
@@ -349,7 +373,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-            {/* Носок */}
             <path
               d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
               fill={colors.secondary}
@@ -357,7 +380,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-            {/* Пятка */}
             <path
               d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
               fill={colors.secondary}
@@ -365,7 +387,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-            {/* Шнурки */}
             <path
               d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
               fill={colors.accent}
@@ -384,4 +405,4 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
     </div>
   )
-}
+ }
