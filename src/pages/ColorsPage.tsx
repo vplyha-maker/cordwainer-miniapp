@@ -250,83 +250,94 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* Чистая SVG-модель кроссовка */}
-        <div className="rounded-[18px] p-6 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-5 flex justify-center">
+        {/* Реалистичная модель кроссовка (low-top) */}
+        <div className="rounded-[18px] p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-5 flex justify-center overflow-hidden">
           <svg
-            width="260"
-            height="160"
-            viewBox="0 0 260 160"
+            width="300"
+            height="180"
+            viewBox="0 0 300 180"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="drop-shadow-lg"
+            className="drop-shadow-xl"
           >
-            {/* Тень под кроссовком */}
-            <ellipse cx="130" cy="148" rx="95" ry="8" fill="rgba(0,0,0,0.25)" />
+            {/* Тень */}
+            <ellipse cx="155" cy="168" rx="110" ry="9" fill="rgba(0,0,0,0.3)" />
 
-            {/* Подошва (вторичный 30%) */}
+            {/* === ПОДОШВА (вторичный 30%) === */}
             <path
-              d="M35 125 C45 138 80 148 130 148 C180 148 215 138 225 125 L220 135 C210 148 170 155 130 155 C90 155 50 148 40 135 Z"
+              d="M48 138 C60 152 100 162 155 162 C210 162 250 152 262 138 L255 148 C245 158 205 168 155 168 C105 168 65 158 55 148 Z"
               fill={colors.secondary}
             />
-
-            {/* Основной верх (60%) */}
+            {/* Нижняя рифлёная часть подошвы */}
             <path
-              d="M42 122 C48 85 75 48 120 42 C160 37 195 55 210 85 C218 100 222 115 220 125 C180 135 90 138 50 128 Z"
+              d="M52 145 C65 155 100 162 155 162 C210 162 245 155 258 145"
+              stroke="rgba(0,0,0,0.15)"
+              strokeWidth="4"
+              fill="none"
+            />
+
+            {/* === ОСНОВНОЙ ВЕРХ (60%) === */}
+            {/* Основная боковая часть */}
+            <path
+              d="M55 135 C58 95 85 55 130 48 C175 42 215 55 235 85 C245 100 250 120 248 135 C210 145 100 148 65 140 Z"
               fill={colors.main}
             />
 
-            {/* Язык / внутренняя часть */}
+            {/* === ЯЗЫК === */}
             <path
-              d="M95 68 C115 52 150 50 175 68 C182 75 185 88 182 98 C160 90 125 88 100 95 Z"
+              d="M118 62 C140 48 175 48 195 65 C200 72 202 85 198 95 C175 85 145 82 125 90 Z"
               fill={colors.secondary}
-              opacity="0.75"
+              opacity="0.85"
             />
 
-            {/* Задник / пятка (акцент) */}
+            {/* === ЗАДНИК / ПЯТКА (акцент) === */}
             <path
-              d="M42 122 C38 105 42 88 55 78 C62 90 58 110 52 122 Z"
+              d="M55 135 C52 115 58 95 75 82 C82 95 78 118 72 135 Z"
               fill={colors.accent}
             />
 
-            {/* Носок (акцент) */}
+            {/* === НОСОК === */}
             <path
-              d="M205 95 C215 105 220 118 218 128 C210 125 200 115 195 105 Z"
+              d="M230 95 C242 108 248 122 246 135 C235 132 222 118 215 105 Z"
               fill={colors.accent}
               opacity="0.9"
             />
 
-            {/* Прострочка 1 */}
+            {/* === БОКОВАЯ ПАНЕЛЬ (swoosh-like) === */}
             <path
-              d="M70 105 Q130 95 185 108"
-              stroke={colors.accent}
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              fill="none"
+              d="M95 105 C130 95 170 98 200 115 C185 108 150 100 115 108 Z"
+              fill={colors.accent}
+              opacity="0.7"
             />
 
-            {/* Прострочка 2 */}
+            {/* === ШНУРКИ === */}
+            <path d="M125 72 C135 68 148 70 158 75" stroke={colors.accent} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+            <path d="M128 82 C140 78 155 80 165 86" stroke={colors.accent} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+            <path d="M132 92 C145 88 160 90 170 96" stroke={colors.accent} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+
+            {/* === ПРОСТРОЧКА === */}
             <path
-              d="M75 118 Q135 110 180 118"
+              d="M80 115 Q150 105 215 120"
               stroke={colors.accent}
-              strokeWidth="1.6"
+              strokeWidth="1.8"
               strokeLinecap="round"
               fill="none"
               opacity="0.8"
             />
-
-            {/* Шнурки (упрощённо) */}
             <path
-              d="M105 78 L125 72 M130 70 L150 75 M155 78 L170 85"
+              d="M85 128 Q155 120 210 130"
               stroke={colors.accent}
-              strokeWidth="2"
+              strokeWidth="1.4"
               strokeLinecap="round"
+              fill="none"
+              opacity="0.6"
             />
 
-            {/* Контур для объёма */}
+            {/* === КОНТУР ДЛЯ ОБЪЁМА === */}
             <path
-              d="M42 122 C48 85 75 48 120 42 C160 37 195 55 210 85 C218 100 222 115 220 125"
-              stroke="rgba(0,0,0,0.2)"
-              strokeWidth="1.5"
+              d="M55 135 C58 95 85 55 130 48 C175 42 215 55 235 85 C245 100 250 120 248 135"
+              stroke="rgba(0,0,0,0.18)"
+              strokeWidth="1.8"
               fill="none"
             />
           </svg>
