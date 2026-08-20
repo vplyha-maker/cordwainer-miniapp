@@ -236,3 +236,38 @@ html.perf-fast body {
   width: 100%;
   max-width: var(--app-max-width);
 }
+
+/* =========================================================
+   CALC PAGES — отступы и степперы на планшете / мониторе
+   ========================================================= */
+
+@media (min-width: 768px) {
+  /* общий контент калькуляторов */
+  .calc-page-content {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+
+  /* кнопки +/− у слайдеров / степперов */
+  .calc-stepper-btn {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+  }
+
+  /* сегменты (Муж / Жен / Дети и т.п.) */
+  .calc-segment button {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* карточки результатов */
+  .calc-result-card {
+    padding: 1.5rem !important;
+  }
+
+  /* заголовок страницы калькулятора */
+  .calc-page-title {
+    font-size: 1.125rem !important;
+  }
+}
