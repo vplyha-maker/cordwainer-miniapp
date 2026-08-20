@@ -13,7 +13,6 @@ type SizeCalcPageProps = {
   lang: Lang
 }
 
-/* ---------- Flags ---------- */
 const FlagEU = () => (
   <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
     <rect width="18" height="12" fill="#003399" />
@@ -54,7 +53,6 @@ const FlagUS = () => (
   </svg>
 )
 
-/* ---------- Accent themes by gender (оставляем как акценты) ---------- */
 const THEMES = {
   men: {
     accent: '#C6A47A',
@@ -214,8 +212,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         color: 'var(--color-ink, #F5F1EA)',
       }}
     >
-      {/* Header */}
-      <div className="relative z-20 flex items-center justify-between px-4 pt-3 pb-1">
+      <div className="relative z-20 flex items-center justify-between px-4 md:px-6 pt-3 pb-1">
         <button
           onClick={() => {
             triggerHaptic()
@@ -233,7 +230,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </button>
 
         <div className="text-center">
-          <h1 className="text-[16px] font-medium tracking-wide">{t.title}</h1>
+          <h1 className="text-[16px] font-medium tracking-wide calc-page-title">{t.title}</h1>
           <p className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
             {t.subtitle}
           </p>
@@ -253,11 +250,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-28 scrollbar-hide">
-        {/* Gender segmented */}
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-28 scrollbar-hide calc-page-content">
         <div
-          className="mt-4 mb-6 flex p-[3px] rounded-2xl"
+          className="mt-4 mb-6 flex p-[3px] rounded-2xl calc-segment"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
@@ -282,7 +277,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           ))}
         </div>
 
-        {/* Foot length card */}
         <div
           className="rounded-3xl p-5 mb-4 shadow-sm"
           style={{
@@ -402,12 +396,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             )}
           </AnimatePresence>
 
-          {/* Big value with +/- steppers */}
           <div className="flex items-center justify-center gap-4 mb-7">
             <button
               onClick={(e) => stepValue(-1, e)}
               disabled={footMm <= range.min}
-              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors disabled:opacity-30"
+              className="w-10 h-10 calc-stepper-btn flex shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors disabled:opacity-30"
               style={{
                 background: 'var(--color-bg, #1C1816)',
                 border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
@@ -456,7 +449,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             <button
               onClick={(e) => stepValue(1, e)}
               disabled={footMm >= range.max}
-              className="w-10 h-10 flex shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors disabled:opacity-30"
+              className="w-10 h-10 calc-stepper-btn flex shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors disabled:opacity-30"
               style={{
                 background: 'var(--color-bg, #1C1816)',
                 border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
@@ -469,7 +462,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </button>
           </div>
 
-          {/* Slider */}
           <div className="px-1">
             <input
               type="range"
@@ -520,9 +512,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
         </div>
 
-        {/* Result card */}
         <div
-          className="rounded-3xl p-6 mb-4 text-center shadow-sm"
+          className="rounded-3xl p-6 mb-4 text-center shadow-sm calc-result-card"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: `1px solid ${theme.accentBorder}`,
@@ -599,7 +590,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           {t.disclaimer}
         </p>
 
-        {/* How calculated — collapsible */}
         <button
           onClick={() => {
             triggerHaptic()
@@ -673,23 +663,24 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </AnimatePresence>
       </div>
 
-      {/* Sticky save */}
-      <div className="fixed bottom-6 left-0 right-0 px-4 z-40 pointer-events-none">
-        <button
-          onClick={() => triggerHaptic('medium')}
-          className="w-full py-3.5 rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform pointer-events-auto"
-          style={{
-            background: theme.accent,
-            color: theme.buttonText,
-            boxShadow: `0 8px 28px ${theme.accent}40`,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-          </svg>
-          {t.save}
-        </button>
+      <div className="fixed bottom-6 left-0 right-0 z-40 pointer-events-none">
+        <div className="mx-auto w-full max-w-[var(--app-max-width)] px-4 md:px-6">
+          <button
+            onClick={() => triggerHaptic('medium')}
+            className="w-full py-3.5 rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform pointer-events-auto"
+            style={{
+              background: theme.accent,
+              color: theme.buttonText,
+              boxShadow: `0 8px 28px ${theme.accent}40`,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            {t.save}
+          </button>
+        </div>
       </div>
     </motion.div>
   )
- }
+}
