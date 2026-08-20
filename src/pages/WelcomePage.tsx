@@ -151,7 +151,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       {/* Hero */}
       <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] md:h-[36vh] md:max-h-[400px] lg:h-[32vh] lg:max-h-[440px] overflow-hidden z-20">
         <img
-          src="/hero-cover.png"
+          src="/hero-cover.webp"
           alt="Cordwainer Background"
           className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
         />
