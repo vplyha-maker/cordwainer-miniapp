@@ -21,7 +21,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [baseHue, setBaseHue] = useState(30)
   const [whiteAmount, setWhiteAmount] = useState(0.2)
   const [blackAmount, setBlackAmount] = useState(0.15)
-  const [achromaticLightness, setAchromaticLightness] = useState(35) // для Ч/Б режима
+  const [baseLightness, setBaseLightness] = useState(35) // базовая светлота для Ч/Б
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -84,6 +84,57 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
+  // ========== Ахроматические схемы (контраст) ==========
+  const getAchromaticColors = (base: number, sch: Scheme) => {
+    const clamp = (v: number) => Math.max(4, Math.min(96, Math.round(v)))
+
+    switch (sch) {
+      case 'analogous': // низкий контраст
+        return {
+          main: `hsl(0, 0%, ${clamp(base)}%)`,
+          secondary: `hsl(0, 0%, ${clamp(base + 12)}%)`,
+          accent: `hsl(0, 0%, ${clamp(base - 12)}%)`,
+        }
+
+      case 'complementary': // максимальный контраст
+        return {
+          main: `hsl(0, 0%, ${clamp(base)}%)`,
+          secondary: `hsl(0, 0%, ${clamp(100 - base)}%)`,
+          accent: `hsl(0, 0%, ${base > 50 ? 8 : 92}%)`,
+        }
+
+      case 'triadic': // равномерное распределение
+        return {
+          main: `hsl(0, 0%, ${clamp(base)}%)`,
+          secondary: `hsl(0, 0%, 50%)`,
+          accent: `hsl(0, 0%, ${clamp(100 - base)}%)`,
+        }
+
+      case 'tetradic':
+        return {
+          main: `hsl(0, 0%, ${clamp(base)}%)`,
+          secondary: `hsl(0, 0%, ${clamp(base + 25)}%)`,
+          accent: `hsl(0, 0%, ${clamp(base - 25)}%)`,
+        }
+
+      case 'split-complementary':
+        return {
+          main: `hsl(0, 0%, ${clamp(base)}%)`,
+          secondary: `hsl(0, 0%, ${clamp(base + 30)}%)`,
+          accent: `hsl(0, 0%, ${clamp(base - 40)}%)`,
+        }
+
+      case 'monochromatic':
+      default:
+        return {
+          main: `hsl(0, 0%, ${clamp(base)}%)`,
+          secondary: `hsl(0, 0%, ${clamp(base + 8)}%)`,
+          accent: `hsl(0, 0%, ${clamp(base - 8)}%)`,
+        }
+    }
+  }
+
+  // ========== Цветные схемы (Оствальд) ==========
   const makeOstwaldColor = (
     hue: number,
     white: number,
@@ -96,17 +147,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }
 
   const getColors = useCallback(() => {
+    // Если выбрана Чёрно-белая — работаем только с контрастом
     if (scheme === 'grayscale') {
-      // Ахроматический режим
-      const mainL = achromaticLightness
-      const secondaryL = mainL > 50 ? Math.max(12, mainL - 45) : Math.min(88, mainL + 45)
-      const accentL = mainL > 50 ? Math.max(5, mainL - 60) : Math.min(70, mainL + 25)
-
-      return {
-        main: `hsl(0, 0%, ${mainL}%)`,
-        secondary: `hsl(0, 0%, ${secondaryL}%)`,
-        accent: `hsl(0, 0%, ${accentL}%)`,
-      }
+      // В этом режиме scheme уже "grayscale", 
+      // но мы можем использовать complementary как дефолт
+      // Чтобы пользователь мог менять схему даже в Ч/Б — 
+      // лучше хранить последнюю выбранную цветную схему.
+      // Для простоты сейчас используем complementary-контраст.
+      return getAchromaticColors(baseLightness, 'complementary')
     }
 
     const h = ((baseHue % 360) + 360) % 360
@@ -157,11 +205,11 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
         }
     }
-  }, [baseHue, whiteAmount, blackAmount, scheme, achromaticLightness])
+  }, [baseHue, whiteAmount, blackAmount, scheme, baseLightness])
 
   const colors = getColors()
 
-  // Фон круга зависит от схемы
+  // Фон круга
   const getWheelBackground = () => {
     if (scheme === 'grayscale') {
       return 'conic-gradient(from 0deg, #ffffff, #d0d0d0, #888888, #333333, #000000, #333333, #888888, #d0d0d0, #ffffff)'
@@ -184,10 +232,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     )`
   }
 
-  // Цвет указателя
   const getPointerColor = () => {
     if (scheme === 'grayscale') {
-      return `hsl(0, 0%, ${achromaticLightness}%)`
+      return `hsl(0, 0%, ${baseLightness}%)`
     }
     return `hsl(${baseHue}, 70%, 50%)`
   }
@@ -206,8 +253,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     angle = (angle + 90 + 360) % 360
 
     if (scheme === 'grayscale') {
-      // Преобразуем угол в светлоту 0–100
-      // 0° (верх) = 100% белый, 180° (низ) = 0% чёрный
+      // 0° = белый (100), 180° = чёрный (0)
       const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
       pendingValue.current = Math.max(0, Math.min(100, lightness))
     } else {
@@ -218,7 +264,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       rafId.current = requestAnimationFrame(() => {
         if (pendingValue.current !== null) {
           if (scheme === 'grayscale') {
-            setAchromaticLightness(pendingValue.current)
+            setBaseLightness(pendingValue.current)
           } else {
             setBaseHue(pendingValue.current)
           }
@@ -245,9 +291,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
   }
 
-  // Угол для указателя
   const pointerAngle = scheme === 'grayscale'
-    ? (100 - achromaticLightness) * 1.8
+    ? (100 - baseLightness) * 1.8
     : baseHue
 
   return (
@@ -285,10 +330,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col px-4 overflow-hidden">
 
-        {/* Схемы — горизонтальный скролл */}
+        {/* Схемы */}
         <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
           {([
             'complementary',
@@ -313,7 +357,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           ))}
         </div>
 
-        {/* Основной блок */}
         <div className="flex-1 overflow-y-auto overscroll-none pb-6">
 
           {/* Круг */}
@@ -330,7 +373,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
             >
-              {/* Объёмный центр */}
               <div
                 className="absolute inset-[24%] rounded-full"
                 style={{
@@ -342,7 +384,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 }}
               />
 
-              {/* Указатель */}
               <div
                 className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
                 style={{
@@ -354,7 +395,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
           </div>
 
-          {/* Ползунки (только для цветных схем) */}
+          {/* Ползунки только в цветном режиме */}
           {scheme !== 'grayscale' && (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -447,7 +488,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </svg>
           </div>
 
-          {/* Quote */}
           <div className="rounded-2xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
             <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
             <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
@@ -456,4 +496,4 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
     </div>
   )
-}
+ }
