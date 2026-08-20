@@ -18,10 +18,10 @@ type Scheme =
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
-  const [baseHue, setBaseHue] = useState(30)
-  const [whiteAmount, setWhiteAmount] = useState(0.2)
-  const [blackAmount, setBlackAmount] = useState(0.15)
-  const [baseLightness, setBaseLightness] = useState(35) // базовая светлота для Ч/Б
+  const [baseHue, setBaseHue] = useState(0) // начинаем с красного
+  const [whiteAmount, setWhiteAmount] = useState(0.05)
+  const [blackAmount, setBlackAmount] = useState(0.05)
+  const [baseLightness, setBaseLightness] = useState(35)
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -84,46 +84,41 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
-  // ========== Ахроматические схемы (контраст) ==========
+  // ========== Ахроматические схемы ==========
   const getAchromaticColors = (base: number, sch: Scheme) => {
     const clamp = (v: number) => Math.max(4, Math.min(96, Math.round(v)))
 
     switch (sch) {
-      case 'analogous': // низкий контраст
+      case 'analogous':
         return {
           main: `hsl(0, 0%, ${clamp(base)}%)`,
           secondary: `hsl(0, 0%, ${clamp(base + 12)}%)`,
           accent: `hsl(0, 0%, ${clamp(base - 12)}%)`,
         }
-
-      case 'complementary': // максимальный контраст
+      case 'complementary':
         return {
           main: `hsl(0, 0%, ${clamp(base)}%)`,
           secondary: `hsl(0, 0%, ${clamp(100 - base)}%)`,
           accent: `hsl(0, 0%, ${base > 50 ? 8 : 92}%)`,
         }
-
-      case 'triadic': // равномерное распределение
+      case 'triadic':
         return {
           main: `hsl(0, 0%, ${clamp(base)}%)`,
           secondary: `hsl(0, 0%, 50%)`,
           accent: `hsl(0, 0%, ${clamp(100 - base)}%)`,
         }
-
       case 'tetradic':
         return {
           main: `hsl(0, 0%, ${clamp(base)}%)`,
           secondary: `hsl(0, 0%, ${clamp(base + 25)}%)`,
           accent: `hsl(0, 0%, ${clamp(base - 25)}%)`,
         }
-
       case 'split-complementary':
         return {
           main: `hsl(0, 0%, ${clamp(base)}%)`,
           secondary: `hsl(0, 0%, ${clamp(base + 30)}%)`,
           accent: `hsl(0, 0%, ${clamp(base - 40)}%)`,
         }
-
       case 'monochromatic':
       default:
         return {
@@ -134,26 +129,22 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }
   }
 
-  // ========== Цветные схемы (Оствальд) ==========
+  // ========== Улучшенный Оствальд (более чистые цвета) ==========
   const makeOstwaldColor = (
     hue: number,
     white: number,
     black: number,
-    satBase = 58
+    satBase = 78
   ): string => {
-    const lightness = 48 * (1 - black) * (1 - white * 0.65) + white * 42
-    const saturation = satBase * (1 - white * 0.9) * (1 - black * 0.75)
-    return `hsl(${hue}, ${Math.max(4, Math.min(80, saturation))}%, ${Math.max(7, Math.min(93, lightness))}%)`
+    // Минимальные white/black → почти чистый яркий цвет
+    const lightness = 54 * (1 - black) * (1 - white * 0.5) + white * 36
+    const saturation = satBase * (1 - white * 0.8) * (1 - black * 0.65)
+
+    return `hsl(${hue}, ${Math.max(12, Math.min(92, saturation))}%, ${Math.max(14, Math.min(86, lightness))}%)`
   }
 
   const getColors = useCallback(() => {
-    // Если выбрана Чёрно-белая — работаем только с контрастом
     if (scheme === 'grayscale') {
-      // В этом режиме scheme уже "grayscale", 
-      // но мы можем использовать complementary как дефолт
-      // Чтобы пользователь мог менять схему даже в Ч/Б — 
-      // лучше хранить последнюю выбранную цветную схему.
-      // Для простоты сейчас используем complementary-контраст.
       return getAchromaticColors(baseLightness, 'complementary')
     }
 
@@ -161,9 +152,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
     if (scheme === 'monochromatic') {
       return {
-        main: makeOstwaldColor(h, whiteAmount * 0.25, blackAmount + 0.22, 38),
-        secondary: makeOstwaldColor(h, whiteAmount + 0.4, blackAmount * 0.25, 22),
-        accent: makeOstwaldColor(h, whiteAmount * 0.08, blackAmount + 0.5, 32),
+        main: makeOstwaldColor(h, whiteAmount * 0.2, blackAmount + 0.18, 48),
+        secondary: makeOstwaldColor(h, whiteAmount + 0.35, blackAmount * 0.2, 28),
+        accent: makeOstwaldColor(h, whiteAmount * 0.05, blackAmount + 0.45, 42),
       }
     }
 
@@ -171,64 +162,63 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       case 'complementary':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.6, blackAmount * 0.5),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.1, blackAmount * 0.2, 82),
         }
       case 'analogous':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 28) % 360, whiteAmount * 0.7, blackAmount * 0.45),
-          accent: makeOstwaldColor((h - 28 + 360) % 360, whiteAmount * 0.2, blackAmount * 0.35, 62),
+          secondary: makeOstwaldColor((h + 28) % 360, whiteAmount * 0.65, blackAmount * 0.4),
+          accent: makeOstwaldColor((h - 28 + 360) % 360, whiteAmount * 0.15, blackAmount * 0.3, 78),
         }
       case 'triadic':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.65, blackAmount * 0.45),
-          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
+          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.6, blackAmount * 0.4),
+          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.12, blackAmount * 0.25, 80),
         }
       case 'tetradic':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.65, blackAmount * 0.45),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
+          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.6, blackAmount * 0.4),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.12, blackAmount * 0.25, 80),
         }
       case 'split-complementary':
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 150) % 360, whiteAmount * 0.65, blackAmount * 0.5),
-          accent: makeOstwaldColor((h + 210) % 360, whiteAmount * 0.18, blackAmount * 0.3, 66),
+          secondary: makeOstwaldColor((h + 150) % 360, whiteAmount * 0.6, blackAmount * 0.45),
+          accent: makeOstwaldColor((h + 210) % 360, whiteAmount * 0.12, blackAmount * 0.25, 80),
         }
       default:
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.6, blackAmount * 0.5),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.1, blackAmount * 0.2, 82),
         }
     }
   }, [baseHue, whiteAmount, blackAmount, scheme, baseLightness])
 
   const colors = getColors()
 
-  // Фон круга
   const getWheelBackground = () => {
     if (scheme === 'grayscale') {
       return 'conic-gradient(from 0deg, #ffffff, #d0d0d0, #888888, #333333, #000000, #333333, #888888, #d0d0d0, #ffffff)'
     }
     return `conic-gradient(
       from 0deg,
-      hsl(0, 75%, 50%),
-      hsl(30, 75%, 50%),
-      hsl(60, 75%, 50%),
-      hsl(90, 75%, 50%),
-      hsl(120, 75%, 50%),
-      hsl(150, 75%, 50%),
-      hsl(180, 75%, 50%),
-      hsl(210, 75%, 50%),
-      hsl(240, 75%, 50%),
-      hsl(270, 75%, 50%),
-      hsl(300, 75%, 50%),
-      hsl(330, 75%, 50%),
-      hsl(360, 75%, 50%)
+      hsl(0, 80%, 50%),
+      hsl(30, 80%, 50%),
+      hsl(60, 80%, 50%),
+      hsl(90, 80%, 50%),
+      hsl(120, 80%, 50%),
+      hsl(150, 80%, 50%),
+      hsl(180, 80%, 50%),
+      hsl(210, 80%, 50%),
+      hsl(240, 80%, 50%),
+      hsl(270, 80%, 50%),
+      hsl(300, 80%, 50%),
+      hsl(330, 80%, 50%),
+      hsl(360, 80%, 50%)
     )`
   }
 
@@ -236,7 +226,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     if (scheme === 'grayscale') {
       return `hsl(0, 0%, ${baseLightness}%)`
     }
-    return `hsl(${baseHue}, 70%, 50%)`
+    return `hsl(${baseHue}, 80%, 50%)`
   }
 
   const updateFromAngle = useCallback((clientX: number, clientY: number) => {
@@ -253,7 +243,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     angle = (angle + 90 + 360) % 360
 
     if (scheme === 'grayscale') {
-      // 0° = белый (100), 180° = чёрный (0)
       const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
       pendingValue.current = Math.max(0, Math.min(100, lightness))
     } else {
@@ -331,7 +320,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
 
       <div className="flex-1 flex flex-col px-4 overflow-hidden">
-
         {/* Схемы */}
         <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
           {([
@@ -358,7 +346,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto overscroll-none pb-6">
-
           {/* Круг */}
           <div className="flex justify-center mb-3">
             <div
@@ -395,7 +382,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
           </div>
 
-          {/* Ползунки только в цветном режиме */}
+          {/* Ползунки */}
           {scheme !== 'grayscale' && (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -496,4 +483,4 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
     </div>
   )
- }
+}
