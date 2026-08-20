@@ -91,7 +91,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     >
       {/* Header */}
       <div
-        className="flex-shrink-0 p-3 flex items-center justify-between backdrop-blur-md z-10"
+        className="flex-shrink-0 p-3 md:px-6 md:py-3.5 flex items-center justify-between backdrop-blur-md z-10"
         style={{
           background: 'color-mix(in srgb, var(--color-bg, #1C1816) 80%, transparent)',
           borderBottom: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -99,7 +99,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       >
         <button
           onClick={() => { haptic(); onBack() }}
-          className="w-9 h-9 flex items-center justify-center rounded-full active:scale-90"
+          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full active:scale-90"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -110,14 +110,14 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </svg>
         </button>
         <div className="text-right">
-          <h1 className="text-[14px] font-medium leading-none mb-1">{t.title}</h1>
+          <h1 className="text-[14px] font-medium leading-none mb-1 calc-page-title">{t.title}</h1>
           <p className="text-[10px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
             {t.desc}
           </p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-2 pb-6">
+      <div className="flex-1 overflow-y-auto px-2.5 md:px-6 py-2 space-y-2 pb-6 calc-page-content">
         <HeelCanvas
           geometry={geometry}
           eng={eng}
@@ -134,7 +134,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
         {/* Стандарт / Рокер */}
         <div
-          className="flex p-1 rounded-xl"
+          className="flex p-1 rounded-xl calc-segment"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -162,7 +162,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         {/* Типы каблука — только Стандарт */}
         {soleType === 'flat' && (
           <div
-            className="grid grid-cols-2 gap-1 p-1 rounded-xl"
+            className="grid grid-cols-2 gap-1 md:gap-2 p-1 rounded-xl calc-segment"
             style={{
               background: 'var(--color-surface, #25201C)',
               border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -189,7 +189,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         )}
 
         {/* Степперы */}
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 md:gap-3">
           <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
           <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" onHaptic={() => haptic()} />
           <HeelStepper
@@ -274,7 +274,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               className="overflow-hidden"
             >
               <div
-                className="p-2.5 rounded-xl text-[10px] space-y-1.5"
+                className="p-2.5 md:p-4 rounded-xl text-[10px] space-y-1.5 calc-result-card"
                 style={{
                   background: 'var(--color-surface, #25201C)',
                   border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
