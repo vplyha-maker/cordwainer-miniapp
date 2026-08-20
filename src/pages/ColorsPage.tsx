@@ -21,11 +21,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [baseHue, setBaseHue] = useState(30)
   const [whiteAmount, setWhiteAmount] = useState(0.2)
   const [blackAmount, setBlackAmount] = useState(0.15)
+  const [achromaticLightness, setAchromaticLightness] = useState(35) // для Ч/Б режима
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const rafId = useRef<number | null>(null)
-  const pendingHue = useRef<number | null>(null)
+  const pendingValue = useRef<number | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem('app_lang') as Lang | null
@@ -95,15 +96,20 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }
 
   const getColors = useCallback(() => {
-    const h = ((baseHue % 360) + 360) % 360
-
     if (scheme === 'grayscale') {
+      // Ахроматический режим
+      const mainL = achromaticLightness
+      const secondaryL = mainL > 50 ? Math.max(12, mainL - 45) : Math.min(88, mainL + 45)
+      const accentL = mainL > 50 ? Math.max(5, mainL - 60) : Math.min(70, mainL + 25)
+
       return {
-        main: 'hsl(0, 0%, 20%)',
-        secondary: 'hsl(0, 0%, 78%)',
-        accent: 'hsl(0, 0%, 8%)',
+        main: `hsl(0, 0%, ${mainL}%)`,
+        secondary: `hsl(0, 0%, ${secondaryL}%)`,
+        accent: `hsl(0, 0%, ${accentL}%)`,
       }
     }
+
+    const h = ((baseHue % 360) + 360) % 360
 
     if (scheme === 'monochromatic') {
       return {
@@ -151,11 +157,42 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
         }
     }
-  }, [baseHue, whiteAmount, blackAmount, scheme])
+  }, [baseHue, whiteAmount, blackAmount, scheme, achromaticLightness])
 
   const colors = getColors()
 
-  const updateHue = useCallback((clientX: number, clientY: number) => {
+  // Фон круга зависит от схемы
+  const getWheelBackground = () => {
+    if (scheme === 'grayscale') {
+      return 'conic-gradient(from 0deg, #ffffff, #d0d0d0, #888888, #333333, #000000, #333333, #888888, #d0d0d0, #ffffff)'
+    }
+    return `conic-gradient(
+      from 0deg,
+      hsl(0, 75%, 50%),
+      hsl(30, 75%, 50%),
+      hsl(60, 75%, 50%),
+      hsl(90, 75%, 50%),
+      hsl(120, 75%, 50%),
+      hsl(150, 75%, 50%),
+      hsl(180, 75%, 50%),
+      hsl(210, 75%, 50%),
+      hsl(240, 75%, 50%),
+      hsl(270, 75%, 50%),
+      hsl(300, 75%, 50%),
+      hsl(330, 75%, 50%),
+      hsl(360, 75%, 50%)
+    )`
+  }
+
+  // Цвет указателя
+  const getPointerColor = () => {
+    if (scheme === 'grayscale') {
+      return `hsl(0, 0%, ${achromaticLightness}%)`
+    }
+    return `hsl(${baseHue}, 70%, 50%)`
+  }
+
+  const updateFromAngle = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
     if (!el) return
 
@@ -168,34 +205,50 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     let angle = Math.atan2(dy, dx) * (180 / Math.PI)
     angle = (angle + 90 + 360) % 360
 
-    pendingHue.current = Math.round(angle)
+    if (scheme === 'grayscale') {
+      // Преобразуем угол в светлоту 0–100
+      // 0° (верх) = 100% белый, 180° (низ) = 0% чёрный
+      const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
+      pendingValue.current = Math.max(0, Math.min(100, lightness))
+    } else {
+      pendingValue.current = Math.round(angle)
+    }
 
     if (rafId.current === null) {
       rafId.current = requestAnimationFrame(() => {
-        if (pendingHue.current !== null) {
-          setBaseHue(pendingHue.current)
-          pendingHue.current = null
+        if (pendingValue.current !== null) {
+          if (scheme === 'grayscale') {
+            setAchromaticLightness(pendingValue.current)
+          } else {
+            setBaseHue(pendingValue.current)
+          }
+          pendingValue.current = null
         }
         rafId.current = null
       })
     }
-  }, [])
+  }, [scheme])
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    updateHue(e.clientX, e.clientY)
+    updateFromAngle(e.clientX, e.clientY)
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging.current) return
-    updateHue(e.clientX, e.clientY)
+    updateFromAngle(e.clientX, e.clientY)
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
     isDragging.current = false
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
   }
+
+  // Угол для указателя
+  const pointerAngle = scheme === 'grayscale'
+    ? (100 - achromaticLightness) * 1.8
+    : baseHue
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -263,28 +316,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         {/* Основной блок */}
         <div className="flex-1 overflow-y-auto overscroll-none pb-6">
 
-          {/* Круг Оствальда */}
+          {/* Круг */}
           <div className="flex justify-center mb-3">
             <div
               ref={wheelRef}
               className="relative w-[200px] h-[200px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
-                background: `conic-gradient(
-                  from 0deg,
-                  hsl(0, 75%, 50%),
-                  hsl(30, 75%, 50%),
-                  hsl(60, 75%, 50%),
-                  hsl(90, 75%, 50%),
-                  hsl(120, 75%, 50%),
-                  hsl(150, 75%, 50%),
-                  hsl(180, 75%, 50%),
-                  hsl(210, 75%, 50%),
-                  hsl(240, 75%, 50%),
-                  hsl(270, 75%, 50%),
-                  hsl(300, 75%, 50%),
-                  hsl(330, 75%, 50%),
-                  hsl(360, 75%, 50%)
-                )`,
+                background: getWheelBackground(),
                 boxShadow: '0 0 0 8px var(--color-surface), 0 8px 28px rgba(0,0,0,0.4)',
               }}
               onPointerDown={handlePointerDown}
@@ -308,15 +346,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               <div
                 className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
                 style={{
-                  backgroundColor: `hsl(${baseHue}, 70%, 50%)`,
-                  transform: `translateX(-50%) rotate(${baseHue}deg)`,
+                  backgroundColor: getPointerColor(),
+                  transform: `translateX(-50%) rotate(${pointerAngle}deg)`,
                   transformOrigin: '50% 96px',
                 }}
               />
             </div>
           </div>
 
-          {/* Ползунки (компактные) */}
+          {/* Ползунки (только для цветных схем) */}
           {scheme !== 'grayscale' && (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -352,7 +390,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
           )}
 
-          {/* Компактные 60/30/10 */}
+          {/* 60/30/10 */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
               <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.main }} />
