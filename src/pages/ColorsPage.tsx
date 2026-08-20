@@ -11,7 +11,7 @@ type Scheme = 'complementary' | 'analogous' | 'triadic' | 'tetradic' | 'monochro
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
-  const [baseHue, setBaseHue] = useState(28) // тёплый коричневый — типичная кожа
+  const [baseHue, setBaseHue] = useState(28)
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
 
@@ -36,7 +36,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       triadic: 'Триадная',
       tetradic: 'Тетрадная',
       monochromatic: 'Монохромная',
-      baseColor: 'Базовый цвет (круг)',
+      baseColor: 'Базовый цвет',
       ratio: 'Соотношение на обуви',
       main: 'Основной 60%',
       secondary: 'Вторичный 30%',
@@ -52,7 +52,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       triadic: 'Тріадна',
       tetradic: 'Тетрадна',
       monochromatic: 'Монохромна',
-      baseColor: 'Базовий колір (коло)',
+      baseColor: 'Базовий колір',
       ratio: 'Співвідношення на взутті',
       main: 'Основний 60%',
       secondary: 'Вторинний 30%',
@@ -62,7 +62,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
-  // Генерация цветов по схеме
   const getColors = (hue: number, sch: Scheme) => {
     const h = ((hue % 360) + 360) % 360
 
@@ -108,7 +107,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const colors = getColors(baseHue, scheme)
 
-  // Обработка вращения круга
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -134,7 +132,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     const dx = e.clientX - cx
     const dy = e.clientY - cy
     let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = (angle + 90 + 360) % 360 // 0 сверху
+    angle = (angle + 90 + 360) % 360
     setBaseHue(Math.round(angle))
   }
 
@@ -221,15 +219,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
-            {/* Внутренний круг */}
             <div className="absolute inset-[28%] rounded-full bg-[var(--color-bg,#1C1816)] border border-[var(--color-border,rgba(255,255,255,0.15))]" />
-
-            {/* Указатель */}
             <div
               className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md"
               style={{
                 backgroundColor: `hsl(${baseHue}, 70%, 50%)`,
-                transform: `translateX(-50%) rotate(${baseHue}deg) translateY(0)`,
+                transform: `translateX(-50%) rotate(${baseHue}deg)`,
                 transformOrigin: '50% 102px',
               }}
             />
@@ -255,57 +250,82 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* SVG-модель обуви */}
-        <div className="rounded-[18px] p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-5 flex justify-center">
+        {/* Чистая SVG-модель кроссовка */}
+        <div className="rounded-[18px] p-6 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-5 flex justify-center">
           <svg
-            width="280"
-            height="180"
-            viewBox="0 0 280 180"
+            width="260"
+            height="160"
+            viewBox="0 0 260 160"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className="drop-shadow-lg"
           >
-            {/* Подошва (вторичный цвет) */}
+            {/* Тень под кроссовком */}
+            <ellipse cx="130" cy="148" rx="95" ry="8" fill="rgba(0,0,0,0.25)" />
+
+            {/* Подошва (вторичный 30%) */}
             <path
-              d="M40 130 C60 145 120 155 180 148 C220 142 250 130 255 120 L250 135 C240 150 200 162 160 165 C100 170 50 155 35 140 Z"
+              d="M35 125 C45 138 80 148 130 148 C180 148 215 138 225 125 L220 135 C210 148 170 155 130 155 C90 155 50 148 40 135 Z"
               fill={colors.secondary}
             />
-            {/* Основная часть (верх) — основной цвет 60% */}
+
+            {/* Основной верх (60%) */}
             <path
-              d="M45 125 C50 90 70 55 110 45 C150 35 190 50 210 75 C225 95 235 115 240 125 C200 135 120 140 60 130 Z"
+              d="M42 122 C48 85 75 48 120 42 C160 37 195 55 210 85 C218 100 222 115 220 125 C180 135 90 138 50 128 Z"
               fill={colors.main}
             />
+
             {/* Язык / внутренняя часть */}
             <path
-              d="M95 70 C110 55 140 52 165 65 C175 72 180 85 178 95 C160 88 130 85 105 92 Z"
+              d="M95 68 C115 52 150 50 175 68 C182 75 185 88 182 98 C160 90 125 88 100 95 Z"
               fill={colors.secondary}
-              opacity="0.7"
+              opacity="0.75"
             />
-            {/* Детали / прострочка / акцент */}
+
+            {/* Задник / пятка (акцент) */}
             <path
-              d="M70 100 Q120 90 170 100"
+              d="M42 122 C38 105 42 88 55 78 C62 90 58 110 52 122 Z"
+              fill={colors.accent}
+            />
+
+            {/* Носок (акцент) */}
+            <path
+              d="M205 95 C215 105 220 118 218 128 C210 125 200 115 195 105 Z"
+              fill={colors.accent}
+              opacity="0.9"
+            />
+
+            {/* Прострочка 1 */}
+            <path
+              d="M70 105 Q130 95 185 108"
               stroke={colors.accent}
-              strokeWidth="2.5"
+              strokeWidth="2.2"
               strokeLinecap="round"
               fill="none"
             />
+
+            {/* Прострочка 2 */}
             <path
-              d="M80 115 Q130 108 175 112"
+              d="M75 118 Q135 110 180 118"
               stroke={colors.accent}
-              strokeWidth="1.8"
+              strokeWidth="1.6"
               strokeLinecap="round"
               fill="none"
               opacity="0.8"
             />
-            {/* Каблук / задник акцент */}
+
+            {/* Шнурки (упрощённо) */}
             <path
-              d="M40 125 C35 110 38 95 48 85 C55 95 52 115 48 125 Z"
-              fill={colors.accent}
+              d="M105 78 L125 72 M130 70 L150 75 M155 78 L170 85"
+              stroke={colors.accent}
+              strokeWidth="2"
+              strokeLinecap="round"
             />
-            {/* Контур */}
+
+            {/* Контур для объёма */}
             <path
-              d="M45 125 C50 90 70 55 110 45 C150 35 190 50 210 75 C225 95 235 115 240 125"
-              stroke="rgba(0,0,0,0.25)"
+              d="M42 122 C48 85 75 48 120 42 C160 37 195 55 210 85 C218 100 222 115 220 125"
+              stroke="rgba(0,0,0,0.2)"
               strokeWidth="1.5"
               fill="none"
             />
