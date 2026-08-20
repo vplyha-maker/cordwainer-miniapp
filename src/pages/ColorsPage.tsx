@@ -7,7 +7,14 @@ type ColorsPageProps = {
   setLang: (lang: Lang) => void
 }
 
-type Scheme = 'complementary' | 'analogous' | 'triadic' | 'tetradic' | 'monochromatic' | 'grayscale'
+type Scheme =
+  | 'complementary'
+  | 'analogous'
+  | 'triadic'
+  | 'tetradic'
+  | 'split-complementary'
+  | 'monochromatic'
+  | 'grayscale'
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
@@ -20,7 +27,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const rafId = useRef<number | null>(null)
   const pendingHue = useRef<number | null>(null)
 
-  // Читаем язык только один раз при монтировании
   useEffect(() => {
     const saved = localStorage.getItem('app_lang') as Lang | null
     if (saved === 'ru' || saved === 'uk') {
@@ -42,17 +48,18 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       analogous: 'Аналогичная',
       triadic: 'Триадная',
       tetradic: 'Тетрадная',
+      'split-complementary': 'Контрастная триада',
       monochromatic: 'Монохромная',
       grayscale: 'Чёрно-белая',
       baseColor: 'Круг Оствальда',
-      ratio: 'Соотношение на обуви',
-      main: 'Основной 60%',
-      secondary: 'Вторичный 30%',
-      accent: 'Акцент 10%',
+      ratio: 'Соотношение',
+      main: '60%',
+      secondary: '30%',
+      accent: '10%',
       quote: '«Цвет — это душа обуви.»',
       white: 'К белому',
       black: 'К чёрному',
-      pure: 'Чистый цвет',
+      pure: 'Чистый',
     },
     uk: {
       title: 'Кольори та оздоблення',
@@ -61,32 +68,29 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       analogous: 'Аналогічна',
       triadic: 'Тріадна',
       tetradic: 'Тетрадна',
+      'split-complementary': 'Контрастна тріада',
       monochromatic: 'Монохромна',
       grayscale: 'Чорно-біла',
       baseColor: 'Коло Оствальда',
-      ratio: 'Співвідношення на взутті',
-      main: 'Основний 60%',
-      secondary: 'Вторинний 30%',
-      accent: 'Акцент 10%',
+      ratio: 'Співвідношення',
+      main: '60%',
+      secondary: '30%',
+      accent: '10%',
       quote: '«Колір — це душа взуття.»',
       white: 'До білого',
       black: 'До чорного',
-      pure: 'Чистий колір',
+      pure: 'Чистий',
     },
   }[lang]
 
-  // ========== Оствальд ==========
   const makeOstwaldColor = (
     hue: number,
     white: number,
     black: number,
     satBase = 58
   ): string => {
-    // Упрощённая, но рабочая модель Оствальда
-    // white → добавляет белизну, black → добавляет черноту
     const lightness = 48 * (1 - black) * (1 - white * 0.65) + white * 42
     const saturation = satBase * (1 - white * 0.9) * (1 - black * 0.75)
-
     return `hsl(${hue}, ${Math.max(4, Math.min(80, saturation))}%, ${Math.max(7, Math.min(93, lightness))}%)`
   }
 
@@ -134,6 +138,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.65, blackAmount * 0.45),
           accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
         }
+      case 'split-complementary':
+        return {
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 150) % 360, whiteAmount * 0.65, blackAmount * 0.5),
+          accent: makeOstwaldColor((h + 210) % 360, whiteAmount * 0.18, blackAmount * 0.3, 66),
+        }
       default:
         return {
           main: makeOstwaldColor(h, whiteAmount, blackAmount),
@@ -145,7 +155,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const colors = getColors()
 
-  // ========== Управление кругом (с throttling) ==========
   const updateHue = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
     if (!el) return
@@ -191,13 +200,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <h1 className="text-[22px] font-serif font-normal tracking-wide leading-none">
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
+        <h1 className="text-[20px] font-serif font-normal tracking-wide leading-none">
           {t.title}
         </h1>
 
         <div className="flex items-center gap-2">
-          <div className="flex rounded-full p-1 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
+          <div className="flex rounded-full p-0.5 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
             <button
               onClick={() => handleLangChange('ru')}
               className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
@@ -214,9 +223,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
           <button
             onClick={onBack}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
@@ -224,17 +233,23 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-5 overflow-y-auto pb-8 overscroll-none">
-        {/* Схемы */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
-          {t.schemes}
-        </p>
-        <div className="flex flex-wrap gap-2 mb-5">
-          {(['complementary', 'analogous', 'triadic', 'tetradic', 'monochromatic', 'grayscale'] as Scheme[]).map((s) => (
+      <div className="flex-1 flex flex-col px-4 overflow-hidden">
+
+        {/* Схемы — горизонтальный скролл */}
+        <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
+          {([
+            'complementary',
+            'analogous',
+            'triadic',
+            'tetradic',
+            'split-complementary',
+            'monochromatic',
+            'grayscale',
+          ] as Scheme[]).map((s) => (
             <button
               key={s}
               onClick={() => setScheme(s)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
+              className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 transition-all ${
                 scheme === s
                   ? 'bg-[var(--color-accent,#E4D00A)] text-[var(--color-bg,#1C1816)]'
                   : 'bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
@@ -245,164 +260,162 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           ))}
         </div>
 
-        {/* Круг Оствальда */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
-          {t.baseColor}
-        </p>
+        {/* Основной блок */}
+        <div className="flex-1 overflow-y-auto overscroll-none pb-6">
 
-        <div className="flex justify-center mb-4">
-          <div
-            ref={wheelRef}
-            className="relative w-[230px] h-[230px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
-            style={{
-              background: `conic-gradient(
-                from 0deg,
-                hsl(0, 75%, 50%),
-                hsl(30, 75%, 50%),
-                hsl(60, 75%, 50%),
-                hsl(90, 75%, 50%),
-                hsl(120, 75%, 50%),
-                hsl(150, 75%, 50%),
-                hsl(180, 75%, 50%),
-                hsl(210, 75%, 50%),
-                hsl(240, 75%, 50%),
-                hsl(270, 75%, 50%),
-                hsl(300, 75%, 50%),
-                hsl(330, 75%, 50%),
-                hsl(360, 75%, 50%)
-              )`,
-              boxShadow: '0 0 0 10px var(--color-surface), 0 10px 40px rgba(0,0,0,0.45)',
-            }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-          >
-            {/* Центральный круг — теперь использует реальный colors.main */}
+          {/* Круг Оствальда */}
+          <div className="flex justify-center mb-3">
             <div
-              className="absolute inset-[26%] rounded-full border border-white/20"
+              ref={wheelRef}
+              className="relative w-[200px] h-[200px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
-                background: `radial-gradient(circle at 50% 30%,
-                  white 0%,
-                  ${colors.main} 45%,
-                  black 100%)`,
+                background: `conic-gradient(
+                  from 0deg,
+                  hsl(0, 75%, 50%),
+                  hsl(30, 75%, 50%),
+                  hsl(60, 75%, 50%),
+                  hsl(90, 75%, 50%),
+                  hsl(120, 75%, 50%),
+                  hsl(150, 75%, 50%),
+                  hsl(180, 75%, 50%),
+                  hsl(210, 75%, 50%),
+                  hsl(240, 75%, 50%),
+                  hsl(270, 75%, 50%),
+                  hsl(300, 75%, 50%),
+                  hsl(330, 75%, 50%),
+                  hsl(360, 75%, 50%)
+                )`,
+                boxShadow: '0 0 0 8px var(--color-surface), 0 8px 28px rgba(0,0,0,0.4)',
               }}
-            />
-
-            {/* Указатель — точный центр вращения 109px */}
-            <div
-              className="absolute top-1.5 left-1/2 w-5 h-5 rounded-full border-2 border-white shadow-lg pointer-events-none"
-              style={{
-                backgroundColor: `hsl(${baseHue}, 70%, 50%)`,
-                transform: `translateX(-50%) rotate(${baseHue}deg)`,
-                transformOrigin: '50% 109px',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Ползунки Оствальда */}
-        {scheme !== 'grayscale' && (
-          <div className="space-y-4 mb-6">
-            <div>
-              <div className="flex justify-between text-[12px] mb-1.5 text-[var(--color-muted,#B9ACA0)]">
-                <span>{t.pure}</span>
-                <span>{t.white}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={whiteAmount}
-                onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
-                className="w-full accent-[var(--color-accent,#E4D00A)]"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            >
+              {/* Объёмный центр */}
+              <div
+                className="absolute inset-[24%] rounded-full"
+                style={{
+                  background: `radial-gradient(circle at 35% 32%,
+                    white 0%,
+                    ${colors.main} 42%,
+                    #111 95%)`,
+                  boxShadow: 'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
+                }}
               />
-            </div>
-            <div>
-              <div className="flex justify-between text-[12px] mb-1.5 text-[var(--color-muted,#B9ACA0)]">
-                <span>{t.pure}</span>
-                <span>{t.black}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={blackAmount}
-                onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
-                className="w-full accent-[var(--color-accent,#E4D00A)]"
+
+              {/* Указатель */}
+              <div
+                className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
+                style={{
+                  backgroundColor: `hsl(${baseHue}, 70%, 50%)`,
+                  transform: `translateX(-50%) rotate(${baseHue}deg)`,
+                  transformOrigin: '50% 96px',
+                }}
               />
             </div>
           </div>
-        )}
 
-        {/* Соотношение */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
-          {t.ratio}
-        </p>
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="rounded-[14px] p-3 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <div className="w-full h-10 rounded-lg mb-2" style={{ backgroundColor: colors.main }} />
-            <div className="text-[12px] font-medium">{t.main}</div>
-          </div>
-          <div className="rounded-[14px] p-3 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <div className="w-full h-10 rounded-lg mb-2" style={{ backgroundColor: colors.secondary }} />
-            <div className="text-[12px] font-medium">{t.secondary}</div>
-          </div>
-          <div className="rounded-[14px] p-3 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <div className="w-full h-10 rounded-lg mb-2" style={{ backgroundColor: colors.accent }} />
-            <div className="text-[12px] font-medium">{t.accent}</div>
-          </div>
-        </div>
+          {/* Ползунки (компактные) */}
+          {scheme !== 'grayscale' && (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
+                  <span>{t.pure}</span>
+                  <span>{t.white}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={whiteAmount}
+                  onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
+                  className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
+                />
+              </div>
+              <div>
+                <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
+                  <span>{t.pure}</span>
+                  <span>{t.black}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={blackAmount}
+                  onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
+                  className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
+                />
+              </div>
+            </div>
+          )}
 
-        {/* Модель кроссовка */}
-        <div className="rounded-[18px] p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-5 flex justify-center">
-          <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="160" style={{ maxWidth: 340 }}>
-            <path
-              d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
-              fill={colors.secondary}
-              stroke="rgba(0,0,0,0.35)"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
-              fill={colors.main}
-              stroke="rgba(0,0,0,0.35)"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
-              fill={colors.secondary}
-              stroke="rgba(0,0,0,0.35)"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
-              fill={colors.secondary}
-              stroke="rgba(0,0,0,0.35)"
-              strokeWidth="3"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
-              fill={colors.accent}
-              stroke="rgba(0,0,0,0.4)"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
+          {/* Компактные 60/30/10 */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.main }} />
+              <div className="text-[11px] font-medium text-center">{t.main}</div>
+            </div>
+            <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.secondary }} />
+              <div className="text-[11px] font-medium text-center">{t.secondary}</div>
+            </div>
+            <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.accent }} />
+              <div className="text-[11px] font-medium text-center">{t.accent}</div>
+            </div>
+          </div>
 
-        {/* Quote */}
-        <div className="rounded-[18px] p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-          <p className="text-[13px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
-          <p className="mt-2 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
+          {/* Кроссовок */}
+          <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-4 flex justify-center">
+            <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="140" style={{ maxWidth: 300 }}>
+              <path
+                d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
+                fill={colors.secondary}
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
+                fill={colors.main}
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
+                fill={colors.secondary}
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
+                fill={colors.secondary}
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
+                fill={colors.accent}
+                stroke="rgba(0,0,0,0.4)"
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+
+          {/* Quote */}
+          <div className="rounded-2xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
+            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
+          </div>
         </div>
       </div>
     </div>
   )
- }
+}
