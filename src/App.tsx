@@ -48,6 +48,23 @@ export interface FavoriteItem {
   imagePng: string
 }
 
+/** 
+ * Вспомогательная функция определения темной темы.
+ * Жестко фиксируем темную тему для браузера.
+ */
+function getIsDarkTheme(): boolean {
+  const tg = window.Telegram?.WebApp
+  // Проверяем наличие initData. Если она не пустая — мы в реальном Telegram.
+  const isRealTelegram = Boolean(tg?.initData && tg.initData.trim().length > 0)
+  
+  if (isRealTelegram) {
+    return tg?.colorScheme === 'dark'
+  }
+  
+  // В браузере ВСЕГДА возвращаем true (темная тема)
+  return true
+}
+
 /** Мгновенный приглушённый fallback (до загрузки спектров) */
 function applyImmediateMutedTheme(isDark: boolean) {
   const root = document.documentElement
@@ -164,10 +181,10 @@ export default function App() {
 
   // === 0. Мгновенный fallback (до первой отрисовки) ===
   useLayoutEffect(() => {
-    const tg = window.Telegram?.WebApp
-    const isDark = tg ? tg.colorScheme === 'dark' : true
+    const isDark = getIsDarkTheme()
     applyImmediateMutedTheme(isDark)
 
+    const tg = window.Telegram?.WebApp
     try {
       if (tg) {
         const bg = isDark ? '#1C1816' : '#F5F1EA'
@@ -177,23 +194,20 @@ export default function App() {
     } catch {}
   }, [])
 
-  // === 1. Завантаження пігментів (сначала тема — быстро) ===
+  // === 1. Загрузка пигментов (сначала тема — быстро) ===
   useEffect(() => {
     let cancelled = false
 
     const run = async () => {
       try {
-        // 1. Быстро — только 12 пигментов для темы
         const themePigments = await loadThemePigments()
         if (cancelled) return
 
         pigmentsRef.current = themePigments
 
-        const tg = window.Telegram?.WebApp
-        const isDark = tg ? tg.colorScheme === 'dark' : true
+        const isDark = getIsDarkTheme()
         applyPigmentTheme(themePigments, isDark)
 
-        // 2. В фоне догружаем остальные (для колористики)
         const all = await loadAllPigments()
         if (cancelled) return
         pigmentsRef.current = all
@@ -208,7 +222,7 @@ export default function App() {
     }
   }, [])
 
-  // === 2. Telegram theme + перемикання день/ніч ===
+  // === 2. Telegram theme + переключение день/ночь ===
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -217,18 +231,20 @@ export default function App() {
     tg.expand()
 
     const applyTheme = () => {
-      const isDark = tg.colorScheme === 'dark'
+      const isDark = getIsDarkTheme()
 
       if (pigmentsRef.current.length > 0) {
         applyPigmentTheme(pigmentsRef.current, isDark)
       } else {
         applyImmediateMutedTheme(isDark)
-        try {
-          const bg = isDark ? '#1C1816' : '#F5F1EA'
-          tg.setHeaderColor(bg)
-          tg.setBackgroundColor(bg)
-        } catch {}
       }
+      
+      // ВАЖНО: Всегда обновляем цвета самого приложения Telegram (даже если пигменты загружены)
+      try {
+        const bg = isDark ? '#1C1816' : '#F5F1EA'
+        tg.setHeaderColor(bg)
+        tg.setBackgroundColor(bg)
+      } catch {}
     }
 
     applyTheme()
@@ -434,4 +450,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
- }
+}
