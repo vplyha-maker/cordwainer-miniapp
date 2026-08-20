@@ -18,7 +18,7 @@ type Scheme =
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
-  const [baseHue, setBaseHue] = useState(0) // начинаем с красного
+  const [baseHue, setBaseHue] = useState(0)
   const [whiteAmount, setWhiteAmount] = useState(0.05)
   const [blackAmount, setBlackAmount] = useState(0.05)
   const [baseLightness, setBaseLightness] = useState(35)
@@ -129,17 +129,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }
   }
 
-  // ========== Улучшенный Оствальд (более чистые цвета) ==========
+  // ========== Улучшенный Оствальд ==========
   const makeOstwaldColor = (
     hue: number,
     white: number,
     black: number,
     satBase = 78
   ): string => {
-    // Минимальные white/black → почти чистый яркий цвет
     const lightness = 54 * (1 - black) * (1 - white * 0.5) + white * 36
     const saturation = satBase * (1 - white * 0.8) * (1 - black * 0.65)
-
     return `hsl(${hue}, ${Math.max(12, Math.min(92, saturation))}%, ${Math.max(14, Math.min(86, lightness))}%)`
   }
 
@@ -434,44 +432,98 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
           </div>
 
-          {/* Кроссовок */}
+          {/* Новый детальный кроссовок + логотип */}
           <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-4 flex justify-center">
-            <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="140" style={{ maxWidth: 300 }}>
+            <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" width="100%" height="150" style={{ maxWidth: 340 }}>
+              
+              {/* Подошва */}
               <path
-                d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
+                d="M 60 250 L 420 250 C 450 250 470 240 475 225 C 480 215 470 210 450 210 L 80 210 C 60 210 50 220 50 235 Z"
                 fill={colors.secondary}
-                stroke="rgba(0,0,0,0.35)"
+                stroke="#1A1A1A"
                 strokeWidth="3"
                 strokeLinejoin="round"
               />
+              
+              {/* Рант */}
               <path
-                d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
+                d="M 50 235 L 450 210 C 460 210 465 215 460 220 L 70 235 C 55 235 50 235 50 235 Z"
+                fill={colors.secondary}
+                opacity="0.8"
+                stroke="#1A1A1A"
+                strokeWidth="2"
+              />
+
+              {/* Основная часть (60%) */}
+              <path
+                d="M 90 210 
+                   L 85 140 
+                   C 95 110 120 90 150 85 
+                   L 240 90 
+                   C 280 110 320 140 360 170 
+                   C 400 200 450 205 450 205 
+                   L 90 210 Z"
                 fill={colors.main}
-                stroke="rgba(0,0,0,0.35)"
+                stroke="#1A1A1A"
                 strokeWidth="3"
                 strokeLinejoin="round"
               />
+
+              {/* Носок */}
               <path
-                d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
+                d="M 360 170 
+                   C 400 200 450 205 450 205 
+                   L 440 160 
+                   C 400 150 380 160 360 170 Z"
                 fill={colors.secondary}
-                stroke="rgba(0,0,0,0.35)"
+                stroke="#1A1A1A"
                 strokeWidth="3"
                 strokeLinejoin="round"
               />
+
+              {/* Пятка */}
               <path
-                d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
+                d="M 90 210 
+                   L 85 140 
+                   C 110 140 120 160 120 210 
+                   Z"
                 fill={colors.secondary}
-                stroke="rgba(0,0,0,0.35)"
+                stroke="#1A1A1A"
                 strokeWidth="3"
                 strokeLinejoin="round"
               />
+
+              {/* Планка шнуровки */}
               <path
-                d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
-                fill={colors.accent}
-                stroke="rgba(0,0,0,0.4)"
+                d="M 140 110 L 250 95 L 230 140 L 130 145 Z"
+                fill={colors.secondary}
+                stroke="#1A1A1A"
                 strokeWidth="2.5"
                 strokeLinejoin="round"
               />
+
+              {/* Шнурки (accent) */}
+              <g stroke="#1A1A1A" strokeWidth="3.5" strokeLinecap="round">
+                <line x1="145" y1="112" x2="165" y2="138" stroke={colors.accent} strokeWidth="5" />
+                <line x1="165" y1="108" x2="185" y2="135" stroke={colors.accent} strokeWidth="5" />
+                <line x1="185" y1="104" x2="205" y2="132" stroke={colors.accent} strokeWidth="5" />
+                <line x1="205" y1="100" x2="225" y2="128" stroke={colors.accent} strokeWidth="5" />
+              </g>
+
+              {/* Маленький логотип (accent) */}
+              <g transform="translate(215, 145) scale(0.85)">
+                <path
+                  d="M 0 22 
+                     C 8 8 22 3 40 0 
+                     C 28 14 20 24 6 35 
+                     C 14 26 22 22 32 22 
+                     C 18 30 10 35 0 40 Z"
+                  fill={colors.accent}
+                  stroke="#1A1A1A"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              </g>
             </svg>
           </div>
 
