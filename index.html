@@ -21,7 +21,31 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+    
+    <!-- Скрипт Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- ========== Принудительная темная тема для браузера ========== -->
+    <script>
+      (function() {
+        try {
+          // Проверяем наличие initData, чтобы точно знать, что мы внутри Telegram
+          const isTelegram = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
+          
+          if (!isTelegram) {
+            // Добавляем класс dark на тег <html>
+            document.documentElement.classList.add('dark');
+            
+            // Если твои стили используют data-theme="dark" вместо класса, 
+            // раскомментируй следующую строку:
+            // document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {
+          console.error('Ошибка инициализации темы:', e);
+        }
+      })();
+    </script>
+    <!-- ============================================================= -->
   </head>
   <body>
     <div id="root"></div>
