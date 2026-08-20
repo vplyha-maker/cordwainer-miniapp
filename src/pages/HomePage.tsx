@@ -7,6 +7,7 @@ type HomePageProps = {
   onBack?: () => void
   onOpenBlog?: () => void
   onOpenCalcMenu?: () => void
+  onOpenColors?: () => void          // ← новый проп
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -18,6 +19,7 @@ export function HomePage({
   onBack,
   onOpenBlog,
   onOpenCalcMenu,
+  onOpenColors,                      // ← новый проп
   lang,
   setLang,
   favorites = [],
@@ -255,22 +257,26 @@ export function HomePage({
           {t.learning}
         </p>
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {LEARNING.map((item) => (
-            <button
-              key={item.id}
-              className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
-            >
-              <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
-                {item.icon}
-              </div>
-              <div>
-                <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
-                  {item.title}
+          {LEARNING.map((item) => {
+            const isColors = item.id === 'colors'
+            return (
+              <button
+                key={item.id}
+                onClick={isColors ? onOpenColors : undefined}
+                className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
+              >
+                <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
+                  {item.icon}
                 </div>
-                <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{item.subtitle}</div>
-              </div>
-            </button>
-          ))}
+                <div>
+                  <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
+                    {item.title}
+                  </div>
+                  <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{item.subtitle}</div>
+                </div>
+              </button>
+            )
+          })}
         </div>
 
         {/* Tools */}
