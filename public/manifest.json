@@ -1,21 +1,43 @@
 {
-  "name": "Cordwainer — Энциклопедия сапожного ремесла",
+  "id": "/",
+  "name": "Cordwainer — Энциклопедия сапожного дела",
   "short_name": "Cordwainer",
+  "description": "Справочник, калькуляторы и инструменты для обувщиков, дизайнеров и колодочников.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
   "background_color": "#151210",
   "theme_color": "#151210",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": [
+    "education",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/Ikon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/Ikon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Ikon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
-
