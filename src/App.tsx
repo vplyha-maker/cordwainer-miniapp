@@ -279,10 +279,10 @@ export default function App() {
   }, [])
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
+    <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
       {showPerfHint && (
         <div
-          className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB]"
+          className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
           style={{
             background: 'rgba(29,24,21,0.96)',
             border: '1px solid rgba(198,164,122,0.35)',
@@ -434,4 +434,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
-}
+ }
