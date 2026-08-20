@@ -1,1 +1,4 @@
+User-agent: *
+Allow: /
 
+Sitemap: https://cordwainer-miniapp.vercel.app/sitemap.xml
