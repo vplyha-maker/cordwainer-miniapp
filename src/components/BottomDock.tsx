@@ -77,7 +77,7 @@ export function BottomDock({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 pointer-events-none">
       <div
-        className="pointer-events-auto relative mx-auto max-w-[360px] overflow-hidden rounded-[24px] p-1.5 flex items-center justify-between"
+        className="pointer-events-auto relative mx-auto w-full max-w-[360px] md:max-w-[400px] overflow-hidden rounded-[24px] p-1.5 flex items-center justify-between"
         style={{
           background: 'color-mix(in srgb, var(--color-surface, #25201C) 88%, transparent)',
           backdropFilter: 'blur(20px)',
