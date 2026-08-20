@@ -9,6 +9,7 @@ import { SizeCalcPage } from './pages/SizeCalcPage'
 import { WidthCalcPage } from './pages/WidthCalcPage'
 import { HeelCalcPage } from './pages/HeelCalcPage'
 import { ColorCalcPage } from './pages/ColorCalcPage'
+import { ColorsPage } from './pages/ColorsPage'   // ← новый импорт
 
 import { loadThemePigments, loadAllPigments } from './data/loadPigments'
 import { applyPigmentTheme } from './theme/pigmentTheme'
@@ -37,6 +38,7 @@ export type Screen =
   | 'width-calc'
   | 'heel-calc'
   | 'color-calc'
+  | 'colors'          // ← новый экран
 
 export type Lang = 'ru' | 'uk'
 
@@ -355,6 +357,7 @@ export default function App() {
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
+            onOpenColors={() => setScreen('colors')}   // ← новый проп
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -445,6 +448,16 @@ export default function App() {
             key="color-calc"
             lang={lang}
             onBack={() => setScreen('calc-menu')}
+          />
+        )}
+
+        {/* === Новый экран Цвета и отделка === */}
+        {screen === 'colors' && (
+          <ColorsPage
+            key="colors"
+            onBack={() => setScreen('home')}
+            lang={lang}
+            setLang={handleSetLang}
           />
         )}
       </AnimatePresence>
