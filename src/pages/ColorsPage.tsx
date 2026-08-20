@@ -18,7 +18,6 @@ type Scheme =
   | 'monochromatic'
   | 'grayscale'
 
-// --- Утилиты цвета ---
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   return result
@@ -65,15 +64,16 @@ function mixWithWhiteBlack(hex: string, white: number, black: number): string {
   g = g * (1 - black)
   b = b * (1 - black)
 
-  const toHex = (v: number) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')
+  const toHex = (v: number) =>
+    Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')
   return `#\( {toHex(r)} \){toHex(g)}${toHex(b)}`
 }
 
 export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
-  const [baseHue, setBaseHue] = useState(15)
-  const [whiteAmount, setWhiteAmount] = useState(0.08)
-  const [blackAmount, setBlackAmount] = useState(0.08)
+  const [baseHue, setBaseHue] = useState(30)
+  const [whiteAmount, setWhiteAmount] = useState(0.02)
+  const [blackAmount, setBlackAmount] = useState(0.05)
   const [baseLightness, setBaseLightness] = useState(35)
 
   const wheelRef = useRef<HTMLDivElement>(null)
@@ -143,25 +143,28 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
     return pigments.filter((p) => p.hex && p.hex.length >= 6)
   }, [pigments])
 
-  const findNearestPigment = useCallback((targetHue: number): Pigment | null => {
-    if (readyPigments.length === 0) return null
+  const findNearestPigment = useCallback(
+    (targetHue: number): Pigment | null => {
+      if (readyPigments.length === 0) return null
 
-    let best: Pigment | null = null
-    let bestDiff = 999
+      let best: Pigment | null = null
+      let bestDiff = 999
 
-    for (const p of readyPigments) {
-      const rgb = hexToRgb(p.hex!)
-      if (!rgb) continue
-      const { h } = rgbToHsl(rgb.r, rgb.g, rgb.b)
-      let diff = Math.abs(h - targetHue)
-      if (diff > 180) diff = 360 - diff
-      if (diff < bestDiff) {
-        bestDiff = diff
-        best = p
+      for (const p of readyPigments) {
+        const rgb = hexToRgb(p.hex!)
+        if (!rgb) continue
+        const { h } = rgbToHsl(rgb.r, rgb.g, rgb.b)
+        let diff = Math.abs(h - targetHue)
+        if (diff > 180) diff = 360 - diff
+        if (diff < bestDiff) {
+          bestDiff = diff
+          best = p
+        }
       }
-    }
-    return best
-  }, [readyPigments])
+      return best
+    },
+    [readyPigments]
+  )
 
   const nearestPigment = useMemo(() => {
     return findNearestPigment(baseHue)
@@ -181,61 +184,67 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
       return getAchromaticColors(baseLightness)
     }
 
-    if (!nearestPigment?.hex) {
-      const h = baseHue
-      return {
-        main: `hsl(${h}, 65%, 42%)`,
-        secondary: `hsl(${(h + 180) % 360}, 55%, 48%)`,
-        accent: `hsl(${(h + 180) % 360}, 70%, 55%)`,
-      }
+    // Надёжный HSL fallback
+    const h = ((baseHue % 360) + 360) % 360
+    const fallback = {
+      main: `hsl(${h}, 70%, 42%)`,
+      secondary: `hsl(${(h + 180) % 360}, 60%, 48%)`,
+      accent: `hsl(${(h + 180) % 360}, 75%, 55%)`,
     }
+
+    if (!nearestPigment?.hex) return fallback
+
+    const rgb = hexToRgb(nearestPigment.hex)
+    if (!rgb) return fallback
 
     const baseHex = nearestPigment.hex
     const main = mixWithWhiteBlack(baseHex, whiteAmount, blackAmount)
 
-    const getShifted = (shift: number, w = whiteAmount * 0.6, b = blackAmount * 0.5) => {
+    const getShifted = (shift: number, w = whiteAmount * 0.55, b = blackAmount * 0.4) => {
       const target = (baseHue + shift + 360) % 360
       const p = findNearestPigment(target)
-      if (p?.hex) return mixWithWhiteBlack(p.hex, w, b)
-      return mixWithWhiteBlack(baseHex, w, b)
+      if (p?.hex && hexToRgb(p.hex)) {
+        return mixWithWhiteBlack(p.hex, w, b)
+      }
+      return `hsl(${target}, 65%, 48%)`
     }
 
     switch (scheme) {
       case 'complementary':
         return {
           main,
-          secondary: getShifted(180, whiteAmount * 0.55, blackAmount * 0.45),
+          secondary: getShifted(180),
           accent: getShifted(180, whiteAmount * 0.1, blackAmount * 0.15),
         }
       case 'analogous':
         return {
           main,
-          secondary: getShifted(30, whiteAmount * 0.6, blackAmount * 0.4),
+          secondary: getShifted(30),
           accent: getShifted(-30, whiteAmount * 0.15, blackAmount * 0.25),
         }
       case 'triadic':
         return {
           main,
-          secondary: getShifted(120, whiteAmount * 0.55, blackAmount * 0.4),
+          secondary: getShifted(120),
           accent: getShifted(240, whiteAmount * 0.12, blackAmount * 0.2),
         }
       case 'tetradic':
         return {
           main,
-          secondary: getShifted(90, whiteAmount * 0.55, blackAmount * 0.4),
+          secondary: getShifted(90),
           accent: getShifted(180, whiteAmount * 0.12, blackAmount * 0.2),
         }
       case 'split-complementary':
         return {
           main,
-          secondary: getShifted(150, whiteAmount * 0.55, blackAmount * 0.4),
+          secondary: getShifted(150),
           accent: getShifted(210, whiteAmount * 0.12, blackAmount * 0.2),
         }
       case 'monochromatic':
         return {
-          main: mixWithWhiteBlack(baseHex, whiteAmount * 0.15, blackAmount + 0.15),
-          secondary: mixWithWhiteBlack(baseHex, whiteAmount + 0.35, blackAmount * 0.2),
-          accent: mixWithWhiteBlack(baseHex, whiteAmount * 0.05, blackAmount + 0.4),
+          main: mixWithWhiteBlack(baseHex, whiteAmount * 0.1, blackAmount + 0.12),
+          secondary: mixWithWhiteBlack(baseHex, whiteAmount + 0.3, blackAmount * 0.15),
+          accent: mixWithWhiteBlack(baseHex, whiteAmount * 0.05, blackAmount + 0.35),
         }
       default:
         return {
@@ -261,35 +270,38 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
     )`
   }
 
-  const updateFromAngle = useCallback((clientX: number, clientY: number) => {
-    const el = wheelRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const dx = clientX - cx
-    const dy = clientY - cy
-    let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = (angle + 90 + 360) % 360
+  const updateFromAngle = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = wheelRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const dx = clientX - cx
+      const dy = clientY - cy
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI)
+      angle = (angle + 90 + 360) % 360
 
-    if (scheme === 'grayscale') {
-      const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
-      pendingValue.current = Math.max(0, Math.min(100, lightness))
-    } else {
-      pendingValue.current = Math.round(angle)
-    }
+      if (scheme === 'grayscale') {
+        const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
+        pendingValue.current = Math.max(0, Math.min(100, lightness))
+      } else {
+        pendingValue.current = Math.round(angle)
+      }
 
-    if (rafId.current === null) {
-      rafId.current = requestAnimationFrame(() => {
-        if (pendingValue.current !== null) {
-          if (scheme === 'grayscale') setBaseLightness(pendingValue.current)
-          else setBaseHue(pendingValue.current)
-          pendingValue.current = null
-        }
-        rafId.current = null
-      })
-    }
-  }, [scheme])
+      if (rafId.current === null) {
+        rafId.current = requestAnimationFrame(() => {
+          if (pendingValue.current !== null) {
+            if (scheme === 'grayscale') setBaseLightness(pendingValue.current)
+            else setBaseHue(pendingValue.current)
+            pendingValue.current = null
+          }
+          rafId.current = null
+        })
+      }
+    },
+    [scheme]
+  )
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
@@ -308,9 +320,10 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
   }
 
   const pointerAngle = scheme === 'grayscale' ? (100 - baseLightness) * 1.8 : baseHue
-  const pointerColor = scheme === 'grayscale'
-    ? `hsl(0, 0%, ${baseLightness}%)`
-    : (nearestPigment?.hex || `hsl(${baseHue}, 80%, 50%)`)
+  const pointerColor =
+    scheme === 'grayscale'
+      ? `hsl(0, 0%, ${baseLightness}%)`
+      : nearestPigment?.hex || `hsl(${baseHue}, 80%, 50%)`
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -321,8 +334,18 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
         </h1>
         <div className="flex items-center gap-2">
           <div className="flex rounded-full p-0.5 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
-            <button onClick={() => handleLangChange('ru')} className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}>RU</button>
-            <button onClick={() => handleLangChange('uk')} className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}>UA</button>
+            <button
+              onClick={() => handleLangChange('ru')}
+              className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
+            >
+              RU
+            </button>
+            <button
+              onClick={() => handleLangChange('uk')}
+              className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}
+            >
+              UA
+            </button>
           </div>
           <button
             onClick={onBack}
@@ -338,10 +361,17 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
       <div className="flex-1 flex flex-col px-4 overflow-hidden">
         {/* Схемы */}
         <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
-          {([
-            'complementary', 'analogous', 'triadic', 'tetradic',
-            'split-complementary', 'monochromatic', 'grayscale',
-          ] as Scheme[]).map((s) => (
+          {(
+            [
+              'complementary',
+              'analogous',
+              'triadic',
+              'tetradic',
+              'split-complementary',
+              'monochromatic',
+              'grayscale',
+            ] as Scheme[]
+          ).map((s) => (
             <button
               key={s}
               onClick={() => setScheme(s)}
@@ -375,7 +405,8 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
                 className="absolute inset-[24%] rounded-full"
                 style={{
                   background: `radial-gradient(circle at 35% 32%, white 0%, ${colors.main} 42%, #111 95%)`,
-                  boxShadow: 'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
+                  boxShadow:
+                    'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
                 }}
               />
               <div
@@ -405,7 +436,10 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
                   <span>{t.white}</span>
                 </div>
                 <input
-                  type="range" min="0" max="1" step="0.01"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
                   value={whiteAmount}
                   onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
                   className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
@@ -417,7 +451,10 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
                   <span>{t.black}</span>
                 </div>
                 <input
-                  type="range" min="0" max="1" step="0.01"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
                   value={blackAmount}
                   onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
                   className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
@@ -429,22 +466,37 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
           {/* 60/30/10 */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.main }} />
+              <div
+                className="w-full h-8 rounded-md mb-1.5"
+                style={{ backgroundColor: colors.main }}
+              />
               <div className="text-[11px] font-medium text-center">{t.main}</div>
             </div>
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.secondary }} />
+              <div
+                className="w-full h-8 rounded-md mb-1.5"
+                style={{ backgroundColor: colors.secondary }}
+              />
               <div className="text-[11px] font-medium text-center">{t.secondary}</div>
             </div>
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.accent }} />
+              <div
+                className="w-full h-8 rounded-md mb-1.5"
+                style={{ backgroundColor: colors.accent }}
+              />
               <div className="text-[11px] font-medium text-center">{t.accent}</div>
             </div>
           </div>
 
           {/* Твой SVG кроссовок */}
           <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-4 flex justify-center">
-            <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="150" style={{ maxWidth: 320 }}>
+            <svg
+              viewBox="0 0 400 250"
+              xmlns="http://www.w3.org/2000/svg"
+              width="100%"
+              height="150"
+              style={{ maxWidth: 320 }}
+            >
               {/* Подошва */}
               <path
                 d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
@@ -493,11 +545,15 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
           </div>
 
           <div className="rounded-2xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
-            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
+            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">
+              {t.quote}
+            </p>
+            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">
+              Cordwainer
+            </p>
           </div>
         </div>
       </div>
     </div>
   )
- }
+}
