@@ -251,7 +251,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       {/* Content */}
       <div className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3">
         {/* Categories */}
-        <div className="grid grid-cols-3 gap-2.5 mb-5 items-stretch">
+        <div className="grid grid-cols-3 gap-2.5 md:gap-3 mb-5 items-stretch max-w-full">
           {categories.map((item) => (
             <button
               key={item.title}
@@ -332,7 +332,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
             </button>
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2 md:gap-3">
             {[0, 1, 2, 3].map((index) => {
               const item = blogFavorites[index]
 
@@ -372,7 +372,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
       {/* Bottom Dock */}
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
-        <BottomDock active="search" lang={lang} />
+        <div className="mx-auto w-full max-w-[var(--app-max-width)]">
+          <BottomDock active="search" lang={lang} />
+        </div>
       </div>
 
       {/* Модалка */}
