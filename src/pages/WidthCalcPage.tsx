@@ -10,7 +10,6 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
-// Единая система акцентов (Gender-based Theme)
 const THEMES = {
   men: { accent: '#C6A47A', accentSoft: '#E8C9A0', accentBg: 'rgba(198,164,122,0.16)', border: 'rgba(198,164,122,0.3)' },
   women: { accent: '#E8A0B5', accentSoft: '#F2C4D0', accentBg: 'rgba(232,160,181,0.16)', border: 'rgba(232,160,181,0.3)' },
@@ -155,12 +154,12 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     >
       {/* Header */}
       <div
-        className="relative z-20 flex items-center justify-between px-4 py-2 backdrop-blur"
+        className="relative z-20 flex items-center justify-between px-4 md:px-6 py-2 backdrop-blur"
         style={{ background: 'color-mix(in srgb, var(--color-bg, #1C1816) 95%, transparent)' }}
       >
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
-          className="w-9 h-9 flex items-center justify-center rounded-full active:scale-95 transition-transform"
+          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
@@ -169,19 +168,19 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="text-center">
-          <h1 className="text-[14px] font-semibold tracking-wide">{t.title}</h1>
+          <h1 className="text-[14px] font-semibold tracking-wide calc-page-title">{t.title}</h1>
           <p className="text-[10px] leading-none mt-0.5" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
             {t.subtitle}
           </p>
         </div>
-        <div className="w-9 h-9" />
+        <div className="w-9 h-9 md:w-10 md:h-10" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4 space-y-3 scrollbar-hide calc-page-content">
         
         {/* Main controls card */}
         <div
-          className="rounded-3xl p-3.5 space-y-4"
+          className="rounded-3xl p-3.5 md:p-5 space-y-4"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 50%, transparent)',
@@ -189,7 +188,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         >
           {/* Gender segmented */}
           <div
-            className="flex p-1 rounded-2xl"
+            className="flex p-1 rounded-2xl calc-segment"
             style={{
               background: 'var(--color-bg, #1C1816)',
               border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -230,7 +229,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             >
               <button
                 disabled={sizeEu <= limits.min} onClick={() => handleSizeChange(sizeEu - 1)}
-                className="w-9 h-9 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
+                className="w-9 h-9 calc-stepper-btn flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
                 style={{ color: theme.accentSoft }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
@@ -240,7 +239,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               </div>
               <button
                 disabled={sizeEu >= limits.max} onClick={() => handleSizeChange(sizeEu + 1)}
-                className="w-9 h-9 flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
+                className="w-9 h-9 calc-stepper-btn flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
                 style={{ color: theme.accentSoft }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
@@ -253,7 +252,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             <span className="text-[13px] font-medium block mb-2 px-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
               {t.step2}
             </span>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5 md:gap-2">
               {(Object.keys(t.cats) as WidthCategory[]).map(cat => {
                 const isSelected = widthCat === cat
                 return (
@@ -278,9 +277,9 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
 
         {/* US / UK result cards */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:gap-3">
           <div
-            className="rounded-2xl py-3 flex flex-col items-center justify-center"
+            className="rounded-2xl py-3 md:py-4 flex flex-col items-center justify-center calc-result-card"
             style={{
               background: 'var(--color-surface, #25201C)',
               border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -299,7 +298,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             </motion.span>
           </div>
           <div
-            className="rounded-2xl py-3 flex flex-col items-center justify-center"
+            className="rounded-2xl py-3 md:py-4 flex flex-col items-center justify-center calc-result-card"
             style={{
               background: 'var(--color-surface, #25201C)',
               border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -321,7 +320,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
 
         {/* PRO DATA */}
         <div
-          className="rounded-3xl p-3.5"
+          className="rounded-3xl p-3.5 md:p-5"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
@@ -359,8 +358,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-3 space-y-3">
                   
-                  {/* Маркировки */}
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 md:gap-2">
                     {([
                       { key: 'gostNum' as const, label: t.gostNum, value: result.gostNum },
                       { key: 'gostNum' as const, label: t.gostLet, value: result.gostLetter },
@@ -394,9 +392,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                     ))}
                   </div>
 
-                  {/* Таблица физических параметров */}
                   <div
-                    className="rounded-xl p-2.5"
+                    className="rounded-xl p-2.5 md:p-3.5"
                     style={{
                       background: 'var(--color-bg, #1C1816)',
                       border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
