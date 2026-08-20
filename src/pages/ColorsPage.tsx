@@ -7,11 +7,13 @@ type ColorsPageProps = {
   setLang: (lang: Lang) => void
 }
 
-type Scheme = 'complementary' | 'analogous' | 'triadic' | 'tetradic' | 'monochromatic'
+type Scheme = 'complementary' | 'analogous' | 'triadic' | 'tetradic' | 'monochromatic' | 'grayscale'
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
-  const [baseHue, setBaseHue] = useState(28)
+  const [baseHue, setBaseHue] = useState(30)
+  const [whiteAmount, setWhiteAmount] = useState(0.25) // 0 = pure, 1 = white
+  const [blackAmount, setBlackAmount] = useState(0.15) // 0 = pure, 1 = black
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
 
@@ -36,13 +38,16 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       triadic: 'Триадная',
       tetradic: 'Тетрадная',
       monochromatic: 'Монохромная',
-      baseColor: 'Базовый цвет',
+      grayscale: 'Чёрно-белая',
+      baseColor: 'Круг Оствальда',
       ratio: 'Соотношение на обуви',
       main: 'Основной 60%',
       secondary: 'Вторичный 30%',
       accent: 'Акцент 10%',
       quote: '«Цвет — это душа обуви.»',
-      drag: 'Крути круг',
+      white: 'К белому',
+      black: 'К чёрному',
+      pure: 'Чистый цвет',
     },
     uk: {
       title: 'Кольори та оздоблення',
@@ -52,60 +57,81 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       triadic: 'Тріадна',
       tetradic: 'Тетрадна',
       monochromatic: 'Монохромна',
-      baseColor: 'Базовий колір',
+      grayscale: 'Чорно-біла',
+      baseColor: 'Коло Оствальда',
       ratio: 'Співвідношення на взутті',
       main: 'Основний 60%',
       secondary: 'Вторинний 30%',
       accent: 'Акцент 10%',
       quote: '«Колір — це душа взуття.»',
-      drag: 'Крути коло',
+      white: 'До білого',
+      black: 'До чорного',
+      pure: 'Чистий колір',
     },
   }[lang]
 
-  const getColors = (hue: number, sch: Scheme) => {
-    const h = ((hue % 360) + 360) % 360
+  // Оствальд: цвет = чистый + белый + чёрный
+  const makeOstwaldColor = (hue: number, white: number, black: number, sat = 55) => {
+    // Упрощённая модель Оствальда
+    const lightness = 50 * (1 - black) * (1 - white * 0.7) + white * 45
+    const saturation = sat * (1 - white) * (1 - black * 0.8)
+    return `hsl(${hue}, ${Math.max(5, saturation)}%, ${Math.max(8, Math.min(92, lightness))}%)`
+  }
 
-    switch (sch) {
+  const getColors = () => {
+    const h = ((baseHue % 360) + 360) % 360
+
+    if (scheme === 'grayscale') {
+      return {
+        main: `hsl(0, 0%, 22%)`,
+        secondary: `hsl(0, 0%, 78%)`,
+        accent: `hsl(0, 0%, 8%)`,
+      }
+    }
+
+    if (scheme === 'monochromatic') {
+      return {
+        main: makeOstwaldColor(h, whiteAmount * 0.3, blackAmount + 0.25, 40),
+        secondary: makeOstwaldColor(h, whiteAmount + 0.45, blackAmount * 0.3, 25),
+        accent: makeOstwaldColor(h, whiteAmount * 0.1, blackAmount + 0.55, 35),
+      }
+    }
+
+    switch (scheme) {
       case 'complementary':
         return {
-          main: `hsl(${h}, 48%, 32%)`,
-          secondary: `hsl(${(h + 180) % 360}, 42%, 42%)`,
-          accent: `hsl(${(h + 180) % 360}, 65%, 58%)`,
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.7, blackAmount * 0.6),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.2, blackAmount * 0.3, 70),
         }
       case 'analogous':
         return {
-          main: `hsl(${h}, 48%, 32%)`,
-          secondary: `hsl(${(h + 28) % 360}, 44%, 40%)`,
-          accent: `hsl(${(h - 28 + 360) % 360}, 55%, 52%)`,
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 30) % 360, whiteAmount * 0.8, blackAmount * 0.5),
+          accent: makeOstwaldColor((h - 30 + 360) % 360, whiteAmount * 0.3, blackAmount * 0.4, 65),
         }
       case 'triadic':
         return {
-          main: `hsl(${h}, 48%, 32%)`,
-          secondary: `hsl(${(h + 120) % 360}, 44%, 40%)`,
-          accent: `hsl(${(h + 240) % 360}, 58%, 52%)`,
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.7, blackAmount * 0.5),
+          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.25, blackAmount * 0.35, 65),
         }
       case 'tetradic':
         return {
-          main: `hsl(${h}, 48%, 32%)`,
-          secondary: `hsl(${(h + 90) % 360}, 44%, 40%)`,
-          accent: `hsl(${(h + 180) % 360}, 58%, 52%)`,
-        }
-      case 'monochromatic':
-        return {
-          main: `hsl(${h}, 42%, 28%)`,
-          secondary: `hsl(${h}, 36%, 42%)`,
-          accent: `hsl(${h}, 52%, 58%)`,
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.7, blackAmount * 0.5),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.25, blackAmount * 0.35, 65),
         }
       default:
         return {
-          main: `hsl(${h}, 48%, 32%)`,
-          secondary: `hsl(${(h + 180) % 360}, 42%, 42%)`,
-          accent: `hsl(${(h + 180) % 360}, 65%, 58%)`,
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.7, blackAmount * 0.6),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.2, blackAmount * 0.3, 70),
         }
     }
   }
 
-  const colors = getColors(baseHue, scheme)
+  const colors = getColors()
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
@@ -173,12 +199,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       {/* Content */}
       <div className="flex-1 px-5 overflow-y-auto pb-8 overscroll-none">
+
         {/* Схемы */}
         <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
           {t.schemes}
         </p>
         <div className="flex flex-wrap gap-2 mb-5">
-          {(['complementary', 'analogous', 'triadic', 'tetradic', 'monochromatic'] as Scheme[]).map((s) => (
+          {(['complementary', 'analogous', 'triadic', 'tetradic', 'monochromatic', 'grayscale'] as Scheme[]).map((s) => (
             <button
               key={s}
               onClick={() => setScheme(s)}
@@ -193,43 +220,96 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           ))}
         </div>
 
-        {/* Цветовой круг */}
+        {/* Круг Оствальда */}
         <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
-          {t.baseColor} · {t.drag}
+          {t.baseColor}
         </p>
-        <div className="flex justify-center mb-6">
+
+        <div className="flex justify-center mb-4">
           <div
             ref={wheelRef}
-            className="relative w-[220px] h-[220px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
+            className="relative w-[230px] h-[230px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
             style={{
               background: `conic-gradient(
                 from 0deg,
-                hsl(0, 70%, 50%),
-                hsl(60, 70%, 50%),
-                hsl(120, 70%, 50%),
-                hsl(180, 70%, 50%),
-                hsl(240, 70%, 50%),
-                hsl(300, 70%, 50%),
-                hsl(360, 70%, 50%)
+                hsl(0, 75%, 50%),
+                hsl(30, 75%, 50%),
+                hsl(60, 75%, 50%),
+                hsl(90, 75%, 50%),
+                hsl(120, 75%, 50%),
+                hsl(150, 75%, 50%),
+                hsl(180, 75%, 50%),
+                hsl(210, 75%, 50%),
+                hsl(240, 75%, 50%),
+                hsl(270, 75%, 50%),
+                hsl(300, 75%, 50%),
+                hsl(330, 75%, 50%),
+                hsl(360, 75%, 50%)
               )`,
-              boxShadow: '0 0 0 8px var(--color-surface), 0 8px 32px rgba(0,0,0,0.4)',
+              boxShadow: '0 0 0 10px var(--color-surface), 0 10px 40px rgba(0,0,0,0.45)',
             }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
-            <div className="absolute inset-[28%] rounded-full bg-[var(--color-bg,#1C1816)] border border-[var(--color-border,rgba(255,255,255,0.15))]" />
+            {/* Центральный круг (сечение Оствальда) */}
             <div
-              className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md"
+              className="absolute inset-[26%] rounded-full border border-white/20"
+              style={{
+                background: `radial-gradient(circle at 50% 30%, 
+                  white 0%, 
+                  hsl(${baseHue}, 60%, 55%) 45%, 
+                  black 100%)`,
+              }}
+            />
+            {/* Указатель */}
+            <div
+              className="absolute top-1.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full border-2 border-white shadow-lg"
               style={{
                 backgroundColor: `hsl(${baseHue}, 70%, 50%)`,
                 transform: `translateX(-50%) rotate(${baseHue}deg)`,
-                transformOrigin: '50% 102px',
+                transformOrigin: '50% 107px',
               }}
             />
           </div>
         </div>
+
+        {/* Ползунки Оствальда (белый / чёрный) */}
+        {scheme !== 'grayscale' && (
+          <div className="space-y-4 mb-6">
+            <div>
+              <div className="flex justify-between text-[12px] mb-1.5 text-[var(--color-muted,#B9ACA0)]">
+                <span>{t.pure}</span>
+                <span>{t.white}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={whiteAmount}
+                onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
+                className="w-full accent-[var(--color-accent,#E4D00A)]"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-[12px] mb-1.5 text-[var(--color-muted,#B9ACA0)]">
+                <span>{t.pure}</span>
+                <span>{t.black}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={blackAmount}
+                onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
+                className="w-full accent-[var(--color-accent,#E4D00A)]"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Соотношение цветов */}
         <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
@@ -261,8 +341,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-
-            {/* Основная часть (upper) */}
+            {/* Основная часть */}
             <path
               d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
               fill={colors.main}
@@ -270,7 +349,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-
             {/* Носок */}
             <path
               d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
@@ -279,7 +357,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-
             {/* Пятка */}
             <path
               d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
@@ -288,7 +365,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               strokeWidth="3"
               strokeLinejoin="round"
             />
-
             {/* Шнурки */}
             <path
               d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
@@ -308,4 +384,4 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
     </div>
   )
- }
+}
