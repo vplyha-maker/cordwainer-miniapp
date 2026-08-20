@@ -52,32 +52,10 @@ function rgbToHsl(r: number, g: number, b: number) {
   return { h: h * 360, s, l }
 }
 
-function hslToHex(h: number, s: number, l: number): string {
-  h = ((h % 360) + 360) % 360
-  s = Math.max(0, Math.min(1, s))
-  l = Math.max(0, Math.min(1, l))
-
-  const c = (1 - Math.abs(2 * l - 1)) * s
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = l - c / 2
-  let r = 0, g = 0, b = 0
-
-  if (h < 60) { r = c; g = x; b = 0 }
-  else if (h < 120) { r = x; g = c; b = 0 }
-  else if (h < 180) { r = 0; g = c; b = x }
-  else if (h < 240) { r = 0; g = x; b = c }
-  else if (h < 300) { r = x; g = 0; b = c }
-  else { r = c; g = 0; b = x }
-
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
-  return `#\( {toHex(r)} \){toHex(g)}${toHex(b)}`
-}
-
 function mixWithWhiteBlack(hex: string, white: number, black: number): string {
   const rgb = hexToRgb(hex)
   if (!rgb) return hex
 
-  // white → к белому, black → к чёрному
   let { r, g, b } = rgb
   r = r * (1 - white) + 255 * white
   g = g * (1 - white) + 255 * white
@@ -161,12 +139,10 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
     },
   }[lang]
 
-  // Пигменты, у которых уже есть hex
   const readyPigments = useMemo(() => {
     return pigments.filter((p) => p.hex && p.hex.length >= 6)
   }, [pigments])
 
-  // Находим ближайший пигмент по hue
   const findNearestPigment = useCallback((targetHue: number): Pigment | null => {
     if (readyPigments.length === 0) return null
 
@@ -191,7 +167,6 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
     return findNearestPigment(baseHue)
   }, [baseHue, findNearestPigment])
 
-  // ========== Ахроматика ==========
   const getAchromaticColors = (base: number) => {
     const clamp = (v: number) => Math.max(4, Math.min(96, Math.round(v)))
     return {
@@ -206,7 +181,6 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
       return getAchromaticColors(baseLightness)
     }
 
-    // Если пигменты ещё не загружены — fallback на HSL
     if (!nearestPigment?.hex) {
       const h = baseHue
       return {
@@ -217,11 +191,8 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
     }
 
     const baseHex = nearestPigment.hex
-
-    // Основной цвет — выбранный пигмент + ползунки
     const main = mixWithWhiteBlack(baseHex, whiteAmount, blackAmount)
 
-    // Для остальных схем ищем пигменты по сдвинутому hue
     const getShifted = (shift: number, w = whiteAmount * 0.6, b = blackAmount * 0.5) => {
       const target = (baseHue + shift + 360) % 360
       const p = findNearestPigment(target)
@@ -418,7 +389,7 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
             </div>
           </div>
 
-          {/* Название текущего пигмента */}
+          {/* Название пигмента */}
           {nearestPigment && scheme !== 'grayscale' && (
             <p className="text-center text-[12px] text-[var(--color-muted,#B9ACA0)] mb-3">
               {t.pigment}: {nearestPigment.name[lang] || nearestPigment.name.ru}
@@ -471,24 +442,53 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
             </div>
           </div>
 
-          {/* Кроссовок */}
+          {/* Твой SVG кроссовок */}
           <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-4 flex justify-center">
-            <svg viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg" width="100%" height="150" style={{ maxWidth: 340 }}>
-              <path d="M 60 250 L 420 250 C 450 250 470 240 475 225 C 480 215 470 210 450 210 L 80 210 C 60 210 50 220 50 235 Z" fill={colors.secondary} stroke="#1A1A1A" strokeWidth="3" strokeLinejoin="round"/>
-              <path d="M 50 235 L 450 210 C 460 210 465 215 460 220 L 70 235 C 55 235 50 235 50 235 Z" fill={colors.secondary} opacity="0.8" stroke="#1A1A1A" strokeWidth="2"/>
-              <path d="M 90 210 L 85 140 C 95 110 120 90 150 85 L 240 90 C 280 110 320 140 360 170 C 400 200 450 205 450 205 L 90 210 Z" fill={colors.main} stroke="#1A1A1A" strokeWidth="3" strokeLinejoin="round"/>
-              <path d="M 360 170 C 400 200 450 205 450 205 L 440 160 C 400 150 380 160 360 170 Z" fill={colors.secondary} stroke="#1A1A1A" strokeWidth="3" strokeLinejoin="round"/>
-              <path d="M 90 210 L 85 140 C 110 140 120 160 120 210 Z" fill={colors.secondary} stroke="#1A1A1A" strokeWidth="3" strokeLinejoin="round"/>
-              <path d="M 140 110 L 250 95 L 230 140 L 130 145 Z" fill={colors.secondary} stroke="#1A1A1A" strokeWidth="2.5" strokeLinejoin="round"/>
-              <g stroke="#1A1A1A" strokeWidth="3.5" strokeLinecap="round">
-                <line x1="145" y1="112" x2="165" y2="138" stroke={colors.accent} strokeWidth="5"/>
-                <line x1="165" y1="108" x2="185" y2="135" stroke={colors.accent} strokeWidth="5"/>
-                <line x1="185" y1="104" x2="205" y2="132" stroke={colors.accent} strokeWidth="5"/>
-                <line x1="205" y1="100" x2="225" y2="128" stroke={colors.accent} strokeWidth="5"/>
-              </g>
-              <g transform="translate(215, 145) scale(0.85)">
-                <path d="M 0 22 C 8 8 22 3 40 0 C 28 14 20 24 6 35 C 14 26 22 22 32 22 C 18 30 10 35 0 40 Z" fill={colors.accent} stroke="#1A1A1A" strokeWidth="2" strokeLinejoin="round"/>
-              </g>
+            <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="150" style={{ maxWidth: 320 }}>
+              {/* Подошва */}
+              <path
+                d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
+                fill={colors.secondary}
+                stroke="#111111"
+                strokeWidth="4"
+                strokeLinejoin="round"
+              />
+
+              {/* Основная часть */}
+              <path
+                d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
+                fill={colors.main}
+                stroke="#111111"
+                strokeWidth="4"
+                strokeLinejoin="round"
+              />
+
+              {/* Носок */}
+              <path
+                d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
+                fill={colors.secondary}
+                stroke="#111111"
+                strokeWidth="4"
+                strokeLinejoin="round"
+              />
+
+              {/* Пятка */}
+              <path
+                d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
+                fill={colors.secondary}
+                stroke="#111111"
+                strokeWidth="4"
+                strokeLinejoin="round"
+              />
+
+              {/* Шнурки */}
+              <path
+                d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
+                fill={colors.accent}
+                stroke="#111111"
+                strokeWidth="3"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
 
