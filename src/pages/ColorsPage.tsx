@@ -51,10 +51,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       monochromatic: 'Монохромная',
       baseColor: 'Круг Иттена',
       ratio: 'Соотношение',
-      main: '60%',
-      secondary: '30%',
+      main: '55%',
+      secondary: '20%',
+      secondary2: '15%',
       accent: '10%',
-      quarter: '25%',
       quote: '«Цвет — это душа обуви.»',
       white: 'К белому',
       black: 'К чёрному',
@@ -72,10 +72,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       monochromatic: 'Монохромна',
       baseColor: 'Коло Іттена',
       ratio: 'Співвідношення',
-      main: '60%',
-      secondary: '30%',
+      main: '55%',
+      secondary: '20%',
+      secondary2: '15%',
       accent: '10%',
-      quarter: '25%',
       quote: '«Колір — це душа взуття.»',
       white: 'До білого',
       black: 'До чорного',
@@ -127,12 +127,18 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           makeIttenColor((h + 240) % 360, whiteAmount * 0.15, blackAmount * 0.25, 72),
         ]
       case 'tetradic':
-        // Classic Itten tetrad (rectangle): 4 hues at 90° intervals
+        // Itten Square tetrad: 4 colors exactly 90° (3 sectors) apart
+        // Balance: Dominant \~55% | Support1 \~20% | Support2 \~15% | Accent \~10%
+        // Secondary colors muted so the scheme doesn't become too flashy
         return [
-          makeIttenColor(h, whiteAmount, blackAmount),
-          makeIttenColor((h + 90) % 360, whiteAmount * 0.55, blackAmount * 0.4),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.2, blackAmount * 0.25, 70),
-          makeIttenColor((h + 270) % 360, whiteAmount * 0.45, blackAmount * 0.35),
+          // 1. Main (dominant)
+          makeIttenColor(h, whiteAmount, blackAmount, 70),
+          // 2. Secondary support (h+90) — slightly muted
+          makeIttenColor((h + 90) % 360, whiteAmount * 0.55 + 0.12, blackAmount * 0.45 + 0.08, 55),
+          // 3. Secondary support (h+180) — complementary pair, more muted
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.5 + 0.15, blackAmount * 0.4 + 0.1, 50),
+          // 4. Accent (h+270) — purest and brightest for small details
+          makeIttenColor((h + 270) % 360, whiteAmount * 0.1, blackAmount * 0.15, 78),
         ]
       case 'split-complementary':
         return [
@@ -216,10 +222,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const pointerAngle = baseHue
 
-  // Ratio labels depending on scheme
+  // Ratio labels: for tetradic follow Itten balance rules
   const ratioLabels = isTetradic
-    ? [t.quarter, t.quarter, t.quarter, t.quarter]
-    : [t.main, t.secondary, t.accent]
+    ? [t.main, t.secondary, t.secondary2, t.accent] // 55 / 20 / 15 / 10
+    : [t.main, t.secondary, t.accent]               // \~60 / 30 / 10
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -365,7 +371,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
           </div>
 
-          {/* Harmonic colour blocks — 60/30/10 or 25/25/25/25 for tetradic */}
+          {/* Harmonic colour blocks */}
           <div
             className={`grid gap-2 mb-4 ${
               isTetradic ? 'grid-cols-4' : 'grid-cols-3'
@@ -387,17 +393,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             ))}
           </div>
 
-          {/* Continuous proportional bar (visual harmony) */}
+          {/* Continuous proportional bar according to Itten balance */}
           <div className="rounded-2xl overflow-hidden mb-4 border border-[var(--color-border,rgba(255,255,255,0.12))] h-14 flex">
             {colors.map((c, i) => {
-              const flex =
-                isTetradic
-                  ? 1
-                  : i === 0
-                    ? 6
-                    : i === 1
-                      ? 3
-                      : 1
+              // Tetradic: 55 / 20 / 15 / 10  → flex 11 / 4 / 3 / 2
+              // Others:   60 / 30 / 10     → flex 6 / 3 / 1
+              const flex = isTetradic
+                ? [11, 4, 3, 2][i]
+                : [6, 3, 1][i]
               return (
                 <div
                   key={i}
@@ -424,4 +427,4 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
     </div>
   )
-}
+ }
