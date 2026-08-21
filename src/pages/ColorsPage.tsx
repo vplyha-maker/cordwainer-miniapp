@@ -1,12 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Lang } from '../App'
-import type { Pigment } from '../data/pigments'
 
 type ColorsPageProps = {
   onBack: () => void
   lang: Lang
   setLang: (lang: Lang) => void
-  pigments: Pigment[]
 }
 
 type Scheme =
@@ -18,63 +16,12 @@ type Scheme =
   | 'monochromatic'
   | 'grayscale'
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : null
-}
-
-function rgbToHsl(r: number, g: number, b: number) {
-  r /= 255
-  g /= 255
-  b /= 255
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  let h = 0
-  let s = 0
-  const l = (max + min) / 2
-
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break
-      case g: h = ((b - r) / d + 2) / 6; break
-      case b: h = ((r - g) / d + 4) / 6; break
-    }
-  }
-  return { h: h * 360, s, l }
-}
-
-function mixWithWhiteBlack(hex: string, white: number, black: number): string {
-  const rgb = hexToRgb(hex)
-  if (!rgb) return hex
-
-  let { r, g, b } = rgb
-  r = r * (1 - white) + 255 * white
-  g = g * (1 - white) + 255 * white
-  b = b * (1 - white) + 255 * white
-
-  r = r * (1 - black)
-  g = g * (1 - black)
-  b = b * (1 - black)
-
-  const toHex = (v: number) =>
-    Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')
-  return `#\( {toHex(r)} \){toHex(g)}${toHex(b)}`
-}
-
-export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps) {
+export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
   const [baseHue, setBaseHue] = useState(30)
-  const [whiteAmount, setWhiteAmount] = useState(0.02)
-  const [blackAmount, setBlackAmount] = useState(0.05)
-  const [baseLightness, setBaseLightness] = useState(35)
+  const [whiteAmount, setWhiteAmount] = useState(0.2)
+  const [blackAmount, setBlackAmount] = useState(0.15)
+  const [achromaticLightness, setAchromaticLightness] = useState(35) // для Ч/Б режима
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -114,7 +61,6 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
       white: 'К белому',
       black: 'К чёрному',
       pure: 'Чистый',
-      pigment: 'Пигмент',
     },
     uk: {
       title: 'Кольори та оздоблення',
@@ -135,173 +81,153 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
       white: 'До білого',
       black: 'До чорного',
       pure: 'Чистий',
-      pigment: 'Пігмент',
     },
   }[lang]
 
-  const readyPigments = useMemo(() => {
-    return pigments.filter((p) => p.hex && p.hex.length >= 6)
-  }, [pigments])
-
-  const findNearestPigment = useCallback(
-    (targetHue: number): Pigment | null => {
-      if (readyPigments.length === 0) return null
-
-      let best: Pigment | null = null
-      let bestDiff = 999
-
-      for (const p of readyPigments) {
-        const rgb = hexToRgb(p.hex!)
-        if (!rgb) continue
-        const { h } = rgbToHsl(rgb.r, rgb.g, rgb.b)
-        let diff = Math.abs(h - targetHue)
-        if (diff > 180) diff = 360 - diff
-        if (diff < bestDiff) {
-          bestDiff = diff
-          best = p
-        }
-      }
-      return best
-    },
-    [readyPigments]
-  )
-
-  const nearestPigment = useMemo(() => {
-    return findNearestPigment(baseHue)
-  }, [baseHue, findNearestPigment])
-
-  const getAchromaticColors = (base: number) => {
-    const clamp = (v: number) => Math.max(4, Math.min(96, Math.round(v)))
-    return {
-      main: `hsl(0, 0%, ${clamp(base)}%)`,
-      secondary: `hsl(0, 0%, ${clamp(100 - base)}%)`,
-      accent: `hsl(0, 0%, ${base > 50 ? 10 : 90}%)`,
-    }
+  const makeOstwaldColor = (
+    hue: number,
+    white: number,
+    black: number,
+    satBase = 58
+  ): string => {
+    const lightness = 48 * (1 - black) * (1 - white * 0.65) + white * 42
+    const saturation = satBase * (1 - white * 0.9) * (1 - black * 0.75)
+    return `hsl(${hue}, ${Math.max(4, Math.min(80, saturation))}%, ${Math.max(7, Math.min(93, lightness))}%)`
   }
 
   const getColors = useCallback(() => {
     if (scheme === 'grayscale') {
-      return getAchromaticColors(baseLightness)
-    }
+      // Ахроматический режим
+      const mainL = achromaticLightness
+      const secondaryL = mainL > 50 ? Math.max(12, mainL - 45) : Math.min(88, mainL + 45)
+      const accentL = mainL > 50 ? Math.max(5, mainL - 60) : Math.min(70, mainL + 25)
 
-    // Надёжный HSL fallback
-    const h = ((baseHue % 360) + 360) % 360
-    const fallback = {
-      main: `hsl(${h}, 70%, 42%)`,
-      secondary: `hsl(${(h + 180) % 360}, 60%, 48%)`,
-      accent: `hsl(${(h + 180) % 360}, 75%, 55%)`,
-    }
-
-    if (!nearestPigment?.hex) return fallback
-
-    const rgb = hexToRgb(nearestPigment.hex)
-    if (!rgb) return fallback
-
-    const baseHex = nearestPigment.hex
-    const main = mixWithWhiteBlack(baseHex, whiteAmount, blackAmount)
-
-    const getShifted = (shift: number, w = whiteAmount * 0.55, b = blackAmount * 0.4) => {
-      const target = (baseHue + shift + 360) % 360
-      const p = findNearestPigment(target)
-      if (p?.hex && hexToRgb(p.hex)) {
-        return mixWithWhiteBlack(p.hex, w, b)
+      return {
+        main: `hsl(0, 0%, ${mainL}%)`,
+        secondary: `hsl(0, 0%, ${secondaryL}%)`,
+        accent: `hsl(0, 0%, ${accentL}%)`,
       }
-      return `hsl(${target}, 65%, 48%)`
+    }
+
+    const h = ((baseHue % 360) + 360) % 360
+
+    if (scheme === 'monochromatic') {
+      return {
+        main: makeOstwaldColor(h, whiteAmount * 0.25, blackAmount + 0.22, 38),
+        secondary: makeOstwaldColor(h, whiteAmount + 0.4, blackAmount * 0.25, 22),
+        accent: makeOstwaldColor(h, whiteAmount * 0.08, blackAmount + 0.5, 32),
+      }
     }
 
     switch (scheme) {
       case 'complementary':
         return {
-          main,
-          secondary: getShifted(180),
-          accent: getShifted(180, whiteAmount * 0.1, blackAmount * 0.15),
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
         }
       case 'analogous':
         return {
-          main,
-          secondary: getShifted(30),
-          accent: getShifted(-30, whiteAmount * 0.15, blackAmount * 0.25),
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 28) % 360, whiteAmount * 0.7, blackAmount * 0.45),
+          accent: makeOstwaldColor((h - 28 + 360) % 360, whiteAmount * 0.2, blackAmount * 0.35, 62),
         }
       case 'triadic':
         return {
-          main,
-          secondary: getShifted(120),
-          accent: getShifted(240, whiteAmount * 0.12, blackAmount * 0.2),
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.65, blackAmount * 0.45),
+          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
         }
       case 'tetradic':
         return {
-          main,
-          secondary: getShifted(90),
-          accent: getShifted(180, whiteAmount * 0.12, blackAmount * 0.2),
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.65, blackAmount * 0.45),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
         }
       case 'split-complementary':
         return {
-          main,
-          secondary: getShifted(150),
-          accent: getShifted(210, whiteAmount * 0.12, blackAmount * 0.2),
-        }
-      case 'monochromatic':
-        return {
-          main: mixWithWhiteBlack(baseHex, whiteAmount * 0.1, blackAmount + 0.12),
-          secondary: mixWithWhiteBlack(baseHex, whiteAmount + 0.3, blackAmount * 0.15),
-          accent: mixWithWhiteBlack(baseHex, whiteAmount * 0.05, blackAmount + 0.35),
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 150) % 360, whiteAmount * 0.65, blackAmount * 0.5),
+          accent: makeOstwaldColor((h + 210) % 360, whiteAmount * 0.18, blackAmount * 0.3, 66),
         }
       default:
         return {
-          main,
-          secondary: getShifted(180),
-          accent: getShifted(180, 0.1, 0.15),
+          main: makeOstwaldColor(h, whiteAmount, blackAmount),
+          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
+          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
         }
     }
-  }, [scheme, baseHue, whiteAmount, blackAmount, baseLightness, nearestPigment, findNearestPigment])
+  }, [baseHue, whiteAmount, blackAmount, scheme, achromaticLightness])
 
   const colors = getColors()
 
+  // Фон круга зависит от схемы
   const getWheelBackground = () => {
     if (scheme === 'grayscale') {
-      return 'conic-gradient(from 0deg, #ffffff, #d0d0d0, #888, #333, #000, #333, #888, #d0d0d0, #ffffff)'
+      return 'conic-gradient(from 0deg, #ffffff, #d0d0d0, #888888, #333333, #000000, #333333, #888888, #d0d0d0, #ffffff)'
     }
     return `conic-gradient(
       from 0deg,
-      hsl(0, 80%, 50%), hsl(30, 80%, 50%), hsl(60, 80%, 50%),
-      hsl(90, 80%, 50%), hsl(120, 80%, 50%), hsl(150, 80%, 50%),
-      hsl(180, 80%, 50%), hsl(210, 80%, 50%), hsl(240, 80%, 50%),
-      hsl(270, 80%, 50%), hsl(300, 80%, 50%), hsl(330, 80%, 50%), hsl(360, 80%, 50%)
+      hsl(0, 75%, 50%),
+      hsl(30, 75%, 50%),
+      hsl(60, 75%, 50%),
+      hsl(90, 75%, 50%),
+      hsl(120, 75%, 50%),
+      hsl(150, 75%, 50%),
+      hsl(180, 75%, 50%),
+      hsl(210, 75%, 50%),
+      hsl(240, 75%, 50%),
+      hsl(270, 75%, 50%),
+      hsl(300, 75%, 50%),
+      hsl(330, 75%, 50%),
+      hsl(360, 75%, 50%)
     )`
   }
 
-  const updateFromAngle = useCallback(
-    (clientX: number, clientY: number) => {
-      const el = wheelRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      const cx = rect.left + rect.width / 2
-      const cy = rect.top + rect.height / 2
-      const dx = clientX - cx
-      const dy = clientY - cy
-      let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-      angle = (angle + 90 + 360) % 360
+  // Цвет указателя
+  const getPointerColor = () => {
+    if (scheme === 'grayscale') {
+      return `hsl(0, 0%, ${achromaticLightness}%)`
+    }
+    return `hsl(${baseHue}, 70%, 50%)`
+  }
 
-      if (scheme === 'grayscale') {
-        const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
-        pendingValue.current = Math.max(0, Math.min(100, lightness))
-      } else {
-        pendingValue.current = Math.round(angle)
-      }
+  const updateFromAngle = useCallback((clientX: number, clientY: number) => {
+    const el = wheelRef.current
+    if (!el) return
 
-      if (rafId.current === null) {
-        rafId.current = requestAnimationFrame(() => {
-          if (pendingValue.current !== null) {
-            if (scheme === 'grayscale') setBaseLightness(pendingValue.current)
-            else setBaseHue(pendingValue.current)
-            pendingValue.current = null
+    const rect = el.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const dx = clientX - cx
+    const dy = clientY - cy
+
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI)
+    angle = (angle + 90 + 360) % 360
+
+    if (scheme === 'grayscale') {
+      // Преобразуем угол в светлоту 0–100
+      // 0° (верх) = 100% белый, 180° (низ) = 0% чёрный
+      const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
+      pendingValue.current = Math.max(0, Math.min(100, lightness))
+    } else {
+      pendingValue.current = Math.round(angle)
+    }
+
+    if (rafId.current === null) {
+      rafId.current = requestAnimationFrame(() => {
+        if (pendingValue.current !== null) {
+          if (scheme === 'grayscale') {
+            setAchromaticLightness(pendingValue.current)
+          } else {
+            setBaseHue(pendingValue.current)
           }
-          rafId.current = null
-        })
-      }
-    },
-    [scheme]
-  )
+          pendingValue.current = null
+        }
+        rafId.current = null
+      })
+    }
+  }, [scheme])
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
@@ -319,11 +245,10 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
   }
 
-  const pointerAngle = scheme === 'grayscale' ? (100 - baseLightness) * 1.8 : baseHue
-  const pointerColor =
-    scheme === 'grayscale'
-      ? `hsl(0, 0%, ${baseLightness}%)`
-      : nearestPigment?.hex || `hsl(${baseHue}, 80%, 50%)`
+  // Угол для указателя
+  const pointerAngle = scheme === 'grayscale'
+    ? (100 - achromaticLightness) * 1.8
+    : baseHue
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -332,6 +257,7 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
         <h1 className="text-[20px] font-serif font-normal tracking-wide leading-none">
           {t.title}
         </h1>
+
         <div className="flex items-center gap-2">
           <div className="flex rounded-full p-0.5 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
             <button
@@ -347,6 +273,7 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
               UA
             </button>
           </div>
+
           <button
             onClick={onBack}
             className="w-9 h-9 rounded-full flex items-center justify-center bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
@@ -358,20 +285,20 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
         </div>
       </div>
 
+      {/* Content */}
       <div className="flex-1 flex flex-col px-4 overflow-hidden">
-        {/* Схемы */}
+
+        {/* Схемы — горизонтальный скролл */}
         <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
-          {(
-            [
-              'complementary',
-              'analogous',
-              'triadic',
-              'tetradic',
-              'split-complementary',
-              'monochromatic',
-              'grayscale',
-            ] as Scheme[]
-          ).map((s) => (
+          {([
+            'complementary',
+            'analogous',
+            'triadic',
+            'tetradic',
+            'split-complementary',
+            'monochromatic',
+            'grayscale',
+          ] as Scheme[]).map((s) => (
             <button
               key={s}
               onClick={() => setScheme(s)}
@@ -386,9 +313,11 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
           ))}
         </div>
 
+        {/* Основной блок */}
         <div className="flex-1 overflow-y-auto overscroll-none pb-6">
+
           {/* Круг */}
-          <div className="flex justify-center mb-2">
+          <div className="flex justify-center mb-3">
             <div
               ref={wheelRef}
               className="relative w-[200px] h-[200px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
@@ -401,18 +330,23 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
             >
+              {/* Объёмный центр */}
               <div
                 className="absolute inset-[24%] rounded-full"
                 style={{
-                  background: `radial-gradient(circle at 35% 32%, white 0%, ${colors.main} 42%, #111 95%)`,
-                  boxShadow:
-                    'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
+                  background: `radial-gradient(circle at 35% 32%,
+                    white 0%,
+                    ${colors.main} 42%,
+                    #111 95%)`,
+                  boxShadow: 'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
                 }}
               />
+
+              {/* Указатель */}
               <div
                 className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
                 style={{
-                  backgroundColor: pointerColor,
+                  backgroundColor: getPointerColor(),
                   transform: `translateX(-50%) rotate(${pointerAngle}deg)`,
                   transformOrigin: '50% 96px',
                 }}
@@ -420,14 +354,7 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
             </div>
           </div>
 
-          {/* Название пигмента */}
-          {nearestPigment && scheme !== 'grayscale' && (
-            <p className="text-center text-[12px] text-[var(--color-muted,#B9ACA0)] mb-3">
-              {t.pigment}: {nearestPigment.name[lang] || nearestPigment.name.ru}
-            </p>
-          )}
-
-          {/* Ползунки */}
+          {/* Ползунки (только для цветных схем) */}
           {scheme !== 'grayscale' && (
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -466,91 +393,64 @@ export function ColorsPage({ onBack, lang, setLang, pigments }: ColorsPageProps)
           {/* 60/30/10 */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div
-                className="w-full h-8 rounded-md mb-1.5"
-                style={{ backgroundColor: colors.main }}
-              />
+              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.main }} />
               <div className="text-[11px] font-medium text-center">{t.main}</div>
             </div>
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div
-                className="w-full h-8 rounded-md mb-1.5"
-                style={{ backgroundColor: colors.secondary }}
-              />
+              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.secondary }} />
               <div className="text-[11px] font-medium text-center">{t.secondary}</div>
             </div>
             <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div
-                className="w-full h-8 rounded-md mb-1.5"
-                style={{ backgroundColor: colors.accent }}
-              />
+              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.accent }} />
               <div className="text-[11px] font-medium text-center">{t.accent}</div>
             </div>
           </div>
 
-          {/* Твой SVG кроссовок */}
+          {/* Кроссовок */}
           <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-4 flex justify-center">
-            <svg
-              viewBox="0 0 400 250"
-              xmlns="http://www.w3.org/2000/svg"
-              width="100%"
-              height="150"
-              style={{ maxWidth: 320 }}
-            >
-              {/* Подошва */}
+            <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="140" style={{ maxWidth: 300 }}>
               <path
                 d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
                 fill={colors.secondary}
-                stroke="#111111"
-                strokeWidth="4"
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
                 strokeLinejoin="round"
               />
-
-              {/* Основная часть */}
               <path
                 d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
                 fill={colors.main}
-                stroke="#111111"
-                strokeWidth="4"
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
                 strokeLinejoin="round"
               />
-
-              {/* Носок */}
               <path
                 d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
                 fill={colors.secondary}
-                stroke="#111111"
-                strokeWidth="4"
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
                 strokeLinejoin="round"
               />
-
-              {/* Пятка */}
               <path
                 d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
                 fill={colors.secondary}
-                stroke="#111111"
-                strokeWidth="4"
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth="3"
                 strokeLinejoin="round"
               />
-
-              {/* Шнурки */}
               <path
                 d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
                 fill={colors.accent}
-                stroke="#111111"
-                strokeWidth="3"
+                stroke="rgba(0,0,0,0.4)"
+                strokeWidth="2.5"
                 strokeLinejoin="round"
               />
             </svg>
           </div>
 
+          {/* Quote */}
           <div className="rounded-2xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">
-              {t.quote}
-            </p>
-            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">
-              Cordwainer
-            </p>
+            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
+            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
           </div>
         </div>
       </div>
