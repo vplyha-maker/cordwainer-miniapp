@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
@@ -113,7 +113,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-        {/* Состав */}
         <section
           className="rounded-2xl overflow-visible relative z-10"
           style={{ background: 'var(--color-surface, #25201C)' }}
@@ -294,7 +293,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* Результат */}
         <section
           className="rounded-2xl px-4 pt-4 pb-5"
           style={{ background: 'var(--color-surface, #25201C)' }}
@@ -362,7 +360,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
-        {/* Объём */}
         <section
           className="rounded-2xl px-4 py-3.5"
           style={{ background: 'var(--color-surface, #25201C)' }}
