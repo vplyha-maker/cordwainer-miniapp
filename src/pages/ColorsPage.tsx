@@ -12,6 +12,7 @@ type Scheme =
   | 'analogous'
   | 'triadic'
   | 'tetradic'
+  | 'rectangular'
   | 'split-complementary'
   | 'monochromatic'
 
@@ -46,7 +47,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       complementary: 'Комплементарная',
       analogous: 'Аналогичная',
       triadic: 'Триадная',
-      tetradic: 'Тетрадная',
+      tetradic: 'Тетрада (квадрат)',
+      rectangular: 'Тетрада (прямоугольник)',
       'split-complementary': 'Контрастная триада',
       monochromatic: 'Монохромная',
       baseColor: 'Круг Иттена',
@@ -67,7 +69,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       complementary: 'Комплементарна',
       analogous: 'Аналогічна',
       triadic: 'Тріадна',
-      tetradic: 'Тетрадна',
+      tetradic: 'Тетрада (квадрат)',
+      rectangular: 'Тетрада (прямокутник)',
       'split-complementary': 'Контрастна тріада',
       monochromatic: 'Монохромна',
       baseColor: 'Коло Іттена',
@@ -129,7 +132,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       case 'tetradic':
         // Itten Square tetrad: 4 colors exactly 90° (3 sectors) apart
         // Balance: Dominant \~55% | Support1 \~20% | Support2 \~15% | Accent \~10%
-        // Secondary colors muted so the scheme doesn't become too flashy
         return [
           // 1. Main (dominant)
           makeIttenColor(h, whiteAmount, blackAmount, 70),
@@ -139,6 +141,20 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           makeIttenColor((h + 180) % 360, whiteAmount * 0.5 + 0.15, blackAmount * 0.4 + 0.1, 50),
           // 4. Accent (h+270) — purest and brightest for small details
           makeIttenColor((h + 270) % 360, whiteAmount * 0.1, blackAmount * 0.15, 78),
+        ]
+      case 'rectangular':
+        // Itten Rectangle (double complementary): two complementary pairs
+        // shifted by 2 sectors (60°). Softer than the square.
+        // Colors: h, h+60°, h+180°, h+240°
+        return [
+          // 1. Main (dominant)
+          makeIttenColor(h, whiteAmount, blackAmount, 70),
+          // 2. Secondary support (h+60) — slightly muted
+          makeIttenColor((h + 60) % 360, whiteAmount * 0.5 + 0.1, blackAmount * 0.4 + 0.08, 58),
+          // 3. Secondary support (h+180) — complementary of main, more muted
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.5 + 0.15, blackAmount * 0.4 + 0.1, 52),
+          // 4. Accent (h+240) — complementary of the +60° color, brightest
+          makeIttenColor((h + 240) % 360, whiteAmount * 0.1, blackAmount * 0.15, 78),
         ]
       case 'split-complementary':
         return [
@@ -156,7 +172,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }, [baseHue, whiteAmount, blackAmount, scheme])
 
   const colors = getColors()
-  const isTetradic = scheme === 'tetradic'
+  const isTetrad = scheme === 'tetradic' || scheme === 'rectangular'
 
   // Itten 12-sector wheel
   const wheelBackground = `conic-gradient(
@@ -222,8 +238,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const pointerAngle = baseHue
 
-  // Ratio labels: for tetradic follow Itten balance rules
-  const ratioLabels = isTetradic
+  // Ratio labels: both tetrads follow the same Itten balance
+  const ratioLabels = isTetrad
     ? [t.main, t.secondary, t.secondary2, t.accent] // 55 / 20 / 15 / 10
     : [t.main, t.secondary, t.accent]               // \~60 / 30 / 10
 
@@ -273,6 +289,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               'analogous',
               'triadic',
               'tetradic',
+              'rectangular',
               'split-complementary',
               'monochromatic',
             ] as Scheme[]
@@ -374,7 +391,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           {/* Harmonic colour blocks */}
           <div
             className={`grid gap-2 mb-4 ${
-              isTetradic ? 'grid-cols-4' : 'grid-cols-3'
+              isTetrad ? 'grid-cols-4' : 'grid-cols-3'
             }`}
           >
             {colors.map((c, i) => (
@@ -396,9 +413,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           {/* Continuous proportional bar according to Itten balance */}
           <div className="rounded-2xl overflow-hidden mb-4 border border-[var(--color-border,rgba(255,255,255,0.12))] h-14 flex">
             {colors.map((c, i) => {
-              // Tetradic: 55 / 20 / 15 / 10  → flex 11 / 4 / 3 / 2
-              // Others:   60 / 30 / 10     → flex 6 / 3 / 1
-              const flex = isTetradic
+              // Tetrads: 55 / 20 / 15 / 10  → flex 11 / 4 / 3 / 2
+              // Others:  60 / 30 / 10      → flex 6 / 3 / 1
+              const flex = isTetrad
                 ? [11, 4, 3, 2][i]
                 : [6, 3, 1][i]
               return (
@@ -427,4 +444,4 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
     </div>
   )
- }
+}
