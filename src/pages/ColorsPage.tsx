@@ -14,14 +14,12 @@ type Scheme =
   | 'tetradic'
   | 'split-complementary'
   | 'monochromatic'
-  | 'grayscale'
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
   const [baseHue, setBaseHue] = useState(30)
-  const [whiteAmount, setWhiteAmount] = useState(0.2)
-  const [blackAmount, setBlackAmount] = useState(0.15)
-  const [achromaticLightness, setAchromaticLightness] = useState(35) // для Ч/Б режима
+  const [whiteAmount, setWhiteAmount] = useState(0.15)
+  const [blackAmount, setBlackAmount] = useState(0.1)
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -51,16 +49,17 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       tetradic: 'Тетрадная',
       'split-complementary': 'Контрастная триада',
       monochromatic: 'Монохромная',
-      grayscale: 'Чёрно-белая',
-      baseColor: 'Круг Оствальда',
+      baseColor: 'Круг Иттена',
       ratio: 'Соотношение',
       main: '60%',
       secondary: '30%',
       accent: '10%',
+      quarter: '25%',
       quote: '«Цвет — это душа обуви.»',
       white: 'К белому',
       black: 'К чёрному',
       pure: 'Чистый',
+      ittenLabel: 'Круг Иттена',
     },
     uk: {
       title: 'Кольори та оздоблення',
@@ -71,126 +70,107 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       tetradic: 'Тетрадна',
       'split-complementary': 'Контрастна тріада',
       monochromatic: 'Монохромна',
-      grayscale: 'Чорно-біла',
-      baseColor: 'Коло Оствальда',
+      baseColor: 'Коло Іттена',
       ratio: 'Співвідношення',
       main: '60%',
       secondary: '30%',
       accent: '10%',
+      quarter: '25%',
       quote: '«Колір — це душа взуття.»',
       white: 'До білого',
       black: 'До чорного',
       pure: 'Чистий',
+      ittenLabel: 'Коло Іттена',
     },
   }[lang]
 
-  const makeOstwaldColor = (
+  /** Itten-style pure hue → HSL with controlled white/black tint */
+  const makeIttenColor = (
     hue: number,
     white: number,
     black: number,
-    satBase = 58
+    satBase = 72
   ): string => {
-    const lightness = 48 * (1 - black) * (1 - white * 0.65) + white * 42
-    const saturation = satBase * (1 - white * 0.9) * (1 - black * 0.75)
-    return `hsl(${hue}, ${Math.max(4, Math.min(80, saturation))}%, ${Math.max(7, Math.min(93, lightness))}%)`
+    const lightness = 52 * (1 - black) * (1 - white * 0.55) + white * 38
+    const saturation = satBase * (1 - white * 0.85) * (1 - black * 0.7)
+    return `hsl(${((hue % 360) + 360) % 360}, ${Math.max(8, Math.min(85, saturation))}%, ${Math.max(12, Math.min(90, lightness))}%)`
   }
 
-  const getColors = useCallback(() => {
-    if (scheme === 'grayscale') {
-      // Ахроматический режим
-      const mainL = achromaticLightness
-      const secondaryL = mainL > 50 ? Math.max(12, mainL - 45) : Math.min(88, mainL + 45)
-      const accentL = mainL > 50 ? Math.max(5, mainL - 60) : Math.min(70, mainL + 25)
-
-      return {
-        main: `hsl(0, 0%, ${mainL}%)`,
-        secondary: `hsl(0, 0%, ${secondaryL}%)`,
-        accent: `hsl(0, 0%, ${accentL}%)`,
-      }
-    }
-
+  const getColors = useCallback((): string[] => {
     const h = ((baseHue % 360) + 360) % 360
 
     if (scheme === 'monochromatic') {
-      return {
-        main: makeOstwaldColor(h, whiteAmount * 0.25, blackAmount + 0.22, 38),
-        secondary: makeOstwaldColor(h, whiteAmount + 0.4, blackAmount * 0.25, 22),
-        accent: makeOstwaldColor(h, whiteAmount * 0.08, blackAmount + 0.5, 32),
-      }
+      return [
+        makeIttenColor(h, whiteAmount * 0.2, blackAmount + 0.18, 48),
+        makeIttenColor(h, whiteAmount + 0.35, blackAmount * 0.3, 28),
+        makeIttenColor(h, whiteAmount * 0.05, blackAmount + 0.42, 40),
+      ]
     }
 
     switch (scheme) {
       case 'complementary':
-        return {
-          main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
-        }
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.6, blackAmount * 0.5),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.12, blackAmount * 0.2, 78),
+        ]
       case 'analogous':
-        return {
-          main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 28) % 360, whiteAmount * 0.7, blackAmount * 0.45),
-          accent: makeOstwaldColor((h - 28 + 360) % 360, whiteAmount * 0.2, blackAmount * 0.35, 62),
-        }
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount),
+          makeIttenColor((h + 30) % 360, whiteAmount * 0.65, blackAmount * 0.4),
+          makeIttenColor((h - 30 + 360) % 360, whiteAmount * 0.15, blackAmount * 0.3, 70),
+        ]
       case 'triadic':
-        return {
-          main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 120) % 360, whiteAmount * 0.65, blackAmount * 0.45),
-          accent: makeOstwaldColor((h + 240) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
-        }
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount),
+          makeIttenColor((h + 120) % 360, whiteAmount * 0.6, blackAmount * 0.4),
+          makeIttenColor((h + 240) % 360, whiteAmount * 0.15, blackAmount * 0.25, 72),
+        ]
       case 'tetradic':
-        return {
-          main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 90) % 360, whiteAmount * 0.65, blackAmount * 0.45),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.18, blackAmount * 0.3, 64),
-        }
+        // Classic Itten tetrad (rectangle): 4 hues at 90° intervals
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount),
+          makeIttenColor((h + 90) % 360, whiteAmount * 0.55, blackAmount * 0.4),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.2, blackAmount * 0.25, 70),
+          makeIttenColor((h + 270) % 360, whiteAmount * 0.45, blackAmount * 0.35),
+        ]
       case 'split-complementary':
-        return {
-          main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 150) % 360, whiteAmount * 0.65, blackAmount * 0.5),
-          accent: makeOstwaldColor((h + 210) % 360, whiteAmount * 0.18, blackAmount * 0.3, 66),
-        }
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount),
+          makeIttenColor((h + 150) % 360, whiteAmount * 0.6, blackAmount * 0.45),
+          makeIttenColor((h + 210) % 360, whiteAmount * 0.15, blackAmount * 0.25, 74),
+        ]
       default:
-        return {
-          main: makeOstwaldColor(h, whiteAmount, blackAmount),
-          secondary: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.65, blackAmount * 0.55),
-          accent: makeOstwaldColor((h + 180) % 360, whiteAmount * 0.15, blackAmount * 0.25, 68),
-        }
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.6, blackAmount * 0.5),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.12, blackAmount * 0.2, 78),
+        ]
     }
-  }, [baseHue, whiteAmount, blackAmount, scheme, achromaticLightness])
+  }, [baseHue, whiteAmount, blackAmount, scheme])
 
   const colors = getColors()
+  const isTetradic = scheme === 'tetradic'
 
-  // Фон круга зависит от схемы
-  const getWheelBackground = () => {
-    if (scheme === 'grayscale') {
-      return 'conic-gradient(from 0deg, #ffffff, #d0d0d0, #888888, #333333, #000000, #333333, #888888, #d0d0d0, #ffffff)'
-    }
-    return `conic-gradient(
-      from 0deg,
-      hsl(0, 75%, 50%),
-      hsl(30, 75%, 50%),
-      hsl(60, 75%, 50%),
-      hsl(90, 75%, 50%),
-      hsl(120, 75%, 50%),
-      hsl(150, 75%, 50%),
-      hsl(180, 75%, 50%),
-      hsl(210, 75%, 50%),
-      hsl(240, 75%, 50%),
-      hsl(270, 75%, 50%),
-      hsl(300, 75%, 50%),
-      hsl(330, 75%, 50%),
-      hsl(360, 75%, 50%)
-    )`
-  }
+  // Itten 12-sector wheel
+  const wheelBackground = `conic-gradient(
+    from 0deg,
+    hsl(0, 80%, 50%),
+    hsl(30, 80%, 50%),
+    hsl(60, 80%, 50%),
+    hsl(90, 80%, 50%),
+    hsl(120, 80%, 50%),
+    hsl(150, 80%, 50%),
+    hsl(180, 80%, 50%),
+    hsl(210, 80%, 50%),
+    hsl(240, 80%, 50%),
+    hsl(270, 80%, 50%),
+    hsl(300, 80%, 50%),
+    hsl(330, 80%, 50%),
+    hsl(360, 80%, 50%)
+  )`
 
-  // Цвет указателя
-  const getPointerColor = () => {
-    if (scheme === 'grayscale') {
-      return `hsl(0, 0%, ${achromaticLightness}%)`
-    }
-    return `hsl(${baseHue}, 70%, 50%)`
-  }
+  const pointerColor = `hsl(${baseHue}, 75%, 48%)`
 
   const updateFromAngle = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
@@ -205,29 +185,18 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     let angle = Math.atan2(dy, dx) * (180 / Math.PI)
     angle = (angle + 90 + 360) % 360
 
-    if (scheme === 'grayscale') {
-      // Преобразуем угол в светлоту 0–100
-      // 0° (верх) = 100% белый, 180° (низ) = 0% чёрный
-      const lightness = Math.round(Math.abs(100 - (angle / 180) * 100))
-      pendingValue.current = Math.max(0, Math.min(100, lightness))
-    } else {
-      pendingValue.current = Math.round(angle)
-    }
+    pendingValue.current = Math.round(angle)
 
     if (rafId.current === null) {
       rafId.current = requestAnimationFrame(() => {
         if (pendingValue.current !== null) {
-          if (scheme === 'grayscale') {
-            setAchromaticLightness(pendingValue.current)
-          } else {
-            setBaseHue(pendingValue.current)
-          }
+          setBaseHue(pendingValue.current)
           pendingValue.current = null
         }
         rafId.current = null
       })
     }
-  }, [scheme])
+  }, [])
 
   const handlePointerDown = (e: React.PointerEvent) => {
     isDragging.current = true
@@ -245,10 +214,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
   }
 
-  // Угол для указателя
-  const pointerAngle = scheme === 'grayscale'
-    ? (100 - achromaticLightness) * 1.8
-    : baseHue
+  const pointerAngle = baseHue
+
+  // Ratio labels depending on scheme
+  const ratioLabels = isTetradic
+    ? [t.quarter, t.quarter, t.quarter, t.quarter]
+    : [t.main, t.secondary, t.accent]
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -277,6 +248,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           <button
             onClick={onBack}
             className="w-9 h-9 rounded-full flex items-center justify-center bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
+            aria-label="Back"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
@@ -287,18 +259,18 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       {/* Content */}
       <div className="flex-1 flex flex-col px-4 overflow-hidden">
-
-        {/* Схемы — горизонтальный скролл */}
+        {/* Schemes — horizontal scroll */}
         <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
-          {([
-            'complementary',
-            'analogous',
-            'triadic',
-            'tetradic',
-            'split-complementary',
-            'monochromatic',
-            'grayscale',
-          ] as Scheme[]).map((s) => (
+          {(
+            [
+              'complementary',
+              'analogous',
+              'triadic',
+              'tetradic',
+              'split-complementary',
+              'monochromatic',
+            ] as Scheme[]
+          ).map((s) => (
             <button
               key={s}
               onClick={() => setScheme(s)}
@@ -313,16 +285,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           ))}
         </div>
 
-        {/* Основной блок */}
+        {/* Main scrollable area */}
         <div className="flex-1 overflow-y-auto overscroll-none pb-6">
-
-          {/* Круг */}
-          <div className="flex justify-center mb-3">
+          {/* Itten wheel */}
+          <div className="flex flex-col items-center mb-2">
             <div
               ref={wheelRef}
               className="relative w-[200px] h-[200px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
-                background: getWheelBackground(),
+                background: wheelBackground,
                 boxShadow: '0 0 0 8px var(--color-surface), 0 8px 28px rgba(0,0,0,0.4)',
               }}
               onPointerDown={handlePointerDown}
@@ -330,127 +301,124 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
             >
-              {/* Объёмный центр */}
+              {/* Volumetric centre */}
               <div
                 className="absolute inset-[24%] rounded-full"
                 style={{
                   background: `radial-gradient(circle at 35% 32%,
                     white 0%,
-                    ${colors.main} 42%,
+                    ${colors[0]} 42%,
                     #111 95%)`,
-                  boxShadow: 'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
+                  boxShadow:
+                    'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
                 }}
               />
 
-              {/* Указатель */}
+              {/* Pointer */}
               <div
                 className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
                 style={{
-                  backgroundColor: getPointerColor(),
+                  backgroundColor: pointerColor,
                   transform: `translateX(-50%) rotate(${pointerAngle}deg)`,
                   transformOrigin: '50% 96px',
                 }}
               />
             </div>
+
+            {/* Explicit Itten label */}
+            <p className="mt-2 text-[12px] font-medium tracking-wide text-[var(--color-muted,#B9ACA0)]">
+              {t.ittenLabel}
+            </p>
           </div>
 
-          {/* Ползунки (только для цветных схем) */}
-          {scheme !== 'grayscale' && (
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
-                <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
-                  <span>{t.pure}</span>
-                  <span>{t.white}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={whiteAmount}
-                  onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
-                  className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
-                />
+          {/* White / Black tints */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
+                <span>{t.pure}</span>
+                <span>{t.white}</span>
               </div>
-              <div>
-                <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
-                  <span>{t.pure}</span>
-                  <span>{t.black}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={blackAmount}
-                  onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
-                  className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
-                />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={whiteAmount}
+                onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
+                className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
+                <span>{t.pure}</span>
+                <span>{t.black}</span>
               </div>
-            </div>
-          )}
-
-          {/* 60/30/10 */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.main }} />
-              <div className="text-[11px] font-medium text-center">{t.main}</div>
-            </div>
-            <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.secondary }} />
-              <div className="text-[11px] font-medium text-center">{t.secondary}</div>
-            </div>
-            <div className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-              <div className="w-full h-8 rounded-md mb-1.5" style={{ backgroundColor: colors.accent }} />
-              <div className="text-[11px] font-medium text-center">{t.accent}</div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={blackAmount}
+                onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
+                className="w-full accent-[var(--color-accent,#E4D00A)] h-1.5"
+              />
             </div>
           </div>
 
-          {/* Кроссовок */}
-          <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] mb-4 flex justify-center">
-            <svg viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg" width="100%" height="140" style={{ maxWidth: 300 }}>
-              <path
-                d="M 40 200 L 360 200 C 380 200 380 230 360 230 L 40 230 C 20 230 20 200 40 200 Z"
-                fill={colors.secondary}
-                stroke="rgba(0,0,0,0.35)"
-                strokeWidth="3"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M 40 200 L 40 100 C 40 70 70 70 90 70 L 140 100 L 220 100 C 280 100 330 150 360 200 Z"
-                fill={colors.main}
-                stroke="rgba(0,0,0,0.35)"
-                strokeWidth="3"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M 280 160 C 320 160 350 180 360 200 L 280 200 Z"
-                fill={colors.secondary}
-                stroke="rgba(0,0,0,0.35)"
-                strokeWidth="3"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M 40 200 L 40 130 C 70 130 90 160 90 200 Z"
-                fill={colors.secondary}
-                stroke="rgba(0,0,0,0.35)"
-                strokeWidth="3"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M 140 100 L 160 80 L 180 100 L 200 80 L 220 100 L 210 115 L 190 95 L 170 115 L 150 95 Z"
-                fill={colors.accent}
-                stroke="rgba(0,0,0,0.4)"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-              />
-            </svg>
+          {/* Harmonic colour blocks — 60/30/10 or 25/25/25/25 for tetradic */}
+          <div
+            className={`grid gap-2 mb-4 ${
+              isTetradic ? 'grid-cols-4' : 'grid-cols-3'
+            }`}
+          >
+            {colors.map((c, i) => (
+              <div
+                key={i}
+                className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]"
+              >
+                <div
+                  className="w-full h-10 rounded-md mb-1.5"
+                  style={{ backgroundColor: c }}
+                />
+                <div className="text-[11px] font-medium text-center">
+                  {ratioLabels[i]}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Continuous proportional bar (visual harmony) */}
+          <div className="rounded-2xl overflow-hidden mb-4 border border-[var(--color-border,rgba(255,255,255,0.12))] h-14 flex">
+            {colors.map((c, i) => {
+              const flex =
+                isTetradic
+                  ? 1
+                  : i === 0
+                    ? 6
+                    : i === 1
+                      ? 3
+                      : 1
+              return (
+                <div
+                  key={i}
+                  style={{
+                    backgroundColor: c,
+                    flex,
+                  }}
+                  className="h-full transition-colors duration-200"
+                />
+              )
+            })}
           </div>
 
           {/* Quote */}
           <div className="rounded-2xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
-            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
+            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">
+              {t.quote}
+            </p>
+            <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">
+              Cordwainer
+            </p>
           </div>
         </div>
       </div>
