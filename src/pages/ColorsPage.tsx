@@ -18,9 +18,9 @@ type Scheme =
 
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
-  const [baseHue, setBaseHue] = useState(30)
-  const [whiteAmount, setWhiteAmount] = useState(0.15)
-  const [blackAmount, setBlackAmount] = useState(0.1)
+  const [baseHue, setBaseHue] = useState(0) // start at pure red
+  const [whiteAmount, setWhiteAmount] = useState(0.05)
+  const [blackAmount, setBlackAmount] = useState(0.05)
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -53,10 +53,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       monochromatic: 'Монохромная',
       baseColor: 'Круг Иттена',
       ratio: 'Соотношение',
-      main: '55%',
-      secondary: '20%',
-      secondary2: '15%',
-      accent: '10%',
+      main60: '60%',
+      secondary30: '30%',
+      accent10: '10%',
+      main55: '55%',
+      secondary20: '20%',
+      secondary15: '15%',
       quote: '«Цвет — это душа обуви.»',
       white: 'К белому',
       black: 'К чёрному',
@@ -75,10 +77,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       monochromatic: 'Монохромна',
       baseColor: 'Коло Іттена',
       ratio: 'Співвідношення',
-      main: '55%',
-      secondary: '20%',
-      secondary2: '15%',
-      accent: '10%',
+      main60: '60%',
+      secondary30: '30%',
+      accent10: '10%',
+      main55: '55%',
+      secondary20: '20%',
+      secondary15: '15%',
       quote: '«Колір — це душа взуття.»',
       white: 'До білого',
       black: 'До чорного',
@@ -87,16 +91,28 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
-  /** Itten-style pure hue → HSL with controlled white/black tint */
+  /**
+   * Improved Itten color maker.
+   * Pure hues stay vibrant (especially red).
+   * white / black only gently desaturate and shift lightness.
+   */
   const makeIttenColor = (
     hue: number,
     white: number,
     black: number,
-    satBase = 72
+    satBase = 85
   ): string => {
-    const lightness = 52 * (1 - black) * (1 - white * 0.55) + white * 38
-    const saturation = satBase * (1 - white * 0.85) * (1 - black * 0.7)
-    return `hsl(${((hue % 360) + 360) % 360}, ${Math.max(8, Math.min(85, saturation))}%, ${Math.max(12, Math.min(90, lightness))}%)`
+    // Keep pure colors bright and saturated
+    const sat = Math.max(
+      12,
+      Math.min(92, satBase * (1 - white * 0.75) * (1 - black * 0.55))
+    )
+    // Lightness stays in a pleasant range for pure hues (\~48–55)
+    const light = Math.max(
+      18,
+      Math.min(88, 50 * (1 - black * 0.9) * (1 - white * 0.45) + white * 42)
+    )
+    return `hsl(${((hue % 360) + 360) % 360}, ${sat.toFixed(1)}%, ${light.toFixed(1)}%)`
   }
 
   const getColors = useCallback((): string[] => {
@@ -104,69 +120,61 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
     if (scheme === 'monochromatic') {
       return [
-        makeIttenColor(h, whiteAmount * 0.2, blackAmount + 0.18, 48),
-        makeIttenColor(h, whiteAmount + 0.35, blackAmount * 0.3, 28),
-        makeIttenColor(h, whiteAmount * 0.05, blackAmount + 0.42, 40),
+        // Main – almost pure
+        makeIttenColor(h, whiteAmount * 0.15, blackAmount * 0.3, 82),
+        // Lighter support
+        makeIttenColor(h, whiteAmount + 0.45, blackAmount * 0.2, 45),
+        // Darker accent
+        makeIttenColor(h, whiteAmount * 0.05, blackAmount + 0.35, 70),
       ]
     }
 
     switch (scheme) {
       case 'complementary':
         return [
-          makeIttenColor(h, whiteAmount, blackAmount),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.6, blackAmount * 0.5),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.12, blackAmount * 0.2, 78),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.55, blackAmount * 0.45, 78),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.1, blackAmount * 0.15, 88),
         ]
       case 'analogous':
         return [
-          makeIttenColor(h, whiteAmount, blackAmount),
-          makeIttenColor((h + 30) % 360, whiteAmount * 0.65, blackAmount * 0.4),
-          makeIttenColor((h - 30 + 360) % 360, whiteAmount * 0.15, blackAmount * 0.3, 70),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 30) % 360, whiteAmount * 0.6, blackAmount * 0.35, 80),
+          makeIttenColor((h - 30 + 360) % 360, whiteAmount * 0.15, blackAmount * 0.25, 86),
         ]
       case 'triadic':
         return [
-          makeIttenColor(h, whiteAmount, blackAmount),
-          makeIttenColor((h + 120) % 360, whiteAmount * 0.6, blackAmount * 0.4),
-          makeIttenColor((h + 240) % 360, whiteAmount * 0.15, blackAmount * 0.25, 72),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 120) % 360, whiteAmount * 0.55, blackAmount * 0.4, 80),
+          makeIttenColor((h + 240) % 360, whiteAmount * 0.12, blackAmount * 0.2, 86),
         ]
       case 'tetradic':
-        // Itten Square tetrad: 4 colors exactly 90° (3 sectors) apart
-        // Balance: Dominant \~55% | Support1 \~20% | Support2 \~15% | Accent \~10%
+        // Square: 90° intervals
         return [
-          // 1. Main (dominant)
-          makeIttenColor(h, whiteAmount, blackAmount, 70),
-          // 2. Secondary support (h+90) — slightly muted
-          makeIttenColor((h + 90) % 360, whiteAmount * 0.55 + 0.12, blackAmount * 0.45 + 0.08, 55),
-          // 3. Secondary support (h+180) — complementary pair, more muted
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.5 + 0.15, blackAmount * 0.4 + 0.1, 50),
-          // 4. Accent (h+270) — purest and brightest for small details
-          makeIttenColor((h + 270) % 360, whiteAmount * 0.1, blackAmount * 0.15, 78),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 90) % 360, whiteAmount * 0.5 + 0.1, blackAmount * 0.4 + 0.05, 72),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.45 + 0.12, blackAmount * 0.35 + 0.08, 68),
+          makeIttenColor((h + 270) % 360, whiteAmount * 0.08, blackAmount * 0.12, 88),
         ]
       case 'rectangular':
-        // Itten Rectangle (double complementary): two complementary pairs
-        // shifted by 2 sectors (60°). Softer than the square.
-        // Colors: h, h+60°, h+180°, h+240°
+        // Rectangle (double complementary): h, h+60, h+180, h+240
         return [
-          // 1. Main (dominant)
-          makeIttenColor(h, whiteAmount, blackAmount, 70),
-          // 2. Secondary support (h+60) — slightly muted
-          makeIttenColor((h + 60) % 360, whiteAmount * 0.5 + 0.1, blackAmount * 0.4 + 0.08, 58),
-          // 3. Secondary support (h+180) — complementary of main, more muted
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.5 + 0.15, blackAmount * 0.4 + 0.1, 52),
-          // 4. Accent (h+240) — complementary of the +60° color, brightest
-          makeIttenColor((h + 240) % 360, whiteAmount * 0.1, blackAmount * 0.15, 78),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 60) % 360, whiteAmount * 0.45 + 0.08, blackAmount * 0.35 + 0.05, 75),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.45 + 0.12, blackAmount * 0.35 + 0.08, 70),
+          makeIttenColor((h + 240) % 360, whiteAmount * 0.08, blackAmount * 0.12, 88),
         ]
       case 'split-complementary':
         return [
-          makeIttenColor(h, whiteAmount, blackAmount),
-          makeIttenColor((h + 150) % 360, whiteAmount * 0.6, blackAmount * 0.45),
-          makeIttenColor((h + 210) % 360, whiteAmount * 0.15, blackAmount * 0.25, 74),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 150) % 360, whiteAmount * 0.55, blackAmount * 0.4, 80),
+          makeIttenColor((h + 210) % 360, whiteAmount * 0.12, blackAmount * 0.2, 86),
         ]
       default:
         return [
-          makeIttenColor(h, whiteAmount, blackAmount),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.6, blackAmount * 0.5),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.12, blackAmount * 0.2, 78),
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.55, blackAmount * 0.45, 78),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.1, blackAmount * 0.15, 88),
         ]
     }
   }, [baseHue, whiteAmount, blackAmount, scheme])
@@ -174,25 +182,25 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const colors = getColors()
   const isTetrad = scheme === 'tetradic' || scheme === 'rectangular'
 
-  // Itten 12-sector wheel
+  // Itten 12-sector wheel – pure vivid hues
   const wheelBackground = `conic-gradient(
     from 0deg,
-    hsl(0, 80%, 50%),
-    hsl(30, 80%, 50%),
-    hsl(60, 80%, 50%),
-    hsl(90, 80%, 50%),
-    hsl(120, 80%, 50%),
-    hsl(150, 80%, 50%),
-    hsl(180, 80%, 50%),
-    hsl(210, 80%, 50%),
-    hsl(240, 80%, 50%),
-    hsl(270, 80%, 50%),
-    hsl(300, 80%, 50%),
-    hsl(330, 80%, 50%),
-    hsl(360, 80%, 50%)
+    hsl(0, 90%, 50%),
+    hsl(30, 90%, 50%),
+    hsl(60, 90%, 50%),
+    hsl(90, 90%, 50%),
+    hsl(120, 90%, 50%),
+    hsl(150, 90%, 50%),
+    hsl(180, 90%, 50%),
+    hsl(210, 90%, 50%),
+    hsl(240, 90%, 50%),
+    hsl(270, 90%, 50%),
+    hsl(300, 90%, 50%),
+    hsl(330, 90%, 50%),
+    hsl(360, 90%, 50%)
   )`
 
-  const pointerColor = `hsl(${baseHue}, 75%, 48%)`
+  const pointerColor = `hsl(${baseHue}, 85%, 50%)`
 
   const updateFromAngle = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
@@ -238,10 +246,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const pointerAngle = baseHue
 
-  // Ratio labels: both tetrads follow the same Itten balance
+  // Correct ratio labels
   const ratioLabels = isTetrad
-    ? [t.main, t.secondary, t.secondary2, t.accent] // 55 / 20 / 15 / 10
-    : [t.main, t.secondary, t.accent]               // \~60 / 30 / 10
+    ? [t.main55, t.secondary20, t.secondary15, t.accent10] // 55 / 20 / 15 / 10
+    : [t.main60, t.secondary30, t.accent10]               // 60 / 30 / 10
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -410,14 +418,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             ))}
           </div>
 
-          {/* Continuous proportional bar according to Itten balance */}
+          {/* Continuous proportional bar */}
           <div className="rounded-2xl overflow-hidden mb-4 border border-[var(--color-border,rgba(255,255,255,0.12))] h-14 flex">
             {colors.map((c, i) => {
-              // Tetrads: 55 / 20 / 15 / 10  → flex 11 / 4 / 3 / 2
-              // Others:  60 / 30 / 10      → flex 6 / 3 / 1
               const flex = isTetrad
-                ? [11, 4, 3, 2][i]
-                : [6, 3, 1][i]
+                ? [11, 4, 3, 2][i]   // 55 / 20 / 15 / 10
+                : [6, 3, 1][i]      // 60 / 30 / 10
               return (
                 <div
                   key={i}
