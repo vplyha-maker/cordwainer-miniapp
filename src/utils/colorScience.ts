@@ -1,16 +1,16 @@
 /**
  * colorScience.ts
- * Spectrophotometric processing, CIE XYZ / sRGB conversion, 
- * and Two-Constant Kubelka-Munk Subtractive Color Mixing.
+ * Reflectance → XYZ → sRGB
+ * Two-Constant Kubelka–Munk + Saunderson
  */
 
 export interface SpectrumPoint {
-  wavelength: number // нм (380–780)
+  wavelength: number // нм
   reflectance: number // 0–100 %
 }
 
 export interface RGB {
-  r: number // 0–255
+  r: number
   g: number
   b: number
 }
@@ -26,10 +26,9 @@ export type IlluminantType = 'D65' | 'A' | 'cool' | 'twilight'
 export interface MixComponent {
   spectrum: SpectrumPoint[]
   volume: number
-  isBinder?: boolean // Флаг прозрачного связующего/лака
+  isBinder?: boolean
 }
 
-// CIE 1931 2° Color Matching Functions (380–780 нм, шаг 5 нм)
 const CIE_CMF = [
   { wl: 380, x: 0.001368, y: 0.000039, z: 0.006450 },
   { wl: 385, x: 0.002236, y: 0.000064, z: 0.010550 },
@@ -114,7 +113,6 @@ const CIE_CMF = [
   { wl: 780, x: 0.000042, y: 0.000015, z: 0.000000 },
 ]
 
-// Источники освещения (D65, A, Cool, Twilight)
 const D65 = [
   49.9755, 52.3118, 54.6482, 68.7015, 82.7549, 87.1204, 91.486, 92.4589, 93.4318,
   90.057, 86.6823, 95.7736, 104.865, 110.936, 117.008, 117.41, 117.812, 116.336,
@@ -170,7 +168,9 @@ const ILLUMINANTS: Record<IlluminantType, number[]> = {
   twilight: ILLUMINANT_TWILIGHT,
 }
 
-// --- Вспомогательные функции теории Кубелки-Мунка ---
+/** Saunderson: внешний блик и внутреннее отражение на границе воздух–краска */
+const SAUNDERSON_K1 = 0.03
+const SAUNDERSON_K2 = 0.6
 
 export function reflectanceToKS(r: number): number {
   const clampedR = Math.max(0.0001, Math.min(0.9999, r))
@@ -182,9 +182,29 @@ export function ksToReflectance(ks: number): number {
   return Math.max(0, Math.min(1, r))
 }
 
-// --- Линейная интерполяция и нормализация ---
+/** Измеренное R → внутреннее R (до KM) */
+function toInternalR(rMeasured: number): number {
+  const r = Math.max(0.0001, Math.min(0.9999, rMeasured))
+  const num = r - SAUNDERSON_K1
+  const den = 1 - SAUNDERSON_K1 - SAUNDERSON_K2 + SAUNDERSON_K2 * r
+  if (den <= 1e-9) return 0.0001
+  return Math.max(0.0001, Math.min(0.9999, num / den))
+}
 
-export function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: number): number {
+/** Внутреннее R → измеренное (после KM) */
+function toMeasuredR(rInternal: number): number {
+  const r = Math.max(0.0001, Math.min(0.9999, rInternal))
+  const val =
+    SAUNDERSON_K1 +
+    ((1 - SAUNDERSON_K1) * (1 - SAUNDERSON_K2) * r) /
+      (1 - SAUNDERSON_K2 * r)
+  return Math.max(0, Math.min(1, val))
+}
+
+export function interpolateReflectance(
+  spectrum: SpectrumPoint[],
+  wavelength: number
+): number {
   if (!spectrum || spectrum.length === 0) return 0
   if (wavelength <= spectrum[0].wavelength) return spectrum[0].reflectance
   if (wavelength >= spectrum[spectrum.length - 1].wavelength) {
@@ -206,26 +226,21 @@ export function interpolateReflectance(spectrum: SpectrumPoint[], wavelength: nu
   return p1.reflectance + t * (p2.reflectance - p1.reflectance)
 }
 
-/**
- * Приведение сырого спектра любого разрешения (даже с шагом 0.18 нм или УФ)
- * к стандартному колориметрическому сетку CIE 380–780 нм с шагом 5 нм.
- */
-export function normalizeSpectrumToCIE(rawSpectrum: SpectrumPoint[]): SpectrumPoint[] {
+export function normalizeSpectrumToCIE(
+  rawSpectrum: SpectrumPoint[]
+): SpectrumPoint[] {
   if (!rawSpectrum || rawSpectrum.length === 0) return []
-  
+
   const normalized: SpectrumPoint[] = []
   for (const cmfPoint of CIE_CMF) {
     normalized.push({
       wavelength: cmfPoint.wl,
-      reflectance: interpolateReflectance(rawSpectrum, cmfPoint.wl)
+      reflectance: interpolateReflectance(rawSpectrum, cmfPoint.wl),
     })
   }
   return normalized
 }
 
-/**
- * Парсинг текста спектрометра с авто-фильтрацией и приведением к стандарту CIE
- */
 export function parseSpectrum(text: string): SpectrumPoint[] {
   const lines = text.trim().split(/\r?\n/)
   const points: SpectrumPoint[] = []
@@ -243,20 +258,20 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
   }
 
   points.sort((a, b) => a.wavelength - b.wavelength)
-
-  // Автоматическая очистка от UV/IR и привести к шагу CIE 5 нм
   return normalizeSpectrumToCIE(points)
 }
 
-// --- Субтрактивное смешивание красок (Two-Constant Kubelka-Munk) ---
-
 /**
- * Двухконстантная модель смешивания пигментов и биндеров.
- * K = (K/S) * S, где S (рассеяние) аппроксимируется коэффициентом отражения.
+ * Two-Constant Kubelka–Munk + Saunderson
+ *
+ * Для пигментов (только R∞ известно):
+ *   S ≈ 0.2 + 0.8 * R   — рассеяние не падает в ноль на тёмных тонах
+ *   K = (K/S) * S
+ * Для биндера: почти прозрачный (малые K и S)
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
   const totalVolume = components.reduce((sum, c) => sum + c.volume, 0)
-  if (totalVolume <= 0) return []
+  if (totalVolume <= 0 || components.length === 0) return []
 
   const result: SpectrumPoint[] = []
 
@@ -267,21 +282,19 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
 
     for (const comp of components) {
       const weight = comp.volume / totalVolume
-      const rawRefl = interpolateReflectance(comp.spectrum, wl) / 100
-      const refl = Math.max(0.0001, Math.min(0.9999, rawRefl))
+      const rMeas = interpolateReflectance(comp.spectrum, wl) / 100
 
-      let S: number
       let K: number
+      let S: number
 
       if (comp.isBinder) {
-        // Прозрачный акриловый лак/биндер: 
-        // Минимальное рассеяние (прозрачность) и почти нулевое поглощение.
-        S = 0.01 
-        K = 0.001
+        S = 0.02
+        K = 0.002
       } else {
-        // Обычные пигменты: Двухконстантная аппроксимация (S ≈ R)
-        S = refl 
-        const KS = reflectanceToKS(refl)
+        const rInt = toInternalR(rMeas)
+        // Рассеяние: тёмные пигменты тоже рассеивают, иначе смесь «убивает» цвет
+        S = 0.2 + 0.8 * rInt
+        const KS = reflectanceToKS(rInt)
         K = KS * S
       }
 
@@ -289,20 +302,19 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
       totalS += weight * S
     }
 
-    // Рассчитываем итоговое отношение K/S и отражение смеси
-    const mixedKS = totalS > 0.00001 ? (totalK / totalS) : reflectanceToKS(0.0001)
-    const finalRefl = ksToReflectance(mixedKS) * 100
+    const mixedKS =
+      totalS > 1e-8 ? totalK / totalS : reflectanceToKS(0.0001)
+    const rIntMix = ksToReflectance(mixedKS)
+    const rMeasMix = toMeasuredR(rIntMix)
 
     result.push({
       wavelength: wl,
-      reflectance: finalRefl,
+      reflectance: rMeasMix * 100,
     })
   }
 
   return result
 }
-
-// --- Расчет CIE XYZ и sRGB ---
 
 export function spectrumToXYZWithIlluminant(
   spectrum: SpectrumPoint[],
