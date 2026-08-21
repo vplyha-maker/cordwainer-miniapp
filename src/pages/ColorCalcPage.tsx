@@ -113,6 +113,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </header>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
+        {/* Состав */}
         <section
           className="rounded-2xl overflow-visible relative z-10"
           style={{ background: 'var(--color-surface, #25201C)' }}
@@ -171,16 +172,32 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5">
                 {paints.map((paint) => (
-                  <div key={paint.id} className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
+                  <div
+                    key={paint.id}
+                    className="flex items-center gap-2 p-2 rounded-2xl"
+                    style={{
+                      background:
+                        'color-mix(in srgb, var(--color-ink, #F5F1EA) 4%, transparent)',
+                      border:
+                        '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
+                    }}
+                  >
+                    {/* Селектор */}
+                    <div
+                      className="flex-1 min-w-0 pr-1"
+                      style={{
+                        borderRight:
+                          '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
+                      }}
+                    >
                       {pigments.length === 0 ? (
                         <div
-                          className="h-12 rounded-xl animate-pulse"
+                          className="h-10 rounded-xl animate-pulse"
                           style={{
                             background:
-                              'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                              'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
                           }}
                         />
                       ) : (
@@ -195,72 +212,75 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       )}
                     </div>
 
-                    <input
-                      ref={(el) => {
-                        if (el) amountRefs.current.set(paint.id, el)
-                        else amountRefs.current.delete(paint.id)
-                      }}
-                      type="text"
-                      inputMode="decimal"
-                      enterKeyHint="done"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      value={paint.amount}
-                      onChange={(e) => {
-                        let val = e.target.value.replace(',', '.')
-                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                    {/* Объём */}
+                    <div className="flex items-center gap-1 w-[70px] flex-shrink-0">
+                      <input
+                        ref={(el) => {
+                          if (el) amountRefs.current.set(paint.id, el)
+                          else amountRefs.current.delete(paint.id)
+                        }}
+                        type="text"
+                        inputMode="decimal"
+                        enterKeyHint="done"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        value={paint.amount}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(',', '.')
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            const num = parseFloat(val)
+                            if (!isNaN(num) && num > 5000) val = '5000'
+                            updatePaint(paint.id, 'amount', val)
+                          }
+                        }}
+                        onBlur={(e) => {
+                          let val = e.target.value.replace(',', '.')
+                          if (val === '.' || val === '') {
+                            updatePaint(paint.id, 'amount', '')
+                            return
+                          }
                           const num = parseFloat(val)
-                          if (!isNaN(num) && num > 5000) val = '5000'
-                          updatePaint(paint.id, 'amount', val)
-                        }
-                      }}
-                      onBlur={(e) => {
-                        let val = e.target.value.replace(',', '.')
-                        if (val === '.' || val === '') {
-                          updatePaint(paint.id, 'amount', '')
-                          return
-                        }
-                        const num = parseFloat(val)
-                        if (!isNaN(num)) {
-                          updatePaint(
-                            paint.id,
-                            'amount',
-                            String(Math.min(num, 5000))
-                          )
-                        }
-                      }}
-                      className="w-[64px] flex-shrink-0 border-0 rounded-xl px-2 py-3 text-center font-medium focus:outline-none"
-                      placeholder="0"
-                      style={{
-                        fontSize: '16px',
-                        background:
-                          'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
-                        color: 'var(--color-ink, #F5F1EA)',
-                      }}
-                    />
-                    <span
-                      className="text-[12px] w-5 flex-shrink-0"
-                      style={{
-                        color:
-                          'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)',
-                      }}
-                    >
-                      мл
-                    </span>
+                          if (!isNaN(num)) {
+                            updatePaint(
+                              paint.id,
+                              'amount',
+                              String(Math.min(num, 5000))
+                            )
+                          }
+                        }}
+                        className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
+                        placeholder="0"
+                        style={{
+                          fontSize: '16px',
+                          color: 'var(--color-ink, #F5F1EA)',
+                        }}
+                      />
+                      <span
+                        className="text-[12px] font-medium flex-shrink-0"
+                        style={{
+                          color:
+                            'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)',
+                        }}
+                      >
+                        мл
+                      </span>
+                    </div>
 
+                    {/* Удалить */}
                     <button
                       onClick={() => removePaint(paint.id)}
                       disabled={paints.length <= 1}
-                      className="w-10 h-10 -mr-1 flex items-center justify-center rounded-full disabled:opacity-20"
+                      className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10"
                       style={{
                         color:
-                          'color-mix(in srgb, var(--color-ink, #F5F1EA) 30%, transparent)',
+                          'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)',
                       }}
+                      aria-label="Remove"
                     >
                       <svg
-                        width="18"
-                        height="18"
+                        width="16"
+                        height="16"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -281,10 +301,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <button
               onClick={addPaint}
               disabled={loading || loadError}
-              className="mt-4 w-full py-3.5 rounded-xl text-[14px] font-medium disabled:opacity-40"
+              className="mt-3.5 w-full py-3 rounded-xl text-[14px] font-medium disabled:opacity-40"
               style={{
                 border:
-                  '1px dashed color-mix(in srgb, var(--color-accent, #D8A35C) 50%, transparent)',
+                  '1px dashed color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)',
                 color: 'var(--color-accent, #D8A35C)',
               }}
             >
@@ -293,6 +313,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
+        {/* Результат */}
         <section
           className="rounded-2xl px-4 pt-4 pb-5"
           style={{ background: 'var(--color-surface, #25201C)' }}
@@ -313,7 +334,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               style={{
                 backgroundColor: squareColor,
                 border:
-                  '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+                  '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
               }}
             />
 
@@ -323,7 +344,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 style={{
                   fontSize: '16px',
                   background:
-                    'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                    'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
                   color: 'var(--color-ink, #F5F1EA)',
                 }}
               >
@@ -360,6 +381,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </div>
         </section>
 
+        {/* Объём */}
         <section
           className="rounded-2xl px-4 py-3.5"
           style={{ background: 'var(--color-surface, #25201C)' }}
@@ -399,7 +421,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             style={{
               background: 'var(--color-surface, #25201C)',
               border:
-                '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+                '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)',
             }}
           >
             <p
@@ -417,7 +439,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               className="w-full rounded-xl px-3 py-3 text-center font-mono tracking-wider mb-4"
               style={{
                 background:
-                  'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                  'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
                 color: 'var(--color-ink, #F5F1EA)',
               }}
               onFocus={(e) => e.target.select()}
