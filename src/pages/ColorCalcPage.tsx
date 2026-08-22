@@ -19,7 +19,6 @@ interface ColorCalcPageProps {
 
 type TabId = 'mix' | 'pro'
 
-/** Стартовый инвентарь Pro */
 const DEFAULT_INVENTORY_IDS = [
   'titanium_white',
   'zinc_white',
@@ -71,7 +70,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [recipeResult, setRecipeResult] = useState<RecipeResult | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  /** Галерея / файлы — БЕЗ capture */
   const fileInputRef = useRef<HTMLInputElement>(null)
+  /** Fallback-камера через input (iOS / Telegram, когда getUserMedia не работает) */
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [samplePreview, setSamplePreview] = useState<string | null>(null)
@@ -85,11 +87,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const pigmentName = (p: Pigment) => (isUk ? p.name.uk : p.name.ru)
 
-  /** Восстановить инвентарь по умолчанию (только те id, что реально есть в базе) */
   const resetInventoryDefaults = useCallback(() => {
     const available = new Set(pigments.map((p) => p.id))
-    const next = DEFAULT_INVENTORY_IDS.filter((id) => available.has(id))
-    setInventoryIds(next)
+    setInventoryIds(DEFAULT_INVENTORY_IDS.filter((id) => available.has(id)))
   }, [pigments])
 
   const loadPigments = () => {
@@ -126,9 +126,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   useEffect(() => {
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop())
-      }
+      if (stream) stream.getTracks().forEach((t) => t.stop())
     }
   }, [stream])
 
@@ -154,14 +152,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (video.readyState >= 2) {
       tryPlay()
     } else {
-      const onMeta = () => {
-        tryPlay()
-      }
+      const onMeta = () => tryPlay()
       video.addEventListener('loadedmetadata', onMeta)
       tryPlay()
-      return () => {
-        video.removeEventListener('loadedmetadata', onMeta)
-      }
+      return () => video.removeEventListener('loadedmetadata', onMeta)
     }
   }, [cameraActive, stream])
 
@@ -223,8 +217,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       if (!ctx) return
 
       ctx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh)
-      const imageData = ctx.getImageData(0, 0, dw, dh)
-      const data = imageData.data
+      const data = ctx.getImageData(0, 0, dw, dh).data
 
       let sumR = 0
       let sumG = 0
@@ -257,29 +250,80 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     []
   )
 
+  /** Обработка файла из галереи ИЛИ из camera-input */
+  const handleImageFile = (file: File | undefined | null) => {
+    if (!file || !file.type.startsWith('image/')) return
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      sampleFromSource(img)
+      URL.revokeObjectURL(url)
+    }
+    img.onerror = () => URL.revokeObjectURL(url)
+    img.src = url
+  }
+
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleImageFile(e.target.files?.[0])
+    e.target.value = ''
+  }
+
+  const onCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleImageFile(e.target.files?.[0])
+    e.target.value = ''
+  }
+
+  /**
+   * Камера:
+   * 1) пробуем live getUserMedia
+   * 2) если отказ / Telegram iOS — открываем input capture (снять 1 кадр)
+   */
   const startCamera = async () => {
+    setRecipeError(null)
+
+    // Есть ли API вообще
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      // Сразу fallback: системная камера → один снимок
+      cameraInputRef.current?.click()
+      return
+    }
+
     try {
       if (stream) {
         stream.getTracks().forEach((t) => t.stop())
         setStream(null)
       }
 
-      const media = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-        },
-        audio: false,
-      })
+      // На iOS проще без жёсткого facingMode
+      let media: MediaStream
+      try {
+        media = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+          audio: false,
+        })
+      } catch {
+        // Повтор без constraints
+        media = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        })
+      }
 
       setStream(media)
       setCameraActive(true)
     } catch (err) {
-      console.error(err)
-      setRecipeError(isUk ? 'Немає доступу до камери' : 'Нет доступа к камере')
+      console.error('getUserMedia failed, fallback to capture input', err)
       setCameraActive(false)
       setStream(null)
+      // iOS / Telegram: открыть нативную камеру на 1 кадр
+      cameraInputRef.current?.click()
     }
   }
 
@@ -306,20 +350,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       return
     }
     sampleFromSource(video)
-  }
-
-  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      sampleFromSource(img)
-      URL.revokeObjectURL(url)
-    }
-    img.onerror = () => URL.revokeObjectURL(url)
-    img.src = url
-    e.target.value = ''
   }
 
   const runRecipeSearch = () => {
@@ -393,7 +423,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           p.spectrum
       )
       .map((p) => p.id)
-    // binder для acrylic оставляем в списке, если был в defaults / system acrylic
     if (system === 'acrylic') {
       const hasBinder = pigments.some((p) => p.id === 'acrylic_binder')
       if (hasBinder && !ids.includes('acrylic_binder')) {
@@ -403,9 +432,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setInventoryIds(ids)
   }
 
-  const clearInventory = () => {
-    setInventoryIds([])
-  }
+  const clearInventory = () => setInventoryIds([])
 
   const tabBtn = (id: TabId, label: string) => (
     <button
@@ -474,7 +501,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       <div className="flex-1 flex flex-col gap-4 mt-1">
         {tab === 'mix' && (
           <>
-            {/* ... mix tab без изменений — состав / результат / объём ... */}
             <section
               className="rounded-2xl overflow-visible relative z-10"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -767,7 +793,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
         {tab === 'pro' && (
           <>
-            {/* целевой цвет + камера — без изменений */}
             <section
               className="rounded-2xl px-4 md:px-5 pt-4 pb-5"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -829,6 +854,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               <div className="flex gap-2 mb-3">
                 {!cameraActive ? (
                   <button
+                    type="button"
                     onClick={startCamera}
                     className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
                     style={{
@@ -842,6 +868,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 ) : (
                   <>
                     <button
+                      type="button"
                       onClick={captureFromCamera}
                       className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
                       style={{
@@ -852,6 +879,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       {isUk ? 'Зняти колір' : 'Снять цвет'}
                     </button>
                     <button
+                      type="button"
                       onClick={stopCamera}
                       className="px-3 py-2.5 rounded-xl text-[13px] font-medium"
                       style={{
@@ -866,6 +894,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </>
                 )}
                 <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
                   style={{
@@ -876,13 +905,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 >
                   {isUk ? 'Фото' : 'Фото'}
                 </button>
+
+                {/* Галерея / файлы — БЕЗ capture */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="hidden"
                   onChange={onFileSelected}
+                />
+                {/* Fallback: системная камера на 1 кадр (iOS / Telegram) */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={onCameraCapture}
                 />
               </div>
 
@@ -926,6 +965,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
               <div className="flex gap-2 mb-3">
                 <button
+                  type="button"
                   onClick={() => setMaxComponents(3)}
                   className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                   style={{
@@ -942,6 +982,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   ≤ 3 {isUk ? 'пігменти' : 'пигмента'}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setMaxComponents(4)}
                   className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                   style={{
@@ -961,6 +1002,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setSystem('acrylic')}
                   className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                   style={{
@@ -977,6 +1019,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   {isUk ? 'Акрил' : 'Акрил'}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setSystem('aniline')}
                   className="flex-1 py-2 rounded-lg text-[12px] font-semibold"
                   style={{
@@ -995,7 +1038,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
-            {/* ── Инвентарь + кнопки ── */}
             <section
               className="rounded-2xl px-4 md:px-5 py-4"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -1014,6 +1056,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </h2>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
+                    type="button"
                     onClick={resetInventoryDefaults}
                     className="text-[11px] font-semibold px-2 py-1 rounded-lg active:opacity-80"
                     style={{
@@ -1025,6 +1068,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     {isUk ? 'За замовч.' : 'По умолчанию'}
                   </button>
                   <button
+                    type="button"
                     onClick={selectAllInventory}
                     className="text-[11px] font-medium px-2 py-1 rounded-lg active:opacity-80"
                     style={{
@@ -1035,6 +1079,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     {isUk ? 'Усі' : 'Все'}
                   </button>
                   <button
+                    type="button"
                     onClick={clearInventory}
                     className="text-[11px] font-medium px-2 py-1 rounded-lg active:opacity-80"
                     style={{ color: 'var(--color-danger, #f87171)' }}
@@ -1066,6 +1111,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     const on = inventoryIds.includes(p.id)
                     return (
                       <button
+                        type="button"
                         key={p.id}
                         onClick={() => toggleInventory(p.id)}
                         className="px-2 py-1 rounded-lg text-[11px] font-medium"
@@ -1089,6 +1135,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </section>
 
             <button
+              type="button"
               onClick={runRecipeSearch}
               disabled={
                 recipeLoading ||
@@ -1192,6 +1239,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
 
                 <button
+                  type="button"
                   onClick={sendRecipeToMix}
                   className="w-full py-3 rounded-xl text-[14px] font-semibold active:scale-[0.98]"
                   style={{
@@ -1248,6 +1296,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               autoFocus
             />
             <button
+              type="button"
               onClick={() => setShowCopyFallback(false)}
               className="w-full py-3 rounded-xl text-[14px] font-semibold"
               style={{
