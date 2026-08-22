@@ -7,10 +7,9 @@ import { loadAllPigments } from '../data/loadPigments'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
-import {
-  findRecipeByHex,
-  hexToRgbObj,
-  type CoverageSystem,
+import type {
+  CoverageSystem,
+  RecipeResult,
 } from '../utils/calculatorLogic'
 
 interface ColorCalcPageProps {
@@ -28,7 +27,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [showCopyFallback, setShowCopyFallback] = useState(false)
   const [tab, setTab] = useState<TabId>('mix')
 
-  // ── Mix tab ──
+  // ── Mix ──
   const {
     paints,
     amountRefs,
@@ -37,6 +36,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     removePaint,
     updatePaint,
     clearAllAmounts,
+    applyRecipe,
   } = usePaintMix(pigments)
 
   const { mixedColor } = useColorCalculations({
@@ -45,16 +45,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     totalAmount,
   })
 
-  // ── Pro tab ──
+  // ── Pro ──
   const [targetHex, setTargetHex] = useState('#8B4513')
   const [inventoryIds, setInventoryIds] = useState<string[]>([])
   const [maxComponents, setMaxComponents] = useState<3 | 4>(3)
   const [system, setSystem] = useState<CoverageSystem>('acrylic')
   const [recipeLoading, setRecipeLoading] = useState(false)
   const [recipeError, setRecipeError] = useState<string | null>(null)
-  const [recipeResult, setRecipeResult] = useState<ReturnType<
-    typeof findRecipeByHex
-  > | null>(null)
+  const [recipeResult, setRecipeResult] = useState<RecipeResult | null>(null)
 
   // Camera / photo
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -63,10 +61,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [samplePreview, setSamplePreview] = useState<string | null>(null)
 
+  // Worker
+  const workerRef = useRef<Worker | null>(null)
+  const reqIdRef = useRef(0)
+
   const isUk = lang === 'uk'
-  const displayHex = mixedColor?.hex
-    ? mixedColor.hex.toUpperCase()
-    : null
+  const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
   const squareColor = displayHex || '#2A2522'
 
   const loadPigments = () => {
@@ -75,7 +75,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadAllPigments()
       .then((loaded) => {
         setPigments(loaded)
-        // По умолчанию в inventory — базовые пигменты (можно менять в Pro)
         const defaults = loaded
           .filter((p) =>
             [
@@ -110,14 +109,35 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
-  // Cleanup camera on unmount / tab switch
+  // Worker lifecycle
   useEffect(() => {
     return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate()
+        workerRef.current = null
+      }
       if (stream) {
         stream.getTracks().forEach((t) => t.stop())
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (stream) stream.getTracks().forEach((t) => t.stop())
+    }
   }, [stream])
+
+  const ensureWorker = useCallback(() => {
+    if (!workerRef.current) {
+      workerRef.current = new Worker(
+        new URL('../workers/recipeWorker.ts', import.meta.url),
+        { type: 'module' }
+      )
+    }
+    return workerRef.current
+  }, [])
 
   const copyHex = async () => {
     if (!displayHex) return
@@ -134,7 +154,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }
 
-  // ── Color Sampler (GC-friendly: только crop) ──
+  // ── GC-friendly sampler ──
   const sampleFromSource = useCallback(
     (
       source: HTMLVideoElement | HTMLImageElement,
@@ -156,7 +176,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       const sw = Math.min(size, srcW - sx)
       const sh = Math.min(size, srcH - sy)
 
-      // Даунскейл до max 32px — не держим full-res ImageData
       const maxDim = 32
       const scale = Math.min(1, maxDim / Math.max(sw, sh))
       const dw = Math.max(1, Math.round(sw * scale))
@@ -185,7 +204,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       const g = Math.round(sumG / pixels)
       const b = Math.round(sumB / pixels)
 
-      // Освобождаем backing store
       canvas.width = 0
       canvas.height = 0
 
@@ -222,11 +240,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }
     } catch (err) {
       console.error(err)
-      setRecipeError(
-        isUk
-          ? 'Немає доступу до камери'
-          : 'Нет доступа к камере'
-      )
+      setRecipeError(isUk ? 'Немає доступу до камери' : 'Нет доступа к камере')
     }
   }
 
@@ -239,9 +253,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const captureFromCamera = () => {
-    if (videoRef.current) {
-      sampleFromSource(videoRef.current)
-    }
+    if (videoRef.current) sampleFromSource(videoRef.current)
   }
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,46 +271,59 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   }
 
   const runRecipeSearch = () => {
-    if (!targetHex || pigments.length === 0) return
+    if (!targetHex || targetHex.length < 7 || pigments.length === 0) return
+    if (inventoryIds.length === 0) return
+
     setRecipeLoading(true)
     setRecipeError(null)
     setRecipeResult(null)
 
-    // Лёгкий defer — не блокируем UI на длинном переборе
-    setTimeout(() => {
-      try {
-        const colorPigments = pigments.filter(
-          (p) =>
-            inventoryIds.includes(p.id) &&
-            p.id !== 'acrylic_binder' &&
-            p.id !== 'cardboard' &&
-            p.spectrum &&
-            p.spectrum.length > 0
-        )
-        const result = findRecipeByHex(
-          targetHex,
-          colorPigments,
-          maxComponents,
-          20,
-          system,
-          []
-        )
-        setRecipeResult(result)
-        if (!result) {
-          setRecipeError(
-            isUk
-              ? 'Не вдалося підібрати рецепт'
-              : 'Не удалось подобрать рецепт'
-          )
-        }
-      } catch (err) {
-        setRecipeError(
-          err instanceof Error ? err.message : String(err)
-        )
-      } finally {
-        setRecipeLoading(false)
+    const id = ++reqIdRef.current
+    const worker = ensureWorker()
+
+    const onMsg = (e: MessageEvent) => {
+      if (e.data.id !== id) return
+      worker.removeEventListener('message', onMsg)
+      setRecipeLoading(false)
+      if (e.data.error) {
+        setRecipeError(e.data.error)
+        setRecipeResult(null)
+        return
       }
-    }, 30)
+      const result = e.data.result as RecipeResult | null
+      setRecipeResult(result)
+      if (!result) {
+        setRecipeError(
+          isUk ? 'Не вдалося підібрати рецепт' : 'Не удалось подобрать рецепт'
+        )
+      }
+    }
+
+    worker.addEventListener('message', onMsg)
+    worker.postMessage({
+      id,
+      targetHex,
+      basicPigments: pigments,
+      maxComponents,
+      targetVolume: 20,
+      system,
+      activeIds: inventoryIds,
+      excludeIds: ['cardboard'],
+    })
+  }
+
+  const sendRecipeToMix = () => {
+    if (!recipeResult?.recipe?.length) return
+    applyRecipe(
+      recipeResult.recipe
+        .filter((item) => !item.isBinder)
+        .map((item) => ({
+          pigmentId: item.pigment.id,
+          ml: item.ml,
+        }))
+    )
+    stopCamera()
+    setTab('mix')
   }
 
   const toggleInventory = (id: string) => {
@@ -307,7 +332,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     )
   }
 
-  // ── UI helpers ──
+  const pigmentName = (p: Pigment) =>
+    lang === 'uk' ? p.name.uk : lang === 'en' ? p.name.en : p.name.ru
+
   const tabBtn = (id: TabId, label: string) => (
     <button
       key={id}
@@ -367,14 +394,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </h1>
       </header>
 
-      {/* Tabs */}
       <div className="flex gap-2 mb-4">
         {tabBtn('mix', isUk ? 'Суміш' : 'Смесь')}
         {tabBtn('pro', 'Pro')}
       </div>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-        {/* ═══════════ MIX TAB ═══════════ */}
+        {/* ═══════════ MIX ═══════════ */}
         {tab === 'mix' && (
           <>
             <section
@@ -573,7 +599,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
-            {/* Результат Mix */}
             <section
               className="rounded-2xl px-4 md:px-5 pt-4 pb-5 calc-result-card"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -641,7 +666,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
-            {/* Объём */}
             <section
               className="rounded-2xl px-4 md:px-5 py-3.5"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -669,10 +693,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </>
         )}
 
-        {/* ═══════════ PRO TAB ═══════════ */}
+        {/* ═══════════ PRO ═══════════ */}
         {tab === 'pro' && (
           <>
-            {/* Target color */}
             <section
               className="rounded-2xl px-4 md:px-5 pt-4 pb-5"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -731,7 +754,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               </div>
 
-              {/* Camera / Photo */}
               <div className="flex gap-2 mb-3">
                 {!cameraActive ? (
                   <button
@@ -800,7 +822,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     muted
                     className="w-full max-h-48 object-cover"
                   />
-                  {/* Crosshair center */}
                   <div
                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
                     style={{
@@ -815,7 +836,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               )}
             </section>
 
-            {/* Settings */}
             <section
               className="rounded-2xl px-4 md:px-5 py-4"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -901,7 +921,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
-            {/* Inventory (compact) */}
             <section
               className="rounded-2xl px-4 md:px-5 py-4"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -955,18 +974,13 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             : '1px solid transparent',
                         }}
                       >
-                        {lang === 'uk'
-                          ? p.name.uk
-                          : lang === 'en'
-                            ? p.name.en
-                            : p.name.ru}
+                        {pigmentName(p)}
                       </button>
                     )
                   })}
               </div>
             </section>
 
-            {/* Search button */}
             <button
               onClick={runRecipeSearch}
               disabled={
@@ -1000,7 +1014,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </p>
             )}
 
-            {/* Recipe result */}
             {recipeResult && (
               <section
                 className="rounded-2xl px-4 md:px-5 pt-4 pb-5"
@@ -1020,28 +1033,26 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <div
                     className="w-14 h-14 rounded-xl flex-shrink-0"
                     style={{
-                      backgroundColor: recipeResult.hex || '#333',
+                      backgroundColor: recipeResult.resultHex || '#333',
                       border:
                         '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)',
                     }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-[15px] tracking-wider">
-                      {(recipeResult.hex || '').toUpperCase()}
+                      {(recipeResult.resultHex || '').toUpperCase()}
                     </p>
                     <p
                       className="text-[12px] mt-0.5"
                       style={{
                         color:
-                          recipeResult.deltaE != null &&
-                          recipeResult.deltaE > 2
+                          recipeResult.deltaE > 2 || recipeResult.approximate
                             ? 'var(--color-danger, #f87171)'
                             : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 50%, transparent)',
                       }}
                     >
-                      ΔE₀₀ ≈ {recipeResult.deltaE?.toFixed(1) ?? '—'}
-                      {recipeResult.deltaE != null &&
-                        recipeResult.deltaE > 2 &&
+                      ΔE₀₀ ≈ {recipeResult.deltaE.toFixed(1)}
+                      {(recipeResult.deltaE > 2 || recipeResult.approximate) &&
                         (isUk
                           ? ' — неточне співпадіння'
                           : ' — неточное совпадение')}
@@ -1049,42 +1060,43 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  {(recipeResult.items || []).map(
-                    (
-                      item: {
-                        pigment: Pigment
-                        ml: number
-                        isBinder?: boolean
-                      },
-                      i: number
-                    ) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between py-2 px-3 rounded-xl"
-                        style={{
-                          background:
-                            'color-mix(in srgb, var(--color-ink, #F5F1EA) 5%, transparent)',
-                        }}
-                      >
-                        <span className="text-[13px] font-medium truncate pr-2">
-                          {item.isBinder
-                            ? isUk
-                              ? 'Зв’язуюче'
-                              : 'Связующее'
-                            : lang === 'uk'
-                              ? item.pigment.name.uk
-                              : lang === 'en'
-                                ? item.pigment.name.en
-                                : item.pigment.name.ru}
-                        </span>
-                        <span className="text-[14px] font-semibold tabular-nums flex-shrink-0">
-                          {item.ml.toFixed(1)} мл
-                        </span>
-                      </div>
-                    )
-                  )}
+                <div className="flex flex-col gap-2 mb-4">
+                  {recipeResult.recipe.map((item, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-2 px-3 rounded-xl"
+                      style={{
+                        background:
+                          'color-mix(in srgb, var(--color-ink, #F5F1EA) 5%, transparent)',
+                      }}
+                    >
+                      <span className="text-[13px] font-medium truncate pr-2">
+                        {item.isBinder
+                          ? isUk
+                            ? 'Зв’язуюче'
+                            : 'Связующее'
+                          : pigmentName(item.pigment)}
+                      </span>
+                      <span className="text-[14px] font-semibold tabular-nums flex-shrink-0">
+                        {item.ml.toFixed(1)} мл
+                      </span>
+                    </div>
+                  ))}
                 </div>
+
+                <button
+                  onClick={sendRecipeToMix}
+                  className="w-full py-3 rounded-xl text-[14px] font-semibold active:scale-[0.98]"
+                  style={{
+                    background:
+                      'color-mix(in srgb, var(--color-accent, #D8A35C) 25%, transparent)',
+                    color: 'var(--color-accent, #D8A35C)',
+                    border:
+                      '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)',
+                  }}
+                >
+                  {isUk ? 'Перенести в суміш' : 'Перенести в смесь'}
+                </button>
               </section>
             )}
           </>
