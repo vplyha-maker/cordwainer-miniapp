@@ -81,7 +81,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="min-h-screen flex flex-col pt-safe px-4 pb-10"
+      className="min-h-screen flex flex-col pt-safe px-4 md:px-6 pb-10 calc-page-content"
       style={{
         background: 'var(--color-bg, #1C1816)',
         color: 'var(--color-ink, #F5F1EA)',
@@ -105,7 +105,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </svg>
         </button>
         <h1
-          className="flex-1 text-[17px] font-semibold tracking-tight"
+          className="flex-1 text-[17px] font-semibold tracking-tight calc-page-title"
           style={{ color: 'var(--color-ink, #F5F1EA)' }}
         >
           {isUk ? 'Калькулятор кольору' : 'Калькулятор цвета'}
@@ -118,7 +118,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           className="rounded-2xl overflow-visible relative z-10"
           style={{ background: 'var(--color-surface, #25201C)' }}
         >
-          <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+          <div className="px-4 md:px-5 pt-4 pb-3 flex items-center justify-between">
             <h2
               className="text-[13px] font-semibold"
               style={{
@@ -139,7 +139,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             )}
           </div>
 
-          <div className="px-4 pb-4">
+          <div className="px-4 md:px-5 pb-4">
             {loading ? (
               <div
                 className="py-8 text-center text-[13px]"
@@ -184,7 +184,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
                     }}
                   >
-                    {/* Селектор */}
                     <div
                       className="flex-1 min-w-0 pr-1"
                       style={{
@@ -212,7 +211,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       )}
                     </div>
 
-                    {/* Объём */}
                     <div className="flex items-center gap-1 w-[70px] flex-shrink-0">
                       <input
                         ref={(el) => {
@@ -267,7 +265,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       </span>
                     </div>
 
-                    {/* Удалить */}
                     <button
                       onClick={() => removePaint(paint.id)}
                       disabled={paints.length <= 1}
@@ -315,7 +312,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
         {/* Результат */}
         <section
-          className="rounded-2xl px-4 pt-4 pb-5"
+          className="rounded-2xl px-4 md:px-5 pt-4 pb-5 calc-result-card"
           style={{ background: 'var(--color-surface, #25201C)' }}
         >
           <h2
@@ -330,7 +327,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
           <div className="flex flex-col items-center">
             <div
-              className="w-36 h-36 rounded-2xl shadow-lg mb-4"
+              className="w-36 h-36 md:w-40 md:h-40 rounded-2xl shadow-lg mb-4"
               style={{
                 backgroundColor: squareColor,
                 border:
@@ -383,7 +380,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
         {/* Объём */}
         <section
-          className="rounded-2xl px-4 py-3.5"
+          className="rounded-2xl px-4 md:px-5 py-3.5"
           style={{ background: 'var(--color-surface, #25201C)' }}
         >
           <div className="flex items-center justify-between">
