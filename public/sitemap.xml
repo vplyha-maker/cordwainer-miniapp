@@ -45,4 +45,12 @@
     <priority>0.8</priority>
   </url>
 
+  <!-- Скрытая SEO-страница (orphan page) — конвертер полноты / Форвард Орто -->
+  <url>
+    <loc>https://cordwainer-miniapp.vercel.app/forward-ortho-converter</loc>
+    <lastmod>2026-08-23</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
 </urlset>
