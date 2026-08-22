@@ -27,7 +27,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [showCopyFallback, setShowCopyFallback] = useState(false)
   const [tab, setTab] = useState<TabId>('mix')
 
-  // ── Mix ──
   const {
     paints,
     amountRefs,
@@ -45,7 +44,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     totalAmount,
   })
 
-  // ── Pro ──
   const [targetHex, setTargetHex] = useState('#8B4513')
   const [inventoryIds, setInventoryIds] = useState<string[]>([])
   const [maxComponents, setMaxComponents] = useState<3 | 4>(3)
@@ -54,20 +52,21 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [recipeError, setRecipeError] = useState<string | null>(null)
   const [recipeResult, setRecipeResult] = useState<RecipeResult | null>(null)
 
-  // Camera / photo
   const videoRef = useRef<HTMLVideoElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [samplePreview, setSamplePreview] = useState<string | null>(null)
 
-  // Worker
   const workerRef = useRef<Worker | null>(null)
   const reqIdRef = useRef(0)
 
   const isUk = lang === 'uk'
   const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
   const squareColor = displayHex || '#2A2522'
+
+  /** Lang = 'ru' | 'uk' only */
+  const pigmentName = (p: Pigment) => (isUk ? p.name.uk : p.name.ru)
 
   const loadPigments = () => {
     setLoading(true)
@@ -109,7 +108,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
-  // Worker lifecycle
   useEffect(() => {
     return () => {
       if (workerRef.current) {
@@ -154,7 +152,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }
 
-  // ── GC-friendly sampler ──
   const sampleFromSource = useCallback(
     (
       source: HTMLVideoElement | HTMLImageElement,
@@ -286,7 +283,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       worker.removeEventListener('message', onMsg)
       setRecipeLoading(false)
       if (e.data.error) {
-        setRecipeError(e.data.error)
+        setRecipeError(String(e.data.error))
         setRecipeResult(null)
         return
       }
@@ -326,14 +323,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setTab('mix')
   }
 
-  const toggleInventory = (id: string) => {
+  const toggleInventory = (pid: string) => {
     setInventoryIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid]
     )
   }
-
-  const pigmentName = (p: Pigment) =>
-    lang === 'uk' ? p.name.uk : lang === 'en' ? p.name.en : p.name.ru
 
   const tabBtn = (id: TabId, label: string) => (
     <button
@@ -400,7 +394,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       </div>
 
       <div className="flex-1 flex flex-col gap-4 mt-1">
-        {/* ═══════════ MIX ═══════════ */}
         {tab === 'mix' && (
           <>
             <section
@@ -693,7 +686,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </>
         )}
 
-        {/* ═══════════ PRO ═══════════ */}
         {tab === 'pro' && (
           <>
             <section
@@ -1155,4 +1147,4 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       )}
     </motion.div>
   )
-}
+ }
