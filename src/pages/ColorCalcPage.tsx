@@ -36,12 +36,10 @@ const DEFAULT_INVENTORY_IDS = [
   'acrylic_binder',
 ] as const
 
-/** iPhone / iPad (в т.ч. Telegram WebView) */
 function detectIOS(): boolean {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent || ''
   if (/iPad|iPhone|iPod/.test(ua)) return true
-  // iPadOS 13+ может маскироваться под Mac
   if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
     return true
   }
@@ -93,6 +91,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const isIOSRef = useRef(detectIOS())
 
   const isUk = lang === 'uk'
+  const isIOS = isIOSRef.current
   const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
   const squareColor = displayHex || '#2A2522'
 
@@ -283,18 +282,10 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     e.target.value = ''
   }
 
-  /**
-   * Камера:
-   * - iOS: сразу input[capture] в том же user-gesture (без await)
-   * - Android: live getUserMedia → при ошибке capture
-   */
+  /** Android only: live camera. iOS uses gallery button only. */
   const startCamera = () => {
     setRecipeError(null)
-
-    if (isIOSRef.current) {
-      cameraInputRef.current?.click()
-      return
-    }
+    if (isIOSRef.current) return
 
     void (async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -860,11 +851,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               </div>
 
+              {/* ── Кнопки: iOS vs Android ── */}
               <div className="flex gap-2 mb-3">
-                {!cameraActive ? (
+                {isIOS ? (
                   <button
                     type="button"
-                    onClick={startCamera}
+                    onClick={() => fileInputRef.current?.click()}
                     className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
                     style={{
                       background:
@@ -872,8 +864,35 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       color: 'var(--color-accent, #D8A35C)',
                     }}
                   >
-                    {isUk ? 'Камера' : 'Камера'}
+                    {isUk ? 'Завантажити фото' : 'Загрузить фото'}
                   </button>
+                ) : !cameraActive ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
+                      style={{
+                        background:
+                          'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
+                        color: 'var(--color-accent, #D8A35C)',
+                      }}
+                    >
+                      {isUk ? 'Камера' : 'Камера'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
+                      style={{
+                        background:
+                          'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
+                        color: 'var(--color-accent, #D8A35C)',
+                      }}
+                    >
+                      {isUk ? 'Фото' : 'Фото'}
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button
@@ -902,20 +921,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </button>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold active:scale-[0.98]"
-                  style={{
-                    background:
-                      'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
-                    color: 'var(--color-accent, #D8A35C)',
-                  }}
-                >
-                  {isUk ? 'Фото' : 'Фото'}
-                </button>
 
-                {/* Галерея — без capture */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -923,18 +929,33 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   className="hidden"
                   onChange={onFileSelected}
                 />
-                {/* Системная камера (iOS + fallback Android) */}
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={onCameraCapture}
-                />
+                {!isIOS && (
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={onCameraCapture}
+                  />
+                )}
               </div>
 
-              {cameraActive && (
+              {isIOS && (
+                <p
+                  className="text-[11px] mb-2"
+                  style={{
+                    color:
+                      'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)',
+                  }}
+                >
+                  {isUk
+                    ? 'Зніміть фото в «Камера», потім виберіть його тут'
+                    : 'Снимите фото в «Камера», затем выберите его здесь'}
+                </p>
+              )}
+
+              {cameraActive && !isIOS && (
                 <div className="relative rounded-xl overflow-hidden mb-2 bg-black">
                   <video
                     ref={videoRef}
@@ -1320,4 +1341,4 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       )}
     </motion.div>
   )
-}
+ }
