@@ -61,7 +61,6 @@ export function BlogPage({
   const [activeFilter, setActiveFilter] = useState('all')
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
   const [emailCopied, setEmailCopied] = useState(false)
-  const [aboutClickCount, setAboutClickCount] = useState(0)
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
@@ -127,26 +126,7 @@ export function BlogPage({
 
   const handleAboutClick = () => {
     triggerHaptic('medium')
-    const nextCount = aboutClickCount + 1
-    setAboutClickCount(nextCount)
-    const stepsLeft = 22 - nextCount
-
-    if (nextCount === 22) {
-      setAboutClickCount(0)
-      setView('about')
-    } else if (lang === 'ru') {
-      if (nextCount === 3) showToastMessage(`Осталось ${stepsLeft} шагов, чтобы стать разработчиком.`)
-      else if (nextCount === 6) showToastMessage(`Вы уже близко. Осталось ${stepsLeft} шагов.`)
-      else if (nextCount === 9) showToastMessage(`Система фиксирует вашу настойчивость... Шагов: ${stepsLeft}.`)
-      else if (nextCount === 15) showToastMessage(`Осторожно, вы ломаете матрицу! Осталось ${stepsLeft} шагов.`)
-      else if (nextCount >= 18) showToastMessage(`Осталось шагов: ${stepsLeft}`)
-    } else {
-      if (nextCount === 3) showToastMessage(`Залишилося ${stepsLeft} кроків, щоб стати розробником.`)
-      else if (nextCount === 6) showToastMessage(`Ви вже близько. Залишилося ${stepsLeft} кроків.`)
-      else if (nextCount === 9) showToastMessage(`Система фіксує вашу наполегливість... Кроків: ${stepsLeft}.`)
-      else if (nextCount === 15) showToastMessage(`Обережно, ви ламаєте матрицю! Залишилося ${stepsLeft} кроків.`)
-      else if (nextCount >= 18) showToastMessage(`Залишилося кроків: ${stepsLeft}`)
-    }
+    setView('about')
   }
 
   const handleCopyEmail = async () => {
@@ -361,7 +341,7 @@ export function BlogPage({
         )}
       </AnimatePresence>
 
-      {view !== 'article' && (
+      {view !== 'article' && view !== 'about' && (
         <button
           type="button"
           aria-label="Go back"
@@ -371,8 +351,7 @@ export function BlogPage({
               setShowOnlyFavorites(false)
               setActiveFilter('all')
               setView('cover')
-            } else if (view === 'about') setView('collaboration')
-            else if (view === 'collaboration') setView('cover')
+            } else if (view === 'collaboration') setView('cover')
             else onBack?.()
           }}
           className="absolute top-4 left-4 z-50 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer focus-visible"
@@ -815,7 +794,7 @@ export function BlogPage({
             exit={{ opacity: 0 }}
             className="absolute inset-0 overflow-y-auto pt-14"
           >
-            <AboutProject lang={lang} />
+            <AboutProject lang={lang} onClose={() => setView('collaboration')} />
           </motion.div>
         )}
 
