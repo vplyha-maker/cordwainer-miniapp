@@ -424,14 +424,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   }}
                   onBlur={commitEdit}
                   onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                  className="w-full text-center text-[48px] font-light bg-transparent outline-none border-b"
+                  className="w-full text-center text-[48px] font-light bg-transparent outline-none border-b tabular-nums"
                   style={{ color: theme.accentSoft, borderColor: `${theme.accent}66` }}
                   inputMode="decimal"
                 />
               ) : (
                 <div className="cursor-pointer active:opacity-70 transition-opacity whitespace-nowrap">
                   <span
-                    className="text-[48px] font-light tracking-tight leading-none"
+                    className="text-[48px] font-light tracking-tight leading-none tabular-nums"
                     style={{ color: theme.accentSoft }}
                   >
                     {displayValue}
@@ -499,7 +499,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               }
             `}</style>
             <div
-              className="flex justify-between mt-2.5 text-[10px]"
+              className="flex justify-between mt-2.5 text-[10px] tabular-nums"
               style={{ color: 'var(--color-muted, #B9ACA0)' }}
             >
               <span>
@@ -531,7 +531,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
 
           <div
-            className="text-[64px] font-light leading-none tracking-tight mb-1"
+            className="text-[64px] font-light leading-none tracking-tight mb-1 tabular-nums"
             style={{ color: theme.accentSoft }}
           >
             {formatSize(result.eu)}
@@ -540,43 +540,58 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             {t.recommended}
           </div>
 
+          {/* Стабильная сетка — без прыжков при смене цифр */}
           <div
-            className="flex items-center justify-center gap-5 pt-4"
+            className="grid grid-cols-3 gap-2 pt-4 items-start"
             style={{
               borderTop: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 10%, transparent)',
             }}
           >
-            <div className="flex items-center gap-1.5">
-              <FlagUK />
-              <span className="text-[12px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                UK
-              </span>
-              <span className="text-[15px] font-medium ml-0.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+            <div className="flex flex-col items-center gap-1.5 min-w-0">
+              <div className="flex items-center gap-1 h-4">
+                <FlagUK />
+                <span className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  UK
+                </span>
+              </div>
+              <span
+                className="text-[15px] font-medium tabular-nums leading-none"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
                 {formatSize(result.uk)}
               </span>
             </div>
+
             <div
-              className="w-px h-4"
-              style={{ background: 'color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)' }}
-            />
-            <div className="flex items-center gap-1.5">
-              <FlagUS />
-              <span className="text-[12px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                {usLabel}
-              </span>
-              <span className="text-[15px] font-medium ml-0.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              className="flex flex-col items-center gap-1.5 min-w-0 border-x px-1"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--color-accent, #C6A47A) 15%, transparent)',
+              }}
+            >
+              <div className="flex items-center gap-1 h-4">
+                <FlagUS />
+                <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  {usLabel}
+                </span>
+              </div>
+              <span
+                className="text-[15px] font-medium tabular-nums leading-none"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
                 {formatSize(result.us)}
               </span>
             </div>
-            <div
-              className="w-px h-4"
-              style={{ background: 'color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)' }}
-            />
-            <div className="flex items-center gap-1.5">
-              <span className="text-[12px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                CM
-              </span>
-              <span className="text-[15px] font-medium ml-0.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+
+            <div className="flex flex-col items-center gap-1.5 min-w-0">
+              <div className="flex items-center h-4">
+                <span className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  CM
+                </span>
+              </div>
+              <span
+                className="text-[15px] font-medium tabular-nums leading-none"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
                 {result.cm.toFixed(1).replace('.', ',')}
               </span>
             </div>
