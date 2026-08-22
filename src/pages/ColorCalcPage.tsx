@@ -36,6 +36,18 @@ const DEFAULT_INVENTORY_IDS = [
   'acrylic_binder',
 ] as const
 
+/** iPhone / iPad (в т.ч. Telegram WebView) */
+function detectIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  if (/iPad|iPhone|iPod/.test(ua)) return true
+  // iPadOS 13+ может маскироваться под Mac
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) {
+    return true
+  }
+  return false
+}
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,9 +82,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [recipeResult, setRecipeResult] = useState<RecipeResult | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
-  /** Галерея / файлы — БЕЗ capture */
   const fileInputRef = useRef<HTMLInputElement>(null)
-  /** Fallback-камера через input (iOS / Telegram, когда getUserMedia не работает) */
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
@@ -80,6 +90,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const workerRef = useRef<Worker | null>(null)
   const reqIdRef = useRef(0)
+  const isIOSRef = useRef(detectIOS())
 
   const isUk = lang === 'uk'
   const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
@@ -250,7 +261,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     []
   )
 
-  /** Обработка файла из галереи ИЛИ из camera-input */
   const handleImageFile = (file: File | undefined | null) => {
     if (!file || !file.type.startsWith('image/')) return
     const url = URL.createObjectURL(file)
@@ -275,56 +285,55 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   /**
    * Камера:
-   * 1) пробуем live getUserMedia
-   * 2) если отказ / Telegram iOS — открываем input capture (снять 1 кадр)
+   * - iOS: сразу input[capture] в том же user-gesture (без await)
+   * - Android: live getUserMedia → при ошибке capture
    */
-  const startCamera = async () => {
+  const startCamera = () => {
     setRecipeError(null)
 
-    // Есть ли API вообще
-    if (
-      typeof navigator === 'undefined' ||
-      !navigator.mediaDevices?.getUserMedia
-    ) {
-      // Сразу fallback: системная камера → один снимок
+    if (isIOSRef.current) {
       cameraInputRef.current?.click()
       return
     }
 
-    try {
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop())
-        setStream(null)
+    void (async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        cameraInputRef.current?.click()
+        return
       }
 
-      // На iOS проще без жёсткого facingMode
-      let media: MediaStream
       try {
-        media = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          },
-          audio: false,
-        })
-      } catch {
-        // Повтор без constraints
-        media = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        })
-      }
+        if (stream) {
+          stream.getTracks().forEach((t) => t.stop())
+          setStream(null)
+        }
 
-      setStream(media)
-      setCameraActive(true)
-    } catch (err) {
-      console.error('getUserMedia failed, fallback to capture input', err)
-      setCameraActive(false)
-      setStream(null)
-      // iOS / Telegram: открыть нативную камеру на 1 кадр
-      cameraInputRef.current?.click()
-    }
+        let media: MediaStream
+        try {
+          media = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+            },
+            audio: false,
+          })
+        } catch {
+          media = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          })
+        }
+
+        setStream(media)
+        setCameraActive(true)
+      } catch (err) {
+        console.error('getUserMedia failed, fallback capture', err)
+        setCameraActive(false)
+        setStream(null)
+        cameraInputRef.current?.click()
+      }
+    })()
   }
 
   const stopCamera = () => {
@@ -906,7 +915,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   {isUk ? 'Фото' : 'Фото'}
                 </button>
 
-                {/* Галерея / файлы — БЕЗ capture */}
+                {/* Галерея — без capture */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -914,7 +923,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   className="hidden"
                   onChange={onFileSelected}
                 />
-                {/* Fallback: системная камера на 1 кадр (iOS / Telegram) */}
+                {/* Системная камера (iOS + fallback Android) */}
                 <input
                   ref={cameraInputRef}
                   type="file"
