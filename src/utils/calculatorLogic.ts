@@ -1,3 +1,8 @@
+/**
+ * calculatorLogic.ts
+ * Подбор рецепта пигментов (Two-Constant KM + Saunderson + CIEDE2000)
+ * Оптимизировано под мобильный WebView: лимиты комбинаций, меньше GC.
+ */
 import { Pigment } from '../data/pigments'
 import { Lang } from '../App'
 import {
@@ -74,6 +79,8 @@ export const getPigmentCategory = (id: string, lang: Lang) => {
   return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
+// ─── Color space ───────────────────────────────────────────────
+
 function rgbToLab(r: number, g: number, b: number) {
   let r_ = r / 255
   let g_ = g / 255
@@ -109,13 +116,20 @@ function calculateDeltaE2000(
   const { L: L1, a: a1, b: b1 } = lab1
   const { L: L2, a: a2, b: b2 } = lab2
 
-  const kL = 1, kC = 1, kH = 1
+  const kL = 1
+  const kC = 1
+  const kH = 1
 
   const C1 = Math.sqrt(a1 * a1 + b1 * b1)
   const C2 = Math.sqrt(a2 * a2 + b2 * b2)
   const Cbar = (C1 + C2) / 2
 
-  const G = 0.5 * (1 - Math.sqrt(Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))))
+  const G =
+    0.5 *
+    (1 -
+      Math.sqrt(
+        Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))
+      ))
 
   const a1Prime = a1 * (1 + G)
   const a2Prime = a2 * (1 + G)
@@ -124,8 +138,14 @@ function calculateDeltaE2000(
   const C2Prime = Math.sqrt(a2Prime * a2Prime + b2 * b2)
   const CbarPrime = (C1Prime + C2Prime) / 2
 
-  let h1Prime = b1 === 0 && a1Prime === 0 ? 0 : ((Math.atan2(b1, a1Prime) * 180) / Math.PI + 360) % 360
-  let h2Prime = b2 === 0 && a2Prime === 0 ? 0 : ((Math.atan2(b2, a2Prime) * 180) / Math.PI + 360) % 360
+  let h1Prime =
+    b1 === 0 && a1Prime === 0
+      ? 0
+      : ((Math.atan2(b1, a1Prime) * 180) / Math.PI + 360) % 360
+  let h2Prime =
+    b2 === 0 && a2Prime === 0
+      ? 0
+      : ((Math.atan2(b2, a2Prime) * 180) / Math.PI + 360) % 360
 
   let HbarPrime = h1Prime + h2Prime
   if (C1Prime * C2Prime !== 0) {
@@ -155,15 +175,25 @@ function calculateDeltaE2000(
 
   const deltaLPrime = L2 - L1
   const deltaCPrime = C2Prime - C1Prime
-  const deltaHPrime = 2 * Math.sqrt(C1Prime * C2Prime) * Math.sin((deltahPrime * Math.PI) / 360)
+  const deltaHPrime =
+    2 *
+    Math.sqrt(C1Prime * C2Prime) *
+    Math.sin((deltahPrime * Math.PI) / 360)
 
   const LbarPrime = (L1 + L2) / 2
-  const S_L = 1 + (0.015 * Math.pow(LbarPrime - 50, 2)) / Math.sqrt(20 + Math.pow(LbarPrime - 50, 2))
+  const S_L =
+    1 +
+    (0.015 * Math.pow(LbarPrime - 50, 2)) /
+      Math.sqrt(20 + Math.pow(LbarPrime - 50, 2))
   const S_C = 1 + 0.045 * CbarPrime
   const S_H = 1 + 0.015 * CbarPrime * T
 
   const deltaTheta = 30 * Math.exp(-Math.pow((HbarPrime - 275) / 25, 2))
-  const R_C = 2 * Math.sqrt(Math.pow(CbarPrime, 7) / (Math.pow(CbarPrime, 7) + Math.pow(25, 7)))
+  const R_C =
+    2 *
+    Math.sqrt(
+      Math.pow(CbarPrime, 7) / (Math.pow(CbarPrime, 7) + Math.pow(25, 7))
+    )
   const R_T = -Math.sin((2 * deltaTheta * Math.PI) / 180) * R_C
 
   return Math.sqrt(
@@ -174,15 +204,15 @@ function calculateDeltaE2000(
   )
 }
 
+/** Быстрая метрика (квадрат ΔE76) — только для грубого отбора */
 function fastDeltaE(
   lab1: { L: number; a: number; b: number },
   lab2: { L: number; a: number; b: number }
 ): number {
-  return (
-    Math.pow(lab1.L - lab2.L, 2) +
-    Math.pow(lab1.a - lab2.a, 2) +
-    Math.pow(lab1.b - lab2.b, 2)
-  )
+  const dL = lab1.L - lab2.L
+  const da = lab1.a - lab2.a
+  const db = lab1.b - lab2.b
+  return dL * dL + da * da + db * db
 }
 
 export function hexToRgbObj(hex: string) {
@@ -195,24 +225,42 @@ export function hexToRgbObj(hex: string) {
   }
 }
 
+// ─── Combinations (без рекурсии в hot path — генерим по запросу) ─
+
 function combinations(n: number, k: number): number[][] {
   const result: number[][] = []
-  const combo: number[] = []
+  if (k > n || k <= 0) return result
+  const combo = new Array<number>(k)
+  for (let i = 0; i < k; i++) combo[i] = i
 
-  function backtrack(start: number) {
-    if (combo.length === k) {
-      result.push([...combo])
-      return
-    }
-    for (let i = start; i < n; i++) {
-      combo.push(i)
-      backtrack(i + 1)
-      combo.pop()
-    }
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    result.push(combo.slice())
+    let i = k - 1
+    while (i >= 0 && combo[i] === n - k + i) i--
+    if (i < 0) break
+    combo[i]++
+    for (let j = i + 1; j < k; j++) combo[j] = combo[j - 1] + 1
   }
-
-  backtrack(0)
   return result
+}
+
+// ─── Recipe types ──────────────────────────────────────────────
+
+export interface RecipeItem {
+  pigment: Pigment
+  ml: number
+  isBinder?: boolean
+}
+
+export interface RecipeResult {
+  recipe: RecipeItem[]
+  resultRgb: { r: number; g: number; b: number }
+  resultHex: string
+  deltaE: number
+  system: CoverageSystem
+  /** true если ΔE₀₀ > 2.0 — неточное совпадение */
+  approximate?: boolean
 }
 
 interface BestResult {
@@ -222,11 +270,13 @@ interface BestResult {
   deltaE: number
 }
 
-export interface RecipeItem {
-  pigment: Pigment
-  ml: number
-  isBinder?: boolean
-}
+// Жёсткие лимиты под мобильный CPU/RAM
+const MAX_CANDIDATES = 12
+const MAX_TOP = 8
+const MAX_EVALS_K3 = 1800
+const MAX_EVALS_K4 = 900
+
+// ─── Core search ───────────────────────────────────────────────
 
 export function findRecipeByHex(
   targetHex: string,
@@ -235,18 +285,21 @@ export function findRecipeByHex(
   targetVolume = 20,
   system: CoverageSystem = 'acrylic',
   excludeIds: string[] = []
-) {
+): RecipeResult | null {
   if (!pigments.length || !targetHex) return null
 
+  // Binder: ищем в переданном списке (для acrylic лучше передавать полный inventory)
   const binderPigment =
     system === 'acrylic'
-      ? pigments.find((p) => p.id === 'acrylic_binder' || (p as any).isBinder === true)
+      ? pigments.find(
+          (p) => p.id === 'acrylic_binder' || (p as { isBinder?: boolean }).isBinder === true
+        )
       : undefined
 
   const validPigments = pigments.filter(
     (p) =>
       p.id !== 'acrylic_binder' &&
-      !(p as any).isBinder &&
+      !(p as { isBinder?: boolean }).isBinder &&
       p.spectrum &&
       p.spectrum.length > 0 &&
       !excludeIds.includes(p.id)
@@ -257,133 +310,165 @@ export function findRecipeByHex(
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
   const isDarkTarget = targetLab.L < 45
 
-  const buildComponentsWithBinder = (
-    selectedPigments: Pigment[],
+  const buildComponents = (
+    selected: Pigment[],
     vols: number[]
   ): MixComponent[] => {
-    const components: MixComponent[] = selectedPigments.map((pigment, i) => ({
-      spectrum: pigment.spectrum!,
-      volume: vols[i],
-    }))
-
+    const components: MixComponent[] = new Array(selected.length)
+    for (let i = 0; i < selected.length; i++) {
+      components[i] = {
+        spectrum: selected[i].spectrum!,
+        volume: vols[i],
+      }
+    }
     if (binderPigment?.spectrum) {
-      const totalPigmentVol = vols.reduce((sum, v) => sum + v, 0)
+      let total = 0
+      for (let i = 0; i < vols.length; i++) total += vols[i]
       components.push({
         spectrum: binderPigment.spectrum,
-        volume: totalPigmentVol * 0.2,
+        volume: total * 0.2,
         isBinder: true,
       })
     }
-
     return components
   }
 
-  const scored = validPigments.map((p) => {
-    const components = buildComponentsWithBinder([p], [100])
-    const rgb = spectrumToRGB(mixSpectra(components))
+  // 1) Score singles → candidates
+  const scored: { pigment: Pigment; dist: number }[] = new Array(
+    validPigments.length
+  )
+  for (let i = 0; i < validPigments.length; i++) {
+    const p = validPigments[i]
+    const rgb = spectrumToRGB(mixSpectra(buildComponents([p], [100])))
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    return { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
-  })
+    scored[i] = { pigment: p, dist: calculateDeltaE2000(targetLab, lab) }
+  }
   scored.sort((a, b) => a.dist - b.dist)
 
   const candidatesSet = new Set<Pigment>()
+  for (let i = 0; i < Math.min(6, scored.length); i++) {
+    candidatesSet.add(scored[i].pigment)
+  }
 
-  scored.slice(0, 6).forEach((s) => candidatesSet.add(s.pigment))
-
-  const allBasicIds = PURE_BASIC_COLORS.flatMap((b) => b.sourceIds as readonly string[])
-  validPigments
-    .filter((p) => allBasicIds.includes(p.id))
-    .forEach((p) => candidatesSet.add(p))
+  const allBasicIds = PURE_BASIC_COLORS.flatMap(
+    (b) => b.sourceIds as readonly string[]
+  )
+  for (let i = 0; i < validPigments.length; i++) {
+    const p = validPigments[i]
+    if (allBasicIds.includes(p.id)) candidatesSet.add(p)
+  }
 
   const earthAndWarmIds = [
-    'yellow_ochre', 'red_ochre', 'raw_sienna', 'burnt_sienna',
-    'raw_umber', 'burnt_umber', 'green_earth',
-    'cadmium_red', 'pyrrole_red', 'carmine_lake', 'venetian_red',
-    'indian_red', 'mars_red', 'quinacridone_red', 'permanent_red',
+    'yellow_ochre',
+    'red_ochre',
+    'raw_sienna',
+    'burnt_sienna',
+    'raw_umber',
+    'burnt_umber',
+    'green_earth',
+    'cadmium_red',
+    'pyrrole_red',
+    'carmine_lake',
   ]
-  validPigments
-    .filter(
-      (p) =>
-        earthAndWarmIds.includes(p.id) ||
-        p.id.includes('ochre') ||
-        p.id.includes('sienna') ||
-        p.id.includes('umber') ||
-        p.id.includes('red')
-    )
-    .forEach((p) => candidatesSet.add(p))
+  for (let i = 0; i < validPigments.length; i++) {
+    const p = validPigments[i]
+    if (
+      earthAndWarmIds.includes(p.id) ||
+      p.id.includes('ochre') ||
+      p.id.includes('sienna') ||
+      p.id.includes('umber') ||
+      p.id.includes('red')
+    ) {
+      candidatesSet.add(p)
+    }
+  }
 
   if (isDarkTarget) {
-    const blackIds = PURE_BASIC_COLORS[1].sourceIds as readonly string[]
-    validPigments
-      .filter(
-        (p) =>
-          blackIds.includes(p.id) ||
-          p.id.includes('black') ||
-          p.id === 'bone_black' ||
-          p.id === 'ivory_black' ||
-          p.id === 'lamp_black'
-      )
-      .forEach((p) => candidatesSet.add(p))
-
-    validPigments
-      .filter(
-        (p) =>
-          p.id.includes('umber') ||
-          p.id.includes('burnt') ||
-          p.id === 'bitumen' ||
-          p.id.includes('mars_black')
-      )
-      .forEach((p) => candidatesSet.add(p))
+    for (let i = 0; i < validPigments.length; i++) {
+      const p = validPigments[i]
+      if (
+        p.id.includes('black') ||
+        p.id.includes('umber') ||
+        p.id.includes('burnt') ||
+        p.id === 'bitumen'
+      ) {
+        candidatesSet.add(p)
+      }
+    }
   }
 
   if (targetLab.L < 35) {
     const blueIds = PURE_BASIC_COLORS[4].sourceIds as readonly string[]
-    validPigments
-      .filter((p) => blueIds.includes(p.id))
-      .forEach((p) => candidatesSet.add(p))
+    for (let i = 0; i < validPigments.length; i++) {
+      if (blueIds.includes(validPigments[i].id)) {
+        candidatesSet.add(validPigments[i])
+      }
+    }
   }
 
-  const candidates = Array.from(candidatesSet).slice(0, 14)
+  const candidates = Array.from(candidatesSet).slice(0, MAX_CANDIDATES)
   const n = candidates.length
+  if (n === 0) return null
 
   const darkIndices: number[] = []
-  candidates.forEach((p, idx) => {
+  for (let idx = 0; idx < n; idx++) {
+    const id = candidates[idx].id
     if (
-      p.id.includes('black') ||
-      p.id.includes('umber') ||
-      p.id.includes('burnt') ||
-      p.id === 'bitumen'
+      id.includes('black') ||
+      id.includes('umber') ||
+      id.includes('burnt') ||
+      id === 'bitumen'
     ) {
       darkIndices.push(idx)
     }
-  })
+  }
 
   let topResults: BestResult[] = []
+  let evalCount = 0
 
   const tryAddResult = (indices: number[], vols: number[]) => {
-    const selectedPigments = indices.map((idx) => candidates[idx])
-    const components = buildComponentsWithBinder(selectedPigments, vols)
-
-    const mixed = mixSpectra(components)
+    evalCount++
+    const selected: Pigment[] = new Array(indices.length)
+    for (let i = 0; i < indices.length; i++) {
+      selected[i] = candidates[indices[i]]
+    }
+    const mixed = mixSpectra(buildComponents(selected, vols))
     const rgb = spectrumToRGB(mixed)
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
     const dist = fastDeltaE(targetLab, lab)
 
-    topResults.push({ indices, volumes: [...vols], rgb, deltaE: dist })
+    topResults.push({
+      indices: indices.slice(),
+      volumes: vols.slice(),
+      rgb,
+      deltaE: dist,
+    })
     topResults.sort((a, b) => a.deltaE - b.deltaE)
-    if (topResults.length > 10) topResults.pop()
+    if (topResults.length > MAX_TOP) topResults.length = MAX_TOP
   }
 
   // k = 1
   for (let i = 0; i < n; i++) tryAddResult([i], [100])
 
   // k = 2
-  const ratios2 = [
-    [98, 2], [96, 4], [95, 5], [92, 8], [90, 10],
-    [85, 15], [80, 20], [70, 30], [60, 40], [50, 50],
+  const ratios2: number[][] = [
+    [98, 2],
+    [96, 4],
+    [95, 5],
+    [92, 8],
+    [90, 10],
+    [85, 15],
+    [80, 20],
+    [70, 30],
+    [60, 40],
+    [50, 50],
   ]
-  for (const [i, j] of combinations(n, 2)) {
-    for (const [a, b] of ratios2) {
+  const combos2 = combinations(n, 2)
+  for (let c = 0; c < combos2.length; c++) {
+    const [i, j] = combos2[c]
+    for (let r = 0; r < ratios2.length; r++) {
+      const a = ratios2[r][0]
+      const b = ratios2[r][1]
       tryAddResult([i, j], [a, b])
       if (a !== b) tryAddResult([i, j], [b, a])
     }
@@ -391,101 +476,125 @@ export function findRecipeByHex(
 
   if (isDarkTarget && darkIndices.length > 0) {
     for (let i = 0; i < n; i++) {
-      if (darkIndices.includes(i)) continue
-      for (const dIdx of darkIndices) {
-        for (const [main, dark] of [
-          [97, 3], [95, 5], [93, 7], [90, 10], [85, 15],
-        ]) {
-          tryAddResult([i, dIdx], [main, dark])
-        }
+      if (darkIndices.indexOf(i) >= 0) continue
+      for (let d = 0; d < darkIndices.length; d++) {
+        const dIdx = darkIndices[d]
+        tryAddResult([i, dIdx], [97, 3])
+        tryAddResult([i, dIdx], [95, 5])
+        tryAddResult([i, dIdx], [90, 10])
+        tryAddResult([i, dIdx], [85, 15])
       }
     }
   }
 
   // k = 3
-  if (maxComponents >= 3) {
-    const ratios3 = [
-      [90, 8, 2], [88, 9, 3], [85, 10, 5], [82, 12, 6],
-      [80, 15, 5], [75, 15, 10], [70, 20, 10], [65, 25, 10],
-      [60, 30, 10], [55, 30, 15], [50, 30, 20], [45, 35, 20],
-      [40, 40, 20], [40, 35, 25], [34, 33, 33], [50, 25, 25],
-      [60, 25, 15],
+  if (maxComponents >= 3 && n >= 3) {
+    const ratios3: number[][] = [
+      [90, 8, 2],
+      [85, 10, 5],
+      [80, 15, 5],
+      [75, 15, 10],
+      [70, 20, 10],
+      [60, 30, 10],
+      [50, 30, 20],
+      [40, 40, 20],
+      [34, 33, 33],
+      [50, 25, 25],
     ]
-    for (const combo of combinations(n, 3)) {
-      for (const ratio of ratios3) {
-        const perms = [
-          [ratio[0], ratio[1], ratio[2]],
-          [ratio[0], ratio[2], ratio[1]],
-          [ratio[1], ratio[0], ratio[2]],
-          [ratio[1], ratio[2], ratio[0]],
-          [ratio[2], ratio[0], ratio[1]],
-          [ratio[2], ratio[1], ratio[0]],
-        ]
-        const uniquePerms = Array.from(
-          new Set(perms.map((p) => JSON.stringify(p)))
-        ).map((s) => JSON.parse(s) as number[])
-        for (const p of uniquePerms) tryAddResult(combo, p)
+    const combos3 = combinations(n, 3)
+    let k3Evals = 0
+    outer3: for (let c = 0; c < combos3.length; c++) {
+      const combo = combos3[c]
+      for (let r = 0; r < ratios3.length; r++) {
+        const ratio = ratios3[r]
+        // 3 уникальных перестановки без JSON
+        tryAddResult(combo, [ratio[0], ratio[1], ratio[2]])
+        tryAddResult(combo, [ratio[0], ratio[2], ratio[1]])
+        tryAddResult(combo, [ratio[1], ratio[0], ratio[2]])
+        k3Evals += 3
+        if (k3Evals >= MAX_EVALS_K3) break outer3
       }
     }
 
-    if (isDarkTarget && darkIndices.length > 0) {
-      for (const combo of combinations(n, 3)) {
-        const hasDark = combo.some((idx) => darkIndices.includes(idx))
-        if (!hasDark) continue
-        for (const ratio of [
-          [90, 7, 3], [88, 8, 4], [85, 10, 5], [80, 15, 5], [75, 18, 7],
-        ]) {
-          tryAddResult(combo, ratio)
-          tryAddResult(combo, [ratio[0], ratio[2], ratio[1]])
+    if (isDarkTarget && darkIndices.length > 0 && k3Evals < MAX_EVALS_K3) {
+      for (let c = 0; c < combos3.length && k3Evals < MAX_EVALS_K3; c++) {
+        const combo = combos3[c]
+        let hasDark = false
+        for (let t = 0; t < 3; t++) {
+          if (darkIndices.indexOf(combo[t]) >= 0) {
+            hasDark = true
+            break
+          }
         }
+        if (!hasDark) continue
+        tryAddResult(combo, [90, 7, 3])
+        tryAddResult(combo, [85, 10, 5])
+        tryAddResult(combo, [80, 15, 5])
+        k3Evals += 3
       }
     }
   }
 
   // k = 4
   if (maxComponents >= 4 && n >= 4) {
-    const ratios4 = [
-      [70, 15, 10, 5], [65, 18, 12, 5], [60, 20, 15, 5],
-      [55, 25, 15, 5], [50, 25, 15, 10], [45, 25, 20, 10],
-      [40, 30, 20, 10], [40, 25, 20, 15], [35, 30, 20, 15],
+    const ratios4: number[][] = [
+      [70, 15, 10, 5],
+      [60, 20, 15, 5],
+      [50, 25, 15, 10],
+      [45, 25, 20, 10],
+      [40, 30, 20, 10],
+      [35, 30, 20, 15],
     ]
-    for (const combo of combinations(n, 4)) {
-      for (const ratio of ratios4) {
-        tryAddResult(combo, ratio)
+    const combos4 = combinations(n, 4)
+    let k4Evals = 0
+    outer4: for (let c = 0; c < combos4.length; c++) {
+      const combo = combos4[c]
+      for (let r = 0; r < ratios4.length; r++) {
+        tryAddResult(combo, ratios4[r])
+        k4Evals++
+        if (k4Evals >= MAX_EVALS_K4) break outer4
       }
     }
   }
 
   if (topResults.length === 0) return null
 
-  // Точна доводка
-  let absoluteBest: BestResult = { ...topResults[0], deltaE: Infinity }
+  // ── Точная доводка (CIEDE2000) ──
+  let absoluteBest: BestResult = {
+    indices: topResults[0].indices,
+    volumes: topResults[0].volumes.slice(),
+    rgb: topResults[0].rgb,
+    deltaE: Infinity,
+  }
 
   const adjustments = isDarkTarget
-    ? [0.7, 0.8, 0.88, 0.94, 0.97, 1.03, 1.06, 1.12, 1.2, 1.3]
-    : [0.75, 0.85, 0.92, 0.97, 1.03, 1.08, 1.15, 1.25]
+    ? [0.7, 0.85, 0.94, 0.97, 1.03, 1.08, 1.2, 1.3]
+    : [0.8, 0.9, 0.95, 0.97, 1.03, 1.08, 1.15, 1.25]
 
-  for (const candidate of topResults) {
-    let currentVols = [...candidate.volumes]
+  for (let t = 0; t < topResults.length; t++) {
+    const candidate = topResults[t]
+    let currentVols = candidate.volumes.slice()
 
     const evaluate = (vols: number[]) => {
-      const selectedPigments = candidate.indices.map((idx) => candidates[idx])
-      const components = buildComponentsWithBinder(selectedPigments, vols)
-      const mixed = mixSpectra(components)
+      const selected: Pigment[] = new Array(candidate.indices.length)
+      for (let i = 0; i < candidate.indices.length; i++) {
+        selected[i] = candidates[candidate.indices[i]]
+      }
+      const mixed = mixSpectra(buildComponents(selected, vols))
       const rgb = spectrumToRGB(mixed)
       const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
       return { rgb, deltaE: calculateDeltaE2000(targetLab, lab) }
     }
 
     let currentRes = evaluate(currentVols)
+    const passes = isDarkTarget ? 4 : 3
 
-    const passes = isDarkTarget ? 5 : 4
     for (let pass = 0; pass < passes; pass++) {
       let improved = false
       for (let i = 0; i < currentVols.length; i++) {
-        for (const adj of adjustments) {
-          const trialVols = [...currentVols]
-          trialVols[i] = Math.max(0.1, Math.min(100, trialVols[i] * adj))
+        for (let a = 0; a < adjustments.length; a++) {
+          const trialVols = currentVols.slice()
+          trialVols[i] = Math.max(0.1, Math.min(100, trialVols[i] * adjustments[a]))
           const trialRes = evaluate(trialVols)
           if (trialRes.deltaE < currentRes.deltaE - 0.0003) {
             currentRes = trialRes
@@ -513,16 +622,21 @@ export function findRecipeByHex(
   const scaleTarget = targetVolume > 0 ? targetVolume : 20
   const scale = scaleTarget / totalWeight
 
-  const recipe: RecipeItem[] = absoluteBest.indices
-    .map((candidateIdx, i) => ({
-      pigment: candidates[candidateIdx],
-      ml: Math.round(absoluteBest.volumes[i] * scale * 100) / 100,
-    }))
-    .filter((r) => r.ml > 0.05)
-    .sort((a, b) => b.ml - a.ml)
+  const recipe: RecipeItem[] = []
+  for (let i = 0; i < absoluteBest.indices.length; i++) {
+    const ml = Math.round(absoluteBest.volumes[i] * scale * 100) / 100
+    if (ml > 0.05) {
+      recipe.push({
+        pigment: candidates[absoluteBest.indices[i]],
+        ml,
+      })
+    }
+  }
+  recipe.sort((a, b) => b.ml - a.ml)
 
   if (binderPigment && system === 'acrylic') {
-    const totalPigmentMl = recipe.reduce((sum, r) => sum + r.ml, 0)
+    let totalPigmentMl = 0
+    for (let i = 0; i < recipe.length; i++) totalPigmentMl += recipe[i].ml
     const binderMl = Math.round(totalPigmentMl * 0.2 * 100) / 100
     if (binderMl > 0) {
       recipe.push({
@@ -533,14 +647,19 @@ export function findRecipeByHex(
     }
   }
 
+  const deltaE = Math.round(absoluteBest.deltaE * 10) / 10
+
   return {
     recipe,
     resultRgb: absoluteBest.rgb,
     resultHex: rgbToHex(absoluteBest.rgb),
-    deltaE: Math.round(absoluteBest.deltaE * 10) / 10,
+    deltaE,
     system,
+    approximate: deltaE > 2.0,
   }
 }
+
+// ─── Layer simulation (без изменений по смыслу) ────────────────
 
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
@@ -552,8 +671,10 @@ export function simulateLayersKM(
   const baseRgb = spectrumToRGB(baseSpectrum)
   const paintRgb = spectrumToRGB(paintSpectrum)
 
-  const baseL = (0.2126 * baseRgb.r + 0.7152 * baseRgb.g + 0.0722 * baseRgb.b) / 255
-  const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
+  const baseL =
+    (0.2126 * baseRgb.r + 0.7152 * baseRgb.g + 0.0722 * baseRgb.b) / 255
+  const paintL =
+    (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
   const deltaL = Math.abs(paintL - baseL)
 
   if (deltaL > 0.45) strength *= 0.72
@@ -562,12 +683,15 @@ export function simulateLayersKM(
 
   strength = Math.max(16, Math.min(58, strength))
 
-  const mixLayer = (current: SpectrumPoint[], paint: SpectrumPoint[], s: number) => {
-    return mixSpectra([
+  const mixLayer = (
+    current: SpectrumPoint[],
+    paint: SpectrumPoint[],
+    s: number
+  ) =>
+    mixSpectra([
       { spectrum: current, volume: 100 - s },
       { spectrum: paint, volume: s },
     ])
-  }
 
   const layer1 = mixLayer(baseSpectrum, paintSpectrum, strength)
   const layer2 = mixLayer(layer1, paintSpectrum, strength * 0.94)
@@ -581,4 +705,4 @@ export function simulateLayersKM(
     strength: Math.round(strength),
     deltaL,
   }
-}
+ }
