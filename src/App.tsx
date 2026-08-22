@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
-import { useEffect, useLayoutEffect, useState, useRef } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
@@ -9,11 +9,7 @@ import { SizeCalcPage } from './pages/SizeCalcPage'
 import { WidthCalcPage } from './pages/WidthCalcPage'
 import { HeelCalcPage } from './pages/HeelCalcPage'
 import { ColorCalcPage } from './pages/ColorCalcPage'
-import { ColorsPage } from './pages/ColorsPage'   // ← новый импорт
-
-import { loadThemePigments, loadAllPigments } from './data/loadPigments'
-import { applyPigmentTheme } from './theme/pigmentTheme'
-import type { Pigment } from './data/pigments'
+import { ColorsPage } from './pages/ColorsPage'
 
 import {
   getSavedPerfMode,
@@ -38,7 +34,7 @@ export type Screen =
   | 'width-calc'
   | 'heel-calc'
   | 'color-calc'
-  | 'colors'          // ← новый экран
+  | 'colors'
 
 export type Lang = 'ru' | 'uk'
 
@@ -50,24 +46,19 @@ export interface FavoriteItem {
   imagePng: string
 }
 
-/** 
- * Вспомогательная функция определения темной темы.
- * Жестко фиксируем темную тему для браузера.
- */
 function getIsDarkTheme(): boolean {
   const tg = window.Telegram?.WebApp
-  // Проверяем наличие initData. Если она не пустая — мы в реальном Telegram.
   const isRealTelegram = Boolean(tg?.initData && tg.initData.trim().length > 0)
-  
+
   if (isRealTelegram) {
     return tg?.colorScheme === 'dark'
   }
-  
-  // В браузере ВСЕГДА возвращаем true (темная тема)
+
+  // В браузере всегда тёмная тема
   return true
 }
 
-/** Мгновенный приглушённый fallback (до загрузки спектров) */
+/** Мгновенная тема без fetch и спектров */
 function applyImmediateMutedTheme(isDark: boolean) {
   const root = document.documentElement
 
@@ -153,8 +144,6 @@ export default function App() {
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
-  const pigmentsRef = useRef<Pigment[]>([])
-
   const handleSetLang = (next: Lang) => {
     setLang(next)
     try {
@@ -181,7 +170,7 @@ export default function App() {
     })
   }
 
-  // === 0. Мгновенный fallback (до первой отрисовки) ===
+  // === 0. Мгновенная тема (до первой отрисовки) ===
   useLayoutEffect(() => {
     const isDark = getIsDarkTheme()
     applyImmediateMutedTheme(isDark)
@@ -196,35 +185,7 @@ export default function App() {
     } catch {}
   }, [])
 
-  // === 1. Загрузка пигментов (сначала тема — быстро) ===
-  useEffect(() => {
-    let cancelled = false
-
-    const run = async () => {
-      try {
-        const themePigments = await loadThemePigments()
-        if (cancelled) return
-
-        pigmentsRef.current = themePigments
-
-        const isDark = getIsDarkTheme()
-        applyPigmentTheme(themePigments, isDark)
-
-        const all = await loadAllPigments()
-        if (cancelled) return
-        pigmentsRef.current = all
-      } catch (err) {
-        console.error('Failed to load pigments for theme:', err)
-      }
-    }
-
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // === 2. Telegram theme + переключение день/ночь ===
+  // === 1. Telegram theme (без пигментов) ===
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -234,14 +195,7 @@ export default function App() {
 
     const applyTheme = () => {
       const isDark = getIsDarkTheme()
-
-      if (pigmentsRef.current.length > 0) {
-        applyPigmentTheme(pigmentsRef.current, isDark)
-      } else {
-        applyImmediateMutedTheme(isDark)
-      }
-      
-      // ВАЖНО: Всегда обновляем цвета самого приложения Telegram (даже если пигменты загружены)
+      applyImmediateMutedTheme(isDark)
       try {
         const bg = isDark ? '#1C1816' : '#F5F1EA'
         tg.setHeaderColor(bg)
@@ -257,7 +211,7 @@ export default function App() {
     }
   }, [])
 
-  // === 3. Performance mode ===
+  // === 2. Performance mode ===
   useEffect(() => {
     let cancelled = false
 
@@ -357,7 +311,7 @@ export default function App() {
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
-            onOpenColors={() => setScreen('colors')}   // ← новый проп
+            onOpenColors={() => setScreen('colors')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -451,7 +405,6 @@ export default function App() {
           />
         )}
 
-        {/* === Новый экран Цвета и отделка === */}
         {screen === 'colors' && (
           <ColorsPage
             key="colors"
