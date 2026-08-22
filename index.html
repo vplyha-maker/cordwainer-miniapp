@@ -21,7 +21,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Cordwainer" />
 
-    <!-- Fonts: preconnect + non-blocking load -->
+    <!-- LCP: hero сразу в HTML -->
+    <link
+      rel="preload"
+      as="image"
+      href="/hero-cover.webp"
+      type="image/webp"
+      fetchpriority="high"
+    />
+
+    <!-- Fonts: preconnect + non-blocking -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -42,7 +51,7 @@
       />
     </noscript>
 
-    <!-- Telegram: defer, чтобы не блокировать first paint -->
+    <!-- Telegram: defer -->
     <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 
     <!-- Тёмная тема в браузере до React -->
@@ -62,4 +71,4 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-  </html>
+</html>
