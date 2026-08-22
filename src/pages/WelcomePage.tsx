@@ -153,6 +153,10 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         <img
           src="/hero-cover.webp"
           alt="Cordwainer Background"
+          width={780}
+          height={1040}
+          fetchPriority="high"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
         />
         <div
@@ -250,7 +254,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
       {/* Content */}
       <div className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3">
-        {/* Categories */}
         <div className="grid grid-cols-3 gap-2.5 md:gap-3 mb-5 items-stretch max-w-full">
           {categories.map((item) => (
             <button
@@ -284,7 +287,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           ))}
         </div>
 
-        {/* Primary Start button */}
         <button
           onClick={onStart}
           className="btn-primary mb-6"
@@ -315,7 +317,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           </div>
         </button>
 
-        {/* Favorites */}
         <div className="mb-2">
           <div className="flex items-center justify-between mb-2 px-0.5">
             <span
@@ -352,6 +353,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                     <img
                       src={item.imagePng}
                       alt={`Favorite ${index}`}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                       draggable={false}
                     />
@@ -370,14 +373,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         </div>
       </div>
 
-      {/* Bottom Dock */}
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto">
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
           <BottomDock active="search" lang={lang} />
         </div>
       </div>
 
-      {/* Модалка */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
@@ -480,4 +481,4 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       </AnimatePresence>
     </div>
   )
- }
+}
