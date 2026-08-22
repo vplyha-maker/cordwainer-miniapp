@@ -19,6 +19,24 @@ interface ColorCalcPageProps {
 
 type TabId = 'mix' | 'pro'
 
+/** Стартовый инвентарь Pro */
+const DEFAULT_INVENTORY_IDS = [
+  'titanium_white',
+  'zinc_white',
+  'ivory_black',
+  'lamp_black',
+  'cadmium_red',
+  'pyrrole_red',
+  'cadmium_yellow',
+  'yellow_ochre',
+  'ultramarine',
+  'phthalo_blue',
+  'phthalo_green',
+  'burnt_sienna',
+  'raw_umber',
+  'acrylic_binder',
+] as const
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,33 +85,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const pigmentName = (p: Pigment) => (isUk ? p.name.uk : p.name.ru)
 
+  /** Восстановить инвентарь по умолчанию (только те id, что реально есть в базе) */
+  const resetInventoryDefaults = useCallback(() => {
+    const available = new Set(pigments.map((p) => p.id))
+    const next = DEFAULT_INVENTORY_IDS.filter((id) => available.has(id))
+    setInventoryIds(next)
+  }, [pigments])
+
   const loadPigments = () => {
     setLoading(true)
     setLoadError(false)
     loadAllPigments()
       .then((loaded) => {
         setPigments(loaded)
-        const defaults = loaded
-          .filter((p) =>
-            [
-              'titanium_white',
-              'zinc_white',
-              'ivory_black',
-              'lamp_black',
-              'cadmium_red',
-              'pyrrole_red',
-              'cadmium_yellow',
-              'yellow_ochre',
-              'ultramarine',
-              'phthalo_blue',
-              'phthalo_green',
-              'burnt_sienna',
-              'raw_umber',
-              'acrylic_binder',
-            ].includes(p.id)
-          )
-          .map((p) => p.id)
-        setInventoryIds(defaults)
+        const available = new Set(loaded.map((p) => p.id))
+        setInventoryIds(
+          DEFAULT_INVENTORY_IDS.filter((id) => available.has(id))
+        )
         setLoading(false)
       })
       .catch((err) => {
@@ -107,7 +115,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (workerRef.current) {
@@ -117,7 +124,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [])
 
-  // Stop tracks when stream changes / unmount
   useEffect(() => {
     return () => {
       if (stream) {
@@ -126,11 +132,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     }
   }, [stream])
 
-  /**
-   * КРИТИЧНО для камеры в Telegram / iOS WebView:
-   * video появляется в DOM только после setCameraActive(true).
-   * Вешаем srcObject и play() здесь, когда ref уже живой.
-   */
   useEffect(() => {
     const video = videoRef.current
     if (!cameraActive || !stream || !video) return
@@ -157,7 +158,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         tryPlay()
       }
       video.addEventListener('loadedmetadata', onMeta)
-      // fallback: иногда metadata уже есть
       tryPlay()
       return () => {
         video.removeEventListener('loadedmetadata', onMeta)
@@ -275,7 +275,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
       setStream(media)
       setCameraActive(true)
-      // srcObject + play — в useEffect выше
     } catch (err) {
       console.error(err)
       setRecipeError(isUk ? 'Немає доступу до камери' : 'Нет доступа к камере')
@@ -298,7 +297,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const captureFromCamera = () => {
     const video = videoRef.current
     if (!video) return
-    // videoWidth может быть 0, пока кадр не пришёл
     if (!video.videoWidth || !video.videoHeight) {
       setRecipeError(
         isUk
@@ -386,6 +384,29 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     )
   }
 
+  const selectAllInventory = () => {
+    const ids = pigments
+      .filter(
+        (p) =>
+          p.id !== 'acrylic_binder' &&
+          p.id !== 'cardboard' &&
+          p.spectrum
+      )
+      .map((p) => p.id)
+    // binder для acrylic оставляем в списке, если был в defaults / system acrylic
+    if (system === 'acrylic') {
+      const hasBinder = pigments.some((p) => p.id === 'acrylic_binder')
+      if (hasBinder && !ids.includes('acrylic_binder')) {
+        ids.push('acrylic_binder')
+      }
+    }
+    setInventoryIds(ids)
+  }
+
+  const clearInventory = () => {
+    setInventoryIds([])
+  }
+
   const tabBtn = (id: TabId, label: string) => (
     <button
       key={id}
@@ -453,6 +474,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       <div className="flex-1 flex flex-col gap-4 mt-1">
         {tab === 'mix' && (
           <>
+            {/* ... mix tab без изменений — состав / результат / объём ... */}
             <section
               className="rounded-2xl overflow-visible relative z-10"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -745,6 +767,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
         {tab === 'pro' && (
           <>
+            {/* целевой цвет + камера — без изменений */}
             <section
               className="rounded-2xl px-4 md:px-5 pt-4 pb-5"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -972,21 +995,54 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
+            {/* ── Инвентарь + кнопки ── */}
             <section
               className="rounded-2xl px-4 md:px-5 py-4"
               style={{ background: 'var(--color-surface, #25201C)' }}
             >
-              <h2
-                className="text-[13px] font-semibold mb-2"
-                style={{
-                  color:
-                    'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)',
-                }}
-              >
-                {isUk
-                  ? `Інвентар (${inventoryIds.length})`
-                  : `Инвентарь (${inventoryIds.length})`}
-              </h2>
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <h2
+                  className="text-[13px] font-semibold"
+                  style={{
+                    color:
+                      'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)',
+                  }}
+                >
+                  {isUk
+                    ? `Інвентар (${inventoryIds.length})`
+                    : `Инвентарь (${inventoryIds.length})`}
+                </h2>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={resetInventoryDefaults}
+                    className="text-[11px] font-semibold px-2 py-1 rounded-lg active:opacity-80"
+                    style={{
+                      background:
+                        'color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)',
+                      color: 'var(--color-accent, #D8A35C)',
+                    }}
+                  >
+                    {isUk ? 'За замовч.' : 'По умолчанию'}
+                  </button>
+                  <button
+                    onClick={selectAllInventory}
+                    className="text-[11px] font-medium px-2 py-1 rounded-lg active:opacity-80"
+                    style={{
+                      color:
+                        'color-mix(in srgb, var(--color-ink, #F5F1EA) 55%, transparent)',
+                    }}
+                  >
+                    {isUk ? 'Усі' : 'Все'}
+                  </button>
+                  <button
+                    onClick={clearInventory}
+                    className="text-[11px] font-medium px-2 py-1 rounded-lg active:opacity-80"
+                    style={{ color: 'var(--color-danger, #f87171)' }}
+                  >
+                    {isUk ? 'Скинути' : 'Сбросить'}
+                  </button>
+                </div>
+              </div>
               <p
                 className="text-[11px] mb-3"
                 style={{
@@ -1206,4 +1262,4 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       )}
     </motion.div>
   )
- }
+}
