@@ -54,11 +54,9 @@ function getIsDarkTheme(): boolean {
     return tg?.colorScheme === 'dark'
   }
 
-  // В браузере всегда тёмная тема
   return true
 }
 
-/** Мгновенная тема без fetch и спектров */
 function applyImmediateMutedTheme(isDark: boolean) {
   const root = document.documentElement
 
@@ -109,6 +107,12 @@ function applyImmediateMutedTheme(isDark: boolean) {
   }
 }
 
+/** Нормализация старых путей из localStorage */
+function normalizeFavoriteImage(src: string): string {
+  if (!src) return '/blog-hero.webp'
+  return src.replace('/blog-hero.png', '/blog-hero.webp')
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>('welcome')
   const [lang, setLang] = useState<Lang>(() => {
@@ -129,10 +133,13 @@ export default function App() {
           return parsed.map((id: string) => ({
             id,
             type: id.includes('blog') ? 'blog' : 'article',
-            imagePng: id.includes('blog') ? '/blog-hero.png' : `/${id}.png`,
+            imagePng: id.includes('blog') ? '/blog-hero.webp' : `/${id}.png`,
           }))
         }
-        return parsed as FavoriteItem[]
+        return (parsed as FavoriteItem[]).map((item) => ({
+          ...item,
+          imagePng: normalizeFavoriteImage(item.imagePng),
+        }))
       }
       return []
     } catch {
@@ -156,11 +163,16 @@ export default function App() {
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
     } catch {}
 
+    const normalized: FavoriteItem = {
+      ...item,
+      imagePng: normalizeFavoriteImage(item.imagePng),
+    }
+
     setFavorites((prev) => {
-      const exists = prev.some((fav) => fav.id === item.id)
+      const exists = prev.some((fav) => fav.id === normalized.id)
       const next = exists
-        ? prev.filter((fav) => fav.id !== item.id)
-        : [...prev, item]
+        ? prev.filter((fav) => fav.id !== normalized.id)
+        : [...prev, normalized]
 
       try {
         localStorage.setItem('cordwainer_favorites', JSON.stringify(next))
@@ -170,7 +182,6 @@ export default function App() {
     })
   }
 
-  // === 0. Мгновенная тема (до первой отрисовки) ===
   useLayoutEffect(() => {
     const isDark = getIsDarkTheme()
     applyImmediateMutedTheme(isDark)
@@ -185,7 +196,6 @@ export default function App() {
     } catch {}
   }, [])
 
-  // === 1. Telegram theme (без пигментов) ===
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (!tg) return
@@ -211,7 +221,6 @@ export default function App() {
     }
   }, [])
 
-  // === 2. Performance mode ===
   useEffect(() => {
     let cancelled = false
 
@@ -342,7 +351,7 @@ export default function App() {
               toggleFavorite({
                 id: 'blog-orvard',
                 type: 'blog',
-                imagePng: '/blog-hero.png',
+                imagePng: '/blog-hero.webp',
               })
             }
             favoriteArticleIds={favorites
@@ -416,4 +425,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
-}
+ }
