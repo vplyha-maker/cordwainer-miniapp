@@ -56,23 +56,18 @@ export function BlogPage({
   initialShowFavorites = false,
 }: BlogPageProps) {
   const [view, setView] = useState<ViewState>('cover')
-
   const [rawSearchQuery, setRawSearchQuery] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-
   const [activeFilter, setActiveFilter] = useState('all')
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null)
   const [emailCopied, setEmailCopied] = useState(false)
-
   const [aboutClickCount, setAboutClickCount] = useState(0)
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
-
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
   const articleScrollRef = useRef<HTMLDivElement>(null)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const onArticleOpenedRef = useRef(onArticleOpened)
 
   const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
@@ -83,9 +78,7 @@ export function BlogPage({
   }, [onArticleOpened])
 
   useEffect(() => {
-    const timerId = setTimeout(() => {
-      setSearchQuery(rawSearchQuery)
-    }, 300)
+    const timerId = setTimeout(() => setSearchQuery(rawSearchQuery), 300)
     return () => clearTimeout(timerId)
   }, [rawSearchQuery])
 
@@ -136,33 +129,29 @@ export function BlogPage({
     triggerHaptic('medium')
     const nextCount = aboutClickCount + 1
     setAboutClickCount(nextCount)
-
     const stepsLeft = 22 - nextCount
 
     if (nextCount === 22) {
       setAboutClickCount(0)
       setView('about')
+    } else if (lang === 'ru') {
+      if (nextCount === 3) showToastMessage(`Осталось ${stepsLeft} шагов, чтобы стать разработчиком.`)
+      else if (nextCount === 6) showToastMessage(`Вы уже близко. Осталось ${stepsLeft} шагов.`)
+      else if (nextCount === 9) showToastMessage(`Система фиксирует вашу настойчивость... Шагов: ${stepsLeft}.`)
+      else if (nextCount === 15) showToastMessage(`Осторожно, вы ломаете матрицу! Осталось ${stepsLeft} шагов.`)
+      else if (nextCount >= 18) showToastMessage(`Осталось шагов: ${stepsLeft}`)
     } else {
-      if (lang === 'ru') {
-        if (nextCount === 3) showToastMessage(`Осталось ${stepsLeft} шагов, чтобы стать разработчиком.`)
-        else if (nextCount === 6) showToastMessage(`Вы уже близко. Осталось ${stepsLeft} шагов.`)
-        else if (nextCount === 9) showToastMessage(`Система фиксирует вашу настойчивость... Шагов: ${stepsLeft}.`)
-        else if (nextCount === 15) showToastMessage(`Осторожно, вы ломаете матрицу! Осталось ${stepsLeft} шагов.`)
-        else if (nextCount >= 18) showToastMessage(`Осталось шагов: ${stepsLeft}`)
-      } else {
-        if (nextCount === 3) showToastMessage(`Залишилося ${stepsLeft} кроків, щоб стати розробником.`)
-        else if (nextCount === 6) showToastMessage(`Ви вже близько. Залишилося ${stepsLeft} кроків.`)
-        else if (nextCount === 9) showToastMessage(`Система фіксує вашу наполегливість... Кроків: ${stepsLeft}.`)
-        else if (nextCount === 15) showToastMessage(`Обережно, ви ламаєте матрицю! Залишилося ${stepsLeft} кроків.`)
-        else if (nextCount >= 18) showToastMessage(`Залишилося кроків: ${stepsLeft}`)
-      }
+      if (nextCount === 3) showToastMessage(`Залишилося ${stepsLeft} кроків, щоб стати розробником.`)
+      else if (nextCount === 6) showToastMessage(`Ви вже близько. Залишилося ${stepsLeft} кроків.`)
+      else if (nextCount === 9) showToastMessage(`Система фіксує вашу наполегливість... Кроків: ${stepsLeft}.`)
+      else if (nextCount === 15) showToastMessage(`Обережно, ви ламаєте матрицю! Залишилося ${stepsLeft} кроків.`)
+      else if (nextCount >= 18) showToastMessage(`Залишилося кроків: ${stepsLeft}`)
     }
   }
 
   const handleCopyEmail = async () => {
     triggerHaptic('medium')
     const email = 'cordwain@tuta.io'
-
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(email)
@@ -177,7 +166,6 @@ export function BlogPage({
         document.execCommand('copy')
         textArea.remove()
       }
-
       setEmailCopied(true)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = setTimeout(() => setEmailCopied(false), 2000)
@@ -189,17 +177,12 @@ export function BlogPage({
   const handleShareArticle = async (title: string, tag: string) => {
     triggerHaptic('medium')
     const tg = getWebApp()
-
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
     const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
 
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: 'PRO Обувь',
-          text: text,
-          url: appUrl,
-        })
+        await navigator.share({ title: 'PRO Обувь', text, url: appUrl })
         return
       } catch (error) {
         console.log('Share canceled or failed', error)
@@ -325,7 +308,6 @@ export function BlogPage({
     return counts
   }, [lang, favoriteArticleIds])
 
-  // Единый стиль карточек через CSS-переменные
   const cardStyle = {
     background:
       'linear-gradient(180deg, color-mix(in srgb, var(--color-surface, #25201C) 92%, transparent) 10%, color-mix(in srgb, var(--color-bg, #1C1816) 20%, transparent) 100%)',
@@ -360,7 +342,6 @@ export function BlogPage({
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
-      {/* Toast */}
       <AnimatePresence>
         {toast.visible && (
           <motion.div
@@ -380,7 +361,6 @@ export function BlogPage({
         )}
       </AnimatePresence>
 
-      {/* Global Back Button */}
       {view !== 'article' && (
         <button
           type="button"
@@ -409,6 +389,7 @@ export function BlogPage({
       )}
 
       <AnimatePresence mode="wait">
+        {/* ========== COVER ========== */}
         {view === 'cover' && (
           <motion.div
             key="cover"
@@ -419,7 +400,14 @@ export function BlogPage({
             className="absolute inset-0 flex flex-col justify-between"
           >
             <div className="absolute inset-0 z-0 h-[65vh] overflow-hidden pointer-events-none">
-              <img src="/blog-hero.png" alt="PRO" className="w-full h-full object-cover object-center" />
+              <img
+                src="/blog-hero.webp"
+                alt="PRO"
+                width={780}
+                height={520}
+                decoding="async"
+                className="w-full h-full object-cover object-center"
+              />
               <div
                 className="absolute inset-0"
                 style={{
@@ -433,7 +421,7 @@ export function BlogPage({
               />
             </div>
 
-            <div className="relative z-10 flex-1 flex flex-col justify-end px-4 pb-6 pt-16">
+            <div className="relative z-10 flex-1 flex flex-col justify-end px-4 md:px-6 pb-6 pt-16">
               <div className="mb-5">
                 <p
                   className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1"
@@ -459,7 +447,6 @@ export function BlogPage({
               </div>
 
               <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
-                {/* Читать */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -488,7 +475,6 @@ export function BlogPage({
                     style={{
                       background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)',
                       color: 'var(--color-accent, #D8A35C)',
-                      boxShadow: '0 0 12px color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)',
                     }}
                   >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -505,7 +491,6 @@ export function BlogPage({
                   </div>
                 </motion.button>
 
-                {/* Сотрудничество */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -517,18 +502,17 @@ export function BlogPage({
                   style={{ ...cardStyle, willChange: 'transform' }}
                 >
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0"
                     style={{
-                      background: 'color-mix(in srgb, var(--color-info, #1034A6) 18%, transparent)',
+                      background: 'color-mix(in srgb, var(--color-info, #60A5FA) 18%, transparent)',
                       color: 'var(--color-info, #60A5FA)',
-                      boxShadow: '0 0 12px color-mix(in srgb, var(--color-info, #60A5FA) 25%, transparent)',
                     }}
                   >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                   </div>
-                  <div className="relative z-10 flex-1 flex flex-col justify-end">
+                  <div className="flex-1 flex flex-col justify-end">
                     <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
                       {t.contact}
                     </div>
@@ -538,7 +522,6 @@ export function BlogPage({
                   </div>
                 </motion.button>
 
-                {/* Избранное */}
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -546,217 +529,94 @@ export function BlogPage({
                     onToggleFavorite?.()
                   }}
                   whileTap={{ scale: 0.96 }}
-                  className="fav-root relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px] focus-visible"
+                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px] focus-visible"
                   style={{ ...cardStyle, willChange: 'transform' }}
                 >
-                  <div className={`fav-highlight absolute inset-0 pointer-events-none ${isFavorite ? 'is-on' : ''}`} />
                   <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10 text-sm transition-colors duration-300 ${
-                      isFavorite ? 'bg-[#F472B6] text-[var(--color-ink,#F5F1EA)]' : 'bg-[#F472B6]/20 text-[#F472B6]'
-                    }`}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0"
+                    style={{
+                      background: isFavorite
+                        ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)'
+                        : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 12%, transparent)',
+                      color: isFavorite ? 'var(--color-accent, #D8A35C)' : 'var(--color-muted, #B9ACA0)',
+                    }}
                   >
-                    ★
+                    <svg
+                      width="17"
+                      height="17"
+                      viewBox="0 0 24 24"
+                      fill={isFavorite ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    >
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
                   </div>
-                  <div className="relative z-10 flex-1 flex flex-col justify-end">
+                  <div className="flex-1 flex flex-col justify-end">
                     <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
                       {isFavorite ? t.favoriteRemove : t.favoriteAdd}
                     </div>
-                    <div
-                      className="text-[9px] mt-1 leading-snug transition-colors duration-300"
-                      style={{ color: isFavorite ? '#F472B6' : 'var(--color-muted, #B9ACA0)' }}
-                    >
+                    <div className="text-[9px] mt-1 leading-snug" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
                       {isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub}
                     </div>
                   </div>
                 </motion.button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic('light')
-                  onBack?.()
-                }}
-                className="w-full text-center text-[15px] font-medium py-2 active:scale-95 transition-all cursor-pointer focus-visible rounded-lg"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
-              >
-                {t.backToMenu}
-              </button>
             </div>
           </motion.div>
         )}
 
-        {view === 'collaboration' && (
-          <motion.div
-            key="collaboration"
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col z-40 overflow-y-auto overflow-x-hidden w-full max-w-full px-5 pt-20 pb-10 box-border"
-            style={{ background: 'var(--color-bg, #1C1816)' }}
-          >
-            <div
-              className="flex flex-col mt-4 mb-10 pt-8"
-              style={{ borderTop: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)' }}
-            >
-              <div
-                className="flex items-center text-[10px] font-mono tracking-[0.2em] uppercase mb-4"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
-              >
-                <span
-                  className="px-2 py-0.5 font-bold mr-3"
-                  style={{
-                    background: 'var(--color-info, #60A5FA)',
-                    color: 'var(--color-bg, #1C1816)',
-                  }}
-                >
-                  INFO
-                </span>
-                {t.collabSubtitle}
-              </div>
-              <h2
-                className="font-display text-[2.4rem] font-black uppercase leading-none tracking-tighter mb-5 break-words"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
-                {t.collabTitle}
-              </h2>
-              <p className="text-[13px] leading-relaxed max-w-sm" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                {t.collabText}
-              </p>
-            </div>
-
-            <div className="rounded-2xl p-5 w-full flex flex-col box-border" style={cardStyle}>
-              <span
-                className="text-[10px] uppercase font-bold tracking-widest mb-1"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
-              >
-                {t.collabEmailLabel}
-              </span>
-              <span
-                className="text-[1.4rem] font-medium mb-6 tracking-wide break-all"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
-                cordwain@tuta.io
-              </span>
-
-              <div className="grid grid-cols-2 gap-3 w-full mt-auto">
-                <button
-                  type="button"
-                  onClick={handleCopyEmail}
-                  className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 focus-visible"
-                  style={{
-                    backgroundColor: emailCopied
-                      ? 'color-mix(in srgb, var(--color-info, #60A5FA) 15%, transparent)'
-                      : 'transparent',
-                    color: emailCopied ? 'var(--color-info, #60A5FA)' : 'var(--color-ink, #F5F1EA)',
-                    border: `1px solid ${
-                      emailCopied
-                        ? 'color-mix(in srgb, var(--color-info, #60A5FA) 30%, transparent)'
-                        : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 30%, transparent)'
-                    }`,
-                  }}
-                >
-                  {emailCopied ? t.copiedBtn : t.copyBtn}
-                </button>
-
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleAboutClick}
-                  className="py-3.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 focus-visible cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--color-accent, #D8A35C)',
-                    color: 'var(--color-bg, #1C1816)',
-                    willChange: 'transform',
-                  }}
-                >
-                  {t.aboutBtn}
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {view === 'about' && (
-          <motion.div
-            key="about"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0 z-50 bg-black"
-          >
-            <AboutProject lang={lang} onClose={() => setView('collaboration')} />
-          </motion.div>
-        )}
-
+        {/* ========== JOURNAL ========== */}
         {view === 'journal' && (
           <motion.div
             key="journal"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col pt-16 z-20"
-            style={{ background: 'var(--color-bg, #1C1816)' }}
+            className="absolute inset-0 flex flex-col"
           >
-            <div className="px-4 shrink-0">
-              <h2
-                className="font-display text-[2rem] leading-none mb-1"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
-                {isFavoritesActive ? (lang === 'ru' ? 'Избранное' : 'Обране') : t.journalTitle}
+            <div className="px-4 md:px-6 pt-16 pb-3 shrink-0">
+              <h2 className="font-display text-[1.75rem] leading-tight mb-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+                {t.journalTitle}
               </h2>
-              <p
-                className="text-[11px] mb-4 leading-relaxed max-w-[90%]"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
-              >
-                {isFavoritesActive
-                  ? lang === 'ru'
-                    ? `Сохранённые статьи · ${favoriteArticleIds.length}`
-                    : `Збережені статті · ${favoriteArticleIds.length}`
-                  : t.journalDesc}
+              <p className="text-[12px] leading-relaxed mb-4" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                {t.journalDesc}
               </p>
 
-              {!isFavoritesActive && (
-                <div className="relative mb-4">
-                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted, #B9ACA0)" strokeWidth="2">
-                      <circle cx="11" cy="11" r="8" />
-                      <path d="M21 21l-4.3-4.3" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder={t.searchPlaceholder}
-                    value={rawSearchQuery}
-                    onChange={(e) => setRawSearchQuery(e.target.value)}
-                    className="w-full rounded-xl py-2 pl-9 pr-4 text-[16px] focus:outline-none transition-colors"
-                    style={{
-                      background: 'var(--color-surface, #25201C)',
-                      border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                      color: 'var(--color-ink, #F5F1EA)',
-                    }}
-                  />
-                </div>
-              )}
+              <div
+                className="rounded-2xl px-3.5 py-2.5 flex items-center gap-2 mb-3"
+                style={{
+                  background: 'var(--color-surface, #25201C)',
+                  border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3.5-3.5" />
+                </svg>
+                <input
+                  type="search"
+                  value={rawSearchQuery}
+                  onChange={(e) => setRawSearchQuery(e.target.value)}
+                  placeholder={t.searchPlaceholder}
+                  className="flex-1 bg-transparent outline-none text-[13px] min-w-0"
+                  style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                />
+              </div>
 
-              <div className="flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 scrollbar-hide snap-x" role="tablist">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 snap-x">
                 {t.filters.map((filter) => {
-                  const isActive = activeFilter === filter.id
-                  const cnt = filterCounts[filter.id] || 0
-
+                  const isActive = activeFilter === filter.id || (filter.id === 'favorites' && showOnlyFavorites)
+                  const cnt = filterCounts[filter.id] ?? 0
                   return (
                     <button
                       key={filter.id}
-                      role="tab"
-                      aria-selected={isActive}
-                      aria-pressed={isActive}
                       type="button"
                       onClick={() => {
-                        triggerHaptic()
-                        if (filter.id !== 'favorites') setShowOnlyFavorites(false)
+                        triggerHaptic('light')
+                        if (filter.id === 'favorites') setShowOnlyFavorites(true)
+                        else setShowOnlyFavorites(false)
                         setActiveFilter(filter.id)
                       }}
                       className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border focus-visible flex items-center gap-1.5"
@@ -778,7 +638,7 @@ export function BlogPage({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 mt-2 pb-8">
+            <div className="flex-1 overflow-y-auto px-4 md:px-6 mt-2 pb-8">
               <p
                 className="text-[10px] tracking-[0.14em] uppercase mb-3 font-semibold"
                 style={{ color: 'var(--color-accent, #D8A35C)' }}
@@ -788,7 +648,9 @@ export function BlogPage({
                     ? 'ИЗБРАННОЕ'
                     : 'ОБРАНЕ'
                   : searchQuery
-                    ? 'Результаты'
+                    ? lang === 'ru'
+                      ? 'Результаты'
+                      : 'Результати'
                     : t.fresh}
               </p>
 
@@ -831,10 +693,7 @@ export function BlogPage({
                           <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />
                         )}
                       </div>
-                      <h3
-                        className="text-[15px] font-semibold leading-snug mb-1.5"
-                        style={{ color: 'var(--color-ink, #F5F1EA)' }}
-                      >
+                      <h3 className="text-[15px] font-semibold leading-snug mb-1.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
                         {title}
                       </h3>
                       <p
@@ -843,10 +702,7 @@ export function BlogPage({
                       >
                         {excerpt}
                       </p>
-                      <div
-                        className="flex items-center text-[11px] font-medium"
-                        style={{ color: 'var(--color-accent, #D8A35C)' }}
-                      >
+                      <div className="flex items-center text-[11px] font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                         {t.readBtn}
                         <span className="ml-1 opacity-70">→</span>
                       </div>
@@ -885,6 +741,85 @@ export function BlogPage({
           </motion.div>
         )}
 
+        {/* ========== COLLABORATION ========== */}
+        {view === 'collaboration' && (
+          <motion.div
+            key="collaboration"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="absolute inset-0 flex flex-col px-4 md:px-6 pt-16 pb-8 overflow-y-auto"
+          >
+            <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+              {t.collabSubtitle}
+            </p>
+            <h2 className="font-display text-[1.75rem] leading-tight mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              {t.collabTitle}
+            </h2>
+            <p className="text-[13px] leading-relaxed mb-6" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+              {t.collabText}
+            </p>
+
+            <div
+              className="rounded-2xl p-4 mb-4"
+              style={{
+                background: 'var(--color-surface, #25201C)',
+                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+              }}
+            >
+              <p className="text-[10px] tracking-[0.12em] uppercase mb-2" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                {t.collabEmailLabel}
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[14px] font-medium truncate" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+                  cordwain@tuta.io
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyEmail}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold active:scale-95 transition-transform"
+                  style={{
+                    background: emailCopied
+                      ? 'color-mix(in srgb, var(--color-success, #0BDA51) 20%, transparent)'
+                      : 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)',
+                    color: emailCopied ? 'var(--color-success, #0BDA51)' : 'var(--color-accent, #D8A35C)',
+                  }}
+                >
+                  {emailCopied ? t.copiedBtn : t.copyBtn}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAboutClick}
+              className="w-full py-3.5 rounded-2xl text-[12px] font-semibold uppercase tracking-wider active:scale-[0.98] transition-transform"
+              style={{
+                background: 'var(--color-surface, #25201C)',
+                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+                color: 'var(--color-muted, #B9ACA0)',
+              }}
+            >
+              {t.aboutBtn}
+            </button>
+          </motion.div>
+        )}
+
+        {/* ========== ABOUT ========== */}
+        {view === 'about' && (
+          <motion.div
+            key="about"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 overflow-y-auto pt-14"
+          >
+            <AboutProject lang={lang} />
+          </motion.div>
+        )}
+
+        {/* ========== ARTICLE ========== */}
         {view === 'article' && activeArticle && content && (
           <motion.div
             key="article"
@@ -955,7 +890,7 @@ export function BlogPage({
                   aria-label="Favorite"
                   onClick={() => {
                     triggerHaptic(isCurrentArticleFavorite ? 'light' : 'medium')
-                    onToggleArticleFavorite?.(activeArticle.id, activeArticle.cover || '/blog-hero.png')
+                    onToggleArticleFavorite?.(activeArticle.id, activeArticle.cover || '/blog-hero.webp')
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-full border active:scale-90 transition-all focus-visible"
                   style={{
@@ -986,9 +921,10 @@ export function BlogPage({
 
             <div className="relative w-full h-[35vh] shrink-0">
               <img
-                src={activeArticle.cover || '/blog-hero.png'}
+                src={activeArticle.cover || '/blog-hero.webp'}
                 alt={lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
               <div
@@ -1021,10 +957,7 @@ export function BlogPage({
             </div>
 
             <div className="px-5 py-6 pb-8">
-              <h1
-                className="font-display text-[1.8rem] leading-tight mb-6"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
+              <h1 className="font-display text-[1.8rem] leading-tight mb-6" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
                 {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
               </h1>
 
@@ -1032,39 +965,19 @@ export function BlogPage({
                 <Markdown
                   components={{
                     p: ({ node, ...props }) => (
-                      <p
-                        className="text-[14.5px] leading-relaxed mb-4"
-                        style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                        {...props}
-                      />
+                      <p className="text-[14.5px] leading-relaxed mb-4" style={{ color: 'var(--color-muted, #B9ACA0)' }} {...props} />
                     ),
                     h2: ({ node, ...props }) => (
-                      <h2
-                        className="font-display text-[1.4rem] font-bold mt-8 mb-4"
-                        style={{ color: 'var(--color-ink, #F5F1EA)' }}
-                        {...props}
-                      />
+                      <h2 className="font-display text-[1.4rem] font-bold mt-8 mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }} {...props} />
                     ),
                     h3: ({ node, ...props }) => (
-                      <h3
-                        className="font-display text-[1.1rem] font-semibold mt-6 mb-3"
-                        style={{ color: 'var(--color-accent, #D8A35C)' }}
-                        {...props}
-                      />
+                      <h3 className="font-display text-[1.1rem] font-semibold mt-6 mb-3" style={{ color: 'var(--color-accent, #D8A35C)' }} {...props} />
                     ),
                     ul: ({ node, ...props }) => (
-                      <ul
-                        className="list-disc pl-5 mb-5 text-[14.5px] space-y-2"
-                        style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                        {...props}
-                      />
+                      <ul className="list-disc pl-5 mb-5 text-[14.5px] space-y-2" style={{ color: 'var(--color-muted, #B9ACA0)' }} {...props} />
                     ),
                     ol: ({ node, ...props }) => (
-                      <ol
-                        className="list-decimal pl-5 mb-5 text-[14.5px] space-y-2"
-                        style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                        {...props}
-                      />
+                      <ol className="list-decimal pl-5 mb-5 text-[14.5px] space-y-2" style={{ color: 'var(--color-muted, #B9ACA0)' }} {...props} />
                     ),
                     li: ({ node, ...props }) => <li className="pl-1" {...props} />,
                     strong: ({ node, ...props }) => (
@@ -1104,6 +1017,7 @@ export function BlogPage({
                         <img
                           className="max-w-full max-h-[360px] w-auto h-auto object-contain rounded-lg"
                           loading="lazy"
+                          decoding="async"
                           alt={alt || 'Иллюстрация к статье'}
                           {...props}
                         />
@@ -1119,7 +1033,7 @@ export function BlogPage({
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={() => {
-                    const cover = activeArticle.cover || '/blog-hero.png'
+                    const cover = activeArticle.cover || '/blog-hero.webp'
                     triggerHaptic(isCurrentArticleFavorite ? 'light' : 'medium')
                     onToggleArticleFavorite?.(activeArticle.id, cover)
                   }}
@@ -1149,7 +1063,6 @@ export function BlogPage({
                         'linear-gradient(to bottom, color-mix(in srgb, var(--color-surface, #25201C) 70%, transparent), color-mix(in srgb, var(--color-surface, #25201C) 50%, transparent))',
                     }}
                   />
-
                   <svg
                     width="18"
                     height="18"
@@ -1161,12 +1074,12 @@ export function BlogPage({
                         : 'var(--color-muted, #B9ACA0)'
                     }
                     strokeWidth="1.8"
-                    className="relative z-10 transition-colors duration-300"
+                    className="relative z-10"
                   >
                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                   </svg>
                   <span
-                    className="relative z-10 text-[12px] font-bold uppercase tracking-wider transition-colors duration-300"
+                    className="relative z-10 text-[12px] font-bold uppercase tracking-wider"
                     style={{
                       color: isCurrentArticleFavorite
                         ? 'var(--color-accent, #D8A35C)'
@@ -1184,10 +1097,7 @@ export function BlogPage({
                   borderTop: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
                 }}
               >
-                <div
-                  className="text-[11px]"
-                  style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 60%, transparent)' }}
-                >
+                <div className="text-[11px]" style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 60%, transparent)' }}>
                   {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
                 </div>
               </div>
@@ -1199,4 +1109,4 @@ export function BlogPage({
       </AnimatePresence>
     </div>
   )
-}
+ }
