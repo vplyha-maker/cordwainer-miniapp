@@ -7,7 +7,7 @@ type HomePageProps = {
   onBack?: () => void
   onOpenBlog?: () => void
   onOpenCalcMenu?: () => void
-  onOpenColors?: () => void          // ← новый проп
+  onOpenColors?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -19,7 +19,7 @@ export function HomePage({
   onBack,
   onOpenBlog,
   onOpenCalcMenu,
-  onOpenColors,                      // ← новый проп
+  onOpenColors,
   lang,
   setLang,
   favorites = [],
@@ -203,7 +203,7 @@ export function HomePage({
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
+      <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
         <h1 className="text-[34px] font-serif font-normal tracking-wide leading-none text-[var(--color-ink,#F5F1EA)]">
           {t.menu}
         </h1>
@@ -240,7 +240,7 @@ export function HomePage({
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-5 overflow-y-auto pb-[110px] overscroll-none">
+      <div className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
         {/* Search */}
         <div className="mb-5">
           <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
@@ -263,16 +263,18 @@ export function HomePage({
               <button
                 key={item.id}
                 onClick={isColors ? onOpenColors : undefined}
-                className="h-[116px] p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
+                className="min-h-[116px] h-auto p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
               >
                 <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
                   {item.icon}
                 </div>
-                <div>
-                  <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
+                <div className="min-w-0 mt-2">
+                  <div className="text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] break-words">
                     {item.title}
                   </div>
-                  <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{item.subtitle}</div>
+                  <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2">
+                    {item.subtitle}
+                  </div>
                 </div>
               </button>
             )
@@ -283,7 +285,7 @@ export function HomePage({
         <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
           {t.tools}
         </p>
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-2.5 md:gap-3 mb-6">
           {TOOLS.map((item) => {
             const isBlog = item.id === 'blog'
             const isCalc = item.id === 'calc'
@@ -291,23 +293,27 @@ export function HomePage({
               <button
                 key={item.id}
                 onClick={isBlog ? onOpenBlog : isCalc ? onOpenCalcMenu : undefined}
-                className={`h-[116px] p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm ${
+                className={`min-h-[116px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm overflow-hidden ${
                   isBlog && hasNewBlog
                     ? 'border border-[var(--pigment-lac-dye,#8B0000)]/50 shadow-[0_0_15px_color-mix(in_srgb,var(--pigment-lac-dye,#8B0000)_20%,transparent)]'
                     : 'border border-[var(--color-border,rgba(255,255,255,0.12))]'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
+                <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 ${item.iconClass}`}>
                   {item.icon}
                 </div>
-                <div>
-                  <div className="text-[13px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)] flex items-center gap-1">
-                    {item.title}
+                <div className="min-w-0 mt-2 w-full">
+                  <div className="text-[12px] md:text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] flex items-start gap-0.5">
+                    <span className="break-words hyphens-auto" lang={lang}>
+                      {item.title}
+                    </span>
                     {isBlog && hasNewBlog && (
-                      <span className="text-[var(--pigment-lac-dye,#8B0000)]">•</span>
+                      <span className="text-[var(--pigment-lac-dye,#8B0000)] shrink-0">•</span>
                     )}
                   </div>
-                  <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] truncate">{item.subtitle}</div>
+                  <div className="text-[10px] md:text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2 leading-snug">
+                    {item.subtitle}
+                  </div>
                 </div>
               </button>
             )
@@ -316,7 +322,7 @@ export function HomePage({
 
         {/* Избранное */}
         <button
-          className="w-full h-[80px] px-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98] shadow-sm"
+          className="w-full min-h-[80px] px-4 py-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98] shadow-sm"
           onClick={() => {
             if (articleFavorites.length === 0) return
             if (articleFavorites.length === 1) {
@@ -367,8 +373,10 @@ export function HomePage({
 
       {/* Bottom Dock */}
       <div className="fixed bottom-[10px] left-0 right-0 z-50 pointer-events-auto">
-        <BottomDock active="search" lang={lang} />
+        <div className="mx-auto w-full max-w-[var(--app-max-width)]">
+          <BottomDock active="search" lang={lang} />
+        </div>
       </div>
     </div>
   )
- }
+}
