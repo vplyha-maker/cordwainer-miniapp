@@ -10,6 +10,7 @@ import { WidthCalcPage } from './pages/WidthCalcPage'
 import { HeelCalcPage } from './pages/HeelCalcPage'
 import { ColorCalcPage } from './pages/ColorCalcPage'
 import { ColorsPage } from './pages/ColorsPage'
+import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 
 import {
   getSavedPerfMode,
@@ -35,6 +36,7 @@ export type Screen =
   | 'heel-calc'
   | 'color-calc'
   | 'colors'
+  | 'seo-width'
 
 export type Lang = 'ru' | 'uk'
 
@@ -113,8 +115,17 @@ function normalizeFavoriteImage(src: string): string {
   return src.replace('/blog-hero.png', '/blog-hero.webp')
 }
 
+/** Определяем, открыта ли скрытая SEO-страница по URL (orphan page) */
+function getInitialScreen(): Screen {
+  try {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/'
+    if (path === '/forward-ortho-converter') return 'seo-width'
+  } catch {}
+  return 'welcome'
+}
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('welcome')
+  const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [lang, setLang] = useState<Lang>(() => {
     try {
       const saved = localStorage.getItem('cordwainer_lang')
@@ -420,6 +431,20 @@ export default function App() {
             onBack={() => setScreen('home')}
             lang={lang}
             setLang={handleSetLang}
+          />
+        )}
+
+        {screen === 'seo-width' && (
+          <ForwardOrthoSEOPage
+            key="seo-width"
+            lang={lang}
+            setLang={handleSetLang}
+            onBack={() => {
+              try {
+                window.history.replaceState(null, '', '/')
+              } catch {}
+              setScreen('home')
+            }}
           />
         )}
       </AnimatePresence>
