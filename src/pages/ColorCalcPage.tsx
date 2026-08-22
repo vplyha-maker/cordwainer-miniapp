@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
@@ -10,7 +10,18 @@ import { PigmentSelector } from '../components/PigmentSelector'
 import type {
   CoverageSystem,
   RecipeResult,
+  RecipeItem,
 } from '../utils/calculatorLogic'
+import {
+  hexToLabObj,
+  calculateDeltaE2000,
+  rgbToLab,
+} from '../utils/calculatorLogic'
+import {
+  mixSpectra,
+  spectrumToRGB,
+  rgbToHex,
+} from '../utils/colorScience'
 
 interface ColorCalcPageProps {
   lang: Lang
@@ -46,6 +57,34 @@ function detectIOS(): boolean {
   return false
 }
 
+/** Пересчёт цвета смеси по текущим мл */
+function recalcFromRecipe(
+  items: RecipeItem[],
+  targetHex: string
+): { resultHex: string; deltaE: number } | null {
+  const components: { spectrum: NonNullable<Pigment['spectrum']>; volume: number }[] =
+    []
+
+  for (const item of items) {
+    if (item.isBinder) continue
+    const vol = item.ml
+    if (!(vol > 0) || !item.pigment?.spectrum) continue
+    components.push({ spectrum: item.pigment.spectrum, volume: vol })
+  }
+
+  if (components.length === 0) return null
+
+  const mixed = mixSpectra(components)
+  const rgb = spectrumToRGB(mixed)
+  const resultHex = rgbToHex(rgb).toUpperCase()
+
+  const labResult = rgbToLab(rgb)
+  const labTarget = hexToLabObj(targetHex)
+  const deltaE = calculateDeltaE2000(labTarget, labResult)
+
+  return { resultHex, deltaE }
+}
+
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,6 +117,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [recipeLoading, setRecipeLoading] = useState(false)
   const [recipeError, setRecipeError] = useState<string | null>(null)
   const [recipeResult, setRecipeResult] = useState<RecipeResult | null>(null)
+  /** Редактируемые строки рецепта (мл можно крутить руками) */
+  const [editItems, setEditItems] = useState<RecipeItem[] | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -96,6 +137,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const squareColor = displayHex || '#2A2522'
 
   const pigmentName = (p: Pigment) => (isUk ? p.name.uk : p.name.ru)
+
+  /** Живой пересчёт после правки мл */
+  const livePreview = useMemo(() => {
+    if (!editItems || !targetHex || targetHex.length < 7) return null
+    try {
+      return recalcFromRecipe(editItems, targetHex)
+    } catch {
+      return null
+    }
+  }, [editItems, targetHex])
+
+  const shownHex =
+    livePreview?.resultHex ||
+    recipeResult?.resultHex ||
+    ''
+  const shownDeltaE =
+    livePreview?.deltaE ?? recipeResult?.deltaE ?? 0
 
   const resetInventoryDefaults = useCallback(() => {
     const available = new Set(pigments.map((p) => p.id))
@@ -255,6 +313,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       setTargetHex(hex)
       setSamplePreview(hex)
       setRecipeResult(null)
+      setEditItems(null)
       setRecipeError(null)
     },
     []
@@ -282,7 +341,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     e.target.value = ''
   }
 
-  /** Android only: live camera. iOS uses gallery button only. */
   const startCamera = () => {
     setRecipeError(null)
     if (isIOSRef.current) return
@@ -359,6 +417,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setRecipeLoading(true)
     setRecipeError(null)
     setRecipeResult(null)
+    setEditItems(null)
 
     const id = ++reqIdRef.current
     const worker = ensureWorker()
@@ -370,11 +429,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       if (e.data.error) {
         setRecipeError(String(e.data.error))
         setRecipeResult(null)
+        setEditItems(null)
         return
       }
       const result = e.data.result as RecipeResult | null
       setRecipeResult(result)
-      if (!result) {
+      if (result?.recipe) {
+        setEditItems(result.recipe.map((r) => ({ ...r })))
+      } else {
+        setEditItems(null)
         setRecipeError(
           isUk ? 'Не вдалося підібрати рецепт' : 'Не удалось подобрать рецепт'
         )
@@ -394,11 +457,28 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     })
   }
 
+  const updateEditMl = (index: number, raw: string) => {
+    let val = raw.replace(',', '.')
+    if (val !== '' && !/^\d*\.?\d*$/.test(val)) return
+
+    setEditItems((prev) => {
+      if (!prev) return prev
+      const next = prev.map((item, i) => {
+        if (i !== index) return item
+        const num = parseFloat(val)
+        const ml = val === '' || val === '.' || isNaN(num) ? 0 : Math.min(num, 5000)
+        return { ...item, ml }
+      })
+      return next
+    })
+  }
+
   const sendRecipeToMix = () => {
-    if (!recipeResult?.recipe?.length) return
+    const items = editItems || recipeResult?.recipe
+    if (!items?.length) return
     applyRecipe(
-      recipeResult.recipe
-        .filter((item) => !item.isBinder)
+      items
+        .filter((item) => !item.isBinder && item.ml > 0)
         .map((item) => ({
           pigmentId: item.pigment.id,
           ml: item.ml,
@@ -501,6 +581,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       <div className="flex-1 flex flex-col gap-4 mt-1">
         {tab === 'mix' && (
           <>
+            {/* Mix tab — без изменений по смыслу */}
             <section
               className="rounded-2xl overflow-visible relative z-10"
               style={{ background: 'var(--color-surface, #25201C)' }}
@@ -826,6 +907,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) {
                         setTargetHex(v.toUpperCase())
                         setRecipeResult(null)
+                        setEditItems(null)
                       }
                     }}
                     className="w-full rounded-xl px-3 py-2.5 font-mono tracking-wider text-[15px] focus:outline-none"
@@ -851,7 +933,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               </div>
 
-              {/* ── Кнопки: iOS vs Android ── */}
               <div className="flex gap-2 mb-3">
                 {isIOS ? (
                   <button
@@ -1198,7 +1279,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </p>
             )}
 
-            {recipeResult && (
+            {recipeResult && editItems && (
               <section
                 className="rounded-2xl px-4 md:px-5 pt-4 pb-5"
                 style={{ background: 'var(--color-surface, #25201C)' }}
@@ -1217,53 +1298,91 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <div
                     className="w-14 h-14 rounded-xl flex-shrink-0"
                     style={{
-                      backgroundColor: recipeResult.resultHex || '#333',
+                      backgroundColor: shownHex || '#333',
                       border:
                         '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)',
                     }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-[15px] tracking-wider">
-                      {(recipeResult.resultHex || '').toUpperCase()}
+                      {(shownHex || '').toUpperCase()}
                     </p>
                     <p
                       className="text-[12px] mt-0.5"
                       style={{
                         color:
-                          recipeResult.deltaE > 2 || recipeResult.approximate
+                          shownDeltaE > 2
                             ? 'var(--color-danger, #f87171)'
                             : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 50%, transparent)',
                       }}
                     >
-                      ΔE₀₀ ≈ {recipeResult.deltaE.toFixed(1)}
-                      {(recipeResult.deltaE > 2 || recipeResult.approximate) &&
+                      ΔE₀₀ ≈ {shownDeltaE.toFixed(1)}
+                      {shownDeltaE > 2 &&
                         (isUk
                           ? ' — неточне співпадіння'
                           : ' — неточное совпадение')}
+                    </p>
+                    <p
+                      className="text-[11px] mt-0.5"
+                      style={{
+                        color:
+                          'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)',
+                      }}
+                    >
+                      {isUk
+                        ? 'Змініть мл — ΔE перерахується'
+                        : 'Меняйте мл — ΔE пересчитается'}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2 mb-4">
-                  {recipeResult.recipe.map((item, i) => (
+                  {editItems.map((item, i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between py-2 px-3 rounded-xl"
+                      className="flex items-center justify-between py-2 px-3 rounded-xl gap-2"
                       style={{
                         background:
                           'color-mix(in srgb, var(--color-ink, #F5F1EA) 5%, transparent)',
                       }}
                     >
-                      <span className="text-[13px] font-medium truncate pr-2">
+                      <span className="text-[13px] font-medium truncate pr-2 flex-1 min-w-0">
                         {item.isBinder
                           ? isUk
                             ? 'Зв’язуюче'
                             : 'Связующее'
                           : pigmentName(item.pigment)}
                       </span>
-                      <span className="text-[14px] font-semibold tabular-nums flex-shrink-0">
-                        {item.ml.toFixed(1)} мл
-                      </span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={
+                            item.ml === 0
+                              ? ''
+                              : String(
+                                  Number.isInteger(item.ml)
+                                    ? item.ml
+                                    : Math.round(item.ml * 10) / 10
+                                )
+                          }
+                          onChange={(e) => updateEditMl(i, e.target.value)}
+                          className="w-14 bg-transparent border-0 text-right font-semibold focus:outline-none p-0 tabular-nums"
+                          style={{
+                            fontSize: '15px',
+                            color: 'var(--color-ink, #F5F1EA)',
+                          }}
+                        />
+                        <span
+                          className="text-[12px]"
+                          style={{
+                            color:
+                              'color-mix(in srgb, var(--color-ink, #F5F1EA) 45%, transparent)',
+                          }}
+                        >
+                          мл
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
