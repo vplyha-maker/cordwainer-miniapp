@@ -65,7 +65,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
   const squareColor = displayHex || '#2A2522'
 
-  /** Lang = 'ru' | 'uk' only */
   const pigmentName = (p: Pigment) => (isUk ? p.name.uk : p.name.ru)
 
   const loadPigments = () => {
@@ -108,24 +107,63 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     loadPigments()
   }, [])
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (workerRef.current) {
         workerRef.current.terminate()
         workerRef.current = null
       }
+    }
+  }, [])
+
+  // Stop tracks when stream changes / unmount
+  useEffect(() => {
+    return () => {
       if (stream) {
         stream.getTracks().forEach((t) => t.stop())
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (stream) stream.getTracks().forEach((t) => t.stop())
-    }
   }, [stream])
+
+  /**
+   * КРИТИЧНО для камеры в Telegram / iOS WebView:
+   * video появляется в DOM только после setCameraActive(true).
+   * Вешаем srcObject и play() здесь, когда ref уже живой.
+   */
+  useEffect(() => {
+    const video = videoRef.current
+    if (!cameraActive || !stream || !video) return
+
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    video.setAttribute('playsinline', 'true')
+    video.setAttribute('webkit-playsinline', 'true')
+    video.setAttribute('muted', 'true')
+
+    const tryPlay = async () => {
+      try {
+        await video.play()
+      } catch (err) {
+        console.error('video.play failed', err)
+      }
+    }
+
+    if (video.readyState >= 2) {
+      tryPlay()
+    } else {
+      const onMeta = () => {
+        tryPlay()
+      }
+      video.addEventListener('loadedmetadata', onMeta)
+      // fallback: иногда metadata уже есть
+      tryPlay()
+      return () => {
+        video.removeEventListener('loadedmetadata', onMeta)
+      }
+    }
+  }, [cameraActive, stream])
 
   const ensureWorker = useCallback(() => {
     if (!workerRef.current) {
@@ -221,23 +259,28 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const startCamera = async () => {
     try {
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop())
+        setStream(null)
+      }
+
       const media = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: { ideal: 'environment' },
           width: { ideal: 640 },
           height: { ideal: 480 },
         },
         audio: false,
       })
+
       setStream(media)
       setCameraActive(true)
-      if (videoRef.current) {
-        videoRef.current.srcObject = media
-        await videoRef.current.play()
-      }
+      // srcObject + play — в useEffect выше
     } catch (err) {
       console.error(err)
       setRecipeError(isUk ? 'Немає доступу до камери' : 'Нет доступа к камере')
+      setCameraActive(false)
+      setStream(null)
     }
   }
 
@@ -246,11 +289,25 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       stream.getTracks().forEach((t) => t.stop())
       setStream(null)
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
     setCameraActive(false)
   }
 
   const captureFromCamera = () => {
-    if (videoRef.current) sampleFromSource(videoRef.current)
+    const video = videoRef.current
+    if (!video) return
+    // videoWidth может быть 0, пока кадр не пришёл
+    if (!video.videoWidth || !video.videoHeight) {
+      setRecipeError(
+        isUk
+          ? 'Камера ще не готова, зачекайте секунду'
+          : 'Камера ещё не готова, подождите секунду'
+      )
+      return
+    }
+    sampleFromSource(video)
   }
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -810,9 +867,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <div className="relative rounded-xl overflow-hidden mb-2 bg-black">
                   <video
                     ref={videoRef}
+                    autoPlay
                     playsInline
                     muted
                     className="w-full max-h-48 object-cover"
+                    style={{ background: '#000', minHeight: 160 }}
                   />
                   <div
                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
