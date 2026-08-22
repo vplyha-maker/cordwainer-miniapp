@@ -283,7 +283,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }
 
   const pointerAngle = baseHue
-
+  // origin: half of wheel height (200/2=100 → 96px offset; 240/2=120 → \~116)
+  // CSS variable via style on element is cleaner; use 96 on mobile, 116 on md via class
   const ratioLabels = isTetrad
     ? [t.main55, t.secondary20, t.secondary15, t.accent10]
     : [t.main60, t.secondary30, t.accent10]
@@ -291,8 +292,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
       {/* Header */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
-        <h1 className="text-[20px] font-serif font-normal tracking-wide leading-none">
+      <div className="px-4 md:px-6 pt-4 pb-2 flex items-center justify-between shrink-0">
+        <h1 className="text-[20px] md:text-[24px] font-serif font-normal tracking-wide leading-none calc-page-title">
           {t.title}
         </h1>
 
@@ -321,7 +322,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
           <button
             onClick={onBack}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
+            className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
             aria-label="Back"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -332,7 +333,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col px-4 overflow-hidden">
+      <div className="flex-1 flex flex-col px-4 md:px-6 overflow-hidden calc-page-content">
         {/* Schemes */}
         <div className="flex overflow-x-auto gap-2 pb-3 mb-3 scrollbar-hide shrink-0">
           {(
@@ -349,7 +350,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             <button
               key={s}
               onClick={() => setScheme(s)}
-              className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 transition-all ${
+              className={`px-3.5 py-1.5 md:py-2 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 transition-all ${
                 scheme === s
                   ? 'bg-[var(--color-accent,#E4D00A)] text-[var(--color-bg,#1C1816)]'
                   : 'bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
@@ -365,7 +366,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           <div className="flex flex-col items-center mb-2">
             <div
               ref={wheelRef}
-              className="relative w-[200px] h-[200px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
+              className="relative w-[200px] h-[200px] md:w-[240px] md:h-[240px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
                 background: wheelBackground,
                 boxShadow: '0 0 0 8px var(--color-surface), 0 8px 28px rgba(0,0,0,0.4)',
@@ -387,11 +388,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 }}
               />
               <div
-                className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
+                className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none origin-[50%_96px] md:origin-[50%_116px]"
                 style={{
                   backgroundColor: pointerColor,
                   transform: `translateX(-50%) rotate(${pointerAngle}deg)`,
-                  transformOrigin: '50% 96px',
                 }}
               />
             </div>
@@ -401,7 +401,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
 
           {/* Tints */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4">
             <div>
               <div className="flex justify-between text-[11px] mb-1 text-[var(--color-muted,#B9ACA0)]">
                 <span>{t.pure}</span>
@@ -435,20 +435,20 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
 
           {/* Colour blocks */}
-          <div className={`grid gap-2 mb-4 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <div className={`grid gap-2 md:gap-3 mb-4 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
             {colors.map((c, i) => (
               <div
                 key={i}
-                className="rounded-xl p-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]"
+                className="rounded-xl p-2.5 md:p-3 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]"
               >
-                <div className="w-full h-10 rounded-md mb-1.5" style={{ backgroundColor: c }} />
+                <div className="w-full h-10 md:h-12 rounded-md mb-1.5" style={{ backgroundColor: c }} />
                 <div className="text-[11px] font-medium text-center">{ratioLabels[i]}</div>
               </div>
             ))}
           </div>
 
           {/* Proportional bar */}
-          <div className="rounded-2xl overflow-hidden mb-4 border border-[var(--color-border,rgba(255,255,255,0.12))] h-14 flex">
+          <div className="rounded-2xl overflow-hidden mb-4 border border-[var(--color-border,rgba(255,255,255,0.12))] h-14 md:h-16 flex">
             {colors.map((c, i) => {
               const flex = isTetrad ? [11, 4, 3, 2][i] : [6, 3, 1][i]
               return (
@@ -462,8 +462,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
 
           {/* Quote */}
-          <div className="rounded-2xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <p className="text-[12px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">
+          <div className="rounded-2xl p-3.5 md:p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+            <p className="text-[12px] md:text-[13px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">
               {t.quote}
             </p>
             <p className="mt-1.5 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">
@@ -473,11 +473,11 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </div>
       </div>
 
-      {/* ========== DESIGN GUIDE OVERLAY ========== */}
+      {/* DESIGN GUIDE OVERLAY */}
       {showGuide && (
         <div className="absolute inset-0 z-50 flex flex-col bg-[var(--color-bg,#1C1816)]">
-          <div className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0 border-b border-[var(--color-border,rgba(255,255,255,0.08))]">
-            <h2 className="text-[18px] font-serif tracking-wide">{t.guideTitle}</h2>
+          <div className="px-4 md:px-6 pt-4 pb-3 flex items-center justify-between shrink-0 border-b border-[var(--color-border,rgba(255,255,255,0.08))]">
+            <h2 className="text-[18px] md:text-[20px] font-serif tracking-wide">{t.guideTitle}</h2>
             <button
               onClick={() => setShowGuide(false)}
               className="px-3.5 py-1.5 rounded-full text-[12px] font-medium bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-95 transition-transform"
@@ -486,12 +486,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5 space-y-6">
             <p className="text-[13px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/85">
               {t.guideIntro}
             </p>
 
-            <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.1))]">
+            <div className="rounded-2xl p-4 md:p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.1))]">
               <h3 className="text-[14px] font-serif tracking-wide text-[var(--color-accent,#E4D00A)] mb-2">
                 {t.guideBalanceTitle}
               </h3>
@@ -516,7 +516,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 ].map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-xl p-3.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.08))]"
+                    className="rounded-xl p-3.5 md:p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.08))]"
                   >
                     <div className="text-[12.5px] font-medium mb-1.5 text-[var(--color-ink,#F5F1EA)]">
                       {item.title}
@@ -529,7 +529,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </div>
             </div>
 
-            <div className="rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.1))]">
+            <div className="rounded-2xl p-4 md:p-5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.1))]">
               <h3 className="text-[14px] font-serif tracking-wide text-[var(--color-accent,#E4D00A)] mb-2">
                 {t.guideFootwearTitle}
               </h3>
@@ -538,7 +538,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </p>
             </div>
 
-            <div className="rounded-2xl p-4 border border-[var(--color-accent,#E4D00A)]/30 bg-[var(--color-accent,#E4D00A)]/5">
+            <div className="rounded-2xl p-4 md:p-5 border border-[var(--color-accent,#E4D00A)]/30 bg-[var(--color-accent,#E4D00A)]/5">
               <p className="text-[12.5px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/90">
                 {t.guideTip}
               </p>
