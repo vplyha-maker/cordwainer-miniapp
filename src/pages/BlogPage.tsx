@@ -505,7 +505,11 @@ export function BlogPage({
                   type="button"
                   onClick={() => {
                     triggerHaptic()
-                    onToggleFavorite?.()
+                    if (isFavorite) {
+                      onToggleFavorite?.()
+                    } else {
+                      onToggleFavorite?.()
+                    }
                   }}
                   whileTap={{ scale: 0.96 }}
                   className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px] focus-visible"
@@ -516,7 +520,7 @@ export function BlogPage({
                     style={{
                       background: isFavorite
                         ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)'
-                        : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 12%, transparent)',
+                        : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 18%, transparent)',
                       color: isFavorite ? 'var(--color-accent, #D8A35C)' : 'var(--color-muted, #B9ACA0)',
                     }}
                   >
@@ -549,173 +553,145 @@ export function BlogPage({
         {view === 'journal' && (
           <motion.div
             key="journal"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col"
+            className="absolute inset-0 flex flex-col px-4 md:px-6 pt-16 pb-8 overflow-y-auto"
           >
-            <div className="px-4 md:px-6 pt-16 pb-3 shrink-0">
-              <h2 className="font-display text-[1.75rem] leading-tight mb-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                {t.journalTitle}
-              </h2>
-              <p className="text-[12px] leading-relaxed mb-4" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                {t.journalDesc}
-              </p>
+            <h2 className="font-display text-[1.75rem] leading-tight mb-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              {t.journalTitle}
+            </h2>
+            <p className="text-[13px] leading-relaxed mb-5" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+              {t.journalDesc}
+            </p>
 
-              <div
-                className="rounded-2xl px-3.5 py-2.5 flex items-center gap-2 mb-3"
-                style={{
-                  background: 'var(--color-surface, #25201C)',
-                  border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="M20 20l-3.5-3.5" />
-                </svg>
-                <input
-                  type="search"
-                  value={rawSearchQuery}
-                  onChange={(e) => setRawSearchQuery(e.target.value)}
-                  placeholder={t.searchPlaceholder}
-                  className="flex-1 bg-transparent outline-none text-[13px] min-w-0"
-                  style={{ color: 'var(--color-ink, #F5F1EA)' }}
-                />
-              </div>
+            {/* === WebMCP form: поиск статей === */}
+            <form
+              toolname="blog_search"
+              tooldescription="Поиск статей в блоге PRO Обувь по названию. Фильтрует список статей в реальном времени."
+              onSubmit={(e) => e.preventDefault()}
+              className="mb-4"
+            >
+              <input
+                type="search"
+                name="query"
+                toolparamdescription="Текст для поиска по названию статьи"
+                value={rawSearchQuery}
+                onChange={(e) => setRawSearchQuery(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                className="w-full rounded-xl px-4 py-3 text-[14px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] text-[var(--color-ink,#F5F1EA)] placeholder:text-[var(--color-muted,#B9ACA0)] focus:outline-none"
+                autoComplete="off"
+              />
+            </form>
 
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 snap-x">
-                {t.filters.map((filter) => {
-                  const isActive = activeFilter === filter.id || (filter.id === 'favorites' && showOnlyFavorites)
-                  const cnt = filterCounts[filter.id] ?? 0
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light')
-                        if (filter.id === 'favorites') setShowOnlyFavorites(true)
-                        else setShowOnlyFavorites(false)
-                        setActiveFilter(filter.id)
-                      }}
-                      className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border focus-visible flex items-center gap-1.5"
-                      style={{
-                        background: isActive
-                          ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)'
-                          : 'transparent',
-                        color: isActive ? 'var(--color-accent, #D8A35C)' : 'var(--color-muted, #B9ACA0)',
-                        borderColor: isActive
-                          ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)'
-                          : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 20%, transparent)',
-                      }}
-                    >
-                      {filter.label}
-                      <span className="opacity-60 text-[9px]">{cnt}</span>
-                    </button>
-                  )
-                })}
-              </div>
+            {/* Фильтры */}
+            <div className="flex overflow-x-auto gap-2 pb-3 mb-4 scrollbar-hide">
+              {t.filters.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light')
+                    setActiveFilter(f.id)
+                    setShowOnlyFavorites(f.id === 'favorites')
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 transition-all ${
+                    activeFilter === f.id
+                      ? 'bg-[var(--color-accent,#D8A35C)] text-[var(--color-bg,#1C1816)]'
+                      : 'bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
+                  }`}
+                >
+                  {f.label}
+                  {filterCounts[f.id] !== undefined && (
+                    <span className="ml-1 opacity-70">({filterCounts[f.id]})</span>
+                  )}
+                </button>
+              ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 mt-2 pb-8">
-              <p
-                className="text-[10px] tracking-[0.14em] uppercase mb-3 font-semibold"
-                style={{ color: 'var(--color-accent, #D8A35C)' }}
-              >
-                {isFavoritesActive
-                  ? lang === 'ru'
-                    ? 'ИЗБРАННОЕ'
-                    : 'ОБРАНЕ'
-                  : searchQuery
-                    ? lang === 'ru'
-                      ? 'Результаты'
-                      : 'Результати'
-                    : t.fresh}
-              </p>
+            {/* Список статей */}
+            <div className="flex flex-col gap-3">
+              {filteredArticles.map((article) => {
+                const title = lang === 'ru' ? article.titleRu : article.titleUk
+                const tag = lang === 'ru' ? article.tagRu : article.tagUk
+                const excerpt = lang === 'ru' ? article.excerptRu : article.excerptUk
+                const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk
+                const isFav = favoriteArticleIds.includes(article.id)
 
-              <div className="flex flex-col gap-3">
-                {filteredArticles.map((article) => {
-                  const title = lang === 'ru' ? article.titleRu : article.titleUk
-                  const excerpt = lang === 'ru' ? article.excerptRu : article.excerptUk
-                  const tag = lang === 'ru' ? article.tagRu : article.tagUk
-                  const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk
-
-                  return (
-                    <button
-                      key={article.id}
-                      type="button"
-                      aria-label={`Читать статью ${title}`}
-                      onClick={() => {
-                        triggerHaptic()
-                        setActiveArticleId(article.id)
-                        setView('article')
-                      }}
-                      className="w-full text-left relative rounded-2xl p-4 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus-visible block"
-                      style={cardStyle}
+                return (
+                  <button
+                    key={article.id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light')
+                      setActiveArticleId(article.id)
+                      setView('article')
+                    }}
+                    className="text-left rounded-2xl p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-[0.98] transition-transform"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 rounded-sm"
+                          style={{
+                            color: 'var(--color-accent, #D8A35C)',
+                            background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 10%, transparent)',
+                          }}
+                        >
+                          {tag}
+                        </span>
+                        <span className="text-[9px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                          · {readTime}
+                        </span>
+                      </div>
+                      {article.isNew && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />
+                      )}
+                    </div>
+                    <h3 className="text-[15px] font-semibold leading-snug mb-1.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+                      {title}
+                    </h3>
+                    <p
+                      className="text-[11.5px] leading-relaxed line-clamp-2 mb-3"
+                      style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 80%, transparent)' }}
                     >
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 rounded-sm"
-                            style={{
-                              color: 'var(--color-accent, #D8A35C)',
-                              background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 10%, transparent)',
-                            }}
-                          >
-                            {tag}
-                          </span>
-                          <span className="text-[9px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                            · {readTime}
-                          </span>
-                        </div>
-                        {article.isNew && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />
-                        )}
-                      </div>
-                      <h3 className="text-[15px] font-semibold leading-snug mb-1.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                        {title}
-                      </h3>
-                      <p
-                        className="text-[11.5px] leading-relaxed line-clamp-2 mb-3"
-                        style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 80%, transparent)' }}
-                      >
-                        {excerpt}
-                      </p>
-                      <div className="flex items-center text-[11px] font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
-                        {t.readBtn}
-                        <span className="ml-1 opacity-70">→</span>
-                      </div>
-                    </button>
-                  )
-                })}
+                      {excerpt}
+                    </p>
+                    <div className="flex items-center text-[11px] font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+                      {t.readBtn}
+                      <span className="ml-1 opacity-70">→</span>
+                    </div>
+                  </button>
+                )
+              })}
 
-                {filteredArticles.length === 0 && (
-                  <EmptyState
-                    variant={isFavoritesActive ? 'favorites' : 'search'}
-                    title={isFavoritesActive ? t.emptyFavoritesTitle : t.emptyTitle}
-                    description={isFavoritesActive ? t.emptyFavoritesDesc : t.emptyDesc}
-                    action={
-                      isFavoritesActive
-                        ? {
-                            label: t.emptyFavoritesBtn,
-                            onClick: () => {
-                              triggerHaptic('light')
-                              setShowOnlyFavorites(false)
-                              setActiveFilter('all')
-                            },
-                          }
-                        : {
-                            label: t.emptyBtn,
-                            onClick: () => {
-                              triggerHaptic('light')
-                              setRawSearchQuery('')
-                              setActiveFilter('all')
-                            },
-                          }
-                    }
-                  />
-                )}
-              </div>
+              {filteredArticles.length === 0 && (
+                <EmptyState
+                  variant={isFavoritesActive ? 'favorites' : 'search'}
+                  title={isFavoritesActive ? t.emptyFavoritesTitle : t.emptyTitle}
+                  description={isFavoritesActive ? t.emptyFavoritesDesc : t.emptyDesc}
+                  action={
+                    isFavoritesActive
+                      ? {
+                          label: t.emptyFavoritesBtn,
+                          onClick: () => {
+                            triggerHaptic('light')
+                            setShowOnlyFavorites(false)
+                            setActiveFilter('all')
+                          },
+                        }
+                      : {
+                          label: t.emptyBtn,
+                          onClick: () => {
+                            triggerHaptic('light')
+                            setRawSearchQuery('')
+                            setActiveFilter('all')
+                          },
+                        }
+                  }
+                />
+              )}
             </div>
           </motion.div>
         )}
