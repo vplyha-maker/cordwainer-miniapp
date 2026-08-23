@@ -63,7 +63,6 @@
     overscroll-behavior: none;
   }
 
-  /* Accessibility focus styles for keyboard navigation */
   .focus-visible:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
@@ -96,7 +95,6 @@
       0 8px 24px -6px rgba(0, 0, 0, 0.35);
   }
 
-  /* Utility for hiding scrollbar visually but keeping scroll functional */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -107,20 +105,17 @@
 }
 
 /* =========================================================
-   UI COMPONENTS (Optimized for performance)
+   UI COMPONENTS
    ========================================================= */
 
-/* Primary Button */
 .btn-primary {
   @apply relative overflow-hidden w-full h-[72px] rounded-[26px] cursor-pointer transition-transform active:scale-[0.97];
   background: linear-gradient(180deg, #F8F3EB 0%, #E2D2BA 100%);
   border: 1px solid rgba(214, 179, 126, 0.4);
-  /* Облегченная, но выразительная тень */
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   will-change: transform;
 }
 
-/* Language Toggle Pills */
 .lang-toggle {
   @apply flex items-center justify-center w-10 h-7 rounded-full text-[10px] font-bold tracking-wide transition-colors cursor-pointer;
   will-change: background-color, color;
@@ -138,7 +133,6 @@
   color: #F5F1EB;
 }
 
-/* Small Action Pill (Add to Home) */
 .action-pill {
   @apply flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-medium transition-transform active:scale-95 cursor-pointer;
   background: rgba(29, 24, 21, 0.8);
@@ -147,14 +141,12 @@
   will-change: transform;
 }
 
-/* Simplified Card Base (No backdrop-filter for better FPS) */
 .card-simplified {
   background: linear-gradient(180deg, rgba(39, 33, 29, 0.95) 0%, rgba(26, 22, 18, 0.95) 100%);
   box-shadow: inset 0 1px 0 rgba(198, 164, 122, 0.15), 0 4px 12px rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(198, 164, 122, 0.05);
 }
 
-/* Performance Favorite Classes */
 .fav-highlight {
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -194,28 +186,41 @@ html.perf-fast body {
 }
 
 /* =========================================================
-   APP SHELL — адаптив под телефон / планшет / монитор / ТВ
+   APP SHELL — телефон / планшет / монитор
    ========================================================= */
 
 :root {
-  --app-max-width: 480px;
+  --app-max-width: 430px;
 }
 
+/* Планшет */
 @media (min-width: 768px) {
+  :root {
+    --app-max-width: 560px;
+  }
+
+  body {
+    background: #0c0a09;
+  }
+
+  .app-shell {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 24px 80px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Ноутбук / монитор */
+@media (min-width: 1024px) {
   :root {
     --app-max-width: 640px;
   }
 }
 
-@media (min-width: 1024px) {
-  :root {
-    --app-max-width: 720px;
-  }
-}
-
+/* Большой монитор */
 @media (min-width: 1440px) {
   :root {
-    --app-max-width: 780px;
+    --app-max-width: 720px;
   }
 }
 
@@ -226,10 +231,10 @@ html.perf-fast body {
   margin-right: auto;
   min-height: 100dvh;
   position: relative;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-border, rgba(255, 255, 255, 0.06)) 80%, transparent);
+  background: var(--color-bg);
 }
 
-/* fixed-элементы внутри колонки (опционально) */
+/* fixed-элементы внутри колонки */
 .app-shell .fixed-within-shell {
   left: 50%;
   transform: translateX(-50%);
@@ -238,36 +243,31 @@ html.perf-fast body {
 }
 
 /* =========================================================
-   CALC PAGES — отступы и степперы на планшете / мониторе
+   CALC PAGES — планшет / монитор
    ========================================================= */
 
 @media (min-width: 768px) {
-  /* общий контент калькуляторов */
   .calc-page-content {
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
   }
 
-  /* кнопки +/− у слайдеров / степперов */
   .calc-stepper-btn {
     width: 2.75rem !important;
     height: 2.75rem !important;
   }
 
-  /* сегменты (Муж / Жен / Дети и т.п.) */
   .calc-segment button {
     padding-top: 0.75rem !important;
     padding-bottom: 0.75rem !important;
     font-size: 0.875rem !important;
   }
 
-  /* карточки результатов */
   .calc-result-card {
     padding: 1.5rem !important;
   }
 
-  /* заголовок страницы калькулятора */
   .calc-page-title {
     font-size: 1.125rem !important;
   }
-}
+ }
