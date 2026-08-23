@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://cordwainer-miniapp.vercel.app/sitemap.xml
+Sitemap: https://www.cordwaine.app/sitemap.xml
