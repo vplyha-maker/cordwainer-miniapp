@@ -10,25 +10,63 @@ type BottomDockProps = {
   lang?: Lang
 }
 
+const translations = {
+  ru: {
+    search: 'Поиск',
+    workspace: 'Инструменты',
+    collection: 'Коллекция',
+    profile: 'Кабинет',
+  },
+  uk: {
+    search: 'Пошук',
+    workspace: 'Інструменти',
+    collection: 'Колекція',
+    profile: 'Кабінет',
+  },
+  en: {
+    search: 'Search',
+    workspace: 'Tools',
+    collection: 'Collection',
+    profile: 'Profile',
+  },
+  fr: {
+    search: 'Recherche',
+    workspace: 'Outils',
+    collection: 'Collection',
+    profile: 'Profil',
+  },
+  de: {
+    search: 'Suche',
+    workspace: 'Werkzeuge',
+    collection: 'Sammlung',
+    profile: 'Profil',
+  },
+  sv: {
+    search: 'Sök',
+    workspace: 'Verktyg',
+    collection: 'Samling',
+    profile: 'Profil',
+  },
+  no: {
+    search: 'Søk',
+    workspace: 'Verktøy',
+    collection: 'Samling',
+    profile: 'Profil',
+  },
+  hi: {
+    search: 'खोज',
+    workspace: 'उपकरण',
+    collection: 'संग्रह',
+    profile: 'प्रोफ़ाइल',
+  },
+}
+
 export function BottomDock({
   active = 'search',
   onChange,
   lang = 'ru',
 }: BottomDockProps) {
-  const labels = {
-    ru: {
-      search: 'Поиск',
-      workspace: 'Инструменты',
-      collection: 'Коллекция',
-      profile: 'Кабинет',
-    },
-    uk: {
-      search: 'Пошук',
-      workspace: 'Інструменти',
-      collection: 'Колекція',
-      profile: 'Кабінет',
-    },
-  }[lang]
+  const labels = translations[lang] || translations.ru
 
   const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
     {
@@ -169,4 +207,4 @@ export function BottomDock({
       </div>
     </div>
   )
- }
+}
