@@ -131,7 +131,7 @@ export function BlogPage({
 
   const handleCopyEmail = async () => {
     triggerHaptic('medium')
-    const email = 'cordwain@tuta.io'
+    const email = 'support@cordwaine.app'
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(email)
@@ -217,7 +217,7 @@ export function BlogPage({
         collabTitle: 'Сотрудничество',
         collabSubtitle: 'ЦИФРОВАЯ ВИЗИТКА',
         collabText:
-          'Мы всегда открыты для профессионального диалога. Разработка концептов, B2B-партнерство, коллаборации или новые идеи в сфере обувного дизайна и производства.',
+          'Это хобби-проект об обувной индустрии. Я открыт к диалогу: идеи, замечания, обратная связь, предложения по сотрудничеству или просто интересные наблюдения. Пишите — с удовольствием обсудим.',
         collabEmailLabel: 'Прямая связь',
         copyBtn: 'Скопировать',
         copiedBtn: 'Скопировано!',
@@ -263,7 +263,7 @@ export function BlogPage({
         collabTitle: 'Співпраця',
         collabSubtitle: 'ЦИФРОВА ВІЗИТКА',
         collabText:
-          'Ми завжди відкриті до професійного діалогу. Розробка концептів, B2B-партнерство, колаборації або нові ідеї у сфері взуттєвого дизайну та виробництва.',
+          'Це хобі-проєкт про взуттєву індустрію. Я відкритий до діалогу: ідеї, зауваження, зворотний звʼязок, пропозиції щодо співпраці або просто цікаві спостереження. Пишіть — із задоволенням обговоримо.',
         collabEmailLabel: 'Прямий звʼязок',
         copyBtn: 'Скопіювати',
         copiedBtn: 'Скопійовано!',
@@ -752,7 +752,7 @@ export function BlogPage({
               </p>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[14px] font-medium truncate" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                  cordwain@tuta.io
+                  support@cordwaine.app
                 </span>
                 <button
                   type="button"
@@ -1088,4 +1088,4 @@ export function BlogPage({
       </AnimatePresence>
     </div>
   )
-                                                                             }
+}
