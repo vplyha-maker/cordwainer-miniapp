@@ -38,7 +38,7 @@ export type Screen =
   | 'colors'
   | 'seo-width'
 
-export type Lang = 'ru' | 'uk' | 'en' | 'fr' | 'de' | 'sv' | 'no' | 'hi'
+export type Lang = 'ru' | 'uk'
 
 export type FavoriteType = 'blog' | 'article'
 
@@ -129,8 +129,7 @@ export default function App() {
   const [lang, setLang] = useState<Lang>(() => {
     try {
       const saved = localStorage.getItem('cordwainer_lang')
-      const supported: Lang[] = ['ru', 'uk', 'en', 'fr', 'de', 'sv', 'no', 'hi']
-      return supported.includes(saved as Lang) ? (saved as Lang) : 'ru'
+      return saved === 'uk' ? 'uk' : 'ru'
     } catch {
       return 'ru'
     }
@@ -271,21 +270,6 @@ export default function App() {
     }
   }, [])
 
-  // Временные тексты для perf-хинта (пока нет общего i18n)
-  const perfHintText =
-    lang === 'uk'
-      ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим — ефекти спрощено.'
-      : lang === 'en'
-        ? 'The interface is running unevenly. Fast mode is enabled — effects are simplified.'
-        : 'Интерфейс работает неравномерно. Включён быстрый режим — эффекты упрощены.'
-
-  const perfHintKeepBeautiful =
-    lang === 'uk'
-      ? 'Залишити красивий'
-      : lang === 'en'
-        ? 'Keep beautiful'
-        : 'Оставить красивый'
-
   return (
     <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
       {showPerfHint && (
@@ -298,7 +282,9 @@ export default function App() {
           }}
         >
           <div className="mb-2 leading-snug text-[#B9ACA0]">
-            {perfHintText}
+            {lang === 'uk'
+              ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим — ефекти спрощено.'
+              : 'Интерфейс работает неравномерно. Включён быстрый режим — эффекты упрощены.'}
           </div>
           <div className="flex gap-2">
             <button
@@ -321,7 +307,7 @@ export default function App() {
                 setShowPerfHint(false)
               }}
             >
-              {perfHintKeepBeautiful}
+              {lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
             </button>
           </div>
         </div>
