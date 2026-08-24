@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang, FavoriteItem } from '../App'
@@ -11,29 +11,23 @@ type WelcomePageProps = {
   favorites?: FavoriteItem[]
 }
 
-const LANG_OPTIONS: { code: Lang; label: string }[] = [
-  { code: 'ru', label: 'RU' },
-  { code: 'uk', label: 'UA' },
-  { code: 'en', label: 'EN' },
-  { code: 'fr', label: 'FR' },
-  { code: 'de', label: 'DE' },
-  { code: 'sv', label: 'SV' },
-  { code: 'no', label: 'NO' },
-  { code: 'hi', label: 'HI' },
-]
-
 export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [] }: WelcomePageProps) {
   const blogFavorites = favorites.filter((f) => f.type === 'blog')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
+  useEffect(() => {
+    const savedLang = localStorage.getItem('app_lang') as Lang
+    if (savedLang && (savedLang === 'ru' || savedLang === 'uk')) {
+      if (savedLang !== lang) setLang(savedLang)
+    }
+  }, [])
+
   const handleLangChange = (newLang: Lang) => {
-    try {
-      localStorage.setItem('cordwainer_lang', newLang)
-    } catch {}
+    localStorage.setItem('app_lang', newLang)
     setLang(newLang)
   }
 
-  const translations = {
+  const t = {
     ru: {
       tagline: 'Энциклопедия обувного мастерства',
       idea1: 'Предмет как идея.',
@@ -78,141 +72,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       widgetStep3: '3. Підтвердіть встановлення',
       widgetAction: 'Відкрити в браузері',
     },
-    en: {
-      tagline: 'Encyclopedia of shoemaking mastery',
-      idea1: 'The object as idea.',
-      idea2: 'Form as language.',
-      idea3: 'Craft as experience.',
-      materials: 'Materials',
-      materialsSub: 'Leather · Suede\nSoles',
-      colors: 'Colors',
-      colorsSub: 'Coloristics\nPatina',
-      styles: 'Styles\n& silhouettes',
-      stylesSub: 'Classic\nStreet',
-      start: 'Start learning',
-      favorites: 'Favorites',
-      seeAll: 'See all',
-      addToHomeShort: 'Install',
-      widgetTitle: 'Install the app',
-      widgetText: 'Telegram does not allow saving icons directly. Open the app in your browser (Chrome or Safari) to add it to the home screen.',
-      widgetStep1: '1. Tap “Open in browser” below',
-      widgetStep2: '2. In the browser menu choose “Add to Home Screen”',
-      widgetStep3: '3. Confirm the installation',
-      widgetAction: 'Open in browser',
-    },
-    fr: {
-      tagline: 'Encyclopédie de la maîtrise cordonnière',
-      idea1: 'L’objet comme idée.',
-      idea2: 'La forme comme langage.',
-      idea3: 'Le métier comme expérience.',
-      materials: 'Matériaux',
-      materialsSub: 'Cuir · Daim\nSemelles',
-      colors: 'Couleurs',
-      colorsSub: 'Colorimétrie\nPatine',
-      styles: 'Styles\net silhouettes',
-      stylesSub: 'Classique\nStreet',
-      start: 'Commencer',
-      favorites: 'Favoris',
-      seeAll: 'Voir tout',
-      addToHomeShort: 'Installer',
-      widgetTitle: 'Installer l’application',
-      widgetText: 'Telegram ne permet pas d’enregistrer les icônes directement. Ouvrez l’application dans votre navigateur (Chrome ou Safari) pour l’ajouter à l’écran d’accueil.',
-      widgetStep1: '1. Appuyez sur « Ouvrir dans le navigateur » ci-dessous',
-      widgetStep2: '2. Dans le menu du navigateur, choisissez « Ajouter à l’écran d’accueil »',
-      widgetStep3: '3. Confirmez l’installation',
-      widgetAction: 'Ouvrir dans le navigateur',
-    },
-    de: {
-      tagline: 'Enzyklopädie der Schuhmacherkunst',
-      idea1: 'Der Gegenstand als Idee.',
-      idea2: 'Form als Sprache.',
-      idea3: 'Handwerk als Erfahrung.',
-      materials: 'Materialien',
-      materialsSub: 'Leder · Wildleder\nSohlen',
-      colors: 'Farben',
-      colorsSub: 'Farblehre\nPatina',
-      styles: 'Schnitte\n& Silhouetten',
-      stylesSub: 'Klassik\nStreet',
-      start: 'Lernen starten',
-      favorites: 'Favoriten',
-      seeAll: 'Alle ansehen',
-      addToHomeShort: 'Installieren',
-      widgetTitle: 'App installieren',
-      widgetText: 'Telegram erlaubt es nicht, Symbole direkt zu speichern. Öffnen Sie die App in Ihrem Browser (Chrome oder Safari), um sie zum Startbildschirm hinzuzufügen.',
-      widgetStep1: '1. Tippen Sie unten auf „Im Browser öffnen“',
-      widgetStep2: '2. Wählen Sie im Browser-Menü „Zum Startbildschirm hinzufügen“',
-      widgetStep3: '3. Bestätigen Sie die Installation',
-      widgetAction: 'Im Browser öffnen',
-    },
-    sv: {
-      tagline: 'Encyklopedi över skomakeriets mästerskap',
-      idea1: 'Föremålet som idé.',
-      idea2: 'Form som språk.',
-      idea3: 'Hantverk som erfarenhet.',
-      materials: 'Material',
-      materialsSub: 'Läder · Mocka\nSulor',
-      colors: 'Färger',
-      colorsSub: 'Färglära\nPatina',
-      styles: 'Modeller\n& siluetter',
-      stylesSub: 'Klassiskt\nStreet',
-      start: 'Börja lära',
-      favorites: 'Favoriter',
-      seeAll: 'Se alla',
-      addToHomeShort: 'Installera',
-      widgetTitle: 'Installera appen',
-      widgetText: 'Telegram tillåter inte att spara ikoner direkt. Öppna appen i din webbläsare (Chrome eller Safari) för att lägga till den på hemskärmen.',
-      widgetStep1: '1. Tryck på ”Öppna i webbläsare” nedan',
-      widgetStep2: '2. I webbläsarmenyn välj ”Lägg till på hemskärmen”',
-      widgetStep3: '3. Bekräfta installationen',
-      widgetAction: 'Öppna i webbläsare',
-    },
-    no: {
-      tagline: 'Encyclopedi over skomakerkunst',
-      idea1: 'Gjenstanden som idé.',
-      idea2: 'Form som språk.',
-      idea3: 'Håndverk som erfaring.',
-      materials: 'Materialer',
-      materialsSub: 'Lær · Semsket\nSåler',
-      colors: 'Farger',
-      colorsSub: 'Fargelære\nPatina',
-      styles: 'Modeller\nog silhuetter',
-      stylesSub: 'Klassisk\nStreet',
-      start: 'Start læring',
-      favorites: 'Favoritter',
-      seeAll: 'Se alle',
-      addToHomeShort: 'Installer',
-      widgetTitle: 'Installer appen',
-      widgetText: 'Telegram tillater ikke å lagre ikoner direkte. Åpne appen i nettleseren din (Chrome eller Safari) for å legge den til på startskjermen.',
-      widgetStep1: '1. Trykk på «Åpne i nettleser» nedenfor',
-      widgetStep2: '2. I nettlesermenyen velg «Legg til på startskjermen»',
-      widgetStep3: '3. Bekreft installasjonen',
-      widgetAction: 'Åpne i nettleser',
-    },
-    hi: {
-      tagline: 'जूता बनाने की महारत का विश्वकोश',
-      idea1: 'वस्तु एक विचार के रूप में।',
-      idea2: 'रूप एक भाषा के रूप में।',
-      idea3: 'शिल्प एक अनुभव के रूप में।',
-      materials: 'सामग्री',
-      materialsSub: 'चमड़ा · साबर\nतलवे',
-      colors: 'रंग',
-      colorsSub: 'रंग विज्ञान\nपटिना',
-      styles: 'शैलियाँ\nऔर सिल्हूट',
-      stylesSub: 'क्लासिक\nस्ट्रीट',
-      start: 'सीखना शुरू करें',
-      favorites: 'पसंदीदा',
-      seeAll: 'सभी देखें',
-      addToHomeShort: 'इंस्टॉल',
-      widgetTitle: 'ऐप इंस्टॉल करें',
-      widgetText: 'Telegram सीधे आइकन सेव करने की अनुमति नहीं देता। ऐप को अपने ब्राउज़र (Chrome या Safari) में खोलें ताकि इसे होम स्क्रीन पर जोड़ सकें।',
-      widgetStep1: '1. नीचे “ब्राउज़र में खोलें” पर टैप करें',
-      widgetStep2: '2. ब्राउज़र मेनू में “होम स्क्रीन पर जोड़ें” चुनें',
-      widgetStep3: '3. इंस्टॉलेशन की पुष्टि करें',
-      widgetAction: 'ब्राउज़र में खोलें',
-    },
-  }
-
-  const t = translations[lang] || translations.ru
+  }[lang]
 
   const categories = [
     {
@@ -311,8 +171,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           }}
         />
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 pr-1">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 pr-2">
               <h1
                 className="font-display text-[2.5rem] leading-[0.9]"
                 style={{
@@ -331,40 +191,38 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
             </div>
 
             <div className="flex flex-col items-end gap-2 shrink-0">
-              {/* Language switcher - horizontal scroll */}
               <div
-                className="flex rounded-full p-1 gap-0.5 overflow-x-auto max-w-[210px] scrollbar-hide"
+                className="flex rounded-full p-1"
                 style={{
-                  background: 'color-mix(in srgb, var(--color-surface, #25201C) 85%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)',
-                  WebkitOverflowScrolling: 'touch',
+                  background: 'color-mix(in srgb, var(--color-surface, #25201C) 80%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
                 }}
                 role="group"
                 aria-label="Language selection"
               >
-                {LANG_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.code}
-                    onClick={() => handleLangChange(opt.code)}
-                    className={`lang-toggle shrink-0 ${lang === opt.code ? 'active' : 'inactive'}`}
-                    aria-pressed={lang === opt.code}
-                    style={{
-                      minWidth: '34px',
-                      padding: '6px 7px',
-                      fontSize: '11px',
-                      fontWeight: lang === opt.code ? 600 : 500,
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                <button
+                  onClick={() => handleLangChange('ru')}
+                  className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
+                  aria-pressed={lang === 'ru'}
+                  role="button"
+                >
+                  RU
+                </button>
+                <button
+                  onClick={() => handleLangChange('uk')}
+                  className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}
+                  aria-pressed={lang === 'uk'}
+                  role="button"
+                >
+                  UA
+                </button>
               </div>
 
               <button
                 onClick={handleAddToHome}
                 className="action-pill w-full flex items-center justify-center"
                 aria-label={t.addToHomeShort}
+                role="button"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="5" y="2" width="14" height="20" rx="2" />
@@ -433,6 +291,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           onClick={onStart}
           className="btn-primary mb-6"
           aria-label={t.start}
+          role="button"
         >
           <div className="relative h-full flex items-center justify-between px-6">
             <div className="flex flex-col text-left">
@@ -579,17 +438,26 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 </p>
 
                 <div className="space-y-3 mb-6">
-                  <div className="text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
+                  <div
+                    className="text-[13px]"
+                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
+                  >
                     <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                       {t.widgetStep1}
                     </span>
                   </div>
-                  <div className="text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
+                  <div
+                    className="text-[13px]"
+                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
+                  >
                     <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                       {t.widgetStep2}
                     </span>
                   </div>
-                  <div className="text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
+                  <div
+                    className="text-[13px]"
+                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
+                  >
                     <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                       {t.widgetStep3}
                     </span>
