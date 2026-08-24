@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang, FavoriteItem } from '../App'
@@ -311,8 +311,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           }}
         />
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 pr-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0 pr-1">
               <h1
                 className="font-display text-[2.5rem] leading-[0.9]"
                 style={{
@@ -331,12 +331,13 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
             </div>
 
             <div className="flex flex-col items-end gap-2 shrink-0">
-              {/* Language switcher */}
+              {/* Language switcher - horizontal scroll */}
               <div
-                className="flex rounded-full p-1 gap-0.5 overflow-x-auto max-w-[160px] scrollbar-hide"
+                className="flex rounded-full p-1 gap-0.5 overflow-x-auto max-w-[210px] scrollbar-hide"
                 style={{
-                  background: 'color-mix(in srgb, var(--color-surface, #25201C) 80%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
+                  background: 'color-mix(in srgb, var(--color-surface, #25201C) 85%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)',
+                  WebkitOverflowScrolling: 'touch',
                 }}
                 role="group"
                 aria-label="Language selection"
@@ -345,9 +346,15 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                   <button
                     key={opt.code}
                     onClick={() => handleLangChange(opt.code)}
-                    className={`lang-toggle ${lang === opt.code ? 'active' : 'inactive'}`}
+                    className={`lang-toggle shrink-0 ${lang === opt.code ? 'active' : 'inactive'}`}
                     aria-pressed={lang === opt.code}
-                    role="button"
+                    style={{
+                      minWidth: '34px',
+                      padding: '6px 7px',
+                      fontSize: '11px',
+                      fontWeight: lang === opt.code ? 600 : 500,
+                      letterSpacing: '0.02em',
+                    }}
                   >
                     {opt.label}
                   </button>
@@ -358,7 +365,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 onClick={handleAddToHome}
                 className="action-pill w-full flex items-center justify-center"
                 aria-label={t.addToHomeShort}
-                role="button"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="5" y="2" width="14" height="20" rx="2" />
@@ -427,7 +433,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           onClick={onStart}
           className="btn-primary mb-6"
           aria-label={t.start}
-          role="button"
         >
           <div className="relative h-full flex items-center justify-between px-6">
             <div className="flex flex-col text-left">
@@ -574,26 +579,17 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 </p>
 
                 <div className="space-y-3 mb-6">
-                  <div
-                    className="text-[13px]"
-                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
-                  >
+                  <div className="text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
                     <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                       {t.widgetStep1}
                     </span>
                   </div>
-                  <div
-                    className="text-[13px]"
-                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
-                  >
+                  <div className="text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
                     <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                       {t.widgetStep2}
                     </span>
                   </div>
-                  <div
-                    className="text-[13px]"
-                    style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}
-                  >
+                  <div className="text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
                     <span className="font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
                       {t.widgetStep3}
                     </span>
@@ -617,4 +613,4 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       </AnimatePresence>
     </div>
   )
-}
+ }
