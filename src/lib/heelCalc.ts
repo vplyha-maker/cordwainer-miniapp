@@ -2,6 +2,7 @@
 
 export type SoleType = 'flat' | 'rocker'
 export type HeelType = 'stiletto' | 'block' | 'kitten' | 'flared'
+export type RockerType = 'forefoot' | 'heelToToe' | 'negative'
 
 export const HEEL_CONST = {
   STEP_TO_MM: 6.67,
@@ -19,6 +20,13 @@ export const HEEL_CONST = {
   MAX_HEEL_OFFSET_MM: 5,
 } as const
 
+/** Пресеты рокера: угол + точка старта переката */
+export const ROCKER_PRESETS: Record<RockerType, { angle: number; startPct: number }> = {
+  forefoot:  { angle: 14, startPct: 60 }, // Метатарзалгия
+  heelToToe: { angle: 16, startPct: 55 }, // Артроз
+  negative:  { angle: 9,  startPct: 65 }, // Диабетическая стопа
+}
+
 export interface HeelInput {
   shoeSize: number
   heelHeight: number
@@ -29,6 +37,7 @@ export interface HeelInput {
   rockerStartPct: number
   heelTipOffsetMm: number
   tipWidthMm: number
+  rockerType?: RockerType
 }
 
 export interface HeelEngineering {
@@ -46,6 +55,12 @@ export interface HeelEngineering {
   inversionRisk: number
   highInversionRisk: boolean
   entryAngleDeg: number
+  // Клинико-ортопедические расширения
+  metatarsalPadPosMm: number | null
+  metatarsalPadHeightMm: number | null
+  apexM1_Mm: number | null
+  apexM5_Mm: number | null
+  carbonInsertThicknessMm: number
 }
 
 export type AuditStatus = 'SUCCESS' | 'WARNING' | 'ERROR'
@@ -131,6 +146,27 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     )
   }
 
+  // 1. Пелот Зейца (Metatarsal Pad)
+  const requiresMetatarsalPad = forefootLoad > C.CRITICAL_LOAD
+  let metatarsalPadPosMm: number | null = null
+  let metatarsalPadHeightMm: number | null = null
+  if (requiresMetatarsalPad) {
+    metatarsalPadPosMm = Math.round(lastLengthMm * 0.60 - 12)
+    metatarsalPadHeightMm = netRise > 60 ? 6 : netRise > 30 ? 5 : 4
+  }
+
+  // 2. Диагональный апекс M1–M5 (скос суставной линии 12–15°)
+  // Актуальны для rocker; для flat тоже полезны как ориентир
+  const apexM1_Mm = Math.round(lastLengthMm * (rockerStartPct / 100) - 5)
+  const apexM5_Mm = Math.round(apexM1_Mm - lastLengthMm * 0.045)
+
+  // 3. Индекс жёсткости / минимальная толщина карбоновой вставки
+  // Рокер работает только при отсутствии изгиба в пучках
+  const carbonInsertThicknessMm =
+    soleType === 'rocker'
+      ? parseFloat((1.2 + (heelHeight / 100) * 0.6).toFixed(1))
+      : 0
+
   return {
     lastLengthMm,
     lEff,
@@ -142,10 +178,15 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     steelThickness,
     heelOffsetTooFarBack,
     heelOffsetTooFarForward,
-    requiresMetatarsalPad: forefootLoad > C.CRITICAL_LOAD,
+    requiresMetatarsalPad,
     inversionRisk,
     highInversionRisk: inversionRisk >= 55,
     entryAngleDeg,
+    metatarsalPadPosMm,
+    metatarsalPadHeightMm,
+    apexM1_Mm,
+    apexM5_Mm,
+    carbonInsertThicknessMm,
   }
 }
 
