@@ -4,12 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 import {
   HEEL_CONST,
+  ROCKER_PRESETS,
   computeEngineering,
   computeAudit,
   defaultTipWidth,
   suggestAutoFix,
   type SoleType,
   type HeelType,
+  type RockerType,
 } from '../lib/heelCalc'
 import { buildHeelGeometry } from '../lib/heelGeometry'
 import { HeelStepper } from '../components/heel/HeelStepper'
@@ -27,6 +29,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   const [heelType, setHeelType] = useState<HeelType>('stiletto')
   const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
   const [tipWidthMm, setTipWidthMm] = useState(10)
+  const [rockerType, setRockerType] = useState<RockerType>('forefoot')
   const [showSpecs, setShowSpecs] = useState(false)
 
   useEffect(() => {
@@ -36,6 +39,15 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   useEffect(() => {
     if (soleType === 'flat') setTipWidthMm(defaultTipWidth(heelType))
   }, [heelType, soleType])
+
+  // Применение пресета рокера
+  useEffect(() => {
+    if (soleType === 'rocker') {
+      const preset = ROCKER_PRESETS[rockerType]
+      setRockerAngle(preset.angle)
+      setRockerStartPct(preset.startPct)
+    }
+  }, [rockerType, soleType])
 
   const haptic = (style: 'light' | 'medium' = 'light') => {
     try {
@@ -49,12 +61,12 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
   const input = {
     shoeSize, heelHeight, toeThickness, soleType, heelType,
-    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm,
+    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm, rockerType,
   }
 
   const eng = useMemo(() => computeEngineering(input), [
     shoeSize, heelHeight, toeThickness, soleType, heelType,
-    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm,
+    rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm, rockerType,
   ])
 
   const audit = useMemo(
@@ -76,6 +88,11 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     setHeelTipOffsetMm(fix.heelTipOffsetMm)
     setTipWidthMm(fix.tipWidthMm)
     setRockerAngle(fix.rockerAngle)
+  }
+
+  const handleRockerType = (type: RockerType) => {
+    haptic()
+    setRockerType(type)
   }
 
   return (
@@ -188,6 +205,35 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         )}
 
+        {/* Типы рокера — только Рокер */}
+        {soleType === 'rocker' && (
+          <div
+            className="grid grid-cols-3 gap-1 md:gap-2 p-1 rounded-xl calc-segment"
+            style={{
+              background: 'var(--color-surface, #25201C)',
+              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
+            }}
+          >
+            {(['forefoot', 'heelToToe', 'negative'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => handleRockerType(type)}
+                className="py-1.5 text-[10px] md:text-[11px] font-medium rounded-lg transition-colors leading-tight"
+                style={
+                  rockerType === type
+                    ? {
+                        background: 'var(--color-accent, #D8A35C)',
+                        color: 'var(--color-bg, #1C1816)',
+                      }
+                    : { color: 'var(--color-muted, #B9ACA0)' }
+                }
+              >
+                {t[type]}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Степперы */}
         <div className="grid grid-cols-2 gap-1.5 md:gap-3">
           <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
@@ -286,6 +332,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 <Row label="Сталь 65Г" value={`${eng.steelThickness.toFixed(1)} мм`} />
                 <Row label="L_eff" value={`${eng.lEff.toFixed(1)} мм`} />
                 <Row label="Heel Center" value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`} />
+
                 {soleType === 'flat' && (
                   <>
                     <Row
@@ -300,6 +347,26 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     )}
                   </>
                 )}
+
+                {/* Клинико-ортопедические параметры */}
+                {eng.requiresMetatarsalPad && eng.metatarsalPadPosMm != null && (
+                  <>
+                    <Row label={t.padPos} value={`${eng.metatarsalPadPosMm} мм`} />
+                    <Row label={t.padHeight} value={`${eng.metatarsalPadHeightMm} мм`} />
+                  </>
+                )}
+
+                {eng.apexM1_Mm != null && (
+                  <>
+                    <Row label={t.apexM1} value={`${eng.apexM1_Mm} мм`} />
+                    <Row label={t.apexM5} value={`${eng.apexM5_Mm} мм`} />
+                  </>
+                )}
+
+                {soleType === 'rocker' && eng.carbonInsertThicknessMm > 0 && (
+                  <Row label={t.carbonInsert} value={`${eng.carbonInsertThicknessMm} мм`} />
+                )}
+
                 <div
                   className="pt-1.5 mt-1 font-mono text-[9px] p-1.5 rounded-lg text-center"
                   style={{
@@ -365,6 +432,15 @@ function getLabels(lang: Lang) {
     specsBtn: '⚙️ Спецификация и Математика', dropLbl: 'Перепад',
     massTitle: 'Распределение массы', forefoot: 'Носок', rearfoot: 'Пятка',
     invertRisk: 'Риск инверсии', entryAngle: 'Угол въезда',
+    // Клинико-ортопедические ключи
+    padPos: 'Пелот Зейца (поз.)',
+    padHeight: 'Высота пелота',
+    apexM1: 'Апекс M1',
+    apexM5: 'Апекс M5',
+    carbonInsert: 'Карбон (толщ.)',
+    forefoot: 'Метатарзалгия',
+    heelToToe: 'Артроз',
+    negative: 'Диабет. стопа',
   }
   const uk = {
     ...ru,
@@ -394,6 +470,15 @@ function getLabels(lang: Lang) {
     specsBtn: '⚙️ Специфікація та Математика', dropLbl: 'Перепад',
     massTitle: 'Розподіл маси', forefoot: 'Носок', rearfoot: "П'ятка",
     invertRisk: 'Ризик інверсії', entryAngle: 'Кут вʼїзду',
+    // Клинико-ортопедические ключи
+    padPos: 'Пелот Зейца (поз.)',
+    padHeight: 'Висота пелота',
+    apexM1: 'Апекс M1',
+    apexM5: 'Апекс M5',
+    carbonInsert: 'Карбон (товщ.)',
+    forefoot: 'Метатарзалгія',
+    heelToToe: 'Артроз',
+    negative: 'Діабет. стопа',
   }
   return lang === 'uk' ? uk : ru
 }
