@@ -77,13 +77,15 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
   const hint = lang === 'uk' ? 'Натисніть, щоб відкрити' : 'Нажмите, чтобы открыть'
   const backHint = lang === 'uk' ? 'Натисніть, щоб згорнути' : 'Нажмите, чтобы свернуть'
 
-  // Обробник для клавіатури, оскільки ми змінили <button> на <div>
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       setFlipped((f) => !f)
     }
   }
+
+  // Зупиняємо будь-яке розповсюдження подій зі скрол-блоку
+  const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
 
   return (
     <div
@@ -106,7 +108,9 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
       >
         {/* FRONT FACE */}
         <div
-          className="absolute inset-0 rounded-[20px] bg-gradient-to-b from-[var(--color-surface,#25201C)] to-[var(--color-surface-dark,#1C1816)] border border-[var(--color-border,rgba(255,255,255,0.1))] group-hover:border-[var(--color-border-hover,rgba(255,255,255,0.22))] shadow-md group-hover:shadow-xl transition-all duration-300 flex flex-col items-center justify-between p-5 backface-hidden overflow-hidden select-none"
+          className={`absolute inset-0 rounded-[20px] bg-gradient-to-b from-[var(--color-surface,#25201C)] to-[var(--color-surface-dark,#1C1816)] border border-[var(--color-border,rgba(255,255,255,0.1))] group-hover:border-[var(--color-border-hover,rgba(255,255,255,0.22))] shadow-md group-hover:shadow-xl transition-all duration-300 flex flex-col items-center justify-between p-5 backface-hidden overflow-hidden select-none ${
+            flipped ? 'pointer-events-none' : '' // Отключаем клики когда скрыто
+          }`}
           style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
         >
           {/* Ambient Glow Background */}
@@ -159,7 +163,9 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
 
         {/* BACK FACE */}
         <div
-          className="absolute inset-0 rounded-[20px] bg-[var(--color-surface,#25201C)] border border-[color-mix(in_srgb,var(--color-accent,#E4D00A)_30%,rgba(255,255,255,0.1))] shadow-2xl flex flex-col p-4 backface-hidden overflow-hidden"
+          className={`absolute inset-0 rounded-[20px] bg-[var(--color-surface,#25201C)] border border-[color-mix(in_srgb,var(--color-accent,#E4D00A)_30%,rgba(255,255,255,0.1))] shadow-2xl flex flex-col p-4 backface-hidden overflow-hidden ${
+            !flipped ? 'pointer-events-none' : '' // Отключаем клики когда скрыто
+          }`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
@@ -182,11 +188,16 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
             </h3>
           </div>
 
-          {/* Scrollable Area - тепер працює ідеально на мобільних */}
+          {/* Scrollable Area */}
           <div 
             className="flex-1 overflow-y-auto overscroll-contain min-h-0 pr-1 space-y-2.5 text-left custom-scrollbar select-text cursor-auto"
-            onClick={(e) => e.stopPropagation()} // Клік по тексту не закриє картку
-            onKeyDown={(e) => e.stopPropagation()} // Дозволяє гортати клавіатурою
+            onClick={stopEvent}
+            onPointerDown={stopEvent}
+            onTouchStart={stopEvent}
+            onWheel={stopEvent}
+            onKeyDown={stopEvent}
+            // translateZ(0) заставляет Safari аппаратно обрабатывать скролл поверх 3D трансформации
+            style={{ WebkitOverflowScrolling: 'touch', transform: 'translateZ(0)' }} 
           >
             <p className="text-[13px] leading-relaxed font-normal text-[var(--color-ink,#F5F1EA)]/90 tracking-normal">
               {definition}
