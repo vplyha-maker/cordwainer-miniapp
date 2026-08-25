@@ -11,6 +11,7 @@ import { HeelCalcPage } from './pages/HeelCalcPage'
 import { ColorCalcPage } from './pages/ColorCalcPage'
 import { ColorsPage } from './pages/ColorsPage'
 import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
+import { GlossaryPage } from './pages/GlossaryPage'
 
 import {
   getSavedPerfMode,
@@ -37,6 +38,7 @@ export type Screen =
   | 'color-calc'
   | 'colors'
   | 'seo-width'
+  | 'glossary'
 
 export type Lang = 'ru' | 'uk'
 
@@ -332,6 +334,7 @@ export default function App() {
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
+            onOpenGlossary={() => setScreen('glossary')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -434,6 +437,14 @@ export default function App() {
           />
         )}
 
+        {screen === 'glossary' && (
+          <GlossaryPage
+            key="glossary"
+            lang={lang}
+            onBack={() => setScreen('home')}
+          />
+        )}
+
         {screen === 'seo-width' && (
           <ForwardOrthoSEOPage
             key="seo-width"
@@ -450,4 +461,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
- }
+}
