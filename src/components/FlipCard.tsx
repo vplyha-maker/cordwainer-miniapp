@@ -8,7 +8,6 @@ type FlipCardProps = {
   index?: number
 }
 
-// Осучаснені векторні іконки з єдиною геометрією (24x24, stroke 1.75px, rounded)
 const CATEGORY_ICON: Record<NonNullable<GlossaryTerm['category']>, React.ReactNode> = {
   material: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -84,8 +83,10 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
     }
   }
 
-  // Зупиняємо будь-яке розповсюдження подій зі скрол-блоку
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
+
+  // Непрозрачный фон — критично для Safari / iOS
+  const solidBg = 'var(--color-surface, #25201C)'
 
   return (
     <div
@@ -95,52 +96,60 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
       onKeyDown={handleKeyDown}
       aria-expanded={flipped}
       aria-label={`${title}. ${flipped ? backHint : hint}`}
-      className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] perspective-[1000px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent,#E4D00A)] rounded-[20px] tap-highlight-transparent cursor-pointer"
+      className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent,#E4D00A)] rounded-[20px] cursor-pointer"
       style={{
+        perspective: 1000,
+        WebkitPerspective: 1000,
         animationDelay: `${Math.min(index * 35, 350)}ms`,
+        // убираем tap-highlight на iOS
+        WebkitTapHighlightColor: 'transparent',
       }}
     >
       <div
-        className={`relative w-full h-full transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] preserve-3d rounded-[20px] ${
-          flipped ? '[transform:rotateY(180deg)]' : ''
-        }`}
-        style={{ transformStyle: 'preserve-3d' }}
+        className="relative w-full h-full rounded-[20px]"
+        style={{
+          transformStyle: 'preserve-3d',
+          WebkitTransformStyle: 'preserve-3d',
+          transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        }}
       >
-        {/* FRONT FACE */}
+        {/* ───── FRONT ───── */}
         <div
-          className={`absolute inset-0 rounded-[20px] bg-gradient-to-b from-[var(--color-surface,#25201C)] to-[var(--color-surface-dark,#1C1816)] border border-[var(--color-border,rgba(255,255,255,0.1))] group-hover:border-[var(--color-border-hover,rgba(255,255,255,0.22))] shadow-md group-hover:shadow-xl transition-all duration-300 flex flex-col items-center justify-between p-5 backface-hidden overflow-hidden select-none ${
-            flipped ? 'pointer-events-none' : '' // Отключаем клики когда скрыто
-          }`}
-          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+          className="absolute inset-0 rounded-[20px] flex flex-col items-center justify-between p-5 overflow-hidden select-none border border-[var(--color-border,rgba(255,255,255,0.1))] shadow-md"
+          style={{
+            backgroundColor: solidBg,
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            // отдельный слой GPU — Safari не смешивает с оборотом
+            transform: 'translateZ(1px)',
+            WebkitTransform: 'translateZ(1px)',
+            pointerEvents: flipped ? 'none' : 'auto',
+          }}
         >
-          {/* Ambient Glow Background */}
-          <div
-            className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl opacity-15 pointer-events-none group-hover:opacity-30 transition-opacity"
-            style={{ background: accent }}
-          />
-
-          {/* Header Row: Letter Badge */}
+          {/* Header: буква */}
           <div className="w-full flex items-center justify-between z-10">
             <span
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold tracking-wider shadow-inner"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold tracking-wider"
               style={{
-                background: `color-mix(in srgb, ${accent} 20%, transparent)`,
+                backgroundColor: solidBg,
                 color: accent,
-                border: `1px solid color-mix(in srgb, ${accent} 30%, transparent)`,
+                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 35%, transparent)`,
               }}
             >
               {term.letter}
             </span>
           </div>
 
-          {/* Center Content: Icon & Title */}
+          {/* Иконка + термин */}
           <div className="flex flex-col items-center text-center z-10 px-1 my-auto">
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110 shadow-lg"
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-105"
               style={{
-                background: `color-mix(in srgb, ${accent} 16%, transparent)`,
+                backgroundColor: solidBg,
                 color: accent,
-                boxShadow: `0 8px 20px -6px color-mix(in srgb, ${accent} 25%, transparent)`,
+                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 28%, transparent)`,
               }}
             >
               {icon}
@@ -151,8 +160,8 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
             </h3>
           </div>
 
-          {/* Footer Hint */}
-          <div className="z-10 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase text-[var(--color-muted,#B9ACA0)] opacity-60 group-hover:opacity-100 transition-opacity">
+          {/* Подсказка */}
+          <div className="z-10 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase text-[var(--color-muted,#B9ACA0)] opacity-70 group-hover:opacity-100 transition-opacity">
             <span>{hint}</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 1l4 4-4 4" />
@@ -161,24 +170,26 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
           </div>
         </div>
 
-        {/* BACK FACE */}
+        {/* ───── BACK ───── */}
         <div
-          className={`absolute inset-0 rounded-[20px] bg-[var(--color-surface,#25201C)] border border-[color-mix(in_srgb,var(--color-accent,#E4D00A)_30%,rgba(255,255,255,0.1))] shadow-2xl flex flex-col p-4 backface-hidden overflow-hidden ${
-            !flipped ? 'pointer-events-none' : '' // Отключаем клики когда скрыто
-          }`}
+          className="absolute inset-0 rounded-[20px] flex flex-col p-4 overflow-hidden border border-[var(--color-border,rgba(255,255,255,0.12))] shadow-md"
           style={{
+            backgroundColor: solidBg,
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
+            transform: 'rotateY(180deg) translateZ(1px)',
+            WebkitTransform: 'rotateY(180deg) translateZ(1px)',
+            pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
-          {/* Header */}
+          {/* Заголовок */}
           <div className="flex items-center gap-2.5 pb-2.5 mb-2.5 border-b border-white/10 shrink-0 select-none">
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
               style={{
-                background: `color-mix(in srgb, ${accent} 20%, transparent)`,
+                backgroundColor: solidBg,
                 color: accent,
+                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 30%, transparent)`,
               }}
             >
               {icon}
@@ -188,27 +199,36 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
             </h3>
           </div>
 
-          {/* Scrollable Area */}
-          <div 
-            className="flex-1 overflow-y-auto overscroll-contain min-h-0 pr-1 space-y-2.5 text-left custom-scrollbar select-text cursor-auto"
+          {/* Текст — скролл */}
+          <div
+            className="flex-1 overflow-y-auto overscroll-contain min-h-0 pr-1 space-y-2.5 text-left select-text"
             onClick={stopEvent}
             onPointerDown={stopEvent}
             onTouchStart={stopEvent}
             onWheel={stopEvent}
-            onKeyDown={stopEvent}
-            // translateZ(0) заставляет Safari аппаратно обрабатывать скролл поверх 3D трансформации
-            style={{ WebkitOverflowScrolling: 'touch', transform: 'translateZ(0)' }} 
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              // Safari: скролл внутри 3D
+              transform: 'translateZ(0)',
+              WebkitTransform: 'translateZ(0)',
+            }}
           >
-            <p className="text-[13px] leading-relaxed font-normal text-[var(--color-ink,#F5F1EA)]/90 tracking-normal">
+            <p className="text-[13px] leading-relaxed font-normal text-[var(--color-ink,#F5F1EA)] tracking-normal">
               {definition}
             </p>
 
             {example && (
-              <div 
-                className="p-2.5 rounded-xl text-[11px] leading-relaxed text-[var(--color-muted,#D1C7BD)] bg-black/25 border-l-2"
-                style={{ borderColor: accent }}
+              <div
+                className="p-2.5 rounded-xl text-[11px] leading-relaxed text-[var(--color-muted,#D1C7BD)] border-l-2"
+                style={{
+                  backgroundColor: 'var(--color-surface-2, #2F2924)',
+                  borderColor: accent,
+                }}
               >
-                <span className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider opacity-70" style={{ color: accent }}>
+                <span
+                  className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider opacity-80"
+                  style={{ color: accent }}
+                >
                   {lang === 'uk' ? 'Приклад:' : 'Пример:'}
                 </span>
                 {example}
@@ -216,7 +236,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
             )}
           </div>
 
-          {/* Back Footer Hint */}
+          {/* Подсказка */}
           <div className="pt-2 mt-auto border-t border-white/5 shrink-0 flex items-center justify-center gap-1 text-[10px] font-medium text-[var(--color-muted,#B9ACA0)] opacity-50 select-none">
             <span>{backHint}</span>
           </div>
@@ -224,4 +244,4 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
       </div>
     </div>
   )
-}
+ }
