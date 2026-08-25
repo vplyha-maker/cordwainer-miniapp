@@ -214,7 +214,11 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
             }}
           >
-            {(['forefoot', 'heelToToe', 'negative'] as const).map((type) => (
+            {([
+              { type: 'forefoot' as const, labelKey: 'rockerForefoot' as const },
+              { type: 'heelToToe' as const, labelKey: 'rockerHeelToToe' as const },
+              { type: 'negative' as const, labelKey: 'rockerNegative' as const },
+            ]).map(({ type, labelKey }) => (
               <button
                 key={type}
                 onClick={() => handleRockerType(type)}
@@ -228,7 +232,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     : { color: 'var(--color-muted, #B9ACA0)' }
                 }
               >
-                {t[type]}
+                {t[labelKey]}
               </button>
             ))}
           </div>
@@ -430,17 +434,21 @@ function getLabels(lang: Lang) {
     stiletto: 'Шпилька', block: 'Блок', kitten: 'Рюмочка', flared: 'Трапеция',
     flat: 'Стандарт', rocker: 'Рокер',
     specsBtn: '⚙️ Спецификация и Математика', dropLbl: 'Перепад',
-    massTitle: 'Распределение массы', forefoot: 'Носок', rearfoot: 'Пятка',
-    invertRisk: 'Риск инверсии', entryAngle: 'Угол въезда',
-    // Клинико-ортопедические ключи
+    massTitle: 'Распределение массы',
+    forefoot: 'Носок',
+    rearfoot: 'Пятка',
+    invertRisk: 'Риск инверсии',
+    entryAngle: 'Угол въезда',
+    // Клинико-ортопедические
     padPos: 'Пелот Зейца (поз.)',
     padHeight: 'Высота пелота',
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
     carbonInsert: 'Карбон (толщ.)',
-    forefoot: 'Метатарзалгия',
-    heelToToe: 'Артроз',
-    negative: 'Диабет. стопа',
+    // Пресеты рокера (уникальные ключи — без конфликта с forefoot)
+    rockerForefoot: 'Метатарзалгия',
+    rockerHeelToToe: 'Артроз',
+    rockerNegative: 'Диабет. стопа',
   }
   const uk = {
     ...ru,
@@ -468,17 +476,19 @@ function getLabels(lang: Lang) {
     stiletto: 'Шпилька', block: 'Блок', kitten: 'Чарочка', flared: 'Трапеція',
     flat: 'Стандарт', rocker: 'Рокер',
     specsBtn: '⚙️ Специфікація та Математика', dropLbl: 'Перепад',
-    massTitle: 'Розподіл маси', forefoot: 'Носок', rearfoot: "П'ятка",
-    invertRisk: 'Ризик інверсії', entryAngle: 'Кут вʼїзду',
-    // Клинико-ортопедические ключи
+    massTitle: 'Розподіл маси',
+    forefoot: 'Носок',
+    rearfoot: "П'ятка",
+    invertRisk: 'Ризик інверсії',
+    entryAngle: 'Кут вʼїзду',
     padPos: 'Пелот Зейца (поз.)',
     padHeight: 'Висота пелота',
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
     carbonInsert: 'Карбон (товщ.)',
-    forefoot: 'Метатарзалгія',
-    heelToToe: 'Артроз',
-    negative: 'Діабет. стопа',
+    rockerForefoot: 'Метатарзалгія',
+    rockerHeelToToe: 'Артроз',
+    rockerNegative: 'Діабет. стопа',
   }
   return lang === 'uk' ? uk : ru
 }
