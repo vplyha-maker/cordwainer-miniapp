@@ -16,7 +16,7 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
   {
     id: 'amidiskozha',
     term: 'Амидискожа',
-    termUk: 'Амідискіра',
+    termUk: 'Амідисшкіра',
     definition:
       'Мягкая искусственная кожа на нетканой (НТ), тканевой (Т) или трикотажной основах (ТР) с полиамидным покрытием.',
     definitionUk:
