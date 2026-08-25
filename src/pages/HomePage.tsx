@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BottomDock } from '../components/BottomDock'
 import { BLOG_ARTICLES } from '../data/blog'
+import { GLOSSARY_TERMS } from '../data/glossary'
 import type { Lang, FavoriteItem } from '../App'
 
 type HomePageProps = {
@@ -17,6 +18,21 @@ type HomePageProps = {
   onOpenFavorites?: () => void
 }
 
+function glossaryLabel(count: number, lang: Lang): string {
+  if (lang === 'uk') {
+    const n10 = count % 10
+    const n100 = count % 100
+    if (n10 === 1 && n100 !== 11) return `${count} термін`
+    if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return `${count} терміни`
+    return `${count} термінів`
+  }
+  const n10 = count % 10
+  const n100 = count % 100
+  if (n10 === 1 && n100 !== 11) return `${count} термин`
+  if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return `${count} термина`
+  return `${count} терминов`
+}
+
 export function HomePage({
   onBack,
   onOpenBlog,
@@ -31,6 +47,7 @@ export function HomePage({
 }: HomePageProps) {
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
   const articleFavorites = favorites.filter((f) => f.type === 'article')
+  const glossaryCount = GLOSSARY_TERMS.length
 
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
@@ -67,7 +84,7 @@ export function HomePage({
       blog: 'Блог',
       blogSub: hasNewBlog ? 'Новая статья' : 'Статьи мастерской',
       glossary: 'Глоссарий',
-      glossarySub: '342 термина',
+      glossarySub: glossaryLabel(glossaryCount, 'ru'),
       favorites: 'Избранное',
       favoritesSub:
         articleFavorites.length > 0
@@ -97,7 +114,7 @@ export function HomePage({
       blog: 'Блог',
       blogSub: hasNewBlog ? 'Нова стаття' : 'Статті майстерні',
       glossary: 'Глосарій',
-      glossarySub: '342 терміни',
+      glossarySub: glossaryLabel(glossaryCount, 'uk'),
       favorites: 'Обране',
       favoritesSub:
         articleFavorites.length > 0
