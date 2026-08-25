@@ -8,6 +8,8 @@ type HomePageProps = {
   onOpenBlog?: () => void
   onOpenCalcMenu?: () => void
   onOpenColors?: () => void
+  /** Открыть глоссарий терминов */
+  onOpenGlossary?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -20,6 +22,7 @@ export function HomePage({
   onOpenBlog,
   onOpenCalcMenu,
   onOpenColors,
+  onOpenGlossary,
   lang,
   setLang,
   favorites = [],
@@ -289,10 +292,19 @@ export function HomePage({
           {TOOLS.map((item) => {
             const isBlog = item.id === 'blog'
             const isCalc = item.id === 'calc'
+            const isGlossary = item.id === 'glossary'
             return (
               <button
                 key={item.id}
-                onClick={isBlog ? onOpenBlog : isCalc ? onOpenCalcMenu : undefined}
+                onClick={
+                  isBlog
+                    ? onOpenBlog
+                    : isCalc
+                      ? onOpenCalcMenu
+                      : isGlossary
+                        ? onOpenGlossary
+                        : undefined
+                }
                 className={`min-h-[116px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm overflow-hidden ${
                   isBlog && hasNewBlog
                     ? 'border border-[var(--pigment-lac-dye,#8B0000)]/50 shadow-[0_0_15px_color-mix(in_srgb,var(--pigment-lac-dye,#8B0000)_20%,transparent)]'
@@ -379,4 +391,4 @@ export function HomePage({
       </div>
     </div>
   )
-}
+ }
