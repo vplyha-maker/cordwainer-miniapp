@@ -36,15 +36,15 @@ function isTelegramWebApp(): boolean {
 }
 
 export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioPlayerProps) {
-  // Скрываем только внутри настоящего Telegram Mini App
+  // Скрываем кнопку только внутри настоящего Telegram Mini App
   if (isTelegramWebApp()) {
     return null
   }
 
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'speaking' | 'error'>('idle')
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
+  // Очистка при размонтировании / смене статьи
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -52,7 +52,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       }
       utteranceRef.current = null
       setIsSpeaking(false)
-      setStatus('idle')
     }
   }, [text, lang])
 
@@ -62,113 +61,73 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     }
     utteranceRef.current = null
     setIsSpeaking(false)
-    setStatus('idle')
   }, [])
 
   const speak = useCallback(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setStatus('error')
-      return
-    }
+    if (typeof window === 'undefined' || !window.speechSynthesis || !text) return
 
-    // Отменяем предыдущее
     window.speechSynthesis.cancel()
-    setStatus('idle')
-    setIsSpeaking(false)
 
     const cleanText = stripMarkdown(text)
-    if (!cleanText) {
-      setStatus('error')
-      return
+    if (!cleanText) return
+
+    const utterance = new SpeechSynthesisUtterance(cleanText)
+    utterance.lang = LANG_MAP[lang] || 'ru-RU'
+    utterance.rate = 0.95
+    utterance.pitch = 1
+    utterance.volume = 1
+
+    // Пытаемся выбрать голос
+    const voices = window.speechSynthesis.getVoices()
+    const preferred =
+      voices.find((v) => v.lang === utterance.lang) ||
+      voices.find((v) => v.lang.startsWith(lang)) ||
+      voices.find((v) => lang === 'uk' && v.lang.toLowerCase().includes('uk')) ||
+      voices.find((v) => lang === 'ru' && v.lang.toLowerCase().includes('ru'))
+
+    if (preferred) {
+      utterance.voice = preferred
     }
 
-    try {
-      const utterance = new SpeechSynthesisUtterance(cleanText)
-      utterance.lang = LANG_MAP[lang] || 'ru-RU'
-      utterance.rate = 0.95
-      utterance.pitch = 1
-      utterance.volume = 1
-
-      const doSpeak = () => {
-        const voices = window.speechSynthesis.getVoices()
-
-        const preferred =
-          voices.find((v) => v.lang === utterance.lang) ||
-          voices.find((v) => v.lang.startsWith(lang)) ||
-          voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
-          voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
-          voices[0]
-
-        if (preferred) {
-          utterance.voice = preferred
-        }
-
-        utterance.onstart = () => {
-          setIsSpeaking(true)
-          setStatus('speaking')
-        }
-
-        utterance.onend = () => {
-          setIsSpeaking(false)
-          setStatus('idle')
-          utteranceRef.current = null
-        }
-
-        utterance.onerror = (event) => {
-          // Игнорируем "interrupted" и "canceled" — это нормально при остановке
-          if (event.error === 'interrupted' || event.error === 'canceled') {
-            setIsSpeaking(false)
-            setStatus('idle')
-          } else {
-            console.warn('TTS error:', event.error)
-            setIsSpeaking(false)
-            setStatus('error')
-          }
-          utteranceRef.current = null
-        }
-
-        utteranceRef.current = utterance
-        window.speechSynthesis.speak(utterance)
-      }
-
-      // Ждём голоса, если их ещё нет
-      const voices = window.speechSynthesis.getVoices()
-      if (voices.length === 0) {
-        const handler = () => {
-          doSpeak()
-          window.speechSynthesis.onvoiceschanged = null
-        }
-        window.speechSynthesis.onvoiceschanged = handler
-        // На всякий случай пробуем через 300мс
-        setTimeout(() => {
-          if (window.speechSynthesis.getVoices().length > 0) {
-            doSpeak()
-          }
-        }, 300)
-      } else {
-        doSpeak()
-      }
-    } catch (err) {
-      console.error('TTS failed:', err)
-      setStatus('error')
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => {
       setIsSpeaking(false)
+      utteranceRef.current = null
+    }
+    utterance.onerror = () => {
+      setIsSpeaking(false)
+      utteranceRef.current = null
+    }
+
+    utteranceRef.current = utterance
+
+    // Если голоса ещё не загрузились — ждём
+    if (voices.length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const updatedVoices = window.speechSynthesis.getVoices()
+        const voice =
+          updatedVoices.find((v) => v.lang === utterance.lang) ||
+          updatedVoices.find((v) => v.lang.startsWith(lang))
+        if (voice) utterance.voice = voice
+        window.speechSynthesis.speak(utterance)
+        window.speechSynthesis.onvoiceschanged = null
+      }
+    } else {
+      window.speechSynthesis.speak(utterance)
     }
   }, [text, lang])
 
   const toggle = () => {
-    if (isSpeaking || status === 'speaking') {
+    if (isSpeaking) {
       stop()
     } else {
       speak()
     }
   }
 
-  let label = lang === 'ru' ? 'Слушать' : 'Слухати'
-  if (status === 'speaking' || isSpeaking) {
-    label = lang === 'ru' ? 'Остановить' : 'Зупинити'
-  } else if (status === 'error') {
-    label = lang === 'ru' ? 'Не удалось запустить' : 'Не вдалося запустити'
-  }
+  const label = isSpeaking
+    ? lang === 'ru' ? 'Остановить' : 'Зупинити'
+    : lang === 'ru' ? 'Слушать' : 'Слухати'
 
   return (
     <motion.button
@@ -183,32 +142,26 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         ${className}
       `}
       style={{
-        border: `1px solid color-mix(in srgb, var(--color-accent, #D8A35C) ${
-          isSpeaking || status === 'speaking' ? '50%' : '28%'
-        }, transparent)`,
-        color:
-          isSpeaking || status === 'speaking'
-            ? 'var(--color-accent, #D8A35C)'
-            : status === 'error'
-              ? 'var(--color-muted, #B9ACA0)'
-              : 'var(--color-ink, #F5F1EA)',
+        border: `1px solid color-mix(in srgb, var(--color-accent, #D8A35C) ${isSpeaking ? '50%' : '28%'}, transparent)`,
+        color: isSpeaking ? 'var(--color-accent, #D8A35C)' : 'var(--color-ink, #F5F1EA)',
       }}
       aria-label={label}
     >
+      {/* Фон */}
       <motion.div
         className="absolute inset-0"
         initial={false}
         animate={{
-          background:
-            isSpeaking || status === 'speaking'
-              ? 'linear-gradient(135deg, color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent), color-mix(in srgb, var(--color-accent, #D8A35C) 8%, transparent))'
-              : 'linear-gradient(135deg, color-mix(in srgb, var(--color-surface, #25201C) 90%, transparent), color-mix(in srgb, var(--color-surface, #25201C) 70%, transparent))',
+          background: isSpeaking
+            ? 'linear-gradient(135deg, color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent), color-mix(in srgb, var(--color-accent, #D8A35C) 8%, transparent))'
+            : 'linear-gradient(135deg, color-mix(in srgb, var(--color-surface, #25201C) 90%, transparent), color-mix(in srgb, var(--color-surface, #25201C) 70%, transparent))',
         }}
         transition={{ duration: 0.3 }}
       />
 
+      {/* Пульсация */}
       <AnimatePresence>
-        {(isSpeaking || status === 'speaking') && (
+        {isSpeaking && (
           <motion.div
             className="absolute inset-0 rounded-2xl pointer-events-none"
             initial={{ opacity: 0 }}
@@ -222,9 +175,10 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         )}
       </AnimatePresence>
 
+      {/* Иконка */}
       <div className="relative z-10 w-5 h-5 flex items-center justify-center shrink-0">
         <AnimatePresence mode="wait">
-          {isSpeaking || status === 'speaking' ? (
+          {isSpeaking ? (
             <motion.svg
               key="stop"
               width="16"
@@ -237,23 +191,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
               transition={{ duration: 0.15 }}
             >
               <rect x="6" y="6" width="12" height="12" rx="1.5" />
-            </motion.svg>
-          ) : status === 'error' ? (
-            <motion.svg
-              key="error"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              initial={{ scale: 0.7, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.7, opacity: 0 }}
-            >
-              <path d="M11 5L6 9H2v6h4l5 4V5z" />
-              <line x1="23" y1="9" x2="17" y2="15" />
-              <line x1="17" y1="9" x2="23" y2="15" />
             </motion.svg>
           ) : (
             <motion.svg
@@ -273,6 +210,7 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         </AnimatePresence>
       </div>
 
+      {/* Текст */}
       <span className="relative z-10 tracking-wide">
         <AnimatePresence mode="wait">
           <motion.span
