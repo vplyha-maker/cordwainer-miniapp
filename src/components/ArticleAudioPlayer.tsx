@@ -43,10 +43,19 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   const [isSpeaking, setIsSpeaking] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
-  // Только при размонтировании компонента
+  // Предзагрузка голосов при монтировании компонента
   useEffect(() => {
-    return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices()
+      
+      const handleVoicesChanged = () => {
+        window.speechSynthesis.getVoices()
+      }
+      
+      window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged)
+      
+      return () => {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged)
         window.speechSynthesis.cancel()
       }
     }
@@ -63,55 +72,50 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   const speak = useCallback(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return
 
+    const cleanText = stripMarkdown(text)
+    if (!cleanText) {
+      console.warn('Текст для озвучивания пуст после очистки')
+      return
+    }
+
+    // Отменяем предыдущее воспроизведение
     window.speechSynthesis.cancel()
 
-    const cleanText = stripMarkdown(text)
-    if (!cleanText) return
+    // Небольшая задержка, чтобы браузер успел завершить отмену (cancel)
+    // до старта нового воспроизведения
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(cleanText)
+      utterance.lang = LANG_MAP[lang] || 'ru-RU'
+      utterance.rate = 0.95
+      utterance.pitch = 1
+      utterance.volume = 1
 
-    const utterance = new SpeechSynthesisUtterance(cleanText)
-    utterance.lang = LANG_MAP[lang] || 'ru-RU'
-    utterance.rate = 0.95
-    utterance.pitch = 1
-    utterance.volume = 1
+      const voices = window.speechSynthesis.getVoices()
+      const preferred =
+        voices.find((v) => v.lang === utterance.lang) ||
+        voices.find((v) => v.lang.startsWith(lang)) ||
+        voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
+        voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
+        voices[0]
 
-    const voices = window.speechSynthesis.getVoices()
-    const preferred =
-      voices.find((v) => v.lang === utterance.lang) ||
-      voices.find((v) => v.lang.startsWith(lang)) ||
-      voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
-      voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
-      voices[0]
-
-    if (preferred) {
-      utterance.voice = preferred
-    }
-
-    utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => {
-      setIsSpeaking(false)
-      utteranceRef.current = null
-    }
-    utterance.onerror = () => {
-      setIsSpeaking(false)
-      utteranceRef.current = null
-    }
-
-    utteranceRef.current = utterance
-
-    if (voices.length === 0) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        const updated = window.speechSynthesis.getVoices()
-        const voice =
-          updated.find((v) => v.lang === utterance.lang) ||
-          updated.find((v) => v.lang.startsWith(lang)) ||
-          updated[0]
-        if (voice) utterance.voice = voice
-        window.speechSynthesis.speak(utterance)
-        window.speechSynthesis.onvoiceschanged = null
+      if (preferred) {
+        utterance.voice = preferred
       }
-    } else {
+
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => {
+        setIsSpeaking(false)
+        utteranceRef.current = null
+      }
+      utterance.onerror = (e) => {
+        console.error('Ошибка синтеза речи:', e)
+        setIsSpeaking(false)
+        utteranceRef.current = null
+      }
+
+      utteranceRef.current = utterance
       window.speechSynthesis.speak(utterance)
-    }
+    }, 50)
   }, [text, lang])
 
   const toggle = () => {
@@ -207,4 +211,4 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       <span className="relative z-10 tracking-wide">{label}</span>
     </motion.button>
   )
- }
+}
