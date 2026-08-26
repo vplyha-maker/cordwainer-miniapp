@@ -70,20 +70,22 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   }, [])
 
   const speak = useCallback(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return
-
-    const cleanText = stripMarkdown(text)
-    if (!cleanText) {
-      console.warn('Текст для озвучивания пуст после очистки')
+    // 1. Проверка поддержки
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      alert('Ошибка: Ваш браузер не поддерживает синтез речи')
       return
     }
 
-    // Отменяем предыдущее воспроизведение
-    window.speechSynthesis.cancel()
+    // 2. Очистка текста
+    const cleanText = stripMarkdown(text)
+    
+    // Если текст после очистки стал пустым - покажем окно
+    if (!cleanText || cleanText.trim() === '') {
+      alert('Ошибка: Текст оказался пустым! Возможно, функция stripMarkdown удалила всё.')
+      return
+    }
 
-    // Небольшая задержка, чтобы браузер успел завершить отмену (cancel)
-    // до старта нового воспроизведения
-    setTimeout(() => {
+    try {
       const utterance = new SpeechSynthesisUtterance(cleanText)
       utterance.lang = LANG_MAP[lang] || 'ru-RU'
       utterance.rate = 0.95
@@ -91,6 +93,7 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       utterance.volume = 1
 
       const voices = window.speechSynthesis.getVoices()
+
       const preferred =
         voices.find((v) => v.lang === utterance.lang) ||
         voices.find((v) => v.lang.startsWith(lang)) ||
@@ -102,20 +105,29 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         utterance.voice = preferred
       }
 
-      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onstart = () => {
+        setIsSpeaking(true)
+      }
+      
       utterance.onend = () => {
         setIsSpeaking(false)
         utteranceRef.current = null
       }
+      
+      // Если браузер выдаст ошибку синтеза - покажем её на экране
       utterance.onerror = (e) => {
-        console.error('Ошибка синтеза речи:', e)
+        alert('Системная ошибка аудио: ' + e.error)
         setIsSpeaking(false)
         utteranceRef.current = null
       }
 
       utteranceRef.current = utterance
+      
       window.speechSynthesis.speak(utterance)
-    }, 50)
+      
+    } catch (error: any) {
+      alert('Критическая ошибка запуска: ' + error.message)
+    }
   }, [text, lang])
 
   const toggle = () => {
