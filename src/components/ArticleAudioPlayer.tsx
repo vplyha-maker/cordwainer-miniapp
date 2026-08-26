@@ -29,20 +29,14 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
-/**
- * Точная проверка: мы реально внутри Telegram Mini App,
- * а не просто на сайте, где подключён telegram-web-app.js
- */
 function isTelegramWebApp(): boolean {
   if (typeof window === 'undefined') return false
-
   const tg = (window as any).Telegram?.WebApp
-  // В настоящем Mini App initData всегда непустой
   return !!(tg && typeof tg.initData === 'string' && tg.initData.length > 0)
 }
 
 export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioPlayerProps) {
-  // Скрываем кнопку только внутри настоящего Telegram Mini App
+  // Скрываем только внутри настоящего Telegram Mini App
   if (isTelegramWebApp()) {
     return null
   }
@@ -77,7 +71,10 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       return
     }
 
+    // Отменяем предыдущее
     window.speechSynthesis.cancel()
+    setStatus('idle')
+    setIsSpeaking(false)
 
     const cleanText = stripMarkdown(text)
     if (!cleanText) {
@@ -117,34 +114,42 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
           utteranceRef.current = null
         }
 
-        utterance.onerror = () => {
-          setIsSpeaking(false)
-          setStatus('error')
+        utterance.onerror = (event) => {
+          // Игнорируем "interrupted" и "canceled" — это нормально при остановке
+          if (event.error === 'interrupted' || event.error === 'canceled') {
+            setIsSpeaking(false)
+            setStatus('idle')
+          } else {
+            console.warn('TTS error:', event.error)
+            setIsSpeaking(false)
+            setStatus('error')
+          }
           utteranceRef.current = null
         }
 
         utteranceRef.current = utterance
         window.speechSynthesis.speak(utterance)
-
-        setTimeout(() => {
-          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-            setIsSpeaking(false)
-            setStatus('error')
-          }
-        }, 600)
       }
 
+      // Ждём голоса, если их ещё нет
       const voices = window.speechSynthesis.getVoices()
       if (voices.length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => {
+        const handler = () => {
           doSpeak()
           window.speechSynthesis.onvoiceschanged = null
         }
-        setTimeout(doSpeak, 400)
+        window.speechSynthesis.onvoiceschanged = handler
+        // На всякий случай пробуем через 300мс
+        setTimeout(() => {
+          if (window.speechSynthesis.getVoices().length > 0) {
+            doSpeak()
+          }
+        }, 300)
       } else {
         doSpeak()
       }
-    } catch {
+    } catch (err) {
+      console.error('TTS failed:', err)
       setStatus('error')
       setIsSpeaking(false)
     }
@@ -154,7 +159,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     if (isSpeaking || status === 'speaking') {
       stop()
     } else {
-      setStatus('idle')
       speak()
     }
   }
