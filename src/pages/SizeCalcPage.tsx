@@ -5,7 +5,9 @@ import {
   convertShoeSize,
   formatSize,
   RANGES,
+  BRAND_LABELS,
   type Gender,
+  type Brand,
 } from '../lib/shoeSizes'
 
 type SizeCalcPageProps = {
@@ -80,8 +82,21 @@ const THEMES = {
   },
 } as const
 
+const BRANDS: Brand[] = [
+  'standard',
+  'nike',
+  'adidas',
+  'newbalance',
+  'puma',
+  'zara',
+  'bershka',
+  'terranova',
+  'lacoste',
+]
+
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [gender, setGender] = useState<Gender>('men')
+  const [brand, setBrand] = useState<Brand>('standard')
   const [unit, setUnit] = useState<'cm' | 'mm'>('cm')
   const [footMm, setFootMm] = useState<number>(RANGES.men.default)
   const [isEditing, setIsEditing] = useState(false)
@@ -99,7 +114,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     setFootMm((prev) => Math.min(r.max, Math.max(r.min, prev)))
   }, [])
 
-  const result = useMemo(() => convertShoeSize(footMm, gender), [footMm, gender])
+  const result = useMemo(
+    () => convertShoeSize(footMm, gender, brand),
+    [footMm, gender, brand],
+  )
 
   const displayValue =
     unit === 'cm'
@@ -170,6 +188,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       standardsTitle: 'Стандарты',
       standardsNote:
         'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
+      brand: 'Бренд',
     },
     uk: {
       title: 'Розмір взуття',
@@ -195,6 +214,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       standardsTitle: 'Стандарти',
       standardsNote:
         'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
+      brand: 'Бренд',
     },
   }[lang]
 
@@ -251,8 +271,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-28 scrollbar-hide calc-page-content">
+        {/* Gender segment */}
         <div
-          className="mt-4 mb-6 flex p-[3px] rounded-2xl calc-segment"
+          className="mt-4 mb-3 flex p-[3px] rounded-2xl calc-segment"
           style={{
             background: 'var(--color-surface, #25201C)',
             border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
@@ -275,6 +296,43 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
             </button>
           ))}
+        </div>
+
+        {/* Brand chips — horizontal scroll */}
+        <div className="mb-5 -mx-4 md:-mx-6 px-4 md:px-6">
+          <div
+            className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {BRANDS.map((b) => {
+              const active = brand === b
+              return (
+                <button
+                  key={b}
+                  onClick={() => {
+                    triggerHaptic('light')
+                    setBrand(b)
+                  }}
+                  className="shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 active:scale-95"
+                  style={
+                    active
+                      ? {
+                          background: theme.accent,
+                          color: theme.buttonText,
+                          boxShadow: `0 2px 10px ${theme.accent}40`,
+                        }
+                      : {
+                          background: 'var(--color-surface, #25201C)',
+                          color: 'var(--color-muted, #B9ACA0)',
+                          border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 18%, transparent)',
+                        }
+                  }
+                >
+                  {BRAND_LABELS[b]}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div
@@ -538,6 +596,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
           <div className="text-[12px] mb-5" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
             {t.recommended}
+            {brand !== 'standard' && (
+              <span className="ml-1 opacity-70">· {BRAND_LABELS[brand]}</span>
+            )}
           </div>
 
           {/* Стабильная сетка — без прыжков при смене цифр */}
