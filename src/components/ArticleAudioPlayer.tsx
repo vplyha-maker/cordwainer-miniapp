@@ -29,12 +29,20 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
+/**
+ * Точная проверка: мы реально внутри Telegram Mini App,
+ * а не просто на сайте, где подключён telegram-web-app.js
+ */
 function isTelegramWebApp(): boolean {
-  return typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp
+  if (typeof window === 'undefined') return false
+
+  const tg = (window as any).Telegram?.WebApp
+  // В настоящем Mini App initData всегда непустой
+  return !!(tg && typeof tg.initData === 'string' && tg.initData.length > 0)
 }
 
 export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioPlayerProps) {
-  // Скрываем кнопку внутри Telegram Mini App
+  // Скрываем кнопку только внутри настоящего Telegram Mini App
   if (isTelegramWebApp()) {
     return null
   }
