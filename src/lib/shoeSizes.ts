@@ -7,6 +7,9 @@
  * Brand tables use official published size charts converted to mm.
  * findClosest always uses the raw footMm (never the rounded mondopoint).
  * ukr is always derived from pure foot length (mondopoint / 10).
+ *
+ * Out-of-range protection: if the closest brand size differs from footMm
+ * by more than 7 mm, the brand result is discarded and ISO fallback is used.
  */
 
 export type Gender = 'men' | 'women' | 'kids'
@@ -38,6 +41,10 @@ type SizeRow = {
   uk: number
   us: number
 }
+
+/** Max allowed difference (mm) between foot length and brand table entry.
+ *  Beyond this the brand size is considered non-existent → ISO fallback. */
+const BRAND_SIZE_THRESHOLD_MM = 7
 
 /** Adult recommended marking (ISO 19407 Table 2 style) — fallback */
 const ADULT_TABLE: Array<{
@@ -378,23 +385,29 @@ export function convertShoeSize(
   // UKR / GOST always from pure foot length (independent of brand last)
   const ukr = mondopoint / 10
 
-  // Brand-specific table — search by raw mm
+  // Brand-specific table — search by raw mm + out-of-range guard
   if (brand !== 'standard') {
     const brandTables = BRAND_TABLES[brand]
     const table = brandTables?.[gender]
     if (table && table.length > 0) {
-      const row = findClosest(table, mm) // ← raw mm, not mondopoint
-      return {
-        mondopoint, // pure rounded foot length
-        eu: row.eu,
-        uk: row.uk,
-        us: row.us,
-        ukr,
-        cm,
-        mm,
+      const row = findClosest(table, mm)
+      const diff = Math.abs(mm - row.mm)
+
+      // If the closest brand size is more than 7 mm away,
+      // the brand simply does not offer this length → fall through to ISO
+      if (diff <= BRAND_SIZE_THRESHOLD_MM) {
+        return {
+          mondopoint,
+          eu: row.eu,
+          uk: row.uk,
+          us: row.us,
+          ukr,
+          cm,
+          mm,
+        }
       }
+      // else: ignore brand result and continue to ISO fallback
     }
-    // no table for this gender → fall through to ISO
   }
 
   // ISO fallback — also search by raw mm for consistency
