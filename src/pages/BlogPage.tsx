@@ -6,6 +6,7 @@ import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
 import AboutProject from '../components/AboutProject'
 import { EmptyState } from '../components/EmptyState'
+import { ArticleAudioPlayer } from '../components/ArticleAudioPlayer'
 
 type BlogPageProps = {
   onBack?: () => void
@@ -104,6 +105,10 @@ export function BlogPage({
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
+      // Останавливаем озвучку при полном размонтировании страницы
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
     }
   }, [])
 
@@ -822,6 +827,10 @@ export function BlogPage({
                 aria-label="Back"
                 onClick={() => {
                   triggerHaptic('light')
+                  // Останавливаем озвучку при выходе из статьи
+                  if (typeof window !== 'undefined' && window.speechSynthesis) {
+                    window.speechSynthesis.cancel()
+                  }
                   setView('journal')
                 }}
                 className="w-8 h-8 flex items-center justify-center rounded-full active:scale-90 transition-transform focus-visible"
@@ -936,9 +945,14 @@ export function BlogPage({
             </div>
 
             <div className="px-5 py-6 pb-8">
-              <h1 className="font-display text-[1.8rem] leading-tight mb-6" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              <h1 className="font-display text-[1.8rem] leading-tight mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
                 {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
               </h1>
+
+              {/* Кнопка озвучки */}
+              <div className="mb-6">
+                <ArticleAudioPlayer text={content[lang]} lang={lang} />
+              </div>
 
               <div className="article-content">
                 <Markdown
