@@ -29,6 +29,25 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
+// Новая функция для нарезки текста на предложения
+function getSentences(text: string): string[] {
+  // Заменяем переносы на точки, чтобы они тоже служили границами
+  const clean = text.replace(/\n/g, '. ')
+  // Разбиваем текст по знакам препинания (. ! ?), сохраняя сами знаки
+  const chunks = clean.split(/([.!?]+)/)
+  const result: string[] = []
+
+  for (let i = 0; i < chunks.length; i += 2) {
+    const sentence = chunks[i]
+    const punctuation = chunks[i + 1] || ''
+    const combined = (sentence + punctuation).trim()
+    if (combined) {
+      result.push(combined)
+    }
+  }
+  return result
+}
+
 function isTelegramWebApp(): boolean {
   if (typeof window === 'undefined') return false
   const tg = (window as any).Telegram?.WebApp
@@ -43,7 +62,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   const [isSpeaking, setIsSpeaking] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
-  // Предзагрузка голосов при монтировании компонента
   useEffect(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.getVoices()
@@ -70,60 +88,69 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   }, [])
 
   const speak = useCallback(() => {
-    // 1. Проверка поддержки
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       alert('Ошибка: Ваш браузер не поддерживает синтез речи')
       return
     }
 
-    // 2. Очистка текста
     const cleanText = stripMarkdown(text)
     
-    // Если текст после очистки стал пустым - покажем окно
     if (!cleanText || cleanText.trim() === '') {
-      alert('Ошибка: Текст оказался пустым! Возможно, функция stripMarkdown удалила всё.')
+      alert('Ошибка: Текст для чтения пуст.')
       return
     }
 
     try {
-      const utterance = new SpeechSynthesisUtterance(cleanText)
-      utterance.lang = LANG_MAP[lang] || 'ru-RU'
-      utterance.rate = 0.95
-      utterance.pitch = 1
-      utterance.volume = 1
-
+      // 1. Разбиваем текст на массив коротких предложений
+      const sentences = getSentences(cleanText)
       const voices = window.speechSynthesis.getVoices()
 
-      const preferred =
-        voices.find((v) => v.lang === utterance.lang) ||
-        voices.find((v) => v.lang.startsWith(lang)) ||
-        voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
-        voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
-        voices[0]
+      // 2. Отправляем каждое предложение в очередь браузера
+      sentences.forEach((sentence, index) => {
+        const utterance = new SpeechSynthesisUtterance(sentence)
+        utterance.lang = LANG_MAP[lang] || 'ru-RU'
+        utterance.rate = 0.95
+        utterance.pitch = 1
+        utterance.volume = 1
 
-      if (preferred) {
-        utterance.voice = preferred
-      }
+        const preferred =
+          voices.find((v) => v.lang === utterance.lang) ||
+          voices.find((v) => v.lang.startsWith(lang)) ||
+          voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
+          voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
+          voices[0]
 
-      utterance.onstart = () => {
-        setIsSpeaking(true)
-      }
-      
-      utterance.onend = () => {
-        setIsSpeaking(false)
-        utteranceRef.current = null
-      }
-      
-      // Если браузер выдаст ошибку синтеза - покажем её на экране
-      utterance.onerror = (e) => {
-        alert('Системная ошибка аудио: ' + e.error)
-        setIsSpeaking(false)
-        utteranceRef.current = null
-      }
+        if (preferred) {
+          utterance.voice = preferred
+        }
 
-      utteranceRef.current = utterance
-      
-      window.speechSynthesis.speak(utterance)
+        // Включаем анимацию кнопки только на старте первого предложения
+        if (index === 0) {
+          utterance.onstart = () => setIsSpeaking(true)
+        }
+        
+        // Выключаем анимацию только когда дочитано последнее предложение
+        if (index === sentences.length - 1) {
+          utterance.onend = () => {
+            setIsSpeaking(false)
+            utteranceRef.current = null
+          }
+        }
+
+        utterance.onerror = (e) => {
+          // Игнорируем ошибку отмены, когда пользователь сам нажал "Остановить"
+          if (e.error !== 'canceled' && e.error !== 'interrupted') {
+            console.error('Ошибка куска аудио:', e.error)
+            setIsSpeaking(false)
+          }
+        }
+
+        // Сохраняем ссылку на текущий кусок (чтобы стоп работал)
+        utteranceRef.current = utterance
+        
+        // Добавляем кусок в очередь браузера
+        window.speechSynthesis.speak(utterance)
+      })
       
     } catch (error: any) {
       alert('Критическая ошибка запуска: ' + error.message)
