@@ -29,12 +29,20 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
+function isTelegramWebApp(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).Telegram?.WebApp
+}
+
 export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioPlayerProps) {
+  // Скрываем кнопку внутри Telegram Mini App
+  if (isTelegramWebApp()) {
+    return null
+  }
+
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [status, setStatus] = useState<'idle' | 'speaking' | 'error'>('idle')
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
-  // Очистка при размонтировании / смене текста / языка
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -61,7 +69,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       return
     }
 
-    // Всегда отменяем предыдущее
     window.speechSynthesis.cancel()
 
     const cleanText = stripMarkdown(text)
@@ -80,13 +87,12 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       const doSpeak = () => {
         const voices = window.speechSynthesis.getVoices()
 
-        // Пытаемся найти подходящий голос
         const preferred =
           voices.find((v) => v.lang === utterance.lang) ||
           voices.find((v) => v.lang.startsWith(lang)) ||
           voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
           voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
-          voices[0] // fallback на любой доступный
+          voices[0]
 
         if (preferred) {
           utterance.voice = preferred
@@ -103,8 +109,7 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
           utteranceRef.current = null
         }
 
-        utterance.onerror = (e) => {
-          console.warn('TTS error:', e)
+        utterance.onerror = () => {
           setIsSpeaking(false)
           setStatus('error')
           utteranceRef.current = null
@@ -113,31 +118,25 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         utteranceRef.current = utterance
         window.speechSynthesis.speak(utterance)
 
-        // Иногда в WebView speak() не вызывает onstart.
-        // Даём небольшую страховку.
         setTimeout(() => {
-          if (window.speechSynthesis.speaking) {
-            setIsSpeaking(true)
-            setStatus('speaking')
+          if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+            setIsSpeaking(false)
+            setStatus('error')
           }
-        }, 300)
+        }, 600)
       }
 
-      // В Telegram WebView голоса часто появляются только после voiceschanged
       const voices = window.speechSynthesis.getVoices()
       if (voices.length === 0) {
-        const handler = () => {
+        window.speechSynthesis.onvoiceschanged = () => {
           doSpeak()
           window.speechSynthesis.onvoiceschanged = null
         }
-        window.speechSynthesis.onvoiceschanged = handler
-        // Fallback на случай, если событие не придёт
-        setTimeout(doSpeak, 500)
+        setTimeout(doSpeak, 400)
       } else {
         doSpeak()
       }
-    } catch (err) {
-      console.error('TTS failed:', err)
+    } catch {
       setStatus('error')
       setIsSpeaking(false)
     }
@@ -152,7 +151,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     }
   }
 
-  // Текст кнопки
   let label = lang === 'ru' ? 'Слушать' : 'Слухати'
   if (status === 'speaking' || isSpeaking) {
     label = lang === 'ru' ? 'Остановить' : 'Зупинити'
@@ -185,7 +183,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       }}
       aria-label={label}
     >
-      {/* Фон */}
       <motion.div
         className="absolute inset-0"
         initial={false}
@@ -198,7 +195,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         transition={{ duration: 0.3 }}
       />
 
-      {/* Пульсация */}
       <AnimatePresence>
         {(isSpeaking || status === 'speaking') && (
           <motion.div
@@ -214,7 +210,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         )}
       </AnimatePresence>
 
-      {/* Иконка */}
       <div className="relative z-10 w-5 h-5 flex items-center justify-center shrink-0">
         <AnimatePresence mode="wait">
           {isSpeaking || status === 'speaking' ? (
@@ -266,7 +261,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         </AnimatePresence>
       </div>
 
-      {/* Текст */}
       <span className="relative z-10 tracking-wide">
         <AnimatePresence mode="wait">
           <motion.span
@@ -283,4 +277,4 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       </span>
     </motion.button>
   )
- }
+}
