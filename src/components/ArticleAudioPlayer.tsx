@@ -35,9 +35,8 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setIsSupported(false)
-    }
+    const supported = typeof window !== 'undefined' && !!window.speechSynthesis
+    setIsSupported(supported)
   }, [])
 
   // Очистка при размонтировании / смене текста / языка
@@ -60,7 +59,7 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   }, [])
 
   const speak = useCallback(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis || !text) return
+    if (!isSupported || !text) return
 
     window.speechSynthesis.cancel()
 
@@ -74,46 +73,50 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     utterance.volume = 1
 
     const applyVoiceAndSpeak = () => {
-      const voices = window.speechSynthesis.getVoices()
-      const preferred = voices.find(
-        (v) =>
-          v.lang === utterance.lang ||
-          v.lang.startsWith(lang) ||
-          (lang === 'uk' && (v.lang.startsWith('uk') || v.lang.includes('Ukrainian'))) ||
-          (lang === 'ru' && (v.lang.startsWith('ru') || v.lang.includes('Russian')))
-      )
-      if (preferred) utterance.voice = preferred
+      try {
+        const voices = window.speechSynthesis.getVoices()
+        const preferred = voices.find(
+          (v) =>
+            v.lang === utterance.lang ||
+            v.lang.startsWith(lang) ||
+            (lang === 'uk' && (v.lang.startsWith('uk') || v.lang.toLowerCase().includes('ukrain'))) ||
+            (lang === 'ru' && (v.lang.startsWith('ru') || v.lang.toLowerCase().includes('russian')))
+        )
+        if (preferred) utterance.voice = preferred
 
-      utterance.onstart = () => setIsSpeaking(true)
-      utterance.onend = () => {
-        setIsSpeaking(false)
-        utteranceRef.current = null
-      }
-      utterance.onerror = () => {
-        setIsSpeaking(false)
-        utteranceRef.current = null
-      }
+        utterance.onstart = () => setIsSpeaking(true)
+        utterance.onend = () => {
+          setIsSpeaking(false)
+          utteranceRef.current = null
+        }
+        utterance.onerror = () => {
+          setIsSpeaking(false)
+          utteranceRef.current = null
+        }
 
-      utteranceRef.current = utterance
-      window.speechSynthesis.speak(utterance)
+        utteranceRef.current = utterance
+        window.speechSynthesis.speak(utterance)
+      } catch (e) {
+        console.error('TTS error:', e)
+        setIsSpeaking(false)
+      }
     }
 
-    // В Telegram WebView и части мобильных браузеров голоса появляются асинхронно
     const voices = window.speechSynthesis.getVoices()
     if (voices.length === 0) {
-      const handler = () => {
+      window.speechSynthesis.onvoiceschanged = () => {
         applyVoiceAndSpeak()
         window.speechSynthesis.onvoiceschanged = null
       }
-      window.speechSynthesis.onvoiceschanged = handler
-      // Fallback на случай, если событие не сработает
-      setTimeout(applyVoiceAndSpeak, 300)
+      // Fallback
+      setTimeout(applyVoiceAndSpeak, 400)
     } else {
       applyVoiceAndSpeak()
     }
-  }, [text, lang])
+  }, [text, lang, isSupported])
 
   const toggle = () => {
+    if (!isSupported) return
     if (isSpeaking) {
       stop()
     } else {
@@ -121,27 +124,33 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     }
   }
 
-  if (!isSupported) return null
-
-  const label = isSpeaking
-    ? lang === 'ru' ? 'Остановить' : 'Зупинити'
-    : lang === 'ru' ? 'Слушать' : 'Слухати'
+  const label = !isSupported
+    ? lang === 'ru' ? 'Озвучка недоступна' : 'Озвучка недоступна'
+    : isSpeaking
+      ? lang === 'ru' ? 'Остановить' : 'Зупинити'
+      : lang === 'ru' ? 'Слушать' : 'Слухати'
 
   return (
     <motion.button
       type="button"
       onClick={toggle}
-      whileTap={{ scale: 0.96 }}
+      whileTap={isSupported ? { scale: 0.96 } : undefined}
+      disabled={!isSupported}
       className={`
         relative flex items-center justify-center gap-2.5
-        px-5 py-3 rounded-2xl text-[12px] font-semibold
+        w-full px-5 py-3.5 rounded-2xl text-[13px] font-semibold
         overflow-hidden transition-colors duration-300
-        focus-visible active:scale-95
+        focus-visible
         ${className}
       `}
       style={{
-        border: `1px solid color-mix(in srgb, var(--color-accent, #D8A35C) ${isSpeaking ? '45%' : '25%'}, transparent)`,
-        color: isSpeaking ? 'var(--color-accent, #D8A35C)' : 'var(--color-ink, #F5F1EA)',
+        border: `1px solid color-mix(in srgb, var(--color-accent, #D8A35C) ${isSpeaking ? '50%' : '30%'}, transparent)`,
+        color: isSpeaking
+          ? 'var(--color-accent, #D8A35C)'
+          : isSupported
+            ? 'var(--color-ink, #F5F1EA)'
+            : 'var(--color-muted, #B9ACA0)',
+        opacity: isSupported ? 1 : 0.6,
       }}
       aria-label={label}
     >
@@ -151,32 +160,49 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         initial={false}
         animate={{
           background: isSpeaking
-            ? 'linear-gradient(135deg, color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent), color-mix(in srgb, var(--color-accent, #D8A35C) 8%, transparent))'
-            : 'linear-gradient(135deg, color-mix(in srgb, var(--color-surface, #25201C) 85%, transparent), color-mix(in srgb, var(--color-surface, #25201C) 60%, transparent))',
+            ? 'linear-gradient(135deg, color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent), color-mix(in srgb, var(--color-accent, #D8A35C) 8%, transparent))'
+            : 'linear-gradient(135deg, color-mix(in srgb, var(--color-surface, #25201C) 90%, transparent), color-mix(in srgb, var(--color-surface, #25201C) 70%, transparent))',
         }}
         transition={{ duration: 0.3 }}
       />
 
-      {/* Пульсирующее кольцо при воспроизведении */}
+      {/* Пульсация при воспроизведении */}
       <AnimatePresence>
         {isSpeaking && (
           <motion.div
             className="absolute inset-0 rounded-2xl pointer-events-none"
             initial={{ opacity: 0 }}
-            animate={{ opacity: [0.3, 0.6, 0.3] }}
+            animate={{ opacity: [0.25, 0.55, 0.25] }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
             style={{
-              boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--color-accent, #D8A35C) 40%, transparent)',
+              boxShadow: 'inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent, #D8A35C) 50%, transparent)',
             }}
           />
         )}
       </AnimatePresence>
 
       {/* Иконка */}
-      <div className="relative z-10 w-5 h-5 flex items-center justify-center">
+      <div className="relative z-10 w-5 h-5 flex items-center justify-center shrink-0">
         <AnimatePresence mode="wait">
-          {isSpeaking ? (
+          {!isSupported ? (
+            <motion.svg
+              key="unsupported"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.7, opacity: 0 }}
+            >
+              <path d="M11 5L6 9H2v6h4l5 4V5z" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </motion.svg>
+          ) : isSpeaking ? (
             <motion.svg
               key="stop"
               width="16"
@@ -213,9 +239,9 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         <AnimatePresence mode="wait">
           <motion.span
             key={label}
-            initial={{ y: 6, opacity: 0 }}
+            initial={{ y: 8, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -6, opacity: 0 }}
+            exit={{ y: -8, opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="inline-block"
           >
