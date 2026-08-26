@@ -36,7 +36,6 @@ function isTelegramWebApp(): boolean {
 }
 
 export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioPlayerProps) {
-  // Скрываем кнопку только внутри настоящего Telegram Mini App
   if (isTelegramWebApp()) {
     return null
   }
@@ -44,7 +43,27 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   const [isSpeaking, setIsSpeaking] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
 
-  // Очистка при размонтировании / смене статьи
+  // Предзагрузка голосов при монтировании
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
+
+    // Принудительно "будим" SpeechSynthesis
+    window.speechSynthesis.getVoices()
+    
+    const handler = () => {
+      console.log('[TTS] Voices loaded:', window.speechSynthesis.getVoices().length)
+    }
+    window.speechSynthesis.onvoiceschanged = handler
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null
+      window.speechSynthesis.cancel()
+      utteranceRef.current = null
+      setIsSpeaking(false)
+    }
+  }, [])
+
+  // Очистка при смене текста/языка
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -56,6 +75,7 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   }, [text, lang])
 
   const stop = useCallback(() => {
+    console.log('[TTS] Stop')
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel()
     }
@@ -64,12 +84,29 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
   }, [])
 
   const speak = useCallback(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis || !text) return
+    console.log('[TTS] Speak clicked')
 
+    if (typeof window === 'undefined') {
+      console.warn('[TTS] No window')
+      return
+    }
+
+    if (!window.speechSynthesis) {
+      console.warn('[TTS] speechSynthesis not supported')
+      return
+    }
+
+    // Важно: иногда API "засыпает"
     window.speechSynthesis.cancel()
+    window.speechSynthesis.resume()
 
     const cleanText = stripMarkdown(text)
-    if (!cleanText) return
+    console.log('[TTS] Text length:', cleanText.length)
+
+    if (!cleanText) {
+      console.warn('[TTS] Empty text after strip')
+      return
+    }
 
     const utterance = new SpeechSynthesisUtterance(cleanText)
     utterance.lang = LANG_MAP[lang] || 'ru-RU'
@@ -77,43 +114,48 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     utterance.pitch = 1
     utterance.volume = 1
 
-    // Пытаемся выбрать голос
     const voices = window.speechSynthesis.getVoices()
+    console.log('[TTS] Available voices:', voices.length)
+
     const preferred =
       voices.find((v) => v.lang === utterance.lang) ||
       voices.find((v) => v.lang.startsWith(lang)) ||
       voices.find((v) => lang === 'uk' && v.lang.toLowerCase().includes('uk')) ||
-      voices.find((v) => lang === 'ru' && v.lang.toLowerCase().includes('ru'))
+      voices.find((v) => lang === 'ru' && v.lang.toLowerCase().includes('ru')) ||
+      voices[0]
 
     if (preferred) {
       utterance.voice = preferred
+      console.log('[TTS] Using voice:', preferred.name, preferred.lang)
+    } else {
+      console.log('[TTS] No preferred voice, using default')
     }
 
-    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onstart = () => {
+      console.log('[TTS] onstart')
+      setIsSpeaking(true)
+    }
+
     utterance.onend = () => {
+      console.log('[TTS] onend')
       setIsSpeaking(false)
       utteranceRef.current = null
     }
-    utterance.onerror = () => {
+
+    utterance.onerror = (e) => {
+      console.warn('[TTS] onerror:', e.error)
       setIsSpeaking(false)
       utteranceRef.current = null
     }
 
     utteranceRef.current = utterance
 
-    // Если голоса ещё не загрузились — ждём
-    if (voices.length === 0) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        const updatedVoices = window.speechSynthesis.getVoices()
-        const voice =
-          updatedVoices.find((v) => v.lang === utterance.lang) ||
-          updatedVoices.find((v) => v.lang.startsWith(lang))
-        if (voice) utterance.voice = voice
-        window.speechSynthesis.speak(utterance)
-        window.speechSynthesis.onvoiceschanged = null
-      }
-    } else {
+    // Запускаем
+    try {
       window.speechSynthesis.speak(utterance)
+      console.log('[TTS] speak() called')
+    } catch (err) {
+      console.error('[TTS] speak() threw:', err)
     }
   }, [text, lang])
 
@@ -147,7 +189,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
       }}
       aria-label={label}
     >
-      {/* Фон */}
       <motion.div
         className="absolute inset-0"
         initial={false}
@@ -159,7 +200,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         transition={{ duration: 0.3 }}
       />
 
-      {/* Пульсация */}
       <AnimatePresence>
         {isSpeaking && (
           <motion.div
@@ -175,7 +215,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         )}
       </AnimatePresence>
 
-      {/* Иконка */}
       <div className="relative z-10 w-5 h-5 flex items-center justify-center shrink-0">
         <AnimatePresence mode="wait">
           {isSpeaking ? (
@@ -210,7 +249,6 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
         </AnimatePresence>
       </div>
 
-      {/* Текст */}
       <span className="relative z-10 tracking-wide">
         <AnimatePresence mode="wait">
           <motion.span
