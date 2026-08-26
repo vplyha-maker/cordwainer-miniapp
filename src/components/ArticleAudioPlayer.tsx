@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 type Lang = 'ru' | 'uk'
@@ -7,6 +7,8 @@ type ArticleAudioPlayerProps = {
   text: string
   lang: Lang
   className?: string
+  // Новая функция, которая будет передавать индекс читаемого предложения наверх
+  onProgress?: (sentenceIndex: number) => void 
 }
 
 const LANG_MAP: Record<Lang, string> = {
@@ -29,11 +31,9 @@ function stripMarkdown(md: string): string {
     .trim()
 }
 
-// Новая функция для нарезки текста на предложения
-function getSentences(text: string): string[] {
-  // Заменяем переносы на точки, чтобы они тоже служили границами
+// Экспортируем функцию нарезки, она нам понадобится в компоненте вывода текста!
+export function getSentences(text: string): string[] {
   const clean = text.replace(/\n/g, '. ')
-  // Разбиваем текст по знакам препинания (. ! ?), сохраняя сами знаки
   const chunks = clean.split(/([.!?]+)/)
   const result: string[] = []
 
@@ -54,13 +54,29 @@ function isTelegramWebApp(): boolean {
   return !!(tg && typeof tg.initData === 'string' && tg.initData.length > 0)
 }
 
-export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioPlayerProps) {
+export function ArticleAudioPlayer({ text, lang, className = '', onProgress }: ArticleAudioPlayerProps) {
   if (isTelegramWebApp()) {
     return null
   }
 
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [currentChunkIndex, setCurrentChunkIndex] = useState(0)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+
+  // Создаем уникальный ключ для сохранения прогресса именно этой статьи
+  const storageKey = useMemo(() => {
+    return `audio-progress-${text.substring(0, 30).replace(/\s/g, '')}`
+  }, [text])
+
+  // При загрузке проверяем, есть ли сохраненный прогресс
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        setCurrentChunkIndex(parseInt(saved, 10))
+      }
+    }
+  }, [storageKey])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -85,7 +101,8 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     }
     utteranceRef.current = null
     setIsSpeaking(false)
-  }, [])
+    if (onProgress) onProgress(-1) // Сообщаем, что чтение остановлено
+  }, [onProgress])
 
   const speak = useCallback(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
@@ -94,20 +111,27 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
     }
 
     const cleanText = stripMarkdown(text)
-    
-    if (!cleanText || cleanText.trim() === '') {
-      alert('Ошибка: Текст для чтения пуст.')
-      return
-    }
+    if (!cleanText || cleanText.trim() === '') return
 
     try {
-      // 1. Разбиваем текст на массив коротких предложений
       const sentences = getSentences(cleanText)
       const voices = window.speechSynthesis.getVoices()
 
-      // 2. Отправляем каждое предложение в очередь браузера
-      sentences.forEach((sentence, index) => {
+      // Если дочитали до конца в прошлый раз, начинаем с нуля
+      let startIndex = currentChunkIndex
+      if (startIndex >= sentences.length) {
+        startIndex = 0
+        setCurrentChunkIndex(0)
+        localStorage.removeItem(storageKey)
+      }
+
+      const sentencesToRead = sentences.slice(startIndex)
+      if (sentencesToRead.length === 0) return
+
+      sentencesToRead.forEach((sentence, index) => {
+        const absoluteIndex = startIndex + index
         const utterance = new SpeechSynthesisUtterance(sentence)
+        
         utterance.lang = LANG_MAP[lang] || 'ru-RU'
         utterance.rate = 0.95
         utterance.pitch = 1
@@ -120,42 +144,40 @@ export function ArticleAudioPlayer({ text, lang, className = '' }: ArticleAudioP
           voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
           voices[0]
 
-        if (preferred) {
-          utterance.voice = preferred
-        }
+        if (preferred) utterance.voice = preferred
 
-        // Включаем анимацию кнопки только на старте первого предложения
-        if (index === 0) {
-          utterance.onstart = () => setIsSpeaking(true)
+        utterance.onstart = () => {
+          setIsSpeaking(true)
+          setCurrentChunkIndex(absoluteIndex)
+          localStorage.setItem(storageKey, absoluteIndex.toString())
+          if (onProgress) onProgress(absoluteIndex) // Подсвечиваем текущее предложение!
         }
         
-        // Выключаем анимацию только когда дочитано последнее предложение
-        if (index === sentences.length - 1) {
-          utterance.onend = () => {
+        utterance.onend = () => {
+          if (absoluteIndex === sentences.length - 1) {
             setIsSpeaking(false)
+            setCurrentChunkIndex(0)
+            localStorage.removeItem(storageKey)
             utteranceRef.current = null
+            if (onProgress) onProgress(-1) // Снимаем подсветку
           }
         }
 
         utterance.onerror = (e) => {
-          // Игнорируем ошибку отмены, когда пользователь сам нажал "Остановить"
           if (e.error !== 'canceled' && e.error !== 'interrupted') {
-            console.error('Ошибка куска аудио:', e.error)
             setIsSpeaking(false)
+            if (onProgress) onProgress(-1)
           }
         }
 
-        // Сохраняем ссылку на текущий кусок (чтобы стоп работал)
         utteranceRef.current = utterance
-        
-        // Добавляем кусок в очередь браузера
         window.speechSynthesis.speak(utterance)
       })
       
     } catch (error: any) {
       alert('Критическая ошибка запуска: ' + error.message)
     }
-  }, [text, lang])
+  }, [text, lang, currentChunkIndex, storageKey, onProgress])
 
   const toggle = () => {
     if (isSpeaking) {
