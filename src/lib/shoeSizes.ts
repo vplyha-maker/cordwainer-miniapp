@@ -3,8 +3,10 @@
  * and Mondopoint (ISO 9407) + brand-specific lasts (Nike, Adidas, NB, Puma,
  * Zara, Bershka, Terranova, Lacoste).
  *
- * Base unit: foot length in millimetres → Mondopoint.
+ * Base unit: foot length in millimetres.
  * Brand tables use official published size charts converted to mm.
+ * findClosest always uses the raw footMm (never the rounded mondopoint).
+ * ukr is always derived from pure foot length (mondopoint / 10).
  */
 
 export type Gender = 'men' | 'women' | 'kids'
@@ -21,11 +23,11 @@ export type Brand =
   | 'lacoste'
 
 export type SizeResult = {
-  mondopoint: number // mm, rounded to nearest 5
+  mondopoint: number // mm, rounded to nearest 5 (pure foot length)
   eu: number
   uk: number
   us: number
-  ukr: number // metric / GOST style (essentially cm of foot)
+  ukr: number // metric / GOST style = mondopoint / 10
   cm: number // exact foot length in cm (1 decimal)
   mm: number // exact input mm
 }
@@ -98,30 +100,43 @@ const KIDS_TABLE: SizeRow[] = [
 
 /* ------------------------------------------------------------------ */
 /*  Brand-specific tables (mm → eu / uk / us)                         */
-/*  Values taken from official charts; Adidas uses ⅓ / ⅔ Paris Point  */
+/*  Nike & Puma Men: US − UK = 1                                      */
+/*  Adidas: ⅓ / ⅔ Paris Point                                         */
 /* ------------------------------------------------------------------ */
 
 // ---------- Nike ----------
+// Official Nike: Men US = UK + 1
 const NIKE_MEN: SizeRow[] = [
-  { mm: 255, eu: 40.5, uk: 7, us: 7.5 },
-  { mm: 260, eu: 41, uk: 7.5, us: 8 },
-  { mm: 265, eu: 42, uk: 8, us: 8.5 },
-  { mm: 270, eu: 42.5, uk: 8.5, us: 9 },
-  { mm: 275, eu: 43, uk: 9, us: 9.5 },
-  { mm: 280, eu: 44, uk: 9.5, us: 10 },
-  { mm: 285, eu: 44.5, uk: 10, us: 10.5 },
-  { mm: 290, eu: 45, uk: 10.5, us: 11 },
-  { mm: 300, eu: 46, uk: 11.5, us: 12 },
+  { mm: 245, eu: 40, uk: 6, us: 7 },
+  { mm: 250, eu: 40.5, uk: 6.5, us: 7.5 },
+  { mm: 254, eu: 41, uk: 7, us: 8 },
+  { mm: 258, eu: 42, uk: 7.5, us: 8.5 },
+  { mm: 262, eu: 42.5, uk: 8, us: 9 },
+  { mm: 267, eu: 43, uk: 8.5, us: 9.5 },
+  { mm: 271, eu: 44, uk: 9, us: 10 },
+  { mm: 275, eu: 44.5, uk: 9.5, us: 10.5 },
+  { mm: 279, eu: 45, uk: 10, us: 11 },
+  { mm: 283, eu: 45.5, uk: 10.5, us: 11.5 },
+  { mm: 288, eu: 46, uk: 11, us: 12 },
+  { mm: 292, eu: 47, uk: 11.5, us: 12.5 },
+  { mm: 296, eu: 47.5, uk: 12, us: 13 },
+  { mm: 300, eu: 48, uk: 12.5, us: 13.5 },
 ]
 
 const NIKE_WOMEN: SizeRow[] = [
-  { mm: 230, eu: 36.5, uk: 3.5, us: 6 },
-  { mm: 235, eu: 37.5, uk: 4, us: 6.5 },
-  { mm: 240, eu: 38, uk: 4.5, us: 7 },
-  { mm: 245, eu: 38.5, uk: 5, us: 7.5 },
-  { mm: 250, eu: 39, uk: 5.5, us: 8 },
-  { mm: 255, eu: 40, uk: 6, us: 8.5 },
-  { mm: 260, eu: 40.5, uk: 6.5, us: 9 },
+  { mm: 220, eu: 35.5, uk: 2.5, us: 5 },
+  { mm: 224, eu: 36, uk: 3, us: 5.5 },
+  { mm: 229, eu: 36.5, uk: 3.5, us: 6 },
+  { mm: 233, eu: 37.5, uk: 4, us: 6.5 },
+  { mm: 237, eu: 38, uk: 4.5, us: 7 },
+  { mm: 241, eu: 38.5, uk: 5, us: 7.5 },
+  { mm: 245, eu: 39, uk: 5.5, us: 8 },
+  { mm: 250, eu: 40, uk: 6, us: 8.5 },
+  { mm: 254, eu: 40.5, uk: 6.5, us: 9 },
+  { mm: 258, eu: 41, uk: 7, us: 9.5 },
+  { mm: 262, eu: 42, uk: 7.5, us: 10 },
+  { mm: 267, eu: 42.5, uk: 8, us: 10.5 },
+  { mm: 271, eu: 43, uk: 8.5, us: 11 },
 ]
 
 const NIKE_KIDS: SizeRow[] = [
@@ -134,6 +149,7 @@ const NIKE_KIDS: SizeRow[] = [
 
 // ---------- Adidas (⅓ / ⅔) ----------
 const ADIDAS_MEN: SizeRow[] = [
+  { mm: 250, eu: 40, uk: 6.5, us: 7 },
   { mm: 255, eu: 40 + 2 / 3, uk: 7, us: 7.5 },
   { mm: 260, eu: 41 + 1 / 3, uk: 7.5, us: 8 },
   { mm: 265, eu: 42, uk: 8, us: 8.5 },
@@ -142,6 +158,7 @@ const ADIDAS_MEN: SizeRow[] = [
   { mm: 280, eu: 44, uk: 9.5, us: 10 },
   { mm: 285, eu: 44 + 2 / 3, uk: 10, us: 10.5 },
   { mm: 290, eu: 45 + 1 / 3, uk: 10.5, us: 11 },
+  { mm: 295, eu: 46, uk: 11, us: 11.5 },
   { mm: 300, eu: 46 + 2 / 3, uk: 11.5, us: 12 },
 ]
 
@@ -153,6 +170,7 @@ const ADIDAS_WOMEN: SizeRow[] = [
   { mm: 250, eu: 40, uk: 6.5, us: 8 },
   { mm: 255, eu: 40 + 2 / 3, uk: 7, us: 8.5 },
   { mm: 260, eu: 41 + 1 / 3, uk: 7.5, us: 9 },
+  { mm: 265, eu: 42, uk: 8, us: 9.5 },
 ]
 
 const ADIDAS_KIDS: SizeRow[] = [
@@ -163,8 +181,9 @@ const ADIDAS_KIDS: SizeRow[] = [
   { mm: 220, eu: 35.5, uk: 3, us: 4 },
 ]
 
-// ---------- New Balance ----------
+// ---------- New Balance (US − UK = 0.5) ----------
 const NB_MEN: SizeRow[] = [
+  { mm: 250, eu: 40, uk: 6.5, us: 7 },
   { mm: 255, eu: 40.5, uk: 7, us: 7.5 },
   { mm: 260, eu: 41.5, uk: 7.5, us: 8 },
   { mm: 265, eu: 42, uk: 8, us: 8.5 },
@@ -195,19 +214,25 @@ const NB_KIDS: SizeRow[] = [
 ]
 
 // ---------- Puma ----------
+// Official Puma: Men US = UK + 1
 const PUMA_MEN: SizeRow[] = [
-  { mm: 255, eu: 40, uk: 7, us: 7.5 },
-  { mm: 260, eu: 40.5, uk: 7.5, us: 8 },
-  { mm: 265, eu: 41, uk: 8, us: 8.5 },
-  { mm: 270, eu: 42, uk: 8.5, us: 9 },
-  { mm: 275, eu: 42.5, uk: 9, us: 9.5 },
-  { mm: 280, eu: 43, uk: 9.5, us: 10 },
-  { mm: 285, eu: 44, uk: 10, us: 10.5 },
-  { mm: 290, eu: 44.5, uk: 10.5, us: 11 },
-  { mm: 300, eu: 46, uk: 11.5, us: 12 },
+  { mm: 245, eu: 39, uk: 6, us: 7 },
+  { mm: 250, eu: 40, uk: 6.5, us: 7.5 },
+  { mm: 255, eu: 40.5, uk: 7, us: 8 },
+  { mm: 260, eu: 41, uk: 7.5, us: 8.5 },
+  { mm: 265, eu: 42, uk: 8, us: 9 },
+  { mm: 270, eu: 42.5, uk: 8.5, us: 9.5 },
+  { mm: 275, eu: 43, uk: 9, us: 10 },
+  { mm: 280, eu: 44, uk: 9.5, us: 10.5 },
+  { mm: 285, eu: 44.5, uk: 10, us: 11 },
+  { mm: 290, eu: 45, uk: 10.5, us: 11.5 },
+  { mm: 295, eu: 46, uk: 11, us: 12 },
+  { mm: 300, eu: 46.5, uk: 11.5, us: 12.5 },
 ]
 
 const PUMA_WOMEN: SizeRow[] = [
+  { mm: 220, eu: 35.5, uk: 3, us: 5.5 },
+  { mm: 225, eu: 36, uk: 3.5, us: 6 },
   { mm: 230, eu: 37, uk: 4, us: 6.5 },
   { mm: 235, eu: 37.5, uk: 4.5, us: 7 },
   { mm: 240, eu: 38, uk: 5, us: 7.5 },
@@ -215,6 +240,7 @@ const PUMA_WOMEN: SizeRow[] = [
   { mm: 250, eu: 39, uk: 6, us: 8.5 },
   { mm: 255, eu: 40, uk: 6.5, us: 9 },
   { mm: 260, eu: 40.5, uk: 7, us: 9.5 },
+  { mm: 265, eu: 41, uk: 7.5, us: 10 },
 ]
 
 const PUMA_KIDS: SizeRow[] = [
@@ -273,8 +299,6 @@ const TERRANOVA_WOMEN: SizeRow[] = [
   { mm: 264, eu: 41, uk: 7, us: 9.5 },
 ]
 
-// Terranova has almost no kids range → fallback to ISO kids
-
 // ---------- Lacoste (UK-oriented) ----------
 const LACOSTE_MEN: SizeRow[] = [
   { mm: 254, eu: 39.5, uk: 6, us: 7 },
@@ -323,7 +347,7 @@ export function toMondopoint(mm: number): number {
   return Math.round(mm / 5) * 5
 }
 
-/** Find closest entry in a table by mm */
+/** Find closest entry in a table by raw mm (never use mondopoint here) */
 function findClosest<T extends { mm: number }>(table: T[], mm: number): T {
   let best = table[0]
   let bestDiff = Math.abs(mm - best.mm)
@@ -351,19 +375,21 @@ export function convertShoeSize(
   const mm = Math.max(100, Math.min(340, footMm))
   const mondopoint = toMondopoint(mm)
   const cm = Math.round((mm / 10) * 10) / 10 // 1 decimal
+  // UKR / GOST always from pure foot length (independent of brand last)
+  const ukr = mondopoint / 10
 
-  // Brand-specific table
+  // Brand-specific table — search by raw mm
   if (brand !== 'standard') {
     const brandTables = BRAND_TABLES[brand]
     const table = brandTables?.[gender]
     if (table && table.length > 0) {
-      const row = findClosest(table, mondopoint)
+      const row = findClosest(table, mm) // ← raw mm, not mondopoint
       return {
-        mondopoint: row.mm,
+        mondopoint, // pure rounded foot length
         eu: row.eu,
         uk: row.uk,
         us: row.us,
-        ukr: Math.round((row.mm / 10) * 10) / 10,
+        ukr,
         cm,
         mm,
       }
@@ -371,29 +397,29 @@ export function convertShoeSize(
     // no table for this gender → fall through to ISO
   }
 
-  // ISO fallback
+  // ISO fallback — also search by raw mm for consistency
   if (gender === 'kids') {
-    const row = findClosest(KIDS_TABLE, mondopoint)
+    const row = findClosest(KIDS_TABLE, mm)
     return {
-      mondopoint: row.mm,
+      mondopoint,
       eu: row.eu,
       uk: row.uk,
       us: row.us,
-      ukr: Math.round((row.mm / 10) * 10) / 10,
+      ukr,
       cm,
       mm,
     }
   }
 
-  const row = findClosest(ADULT_TABLE, mondopoint)
+  const row = findClosest(ADULT_TABLE, mm)
   const us = gender === 'men' ? row.usMen : row.usWomen
 
   return {
-    mondopoint: row.mm,
+    mondopoint,
     eu: row.eu,
     uk: row.uk,
     us,
-    ukr: Math.round((row.mm / 10) * 10) / 10,
+    ukr,
     cm,
     mm,
   }
