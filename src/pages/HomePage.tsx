@@ -11,6 +11,7 @@ type HomePageProps = {
   onOpenColors?: () => void
   /** Открыть глоссарий терминов */
   onOpenGlossary?: () => void
+  onOpenPrices?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -39,6 +40,7 @@ export function HomePage({
   onOpenCalcMenu,
   onOpenColors,
   onOpenGlossary,
+  onOpenPrices,
   lang,
   setLang,
   favorites = [],
@@ -85,6 +87,8 @@ export function HomePage({
       blogSub: hasNewBlog ? 'Новая статья' : 'Статьи мастерской',
       glossary: 'Глоссарий',
       glossarySub: glossaryLabel(glossaryCount, 'ru'),
+      prices: 'Цены',
+      pricesSub: 'Клеи, материалы',
       favorites: 'Избранное',
       favoritesSub:
         articleFavorites.length > 0
@@ -115,6 +119,8 @@ export function HomePage({
       blogSub: hasNewBlog ? 'Нова стаття' : 'Статті майстерні',
       glossary: 'Глосарій',
       glossarySub: glossaryLabel(glossaryCount, 'uk'),
+      prices: 'Ціни',
+      pricesSub: 'Клеї, матеріали',
       favorites: 'Обране',
       favoritesSub:
         articleFavorites.length > 0
@@ -218,6 +224,17 @@ export function HomePage({
         </svg>
       ),
     },
+    {
+      id: 'prices',
+      title: t.prices,
+      subtitle: t.pricesSub,
+      iconClass: 'bg-[var(--pigment-malachite,#0BDA51)]/15 text-[var(--pigment-malachite,#0BDA51)]',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+      ),
+    },
   ]
 
   return (
@@ -310,6 +327,7 @@ export function HomePage({
             const isBlog = item.id === 'blog'
             const isCalc = item.id === 'calc'
             const isGlossary = item.id === 'glossary'
+            const isPrices = item.id === 'prices'
             return (
               <button
                 key={item.id}
@@ -320,7 +338,9 @@ export function HomePage({
                       ? onOpenCalcMenu
                       : isGlossary
                         ? onOpenGlossary
-                        : undefined
+                        : isPrices
+                          ? onOpenPrices
+                          : undefined
                 }
                 className={`min-h-[116px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm overflow-hidden ${
                   isBlog && hasNewBlog
