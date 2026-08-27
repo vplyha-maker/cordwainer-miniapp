@@ -12,6 +12,7 @@ import { ColorCalcPage } from './pages/ColorCalcPage'
 import { ColorsPage } from './pages/ColorsPage'
 import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
+import { PricesPage } from './pages/PricesPage'
 
 import {
   getSavedPerfMode,
@@ -39,6 +40,7 @@ export type Screen =
   | 'colors'
   | 'seo-width'
   | 'glossary'
+  | 'prices'
 
 export type Lang = 'ru' | 'uk'
 
@@ -335,6 +337,7 @@ export default function App() {
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
             onOpenGlossary={() => setScreen('glossary')}
+            onOpenPrices={() => setScreen('prices')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
@@ -445,6 +448,14 @@ export default function App() {
           />
         )}
 
+        {screen === 'prices' && (
+          <PricesPage
+            key="prices"
+            onBack={() => setScreen('home')}
+            lang={lang}
+          />
+        )}
+
         {screen === 'seo-width' && (
           <ForwardOrthoSEOPage
             key="seo-width"
@@ -461,4 +472,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
-}
+ }
