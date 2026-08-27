@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.0",
     "@tma.js/sdk": "^3.3.0",
     "@tma.js/sdk-react": "^3.0.23",
     "framer-motion": "^11.15.0",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@playwright/test": "^1.41.0",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^20.12.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
