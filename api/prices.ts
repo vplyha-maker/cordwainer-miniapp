@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 
 export const config = {
-  runtime: 'edge', // или 'nodejs' — edge быстрее и дешевле
+  runtime: 'edge',
 };
 
 export default async function handler(request: Request) {
@@ -15,16 +15,26 @@ export default async function handler(request: Request) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Подставь реальное имя таблицы и колонок из твоего парсера
+    // Забираем 100 последних обновленных товаров + их самую свежую цену из price_history
     const rows = await sql`
       SELECT 
-        id,
-        name,
-        price_zotti,
-        url,
-        updated_at
-      FROM products
-      ORDER BY updated_at DESC
+        p.id,
+        p.name,
+        p.source,
+        p.product_code,
+        p.url,
+        p.image_url,
+        p.category,
+        p.updated_at,
+        (
+          SELECT price 
+          FROM price_history ph 
+          WHERE ph.product_id = p.id 
+          ORDER BY scraped_at DESC 
+          LIMIT 1
+        ) as current_price
+      FROM products p
+      ORDER BY p.updated_at DESC
       LIMIT 100
     `;
 
@@ -42,4 +52,4 @@ export default async function handler(request: Request) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
- }
+}
