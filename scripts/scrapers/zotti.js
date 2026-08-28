@@ -8,14 +8,16 @@ export async function scrapeZottiCategory(categoryPath) {
   let start = 0;
   let hasMore = true;
   const allProducts = [];
-  const limit = 20; // Шаг пагинации на Zotti
+  const limit = 20;
 
-  // Убираем параметр start из базового пути, если он там был, чтобы контролировать пагинацию программно
-  const cleanPath = categoryPath.split('?')[0];
+  let cleanPath = categoryPath.split('?')[0];
+  if (!cleanPath.startsWith('/')) {
+    cleanPath = `/${cleanPath}`;
+  }
 
   while (hasMore) {
     const url = `${BASE_URL}${cleanPath}${start > 0 ? `?start=${start}` : ''}`;
-    console.log(`Парсим: ${url}`);
+    console.log(`\n🔍 Парсим страницу: ${url}`);
 
     try {
       const { data: html } = await axios.get(url, {
@@ -59,10 +61,14 @@ export async function scrapeZottiCategory(categoryPath) {
         const productCode =
           $el.find('.item-footer .cell').last().text().trim() || null;
 
-        const sourceId =
-          $el.find('form input[name="id"]').attr('value') ||
-          $el.find('button[onclick]').attr('onclick')?.match(/buy\((\d+)\)/)?.[1] ||
-          null;
+        let sourceId = $el.find('form input[name="id"]').attr('value') || null;
+        if (!sourceId) {
+          const onClickAttr = $el.find('button[onclick]').attr('onclick');
+          if (onClickAttr) {
+            const match = onClickAttr.match(/buy\((\d+)\)/);
+            if (match) sourceId = match[1];
+          }
+        }
 
         products.push({
           source: 'zotti',
@@ -78,28 +84,28 @@ export async function scrapeZottiCategory(categoryPath) {
 
       if (products.length === 0) {
         hasMore = false;
-        console.log('Товары на странице закончились.');
+        console.log('🛑 Товары на странице закончились. Переход остановлен.');
       } else {
-        console.log(`Найдено товаров на странице: ${products.length}`);
+        console.log(`📦 Найдено товаров на странице: ${products.length}`);
 
         for (const product of products) {
           try {
             await saveProduct(product);
-            console.log(`✓ ${product.name} — ${product.price} грн`);
           } catch (err) {
-            console.error(`Ошибка сохранения "${product.name}":`, err.message);
+            console.error(`❌ Ошибка сохранения "${product.name}":`, err.message);
           }
         }
 
         allProducts.push(...products);
-        start += limit; // Переходим к следующей странице (?start=20, ?start=40 и т.д.)
+        start += limit;
+        
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (err) {
-      console.error(`Ошибка при запросе ${url}:`, err.message);
+      console.error(`❌ Ошибка при запросе ${url}:`, err.message);
       hasMore = false;
     }
   }
 
-  console.log(`Всего успешно обработано товаров: ${allProducts.length}`);
   return allProducts;
 }

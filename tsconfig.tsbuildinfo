@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/components/AboutProject.tsx","./src/components/BottomDock.tsx","./src/components/SectionCard.tsx","./src/data/articleContents.ts","./src/data/blog.ts","./src/lib/performance.ts","./src/pages/BlogPage.tsx","./src/pages/HomePage.tsx","./src/pages/WelcomePage.tsx"],"version":"5.6.3"}
