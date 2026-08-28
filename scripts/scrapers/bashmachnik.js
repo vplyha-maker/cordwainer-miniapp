@@ -20,24 +20,24 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   const $ = cheerio.load(html);
   const products = [];
 
-  // Диагностика: проверяем, сколько всего элементов div на странице
-  const totalDivs = $('div').length;
-  console.log(`Всего блоков div на странице: ${totalDivs}`);
-
-  // На Prom.ua карточки товаров обернуты в блоки с атрибутом data-qaid="product_block"
-  $('[data-qaid="product_block"]').each((_, el) => {
+  // Ищем все элементы, у которых есть ID товара — это 100% карточки
+  const $items = $('[data-product-id]');
+  
+  $items.each((_, el) => {
     const $el = $(el);
 
-    const name = $el.find('[data-qaid="product_name"]').text().trim();
-    if (!name) return;
+    // Ищем название по всем возможным классам Prom.ua
+    const name = $el.find('[data-qaid="product_name"], .cs-goods-title, .cs-product-gallery__title, .b-product-line__title').text().trim() || $el.attr('title');
+    if (!name) return; // Если названия нет, пропускаем "мусорные" блоки
 
-    const relativeUrl = $el.find('[data-qaid="product_link"]').attr('href') || '';
+    // Ищем ссылку на товар
+    const $link = $el.find('a[href*="/p"]');
+    const relativeUrl = $link.attr('href') || '';
     const fullUrl = relativeUrl.startsWith('http')
       ? relativeUrl
       : `${BASE_URL}${relativeUrl}`;
 
-    // На Prom.ua изображения часто подгружаются лениво (lazy load), 
-    // поэтому проверяем и data-src, и обычный src
+    // Картинка
     const $img = $el.find('img');
     const imageUrl = $img.attr('data-src') || $img.attr('src') || $img.attr('data-lazy-src');
     const fullImage = imageUrl
@@ -46,27 +46,29 @@ export async function scrapeBashmachnikCategory(categoryPath) {
         : `${BASE_URL}${imageUrl}`
       : null;
 
-    // Очистка цены (убираем пробелы, "₴", меняем запятую на точку)
-    const priceText = $el.find('[data-qaid="product_price"]').text();
+    // Цена (ищем по всем возможным классам цены)
+    const priceText = $el.find('[data-qaid="product_price"], .cs-goods-price__value, .b-product-cost__price, .cs-goods-price').text();
     const priceClean = priceText
       .replace(/\s/g, '')
-      .replace(/[^0-9,.]/g, '') // Оставляем только цифры, точки и запятые
+      .replace(/[^0-9,.]/g, '')
       .replace(',', '.');
     const price = priceClean ? parseFloat(priceClean) : null;
 
-    // ID товара на проме обычно зашит в атрибуте data-product-id
-    const sourceId = $el.attr('data-product-id') || null;
+    const sourceId = $el.attr('data-product-id');
 
-    products.push({
-      source: 'bashmachnik',
-      sourceId,
-      productCode: null, // Артикулы в списке товаров Prom.ua обычно не выводятся
-      name,
-      url: fullUrl,
-      imageUrl: fullImage,
-      category: categoryPath,
-      price,
-    });
+    // Исключаем дубликаты (иногда Prom вкладывает один блок с ID в другой)
+    if (!products.some(p => p.sourceId === sourceId)) {
+      products.push({
+        source: 'bashmachnik',
+        sourceId,
+        productCode: null,
+        name,
+        url: fullUrl,
+        imageUrl: fullImage,
+        category: categoryPath,
+        price,
+      });
+    }
   });
 
   console.log(`Найдено товаров: ${products.length}`);
@@ -74,7 +76,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   for (const product of products) {
     try {
       await saveProduct(product);
-      console.log(`✓ ${product.name} — ${product.price} грн`);
+      console.log(`✓ [Башмачник] ${product.name} — ${product.price} грн`);
     } catch (err) {
       console.error(`Ошибка сохранения "${product.name}":`, err.message);
     }
