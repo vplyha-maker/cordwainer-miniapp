@@ -20,6 +20,10 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   const $ = cheerio.load(html);
   const products = [];
 
+  // Диагностика: проверяем, сколько всего элементов div на странице
+  const totalDivs = $('div').length;
+  console.log(`Всего блоков div на странице: ${totalDivs}`);
+
   // На Prom.ua карточки товаров обернуты в блоки с атрибутом data-qaid="product_block"
   $('[data-qaid="product_block"]').each((_, el) => {
     const $el = $(el);
@@ -78,4 +82,3 @@ export async function scrapeBashmachnikCategory(categoryPath) {
 
   return products;
 }
-
