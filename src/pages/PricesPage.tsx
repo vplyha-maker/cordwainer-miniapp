@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { ArrowLeft, Search, X, TrendingDown, Info, Store, Tag } from 'lucide-react'
+import { BarChart, Bar, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { ArrowLeft, Search, X, TrendingDown, Store, Tag } from 'lucide-react'
 import type { Lang } from '../App'
 
 type Product = {
@@ -31,7 +31,7 @@ type GroupedProduct = {
   minPrice: number
   maxPrice: number
   avgPrice: number
-  maxSavings: number // Выгода (разница между самой дорогой и дешевой)
+  maxSavings: number 
 }
 
 type PricesPageProps = {
@@ -161,7 +161,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     })
 
     let result = Array.from(map.values()).map(group => {
-      // Подсчет аналитики для группы
       const sum = group.offers.reduce((acc, offer) => acc + offer.price, 0)
       group.avgPrice = sum / group.offers.length
       group.maxSavings = group.maxPrice - group.minPrice
@@ -187,7 +186,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     return result
   }, [items, searchQuery, selectedSource, sortBy])
 
-  // Глобальная статистика рынка (Дашборд)
   const globalStats = useMemo(() => {
     if (groupedItems.length === 0) return null
     const multiOfferItems = groupedItems.filter(g => g.offers.length > 1)
@@ -208,7 +206,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EA] overflow-hidden font-sans"
     >
-      {/* HEADER SECTION (GLASSMORPHISM) */}
+      {/* HEADER SECTION */}
       <div className="shrink-0 flex flex-col z-20 bg-[#1A1614]/80 backdrop-blur-xl border-b border-white/5">
         <div className="px-4 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -240,7 +238,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t.search}
-                  className="w-full h-12 pl-10 pr-10 rounded-xl bg-[#25201C] border border-white/5 focus:border-[#E4D00A]/50 outline-none text-sm transition-all"
+                  className="w-full h-12 pl-10 pr-10 rounded-xl bg-[#25201C] border border-white/5 focus:border-[#E4D00A]/50 outline-none text-sm transition-all text-white"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#B9ACA0] hover:text-white">
@@ -251,7 +249,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="h-12 px-4 rounded-xl text-sm font-medium bg-[#25201C] border border-white/5 focus:border-[#E4D00A]/50 outline-none cursor-pointer"
+                className="h-12 px-4 rounded-xl text-sm font-medium bg-[#25201C] border border-white/5 focus:border-[#E4D00A]/50 outline-none cursor-pointer text-white"
               >
                 <option value="default">{t.sortDefault}</option>
                 <option value="savings">{t.sortSavings}</option>
@@ -288,7 +286,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       {/* CONTENT LIST */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar">
         {loading && (
-          // SKELETON LOADER
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-[220px] rounded-2xl bg-[#1A1614] border border-white/5 p-4 animate-pulse flex flex-col gap-4">
               <div className="flex gap-4">
@@ -319,12 +316,10 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               transition={{ delay: index * 0.05 }}
               className="rounded-2xl p-5 bg-[#1A1614] border border-white/5 hover:border-white/10 transition-colors flex flex-col gap-5 relative overflow-hidden"
             >
-              {/* Highlight Glow for high savings */}
               {group.maxSavings > 500 && (
                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#E4D00A]/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
               )}
 
-              {/* Product Info */}
               <div className="flex gap-4 items-start relative z-10">
                 {group.image_url ? (
                   <img src={group.image_url} alt={group.name} className="w-20 h-20 rounded-xl object-cover bg-[#25201C] shrink-0 border border-white/5" />
@@ -361,11 +356,12 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     <BarChart data={chartData} margin={{ top: 15, right: 0, left: 0, bottom: 0 }}>
                       <Tooltip 
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        content={({ active, payload }) => {
+                        // ТУТ ИСПРАВЛЕНА ОШИБКА TYPESCRIPT (добавлено : any)
+                        content={({ active, payload }: any) => {
                           if (active && payload && payload.length) {
                             return (
                               <div className="bg-[#12100E] border border-white/10 p-2 rounded-lg shadow-xl text-xs">
-                                <span className="block font-semibold mb-1">{payload[0].payload.name}</span>
+                                <span className="block font-semibold mb-1 text-white">{payload[0].payload.name}</span>
                                 <span className="text-[#E4D00A]">{formatPrice(payload[0].value as number)}</span>
                               </div>
                             )
