@@ -5,7 +5,7 @@ import { saveProduct } from '../db/saveProduct.js';
 const BASE_URL = 'https://zotti.ua';
 
 export async function scrapeZottiCategory(categoryPath) {
-  const url = `\( {BASE_URL} \){categoryPath}`;
+  const url = `${BASE_URL}${categoryPath}`;
   console.log(`Парсим: ${url}`);
 
   const { data: html } = await axios.get(url, {
@@ -29,13 +29,13 @@ export async function scrapeZottiCategory(categoryPath) {
     const relativeUrl = $el.find('a.link-product').attr('href') || '';
     const fullUrl = relativeUrl.startsWith('http')
       ? relativeUrl
-      : `\( {BASE_URL} \){relativeUrl}`;
+      : `${BASE_URL}${relativeUrl}`;
 
     const imageUrl = $el.find('.thumb img').attr('src');
     const fullImage = imageUrl
       ? imageUrl.startsWith('http')
         ? imageUrl
-        : `\( {BASE_URL} \){imageUrl}`
+        : `${BASE_URL}${imageUrl}`
       : null;
 
     const priceText = $el
