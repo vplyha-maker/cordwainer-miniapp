@@ -2,31 +2,36 @@ import { scrapeZottiCategory } from './scrapers/zotti.js';
 import { scrapeBashmachnikCategory } from './scrapers/bashmachnik.js';
 
 async function main() {
-  console.log('=== Запуск парсера цен ===');
-  console.log('Время:', new Date().toISOString());
+  console.log('🚀 === Запуск комплексного парсера цен ===');
+  console.log('⏰ Время:', new Date().toISOString());
 
+  let totalProducts = 0;
+
+  // 1. ZOTTI (Химия + Клей)
   try {
-    // 1. Парсим Zotti
-    const zottiProducts = await scrapeZottiCategory('/ua/catalog/cat/klei');
-    console.log(`=== Готово: ${zottiProducts.length} товаров (Zotti) ===\n`);
-
-    // 2. Парсим Башмачник (Страница 1)
-    const bashmachnikPage1 = await scrapeBashmachnikCategory('/ua/g5615908-obuvnye-klei');
-    
-    // 3. Парсим Башмачник (Страница 2)
-    const bashmachnikPage2 = await scrapeBashmachnikCategory('/ua/g5615908-obuvnye-klei/page_2');
-    
-    // Объединяем товары с обеих страниц Башмачника
-    const totalBashmachnik = bashmachnikPage1.length + bashmachnikPage2.length;
-    console.log(`=== Готово: ${totalBashmachnik} товаров (Bashmachnik) ===\n`);
-
-    const total = zottiProducts.length + totalBashmachnik;
-    console.log(`=== Общий итог: спарсено ${total} товаров ===`);
-    
+    console.log('\n--- 📦 Парсинг Zotti ---');
+    const zottiHimiya = await scrapeZottiCategory('/ua/catalog/cat/himiya');
+    const zottiKlei = await scrapeZottiCategory('/ua/catalog/cat/klei');
+    const zottiTotal = zottiHimiya.length + zottiKlei.length;
+    console.log(`✅ Zotti всего: ${zottiTotal} товаров`);
+    totalProducts += zottiTotal;
   } catch (err) {
-    console.error('Критическая ошибка:', err);
-    process.exit(1);
+    console.error('❌ Ошибка при парсинге Zotti:', err.message);
   }
+
+  // 2. БАШМАЧНИК (Клеи, Страницы 1 и 2)
+  try {
+    console.log('\n--- 📦 Парсинг Башмачник ---');
+    const bashPage1 = await scrapeBashmachnikCategory('/ua/g5615908-obuvnye-klei');
+    const bashPage2 = await scrapeBashmachnikCategory('/ua/g5615908-obuvnye-klei/page_2');
+    const bashTotal = bashPage1.length + bashPage2.length;
+    console.log(`✅ Башмачник всего: ${bashTotal} товаров`);
+    totalProducts += bashTotal;
+  } catch (err) {
+    console.error('❌ Ошибка при парсинге Башмачника:', err.message);
+  }
+
+  console.log(`\n🏁 === ВСЕГО ОБРАБОТАНО И СОХРАНЕНО: ${totalProducts} товаров ===`);
 }
 
 main();
