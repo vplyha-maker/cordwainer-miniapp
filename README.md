@@ -1,133 +1,135 @@
 ```markdown
 # 👞 Cordwainer Mini App
 
-Telegram Mini App + веб-приложение: энциклопедия сапожного ремесла, профессиональные калькуляторы и инструменты для обувщиков, дизайнеров, колодочников и ортопедов.
+Telegram Mini App + web application: an encyclopedia of the shoemaking craft, professional calculators, and tools for shoemakers, designers, last makers, and orthopedists.
 
-**Сайт:** [https://www.cordwaine.app](https://www.cordwaine.app)  
-**Telegram-бот:** [@Cordwainer_bot](https://t.me/Cordwainer_bot)  
-**Стек:** React 18 · TypeScript · Vite 6 · Tailwind CSS 4 · Framer Motion · @tma.js/sdk
+**Website:** [https://www.cordwaine.app](https://www.cordwaine.app)  
+**Telegram bot:** [@Cordwainer_bot](https://t.me/Cordwainer_bot)  
+**Stack:** React 18 · TypeScript · Vite 6 · Tailwind CSS 4 · Framer Motion · @tma.js/sdk
 
-Поддерживаемые языки: **русский** и **украинский**.
-
----
-
-## 🎯 Возможности
-
-### 🏠 Главный экран и навигация
-- Welcome-экран с переключением языка (RU / UK)
-- Главное меню разделов энциклопедии
-- Нижний док (Bottom Dock) для быстрой навигации
-- Избранное (статьи блога) с сохранением в `localStorage`
-- Адаптация под Telegram WebApp (тема, viewport, initData)
-- Тёмная тема по умолчанию в браузере; в Telegram — по `colorScheme`
-- Режим производительности (`auto` / `full` / `fast`) для слабых устройств
-
-### 🧮 Калькуляторы
-
-| Калькулятор | Что делает |
-|------------|------------|
-| **Размеры обуви** | Конвертер по длине стопы (мм/см) → Mondopoint, EU, UK, US, метрическая (ГОСТ/Укр). Таблицы по ISO 19407:2023 / ISO/TS 19407 и Mondopoint (ISO 9407). Мужская, женская, детская обувь |
-| **Полнота колодки (ширина)** | Полнота по ГОСТ (цифровая 1–12 и буквенная), конвертер US / UK / EU ↔ ГОСТ, обхваты плюсны, подъёма и пятки (мм и дюймы) |
-| **Каблук** | Расчёт геометрии каблука: пошаговый степпер + Canvas-визуализация (heel geometry) |
-| **Цвет / рецепты смешивания** | Подбор пигментов, спектральные данные, смешивание красок, Web Worker для тяжёлых расчётов рецептов |
-
-### 🎨 Цвета и колористика
-- База пигментов со спектральными кривыми (`public/spectra/*.txt`)
-- График спектра (`SpectrumGraph`)
-- Методология цвета (`ColorMethodology`)
-- Селектор пигментов (`PigmentSelector`)
-- Color science utils (расчёты в Lab / спектре)
-
-### 📰 Блог и контент
-- Журнал статей (`BlogPage`) с Markdown-контентом
-- Теги (индустрия и др.), избранное статей
-- Раздел «О проекте» / коллаборации
-- SEO-страница (orphan) для калькулятора полноты: `/forward-ortho-converter`
-
-### 📱 PWA и Telegram
-- `manifest.json`, иконки 192/512
-- Preload hero-изображения для LCP
-- Интеграция `telegram-web-app.js` + `@tma.js/sdk` / `@tma.js/sdk-react`
-- Viewport-fit, safe-area, отключение масштабирования
-
-### ⚡ Производительность
-- Эвристика low-power устройств (Android, cores, deviceMemory, `prefers-reduced-motion`)
-- Режимы анимаций Framer Motion
-- Web Worker для рецептов смешивания (`recipeWorker.ts`)
+Supported languages: **Russian** and **Ukrainian**.
 
 ---
 
-## 🚀 Быстрый старт
+## 🎯 Features
 
-### Требования
-- **Node.js** 18+ (CI использует Node 24)
-- npm (или pnpm / yarn)
+### 🏠 Home screen & navigation
+- Welcome screen with language switcher (RU / UK)
+- Main menu of encyclopedia sections
+- Bottom Dock for quick navigation
+- Favorites (blog articles) stored in `localStorage`
+- Telegram WebApp adaptation (theme, viewport, initData)
+- Dark theme by default in the browser; in Telegram follows `colorScheme`
+- Performance mode (`auto` / `full` / `fast`) for low-end devices
 
-### Установка
+### 🧮 Calculators
+
+| Calculator | What it does |
+|------------|--------------|
+| **Shoe sizes** | Converter by foot length (mm/cm) → Mondopoint, EU, UK, US, metric (GOST/Ukr). Tables based on ISO 19407:2023 / ISO/TS 19407 and Mondopoint (ISO 9407). Men's, women's, and children's shoes |
+| **Last width (girth)** | GOST widths (numeric 1–12 and letter), converter US / UK / EU ↔ GOST, ball, instep, and heel girths (mm and inches) |
+| **Heel** | Heel geometry calculation: step-by-step stepper + Canvas visualization |
+| **Color / mixing recipes** | Pigment selection, spectral data, paint mixing, Web Worker for heavy recipe calculations |
+
+### 🎨 Colors & coloristics
+- Pigment database with spectral curves (`public/spectra/*.txt`)
+- Spectrum chart (`SpectrumGraph`)
+- Color methodology (`ColorMethodology`)
+- Pigment selector (`PigmentSelector`)
+- Color science utilities (Lab / spectrum calculations)
+
+### 📰 Blog & content
+- Article journal (`BlogPage`) with Markdown content
+- Tags (industry, etc.), article favorites
+- “About the project” / collaborations section
+- SEO orphan page for the width calculator: `/forward-ortho-converter`
+
+### 📱 PWA & Telegram
+- `manifest.json`, icons 192/512
+- Hero image preload for LCP
+- Integration of `telegram-web-app.js` + `@tma.js/sdk` / `@tma.js/sdk-react`
+- Viewport-fit, safe-area, zoom disabled
+
+### ⚡ Performance
+- Low-power device heuristics (Android, cores, deviceMemory, `prefers-reduced-motion`)
+- Framer Motion animation modes
+- Web Worker for mixing recipes (`recipeWorker.ts`) so the UI stays responsive
+
+### 💰 Prices
+- Scraped material/price data (script + GitHub Actions workflow)
+- Prices page in the app
+
+---
+
+## 🚀 Quick start
+
+### Requirements
+- Node.js 18+ (recommended 20 or 24)
+- npm
+
+### Install & run
 
 ```bash
-git clone https://github.com/vplyha-maker/cordwainer-miniapp.git
-cd cordwainer-miniapp
-
 npm install
-```
-
-### Разработка
-
-```bash
 npm run dev
 ```
 
-Откроется Vite dev-server (обычно `http://localhost:5173`).
+Vite dev server starts (usually `http://localhost:5173`).
 
-Для проверки внутри Telegram:
-1. Задеплойте preview (Vercel / Cloudflare Pages / ngrok).
-2. Укажите HTTPS-URL в BotFather → Bot Settings → Menu Button / Web App.
+To test inside Telegram:
+1. Deploy a preview (Vercel / Cloudflare Pages / ngrok).
+2. Set the HTTPS URL in BotFather → Bot Settings → Menu Button / Web App.
 
-### Сборка
+### Build
 
 ```bash
 npm run build
 ```
 
-Артефакты в `dist/`. Превью production-сборки:
+Output goes to `dist/`. Preview the production build:
 
 ```bash
 npm run preview
 ```
 
-### E2E-тесты
+### E2E tests
 
 ```bash
 npx playwright install --with-deps
 npm run test:e2e
 ```
 
-CI (GitHub Actions): на каждый push — `npm install` → `npm run build` → Playwright e2e.
+CI (GitHub Actions): on every push — `npm install` → `npm run build` → Playwright e2e.
 
 ---
 
-## 📦 Зависимости
+## 📦 Dependencies
 
 **Runtime**
-| Пакет | Назначение |
-|-------|------------|
+
+| Package | Purpose |
+|---------|---------|
 | `react` / `react-dom` | UI |
 | `@tma.js/sdk` / `@tma.js/sdk-react` | Telegram Mini App SDK |
-| `framer-motion` | Анимации и переходы экранов |
-| `react-markdown` | Рендер статей блога |
+| `framer-motion` | Animations and screen transitions |
+| `react-markdown` | Blog article rendering |
+| `recharts` | Charts |
+| `lucide-react` | Icons |
+| `axios` / `cheerio` | Price scraping |
+| `@neondatabase/serverless` | Optional DB for prices |
 
 **Dev**
-| Пакет | Назначение |
-|-------|------------|
-| `vite` + `@vitejs/plugin-react` | Сборка и HMR |
-| `typescript` | Типизация |
-| `tailwindcss` + `@tailwindcss/vite` | Стили (v4) |
+
+| Package | Purpose |
+|---------|---------|
+| `vite` + `@vitejs/plugin-react` | Build & HMR |
+| `typescript` | Typing |
+| `tailwindcss` + `@tailwindcss/vite` | Styles (v4) |
 | `@playwright/test` | E2E |
 
 ---
 
-## 🏗️ Архитектура
+## 🏗️ Architecture
 
 ```
 cordwainer-miniapp/
@@ -136,23 +138,33 @@ cordwainer-miniapp/
 ├── vite.config.ts
 ├── tsconfig.json
 ├── playwright.config.ts
-├── .github/workflows/ci.yml   # Build + Playwright
+├── vercel.json
+├── .github/workflows/
+│   ├── ci.yml                 # Build + Playwright
+│   └── scrape-prices.yml      # Scheduled price scraping
+│
+├── api/
+│   └── prices.ts              # API route (Vercel)
 │
 ├── public/
 │   ├── manifest.json          # PWA
 │   ├── icon-192.png / icon-512.png
 │   ├── hero-cover.webp, blog-hero.webp, …
-│   ├── spectra/               # Спектральные данные пигментов (*.txt)
-│   ├── audio/                 # Звуки (опционально)
+│   ├── spectra/               # Pigment spectral data (*.txt)
+│   ├── audio/                 # Optional sounds
 │   ├── robots.txt, sitemap.xml, llms.txt
-│   └── google*.html           # Search Console
+│   └── google*.html           # Search Console verification
+│
+├── scripts/
+│   ├── scrape-prices.mjs
+│   └── scrapers/
 │
 └── src/
     ├── main.tsx               # React root
-    ├── App.tsx                # Роутинг экранов, тема, язык, избранное, perf mode
-    ├── index.css              # Tailwind + CSS-переменные темы
+    ├── App.tsx                # Screen routing, theme, language, favorites, perf mode
+    ├── index.css              # Tailwind + theme CSS variables
     │
-    ├── pages/                 # Экраны (screen-based navigation)
+    ├── pages/                 # Screens (screen-based navigation)
     │   ├── WelcomePage.tsx
     │   ├── HomePage.tsx
     │   ├── BlogPage.tsx
@@ -162,6 +174,8 @@ cordwainer-miniapp/
     │   ├── HeelCalcPage.tsx
     │   ├── ColorCalcPage.tsx
     │   ├── ColorsPage.tsx
+    │   ├── GlossaryPage.tsx
+    │   ├── PricesPage.tsx
     │   └── ForwardOrthoSEOPage.tsx
     │
     ├── components/
@@ -176,15 +190,15 @@ cordwainer-miniapp/
     │       ├── HeelCanvas.tsx
     │       └── HeelStepper.tsx
     │
-    ├── lib/                   # Доменная логика калькуляторов
+    ├── lib/                   # Domain logic for calculators
     │   ├── shoeSizes.ts       # ISO 19407 / Mondopoint
-    │   ├── shoeWidths.ts      # Полнота ГОСТ + обхваты
+    │   ├── shoeWidths.ts      # GOST widths + girths
     │   ├── heelCalc.ts
     │   ├── heelGeometry.ts
-    │   └── performance.ts     # auto/full/fast режимы
+    │   └── performance.ts     # auto/full/fast modes
     │
     ├── utils/
-    │   ├── colorScience.ts    # Спектр, Lab, смешивание
+    │   ├── colorScience.ts    # Spectrum, Lab, mixing
     │   └── calculatorLogic.ts
     │
     ├── hooks/
@@ -192,137 +206,100 @@ cordwainer-miniapp/
     │   └── usePaintMix.ts
     │
     ├── workers/
-    │   └── recipeWorker.ts    # Тяжёлые рецепты в Web Worker
+    │   └── recipeWorker.ts    # Heavy recipes in Web Worker
     │
     ├── data/
     │   ├── pigments.ts
     │   ├── loadPigments.ts
-    │   ├── blog.ts
-    │   └── articleContents.ts
+    │   └── blog.ts
     │
     └── theme/
         └── pigmentTheme.ts
 ```
 
-### Навигация (screen state)
+### Navigation model
+Screen-based (not React Router): `App.tsx` holds the current `Screen` state and switches pages inside `AnimatePresence`. Deep links and the SEO landing `/forward-ortho-converter` are handled as special cases.
 
-Вместо React Router используется явный state в `App.tsx`:
+### Color module
+1. Spectral files in `public/spectra/`.
+2. Load & parse → `loadPigments` / `pigments`.
+3. Calculations in `colorScience.ts` + hooks `useColorCalculations` / `usePaintMix`.
+4. Heavy recipes run in `recipeWorker.ts` (non-blocking UI).
 
-```ts
-type Screen =
-  | 'welcome' | 'home' | 'blog' | 'calc-menu'
-  | 'size-calc' | 'width-calc' | 'heel-calc'
-  | 'color-calc' | 'colors' | 'seo-width'
-```
-
-Переходы анимируются через `AnimatePresence` (Framer Motion).
-
-### Тема и Telegram
-
-1. До React: скрипт в `index.html` добавляет класс `dark`, если нет Telegram `initData`.
-2. В приложении: `getIsDarkTheme()` читает `Telegram.WebApp.colorScheme` или форсирует dark в браузере.
-3. CSS-переменные (`--color-bg`, `--color-accent`, пигментные токены) выставляются на `document.documentElement`.
-
-### Калькулятор размеров
-
-- Вход: длина стопы (мм).
-- База: Mondopoint (округление до 5 мм).
-- Выход: EU, UK, US (men/women), метрический/ГОСТ, см.
-- Таблицы: взрослые и детские по ISO 19407.
-
-### Калькулятор полноты
-
-- ГОСТ-цифровая и буквенная полнота.
-- Обхваты: плюсна, подъём, пятка.
-- SEO-лендинг `/forward-ortho-converter` (orphan page) для органического трафика.
-
-### Цветовой модуль
-
-1. Спектральные файлы в `public/spectra/`.
-2. Загрузка и парсинг → `loadPigments` / `pigments`.
-3. Расчёты в `colorScience.ts` + хуки `useColorCalculations` / `usePaintMix`.
-4. Тяжёлые рецепты — в `recipeWorker.ts` (не блокирует UI).
-
-### Избранное и язык
-
-- `localStorage`: `app_lang`, избранные статьи, режим производительности.
-- Язык: `Lang = 'ru' | 'uk'`.
+### Favorites & language
+- `localStorage`: `app_lang`, favorite articles, performance mode.
+- Language type: `Lang = 'ru' | 'uk'`.
 
 ---
 
-## 🌐 Деплой
+## 🌐 Deployment
 
 ### Vercel / Netlify / Cloudflare Pages
-
-1. Подключите репозиторий.
+1. Connect the repository.
 2. Build command: `npm run build`
 3. Output directory: `dist`
-4. Node version: 18+ (лучше 20/24)
+4. Node version: 18+ (preferably 20/24)
 
 ### Telegram Mini App
+1. Deploy to HTTPS.
+2. BotFather → your bot → **Menu Button** / **Web App** → app URL.
+3. In Cordwainer Bot the “Open Cordwainer Mini App” button already points to the production URL.
 
-1. Задеплойте на HTTPS.
-2. BotFather → ваш бот → **Menu Button** / **Web App** → URL приложения.
-3. В боте (Cordwainer Bot) кнопка «Открыть Cordwainer Mini App» уже указывает на production URL.
-
-### Переменные окружения
-
-На текущий момент секреты в клиенте не обязательны: приложение статическое.  
-При добавлении бэкенда/аналитики используйте `VITE_*` переменные Vite.
+### Environment variables
+Currently no client-side secrets are required (static app).  
+If you add a backend or analytics, use Vite `VITE_*` variables.
 
 ---
 
-## 🧪 Разработка
+## 🧪 Development
 
-### Новый экран
-1. Создайте `src/pages/NewPage.tsx`.
-2. Добавьте значение в `Screen` в `App.tsx`.
-3. Отрендерите страницу в `AnimatePresence` и добавьте переход из меню/дока.
+### New screen
+1. Create `src/pages/NewPage.tsx`.
+2. Add a value to the `Screen` type in `App.tsx`.
+3. Render the page inside `AnimatePresence` and wire navigation from the menu/dock.
 
-### Новый калькулятор
-1. Логику — в `src/lib/`.
-2. UI — `src/pages/XxxCalcPage.tsx`.
-3. Пункт в `CalcMenuPage`.
+### New calculator
+1. Put logic in `src/lib/`.
+2. UI in `src/pages/XxxCalcPage.tsx`.
+3. Add an entry in `CalcMenuPage`.
 
-### Новые пигменты
-1. Добавьте спектральный `.txt` в `public/spectra/`.
-2. Зарегистрируйте в `data/pigments.ts` / `loadPigments.ts`.
+### New pigments
+1. Add a spectral `.txt` file to `public/spectra/`.
+2. Register it in `data/pigments.ts` / `loadPigments.ts`.
 
-### Стили
-- Tailwind CSS v4 через `@tailwindcss/vite`.
-- Глобальные токены — CSS-переменные в `index.css` и runtime в `App.tsx`.
+### Styles
+- Tailwind CSS v4 via `@tailwindcss/vite`.
+- Global tokens: CSS variables in `index.css` and runtime updates in `App.tsx`.
 
 ---
 
-## 📁 Полезные публичные файлы
+## 📁 Useful public files
 
-| Файл | Назначение |
-|------|------------|
+| File | Purpose |
+|------|---------|
 | `public/manifest.json` | PWA |
-| `public/llms.txt` | Описание проекта для LLM/краулеров |
+| `public/llms.txt` | Project description for LLMs / crawlers |
 | `public/sitemap.xml` / `robots.txt` | SEO |
-| `public/spectra/` | Спектры пигментов для color science |
+| `public/spectra/` | Pigment spectra for color science |
 
 ---
 
-## 📝 Лицензия и связанные проекты
+## 📝 License & related projects
 
-Mini App связан с Telegram-ботом **Cordwainer Bot** (репозиторий `shoemaker-bot`):  
-справочник конструкций, материалов, химии, глоссария и серверные калькуляторы (в т.ч. расход кожи и сдельная зарплата).
+The Mini App is linked to the Telegram bot **Cordwainer Bot** (repo `shoemaker-bot`):  
+a reference for constructions, materials, chemistry, glossary, and server-side calculators (including leather consumption and piece-rate wages).
 
-- Бот: [https://t.me/Cordwainer_bot](https://t.me/Cordwainer_bot)
-- Сайт: [https://www.cordwaine.app](https://www.cordwaine.app)
+- Bot: [https://t.me/Cordwainer_bot](https://t.me/Cordwainer_bot)
+- Website: [https://www.cordwaine.app](https://www.cordwaine.app)
 
 ---
 
-## 📞 Контакты
+## 📞 Contacts
 
 - GitHub: [@vplyha-maker](https://github.com/vplyha-maker)
 - Telegram: [@Cordwainer_bot](https://t.me/Cordwainer_bot)
 
 ---
 
-*Cordwainer — предмет как идея, форма как язык, мастерство как опыт.*
+*Cordwainer — the object as idea, form as language, craft as experience.*
 ```
-
-
