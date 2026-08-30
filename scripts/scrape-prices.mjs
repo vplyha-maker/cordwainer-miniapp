@@ -14,7 +14,7 @@ async function main() {
     const zottiHimiya = await scrapeZottiCategory('/ua/catalog/cat/himiya');
     const zottiKlei = await scrapeZottiCategory('/ua/catalog/cat/klei');
     const zottiTotal = zottiHimiya.length + zottiKlei.length;
-    console.log(`✅ Zotti всего: ${zottiTotal} товаров`);
+    console.log('✅ Zotti всего: ' + zottiTotal + ' товаров');
     totalProducts += zottiTotal;
   } catch (err) {
     console.error('❌ Ошибка при парсинге Zotti:', err.message);
@@ -24,9 +24,11 @@ async function main() {
   try {
     console.log('\n--- 📦 Парсинг Башмачник ---');
     const bashPage1 = await scrapeBashmachnikCategory('/ua/g5615908-obuvnye-klei');
-    const bashPage2 = await scrapeBashmachnikCategory('/ua/g5615908-obuvnye-klei/page_2');
+    const bashPage2 = await scrapeBashmachnikCategory(
+      '/ua/g5615908-obuvnye-klei/page_2'
+    );
     const bashTotal = bashPage1.length + bashPage2.length;
-    console.log(`✅ Башмачник всего: ${bashTotal} товаров`);
+    console.log('✅ Башмачник всего: ' + bashTotal + ' товаров');
     totalProducts += bashTotal;
   } catch (err) {
     console.error('❌ Ошибка при парсинге Башмачника:', err.message);
@@ -52,13 +54,15 @@ async function main() {
       masterokTotal += items.length;
       await new Promise((r) => setTimeout(r, 1000));
     }
-    console.log(`✅ Masterok всего: ${masterokTotal} товаров`);
+    console.log('✅ Masterok всего: ' + masterokTotal + ' товаров');
     totalProducts += masterokTotal;
   } catch (err) {
     console.error('❌ Ошибка при парсинге Masterok:', err.message);
   }
 
-  console.log(`\n🏁 === ВСЕГО ОБРАБОТАНО И СОХРАНЕНО: ${totalProducts} товаров ===`);
+  console.log(
+    '\n🏁 === ВСЕГО ОБРАБОТАНО И СОХРАНЕНО: ' + totalProducts + ' товаров ==='
+  );
 }
 
 main();
