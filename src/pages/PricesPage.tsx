@@ -112,6 +112,7 @@ const formatSourceName = (sourceId: string) => {
     aligo: 'Aligo Group',
     bahtarma: 'Bahtarma',
     bashmachnik: 'Башмачник',
+    masterok: 'Masterok',
   }
   return (
     customNames[sourceId.toLowerCase()] ||
@@ -120,7 +121,7 @@ const formatSourceName = (sourceId: string) => {
 }
 
 /* =========================================================
-   УМНАЯ НОРМАЛИЗАЦИЯ НАЗВАНИЙ (Zotti ↔ Башмачник)
+   УМНАЯ НОРМАЛИЗАЦИЯ НАЗВАНИЙ
    ========================================================= */
 
 const BRAND_ALIASES: Array<[RegExp, string]> = [
@@ -149,6 +150,7 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bpuntacol\b/gi, 'puntacol'],
   [/\bdenlaks\b/gi, 'denlaks'],
   [/\bkendor\b/gi, 'kendor'],
+  [/\bkenda\b/gi, 'kenda'],
   [/\bзатверджувач\b/gi, 'hardener'],
   [/\bотвердитель\b/gi, 'hardener'],
   [/\bsolution\b/gi, 'solution'],
@@ -159,11 +161,10 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bрезинов(ый|ий|ая)?\b/gi, 'rubber'],
 ]
 
-/** Достаём и нормализуем объём: 15кг, 1л, 100мл, 0.85kg → единый вид */
+/** 15 кг / 1л / 100мл → 15kg / 1l / 100ml */
 function extractVolumeKey(raw: string): string {
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
 
-  // 11 кг/13,75 літра → берём первую пару число+единица
   const m = s.match(
     /(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[аів]*|литр[аов]*|мл|ml)\b/i
   )
@@ -178,7 +179,6 @@ function extractVolumeKey(raw: string): string {
   else if (unit === 'г' || unit === 'гр' || unit === 'g') unit = 'g'
   else if (unit === 'мл' || unit === 'ml') unit = 'ml'
 
-  // 0.8kg ≈ 1l для некоторых клеев — НЕ склеиваем, оставляем как есть
   const rounded =
     num >= 10 ? String(Math.round(num)) : String(Math.round(num * 100) / 100)
 
@@ -193,20 +193,15 @@ function normalizeProductName(raw: string): string {
     .replace(/[()[\]{}]/g, ' ')
     .replace(/[_/\\|–—−]+/g, ' ')
 
-  // убрать SEO-простыни (дубли описаний в названии bashmachnik)
-  if (s.length > 120) {
-    s = s.slice(0, 120)
-  }
+  if (s.length > 120) s = s.slice(0, 120)
 
-  // алиасы брендов/типов
   for (const [re, rep] of BRAND_ALIASES) {
     s = s.replace(re, ` ${rep} `)
   }
 
-  // выкинуть мусор
   s = s
     .replace(
-      /\b(італія|италия|турция|туреччина|китай|нови[йя]|новый|акція|акция|гель|гелевий|сильної фіксації|для взуття|для обуви|обувной|взуттєвий|полиуретановий|поліуретановий|поліхлоропреновий|полихлоропреновый|на розлив|светлый|світлий|чорний|черный)\b/gi,
+      /\b(італія|италия|турция|туреччина|китай|нови[йя]|новый|акція|акция|гель|гелевий|сильної фіксації|для взуття|для обуви|обувной|взуттєвий|полиуретановий|поліуретановий|поліхлоропреновий|полихлоропреновый|на розлив|розливний|светлый|світлий|чорний|черный|premium)\b/gi,
       ' '
     )
     .replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
@@ -218,13 +213,11 @@ function normalizeProductName(raw: string): string {
   const tokens = s
     .split(' ')
     .filter((t) => t.length > 1)
-    // слишком общие слова
     .filter(
       (t) =>
         !['клей', 'klej', 'для', 'the', 'and', 'або', 'или', 'тип'].includes(t)
     )
 
-  // уникальные токены, порядок сохраняем
   const seen = new Set<string>()
   const unique: string[] = []
   for (const t of tokens) {
@@ -237,7 +230,6 @@ function normalizeProductName(raw: string): string {
   return unique.join(' ')
 }
 
-/** Ключ группировки: code → иначе name+volume */
 function makeGroupingKey(item: {
   product_code: string | null
   name: string
@@ -250,7 +242,6 @@ function makeGroupingKey(item: {
   const base = normalizeProductName(item.name)
   const vol = extractVolumeKey(item.name)
 
-  // если после чистки почти пусто — fallback
   const core =
     base.length >= 3
       ? base
@@ -262,11 +253,9 @@ function makeGroupingKey(item: {
   return vol ? `name_\( {core}__ \){vol}` : `name_${core}`
 }
 
-/** Более короткое «человеческое» имя для карточки */
 function preferDisplayName(current: string, candidate: string): string {
   if (!current) return candidate
   if (!candidate) return current
-  // без SEO-простыней
   const a = current.length
   const b = candidate.length
   if (b < a * 0.7) return candidate
@@ -382,7 +371,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       if (sortBy === 'price-asc') return a.minPrice - b.minPrice
       if (sortBy === 'savings') return b.maxSavings - a.maxSavings
       if (sortBy === 'name') return a.name.localeCompare(b.name)
-      // по умолчанию: сначала с несколькими магазинами, потом по выгоде
       if (b.offers.length !== a.offers.length) {
         return b.offers.length - a.offers.length
       }
