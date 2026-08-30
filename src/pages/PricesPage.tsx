@@ -76,6 +76,8 @@ const DICTIONARY = {
     empty: 'Ничего не найдено',
     emptyHint: 'Измените фильтры или поиск',
     bookletHint: 'Листайте буклет',
+    singleOffer:
+      'Цена из одного магазина — сравнение появится, когда товар найдётся ещё где-то',
   },
   uk: {
     title: 'Аналітика цін',
@@ -99,6 +101,8 @@ const DICTIONARY = {
     empty: 'Нічого не знайдено',
     emptyHint: 'Змініть фільтри або пошук',
     bookletHint: 'Гортайте буклет',
+    singleOffer:
+      'Ціна з одного магазину — порівняння з’явиться, коли товар знайдеться ще десь',
   },
 }
 
@@ -113,6 +117,161 @@ const formatSourceName = (sourceId: string) => {
     customNames[sourceId.toLowerCase()] ||
     sourceId.charAt(0).toUpperCase() + sourceId.slice(1)
   )
+}
+
+/* =========================================================
+   УМНАЯ НОРМАЛИЗАЦИЯ НАЗВАНИЙ (Zotti ↔ Башмачник)
+   ========================================================= */
+
+const BRAND_ALIASES: Array<[RegExp, string]> = [
+  [/\bнайр[іиі]т\b/gi, 'nairit'],
+  [/\bnairit\b/gi, 'nairit'],
+  [/\bneogrip\b/gi, 'neogrip'],
+  [/\bboterm\b/gi, 'boterm'],
+  [/\bgta\b/gi, 'gta'],
+  [/\bpoligrip\b/gi, 'poligrip'],
+  [/\bдесмокол\b/gi, 'desmokol'],
+  [/\bdesmokol\b/gi, 'desmokol'],
+  [/\bbonikol\b/gi, 'bonikol'],
+  [/\bбон[іиі]кол\b/gi, 'bonikol'],
+  [/\bdismakol\b/gi, 'desmokol'],
+  [/\bдисмакол\b/gi, 'desmokol'],
+  [/\bsar\b/gi, 'sar'],
+  [/\bsarmultifix\b/gi, 'sarmultifix'],
+  [/\bмультиф[іиі]кс\b/gi, 'sarmultifix'],
+  [/\bmultifix\b/gi, 'multifix'],
+  [/\bpreparatore\b/gi, 'preparatore'],
+  [/\bпротрава\b/gi, 'preparatore'],
+  [/\bbsk\b/gi, 'bsk'],
+  [/\balboter\b/gi, 'alboter'],
+  [/\bальботер\b/gi, 'alboter'],
+  [/\bsupercolla\b/gi, 'supercolla'],
+  [/\bpuntacol\b/gi, 'puntacol'],
+  [/\bdenlaks\b/gi, 'denlaks'],
+  [/\bkendor\b/gi, 'kendor'],
+  [/\bзатверджувач\b/gi, 'hardener'],
+  [/\bотвердитель\b/gi, 'hardener'],
+  [/\bsolution\b/gi, 'solution'],
+  [/\bsolusion\b/gi, 'solution'],
+  [/\bслоник\b/gi, 'solution'],
+  [/\brubber\b/gi, 'rubber'],
+  [/\bгумов(ий|ий|а|ой)?\b/gi, 'rubber'],
+  [/\bрезинов(ый|ий|ая)?\b/gi, 'rubber'],
+]
+
+/** Достаём и нормализуем объём: 15кг, 1л, 100мл, 0.85kg → единый вид */
+function extractVolumeKey(raw: string): string {
+  const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
+
+  // 11 кг/13,75 літра → берём первую пару число+единица
+  const m = s.match(
+    /(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[аів]*|литр[аов]*|мл|ml)\b/i
+  )
+  if (!m) return ''
+
+  const num = parseFloat(m[1])
+  if (!Number.isFinite(num) || num <= 0) return ''
+
+  let unit = m[2].toLowerCase()
+  if (unit.startsWith('літр') || unit.startsWith('литр') || unit === 'l') unit = 'l'
+  else if (unit === 'кг' || unit === 'kg') unit = 'kg'
+  else if (unit === 'г' || unit === 'гр' || unit === 'g') unit = 'g'
+  else if (unit === 'мл' || unit === 'ml') unit = 'ml'
+
+  // 0.8kg ≈ 1l для некоторых клеев — НЕ склеиваем, оставляем как есть
+  const rounded =
+    num >= 10 ? String(Math.round(num)) : String(Math.round(num * 100) / 100)
+
+  return `\( {rounded} \){unit}`
+}
+
+function normalizeProductName(raw: string): string {
+  let s = (raw || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/['"`«»„“]/g, '')
+    .replace(/[()[\]{}]/g, ' ')
+    .replace(/[_/\\|–—−]+/g, ' ')
+
+  // убрать SEO-простыни (дубли описаний в названии bashmachnik)
+  if (s.length > 120) {
+    s = s.slice(0, 120)
+  }
+
+  // алиасы брендов/типов
+  for (const [re, rep] of BRAND_ALIASES) {
+    s = s.replace(re, ` ${rep} `)
+  }
+
+  // выкинуть мусор
+  s = s
+    .replace(
+      /\b(італія|италия|турция|туреччина|китай|нови[йя]|новый|акція|акция|гель|гелевий|сильної фіксації|для взуття|для обуви|обувной|взуттєвий|полиуретановий|поліуретановий|поліхлоропреновий|полихлоропреновый|на розлив|светлый|світлий|чорний|черный)\b/gi,
+      ' '
+    )
+    .replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
+    .replace(/\b\d+\s*[xх×]\s*\d+\b/gi, ' ')
+    .replace(/[^a-zа-яіїєґ0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const tokens = s
+    .split(' ')
+    .filter((t) => t.length > 1)
+    // слишком общие слова
+    .filter(
+      (t) =>
+        !['клей', 'klej', 'для', 'the', 'and', 'або', 'или', 'тип'].includes(t)
+    )
+
+  // уникальные токены, порядок сохраняем
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const t of tokens) {
+    if (!seen.has(t)) {
+      seen.add(t)
+      unique.push(t)
+    }
+  }
+
+  return unique.join(' ')
+}
+
+/** Ключ группировки: code → иначе name+volume */
+function makeGroupingKey(item: {
+  product_code: string | null
+  name: string
+}): string {
+  const code = item.product_code?.trim()
+  if (code && code.length >= 3) {
+    return `code_${code.toLowerCase()}`
+  }
+
+  const base = normalizeProductName(item.name)
+  const vol = extractVolumeKey(item.name)
+
+  // если после чистки почти пусто — fallback
+  const core =
+    base.length >= 3
+      ? base
+      : (item.name || '')
+          .toLowerCase()
+          .replace(/[^a-zа-яіїєґ0-9]/g, '')
+          .slice(0, 40)
+
+  return vol ? `name_\( {core}__ \){vol}` : `name_${core}`
+}
+
+/** Более короткое «человеческое» имя для карточки */
+function preferDisplayName(current: string, candidate: string): string {
+  if (!current) return candidate
+  if (!candidate) return current
+  // без SEO-простыней
+  const a = current.length
+  const b = candidate.length
+  if (b < a * 0.7) return candidate
+  if (a > 90 && b < a) return candidate
+  return current
 }
 
 export function PricesPage({ onBack, lang }: PricesPageProps) {
@@ -160,13 +319,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       const priceNum = Number(item.current_price)
       if (isNaN(priceNum) || priceNum <= 0) return
 
-      const cleanName = item.name
-        .toLowerCase()
-        .replace(/(\(.*?\)|\[.*?\])/g, '')
-        .replace(/[^a-zа-яёіїєґ0-9]/g, '')
-      const groupingKey = item.product_code
-        ? `code_${item.product_code.trim().toLowerCase()}`
-        : `name_${cleanName.slice(0, 30)}`
+      const groupingKey = makeGroupingKey(item)
 
       if (!map.has(groupingKey)) {
         map.set(groupingKey, {
@@ -184,7 +337,11 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       }
 
       const group = map.get(groupingKey)!
+      group.name = preferDisplayName(group.name, item.name)
       if (!group.image_url && item.image_url) group.image_url = item.image_url
+      if (!group.product_code && item.product_code) {
+        group.product_code = item.product_code
+      }
 
       if (!group.offers.find((o) => o.source === item.source)) {
         group.offers.push({
@@ -210,7 +367,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       result = result.filter(
         (g) =>
           g.name.toLowerCase().includes(q) ||
-          (g.product_code && g.product_code.toLowerCase().includes(q))
+          (g.product_code && g.product_code.toLowerCase().includes(q)) ||
+          normalizeProductName(g.name).includes(normalizeProductName(q))
       )
     }
 
@@ -224,7 +382,11 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       if (sortBy === 'price-asc') return a.minPrice - b.minPrice
       if (sortBy === 'savings') return b.maxSavings - a.maxSavings
       if (sortBy === 'name') return a.name.localeCompare(b.name)
-      return b.offers.length - a.offers.length
+      // по умолчанию: сначала с несколькими магазинами, потом по выгоде
+      if (b.offers.length !== a.offers.length) {
+        return b.offers.length - a.offers.length
+      }
+      return b.maxSavings - a.maxSavings
     })
 
     return result
@@ -241,7 +403,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const totalPages = pages.length
   const safePage = Math.min(pageIndex, Math.max(0, totalPages - 1))
 
-  // Сброс страницы при смене фильтров
   useEffect(() => {
     setPageIndex(0)
   }, [searchQuery, selectedSource, sortBy])
@@ -260,6 +421,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       : 0
     return {
       total: groupedItems.length,
+      multiCount: multi.length,
       avgSpreadPercent: avgSpread.toFixed(1),
     }
   }, [groupedItems])
@@ -271,7 +433,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       maximumFractionDigits: 0,
     }).format(val)
 
-  // ---------- Карточка товара (без transform-анимаций) ----------
   const renderCard = (group: GroupedProduct) => {
     const sortedOffers = [...group.offers].sort((a, b) => a.price - b.price)
     const chartData = sortedOffers.map((o) => ({
@@ -322,8 +483,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           </div>
         </div>
 
-        {/* График — родитель без transform */}
-        {group.offers.length > 1 && (
+        {group.offers.length > 1 ? (
           <div className="h-[70px] w-full relative z-10 bg-[#25201C]/60 rounded-xl p-2 border border-white/5">
             <span className="absolute top-1.5 left-2 text-[9px] font-semibold text-[#B9ACA0]">
               {t.marketSpread}
@@ -356,6 +516,11 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#25201C]/50 border border-white/5 text-[11px] text-[#B9ACA0]">
+            <Store size={12} className="text-[#E4D00A]/80 shrink-0" />
+            <span>{t.singleOffer}</span>
           </div>
         )}
 
@@ -408,7 +573,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       transition={{ duration: 0.2 }}
       className="relative flex flex-col h-[100dvh] bg-[#12100E] text-[#F5F1EA] overflow-hidden font-sans"
     >
-      {/* HEADER */}
       <div className="shrink-0 z-20 bg-[#1A1614]/95 backdrop-blur-md border-b border-white/5">
         <div className="px-4 pt-5 pb-3 flex items-center gap-3">
           <button
@@ -425,8 +589,13 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
             {globalStats && (
               <p className="text-[11px] text-[#B9ACA0] flex items-center gap-1 mt-0.5">
                 <TrendingDown size={11} className="text-[#E4D00A]" />
-                {t.statsAvgSpread}: {globalStats.avgSpreadPercent}% ·{' '}
+                {globalStats.multiCount > 0
+                  ? `${t.statsAvgSpread}: ${globalStats.avgSpreadPercent}% · `
+                  : ''}
                 {globalStats.total} {t.statsTotal}
+                {globalStats.multiCount > 0
+                  ? ` · ${globalStats.multiCount} ${lang === 'uk' ? 'з порівнянням' : 'со сравнением'}`
+                  : ''}
               </p>
             )}
           </div>
@@ -498,7 +667,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         )}
       </div>
 
-      {/* CONTENT — обычный скролл, без transform */}
       <div className="flex-1 overflow-y-auto px-4 py-3 no-scrollbar">
         {loading && (
           <div className="space-y-3">
@@ -538,7 +706,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         )}
       </div>
 
-      {/* BOTTOM CONTROLS — буклет */}
       {!loading && !error && totalPages > 0 && (
         <div className="shrink-0 border-t border-white/5 bg-[#1A1614]/95 backdrop-blur-md">
           <div className="px-4 py-2.5 flex items-center justify-between gap-3">
@@ -558,9 +725,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                       key={i}
                       onClick={() => goToPage(i)}
                       className={`h-1.5 rounded-full transition-all ${
-                        i === safePage
-                          ? 'w-5 bg-[#E4D00A]'
-                          : 'w-1.5 bg-white/20'
+                        i === safePage ? 'w-5 bg-[#E4D00A]' : 'w-1.5 bg-white/20'
                       }`}
                     />
                   ))}
