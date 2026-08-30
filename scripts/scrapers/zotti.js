@@ -11,11 +11,17 @@ export async function scrapeZottiCategory(categoryPath) {
   const limit = 20;
 
   let cleanPath = categoryPath.split('?')[0];
-  if (!cleanPath.startsWith('/')) cleanPath = `/${cleanPath}`;
+  if (!cleanPath.startsWith('/')) {
+    cleanPath = '/' + cleanPath;
+  }
 
   while (hasMore) {
-    const url = `\( {BASE_URL} \){cleanPath}\( {start > 0 ? `?start= \){start}` : ''}`;
-    console.log(`\n🔍 Парсим страницу: ${url}`);
+    const url =
+      BASE_URL +
+      cleanPath +
+      (start > 0 ? '?start=' + start : '');
+
+    console.log('\n🔍 Парсим страницу: ' + url);
 
     try {
       const { data: html } = await axios.get(url, {
@@ -39,13 +45,13 @@ export async function scrapeZottiCategory(categoryPath) {
         const relativeUrl = $el.find('a.link-product').attr('href') || '';
         const fullUrl = relativeUrl.startsWith('http')
           ? relativeUrl
-          : `\( {BASE_URL} \){relativeUrl}`;
+          : BASE_URL + relativeUrl;
 
         const imageUrl = $el.find('.thumb img').attr('src');
         const fullImage = imageUrl
           ? imageUrl.startsWith('http')
             ? imageUrl
-            : `\( {BASE_URL} \){imageUrl}`
+            : BASE_URL + imageUrl
           : null;
 
         const priceText = $el
@@ -71,7 +77,6 @@ export async function scrapeZottiCategory(categoryPath) {
             if (match) sourceId = match[1];
           }
         }
-        // запасной ID из URL
         if (!sourceId && fullUrl) {
           const m = fullUrl.match(/\/(\d+)\/?$/);
           if (m) sourceId = m[1];
@@ -93,13 +98,13 @@ export async function scrapeZottiCategory(categoryPath) {
         hasMore = false;
         console.log('🛑 Товары на странице закончились.');
       } else {
-        console.log(`📦 Найдено товаров на странице: ${products.length}`);
+        console.log('📦 Найдено товаров на странице: ' + products.length);
 
         for (const product of products) {
           try {
             await saveProduct(product);
           } catch (err) {
-            console.error(`❌ Ошибка сохранения "${product.name}":`, err.message);
+            console.error('❌ Ошибка сохранения "' + product.name + '":', err.message);
           }
         }
 
@@ -108,7 +113,7 @@ export async function scrapeZottiCategory(categoryPath) {
         await new Promise((r) => setTimeout(r, 1000));
       }
     } catch (err) {
-      console.error(`❌ Ошибка при запросе ${url}:`, err.message);
+      console.error('❌ Ошибка при запросе ' + url + ':', err.message);
       hasMore = false;
     }
   }
