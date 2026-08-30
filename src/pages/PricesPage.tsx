@@ -125,7 +125,7 @@ const formatSourceName = (sourceId: string) => {
    ========================================================= */
 
 const BRAND_ALIASES: Array<[RegExp, string]> = [
-  [/\bнайр[іиі]т\b/gi, 'nairit'],
+  [/\bнайр[іи]т\b/gi, 'nairit'],
   [/\bnairit\b/gi, 'nairit'],
   [/\bneogrip\b/gi, 'neogrip'],
   [/\bboterm\b/gi, 'boterm'],
@@ -134,12 +134,12 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bдесмокол\b/gi, 'desmokol'],
   [/\bdesmokol\b/gi, 'desmokol'],
   [/\bbonikol\b/gi, 'bonikol'],
-  [/\bбон[іиі]кол\b/gi, 'bonikol'],
+  [/\bбон[іи]кол\b/gi, 'bonikol'],
   [/\bdismakol\b/gi, 'desmokol'],
   [/\bдисмакол\b/gi, 'desmokol'],
   [/\bsar\b/gi, 'sar'],
   [/\bsarmultifix\b/gi, 'sarmultifix'],
-  [/\bмультиф[іиі]кс\b/gi, 'sarmultifix'],
+  [/\bмультиф[іи]кс\b/gi, 'sarmultifix'],
   [/\bmultifix\b/gi, 'multifix'],
   [/\bpreparatore\b/gi, 'preparatore'],
   [/\bпротрава\b/gi, 'preparatore'],
@@ -157,7 +157,7 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bsolusion\b/gi, 'solution'],
   [/\bслоник\b/gi, 'solution'],
   [/\brubber\b/gi, 'rubber'],
-  [/\bгумов(ий|ий|а|ой)?\b/gi, 'rubber'],
+  [/\bгумов(ий|а|ой)?\b/gi, 'rubber'],
   [/\bрезинов(ый|ий|ая)?\b/gi, 'rubber'],
 ]
 
@@ -182,7 +182,7 @@ function extractVolumeKey(raw: string): string {
   const rounded =
     num >= 10 ? String(Math.round(num)) : String(Math.round(num * 100) / 100)
 
-  return `\( {rounded} \){unit}`
+  return `${rounded}${unit}`
 }
 
 function normalizeProductName(raw: string): string {
@@ -250,7 +250,7 @@ function makeGroupingKey(item: {
           .replace(/[^a-zа-яіїєґ0-9]/g, '')
           .slice(0, 40)
 
-  return vol ? `name_\( {core}__ \){vol}` : `name_${core}`
+  return vol ? `name_${core}__${vol}` : `name_${core}`
 }
 
 function preferDisplayName(current: string, candidate: string): string {
@@ -752,4 +752,4 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       )}
     </motion.div>
   )
- }
+}
