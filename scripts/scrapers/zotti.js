@@ -11,12 +11,10 @@ export async function scrapeZottiCategory(categoryPath) {
   const limit = 20;
 
   let cleanPath = categoryPath.split('?')[0];
-  if (!cleanPath.startsWith('/')) {
-    cleanPath = `/${cleanPath}`;
-  }
+  if (!cleanPath.startsWith('/')) cleanPath = `/${cleanPath}`;
 
   while (hasMore) {
-    const url = `${BASE_URL}${cleanPath}${start > 0 ? `?start=${start}` : ''}`;
+    const url = `\( {BASE_URL} \){cleanPath}\( {start > 0 ? `?start= \){start}` : ''}`;
     console.log(`\n🔍 Парсим страницу: ${url}`);
 
     try {
@@ -41,22 +39,26 @@ export async function scrapeZottiCategory(categoryPath) {
         const relativeUrl = $el.find('a.link-product').attr('href') || '';
         const fullUrl = relativeUrl.startsWith('http')
           ? relativeUrl
-          : `${BASE_URL}${relativeUrl}`;
+          : `\( {BASE_URL} \){relativeUrl}`;
 
         const imageUrl = $el.find('.thumb img').attr('src');
         const fullImage = imageUrl
           ? imageUrl.startsWith('http')
             ? imageUrl
-            : `${BASE_URL}${imageUrl}`
+            : `\( {BASE_URL} \){imageUrl}`
           : null;
 
         const priceText = $el
           .find('.price_summ')
           .text()
           .replace(/\s/g, '')
+          .replace(/\u00a0/g, '')
           .replace('грн.', '')
+          .replace('грн', '')
           .replace(',', '.');
         const price = priceText ? parseFloat(priceText) : null;
+        const safePrice =
+          price !== null && Number.isFinite(price) && price > 0 ? price : null;
 
         const productCode =
           $el.find('.item-footer .cell').last().text().trim() || null;
@@ -69,6 +71,11 @@ export async function scrapeZottiCategory(categoryPath) {
             if (match) sourceId = match[1];
           }
         }
+        // запасной ID из URL
+        if (!sourceId && fullUrl) {
+          const m = fullUrl.match(/\/(\d+)\/?$/);
+          if (m) sourceId = m[1];
+        }
 
         products.push({
           source: 'zotti',
@@ -78,13 +85,13 @@ export async function scrapeZottiCategory(categoryPath) {
           url: fullUrl,
           imageUrl: fullImage,
           category: cleanPath,
-          price,
+          price: safePrice,
         });
       });
 
       if (products.length === 0) {
         hasMore = false;
-        console.log('🛑 Товары на странице закончились. Переход остановлен.');
+        console.log('🛑 Товары на странице закончились.');
       } else {
         console.log(`📦 Найдено товаров на странице: ${products.length}`);
 
@@ -98,8 +105,7 @@ export async function scrapeZottiCategory(categoryPath) {
 
         allProducts.push(...products);
         start += limit;
-        
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((r) => setTimeout(r, 1000));
       }
     } catch (err) {
       console.error(`❌ Ошибка при запросе ${url}:`, err.message);
