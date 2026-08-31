@@ -11,12 +11,13 @@
     "scrape": "node scripts/scrape-prices.mjs"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@tma.js/sdk": "^3.3.0",
     "@tma.js/sdk-react": "^3.0.23",
     "axios": "^1.20.0",
-    "better-sqlite3": "^11.0.0",
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "framer-motion": "^11.15.0",
     "lucide-react": "^1.35.0",
     "react": "^18.3.1",
