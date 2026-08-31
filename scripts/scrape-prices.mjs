@@ -1,6 +1,7 @@
 import { scrapeZottiCategory } from './scrapers/zotti.js';
 import { scrapeBashmachnikCategory } from './scrapers/bashmachnik.js';
 import { scrapeMasterokCategory } from './scrapers/masterok.js';
+import { saveProduct } from './db/saveProduct.js';
 
 async function main() {
   console.log('🚀 === Запуск комплексного парсера цен ===');
@@ -13,9 +14,24 @@ async function main() {
     console.log('\n--- 📦 Парсинг Zotti ---');
     const zottiHimiya = await scrapeZottiCategory('/ua/catalog/cat/himiya');
     const zottiKlei = await scrapeZottiCategory('/ua/catalog/cat/klei');
-    const zottiTotal = zottiHimiya.length + zottiKlei.length;
-    console.log('✅ Zotti всего: ' + zottiTotal + ' товаров');
-    totalProducts += zottiTotal;
+    
+    const zottiProducts = [...zottiHimiya, ...zottiKlei];
+
+    for (const prod of zottiProducts) {
+      await saveProduct({
+        source: 'zotti',
+        sourceId: prod.id || prod.url,
+        productCode: prod.code,
+        name: prod.name,
+        url: prod.url,
+        imageUrl: prod.imageUrl,
+        category: prod.category || 'Zotti Каталог',
+        price: prod.price
+      });
+    }
+
+    console.log('✅ Zotti всего сохранено: ' + zottiProducts.length + ' товаров');
+    totalProducts += zottiProducts.length;
   } catch (err) {
     console.error('❌ Ошибка при парсинге Zotti:', err.message);
   }
@@ -27,9 +43,24 @@ async function main() {
     const bashPage2 = await scrapeBashmachnikCategory(
       '/ua/g5615908-obuvnye-klei/page_2'
     );
-    const bashTotal = bashPage1.length + bashPage2.length;
-    console.log('✅ Башмачник всего: ' + bashTotal + ' товаров');
-    totalProducts += bashTotal;
+    
+    const bashProducts = [...bashPage1, ...bashPage2];
+
+    for (const prod of bashProducts) {
+      await saveProduct({
+        source: 'bashmachnik',
+        sourceId: prod.id || prod.url,
+        productCode: prod.code,
+        name: prod.name,
+        url: prod.url,
+        imageUrl: prod.imageUrl,
+        category: prod.category || 'Об обувных клеях',
+        price: prod.price
+      });
+    }
+
+    console.log('✅ Башмачник всего сохранено: ' + bashProducts.length + ' товаров');
+    totalProducts += bashProducts.length;
   } catch (err) {
     console.error('❌ Ошибка при парсинге Башмачника:', err.message);
   }
@@ -51,10 +82,24 @@ async function main() {
     let masterokTotal = 0;
     for (const path of masterokPaths) {
       const items = await scrapeMasterokCategory(path);
+      
+      for (const prod of items) {
+        await saveProduct({
+          source: 'masterok',
+          sourceId: prod.id || prod.url,
+          productCode: prod.code,
+          name: prod.name,
+          url: prod.url,
+          imageUrl: prod.imageUrl,
+          category: prod.category || path,
+          price: prod.price
+        });
+      }
+
       masterokTotal += items.length;
       await new Promise((r) => setTimeout(r, 1000));
     }
-    console.log('✅ Masterok всего: ' + masterokTotal + ' товаров');
+    console.log('✅ Masterok всего сохранено: ' + masterokTotal + ' товаров');
     totalProducts += masterokTotal;
   } catch (err) {
     console.error('❌ Ошибка при парсинге Masterok:', err.message);
