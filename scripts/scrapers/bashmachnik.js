@@ -13,7 +13,6 @@ const skipWords = [
 
 function extractPrice(text) {
   if (!text) return null;
-  // 1 234,50 грн | 1234.50 ₴ | 1234 грн
   const m = String(text).replace(/\u00a0/g, ' ').match(
     /(\d{1,3}(?:[\s\u00a0]\d{3})*|\d+)([.,]\d{1,2})?\s*(?:грн\.?|₴)/i
   );
@@ -27,11 +26,11 @@ function extractPrice(text) {
 function absoluteUrl(href) {
   if (!href || href.startsWith('data:')) return null;
   if (href.startsWith('http')) return href.split('?')[0];
-  return `\( {BASE_URL} \){href.startsWith('/') ? '' : '/'}${href}`.split('?')[0];
+  return `${BASE_URL}${href.startsWith('/') ? '' : '/'}${href}`.split('?')[0];
 }
 
 export async function scrapeBashmachnikCategory(categoryPath) {
-  const url = `\( {BASE_URL} \){categoryPath}`;
+  const url = `${BASE_URL}${categoryPath}`;
   console.log(`Парсим Башмачник: ${url}`);
 
   const { data: html } = await axios.get(url, {
@@ -46,7 +45,6 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   const $ = cheerio.load(html);
   const productsMap = new Map();
 
-  // Prom.ua / company-site: ссылки вида /ua/p1234567-... или /p1234567-...
   $('a[href*="/p"]').each((_, el) => {
     const $a = $(el);
     const href = $a.attr('href');
@@ -59,13 +57,11 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     const fullUrl = absoluteUrl(href);
     if (!fullUrl || productsMap.has(fullUrl)) return;
 
-    // Карточка: поднимаемся до блока товара
     let $card = $a.closest(
       '[data-qaid="product-block"], [data-qaid="product_block"], .b-product-gallery__item, .product-item, .product-card, li, article'
     );
     if (!$card.length) $card = $a.parent();
 
-    // Название
     let name =
       $card.find('[data-qaid="product_name"]').first().text().trim() ||
       $card.find('a[data-qaid="product_name"]').first().text().trim() ||
@@ -79,7 +75,6 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     const lower = name.toLowerCase();
     if (skipWords.some((w) => lower.includes(w))) return;
 
-    // Цена — несколько стратегий
     let price = null;
     const priceSelectors = [
       '[data-qaid="product_price"]',
@@ -95,11 +90,9 @@ export async function scrapeBashmachnikCategory(categoryPath) {
       if (price) break;
     }
     if (!price) {
-      // fallback: любой текст с "грн" внутри карточки
       price = extractPrice($card.text());
     }
 
-    // Картинка
     const $img = $card.find('img').first();
     const rawImg =
       $img.attr('data-src') ||
@@ -110,7 +103,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
 
     productsMap.set(fullUrl, {
       source: 'bashmachnik',
-      sourceId,           // ← теперь стабильный ID
+      sourceId,
       productCode: null,
       name,
       url: fullUrl,
@@ -129,7 +122,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
       await saveProduct(product);
       if (product.price) withPrice++;
       console.log(
-        `✓ ${product.name.slice(0, 60)} — \( {product.price ? product.price + ' грн' : 'нет цены'} [id= \){product.sourceId}]`
+        `✓ ${product.name.slice(0, 60)} — ${product.price ? product.price + ' грн' : 'нет цены'} [id=${product.sourceId}]`
       );
     } catch (err) {
       console.error(`Ошибка БД для "${product.name}":`, err.message);
