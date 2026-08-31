@@ -1,4 +1,3 @@
-
 import { db } from './client.js';
 
 export async function saveProduct(product) {
@@ -13,20 +12,17 @@ export async function saveProduct(product) {
     price,
   } = product;
 
-  // source_id обязателен для корректного UPSERT.
-  // Если его нет — берём стабильный ключ из URL.
   let stableSourceId = sourceId;
   if (!stableSourceId && url) {
     const m = String(url).match(/\/p(\d+)/i) || String(url).match(/[?&]id=(\d+)/i);
     if (m) stableSourceId = m[1];
   }
   if (!stableSourceId && url) {
-    // последний запасной вариант — хеш URL (чтобы не плодить дубли)
     stableSourceId = 'url_' + Buffer.from(String(url)).toString('base64url').slice(0, 32);
   }
 
-  // Используем db.get, так как нам нужна одна возвращаемая строка (RETURNING id)
-  const row = await db.get(`
+  let row;
+  const sql = `
     INSERT INTO products (
       source, source_id, product_code, name, url, image_url, category, updated_at
     )
@@ -40,7 +36,9 @@ export async function saveProduct(product) {
       product_code = COALESCE(EXCLUDED.product_code, products.product_code),
       updated_at  = CURRENT_TIMESTAMP
     RETURNING id
-  `, [
+  `;
+
+  const params = [
     source,
     stableSourceId,
     productCode ?? null,
@@ -48,19 +46,30 @@ export async function saveProduct(product) {
     url ?? null,
     imageUrl ?? null,
     category ?? null
-  ]);
+  ];
 
-  const productId = row.id;
+  if (typeof db.get === 'function') {
+    row = await db.get(sql, params);
+  } else if (typeof db.prepare === 'function') {
+    row = db.prepare(sql).get(...params);
+  } else {
+    throw new Error('Не найден подходящий метод выполнения запроса в объекте db');
+  }
 
-  if (price !== null && price !== undefined && !Number.isNaN(Number(price)) && Number(price) > 0) {
-    // Здесь db.run, так как нам не нужно возвращать данные из price_history
-    await db.run(`
+  const productId = row?.id;
+
+  if (productId && price !== null && price !== undefined && !Number.isNaN(Number(price)) && Number(price) > 0) {
+    const priceSql = `
       INSERT INTO price_history (product_id, price, currency)
       VALUES (?, ?, 'UAH')
-    `, [
-      productId, 
-      Number(price)
-    ]);
+    `;
+    const priceParams = [productId, Number(price)];
+
+    if (typeof db.run === 'function') {
+      await db.run(priceSql, priceParams);
+    } else if (typeof db.prepare === 'function') {
+      db.prepare(priceSql).run(...priceParams);
+    }
   }
 
   return productId;
