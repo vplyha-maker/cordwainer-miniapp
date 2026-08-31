@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useDeferredValue, memo } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart, Bar, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import {
@@ -51,7 +51,7 @@ type PricesPageProps = {
 
 type SortOption = 'default' | 'price-asc' | 'savings' | 'name'
 
-const PAGE_SIZE = 3
+const PAGE_SIZE = 10
 
 const DICTIONARY = {
   ru: {
@@ -161,7 +161,6 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bрезинов(ый|ий|ая)?\b/gi, 'rubber'],
 ]
 
-/** 15 кг / 1л / 100мл → 15kg / 1l / 100ml */
 function extractVolumeKey(raw: string): string {
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
 
@@ -234,11 +233,6 @@ function makeGroupingKey(item: {
   product_code: string | null
   name: string
 }): string {
-  const code = item.product_code?.trim()
-  if (code && code.length >= 3) {
-    return `code_${code.toLowerCase()}`
-  }
-
   const base = normalizeProductName(item.name)
   const vol = extractVolumeKey(item.name)
 
@@ -263,165 +257,26 @@ function preferDisplayName(current: string, candidate: string): string {
   return current
 }
 
-export function PricesPage({ onBack, lang }: PricesPageProps) {
-  const t = DICTIONARY[lang]
+const formatPrice = (val: number, lang: Lang) =>
+  new Intl.NumberFormat(lang === 'uk' ? 'uk-UA' : 'ru-RU', {
+    style: 'currency',
+    currency: 'UAH',
+    maximumFractionDigits: 0,
+  }).format(val)
 
-  const [items, setItems] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedSource, setSelectedSource] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<SortOption>('default')
-  const [pageIndex, setPageIndex] = useState(0)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/prices')
-      if (!res.ok) throw new Error(`API ${res.status}`)
-      const data = await res.json()
-      setItems(Array.isArray(data) ? data : [])
-    } catch {
-      setError(t.error)
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [t.error])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const sources = useMemo(() => {
-    return Array.from(
-      new Set(items.map((i) => i.source).filter(Boolean) as string[])
-    ).sort()
-  }, [items])
-
-  const groupedItems = useMemo(() => {
-    const map = new Map<string, GroupedProduct>()
-
-    items.forEach((item) => {
-      const priceNum = Number(item.current_price)
-      if (isNaN(priceNum) || priceNum <= 0) return
-
-      const groupingKey = makeGroupingKey(item)
-
-      if (!map.has(groupingKey)) {
-        map.set(groupingKey, {
-          key: groupingKey,
-          name: item.name,
-          product_code: item.product_code,
-          image_url: item.image_url,
-          category: item.category,
-          offers: [],
-          minPrice: Infinity,
-          maxPrice: -Infinity,
-          avgPrice: 0,
-          maxSavings: 0,
-        })
-      }
-
-      const group = map.get(groupingKey)!
-      group.name = preferDisplayName(group.name, item.name)
-      if (!group.image_url && item.image_url) group.image_url = item.image_url
-      if (!group.product_code && item.product_code) {
-        group.product_code = item.product_code
-      }
-
-      if (!group.offers.find((o) => o.source === item.source)) {
-        group.offers.push({
-          id: item.id,
-          source: item.source || 'unknown',
-          price: priceNum,
-          url: item.url,
-        })
-        if (priceNum < group.minPrice) group.minPrice = priceNum
-        if (priceNum > group.maxPrice) group.maxPrice = priceNum
-      }
-    })
-
-    let result = Array.from(map.values()).map((group) => {
-      const sum = group.offers.reduce((acc, o) => acc + o.price, 0)
-      group.avgPrice = sum / group.offers.length
-      group.maxSavings = group.maxPrice - group.minPrice
-      return group
-    })
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim()
-      result = result.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          (g.product_code && g.product_code.toLowerCase().includes(q)) ||
-          normalizeProductName(g.name).includes(normalizeProductName(q))
-      )
-    }
-
-    if (selectedSource !== 'all') {
-      result = result.filter((g) =>
-        g.offers.some((o) => o.source === selectedSource)
-      )
-    }
-
-    result.sort((a, b) => {
-      if (sortBy === 'price-asc') return a.minPrice - b.minPrice
-      if (sortBy === 'savings') return b.maxSavings - a.maxSavings
-      if (sortBy === 'name') return a.name.localeCompare(b.name)
-      if (b.offers.length !== a.offers.length) {
-        return b.offers.length - a.offers.length
-      }
-      return b.maxSavings - a.maxSavings
-    })
-
-    return result
-  }, [items, searchQuery, selectedSource, sortBy])
-
-  const pages = useMemo(() => {
-    const chunks: GroupedProduct[][] = []
-    for (let i = 0; i < groupedItems.length; i += PAGE_SIZE) {
-      chunks.push(groupedItems.slice(i, i + PAGE_SIZE))
-    }
-    return chunks
-  }, [groupedItems])
-
-  const totalPages = pages.length
-  const safePage = Math.min(pageIndex, Math.max(0, totalPages - 1))
-
-  useEffect(() => {
-    setPageIndex(0)
-  }, [searchQuery, selectedSource, sortBy])
-
-  const goToPage = (next: number) => {
-    if (next < 0 || next >= totalPages) return
-    setPageIndex(next)
-  }
-
-  const globalStats = useMemo(() => {
-    if (groupedItems.length === 0) return null
-    const multi = groupedItems.filter((g) => g.offers.length > 1)
-    const avgSpread = multi.length
-      ? multi.reduce((acc, g) => acc + (g.maxSavings / g.minPrice) * 100, 0) /
-        multi.length
-      : 0
-    return {
-      total: groupedItems.length,
-      multiCount: multi.length,
-      avgSpreadPercent: avgSpread.toFixed(1),
-    }
-  }, [groupedItems])
-
-  const formatPrice = (val: number) =>
-    new Intl.NumberFormat(lang === 'uk' ? 'uk-UA' : 'ru-RU', {
-      style: 'currency',
-      currency: 'UAH',
-      maximumFractionDigits: 0,
-    }).format(val)
-
-  const renderCard = (group: GroupedProduct) => {
+/* =========================================================
+   ИЗОЛИРОВАННАЯ КАРТОЧКА ТОВАРА
+   ========================================================= */
+const ProductCard = memo(
+  ({
+    group,
+    lang,
+    t,
+  }: {
+    group: GroupedProduct
+    lang: Lang
+    t: typeof DICTIONARY['ru']
+  }) => {
     const sortedOffers = [...group.offers].sort((a, b) => a.price - b.price)
     const chartData = sortedOffers.map((o) => ({
       name: formatSourceName(o.source),
@@ -430,10 +285,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     }))
 
     return (
-      <div
-        key={group.key}
-        className="rounded-2xl p-4 bg-[#1A1614] border border-white/5 flex flex-col gap-3 relative overflow-hidden"
-      >
+      <div className="rounded-2xl p-4 bg-[#1A1614] border border-white/5 flex flex-col gap-3 relative overflow-hidden">
         {group.maxSavings > 500 && (
           <div className="absolute top-0 right-0 w-24 h-24 bg-[#E4D00A]/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         )}
@@ -464,7 +316,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               )}
               {group.offers.length > 1 && group.maxSavings > 0 && (
                 <span className="px-1.5 py-0.5 rounded bg-[#E4D00A]/20 text-[#E4D00A] text-[10px] font-bold">
-                  {t.saveUpTo} {formatPrice(group.maxSavings)}
+                  {t.saveUpTo} {formatPrice(group.maxSavings, lang)}
                 </span>
               )}
             </div>
@@ -477,7 +329,10 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               {t.marketSpread}
             </span>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 14, right: 0, left: 0, bottom: 0 }}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 14, right: 0, left: 0, bottom: 0 }}
+              >
                 <Tooltip
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                   content={({ active, payload }: any) => {
@@ -488,7 +343,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                           {payload[0].payload.name}
                         </div>
                         <div className="text-[#E4D00A]">
-                          {formatPrice(payload[0].value as number)}
+                          {formatPrice(payload[0].value as number, lang)}
                         </div>
                       </div>
                     )
@@ -543,7 +398,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     isBest ? 'text-[#E4D00A]' : 'text-white'
                   }`}
                 >
-                  {formatPrice(offer.price)}
+                  {formatPrice(offer.price, lang)}
                 </span>
               </Comp>
             )
@@ -551,7 +406,174 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         </div>
       </div>
     )
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.group.key === nextProps.group.key &&
+      prevProps.lang === nextProps.lang
+    )
   }
+)
+
+/* =========================================================
+   ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ
+   ========================================================= */
+export function PricesPage({ onBack, lang }: PricesPageProps) {
+  const t = DICTIONARY[lang]
+
+  const [items, setItems] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const deferredSearchQuery = useDeferredValue(searchQuery)
+
+  const [selectedSource, setSelectedSource] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<SortOption>('default')
+  const [pageIndex, setPageIndex] = useState(0)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/prices')
+      if (!res.ok) throw new Error(`API ${res.status}`)
+      const data = await res.json()
+      setItems(Array.isArray(data) ? data : [])
+    } catch {
+      setError(t.error)
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }, [t.error])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const sources = useMemo(() => {
+    return Array.from(
+      new Set(items.map((i) => i.source).filter(Boolean) as string[])
+    ).sort()
+  }, [items])
+
+  const baseGroupedItems = useMemo(() => {
+    const map = new Map<string, GroupedProduct>()
+
+    items.forEach((item) => {
+      const priceNum = Number(item.current_price)
+      if (isNaN(priceNum) || priceNum <= 0) return
+
+      const groupingKey = makeGroupingKey(item)
+
+      if (!map.has(groupingKey)) {
+        map.set(groupingKey, {
+          key: groupingKey,
+          name: item.name,
+          product_code: item.product_code,
+          image_url: item.image_url,
+          category: item.category,
+          offers: [],
+          minPrice: Infinity,
+          maxPrice: -Infinity,
+          avgPrice: 0,
+          maxSavings: 0,
+        })
+      }
+
+      const group = map.get(groupingKey)!
+      group.name = preferDisplayName(group.name, item.name)
+      if (!group.image_url && item.image_url) group.image_url = item.image_url
+      if (!group.product_code && item.product_code) {
+        group.product_code = item.product_code
+      }
+
+      if (!group.offers.find((o) => o.source === item.source)) {
+        group.offers.push({
+          id: item.id,
+          source: item.source || 'unknown',
+          price: priceNum,
+          url: item.url,
+        })
+        if (priceNum < group.minPrice) group.minPrice = priceNum
+        if (priceNum > group.maxPrice) group.maxPrice = priceNum
+      }
+    })
+
+    return Array.from(map.values()).map((group) => {
+      const sum = group.offers.reduce((acc, o) => acc + o.price, 0)
+      group.avgPrice = sum / group.offers.length
+      group.maxSavings = group.maxPrice - group.minPrice
+      return group
+    })
+  }, [items])
+
+  const filteredAndSortedGroups = useMemo(() => {
+    let result = baseGroupedItems
+
+    if (deferredSearchQuery.trim()) {
+      const q = deferredSearchQuery.toLowerCase().trim()
+      result = result.filter(
+        (g) =>
+          g.name.toLowerCase().includes(q) ||
+          (g.product_code && g.product_code.toLowerCase().includes(q)) ||
+          normalizeProductName(g.name).includes(normalizeProductName(q))
+      )
+    }
+
+    if (selectedSource !== 'all') {
+      result = result.filter((g) =>
+        g.offers.some((o) => o.source === selectedSource)
+      )
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === 'price-asc') return a.minPrice - b.minPrice
+      if (sortBy === 'savings') return b.maxSavings - a.maxSavings
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      if (b.offers.length !== a.offers.length) {
+        return b.offers.length - a.offers.length
+      }
+      return b.maxSavings - a.maxSavings
+    })
+
+    return result
+  }, [baseGroupedItems, deferredSearchQuery, selectedSource, sortBy])
+
+  const pages = useMemo(() => {
+    const chunks: GroupedProduct[][] = []
+    for (let i = 0; i < filteredAndSortedGroups.length; i += PAGE_SIZE) {
+      chunks.push(filteredAndSortedGroups.slice(i, i + PAGE_SIZE))
+    }
+    return chunks
+  }, [filteredAndSortedGroups])
+
+  const totalPages = pages.length
+  const safePage = Math.min(pageIndex, Math.max(0, totalPages - 1))
+
+  useEffect(() => {
+    setPageIndex(0)
+  }, [deferredSearchQuery, selectedSource, sortBy])
+
+  const goToPage = (next: number) => {
+    if (next < 0 || next >= totalPages) return
+    setPageIndex(next)
+  }
+
+  const globalStats = useMemo(() => {
+    if (baseGroupedItems.length === 0) return null
+    const multi = baseGroupedItems.filter((g) => g.offers.length > 1)
+    const avgSpread = multi.length
+      ? multi.reduce((acc, g) => acc + (g.maxSavings / g.minPrice) * 100, 0) /
+        multi.length
+      : 0
+    return {
+      total: baseGroupedItems.length,
+      multiCount: multi.length,
+      avgSpreadPercent: avgSpread.toFixed(1),
+    }
+  }, [baseGroupedItems])
 
   return (
     <motion.div
@@ -582,7 +604,9 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   : ''}
                 {globalStats.total} {t.statsTotal}
                 {globalStats.multiCount > 0
-                  ? ` · ${globalStats.multiCount} ${lang === 'uk' ? 'з порівнянням' : 'со сравнением'}`
+                  ? ` · ${globalStats.multiCount} ${
+                      lang === 'uk' ? 'з порівнянням' : 'со сравнением'
+                    }`
                   : ''}
               </p>
             )}
@@ -689,7 +713,9 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
         {!loading && !error && totalPages > 0 && (
           <div className="space-y-3 pb-4">
-            {pages[safePage]?.map((g) => renderCard(g))}
+            {pages[safePage]?.map((g) => (
+              <ProductCard key={g.key} group={g} lang={lang} t={t} />
+            ))}
           </div>
         )}
       </div>
