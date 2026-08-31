@@ -1,8 +1,21 @@
-import axios from 'axios';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import * as cheerio from 'cheerio';
 import { saveProduct } from '../db/saveProduct.js';
 
+const execAsync = promisify(exec);
 const BASE_URL = 'https://masterok-key.com.ua';
+
+async function fetchWithCurl(url) {
+  const userAgent =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  
+  // Выполняем запрос через системный curl прямо из терминала
+  const command = `curl -s -L -A "${userAgent}" -H "Accept-Language: uk-UA,uk;q=0.9,ru;q=0.8" "${url}"`;
+
+  const { stdout } = await execAsync(command, { maxBuffer: 15 * 1024 * 1024 });
+  return stdout;
+}
 
 function absoluteUrl(href) {
   if (!href || href.startsWith('data:')) return null;
@@ -142,17 +155,10 @@ export async function scrapeMasterokCategory(categoryPath) {
 
   for (const path of pagesToTry) {
     const url = path.startsWith('http') ? path : BASE_URL + path;
-    console.log('Парсим Masterok: ' + url);
+    console.log('Парсим Masterok (curl): ' + url);
 
     try {
-      const { data: html } = await axios.get(url, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'uk-UA,uk;q=0.9,ru;q=0.8',
-        },
-        timeout: 20000,
-      });
+      const html = await fetchWithCurl(url);
 
       const $ = cheerio.load(html);
       const fromLd = extractFromJsonLd($, categoryPath);
@@ -166,7 +172,7 @@ export async function scrapeMasterokCategory(categoryPath) {
 
       if (path === categoryPath && merged.size < 10) break;
 
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 1000));
     } catch (err) {
       if (path !== categoryPath) break;
       console.error('Ошибка Masterok ' + url + ':', err.message);
