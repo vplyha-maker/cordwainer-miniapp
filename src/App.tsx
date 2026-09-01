@@ -14,6 +14,9 @@ import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
 import { PricesPage } from './pages/PricesPage'
 
+// Импортируем нашу новую страницу зарплаты (путь зависит от того, как ты её назвал)
+import SalaryCalcPage from './pages/salary' 
+
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -28,6 +31,7 @@ declare global {
   }
 }
 
+// ДОБАВИЛ 'salary-calc' в типы экранов
 export type Screen =
   | 'welcome'
   | 'home'
@@ -37,6 +41,7 @@ export type Screen =
   | 'width-calc'
   | 'heel-calc'
   | 'color-calc'
+  | 'salary-calc' 
   | 'colors'
   | 'seo-width'
   | 'glossary'
@@ -113,13 +118,11 @@ function applyImmediateMutedTheme(isDark: boolean) {
   }
 }
 
-/** Нормализация старых путей из localStorage */
 function normalizeFavoriteImage(src: string): string {
   if (!src) return '/blog-hero.webp'
   return src.replace('/blog-hero.png', '/blog-hero.webp')
 }
 
-/** Определяем, открыта ли скрытая SEO-страница по URL (orphan page) */
 function getInitialScreen(): Screen {
   try {
     const path = window.location.pathname.replace(/\/+$/, '') || '/'
@@ -396,6 +399,17 @@ export default function App() {
             onOpenWidthCalc={() => setScreen('width-calc')}
             onOpenHeelCalc={() => setScreen('heel-calc')}
             onOpenColorCalc={() => setScreen('color-calc')}
+            // ДОБАВИЛ ПЕРЕХОД:
+            onOpenSalaryCalc={() => setScreen('salary-calc')} 
+          />
+        )}
+
+        {/* ДОБАВИЛ РЕНДЕР СТРАНИЦЫ ЗАРПЛАТЫ */}
+        {screen === 'salary-calc' && (
+          <SalaryCalcPage
+            key="salary-calc"
+            // Передаем onBack на случай, если ты захочешь добавить кнопку "Назад" в самом калькуляторе
+            // onBack={() => setScreen('calc-menu')}
           />
         )}
 
@@ -472,4 +486,4 @@ export default function App() {
       </AnimatePresence>
     </div>
   )
- }
+}
