@@ -29,7 +29,7 @@ export function getCurrentMonth(): string {
 /** 2025-03-15 → 15.03.2025 */
 export function formatDay(dayStr: string): string {
   const [y, m, d] = dayStr.split('-')
-  return `\( {d}. \){m}.${y}`
+  return `${d}.${m}.${y}`
 }
 
 /** 2025-03 → Март 2025 / Березень 2025 */
