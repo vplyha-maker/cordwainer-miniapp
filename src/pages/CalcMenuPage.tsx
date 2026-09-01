@@ -9,6 +9,7 @@ type CalcMenuPageProps = {
   onOpenWidthCalc?: () => void
   onOpenHeelCalc?: () => void
   onOpenColorCalc?: () => void
+  onOpenSalaryCalc?: () => void
   isFavorite?: boolean
   onToggleFavorite?: () => void
 }
@@ -20,6 +21,7 @@ export function CalcMenuPage({
   onOpenWidthCalc,
   onOpenHeelCalc,
   onOpenColorCalc,
+  onOpenSalaryCalc,
   isFavorite = false,
   onToggleFavorite,
 }: CalcMenuPageProps) {
@@ -46,6 +48,8 @@ export function CalcMenuPage({
       saveRemoveSub: 'Сохранено',
       colorTitle: 'Колористика',
       colorSub: 'Смешивание красок',
+      salaryTitle: 'Зарплата',
+      salarySub: 'Сдельная оплата',
       backMenu: 'Назад в меню',
     },
     uk: {
@@ -62,6 +66,8 @@ export function CalcMenuPage({
       saveRemoveSub: 'Збережено',
       colorTitle: 'Колористика',
       colorSub: 'Змішування фарб',
+      salaryTitle: 'Зарплата',
+      salarySub: 'Відрядна оплата',
       backMenu: 'Назад в меню',
     },
   }[lang]
@@ -77,7 +83,6 @@ export function CalcMenuPage({
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden justify-between transform-gpu"
     >
-      {/* Фон */}
       <div className="absolute inset-0 h-full w-full overflow-hidden pointer-events-none bg-[var(--color-bg,#1C1816)]">
         <img
           src="/CalcMenuPage/size.jpg"
@@ -103,7 +108,6 @@ export function CalcMenuPage({
         />
       </div>
 
-      {/* Назад */}
       <div className="relative z-50 p-5 md:p-6">
         <button
           onClick={() => {
@@ -125,9 +129,7 @@ export function CalcMenuPage({
           </h1>
         </div>
 
-        {/* Сетка: 2 колонки на телефоне, на md+ чуть просторнее */}
         <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6">
-          {/* Размеры */}
           <button
             onClick={() => {
               triggerHaptic('medium')
@@ -149,7 +151,6 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Полнота */}
           <button
             onClick={() => {
               triggerHaptic('medium')
@@ -172,7 +173,6 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Каблук */}
           <button
             onClick={() => {
               triggerHaptic('medium')
@@ -194,7 +194,6 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Избранное */}
           <button
             onClick={() => {
               triggerHaptic(isFavorite ? 'light' : 'medium')
@@ -234,7 +233,6 @@ export function CalcMenuPage({
             </div>
           </button>
 
-          {/* Колористика */}
           <button
             onClick={() => {
               triggerHaptic('medium')
@@ -254,6 +252,28 @@ export function CalcMenuPage({
               <div className="text-[11px] md:text-[12px] text-[var(--color-muted,#B9ACA0)] truncate">{t.colorSub}</div>
             </div>
           </button>
+
+          <button
+            onClick={() => {
+              triggerHaptic('medium')
+              onOpenSalaryCalc?.()
+            }}
+            className={cardBase}
+          >
+            <div className="w-8 h-8 md:w-9 md:h-9 rounded-[10px] bg-[var(--pigment-orange,#FF7F50)]/15 text-[var(--pigment-orange,#FF7F50)] flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="6" width="20" height="12" rx="2" />
+                <circle cx="12" cy="12" r="2" />
+                <path d="M6 12h.01M18 12h.01" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-[13px] md:text-[14px] font-medium leading-tight mb-0.5 text-[var(--color-ink,#F5F1EA)]">
+                {t.salaryTitle}
+              </div>
+              <div className="text-[11px] md:text-[12px] text-[var(--color-muted,#B9ACA0)] truncate">{t.salarySub}</div>
+            </div>
+          </button>
         </div>
 
         <button
@@ -267,7 +287,6 @@ export function CalcMenuPage({
         </button>
       </div>
 
-      {/* Док — внутри колонки app-shell */}
       <div className="fixed bottom-[10px] left-0 right-0 z-50 pointer-events-auto">
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
           <BottomDock active="workspace" lang={lang} />
@@ -275,4 +294,4 @@ export function CalcMenuPage({
       </div>
     </motion.div>
   )
- }
+}
