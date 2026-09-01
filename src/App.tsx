@@ -14,8 +14,8 @@ import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
 import { PricesPage } from './pages/PricesPage'
 
-// Импортируем нашу новую страницу зарплаты (путь зависит от того, как ты её назвал)
-import SalaryCalcPage from './pages/salary' 
+// Именой импорт адаптированного компонента зарплаты
+import { SalaryCalcPage } from './pages/salary' 
 
 import {
   getSavedPerfMode,
@@ -31,7 +31,6 @@ declare global {
   }
 }
 
-// ДОБАВИЛ 'salary-calc' в типы экранов
 export type Screen =
   | 'welcome'
   | 'home'
@@ -399,17 +398,15 @@ export default function App() {
             onOpenWidthCalc={() => setScreen('width-calc')}
             onOpenHeelCalc={() => setScreen('heel-calc')}
             onOpenColorCalc={() => setScreen('color-calc')}
-            // ДОБАВИЛ ПЕРЕХОД:
             onOpenSalaryCalc={() => setScreen('salary-calc')} 
           />
         )}
 
-        {/* ДОБАВИЛ РЕНДЕР СТРАНИЦЫ ЗАРПЛАТЫ */}
         {screen === 'salary-calc' && (
           <SalaryCalcPage
             key="salary-calc"
-            // Передаем onBack на случай, если ты захочешь добавить кнопку "Назад" в самом калькуляторе
-            // onBack={() => setScreen('calc-menu')}
+            onBack={() => setScreen('calc-menu')}
+            lang={lang}
           />
         )}
 
