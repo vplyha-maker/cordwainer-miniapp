@@ -399,16 +399,33 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     })
   }
 
+  // ВАЖЛИВО: Видалено фільтр !item.isBinder. Тепер база передається у суміш.
   const sendRecipeToMix = () => {
     if (!recipeResult?.recipe?.length) return
     applyRecipe(
-      recipeResult.recipe
-        .filter((item) => !item.isBinder)
-        .map((item) => ({ pigmentId: item.pigment.id, ml: item.ml }))
+      recipeResult.recipe.map((item) => ({ 
+        pigmentId: item.pigment.id, 
+        ml: item.ml 
+      }))
     )
     setActiveTarget(targetHex)
     stopCamera()
     setTab('mix')
+  }
+
+  // Обробник зміни системи для авто-коригування інвентарю
+  const handleSystemChange = (newSystem: CoverageSystem) => {
+    setSystem(newSystem)
+    if (newSystem === 'aniline') {
+      // Прибираємо акрилове зв'язуюче для аніліну
+      setInventoryIds(prev => prev.filter(id => id !== 'acrylic_binder'))
+    } else if (newSystem === 'acrylic') {
+      // Додаємо акрилове зв'язуюче для акрилу
+      const hasBinder = pigments.some(p => p.id === 'acrylic_binder')
+      if (hasBinder) {
+        setInventoryIds(prev => prev.includes('acrylic_binder') ? prev : [...prev, 'acrylic_binder'])
+      }
+    }
   }
 
   const toggleInventory = (pid: string) => setInventoryIds((prev) => prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid])
@@ -488,7 +505,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <div className="flex flex-col gap-3">
                     {paints.map((paint) => {
                       const currentAmount = parseFloat(paint.amount) || 0;
-                      // Динамический максимум ползунка: не меньше 20мл, но если введено больше - расширяем границу (в 1.5 раза)
                       const sliderMax = Math.max(20, Math.ceil(currentAmount * 1.5));
                       
                       return (
@@ -529,7 +545,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             </button>
                           </div>
 
-                          {/* --- НОВЫЙ БЛОК: ПОЛЗУНОК --- */}
                           <div className="w-full px-1 pb-1">
                             <input
                               type="range"
@@ -545,7 +560,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               }}
                             />
                           </div>
-
                         </div>
                       )
                     })}
@@ -665,8 +679,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                  <button onClick={() => setMaxComponents(4)} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: maxComponents === 4 ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: maxComponents === 4 ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>≤ 4</button>
               </div>
               <div className="flex gap-2">
-                 <button onClick={() => setSystem('acrylic')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'acrylic' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'acrylic' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Акрил' : 'Акрил'}</button>
-                 <button onClick={() => setSystem('aniline')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'aniline' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'aniline' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Анілін' : 'Анилин'}</button>
+                 <button onClick={() => handleSystemChange('acrylic')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'acrylic' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'acrylic' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Акрил' : 'Акрил'}</button>
+                 <button onClick={() => handleSystemChange('aniline')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'aniline' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'aniline' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Анілін' : 'Анилин'}</button>
               </div>
             </section>
 
