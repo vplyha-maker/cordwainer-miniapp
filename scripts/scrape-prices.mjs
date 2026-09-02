@@ -3,6 +3,30 @@ import { scrapeBashmachnikCategory } from './scrapers/bashmachnik.js';
 import { scrapeMasterokCategory } from './scrapers/masterok.js';
 import { saveProduct } from './db/saveProduct.js';
 
+// Бронебойный очиститель цены перед записью в БД
+function parseScrapedPrice(rawPrice) {
+  if (rawPrice === null || rawPrice === undefined || rawPrice === '') return 0;
+  
+  let s = String(rawPrice).toLowerCase();
+  
+  // Перехват статуса "Нет в наличии"
+  if (s.includes('нет') || s.includes('немає') || s.includes('null')) return 0;
+
+  // Убираем пробелы (включая неразрывные) и меняем запятую на точку
+  s = s.replace(/\s+/g, '').replace(',', '.');
+  
+  // Ищем первое адекватное число
+  const match = s.match(/\d+(\.\d+)?/);
+  if (match) {
+    const val = parseFloat(match[0]);
+    // Защита от случайного парсинга 6-значных артикулов как цены
+    if (!isNaN(val) && val > 0 && val < 100000) {
+        return val;
+    }
+  }
+  return 0;
+}
+
 async function main() {
   console.log('🚀 === Запуск комплексного парсера цен ===');
   console.log('⏰ Время:', new Date().toISOString());
@@ -26,7 +50,7 @@ async function main() {
         url: prod.url,
         imageUrl: prod.imageUrl,
         category: prod.category || 'Zotti Каталог',
-        price: prod.price
+        price: parseScrapedPrice(prod.price) // <-- ОЧИСТКА ЗДЕСЬ
       });
     }
 
@@ -55,7 +79,7 @@ async function main() {
         url: prod.url,
         imageUrl: prod.imageUrl,
         category: prod.category || 'Об обувных клеях',
-        price: prod.price
+        price: parseScrapedPrice(prod.price) // <-- ОЧИСТКА ЗДЕСЬ
       });
     }
 
@@ -92,7 +116,7 @@ async function main() {
           url: prod.url,
           imageUrl: prod.imageUrl,
           category: prod.category || path,
-          price: prod.price
+          price: parseScrapedPrice(prod.price) // <-- ОЧИСТКА ЗДЕСЬ
         });
       }
 
