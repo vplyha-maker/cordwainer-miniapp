@@ -17,21 +17,20 @@ interface ColorCalcPageProps {
 type TabId = 'mix' | 'pro'
 
 const DEFAULT_INVENTORY_IDS = [
-  'titanium_white',
-  'zinc_white',
-  'ivory_black',
-  'lamp_black',
-  'cadmium_red',
-  'pyrrole_red',
-  'cadmium_yellow',
-  'yellow_ochre',
-  'ultramarine',
-  'phthalo_blue',
-  'phthalo_green',
-  'burnt_sienna',
-  'raw_umber',
-  'acrylic_binder',
+  'pw_6_anatase',                      // Белила титановые (PW6)
+  'pbk_1_aniline_black',               // Черный (PBk1)
+  'py_154_benzimidazolone_yellow_h3g', // Желтый холодный / лимонный (PY154)
+  'py_83_diarylide_yellow_hr',         // Желтый теплый (PY83)
+  'po_73_pyrrole_orange',              // Оранжевый (PO73)
+  'pr_254_pyrrole_red',                // Красный теплый / Пиррол (PR254)
+  'pr_122_quinacridone_magenta',       // Маджента / Холодный красный (PR122)
+  'pv_23_dioxazine_purple',            // Фиолетовый диоксазин (PV23)
+  'phthalo_blue',                      // Синий фталоциан (PB15) - в вашей базе он без индекса в названии, но это современный пигмент
+  'pg_36_phthalo_green_ys',            // Зеленый фталоциан (PG36)
+  'pbr_25_benzimidazolone_brown',      // Коричневый (PBr25)
+  'acrylic_binder',                    // Обязательная прозрачная база
 ] as const
+
 
 function detectIOS(): boolean {
   if (typeof navigator === 'undefined') return false
