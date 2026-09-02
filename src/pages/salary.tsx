@@ -65,8 +65,40 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     }));
   };
 
-  if (loading) return <div className="p-4 text-center text-[var(--color-muted)] animate-pulse h-[100dvh] flex items-center justify-center">Загрузка данных...</div>;
-  if (error) return <div className="p-4 text-center text-[var(--color-danger)] h-[100dvh] flex items-center justify-center">Ошибка: {error}</div>;
+    if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="min-h-[100dvh] bg-[var(--color-bg)] flex flex-col items-center justify-center"
+      >
+        <div className="text-[var(--color-muted)] animate-pulse font-medium">Загрузка данных...</div>
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className="min-h-[100dvh] bg-[var(--color-bg)] flex flex-col items-center justify-center gap-4"
+      >
+        <div className="text-[var(--color-danger)] font-medium text-center px-4">Ошибка: {error}</div>
+        <button 
+          onClick={onBack} 
+          className="text-sm text-[var(--color-ink)] bg-[var(--color-surface)] border border-[var(--color-border)] px-5 py-2 rounded-xl active:scale-95 transition-transform"
+        >
+          Вернуться назад
+        </button>
+      </motion.div>
+    );
+  }
+
 
   const currentMonth = getCurrentMonth();
   const currentMonthRecords = Object.entries(data.days)
