@@ -1,10 +1,7 @@
 /**
  * colorScience.ts
  * Reflectance → XYZ → sRGB
- * Two-Constant Kubelka–Munk + Saunderson
- *
- * Memory-oriented: CMF/illuminants as Float32Array,
- * fast-path for CIE-aligned spectra (81 pts, no per-λ interpolation).
+ * Single-Constant Kubelka–Munk (Оптимизировано для спектров FORS)
  */
 
 export interface SpectrumPoint {
@@ -37,7 +34,7 @@ export const SPECTRUM_LEN = 81
 export const WL_START = 380
 export const WL_STEP = 5
 
-// ─── CIE 1931 2° CMF (raw objects — нужны для normalize/parse) ───
+// ─── CIE 1931 2° CMF ───
 
 const CIE_CMF = [
   { wl: 380, x: 0.001368, y: 0.000039, z: 0.00645 },
@@ -123,11 +120,11 @@ const CIE_CMF = [
   { wl: 780, x: 0.000042, y: 0.000015, z: 0 },
 ]
 
-// Typed views — hot path
 const XBAR = new Float32Array(SPECTRUM_LEN)
 const YBAR = new Float32Array(SPECTRUM_LEN)
 const ZBAR = new Float32Array(SPECTRUM_LEN)
 const WL = new Float32Array(SPECTRUM_LEN)
+
 for (let i = 0; i < SPECTRUM_LEN; i++) {
   XBAR[i] = CIE_CMF[i].x
   YBAR[i] = CIE_CMF[i].y
@@ -185,9 +182,16 @@ const ILLUMINANTS: Record<IlluminantType, Float32Array> = {
   twilight: ILLUMINANT_TWILIGHT,
 }
 
-/** Saunderson */
-const SAUNDERSON_K1 = 0.03
-const SAUNDERSON_K2 = 0.6
+// ИСПРАВЛЕНИЕ "ЧЕРНОЙ ДЫРЫ": Отключаем вычитание блика (Saunderson), 
+// так как файлы FORS-спектрометрии уже очищены от него. 
+// Теперь темные цвета будут плавно смешиваться с белилами!
+export function toInternalR(rMeasured: number): number {
+  return Math.max(0.0001, Math.min(0.9999, rMeasured))
+}
+
+export function toMeasuredR(rInternal: number): number {
+  return Math.max(0.0001, Math.min(0.9999, rInternal))
+}
 
 export function reflectanceToKS(r: number): number {
   const clampedR = Math.max(0.0001, Math.min(0.9999, r))
@@ -200,23 +204,6 @@ export function ksToReflectance(ks: number): number {
   return Math.max(0, Math.min(1, r))
 }
 
-function toInternalR(rMeasured: number): number {
-  const r = Math.max(0.0001, Math.min(0.9999, rMeasured))
-  const num = r - SAUNDERSON_K1
-  const den = 1 - SAUNDERSON_K1 - SAUNDERSON_K2 + SAUNDERSON_K2 * r
-  if (den <= 1e-9) return 0.0001
-  return Math.max(0.0001, Math.min(0.9999, num / den))
-}
-
-function toMeasuredR(rInternal: number): number {
-  const r = Math.max(0.0001, Math.min(0.9999, rInternal))
-  const val =
-    SAUNDERSON_K1 +
-    ((1 - SAUNDERSON_K1) * (1 - SAUNDERSON_K2) * r) / (1 - SAUNDERSON_K2 * r)
-  return Math.max(0, Math.min(1, val))
-}
-
-/** Спектр уже на сетке CIE (после parseSpectrum / normalizeSpectrumToCIE) */
 function isCieAligned(spectrum: SpectrumPoint[]): boolean {
   return (
     spectrum.length === SPECTRUM_LEN &&
@@ -283,8 +270,8 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * Two-Constant Kubelka–Munk + Saunderson.
- * Fast-path: CIE-aligned spectra → прямое индексирование, без интерполяции.
+ * Single-Constant Kubelka–Munk.
+ * Fast-path: CIE-aligned spectra → прямое индексирование.
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
   const n = components.length
@@ -309,6 +296,7 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
 
       let rMeas: number
       if (aligned) {
+        // Конвертируем проценты (0-100+) в дроби (0-1)
         rMeas = comp.spectrum[i].reflectance * 0.01
       } else {
         rMeas = interpolateReflectance(comp.spectrum, wl) * 0.01
@@ -319,20 +307,19 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
         totalK += weight * 0.002
       } else {
         const rInt = toInternalR(rMeas)
-        const S = 0.2 + 0.8 * rInt
+        const S = 0.2 + 0.8 * rInt // Эмпирическое рассеивание
         const KS = reflectanceToKS(rInt)
         totalK += weight * KS * S
         totalS += weight * S
       }
     }
 
-    const mixedKS =
-      totalS > 1e-8 ? totalK / totalS : reflectanceToKS(0.0001)
+    const mixedKS = totalS > 1e-8 ? totalK / totalS : reflectanceToKS(0.0001)
     const rMeasMix = toMeasuredR(ksToReflectance(mixedKS))
 
     result[i] = {
       wavelength: wl,
-      reflectance: rMeasMix * 100,
+      reflectance: rMeasMix * 100, // Возвращаем в проценты
     }
   }
 
@@ -343,10 +330,7 @@ export function spectrumToXYZWithIlluminant(
   spectrum: SpectrumPoint[],
   illuminant: IlluminantType = 'D65'
 ): XYZ {
-  let X = 0
-  let Y = 0
-  let Z = 0
-  let N = 0
+  let X = 0, Y = 0, Z = 0, N = 0
 
   const S = ILLUMINANTS[illuminant]
   const step = 5
