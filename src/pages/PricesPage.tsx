@@ -24,20 +24,20 @@ type Product = {
   category: string | null
   updated_at: string | null
   current_price: number | string | null
-  history?: number[] // Добавлено для реальной истории из БД
+  history?: number[]
 }
 
 type Offer = {
   id: number
   source: string
-  price: number // Исходная цена
-  unitPrice: number // Цена за 1 кг / 1 л / 1 шт
+  price: number 
+  unitPrice: number 
   baseUnit: 'кг' | 'л' | 'шт'
-  volumeLabel: string // Исходная этикетка объема (например "15 кг")
-  multiplier: number // Множитель для пересчета цены
+  volumeLabel: string 
+  multiplier: number 
   url: string | null
   updated_at: string | null
-  history?: number[] // Переданная история для графика
+  history?: number[] 
 }
 
 type GroupedProduct = {
@@ -49,7 +49,7 @@ type GroupedProduct = {
   offers: Offer[]
   minUnitPrice: number
   maxUnitPrice: number
-  unitSpread: number // В процентах разница удельной цены
+  unitSpread: number 
   latestUpdatedAt: string | null
   outOfStockCount: number
   totalOffers: number
@@ -157,6 +157,18 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bслоник\b/gi, 'solution'],
 ]
 
+// БЕЗОПАСНЫЙ ПАРСЕР ЦЕНЫ (решает проблему "400,16")
+function parsePriceSafely(raw: number | string | null | undefined): number {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return raw > 0 ? raw : 0;
+  
+  // Меняем запятую на точку и удаляем все нечисловые символы (буквы, пробелы, знак ₴)
+  const cleanStr = String(raw).replace(',', '.').replace(/[^0-9.]/g, '');
+  const val = parseFloat(cleanStr);
+  
+  return !isNaN(val) && val > 0 ? val : 0;
+}
+
 function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; originalLabel: string; multiplier: number } {
   if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
@@ -173,10 +185,8 @@ function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; origina
   return { baseUnit: 'кг', originalLabel: `${num} г`, multiplier: 1000 / num }
 }
 
-// Ультра-агрессивная очистка для идеальной группировки товаров из разных магазинов
 function normalizeProductName(raw: string): string {
   if (!raw) return ''
-  // Удаляем дефисы, скобки, чтобы SAR-306 и SAR 306 (06w) стали идентичны
   let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
   
   const stopWords = [
@@ -185,12 +195,11 @@ function normalizeProductName(raw: string): string {
     'ремонту', 'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр', 'шт',
     'розлив', 'на', 'поліуретановий', 'полиуретановый', 'десмокол', 'дисмакол', 'desmokol', 
     'наїріт', 'наирит', 'nairit', 'затверджувач', 'отвердитель', 'hardener',
-    '06w', '06wn', '006w', 'm' // Вырезаем цвета и модификации, чтобы свести всё к SAR 306
+    '06w', '06wn', '006w', 'm' 
   ]
 
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
   
-  // Вырезаем объемы из строки
   s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
   
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
@@ -257,7 +266,6 @@ const ProductCard = memo(
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#E4D00A]/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         )}
 
-        {/* Шапка карточки */}
         <div className="flex gap-3 items-start relative z-10">
           {group.image_url ? (
             <img
@@ -307,7 +315,6 @@ const ProductCard = memo(
           </button>
         </div>
 
-        {/* Компактный список предложений */}
         <div className="flex flex-col gap-1 mt-1 relative z-10">
           {!showSpread && (
             <div className="mb-0.5 text-[10px] text-[#B9ACA0] flex items-center gap-1 px-1">
@@ -323,7 +330,6 @@ const ProductCard = memo(
             const Comp = offer.url ? 'a' : 'div'
             const barWidth = offer.unitPrice > 0 && maxCardPrice > 0 ? `${(offer.unitPrice / maxCardPrice) * 100}%` : '0%'
 
-            // Генерация мок-данных графика тренда, если БД пока пустая
             const historyData = offer.history?.length === 5 
               ? offer.history 
               : [offer.price * 1.05, offer.price * 1.02, offer.price * 1.01, offer.price * 0.99, offer.price].map(Math.round);
@@ -349,7 +355,6 @@ const ProductCard = memo(
                   />
                 )}
 
-                {/* Левая часть: Магазин, Объем, Спарклайн */}
                 <div className="flex items-center gap-2 z-10 min-w-0 pr-2">
                   <span className={`text-[12px] font-medium truncate ${isBest ? 'text-white' : 'text-[#B9ACA0]'}`}>
                     {formatSourceName(offer.source)}
@@ -361,7 +366,6 @@ const ProductCard = memo(
                     </span>
                   )}
 
-                  {/* Мини-барчарт цен */}
                   {offer.price > 0 && (
                     <div className="flex items-end gap-[2px] h-3 ml-1 shrink-0 opacity-70" title="Тренд цен">
                       {historyData.map((val, i) => {
@@ -377,7 +381,6 @@ const ProductCard = memo(
                   )}
                 </div>
 
-                {/* Правая часть: Цена */}
                 <div className="flex items-center gap-2 z-10 shrink-0">
                   <div className="flex flex-col items-end leading-none">
                     <span className={`text-[13px] font-bold tabular-nums ${isBest ? 'text-[#E4D00A]' : isStrongArbitrage ? 'text-red-300' : 'text-white'}`}>
@@ -479,7 +482,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     const map = new Map<string, GroupedProduct>()
 
     items.forEach((item) => {
-      let validPrice = item.current_price && !isNaN(Number(item.current_price)) && Number(item.current_price) > 0 ? Number(item.current_price) : 0
+      // ИСПОЛЬЗУЕМ БЕЗОПАСНЫЙ ПАРСЕР ЦЕН
+      let validPrice = parsePriceSafely(item.current_price)
       
       if (validPrice > 50000) validPrice = 0
 
