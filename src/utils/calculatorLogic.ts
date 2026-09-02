@@ -5,8 +5,8 @@ import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint, MixComponent } from
 export type CoverageSystem = 'aniline' | 'acrylic'
 
 export const PURE_BASIC_COLORS = [
-  { id: 'pure_white', name: { uk: 'Білий', ru: 'Белый', en: 'White' }, sourceIds: ['titanium_white', 'zinc_white', 'lithopone', 'pw_6_anatase', 'pw_7_zinc_sulfide', 'pw_11_antimony_white', 'pw_21_barium_sulfate'] },
-  { id: 'pure_black', name: { uk: 'Чорний', ru: 'Чёрный', en: 'Black' }, sourceIds: ['ivory_black', 'lamp_black', 'bone_black', 'pbk_1_aniline_black'] },
+  { id: 'pure_white', name: { uk: 'Білий', ru: 'Белый', en: 'White' }, sourceIds: ['pw_6_anatase', 'titanium_white', 'zinc_white', 'lithopone', 'pw_7_zinc_sulfide', 'pw_11_antimony_white', 'pw_21_barium_sulfate'] },
+  { id: 'pure_black', name: { uk: 'Чорний', ru: 'Чёрный', en: 'Black' }, sourceIds: ['pbk_1_aniline_black', 'ivory_black', 'lamp_black', 'bone_black'] },
   { id: 'pure_red', name: { uk: 'Червоний', ru: 'Красный', en: 'Red' }, sourceIds: ['cadmium_red', 'pyrrole_red', 'carmine_lake', 'pr_254_pyrrole_red', 'pr_122_quinacridone_magenta', 'pr_255_pyrrole_scarlet'] },
   { id: 'pure_yellow', name: { uk: 'Жовтий', ru: 'Жёлтый', en: 'Yellow' }, sourceIds: ['cadmium_yellow', 'yellow_ochre', 'hansa_yellow', 'py_154_benzimidazolone_yellow_h3g', 'py_83_diarylide_yellow_hr', 'py_150_nickel_azo_yellow'] },
   { id: 'pure_blue', name: { uk: 'Синій', ru: 'Синий', en: 'Blue' }, sourceIds: ['ultramarine', 'phthalo_blue', 'prussian_blue', 'pb_66_synthetic_indigo'] },
@@ -118,29 +118,24 @@ export interface RecipeItem { pigment: Pigment; ml: number; isBinder?: boolean }
 export interface RecipeResult { recipe: RecipeItem[]; resultRgb: { r: number; g: number; b: number }; resultHex: string; deltaE: number; system: CoverageSystem; approximate?: boolean }
 interface BestResult { indices: number[]; volumes: number[]; rgb: { r: number; g: number; b: number }; deltaE: number }
 
-function getDominantShifts(baseRatios: number[][]): number[][] {
-  const unique = new Map<string, number[]>()
-  baseRatios.forEach(r => {
-    for (let i = 0; i < r.length; i++) {
-      const copy = [...r], dom = copy.shift()!
-      copy.splice(i, 0, dom)
-      unique.set(copy.join(','), copy)
-    }
-  })
-  return Array.from(unique.values())
-}
-
-const RATIOS_2 = getDominantShifts([[50, 50], [80, 20], [90, 10], [95, 5], [98, 2], [99, 1]])
-const RATIOS_3 = getDominantShifts([[34, 33, 33], [60, 20, 20], [80, 10, 10], [90, 5, 5], [95, 3, 2], [98, 1, 1], [99, 0.5, 0.5]])
-const RATIOS_4 = getDominantShifts([[25, 25, 25, 25], [40, 20, 20, 20], [60, 20, 10, 10], [80, 10, 5, 5], [90, 5, 3, 2], [95, 3, 1, 1], [98, 1, 0.5, 0.5], [99, 0.5, 0.3, 0.2]])
+// Умные стартовые точки, включающие сильные отклонения (для пастельных тонов с белилами)
+const RATIOS_2 = [ [50, 50], [80, 20], [90, 10], [95, 5], [98, 2], [99, 1], [1, 99], [2, 98], [5, 95], [10, 90], [20, 80] ]
+const RATIOS_3 = [
+  [34, 33, 33], [60, 20, 20], [80, 10, 10], [90, 5, 5], [95, 3, 2], [98, 1, 1],
+  [20, 60, 20], [10, 80, 10], [5, 90, 5], [2, 95, 3], [1, 98, 1],
+  [20, 20, 60], [10, 10, 80], [5, 5, 90], [2, 3, 95], [1, 1, 98]
+]
+const RATIOS_4 = [
+  [25, 25, 25, 25], [40, 20, 20, 20], [70, 10, 10, 10], [85, 5, 5, 5], [94, 2, 2, 2], [97, 1, 1, 1],
+  [20, 40, 20, 20], [10, 70, 10, 10], [5, 85, 5, 5], [2, 94, 2, 2], [1, 97, 1, 1],
+  [20, 20, 40, 20], [10, 10, 70, 10], [5, 5, 85, 5], [2, 2, 94, 2], [1, 1, 97, 1],
+  [20, 20, 20, 40], [10, 10, 10, 70], [5, 5, 5, 85], [2, 2, 2, 94], [1, 1, 1, 97]
+]
 
 export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxComponents = 3, targetVolume = 20, system: CoverageSystem = 'acrylic', excludeIds: string[] = []): RecipeResult | null {
   if (!pigments.length || !targetHex) return null
 
-  // Зберігаємо біндер окремо, щоб додати тільки в кінці
   const binderPigment = system === 'acrylic' ? pigments.find((p) => p.id === 'acrylic_binder' || (p as { isBinder?: boolean }).isBinder === true) : undefined
-
-  // Під час пошуку біндер нам НЕ ПОТРІБЕН
   const validPigments = pigments.filter((p) => p.id !== 'acrylic_binder' && !(p as { isBinder?: boolean }).isBinder && p.spectrum && p.spectrum.length > 0 && !excludeIds.includes(p.id))
   if (validPigments.length === 0) return null
 
@@ -153,26 +148,38 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
     return components
   }
 
-  const scored: { pigment: Pigment; dist: number }[] = []
-  for (let i = 0; i < validPigments.length; i++) {
-    const p = validPigments[i]
-    const rgb = spectrumToRGB(mixSpectra(buildComponents([p], [100])))
-    scored.push({ pigment: p, dist: calculateDeltaE2000(targetLab, rgbToLab(rgb.r, rgb.g, rgb.b)) })
-  }
-
   const isAchromatic = (id: string) => {
     const lower = id.toLowerCase()
     return lower.includes('white') || lower.startsWith('pw_') || lower.includes('black') || lower.startsWith('pbk_')
   }
 
-  scored.sort((a, b) => {
-    const aAchro = isAchromatic(a.pigment.id), bAchro = isAchromatic(b.pigment.id)
-    if (aAchro && !bAchro) return -1
-    if (!aAchro && bAchro) return 1
-    return a.dist - b.dist
+  // 1. ЖЕСТКАЯ ФИКСАЦИЯ БЕЛИЛ И ЧЕРНОГО В КАНДИДАТАХ
+  const candidatesSet = new Set<Pigment>()
+  
+  // Добавляем ахроматы в первую очередь, если они есть в инвентаре пользователя
+  validPigments.forEach(p => {
+    if (isAchromatic(p.id)) candidatesSet.add(p)
   })
 
-  const candidates = scored.slice(0, 16).map(s => s.pigment)
+  // Оцениваем оставшиеся цвета по дистанции
+  const scored: { pigment: Pigment; dist: number }[] = []
+  for (let i = 0; i < validPigments.length; i++) {
+    const p = validPigments[i]
+    if (candidatesSet.has(p)) continue // Уже добавили
+    
+    const rgb = spectrumToRGB(mixSpectra(buildComponents([p], [100])))
+    scored.push({ pigment: p, dist: calculateDeltaE2000(targetLab, rgbToLab(rgb.r, rgb.g, rgb.b)) })
+  }
+
+  scored.sort((a, b) => a.dist - b.dist)
+
+  // Добиваем пул до 16 кандидатов ближайшими цветами
+  for (let i = 0; i < scored.length; i++) {
+    if (candidatesSet.size >= 16) break
+    candidatesSet.add(scored[i].pigment)
+  }
+
+  const candidates = Array.from(candidatesSet)
   const n = candidates.length
   if (n === 0) return null
 
@@ -213,7 +220,7 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   if (topResults.length === 0) return null
 
   let absoluteBest: BestResult = { ...topResults[0], volumes: topResults[0].volumes.slice() }
-  const coarseAdjustments = [0.33, 0.6, 0.8, 1.25, 1.6, 3.0]
+  const coarseAdjustments = [0.2, 0.5, 0.8, 1.25, 2.0, 5.0] // 5.0 позволяет белилам стремительно увеличиться
   const fineAdjustments = [0.9, 0.95, 1.05, 1.1]
 
   for (let t = 0; t < topResults.length; t++) {
@@ -229,12 +236,12 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
 
     let currentRes = evaluate(currentVols)
 
-    for (let pass = 0; pass < 4; pass++) {
+    for (let pass = 0; pass < 5; pass++) {
       let improved = false
       for (let i = 0; i < currentVols.length; i++) {
         for (let a = 0; a < coarseAdjustments.length; a++) {
           const trialVols = currentVols.slice()
-          trialVols[i] = Math.max(0.01, Math.min(100, trialVols[i] * coarseAdjustments[a]))
+          trialVols[i] = Math.max(0.001, Math.min(100, trialVols[i] * coarseAdjustments[a]))
           const trialRes = evaluate(trialVols)
           if (trialRes.deltaE < currentRes.deltaE - 0.0001) { currentRes = trialRes; currentVols = trialVols; improved = true }
         }
@@ -247,7 +254,7 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
       for (let i = 0; i < currentVols.length; i++) {
         for (let a = 0; a < fineAdjustments.length; a++) {
           const trialVols = currentVols.slice()
-          trialVols[i] = Math.max(0.01, Math.min(100, trialVols[i] * fineAdjustments[a]))
+          trialVols[i] = Math.max(0.001, Math.min(100, trialVols[i] * fineAdjustments[a]))
           const trialRes = evaluate(trialVols)
           if (trialRes.deltaE < currentRes.deltaE - 0.0001) { currentRes = trialRes; currentVols = trialVols; improved = true }
         }
@@ -270,7 +277,6 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   }
   recipe.sort((a, b) => b.ml - a.ml)
 
-  // Тільки після того, як рецепт знайдено (БЕЗ біндера), ми додаємо 20% біндера до списку
   if (binderPigment && system === 'acrylic') {
     const binderMl = Math.round(recipe.reduce((sum, item) => sum + item.ml, 0) * 0.2 * 100) / 100
     if (binderMl > 0) recipe.push({ pigment: binderPigment, ml: binderMl, isBinder: true })
@@ -284,4 +290,34 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
     system,
     approximate: absoluteBest.deltaE > 2.0,
   }
+}
+
+export function simulateLayersKM(
+  baseSpectrum: SpectrumPoint[],
+  paintSpectrum: SpectrumPoint[],
+  system: CoverageSystem
+) {
+  let strength = system === 'aniline' ? 24 : 48
+
+  const baseRgb = spectrumToRGB(baseSpectrum)
+  const paintRgb = spectrumToRGB(paintSpectrum)
+
+  const baseL = (0.2126 * baseRgb.r + 0.7152 * baseRgb.g + 0.0722 * baseRgb.b) / 255
+  const paintL = (0.2126 * paintRgb.r + 0.7152 * paintRgb.g + 0.0722 * paintRgb.b) / 255
+  const deltaL = Math.abs(paintL - baseL)
+
+  if (deltaL > 0.45) strength *= 0.72
+  else if (deltaL > 0.3) strength *= 0.85
+  else if (deltaL < 0.12) strength *= 1.18
+
+  strength = Math.max(16, Math.min(58, strength))
+
+  const mixLayer = (current: SpectrumPoint[], paint: SpectrumPoint[], s: number) =>
+    mixSpectra([{ spectrum: current, volume: 100 - s }, { spectrum: paint, volume: s }])
+
+  const layer1 = mixLayer(baseSpectrum, paintSpectrum, strength)
+  const layer2 = mixLayer(layer1, paintSpectrum, strength * 0.94)
+  const layer3 = mixLayer(layer2, paintSpectrum, strength * 0.91)
+
+  return { layer1, layer2, layer3, final: paintSpectrum, strength: Math.round(strength), deltaL }
 }
