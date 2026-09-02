@@ -1,7 +1,3 @@
-/**
- * calculatorLogic.ts
- * Подбор рецепта пигментов (Classic KM + CIEDE2000)
- */
 import { Pigment } from '../data/pigments'
 import { Lang } from '../App'
 import { mixSpectra, spectrumToRGB, rgbToHex, SpectrumPoint, WL, SPECTRUM_LEN } from './colorScience'
@@ -99,7 +95,6 @@ function combinations(n: number, k: number): number[][] {
 
 export interface RecipeItem { pigment: Pigment; ml: number; isBinder?: boolean }
 export interface RecipeResult { recipe: RecipeItem[]; resultRgb: { r: number; g: number; b: number }; resultHex: string; deltaE: number; system: CoverageSystem; approximate?: boolean }
-interface BestResult { indices: number[]; volumes: number[]; rgb: { r: number; g: number; b: number }; deltaE: number }
 
 function getDominantShifts(baseRatios: number[][]): number[][] {
   const unique = new Map<string, number[]>()
@@ -213,13 +208,13 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   const n = candidates.length
   if (n === 0) return null
 
-  // Строго типизированная переменная для хранения лучшего результата
-  let bestGlobalResult: BestResult | null = null
+  // Убираем зависимость от интерфейса BestResult, прописываем тип напрямую
+  let bestGlobalResult: { indices: number[]; volumes: number[]; deltaE: number } | null = null
 
   const evaluateCombo = (indices: number[]) => {
     const res = optimizeCombo(indices, candidates, targetLab);
     if (!bestGlobalResult || res.deltaE < bestGlobalResult.deltaE) {
-      bestGlobalResult = { indices, volumes: res.vols, deltaE: res.deltaE, rgb: { r: 0, g: 0, b: 0 } };
+      bestGlobalResult = { indices, volumes: res.vols, deltaE: res.deltaE };
     }
   }
 
