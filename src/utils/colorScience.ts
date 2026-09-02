@@ -1,7 +1,7 @@
 /**
  * colorScience.ts
  * Reflectance → XYZ → sRGB
- * Empirical Two-Constant Kubelka–Munk
+ * Single-Constant Kubelka–Munk with Saunderson Correction
  */
 
 export interface SpectrumPoint {
@@ -23,7 +23,6 @@ export const SPECTRUM_LEN = 81
 export const WL_START = 380
 export const WL_STEP = 5
 
-// ─── CIE 1931 2° CMF ───
 const CIE_CMF = [
   { wl: 380, x: 0.001368, y: 0.000039, z: 0.00645 },
   { wl: 385, x: 0.002236, y: 0.000064, z: 0.01055 },
@@ -108,10 +107,10 @@ const CIE_CMF = [
   { wl: 780, x: 0.000042, y: 0.000015, z: 0 },
 ]
 
-const XBAR = new Float32Array(SPECTRUM_LEN)
-const YBAR = new Float32Array(SPECTRUM_LEN)
-const ZBAR = new Float32Array(SPECTRUM_LEN)
-const WL = new Float32Array(SPECTRUM_LEN)
+export const XBAR = new Float32Array(SPECTRUM_LEN)
+export const YBAR = new Float32Array(SPECTRUM_LEN)
+export const ZBAR = new Float32Array(SPECTRUM_LEN)
+export const WL = new Float32Array(SPECTRUM_LEN)
 
 for (let i = 0; i < SPECTRUM_LEN; i++) {
   XBAR[i] = CIE_CMF[i].x; YBAR[i] = CIE_CMF[i].y; ZBAR[i] = CIE_CMF[i].z; WL[i] = CIE_CMF[i].wl
@@ -129,7 +128,7 @@ const D65 = new Float32Array([
   75.0865, 69.3616, 63.6363, 64.8082, 65.9801, 65.023, 64.0659, 61.3633, 58.6608,
 ])
 
-function isCieAligned(spectrum: SpectrumPoint[]): boolean {
+export function isCieAligned(spectrum: SpectrumPoint[]): boolean {
   return spectrum.length === SPECTRUM_LEN && spectrum[0].wavelength === WL_START && spectrum[SPECTRUM_LEN - 1].wavelength === 780
 }
 
@@ -170,7 +169,7 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * ФИЗИКА УПРЫВИСТОСТИ (Empirical Kubelka-Munk).
+ * ЧИСТЫЙ KUBELKA-MUNK с поправкой Саундерсона
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
   const pigments = components.filter(c => !c.isBinder)
@@ -187,32 +186,32 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
 
   for (let i = 0; i < SPECTRUM_LEN; i++) {
     const wl = WL[i]
-    let totalK = 0
-    let totalS = 0
+    let mixedKS = 0
 
     for (let c = 0; c < n; c++) {
       let rMeas = aligned
         ? pigments[c].spectrum[i].reflectance * 0.01
         : interpolateReflectance(pigments[c].spectrum, wl) * 0.01
 
+      // Ограничиваем от 0.01% до 99.99% (защита от ошибок деления)
       rMeas = Math.max(0.0001, Math.min(0.9999, rMeas))
       
-      const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas)
+      // Поправка Саундерсона (учет блика акрила, k2=0.6)
+      const rInt = rMeas / (0.4 + 0.6 * rMeas)
       
-      // Эмпирическая сила белил: белила (rMeas ~0.9) кроют в 10 раз сильнее тёмных красок
-      const S = 0.1 + 10.0 * Math.pow(rMeas, 3)
-      const K = KS * S
-
-      const weight = pigments[c].volume * invTotal
-      totalK += weight * K
-      totalS += weight * S
+      // Стандартный K/S
+      const KS = ((1 - rInt) * (1 - rInt)) / (2 * rInt)
+      mixedKS += (pigments[c].volume * invTotal) * KS
     }
 
-    const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001
-    let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
-    rMix = Math.max(0, Math.min(1, rMix))
+    // Обратный пересчет в отражение
+    let rMixInt = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
+    rMixInt = Math.max(0.0001, Math.min(0.9999, rMixInt))
+    
+    // Возвращаем блик Саундерсона
+    const rMixMeas = (0.4 * rMixInt) / (1 - 0.6 * rMixInt)
 
-    result[i] = { wavelength: wl, reflectance: rMix * 100 }
+    result[i] = { wavelength: wl, reflectance: rMixMeas * 100 }
   }
 
   return result
