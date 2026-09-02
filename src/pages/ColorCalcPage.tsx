@@ -130,7 +130,6 @@ function calculateDeltaE2000(hex1: string, hex2: string): number {
   )
   return dE
 }
-// -----------------------------------------------------------
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
@@ -158,9 +157,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   })
 
   const [targetHex, setTargetHex] = useState('#8B4513')
-  // НОВОЕ: Состояние для отслеживания целевого цвета во вкладке "Суміш"
   const [activeTarget, setActiveTarget] = useState<string | null>(null)
-  // НОВОЕ: Живой расчет Delta E
+  
   const liveDeltaE = activeTarget && mixedColor?.hex 
     ? calculateDeltaE2000(activeTarget, mixedColor.hex) 
     : null
@@ -408,10 +406,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         .filter((item) => !item.isBinder)
         .map((item) => ({ pigmentId: item.pigment.id, ml: item.ml }))
     )
-    
-    // ВАЖНО: Активируем режим "подгонки" цвета, запоминая цель
     setActiveTarget(targetHex)
-    
     stopCamera()
     setTab('mix')
   }
@@ -490,46 +485,73 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2.5">
-                    {paints.map((paint) => (
-                      <div key={paint.id} className="flex items-center gap-2 p-2 rounded-2xl" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
-                        <div className="flex-1 min-w-0 pr-1" style={{ borderRight: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
-                          <PigmentSelector pigments={pigments} value={paint.pigmentId} onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)} lang={lang} />
+                  <div className="flex flex-col gap-3">
+                    {paints.map((paint) => {
+                      const currentAmount = parseFloat(paint.amount) || 0;
+                      // Динамический максимум ползунка: не меньше 20мл, но если введено больше - расширяем границу (в 1.5 раза)
+                      const sliderMax = Math.max(20, Math.ceil(currentAmount * 1.5));
+                      
+                      return (
+                        <div key={paint.id} className="flex flex-col gap-2 p-3 rounded-2xl" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
+                          
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0 pr-1">
+                              <PigmentSelector pigments={pigments} value={paint.pigmentId} onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)} lang={lang} />
+                            </div>
+                            <div className="flex items-center gap-1 w-[70px] flex-shrink-0">
+                              <input
+                                ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
+                                type="text" inputMode="decimal" enterKeyHint="done"
+                                value={paint.amount}
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(',', '.')
+                                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                    const num = parseFloat(val)
+                                    if (!isNaN(num) && num > 5000) val = '5000'
+                                    updatePaint(paint.id, 'amount', val)
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  let val = e.target.value.replace(',', '.')
+                                  if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
+                                  else {
+                                    const num = parseFloat(val)
+                                    if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                                  }
+                                }}
+                                className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
+                                placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
+                              />
+                              <span className="text-[12px] font-medium flex-shrink-0" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
+                            </div>
+                            <button onClick={() => removePaint(paint.id)} disabled={paints.length <= 1} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)' }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+
+                          {/* --- НОВЫЙ БЛОК: ПОЛЗУНОК --- */}
+                          <div className="w-full px-1 pb-1">
+                            <input
+                              type="range"
+                              min="0"
+                              max={sliderMax}
+                              step="0.1"
+                              value={currentAmount}
+                              onChange={(e) => updatePaint(paint.id, 'amount', e.target.value)}
+                              className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                              style={{ 
+                                background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 15%, transparent)',
+                                accentColor: 'var(--color-accent, #D8A35C)'
+                              }}
+                            />
+                          </div>
+
                         </div>
-                        <div className="flex items-center gap-1 w-[70px] flex-shrink-0">
-                          <input
-                            ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
-                            type="text" inputMode="decimal" enterKeyHint="done"
-                            value={paint.amount}
-                            onChange={(e) => {
-                              let val = e.target.value.replace(',', '.')
-                              if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                const num = parseFloat(val)
-                                if (!isNaN(num) && num > 5000) val = '5000'
-                                updatePaint(paint.id, 'amount', val)
-                              }
-                            }}
-                            onBlur={(e) => {
-                              let val = e.target.value.replace(',', '.')
-                              if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
-                              else {
-                                const num = parseFloat(val)
-                                if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                              }
-                            }}
-                            className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
-                            placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
-                          />
-                          <span className="text-[12px] font-medium flex-shrink-0" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
-                        </div>
-                        <button onClick={() => removePaint(paint.id)} disabled={paints.length <= 1} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)' }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
-                <button onClick={addPaint} disabled={loading || loadError} className="mt-3.5 w-full py-3 rounded-xl text-[14px] font-medium disabled:opacity-40" style={{ border: '1px dashed color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>
+                <button onClick={addPaint} disabled={loading || loadError} className="mt-4 w-full py-3 rounded-xl text-[14px] font-medium disabled:opacity-40" style={{ border: '1px dashed color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>
                   {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
                 </button>
               </div>
@@ -549,7 +571,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
               <div className="flex flex-col items-center">
                 
-                {/* --- РЕЖИМ СРАВНЕНИЯ: Цель vs Текущая смесь --- */}
                 {activeTarget ? (
                   <div className="w-full flex flex-col items-center gap-3 mb-4">
                     <div className="flex w-full justify-center gap-4">
@@ -565,7 +586,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </div>
 
                     {liveDeltaE !== null && (
-                      <div className="px-4 py-2 rounded-xl text-center" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
+                      <div className="px-4 py-2 rounded-xl text-center transition-colors" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
                         <span className="text-[12px] opacity-70 block mb-0.5">{isUk ? 'Відхилення' : 'Отклонение'}</span>
                         <span className="text-[18px] font-bold" style={{ color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171' }}>
                           ΔE = {liveDeltaE.toFixed(1)}
@@ -574,7 +595,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     )}
                   </div>
                 ) : (
-                  // Обычный режим одного квадрата
                   <div className="w-36 h-36 md:w-40 md:h-40 rounded-2xl shadow-lg mb-4" style={{ backgroundColor: squareColor, border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }} />
                 )}
 
@@ -600,7 +620,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </>
         )}
 
-        {/* --- ВКЛАДКА PRO (БЕЗ ИЗМЕНЕНИЙ В ЛОГИКЕ, КРОМЕ ПЕРЕНОСА ЦЕЛИ) --- */}
         {tab === 'pro' && (
           <>
             <section className="rounded-2xl px-4 md:px-5 pt-4 pb-5" style={{ background: 'var(--color-surface, #25201C)' }}>
