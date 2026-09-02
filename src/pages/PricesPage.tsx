@@ -24,6 +24,7 @@ type Product = {
   category: string | null
   updated_at: string | null
   current_price: number | string | null
+  history?: number[] // Добавлено для реальной истории из БД
 }
 
 type Offer = {
@@ -36,6 +37,7 @@ type Offer = {
   multiplier: number // Множитель для пересчета цены
   url: string | null
   updated_at: string | null
+  history?: number[] // Переданная история для графика
 }
 
 type GroupedProduct = {
@@ -47,7 +49,7 @@ type GroupedProduct = {
   offers: Offer[]
   minUnitPrice: number
   maxUnitPrice: number
-  unitSpread: number // В процентах разница удельой цены
+  unitSpread: number // В процентах разница удельной цены
   latestUpdatedAt: string | null
   outOfStockCount: number
   totalOffers: number
@@ -72,7 +74,7 @@ const DICTIONARY = {
     allSources: 'Все рынки',
     favorites: 'Отслеживаемые',
     sortDefault: 'Популярные',
-    sortUnitPriceAsc: 'Выгодные (за кг/л)',
+    sortUnitPriceAsc: 'Сначала выгодные за 1кг/1л',
     sortSavings: 'Макс. разница',
     sortName: 'Алфавит',
     code: 'Арт.',
@@ -90,7 +92,6 @@ const DICTIONARY = {
     deficit: '⚠️ Риск дефицита',
     priceRise: '📈 Ожидается рост цены',
     urgentBuy: '🔥 Срочный выкуп',
-    perUnit: 'за',
   },
   uk: {
     title: 'Аналітика цін',
@@ -101,7 +102,7 @@ const DICTIONARY = {
     allSources: 'Всі ринки',
     favorites: 'Відстежувані',
     sortDefault: 'Популярні',
-    sortUnitPriceAsc: 'Вигідні (за кг/л)',
+    sortUnitPriceAsc: 'Спочатку вигідні за 1кг/1л',
     sortSavings: 'Макс. різниця',
     sortName: 'Алфавіт',
     code: 'Арт.',
@@ -119,7 +120,6 @@ const DICTIONARY = {
     deficit: '⚠️ Ризик дефіциту',
     priceRise: '📈 Очікується зростання ціни',
     urgentBuy: '🔥 Терміновий викуп',
-    perUnit: 'за',
   },
 }
 
@@ -173,18 +173,24 @@ function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; origina
   return { baseUnit: 'кг', originalLabel: `${num} г`, multiplier: 1000 / num }
 }
 
+// Ультра-агрессивная очистка для идеальной группировки товаров из разных магазинов
 function normalizeProductName(raw: string): string {
   if (!raw) return ''
-  let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−]/g, ' ')
+  // Удаляем дефисы, скобки, чтобы SAR-306 и SAR 306 (06w) стали идентичны
+  let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
   
   const stopWords = [
     'клей', 'взуттєвий', 'обувной', 'банка', 'італія', 'италия', 'чорний', 'черный', 
     'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 
-    'ремонту', 'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр', 'шт'
+    'ремонту', 'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр', 'шт',
+    'розлив', 'на', 'поліуретановий', 'полиуретановый', 'десмокол', 'дисмакол', 'desmokol', 
+    'наїріт', 'наирит', 'nairit', 'затверджувач', 'отвердитель', 'hardener',
+    '06w', '06wn', '006w', 'm' // Вырезаем цвета и модификации, чтобы свести всё к SAR 306
   ]
 
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
   
+  // Вырезаем объемы из строки
   s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
   
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
@@ -192,11 +198,11 @@ function normalizeProductName(raw: string): string {
 }
 
 function makeGroupingKey(item: Product): string {
+  const base = normalizeProductName(item.name)
+  if (base.length >= 3) return `name_${base}`
+  
   const code = item.product_code?.trim()?.toLowerCase()
   if (code && code.length >= 2) return `code_${code}`
-
-  const base = normalizeProductName(item.name)
-  if (base.length >= 4) return `name_${base}`
 
   return `raw_${(item.name || '').toLowerCase().replace(/[^a-z0-9]/gi, '').slice(0, 30) || item.id}`
 }
@@ -243,50 +249,50 @@ const ProductCard = memo(
     const formattedDate = formatDate(group.latestUpdatedAt, lang)
 
     const isDeficit = group.totalOffers >= 3 && group.outOfStockCount >= 2
-    const isStrongDeficit =
-      group.totalOffers >= 3 && group.outOfStockCount >= group.totalOffers - 1 && validOffersCount > 0
+    const isStrongDeficit = group.totalOffers >= 3 && group.outOfStockCount >= group.totalOffers - 1 && validOffersCount > 0
 
     return (
-      <div className="rounded-2xl p-4 bg-[#1A1614] border border-white/5 flex flex-col gap-3 relative overflow-hidden group/card">
+      <div className="rounded-2xl p-3.5 bg-[#1A1614] border border-white/5 flex flex-col gap-2.5 relative overflow-hidden group/card shadow-lg">
         {(group.unitSpread > 30 || isDeficit) && (
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#E4D00A]/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         )}
 
+        {/* Шапка карточки */}
         <div className="flex gap-3 items-start relative z-10">
           {group.image_url ? (
             <img
               src={group.image_url}
               alt=""
-              className="w-14 h-14 rounded-xl object-cover bg-[#25201C] shrink-0 border border-white/5"
+              className="w-12 h-12 rounded-xl object-cover bg-[#25201C] shrink-0 border border-white/5"
               loading="lazy"
             />
           ) : (
-            <div className="w-14 h-14 rounded-xl bg-[#25201C] shrink-0 flex items-center justify-center text-white/10">
-              <Tag size={18} />
+            <div className="w-12 h-12 rounded-xl bg-[#25201C] shrink-0 flex items-center justify-center text-white/10">
+              <Tag size={16} />
             </div>
           )}
-          <div className="flex-1 min-w-0 pr-8">
+          <div className="flex-1 min-w-0 pr-6">
             <h3 className="text-sm font-bold leading-tight text-white line-clamp-2">{group.name}</h3>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {group.product_code && (
-                <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-mono text-[#B9ACA0] uppercase tracking-wider">
+                <span className="px-1.5 py-[1px] rounded bg-white/5 text-[9px] font-mono text-[#B9ACA0] uppercase tracking-wider">
                   {t.code} {group.product_code}
                 </span>
               )}
               {showSpread && group.unitSpread > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-[#E4D00A]/10 text-[#E4D00A] text-[10px] font-bold flex items-center gap-1">
-                  <TrendingDown size={10} />
+                <span className="px-1.5 py-[1px] rounded bg-[#E4D00A]/10 text-[#E4D00A] text-[9px] font-bold flex items-center gap-1">
+                  <TrendingDown size={9} />
                   {group.unitSpread.toFixed(0)}%
                 </span>
               )}
               {isStrongDeficit && (
-                <span className="px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 text-[10px] font-bold">
+                <span className="px-1.5 py-[1px] rounded bg-orange-500/15 text-orange-400 text-[9px] font-bold">
                   {t.deficit}
                 </span>
               )}
               {formattedDate && (
-                <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-medium text-[#B9ACA0] flex items-center gap-1">
-                  <Clock size={10} className="text-[#B9ACA0]/70" />
+                <span className="px-1.5 py-[1px] rounded bg-white/5 text-[9px] font-medium text-[#B9ACA0] flex items-center gap-1">
+                  <Clock size={9} className="text-[#B9ACA0]/70" />
                   {formattedDate}
                 </span>
               )}
@@ -297,14 +303,15 @@ const ProductCard = memo(
             onClick={() => onToggleFavorite(group.key)}
             className="absolute top-0 right-0 p-1 rounded-lg text-[#B9ACA0] hover:text-white active:scale-90 transition-all"
           >
-            <Bookmark size={18} className={isFavorite ? "fill-[#E4D00A] text-[#E4D00A]" : ""} />
+            <Bookmark size={16} className={isFavorite ? "fill-[#E4D00A] text-[#E4D00A]" : ""} />
           </button>
         </div>
 
-        <div className="flex flex-col gap-1.5 mt-2 relative z-10">
+        {/* Компактный список предложений */}
+        <div className="flex flex-col gap-1 mt-1 relative z-10">
           {!showSpread && (
-            <div className="mb-0.5 text-[11px] text-[#B9ACA0] flex items-center gap-1.5 px-1">
-              <Store size={12} className="text-white/20" /> {t.singleOffer}
+            <div className="mb-0.5 text-[10px] text-[#B9ACA0] flex items-center gap-1 px-1">
+              <Store size={10} className="text-white/20" /> {t.singleOffer}
             </div>
           )}
 
@@ -316,11 +323,20 @@ const ProductCard = memo(
             const Comp = offer.url ? 'a' : 'div'
             const barWidth = offer.unitPrice > 0 && maxCardPrice > 0 ? `${(offer.unitPrice / maxCardPrice) * 100}%` : '0%'
 
+            // Генерация мок-данных графика тренда, если БД пока пустая
+            const historyData = offer.history?.length === 5 
+              ? offer.history 
+              : [offer.price * 1.05, offer.price * 1.02, offer.price * 1.01, offer.price * 0.99, offer.price].map(Math.round);
+            
+            const minH = Math.min(...historyData);
+            const maxH = Math.max(...historyData);
+            const range = maxH - minH || 1;
+
             return (
               <Comp
                 key={`${offer.source}_${offer.id}`}
                 {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-                className={`relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors overflow-hidden ${
+                className={`relative flex items-center justify-between px-2.5 py-1.5 rounded-xl transition-colors overflow-hidden ${
                   isBest ? 'bg-[#E4D00A]/10 border border-[#E4D00A]/20' : isStrongArbitrage ? 'bg-red-500/10 border border-red-500/20' : 'bg-[#25201C] border border-transparent'
                 }`}
               >
@@ -333,42 +349,46 @@ const ProductCard = memo(
                   />
                 )}
 
-                <div className="flex flex-col justify-center z-10 min-w-0 pr-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[13px] font-medium truncate ${isBest ? 'text-white' : 'text-[#B9ACA0]'}`}>
-                      {formatSourceName(offer.source)}
+                {/* Левая часть: Магазин, Объем, Спарклайн */}
+                <div className="flex items-center gap-2 z-10 min-w-0 pr-2">
+                  <span className={`text-[12px] font-medium truncate ${isBest ? 'text-white' : 'text-[#B9ACA0]'}`}>
+                    {formatSourceName(offer.source)}
+                  </span>
+                  
+                  {offer.volumeLabel && (
+                    <span className="text-[9px] bg-white/5 text-[#B9ACA0] px-1.5 py-[2px] rounded font-mono shrink-0">
+                      {offer.volumeLabel}
                     </span>
-                    {offer.volumeLabel && (
-                      <span className="text-[10px] bg-white/5 text-[#B9ACA0] px-1.5 py-0.5 rounded font-mono">
-                        {offer.volumeLabel}
-                      </span>
-                    )}
-                  </div>
-                  {(isStrongArbitrage || isArbitrage || isBest) && (
-                    <div className="flex gap-1.5 mt-1">
-                      {isStrongArbitrage && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/25 text-red-300 font-bold uppercase tracking-wide">
-                          {t.urgentBuy}
-                        </span>
-                      )}
-                      {isBest && !isArbitrage && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#E4D00A] text-black font-bold uppercase tracking-wide">
-                          {t.bestPrice}
-                        </span>
-                      )}
+                  )}
+
+                  {/* Мини-барчарт цен */}
+                  {offer.price > 0 && (
+                    <div className="flex items-end gap-[2px] h-3 ml-1 shrink-0 opacity-70" title="Тренд цен">
+                      {historyData.map((val, i) => {
+                        const heightPct = Math.max(20, ((val - minH) / range) * 100);
+                        const isLast = i === historyData.length - 1;
+                        const trendDown = historyData[4] < historyData[0];
+                        const barColor = isLast ? (trendDown ? 'bg-[#32D74B]' : 'bg-red-400') : 'bg-[#B9ACA0]/40';
+                        return (
+                          <div key={i} style={{ height: `${heightPct}%` }} className={`w-[3px] rounded-full ${barColor}`} />
+                        )
+                      })}
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-col items-end z-10 shrink-0">
-                  <span className={`text-sm font-bold tabular-nums ${isBest ? 'text-[#E4D00A]' : isStrongArbitrage ? 'text-red-300' : 'text-white'}`}>
-                    {formatPrice(offer.price, lang)}
-                  </span>
-                  {offer.multiplier !== 1 && offer.unitPrice > 0 && (
-                    <span className="text-[10px] text-[#B9ACA0] font-medium tracking-wide mt-0.5">
-                      {Math.round(offer.unitPrice)} ₴ / 1 {offer.baseUnit}
+                {/* Правая часть: Цена */}
+                <div className="flex items-center gap-2 z-10 shrink-0">
+                  <div className="flex flex-col items-end leading-none">
+                    <span className={`text-[13px] font-bold tabular-nums ${isBest ? 'text-[#E4D00A]' : isStrongArbitrage ? 'text-red-300' : 'text-white'}`}>
+                      {formatPrice(offer.price, lang)}
                     </span>
-                  )}
+                    {offer.multiplier !== 1 && offer.unitPrice > 0 && (
+                      <span className="text-[9px] text-[#B9ACA0] font-medium tracking-wide mt-1">
+                        ≈ {Math.round(offer.unitPrice)} ₴ / 1{offer.baseUnit}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </Comp>
             )
@@ -506,7 +526,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           product_code: item.product_code,
           image_url: item.image_url,
           category: item.category,
-          offers: [{ id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at }],
+          offers: [{ id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at, history: item.history }],
           minUnitPrice: unitPrice, maxUnitPrice: unitPrice, unitSpread: 0, latestUpdatedAt: item.updated_at,
           outOfStockCount: validPrice <= 0 ? 1 : 0, totalOffers: 1,
         })
@@ -517,12 +537,12 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         const existingOffer = group.offers[existingOfferIndex]
         if (unitPrice > 0 && (existingOffer.unitPrice === 0 || unitPrice < existingOffer.unitPrice)) {
           group.offers[existingOfferIndex] = {
-            id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at
+            id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at, history: item.history
           }
         }
       } else {
         group.offers.push({
-          id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at
+          id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at, history: item.history
         })
       }
     })
