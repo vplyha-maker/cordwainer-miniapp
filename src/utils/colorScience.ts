@@ -1,12 +1,6 @@
-/**
- * colorScience.ts
- * Reflectance → XYZ → sRGB
- * Single-Constant Kubelka–Munk with Saunderson Correction
- */
-
 export interface SpectrumPoint {
-  wavelength: number // нм
-  reflectance: number // 0–100 %
+  wavelength: number
+  reflectance: number
 }
 
 export interface RGB { r: number; g: number; b: number }
@@ -169,7 +163,8 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * ЧИСТЫЙ KUBELKA-MUNK с поправкой Саундерсона
+ * ЧИСТАЯ ЭМПИРИЧЕСКАЯ ФИЗИКА (Kubelka-Munk).
+ * Укрывистость (S) динамически зависит от яркости: белила кроют мощно, темные цвета — прозрачные.
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
   const pigments = components.filter(c => !c.isBinder)
@@ -186,32 +181,32 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
 
   for (let i = 0; i < SPECTRUM_LEN; i++) {
     const wl = WL[i]
-    let mixedKS = 0
+    let totalK = 0
+    let totalS = 0
 
     for (let c = 0; c < n; c++) {
       let rMeas = aligned
         ? pigments[c].spectrum[i].reflectance * 0.01
         : interpolateReflectance(pigments[c].spectrum, wl) * 0.01
 
-      // Ограничиваем от 0.01% до 99.99% (защита от ошибок деления)
       rMeas = Math.max(0.0001, Math.min(0.9999, rMeas))
       
-      // Поправка Саундерсона (учет блика акрила, k2=0.6)
-      const rInt = rMeas / (0.4 + 0.6 * rMeas)
+      const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas)
       
-      // Стандартный K/S
-      const KS = ((1 - rInt) * (1 - rInt)) / (2 * rInt)
-      mixedKS += (pigments[c].volume * invTotal) * KS
+      // Идеальный баланс укрывистости
+      const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5)
+      const K = KS * S
+
+      const weight = pigments[c].volume * invTotal
+      totalK += weight * K
+      totalS += weight * S
     }
 
-    // Обратный пересчет в отражение
-    let rMixInt = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
-    rMixInt = Math.max(0.0001, Math.min(0.9999, rMixInt))
-    
-    // Возвращаем блик Саундерсона
-    const rMixMeas = (0.4 * rMixInt) / (1 - 0.6 * rMixInt)
+    const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001
+    let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
+    rMix = Math.max(0, Math.min(1, rMix))
 
-    result[i] = { wavelength: wl, reflectance: rMixMeas * 100 }
+    result[i] = { wavelength: wl, reflectance: rMix * 100 }
   }
 
   return result
