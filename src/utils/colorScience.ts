@@ -1,7 +1,7 @@
 /**
  * colorScience.ts
  * Reflectance → XYZ → sRGB
- * Pure Single-Constant Kubelka–Munk (Standard Physics)
+ * Empirical Two-Constant Kubelka–Munk
  */
 
 export interface SpectrumPoint {
@@ -170,11 +170,9 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * ЧИСТАЯ ФИЗИКА (Single-Constant Kubelka-Munk).
- * Идеально подходит для высоконасыщенных пигментов.
+ * ФИЗИКА УПРЫВИСТОСТИ (Empirical Kubelka-Munk).
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
-  // Биндер (прозрачный акрил) отфильтровываем, он не меняет базовый тон смеси
   const pigments = components.filter(c => !c.isBinder)
   const n = pigments.length
   if (n === 0) return []
@@ -189,31 +187,32 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
 
   for (let i = 0; i < SPECTRUM_LEN; i++) {
     const wl = WL[i]
-    let totalKS = 0
+    let totalK = 0
+    let totalS = 0
 
     for (let c = 0; c < n; c++) {
       let rMeas = aligned
         ? pigments[c].spectrum[i].reflectance * 0.01
         : interpolateReflectance(pigments[c].spectrum, wl) * 0.01
 
-      // Ограничиваем от 0.01% до 99.99% (защита математики)
       rMeas = Math.max(0.0001, Math.min(0.9999, rMeas))
       
-      // Формула K/S Кубелки-Мунка
       const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas)
       
-      // Прямое сложение долей
-      totalKS += (pigments[c].volume * invTotal) * KS
+      // Эмпирическая сила белил: белила (rMeas ~0.9) кроют в 10 раз сильнее тёмных красок
+      const S = 0.1 + 10.0 * Math.pow(rMeas, 3)
+      const K = KS * S
+
+      const weight = pigments[c].volume * invTotal
+      totalK += weight * K
+      totalS += weight * S
     }
 
-    // Обратный расчет отражения (Reflectance) из общего K/S
-    let rMix = 1 + totalKS - Math.sqrt(totalKS * totalKS + 2 * totalKS)
+    const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001
+    let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
     rMix = Math.max(0, Math.min(1, rMix))
 
-    result[i] = {
-      wavelength: wl,
-      reflectance: rMix * 100, 
-    }
+    result[i] = { wavelength: wl, reflectance: rMix * 100 }
   }
 
   return result
