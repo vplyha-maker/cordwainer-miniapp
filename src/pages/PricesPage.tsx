@@ -157,15 +157,11 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bслоник\b/gi, 'solution'],
 ]
 
-// БЕЗОПАСНЫЙ ПАРСЕР ЦЕНЫ (решает проблему "400,16")
 function parsePriceSafely(raw: number | string | null | undefined): number {
   if (raw === null || raw === undefined || raw === '') return 0;
   if (typeof raw === 'number') return raw > 0 ? raw : 0;
-  
-  // Меняем запятую на точку и удаляем все нечисловые символы (буквы, пробелы, знак ₴)
   const cleanStr = String(raw).replace(',', '.').replace(/[^0-9.]/g, '');
   const val = parseFloat(cleanStr);
-  
   return !isNaN(val) && val > 0 ? val : 0;
 }
 
@@ -199,21 +195,23 @@ function normalizeProductName(raw: string): string {
   ]
 
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
-  
   s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
-  
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
   return Array.from(new Set(words)).sort().join(' ')
 }
 
-function makeGroupingKey(item: Product): string {
-  const base = normalizeProductName(item.name)
-  if (base.length >= 3) return `name_${base}`
+// ВСТРОЕННЫЙ АЛГОРИТМ ОЦЕНКИ СХОЖЕСТИ СЛОВ
+function calculateWordSimilarity(name1: string, name2: string): number {
+  const words1 = name1.split(' ').filter(Boolean);
+  const words2 = name2.split(' ').filter(Boolean);
+  if (words1.length === 0 || words2.length === 0) return 0;
   
-  const code = item.product_code?.trim()?.toLowerCase()
-  if (code && code.length >= 2) return `code_${code}`
-
-  return `raw_${(item.name || '').toLowerCase().replace(/[^a-z0-9]/gi, '').slice(0, 30) || item.id}`
+  let matches = 0;
+  for (const w of words1) {
+    if (words2.includes(w)) matches++;
+  }
+  // Возвращает процент совпадения от 0 до 1
+  return matches / Math.max(words1.length, words2.length);
 }
 
 const formatPrice = (val: number, lang: Lang) => {
@@ -448,8 +446,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
     try {
       const [apiRes, ratesRes] = await Promise.all([
-        fetch('/api/prices').catch(() => null),
-        fetch('/api/rates').catch(() => null),
+        fetch(`/api/prices?_t=${Date.now()}`).catch(() => null),
+        fetch(`/api/rates?_t=${Date.now()}`).catch(() => null),
       ])
 
       if (!apiRes || !apiRes.ok) throw new Error('API error')
@@ -479,88 +477,122 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   )
 
   const baseGroupedItems = useMemo(() => {
-    const map = new Map<string, GroupedProduct>()
+    const groups: GroupedProduct[] = [];
 
     items.forEach((item) => {
-      // ИСПОЛЬЗУЕМ БЕЗОПАСНЫЙ ПАРСЕР ЦЕН
-      let validPrice = parsePriceSafely(item.current_price)
-      
-      if (validPrice > 50000) validPrice = 0
+      let validPrice = parsePriceSafely(item.current_price);
+      if (validPrice > 50000) validPrice = 0;
 
-      const volData = getVolumeData(item.name)
-      const unitPrice = validPrice * volData.multiplier
-      const groupingKey = makeGroupingKey(item)
+      const volData = getVolumeData(item.name);
+      const unitPrice = validPrice * volData.multiplier;
+      const cleanName = normalizeProductName(item.name);
+      const code = item.product_code?.trim()?.toLowerCase();
 
-      if (!map.has(groupingKey)) {
-        map.set(groupingKey, {
-          key: groupingKey,
-          name: item.name,
-          product_code: item.product_code,
-          image_url: item.image_url,
-          category: item.category,
-          offers: [],
-          minUnitPrice: Infinity,
-          maxUnitPrice: -Infinity,
-          unitSpread: 0,
-          latestUpdatedAt: null,
-          outOfStockCount: 0,
-          totalOffers: 0,
-        })
+      let targetGroup: GroupedProduct | null = null;
+
+      // 1. Поиск по артикулу
+      if (code && code.length >= 2) {
+        targetGroup = groups.find(g => g.product_code?.toLowerCase() === code) || null;
       }
 
-      const group = map.get(groupingKey)!
+      // 2. НЕЧЕТКИЙ ПОИСК (Fuzzy Match по пересечению слов)
+      if (!targetGroup && cleanName.length >= 2 && groups.length > 0) {
+        let bestMatchScore = 0;
+        let bestMatchIndex = -1;
 
-      if (item.name.length > group.name.length) group.name = item.name
-      if (!group.image_url && item.image_url) group.image_url = item.image_url
-      if (!group.product_code && item.product_code) group.product_code = item.product_code
+        for (let i = 0; i < groups.length; i++) {
+          const score = calculateWordSimilarity(cleanName, groups[i].key);
+          if (score > bestMatchScore) {
+            bestMatchScore = score;
+            bestMatchIndex = i;
+          }
+        }
 
-      if (item.updated_at) {
-        if (!group.latestUpdatedAt || new Date(item.updated_at) > new Date(group.latestUpdatedAt)) {
-          group.latestUpdatedAt = item.updated_at
+        // Если сходство больше 60%, объединяем товары
+        if (bestMatchScore >= 0.6) {
+          targetGroup = groups[bestMatchIndex];
         }
       }
 
-      const existingOfferIndex = group.offers.findIndex((o) => o.source === item.source)
+      const offer: Offer = {
+        id: item.id,
+        source: item.source || 'unknown',
+        price: validPrice,
+        unitPrice,
+        baseUnit: volData.baseUnit,
+        volumeLabel: volData.originalLabel,
+        multiplier: volData.multiplier,
+        url: item.url,
+        updated_at: item.updated_at,
+        history: item.history
+      };
 
-      if (existingOfferIndex >= 0 && !item.product_code) {
-        const uniqueKey = `raw_isolate_${item.id}`
-        map.set(uniqueKey, {
-          key: uniqueKey,
-          name: item.name,
-          product_code: item.product_code,
-          image_url: item.image_url,
-          category: item.category,
-          offers: [{ id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at, history: item.history }],
-          minUnitPrice: unitPrice, maxUnitPrice: unitPrice, unitSpread: 0, latestUpdatedAt: item.updated_at,
-          outOfStockCount: validPrice <= 0 ? 1 : 0, totalOffers: 1,
-        })
-        return
-      }
+      if (targetGroup) {
+        const existingOfferIndex = targetGroup.offers.findIndex((o) => o.source === item.source);
 
-      if (existingOfferIndex >= 0) {
-        const existingOffer = group.offers[existingOfferIndex]
-        if (unitPrice > 0 && (existingOffer.unitPrice === 0 || unitPrice < existingOffer.unitPrice)) {
-          group.offers[existingOfferIndex] = {
-            id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at, history: item.history
+        if (existingOfferIndex >= 0 && !item.product_code) {
+          groups.push({
+            key: `isolate_${item.id}`,
+            name: item.name,
+            product_code: item.product_code,
+            image_url: item.image_url,
+            category: item.category,
+            offers: [offer],
+            minUnitPrice: unitPrice,
+            maxUnitPrice: unitPrice,
+            unitSpread: 0,
+            latestUpdatedAt: item.updated_at,
+            outOfStockCount: validPrice <= 0 ? 1 : 0,
+            totalOffers: 1,
+          });
+          return;
+        }
+
+        if (existingOfferIndex >= 0) {
+          const existingOffer = targetGroup.offers[existingOfferIndex];
+          if (unitPrice > 0 && (existingOffer.unitPrice === 0 || unitPrice < existingOffer.unitPrice)) {
+            targetGroup.offers[existingOfferIndex] = offer;
+          }
+        } else {
+          targetGroup.offers.push(offer);
+        }
+
+        if (item.name.length > targetGroup.name.length) targetGroup.name = item.name;
+        if (!targetGroup.image_url && item.image_url) targetGroup.image_url = item.image_url;
+        if (!targetGroup.product_code && item.product_code) targetGroup.product_code = item.product_code;
+        if (item.updated_at) {
+          if (!targetGroup.latestUpdatedAt || new Date(item.updated_at) > new Date(targetGroup.latestUpdatedAt)) {
+            targetGroup.latestUpdatedAt = item.updated_at;
           }
         }
       } else {
-        group.offers.push({
-          id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at, history: item.history
-        })
+        groups.push({
+          key: cleanName || `raw_${item.id}`,
+          name: item.name,
+          product_code: item.product_code,
+          image_url: item.image_url,
+          category: item.category,
+          offers: [offer],
+          minUnitPrice: Infinity,
+          maxUnitPrice: -Infinity,
+          unitSpread: 0,
+          latestUpdatedAt: item.updated_at,
+          outOfStockCount: 0,
+          totalOffers: 0,
+        });
       }
-    })
+    });
 
-    return Array.from(map.values()).map((group) => {
-      const priced = group.offers.filter((o) => o.unitPrice > 0)
-      group.minUnitPrice = priced.length ? Math.min(...priced.map((o) => o.unitPrice)) : 0
-      group.maxUnitPrice = priced.length ? Math.max(...priced.map((o) => o.unitPrice)) : 0
-      group.unitSpread = group.minUnitPrice > 0 ? ((group.maxUnitPrice - group.minUnitPrice) / group.minUnitPrice) * 100 : 0
-      group.totalOffers = group.offers.length
-      group.outOfStockCount = group.offers.filter((o) => o.unitPrice <= 0).length
-      return group
-    })
-  }, [items])
+    return groups.map((group) => {
+      const priced = group.offers.filter((o) => o.unitPrice > 0);
+      group.minUnitPrice = priced.length ? Math.min(...priced.map((o) => o.unitPrice)) : 0;
+      group.maxUnitPrice = priced.length ? Math.max(...priced.map((o) => o.unitPrice)) : 0;
+      group.unitSpread = group.minUnitPrice > 0 ? ((group.maxUnitPrice - group.minUnitPrice) / group.minUnitPrice) * 100 : 0;
+      group.totalOffers = group.offers.length;
+      group.outOfStockCount = group.offers.filter((o) => o.unitPrice <= 0).length;
+      return group;
+    });
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     let result = baseGroupedItems
