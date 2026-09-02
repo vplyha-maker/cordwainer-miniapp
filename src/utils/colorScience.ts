@@ -1,7 +1,7 @@
 /**
  * colorScience.ts
  * Reflectance → XYZ → sRGB
- * Single-Constant Kubelka–Munk (Оптимизировано для спектров FORS)
+ * Empirical Two-Constant Kubelka–Munk approximation
  */
 
 export interface SpectrumPoint {
@@ -29,7 +29,6 @@ export interface MixComponent {
   isBinder?: boolean
 }
 
-/** Фиксированная сетка CIE 1931 (5 нм): 380–780 → 81 точка */
 export const SPECTRUM_LEN = 81
 export const WL_START = 380
 export const WL_STEP = 5
@@ -182,27 +181,8 @@ const ILLUMINANTS: Record<IlluminantType, Float32Array> = {
   twilight: ILLUMINANT_TWILIGHT,
 }
 
-// ИСПРАВЛЕНИЕ "ЧЕРНОЙ ДЫРЫ": Отключаем вычитание блика (Saunderson), 
-// так как файлы FORS-спектрометрии уже очищены от него. 
-// Теперь темные цвета будут плавно смешиваться с белилами!
-export function toInternalR(rMeasured: number): number {
-  return Math.max(0.0001, Math.min(0.9999, rMeasured))
-}
-
-export function toMeasuredR(rInternal: number): number {
-  return Math.max(0.0001, Math.min(0.9999, rInternal))
-}
-
-export function reflectanceToKS(r: number): number {
-  const clampedR = Math.max(0.0001, Math.min(0.9999, r))
-  const t = 1 - clampedR
-  return (t * t) / (2 * clampedR)
-}
-
-export function ksToReflectance(ks: number): number {
-  const r = 1 + ks - Math.sqrt(ks * ks + 2 * ks)
-  return Math.max(0, Math.min(1, r))
-}
+// Більше ніяких `toInternalR` / `toMeasuredR`
+// Спектри напряму йдуть у рівняння
 
 function isCieAligned(spectrum: SpectrumPoint[]): boolean {
   return (
@@ -270,8 +250,8 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * Single-Constant Kubelka–Munk.
- * Fast-path: CIE-aligned spectra → прямое индексирование.
+ * Empirical Two-Constant Kubelka–Munk.
+ * Використовує динамічне розсіювання, щоб білила мали колосальну фізичну силу.
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
   const n = components.length
@@ -294,32 +274,43 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
       const comp = components[c]
       const weight = comp.volume * invTotal
 
-      let rMeas: number
-      if (aligned) {
-        // Конвертируем проценты (0-100+) в дроби (0-1)
-        rMeas = comp.spectrum[i].reflectance * 0.01
-      } else {
-        rMeas = interpolateReflectance(comp.spectrum, wl) * 0.01
-      }
+      let rMeas = aligned
+        ? comp.spectrum[i].reflectance * 0.01
+        : interpolateReflectance(comp.spectrum, wl) * 0.01
+
+      // Жорсткий захист від 100%+ спектрів (щоб не зламати рівняння K/S)
+      rMeas = Math.max(0.001, Math.min(0.999, rMeas))
 
       if (comp.isBinder) {
-        totalS += weight * 0.02
-        totalK += weight * 0.002
+        // Біндер - це абсолютно прозорий гель. Слабке розсіювання (S) і нульове поглинання (K)
+        totalS += weight * 0.001
+        totalK += weight * 0.0001
       } else {
-        const rInt = toInternalR(rMeas)
-        const S = 0.2 + 0.8 * rInt // Эмпирическое рассеивание
-        const KS = reflectanceToKS(rInt)
-        totalK += weight * KS * S
+        // Формула Кубелки-Мунка
+        const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas)
+
+        // ЕМПІРИЧНА СИЛА РОЗСІЮВАННЯ (S)
+        // Яскраві/Білі пігменти (rMeas ≈ 0.9) отримують величезне розсіювання (S ≈ 12).
+        // Темні пігменти (rMeas ≈ 0.05) отримують мінімальне розсіювання (S ≈ 0.1).
+        // Саме це дозволяє програмі перекривати інші кольори білилами.
+        const S = 0.1 + 12.0 * Math.pow(rMeas, 2.5)
+        const K = KS * S
+
+        totalK += weight * K
         totalS += weight * S
       }
     }
 
-    const mixedKS = totalS > 1e-8 ? totalK / totalS : reflectanceToKS(0.0001)
-    const rMeasMix = toMeasuredR(ksToReflectance(mixedKS))
+    // Підсумковий K/S суміші
+    const mixedKS = totalS > 1e-9 ? totalK / totalS : 0.0001
+    
+    // Зворотний розрахунок R із K/S: R = 1 + K/S - sqrt((K/S)^2 + 2*(K/S))
+    let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS)
+    rMix = Math.max(0, Math.min(1, rMix))
 
     result[i] = {
       wavelength: wl,
-      reflectance: rMeasMix * 100, // Возвращаем в проценты
+      reflectance: rMix * 100, // Повертаємо у відсотки
     }
   }
 
