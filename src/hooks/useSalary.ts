@@ -1,4 +1,3 @@
-// src/hooks/useSalary.ts
 import { useCallback, useEffect, useState } from 'react'
 import type { DayRecord, SalaryItem, SalaryUserData } from '../types/salary'
 import { createEmptySalaryData } from '../types/salary'
@@ -200,7 +199,7 @@ export function useSalary({ userId }: UseSalaryOptions) {
     // Если в текущем месяце нет данных и сегодня ≤ 7 число — пробуем прошлый месяц
     if (Object.keys(monthDays).length === 0 && today.getDate() <= 7) {
       const prev = new Date(today.getFullYear(), today.getMonth(), 0) // последний день прошлого месяца
-      const prevMonth = `\( {prev.getFullYear()}- \){String(prev.getMonth() + 1).padStart(2, '0')}` // <- сломано
+      const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
 
       const prevDays = Object.fromEntries(
         Object.entries(data.days).filter(([k]) => k.startsWith(prevMonth))
