@@ -14,6 +14,12 @@ const getLocalDateString = (d: Date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// Форматирование для маленьких кнопок в виде DD.MM
+const getShortDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-');
+  return `${d}.${m}`;
+};
+
 type SalaryCalcPageProps = {
   onBack: () => void;
   lang?: Lang;
@@ -142,7 +148,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     return { data: last7Days, max: maxVal };
   }, [data?.days]);
 
-  // Проверка на то, изменились ли данные по сравнению с сохраненными
   const hasChanges = useMemo(() => {
     const saved = data?.days?.[selectedDate]?.quantities || {};
     const currentKeys = Object.keys(dayForm);
@@ -159,7 +164,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
 
   const todayStr = getLocalDateString(new Date());
 
-  // Общие параметры анимации для устранения мигания
   const tabVariants = {
     hidden: { opacity: 0, y: 10, scale: 0.98 },
     visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: "easeOut" } },
@@ -208,7 +212,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           ))}
         </div>
 
-        {/* mode="popLayout" предотвращает схлопывание высоты контейнера при смене вкладок */}
         <div className="relative">
           <AnimatePresence mode="popLayout">
             {activeTab === 'daily' && (
@@ -225,13 +228,18 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         <button
                           key={date}
                           onClick={() => { triggerHaptic(); setSelectedDate(date); }}
-                          className={`relative flex-shrink-0 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all ${
+                          className={`relative flex-shrink-0 px-5 py-3 rounded-2xl flex flex-col items-center justify-center min-w-[70px] transition-all ${
                             isSelected 
                               ? 'bg-[#0A84FF] text-white shadow-lg shadow-[#0A84FF]/25' 
                               : 'bg-[#1C1C1E] text-white/60 hover:bg-white/10 border border-transparent'
-                          } ${isToday && !isSelected ? 'border-white/10' : ''}`}
+                          }`}
                         >
-                          {isToday ? 'Сегодня' : formatDay(date).split(',')[0]}
+                          <span className="text-base font-bold tracking-wide">{getShortDate(date)}</span>
+                          {isToday && (
+                            <span className={`text-[10px] font-medium mt-0.5 ${isSelected ? 'text-white/80' : 'text-[#32D74B]'}`}>
+                              Сегодня
+                            </span>
+                          )}
                           {hasData && (
                             <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
                           )}
@@ -240,7 +248,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     })}
                   </div>
 
-                  <label className="flex-shrink-0 w-12 h-12 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative overflow-hidden active:bg-white/10 border border-white/5 transition-colors">
+                  <label className="flex-shrink-0 w-14 h-14 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative overflow-hidden active:bg-white/10 border border-white/5 transition-colors">
                     <input 
                       type="date" 
                       value={selectedDate} 
@@ -252,9 +260,18 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       }} 
                       className="absolute inset-0 opacity-0 w-full h-full" 
                     />
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                   </label>
                 </div>
+
+                {/* Якорный заголовок контекста */}
+                {data.items.length > 0 && (
+                  <div className="px-2 pt-2">
+                    <h2 className="text-lg font-bold text-white/90">
+                      Внесение за: <span className="text-[#0A84FF] ml-1">{selectedDate === todayStr ? 'Сегодня (' + formatDay(selectedDate) + ')' : formatDay(selectedDate)}</span>
+                    </h2>
+                  </div>
+                )}
 
                 {data.items.length === 0 ? (
                   <div className="bg-[#1C1C1E] p-8 rounded-3xl border border-white/5 text-center">
