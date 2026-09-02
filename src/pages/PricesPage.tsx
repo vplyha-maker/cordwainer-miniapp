@@ -33,6 +33,7 @@ type Offer = {
   unitPrice: number // Цена за 1 кг / 1 л / 1 шт
   baseUnit: 'кг' | 'л' | 'шт'
   volumeLabel: string // Исходная этикетка объема (например "15 кг")
+  multiplier: number // Множитель для пересчета цены
   url: string | null
   updated_at: string | null
 }
@@ -156,7 +157,6 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bслоник\b/gi, 'solution'],
 ]
 
-// Универсальный парсер объемов для приведения к цене за 1 кг / 1 л
 function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; originalLabel: string; multiplier: number } {
   if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
@@ -173,7 +173,6 @@ function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; origina
   return { baseUnit: 'кг', originalLabel: `${num} г`, multiplier: 1000 / num }
 }
 
-// Жесткая очистка названий от "мусорных" слов для объединения 1кг и 15кг в одну группу
 function normalizeProductName(raw: string): string {
   if (!raw) return ''
   let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−]/g, ' ')
@@ -186,11 +185,9 @@ function normalizeProductName(raw: string): string {
 
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
   
-  // Вырезаем объемы, чтобы SAR 306 1кг и SAR 306 15кг стали просто SAR 306
   s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
   
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
-  // Сортируем слова по алфавиту, чтобы порядок не влиял на группировку
   return Array.from(new Set(words)).sort().join(' ')
 }
 
@@ -231,7 +228,6 @@ const ProductCard = memo(
     isFavorite: boolean
     onToggleFavorite: (key: string) => void
   }) => {
-    // Сортируем предложения по УДЕЛЬНОЙ цене, а не по исходной
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
       if (b.unitPrice <= 0) return -1
@@ -400,7 +396,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
-  const [selectedSource, setSelectedSource] = useState<string>('all') // 'all' | 'favorites' | sourceId
+  const [selectedSource, setSelectedSource] = useState<string>('all') 
   const [sortBy, setSortBy] = useState<SortOption>('default')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
@@ -465,7 +461,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     items.forEach((item) => {
       let validPrice = item.current_price && !isNaN(Number(item.current_price)) && Number(item.current_price) > 0 ? Number(item.current_price) : 0
       
-      // Защита от мусора в базе (например, когда парсер захватил телефон или артикул 306400 как цену)
       if (validPrice > 50000) validPrice = 0
 
       const volData = getVolumeData(item.name)
@@ -504,7 +499,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       const existingOfferIndex = group.offers.findIndex((o) => o.source === item.source)
 
       if (existingOfferIndex >= 0 && !item.product_code) {
-        // Изолируем товары без артикула, если в одном магазине их несколько, чтобы не перезаписывать
         const uniqueKey = `raw_isolate_${item.id}`
         map.set(uniqueKey, {
           key: uniqueKey,
@@ -512,7 +506,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           product_code: item.product_code,
           image_url: item.image_url,
           category: item.category,
-          offers: [{ id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, url: item.url, updated_at: item.updated_at }],
+          offers: [{ id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at }],
           minUnitPrice: unitPrice, maxUnitPrice: unitPrice, unitSpread: 0, latestUpdatedAt: item.updated_at,
           outOfStockCount: validPrice <= 0 ? 1 : 0, totalOffers: 1,
         })
@@ -521,15 +515,14 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
       if (existingOfferIndex >= 0) {
         const existingOffer = group.offers[existingOfferIndex]
-        // Оставляем самое выгодное предложение (за удельную единицу) от одного магазина
         if (unitPrice > 0 && (existingOffer.unitPrice === 0 || unitPrice < existingOffer.unitPrice)) {
           group.offers[existingOfferIndex] = {
-            id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, url: item.url, updated_at: item.updated_at
+            id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at
           }
         }
       } else {
         group.offers.push({
-          id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, url: item.url, updated_at: item.updated_at
+          id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, multiplier: volData.multiplier, url: item.url, updated_at: item.updated_at
         })
       }
     })
