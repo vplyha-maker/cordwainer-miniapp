@@ -1,3 +1,8 @@
+/**
+ * calculatorLogic.ts
+ * Подбор рецепта пигментов (Empirical KM + CIEDE2000)
+ * Оптимизировано для работы с экстремально сильными пигментами (Phthalo/Quinacridone).
+ */
 import { Pigment } from '../data/pigments'
 import { Lang } from '../App'
 import {
@@ -70,10 +75,7 @@ export const getPigmentCategory = (id: string, lang: Lang) => {
 }
 
 function rgbToLab(r: number, g: number, b: number) {
-  let r_ = r / 255
-  let g_ = g / 255
-  let b_ = b / 255
-
+  let r_ = r / 255, g_ = g / 255, b_ = b / 255
   r_ = r_ > 0.04045 ? Math.pow((r_ + 0.055) / 1.055, 2.4) : r_ / 12.92
   g_ = g_ > 0.04045 ? Math.pow((g_ + 0.055) / 1.055, 2.4) : g_ / 12.92
   b_ = b_ > 0.04045 ? Math.pow((b_ + 0.055) / 1.055, 2.4) : b_ / 12.92
@@ -82,9 +84,7 @@ function rgbToLab(r: number, g: number, b: number) {
   let y = (r_ * 0.2126 + g_ * 0.7152 + b_ * 0.0722) * 100
   let z = (r_ * 0.0193 + g_ * 0.1192 + b_ * 0.9505) * 100
 
-  x /= 95.047
-  y /= 100.0
-  z /= 108.883
+  x /= 95.047; y /= 100.0; z /= 108.883
 
   x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116
   y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116
@@ -99,18 +99,14 @@ function calculateDeltaE2000(
 ): number {
   const { L: L1, a: a1, b: b1 } = lab1
   const { L: L2, a: a2, b: b2 } = lab2
-
   const kL = 1, kC = 1, kH = 1
 
   const C1 = Math.sqrt(a1 * a1 + b1 * b1)
   const C2 = Math.sqrt(a2 * a2 + b2 * b2)
   const Cbar = (C1 + C2) / 2
-
   const G = 0.5 * (1 - Math.sqrt(Math.pow(Cbar, 7) / (Math.pow(Cbar, 7) + Math.pow(25, 7))))
 
-  const a1Prime = a1 * (1 + G)
-  const a2Prime = a2 * (1 + G)
-
+  const a1Prime = a1 * (1 + G), a2Prime = a2 * (1 + G)
   const C1Prime = Math.sqrt(a1Prime * a1Prime + b1 * b1)
   const C2Prime = Math.sqrt(a2Prime * a2Prime + b2 * b2)
   const CbarPrime = (C1Prime + C2Prime) / 2
@@ -120,9 +116,7 @@ function calculateDeltaE2000(
 
   let HbarPrime = h1Prime + h2Prime
   if (C1Prime * C2Prime !== 0) {
-    if (Math.abs(h1Prime - h2Prime) > 180) {
-      HbarPrime = HbarPrime < 360 ? HbarPrime + 360 : HbarPrime - 360
-    }
+    if (Math.abs(h1Prime - h2Prime) > 180) HbarPrime = HbarPrime < 360 ? HbarPrime + 360 : HbarPrime - 360
     HbarPrime /= 2
   }
 
@@ -152,21 +146,15 @@ function calculateDeltaE2000(
   const R_T = -Math.sin((2 * deltaTheta * Math.PI) / 180) * R_C
 
   return Math.sqrt(
-    Math.pow(deltaLPrime / (kL * S_L), 2) +
-    Math.pow(deltaCPrime / (kC * S_C), 2) +
-    Math.pow(deltaHPrime / (kH * S_H), 2) +
-    R_T * (deltaCPrime / (kC * S_C)) * (deltaHPrime / (kH * S_H))
+    Math.pow(deltaLPrime / (kL * S_L), 2) + Math.pow(deltaCPrime / (kC * S_C), 2) +
+    Math.pow(deltaHPrime / (kH * S_H), 2) + R_T * (deltaCPrime / (kC * S_C)) * (deltaHPrime / (kH * S_H))
   )
 }
 
 export function hexToRgbObj(hex: string) {
   let c = hex.replace(/^#/, '')
   if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
-  return {
-    r: parseInt(c.substring(0, 2), 16) || 0,
-    g: parseInt(c.substring(2, 4), 16) || 0,
-    b: parseInt(c.substring(4, 6), 16) || 0,
-  }
+  return { r: parseInt(c.substring(0, 2), 16) || 0, g: parseInt(c.substring(2, 4), 16) || 0, b: parseInt(c.substring(4, 6), 16) || 0 }
 }
 
 function combinations(n: number, k: number): number[][] {
@@ -174,8 +162,6 @@ function combinations(n: number, k: number): number[][] {
   if (k > n || k <= 0) return result
   const combo = new Array<number>(k)
   for (let i = 0; i < k; i++) combo[i] = i
-
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     result.push(combo.slice())
     let i = k - 1
@@ -209,9 +195,31 @@ interface BestResult {
   deltaE: number
 }
 
-// Расширяем лимиты: больше кандидатов, больше точных результатов, сняты блокировки
-const MAX_CANDIDATES = 16
-const MAX_TOP = 20
+// ─── ГЕНЕРАТОР УМНЫХ СЕТОК ДЛЯ ФТАЛОЦИАНИНОВ И БЕЛИЛ ───
+// Смещает доминантную пропорцию (например, 99%) по всем позициям массива.
+function getDominantShifts(baseRatios: number[][]): number[][] {
+  const unique = new Map<string, number[]>()
+  baseRatios.forEach(r => {
+    for (let i = 0; i < r.length; i++) {
+      const copy = [...r]
+      const dom = copy.shift()!
+      copy.splice(i, 0, dom)
+      unique.set(copy.join(','), copy)
+    }
+  })
+  return Array.from(unique.values())
+}
+
+const RATIOS_2 = getDominantShifts([
+  [50, 50], [80, 20], [90, 10], [95, 5], [98, 2], [99, 1]
+])
+const RATIOS_3 = getDominantShifts([
+  [34, 33, 33], [60, 20, 20], [80, 10, 10], [90, 5, 5], [95, 3, 2], [98, 1, 1], [99, 0.5, 0.5]
+])
+const RATIOS_4 = getDominantShifts([
+  [25, 25, 25, 25], [40, 20, 20, 20], [60, 20, 10, 10], [80, 10, 5, 5], 
+  [90, 5, 3, 2], [95, 3, 1, 1], [98, 1, 0.5, 0.5], [99, 0.5, 0.3, 0.2] // <-- Микро-дозы для пастели!
+])
 
 export function findRecipeByHex(
   targetHex: string,
@@ -234,7 +242,6 @@ export function findRecipeByHex(
 
   const targetRgb = hexToRgbObj(targetHex)
   const targetLab = rgbToLab(targetRgb.r, targetRgb.g, targetRgb.b)
-  const isDarkTarget = targetLab.L < 45
 
   const buildComponents = (selected: Pigment[], vols: number[]): MixComponent[] => {
     const components: MixComponent[] = new Array(selected.length)
@@ -242,20 +249,17 @@ export function findRecipeByHex(
       components[i] = { spectrum: selected[i].spectrum!, volume: vols[i] }
     }
     if (binderPigment?.spectrum) {
-      let total = 0
-      for (let i = 0; i < vols.length; i++) total += vols[i]
+      const total = vols.reduce((sum, v) => sum + v, 0)
       components.push({ spectrum: binderPigment.spectrum, volume: total * 0.2, isBinder: true })
     }
     return components
   }
 
-  // Оценка ВСЕХ пигментов по истинной CIEDE2000
   const scored: { pigment: Pigment; dist: number }[] = []
   for (let i = 0; i < validPigments.length; i++) {
     const p = validPigments[i]
     const rgb = spectrumToRGB(mixSpectra(buildComponents([p], [100])))
-    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    scored.push({ pigment: p, dist: calculateDeltaE2000(targetLab, lab) })
+    scored.push({ pigment: p, dist: calculateDeltaE2000(targetLab, rgbToLab(rgb.r, rgb.g, rgb.b)) })
   }
 
   const isAchromatic = (id: string) => {
@@ -263,7 +267,7 @@ export function findRecipeByHex(
     return lower.includes('white') || lower.startsWith('pw_') || lower.includes('black') || lower.startsWith('pbk_')
   }
 
-  // Сортировка кандидатов: Ахроматы (белила/черный) всегда первые, затем по дистанции
+  // Ахроматы (белила/черный) всегда гарантированно попадают в топ кандидатов
   scored.sort((a, b) => {
     const aAchro = isAchromatic(a.pigment.id)
     const bAchro = isAchromatic(b.pigment.id)
@@ -272,6 +276,7 @@ export function findRecipeByHex(
     return a.dist - b.dist
   })
 
+  const MAX_CANDIDATES = 16
   const candidates = scored.slice(0, MAX_CANDIDATES).map(s => s.pigment)
   const n = candidates.length
   if (n === 0) return null
@@ -280,91 +285,46 @@ export function findRecipeByHex(
 
   const tryAddResult = (indices: number[], vols: number[]) => {
     const selected: Pigment[] = new Array(indices.length)
-    for (let i = 0; i < indices.length; i++) {
-      selected[i] = candidates[indices[i]]
-    }
+    for (let i = 0; i < indices.length; i++) selected[i] = candidates[indices[i]]
     const mixed = mixSpectra(buildComponents(selected, vols))
     const rgb = spectrumToRGB(mixed)
-    const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-    
-    // Используем ТОЛЬКО точную формулу CIEDE2000
-    const dist = calculateDeltaE2000(targetLab, lab)
+    const dist = calculateDeltaE2000(targetLab, rgbToLab(rgb.r, rgb.g, rgb.b))
 
-    topResults.push({
-      indices: indices.slice(),
-      volumes: vols.slice(),
-      rgb,
-      deltaE: dist,
-    })
+    topResults.push({ indices: indices.slice(), volumes: vols.slice(), rgb, deltaE: dist })
     topResults.sort((a, b) => a.deltaE - b.deltaE)
-    if (topResults.length > MAX_TOP) topResults.length = MAX_TOP
+    if (topResults.length > 25) topResults.length = 25
   }
 
-  // k = 1
   for (let i = 0; i < n; i++) tryAddResult([i], [100])
 
-  // k = 2
-  const ratios2: number[][] = [
-    [98, 2], [95, 5], [90, 10], [85, 15], [80, 20], [70, 30], [60, 40], [50, 50]
-  ]
   const combos2 = combinations(n, 2)
   for (let c = 0; c < combos2.length; c++) {
-    const [i, j] = combos2[c]
-    for (let r = 0; r < ratios2.length; r++) {
-      const a = ratios2[r][0]
-      const b = ratios2[r][1]
-      tryAddResult([i, j], [a, b])
-      if (a !== b) tryAddResult([i, j], [b, a])
-    }
+    for (let r = 0; r < RATIOS_2.length; r++) tryAddResult(combos2[c], RATIOS_2[r])
   }
 
-  // k = 3
   if (maxComponents >= 3 && n >= 3) {
-    const ratios3: number[][] = [
-      [90, 8, 2], [85, 10, 5], [80, 15, 5], [75, 15, 10],
-      [70, 20, 10], [60, 30, 10], [50, 30, 20], [40, 40, 20], [34, 33, 33]
-    ]
     const combos3 = combinations(n, 3)
     for (let c = 0; c < combos3.length; c++) {
-      const combo = combos3[c]
-      for (let r = 0; r < ratios3.length; r++) {
-        const ratio = ratios3[r]
-        tryAddResult(combo, [ratio[0], ratio[1], ratio[2]])
-        tryAddResult(combo, [ratio[0], ratio[2], ratio[1]])
-        tryAddResult(combo, [ratio[1], ratio[0], ratio[2]])
-      }
+      for (let r = 0; r < RATIOS_3.length; r++) tryAddResult(combos3[c], RATIOS_3[r])
     }
   }
 
-  // k = 4
   if (maxComponents >= 4 && n >= 4) {
-    const ratios4: number[][] = [
-      [70, 15, 10, 5], [60, 20, 15, 5], [50, 25, 15, 10],
-      [45, 25, 20, 10], [40, 30, 20, 10], [35, 30, 20, 15]
-    ]
     const combos4 = combinations(n, 4)
     for (let c = 0; c < combos4.length; c++) {
-      const combo = combos4[c]
-      for (let r = 0; r < ratios4.length; r++) {
-        tryAddResult(combo, ratios4[r])
-      }
+      for (let r = 0; r < RATIOS_4.length; r++) tryAddResult(combos4[c], RATIOS_4[r])
     }
   }
 
   if (topResults.length === 0) return null
 
-  // ── Точная доводка (CIEDE2000 - Улучшенный градиентный спуск) ──
-  let absoluteBest: BestResult = {
-    indices: topResults[0].indices,
-    volumes: topResults[0].volumes.slice(),
-    rgb: topResults[0].rgb,
-    deltaE: Infinity,
-  }
+  // ── ГЛУБОКИЙ ГРАДИЕНТНЫЙ СПУСК ──
+  let absoluteBest: BestResult = { ...topResults[0], volumes: topResults[0].volumes.slice() }
 
-  // Расширенный спектр множителей для более точного поиска
-  const adjustments = isDarkTarget
-    ? [0.5, 0.75, 0.9, 0.95, 1.05, 1.1, 1.33, 2.0]
-    : [0.6, 0.8, 0.9, 0.95, 1.05, 1.1, 1.25, 1.6]
+  // 1. Грубая подгонка (позволяет быстро нарастить объем нужного пигмента в 3-5 раз)
+  const coarseAdjustments = [0.33, 0.6, 0.8, 1.25, 1.6, 3.0]
+  // 2. Ювелирная точность
+  const fineAdjustments = [0.9, 0.95, 1.05, 1.1]
 
   for (let t = 0; t < topResults.length; t++) {
     const candidate = topResults[t]
@@ -372,29 +332,39 @@ export function findRecipeByHex(
 
     const evaluate = (vols: number[]) => {
       const selected: Pigment[] = new Array(candidate.indices.length)
-      for (let i = 0; i < candidate.indices.length; i++) {
-        selected[i] = candidates[candidate.indices[i]]
-      }
-      const mixed = mixSpectra(buildComponents(selected, vols))
-      const rgb = spectrumToRGB(mixed)
-      const lab = rgbToLab(rgb.r, rgb.g, rgb.b)
-      return { rgb, deltaE: calculateDeltaE2000(targetLab, lab) }
+      for (let i = 0; i < candidate.indices.length; i++) selected[i] = candidates[candidate.indices[i]]
+      const rgb = spectrumToRGB(mixSpectra(buildComponents(selected, vols)))
+      return { rgb, deltaE: calculateDeltaE2000(targetLab, rgbToLab(rgb.r, rgb.g, rgb.b)) }
     }
 
     let currentRes = evaluate(currentVols)
-    const passes = 5 // Увеличено количество проходов для глубокой подгонки
 
-    for (let pass = 0; pass < passes; pass++) {
+    // Coarse Passes
+    for (let pass = 0; pass < 4; pass++) {
       let improved = false
       for (let i = 0; i < currentVols.length; i++) {
-        for (let a = 0; a < adjustments.length; a++) {
+        for (let a = 0; a < coarseAdjustments.length; a++) {
           const trialVols = currentVols.slice()
-          trialVols[i] = Math.max(0.1, Math.min(100, trialVols[i] * adjustments[a]))
+          trialVols[i] = Math.max(0.01, Math.min(100, trialVols[i] * coarseAdjustments[a]))
           const trialRes = evaluate(trialVols)
-          if (trialRes.deltaE < currentRes.deltaE - 0.0003) {
-            currentRes = trialRes
-            currentVols = trialVols
-            improved = true
+          if (trialRes.deltaE < currentRes.deltaE - 0.0001) {
+            currentRes = trialRes; currentVols = trialVols; improved = true
+          }
+        }
+      }
+      if (!improved) break
+    }
+
+    // Fine Passes
+    for (let pass = 0; pass < 6; pass++) {
+      let improved = false
+      for (let i = 0; i < currentVols.length; i++) {
+        for (let a = 0; a < fineAdjustments.length; a++) {
+          const trialVols = currentVols.slice()
+          trialVols[i] = Math.max(0.01, Math.min(100, trialVols[i] * fineAdjustments[a]))
+          const trialRes = evaluate(trialVols)
+          if (trialRes.deltaE < currentRes.deltaE - 0.0001) {
+            currentRes = trialRes; currentVols = trialVols; improved = true
           }
         }
       }
@@ -402,48 +372,32 @@ export function findRecipeByHex(
     }
 
     if (currentRes.deltaE < absoluteBest.deltaE) {
-      absoluteBest = {
-        indices: candidate.indices,
-        volumes: currentVols,
-        rgb: currentRes.rgb,
-        deltaE: currentRes.deltaE,
-      }
+      absoluteBest = { indices: candidate.indices, volumes: currentVols, rgb: currentRes.rgb, deltaE: currentRes.deltaE }
     }
   }
 
   const totalWeight = absoluteBest.volumes.reduce((sum, v) => sum + v, 0)
-  if (totalWeight <= 0) return null
-
-  const scaleTarget = targetVolume > 0 ? targetVolume : 20
-  const scale = scaleTarget / totalWeight
+  const scale = (targetVolume > 0 ? targetVolume : 20) / totalWeight
 
   const recipe: RecipeItem[] = []
   for (let i = 0; i < absoluteBest.indices.length; i++) {
     const ml = Math.round(absoluteBest.volumes[i] * scale * 100) / 100
-    if (ml > 0.05) {
-      recipe.push({ pigment: candidates[absoluteBest.indices[i]], ml })
-    }
+    if (ml > 0.05) recipe.push({ pigment: candidates[absoluteBest.indices[i]], ml })
   }
   recipe.sort((a, b) => b.ml - a.ml)
 
   if (binderPigment && system === 'acrylic') {
-    let totalPigmentMl = 0
-    for (let i = 0; i < recipe.length; i++) totalPigmentMl += recipe[i].ml
-    const binderMl = Math.round(totalPigmentMl * 0.2 * 100) / 100
-    if (binderMl > 0) {
-      recipe.push({ pigment: binderPigment, ml: binderMl, isBinder: true })
-    }
+    const binderMl = Math.round(recipe.reduce((sum, item) => sum + item.ml, 0) * 0.2 * 100) / 100
+    if (binderMl > 0) recipe.push({ pigment: binderPigment, ml: binderMl, isBinder: true })
   }
-
-  const deltaE = Math.round(absoluteBest.deltaE * 10) / 10
 
   return {
     recipe,
     resultRgb: absoluteBest.rgb,
     resultHex: rgbToHex(absoluteBest.rgb),
-    deltaE,
+    deltaE: Math.round(absoluteBest.deltaE * 10) / 10,
     system,
-    approximate: deltaE > 2.0,
+    approximate: absoluteBest.deltaE > 2.0,
   }
 }
 
