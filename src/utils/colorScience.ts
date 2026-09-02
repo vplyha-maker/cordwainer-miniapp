@@ -1,3 +1,9 @@
+/**
+ * colorScience.ts
+ * Reflectance → XYZ → sRGB
+ * Pure Single-Constant Kubelka–Munk (Standard Physics)
+ */
+
 export interface SpectrumPoint {
   wavelength: number // нм
   reflectance: number // 0–100 %
@@ -17,6 +23,7 @@ export const SPECTRUM_LEN = 81
 export const WL_START = 380
 export const WL_STEP = 5
 
+// ─── CIE 1931 2° CMF ───
 const CIE_CMF = [
   { wl: 380, x: 0.001368, y: 0.000039, z: 0.00645 },
   { wl: 385, x: 0.002236, y: 0.000064, z: 0.01055 },
@@ -163,11 +170,11 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
 }
 
 /**
- * ЧИСТИЙ SINGLE-CONSTANT KUBELKA-MUNK
- * Біндер ігнорується у математиці кольору для щільного шару фарби.
+ * ЧИСТАЯ ФИЗИКА (Single-Constant Kubelka-Munk).
+ * Идеально подходит для высоконасыщенных пигментов.
  */
 export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
-  // Відфільтровуємо біндер, він впливає тільки на прозорість, а не на колір самої маси
+  // Биндер (прозрачный акрил) отфильтровываем, он не меняет базовый тон смеси
   const pigments = components.filter(c => !c.isBinder)
   const n = pigments.length
   if (n === 0) return []
@@ -185,19 +192,21 @@ export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
     let totalKS = 0
 
     for (let c = 0; c < n; c++) {
-      const comp = pigments[c]
-      const weight = comp.volume * invTotal
-
       let rMeas = aligned
-        ? comp.spectrum[i].reflectance * 0.01
-        : interpolateReflectance(comp.spectrum, wl) * 0.01
+        ? pigments[c].spectrum[i].reflectance * 0.01
+        : interpolateReflectance(pigments[c].spectrum, wl) * 0.01
 
+      // Ограничиваем от 0.01% до 99.99% (защита математики)
       rMeas = Math.max(0.0001, Math.min(0.9999, rMeas))
+      
+      // Формула K/S Кубелки-Мунка
       const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas)
       
-      totalKS += weight * KS
+      // Прямое сложение долей
+      totalKS += (pigments[c].volume * invTotal) * KS
     }
 
+    // Обратный расчет отражения (Reflectance) из общего K/S
     let rMix = 1 + totalKS - Math.sqrt(totalKS * totalKS + 2 * totalKS)
     rMix = Math.max(0, Math.min(1, rMix))
 
