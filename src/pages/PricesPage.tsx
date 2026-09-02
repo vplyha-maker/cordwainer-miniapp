@@ -145,7 +145,6 @@ const formatDate = (dateStr: string | null, lang: Lang) => {
   }).format(d)
 }
 
-// РАСШИРЕННЫЙ СПИСОК СИНОНИМОВ
 const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bнайр[іи]т\b/gi, 'nairit'],
   [/\bдесмокол\b/gi, 'desmokol'],
@@ -156,9 +155,9 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bмультиф[іи]кс\b/gi, 'sarmultifix'],
   [/\bпротрава\b/gi, 'preparatore'],
   [/\bпротравка\b/gi, 'preparatore'],
-  [/\bпротирання\b/gi, 'preparatore'], // Добавлено для Masterok vs Zotti
+  [/\bпротирання\b/gi, 'preparatore'],
   [/\bслоник\b/gi, 'solution'],
-  [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'], // Исправлено для ґумовий / гумової
+  [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'],
   [/\bрезинов(ый|ой|ая|ое)\b/gi, 'rubber'],
   [/\bполіуретанов(ий|ої|а|е)\b/gi, 'polyurethane'],
   [/\bполиуретанов(ый|ой|ая|ое)\b/gi, 'polyurethane'],
@@ -174,10 +173,13 @@ function parsePriceSafely(raw: number | string | null | undefined): number {
   return !isNaN(val) && val > 0 ? val : 0;
 }
 
+// ИСПРАВЛЕННЫЙ ПАРСЕР ОБЪЕМА (Без бага с кириллицей)
 function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; originalLabel: string; multiplier: number } {
   if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
-  const m = s.match(/(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[а-я]*|литр[а-я]*|мл|ml)\b/i)
+  
+  // (?:[\s.,;)]|$) - заменяет багованный \b и отлично читает "0.5л" или "0,5 літра"
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[а-я]*|литр[а-я]*|мл|ml)(?:[\s.,;)]|$)/i)
   if (!m) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
 
   const num = parseFloat(m[1])
@@ -196,9 +198,8 @@ function normalizeProductName(raw: string): string {
 
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
   
-  s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
+  s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)(?:[\s.,;)]|$)/gi, ' ')
   
-  // УДАЛЕНЫ sar, kenda, farben, desmokol, nairit, pur ИЗ МУСОРА! Теперь они сохраняются для поиска.
   const stopWords = [
     'клей', 'взуттєвий', 'обувной', 'обувної', 'банка', 'італія', 'италия', 'чорний', 'черный', 
     'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 
@@ -211,16 +212,20 @@ function normalizeProductName(raw: string): string {
   return Array.from(new Set(words)).sort().join(' ')
 }
 
+// АЛГОРИТМ ИНДЕКСА ЖАККАРА (Предотвращает склеивание разных брендов)
 function calculateWordSimilarity(name1: string, name2: string): number {
-  const words1 = name1.split(' ').filter(Boolean);
-  const words2 = name2.split(' ').filter(Boolean);
-  if (words1.length === 0 || words2.length === 0) return 0;
+  const w1 = name1.split(' ').filter(Boolean);
+  const w2 = name2.split(' ').filter(Boolean);
+  if (w1.length === 0 || w2.length === 0) return 0;
   
   let matches = 0;
-  for (const w of words1) {
-    if (words2.includes(w)) matches++;
+  for (const w of w1) {
+    if (w2.includes(w)) matches++;
   }
-  return (2 * matches) / (words1.length + words2.length);
+  
+  // Формула: Совпадения / (Длина 1 + Длина 2 - Совпадения)
+  const unionSize = new Set([...w1, ...w2]).size;
+  return matches / unionSize;
 }
 
 const formatPrice = (val: number, lang: Lang) => {
@@ -250,7 +255,6 @@ const ProductCard = memo(
     isFavorite: boolean
     onToggleFavorite: (key: string) => void
   }) => {
-    // Сортировка предложений по выгодности внутри карточки
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
       if (b.unitPrice <= 0) return -1
@@ -332,6 +336,7 @@ const ProductCard = memo(
 
           {sortedOffers.map((offer, idx) => {
             const isBest = idx === 0 && showSpread && offer.unitPrice > 0
+            // Обновленные пороги арбитража
             const isArbitrage = offer.unitPrice > 0 && validOffersCount > 1 && offer.unitPrice < avgUnitPrice * 0.88
             const isStrongArbitrage = offer.unitPrice > 0 && validOffersCount > 1 && offer.unitPrice < avgUnitPrice * 0.8
 
@@ -504,6 +509,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         targetGroup = groups.find(g => g.product_code?.toLowerCase() === code) || null;
       }
 
+      // Нечеткий поиск с порогом 0.65 
       if (!targetGroup && cleanName.length >= 2 && groups.length > 0) {
         let bestMatchScore = 0;
         let bestMatchIndex = -1;
@@ -516,7 +522,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           }
         }
 
-        if (bestMatchScore >= 0.6) {
+        if (bestMatchScore >= 0.65) {
           targetGroup = groups[bestMatchIndex];
         }
       }
@@ -535,7 +541,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       };
 
       if (targetGroup) {
-        // УДАЛЕНА ОШИБКА ИЗОЛЯЦИИ! Теперь магазин может иметь несколько предложений (например 1л и 15кг) в одной карточке!
         const isDuplicate = targetGroup.offers.some((o) => o.id === item.id || (o.url && o.url === item.url));
         if (!isDuplicate) {
           targetGroup.offers.push(offer);
