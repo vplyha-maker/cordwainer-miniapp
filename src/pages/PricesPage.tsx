@@ -154,7 +154,14 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bотвердитель\b/gi, 'hardener'],
   [/\bмультиф[іи]кс\b/gi, 'sarmultifix'],
   [/\bпротрава\b/gi, 'preparatore'],
+  [/\bпротравка\b/gi, 'preparatore'],
   [/\bслоник\b/gi, 'solution'],
+  [/\bгумовий\b/gi, 'rubber'],
+  [/\bрезиновый\b/gi, 'rubber'],
+  [/\bполіуретановий\b/gi, 'polyurethane'],
+  [/\bполиуретановый\b/gi, 'polyurethane'],
+  [/\bполіхлоропреновий\b/gi, 'polychloroprene'],
+  [/\bполихлоропреновый\b/gi, 'polychloroprene'],
 ]
 
 function parsePriceSafely(raw: number | string | null | undefined): number {
@@ -184,23 +191,26 @@ function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; origina
 function normalizeProductName(raw: string): string {
   if (!raw) return ''
   let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
+
+  for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
   
+  // Убираем объемы ДО удаления стоп-слов
+  s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
+  
+  // Вырезаем только реальный мусор, оставляя ключевые идентификаторы типа nairit, desmokol, rubber и номера
   const stopWords = [
     'клей', 'взуттєвий', 'обувной', 'банка', 'італія', 'италия', 'чорний', 'черный', 
     'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 
     'ремонту', 'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр', 'шт',
-    'розлив', 'на', 'поліуретановий', 'полиуретановый', 'десмокол', 'дисмакол', 'desmokol', 
-    'наїріт', 'наирит', 'nairit', 'затверджувач', 'отвердитель', 'hardener',
-    '06w', '06wn', '006w', 'm' 
+    'розлив', 'на', 'kenda', 'farben', 'pur', 'original', 'strong', 'shoe', 'glue', 'в', 'от',
+    '06w', '06wn', '006w', 'm', 'і', 'и', 'та'
   ]
 
-  for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
-  s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
   return Array.from(new Set(words)).sort().join(' ')
 }
 
-// ВСТРОЕННЫЙ АЛГОРИТМ ОЦЕНКИ СХОЖЕСТИ СЛОВ
+// КОЭФФИЦИЕНТ СЁРЕНСЕНА — ДАЙСА (Идеально для частичных совпадений)
 function calculateWordSimilarity(name1: string, name2: string): number {
   const words1 = name1.split(' ').filter(Boolean);
   const words2 = name2.split(' ').filter(Boolean);
@@ -210,8 +220,7 @@ function calculateWordSimilarity(name1: string, name2: string): number {
   for (const w of words1) {
     if (words2.includes(w)) matches++;
   }
-  // Возвращает процент совпадения от 0 до 1
-  return matches / Math.max(words1.length, words2.length);
+  return (2 * matches) / (words1.length + words2.length);
 }
 
 const formatPrice = (val: number, lang: Lang) => {
@@ -490,12 +499,11 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
       let targetGroup: GroupedProduct | null = null;
 
-      // 1. Поиск по артикулу
       if (code && code.length >= 2) {
         targetGroup = groups.find(g => g.product_code?.toLowerCase() === code) || null;
       }
 
-      // 2. НЕЧЕТКИЙ ПОИСК (Fuzzy Match по пересечению слов)
+      // Нечеткий поиск с порогом 0.6 (60% совпадения слов)
       if (!targetGroup && cleanName.length >= 2 && groups.length > 0) {
         let bestMatchScore = 0;
         let bestMatchIndex = -1;
@@ -508,7 +516,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           }
         }
 
-        // Если сходство больше 60%, объединяем товары
         if (bestMatchScore >= 0.6) {
           targetGroup = groups[bestMatchIndex];
         }
