@@ -8,8 +8,6 @@ const TELEGRAM_USER_ID = typeof window !== 'undefined' && (window as any).Telegr
   ? (window as any).Telegram.WebApp.initDataUnsafe.user.id 
   : 123456789; 
 
-const MOCK_USD_RATE = 41.50; 
-
 const getLocalDateString = (d: Date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
@@ -19,7 +17,6 @@ const getShortDate = (dateStr: string) => {
   return `${d}.${m}`;
 };
 
-// Форматирование для кнопки "Сохранить за 31 авг"
 const getShortDateName = (dateStr: string) => {
   const d = new Date(dateStr);
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
@@ -41,6 +38,44 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const [dayForm, setDayForm] = useState<Record<string, number | ''>>({});
   const [newItemName, setNewItemName] = useState('');
   const [newItemRate, setNewItemRate] = useState<number | ''>('');
+  
+  // Состояние для реального курса доллара (по умолчанию ставим примерный)
+  const [usdRate, setUsdRate] = useState<number>(41.50);
+  const [isRateLoading, setIsRateLoading] = useState(true);
+
+  // --- ИНТЕГРАЦИЯ КУРСА НБУ ---
+  useEffect(() => {
+    const fetchUsdRate = async () => {
+      try {
+        setIsRateLoading(true);
+        // Попытка 1: Берем из вашего API (как в PricesPage)
+        const apiRes = await fetch('/api/rates').catch(() => null);
+        if (apiRes && apiRes.ok) {
+          const ratesData = await apiRes.json();
+          if (ratesData?.usd) {
+            setUsdRate(Number(ratesData.usd));
+            return; // Успешно загрузили, выходим
+          }
+        }
+
+        // Попытка 2: Прямой запрос к НБУ (если ваш API недоступен)
+        const nbuRes = await fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json');
+        if (nbuRes.ok) {
+          const nbuData = await nbuRes.json();
+          if (nbuData && nbuData.length > 0) {
+            setUsdRate(nbuData[0].rate);
+          }
+        }
+      } catch (err) {
+        console.error('Ошибка при загрузке курса валют:', err);
+      } finally {
+        setIsRateLoading(false);
+      }
+    };
+
+    fetchUsdRate();
+  }, []);
+  // -----------------------------
 
   useEffect(() => {
     if (data?.days?.[selectedDate]) {
@@ -56,7 +91,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     if (data?.days) {
       Object.entries(data.days).forEach(([date, record]) => {
         if (date.startsWith(month)) {
-          // Гарантируем использование актуальных расценок во избежание NaN
           total += calcDayTotal(record.quantities, data.rates || record.rates);
         }
       });
@@ -145,7 +179,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
       const dateStr = getLocalDateString(d); 
       
       const record = data?.days?.[dateStr];
-      // Принудительно используем data.rates, чтобы исключить ошибку нулевого графика
       const total = record ? calcDayTotal(record.quantities, data.rates) : 0;
       if (total > maxVal) maxVal = total;
       
@@ -155,7 +188,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     return { data: last7Days, max: maxVal };
   }, [data?.days, data?.rates]);
 
-  // Улучшенная, более точная логика отслеживания изменений (hasChanges)
   const hasChanges = useMemo(() => {
     const saved = data?.days?.[selectedDate]?.quantities || {};
     if (!data?.items) return false;
@@ -196,13 +228,15 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         <div className="bg-gradient-to-br from-[#1C1C1E] to-[#121212] p-6 rounded-[28px] border border-white/5 shadow-xl">
           <div className="flex justify-between items-start mb-1">
             <span className="text-white/50 text-sm font-medium">Итого за месяц</span>
-            <span className="text-white/30 text-xs px-2 py-1 bg-black/20 rounded-lg">USD {MOCK_USD_RATE}</span>
+            <span className="text-white/30 text-xs px-2 py-1 bg-black/20 rounded-lg flex items-center gap-1">
+              USD {isRateLoading ? <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" /> : usdRate.toFixed(2)}
+            </span>
           </div>
           <div className="text-[40px] leading-none font-black text-[#32D74B] tracking-tight">
             {currentMonthTotal.toLocaleString()} <span className="text-2xl text-white/20 font-bold ml-1">₴</span>
           </div>
           <div className="text-sm font-medium text-white/30 mt-2">
-            ≈ ${(currentMonthTotal / MOCK_USD_RATE).toFixed(2)}
+            ≈ ${(currentMonthTotal / usdRate).toFixed(2)}
           </div>
         </div>
 
@@ -232,7 +266,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       const isToday = date === todayStr;
                       const hasData = checkHasData(date);
                       
-                      // Новая логика стилей для "Сегодня"
                       let buttonClass = 'bg-[#1C1C1E] text-white/60 hover:bg-white/10 border-transparent';
                       let labelClass = 'text-[#32D74B]';
                       
@@ -240,7 +273,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         buttonClass = 'bg-[#0A84FF] text-white shadow-lg shadow-[#0A84FF]/25 border-[#0A84FF]';
                         labelClass = 'text-white/80';
                       } else if (isToday) {
-                        // Сегодня, но не выбрано - прозрачная кнопка с синей обводкой и синим текстом
                         buttonClass = 'bg-[#0A84FF]/10 text-[#0A84FF] border-[#0A84FF]/50';
                         labelClass = 'text-[#0A84FF]';
                       }
@@ -342,7 +374,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       const isToday = i === 6; 
                       
                       return (
-                        // ИСПРАВЛЕНИЕ: Добавлен h-full контейнеру, чтобы flex-1 мог рассчитать высоту бара корректно
                         <div key={i} className="flex flex-col items-center h-full flex-1 group gap-2">
                           <div className="w-full flex-1 relative flex justify-center items-end">
                             <div 
@@ -488,7 +519,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     : 'bg-[#1C1C1E]/80 text-white/30 border-white/5 shadow-none'
                 }`}
               >
-                {/* Теперь кнопка явно показывает, за какое число идет сохранение */}
                 {saving ? 'Сохранение...' : hasChanges ? `Сохранить за ${getShortDateName(selectedDate)}` : `Изменений за ${getShortDateName(selectedDate)} нет`}
               </button>
             </div>
