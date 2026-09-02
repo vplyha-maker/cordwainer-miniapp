@@ -95,9 +95,7 @@ function combinations(n: number, k: number): number[][] {
 
 export interface RecipeItem { pigment: Pigment; ml: number; isBinder?: boolean }
 export interface RecipeResult { recipe: RecipeItem[]; resultRgb: { r: number; g: number; b: number }; resultHex: string; deltaE: number; system: CoverageSystem; approximate?: boolean }
-interface BestResult { indices: number[]; volumes: number[]; rgb: { r: number; g: number; b: number }; deltaE: number }
 
-// Умные сетки (заставляют алгоритм тестировать 99% белил и 1% цвета)
 function getDominantShifts(baseRatios: number[][]): number[][] {
   const unique = new Map<string, number[]>()
   baseRatios.forEach(r => {
@@ -114,11 +112,11 @@ const RATIOS_2 = getDominantShifts([[50, 50], [80, 20], [90, 10], [95, 5], [98, 
 const RATIOS_3 = getDominantShifts([[34, 33, 33], [60, 20, 20], [80, 10, 10], [90, 5, 5], [95, 3, 2], [98, 1, 1], [99, 0.5, 0.5]])
 const RATIOS_4 = getDominantShifts([[25, 25, 25, 25], [40, 20, 20, 20], [60, 20, 10, 10], [80, 10, 5, 5], [90, 5, 3, 2], [95, 3, 1, 1], [98, 1, 0.5, 0.5], [99, 0.5, 0.3, 0.2]])
 
-// ИНЛАЙН СТРОГАЯ ФИЗИКА (Синхронизирована с colorScience.ts)
-function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: any) {
+function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L: number; a: number; b: number }) {
   const n = indices.length;
   let minDE = Infinity;
   let bestVols = Array(n).fill(100 / n);
+  
   const spectra = indices.map(idx => candidates[idx].spectrum!);
 
   const evalVols = (v: number[]) => {
@@ -128,22 +126,19 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: any)
 
     const result: SpectrumPoint[] = new Array(SPECTRUM_LEN);
     for (let i = 0; i < SPECTRUM_LEN; i++) {
-      let totalK = 0, totalS = 0;
+      let mixedKS = 0;
       for (let c = 0; c < n; c++) {
-        let rMeas = spectra[c][i].reflectance * 0.01;
-        rMeas = Math.max(0.0001, Math.min(0.9999, rMeas));
-        
-        const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas);
-        const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5); // СТРОГО ТА ЖЕ ФОРМУЛА
-        const weight = v[c] * invTotal;
-        totalK += weight * KS * S;
-        totalS += weight * S;
+        let rMeas = Math.max(0.0001, Math.min(0.9999, spectra[c][i].reflectance * 0.01));
+        const rInt = rMeas / (0.4 + 0.6 * rMeas);
+        const KS = ((1 - rInt) * (1 - rInt)) / (2 * rInt);
+        mixedKS += (v[c] * invTotal) * KS;
       }
-      const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001;
-      let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS);
-      rMix = Math.max(0, Math.min(1, rMix));
-      result[i] = { wavelength: WL[i], reflectance: rMix * 100 };
+      let rMixInt = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS);
+      rMixInt = Math.max(0.0001, Math.min(0.9999, rMixInt));
+      const rMixMeas = (0.4 * rMixInt) / (1 - 0.6 * rMixInt);
+      result[i] = { wavelength: WL[i], reflectance: rMixMeas * 100 };
     }
+
     const rgb = spectrumToRGB(result);
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b);
     const de = calculateDeltaE2000(targetLab, lab);
@@ -151,23 +146,33 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: any)
     return de;
   }
 
-  if (n === 1) evalVols([100]);
-  else if (n === 2) RATIOS_2.forEach(evalVols);
-  else if (n === 3) RATIOS_3.forEach(evalVols);
-  else if (n === 4) RATIOS_4.forEach(evalVols);
+  if (n === 1) {
+    evalVols([100]);
+  } else if (n === 2) {
+    for (let i = 5; i <= 95; i += 5) evalVols([i, 100 - i]);
+  } else if (n === 3) {
+    for (let i = 5; i <= 90; i += 15)
+      for (let j = 5; j <= 95 - i; j += 15)
+        evalVols([i, j, 100 - i - j]);
+  } else if (n === 4) {
+    for (let i = 5; i <= 85; i += 25)
+      for (let j = 5; j <= 90 - i; j += 25)
+        for (let k = 5; k <= 95 - i - j; k += 25)
+          evalVols([i, j, k, 100 - i - j - k]);
+  }
 
   let improved = true;
   let pass = 0;
-  const shifts = [5, 2, 0.5, 0.1]; 
-  while (improved && pass < 15) {
+  const shifts = [10, 5, 1, 0.5, 0.1]; 
+  while (improved && pass < 20) {
     improved = false;
     pass++;
-    for (let s of shifts) {
+    for (const s of shifts) {
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
           if (i === j) continue;
-          if (bestVols[j] - s >= 0.05) {
-            let test = [...bestVols];
+          if (bestVols[j] - s >= 0.1) {
+            const test = [...bestVols];
             test[i] += s;
             test[j] -= s;
             const oldDE = minDE;
@@ -178,6 +183,7 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: any)
       }
     }
   }
+
   return { vols: bestVols, deltaE: minDE };
 }
 
@@ -206,18 +212,21 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   })
   scoredColors.sort((a, b) => a.dist - b.dist)
 
-  // Гарантируем, что Белила и Чёрный ВСЕГДА попадают в кандидаты
   const candidatesSet = new Set([...achromatics, ...scoredColors.slice(0, 10).map(s => s.pigment)])
   const candidates = Array.from(candidatesSet)
   const n = candidates.length
   if (n === 0) return null
 
-  let bestGlobalResult: { indices: number[], vols: number[], deltaE: number } | null = null
+  let bestDE = Infinity;
+  let bestIndices: number[] = [];
+  let bestVols: number[] = [];
 
   const evaluateCombo = (indices: number[]) => {
     const res = optimizeCombo(indices, candidates, targetLab);
-    if (!bestGlobalResult || res.deltaE < bestGlobalResult.deltaE) {
-      bestGlobalResult = { indices, vols: res.vols, deltaE: res.deltaE };
+    if (res.deltaE < bestDE) {
+      bestDE = res.deltaE;
+      bestIndices = indices;
+      bestVols = res.vols;
     }
   }
 
@@ -236,28 +245,25 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
     for (let c = 0; c < combos4.length; c++) evaluateCombo(combos4[c])
   }
 
-  if (!bestGlobalResult) return null
+  if (bestDE === Infinity) return null
 
-  const finalIndices = bestGlobalResult.indices
-  const finalVols = bestGlobalResult.vols
-  const selected: Pigment[] = finalIndices.map(idx => candidates[idx])
+  const selected: Pigment[] = bestIndices.map((idx: number) => candidates[idx])
   
-  const finalMixed = mixSpectra(selected.map((p, i) => ({ spectrum: p.spectrum!, volume: finalVols[i] })))
+  const finalMixed = mixSpectra(selected.map((p, i) => ({ spectrum: p.spectrum!, volume: bestVols[i] })))
   const finalRgb = spectrumToRGB(finalMixed)
 
-  const totalWeight = finalVols.reduce((sum, v) => sum + v, 0)
+  const totalWeight = bestVols.reduce((sum: number, v: number) => sum + v, 0)
   const scale = (targetVolume > 0 ? targetVolume : 20) / totalWeight
 
   const recipe: RecipeItem[] = []
-  for (let i = 0; i < finalIndices.length; i++) {
-    const ml = Math.round(finalVols[i] * scale * 100) / 100
-    if (ml > 0.05) recipe.push({ pigment: candidates[finalIndices[i]], ml })
+  for (let i = 0; i < bestIndices.length; i++) {
+    const ml = Math.round(bestVols[i] * scale * 100) / 100
+    if (ml > 0.05) recipe.push({ pigment: candidates[bestIndices[i]], ml })
   }
   recipe.sort((a, b) => b.ml - a.ml)
 
-  // В самом конце мы подставляем 20% прозрачного акрилового біндера
   if (binderPigment && system === 'acrylic') {
-    const binderMl = Math.round(recipe.reduce((sum, item) => sum + item.ml, 0) * 0.2 * 100) / 100
+    const binderMl = Math.round(recipe.reduce((sum: number, item: RecipeItem) => sum + item.ml, 0) * 0.2 * 100) / 100
     if (binderMl > 0) recipe.push({ pigment: binderPigment, ml: binderMl, isBinder: true })
   }
 
@@ -265,13 +271,12 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
     recipe,
     resultRgb: finalRgb,
     resultHex: rgbToHex(finalRgb),
-    deltaE: Math.round(bestGlobalResult.deltaE * 10) / 10,
+    deltaE: Math.round(bestDE * 10) / 10,
     system,
-    approximate: bestGlobalResult.deltaE > 2.0,
+    approximate: bestDE > 2.0,
   }
 }
 
-// simulateLayersKM оставьте без изменений
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
   paintSpectrum: SpectrumPoint[],
