@@ -145,6 +145,7 @@ const formatDate = (dateStr: string | null, lang: Lang) => {
   }).format(d)
 }
 
+// РАСШИРЕННЫЙ СПИСОК СИНОНИМОВ
 const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bнайр[іи]т\b/gi, 'nairit'],
   [/\bдесмокол\b/gi, 'desmokol'],
@@ -155,13 +156,14 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bмультиф[іи]кс\b/gi, 'sarmultifix'],
   [/\bпротрава\b/gi, 'preparatore'],
   [/\bпротравка\b/gi, 'preparatore'],
+  [/\bпротирання\b/gi, 'preparatore'], // Добавлено для Masterok vs Zotti
   [/\bслоник\b/gi, 'solution'],
-  [/\bгумовий\b/gi, 'rubber'],
-  [/\bрезиновый\b/gi, 'rubber'],
-  [/\bполіуретановий\b/gi, 'polyurethane'],
-  [/\bполиуретановый\b/gi, 'polyurethane'],
-  [/\bполіхлоропреновий\b/gi, 'polychloroprene'],
-  [/\bполихлоропреновый\b/gi, 'polychloroprene'],
+  [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'], // Исправлено для ґумовий / гумової
+  [/\bрезинов(ый|ой|ая|ое)\b/gi, 'rubber'],
+  [/\bполіуретанов(ий|ої|а|е)\b/gi, 'polyurethane'],
+  [/\bполиуретанов(ый|ой|ая|ое)\b/gi, 'polyurethane'],
+  [/\bполіхлоропренов(ий|ої|а|е)\b/gi, 'polychloroprene'],
+  [/\bполихлоропренов(ый|ой|ая|ое)\b/gi, 'polychloroprene'],
 ]
 
 function parsePriceSafely(raw: number | string | null | undefined): number {
@@ -194,23 +196,21 @@ function normalizeProductName(raw: string): string {
 
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
   
-  // Убираем объемы ДО удаления стоп-слов
   s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
   
-  // Вырезаем только реальный мусор, оставляя ключевые идентификаторы типа nairit, desmokol, rubber и номера
+  // УДАЛЕНЫ sar, kenda, farben, desmokol, nairit, pur ИЗ МУСОРА! Теперь они сохраняются для поиска.
   const stopWords = [
-    'клей', 'взуттєвий', 'обувной', 'банка', 'італія', 'италия', 'чорний', 'черный', 
+    'клей', 'взуттєвий', 'обувной', 'обувної', 'банка', 'італія', 'италия', 'чорний', 'черный', 
     'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 
     'ремонту', 'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр', 'шт',
-    'розлив', 'на', 'kenda', 'farben', 'pur', 'original', 'strong', 'shoe', 'glue', 'в', 'от',
-    '06w', '06wn', '006w', 'm', 'і', 'и', 'та'
+    'розлив', 'на', 'original', 'strong', 'shoe', 'glue', 'в', 'от',
+    '06w', '06wn', '006w', 'm', 'і', 'и', 'та', 'або', 'или'
   ]
 
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
   return Array.from(new Set(words)).sort().join(' ')
 }
 
-// КОЭФФИЦИЕНТ СЁРЕНСЕНА — ДАЙСА (Идеально для частичных совпадений)
 function calculateWordSimilarity(name1: string, name2: string): number {
   const words1 = name1.split(' ').filter(Boolean);
   const words2 = name2.split(' ').filter(Boolean);
@@ -250,6 +250,7 @@ const ProductCard = memo(
     isFavorite: boolean
     onToggleFavorite: (key: string) => void
   }) => {
+    // Сортировка предложений по выгодности внутри карточки
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
       if (b.unitPrice <= 0) return -1
@@ -503,7 +504,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         targetGroup = groups.find(g => g.product_code?.toLowerCase() === code) || null;
       }
 
-      // Нечеткий поиск с порогом 0.6 (60% совпадения слов)
       if (!targetGroup && cleanName.length >= 2 && groups.length > 0) {
         let bestMatchScore = 0;
         let bestMatchIndex = -1;
@@ -535,32 +535,9 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       };
 
       if (targetGroup) {
-        const existingOfferIndex = targetGroup.offers.findIndex((o) => o.source === item.source);
-
-        if (existingOfferIndex >= 0 && !item.product_code) {
-          groups.push({
-            key: `isolate_${item.id}`,
-            name: item.name,
-            product_code: item.product_code,
-            image_url: item.image_url,
-            category: item.category,
-            offers: [offer],
-            minUnitPrice: unitPrice,
-            maxUnitPrice: unitPrice,
-            unitSpread: 0,
-            latestUpdatedAt: item.updated_at,
-            outOfStockCount: validPrice <= 0 ? 1 : 0,
-            totalOffers: 1,
-          });
-          return;
-        }
-
-        if (existingOfferIndex >= 0) {
-          const existingOffer = targetGroup.offers[existingOfferIndex];
-          if (unitPrice > 0 && (existingOffer.unitPrice === 0 || unitPrice < existingOffer.unitPrice)) {
-            targetGroup.offers[existingOfferIndex] = offer;
-          }
-        } else {
+        // УДАЛЕНА ОШИБКА ИЗОЛЯЦИИ! Теперь магазин может иметь несколько предложений (например 1л и 15кг) в одной карточке!
+        const isDuplicate = targetGroup.offers.some((o) => o.id === item.id || (o.url && o.url === item.url));
+        if (!isDuplicate) {
           targetGroup.offers.push(offer);
         }
 
