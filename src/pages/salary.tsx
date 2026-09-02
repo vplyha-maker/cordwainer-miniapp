@@ -14,10 +14,15 @@ const getLocalDateString = (d: Date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-// Форматирование для маленьких кнопок в виде DD.MM
 const getShortDate = (dateStr: string) => {
   const [y, m, d] = dateStr.split('-');
   return `${d}.${m}`;
+};
+
+// Форматирование для кнопки "Сохранить за 31 авг"
+const getShortDateName = (dateStr: string) => {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
 };
 
 type SalaryCalcPageProps = {
@@ -51,7 +56,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     if (data?.days) {
       Object.entries(data.days).forEach(([date, record]) => {
         if (date.startsWith(month)) {
-          total += calcDayTotal(record.quantities, record.rates);
+          // Гарантируем использование актуальных расценок во избежание NaN
+          total += calcDayTotal(record.quantities, data.rates || record.rates);
         }
       });
     }
@@ -139,26 +145,28 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
       const dateStr = getLocalDateString(d); 
       
       const record = data?.days?.[dateStr];
-      const total = record ? calcDayTotal(record.quantities, record.rates) : 0;
+      // Принудительно используем data.rates, чтобы исключить ошибку нулевого графика
+      const total = record ? calcDayTotal(record.quantities, data.rates) : 0;
       if (total > maxVal) maxVal = total;
       
       const shortDate = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
       last7Days.push({ date: shortDate, total });
     }
     return { data: last7Days, max: maxVal };
-  }, [data?.days]);
+  }, [data?.days, data?.rates]);
 
+  // Улучшенная, более точная логика отслеживания изменений (hasChanges)
   const hasChanges = useMemo(() => {
     const saved = data?.days?.[selectedDate]?.quantities || {};
-    const currentKeys = Object.keys(dayForm);
-    const savedKeys = Object.keys(saved);
+    if (!data?.items) return false;
     
-    if (currentKeys.length !== savedKeys.length) return true;
-    for (const key of currentKeys) {
-      if (Number(dayForm[key]) !== Number(saved[key] || 0)) return true;
+    for (const item of data.items) {
+      const currentVal = Number(dayForm[item.id]) || 0;
+      const savedVal = Number(saved[item.id]) || 0;
+      if (currentVal !== savedVal) return true;
     }
     return false;
-  }, [dayForm, data?.days, selectedDate]);
+  }, [dayForm, data?.days, selectedDate, data?.items]);
 
   if (loading || error) return null; 
 
@@ -224,19 +232,28 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       const isToday = date === todayStr;
                       const hasData = checkHasData(date);
                       
+                      // Новая логика стилей для "Сегодня"
+                      let buttonClass = 'bg-[#1C1C1E] text-white/60 hover:bg-white/10 border-transparent';
+                      let labelClass = 'text-[#32D74B]';
+                      
+                      if (isSelected) {
+                        buttonClass = 'bg-[#0A84FF] text-white shadow-lg shadow-[#0A84FF]/25 border-[#0A84FF]';
+                        labelClass = 'text-white/80';
+                      } else if (isToday) {
+                        // Сегодня, но не выбрано - прозрачная кнопка с синей обводкой и синим текстом
+                        buttonClass = 'bg-[#0A84FF]/10 text-[#0A84FF] border-[#0A84FF]/50';
+                        labelClass = 'text-[#0A84FF]';
+                      }
+
                       return (
                         <button
                           key={date}
                           onClick={() => { triggerHaptic(); setSelectedDate(date); }}
-                          className={`relative flex-shrink-0 px-5 py-3 rounded-2xl flex flex-col items-center justify-center min-w-[70px] transition-all ${
-                            isSelected 
-                              ? 'bg-[#0A84FF] text-white shadow-lg shadow-[#0A84FF]/25' 
-                              : 'bg-[#1C1C1E] text-white/60 hover:bg-white/10 border border-transparent'
-                          }`}
+                          className={`relative flex-shrink-0 px-5 py-3 rounded-2xl flex flex-col items-center justify-center min-w-[70px] transition-all border ${buttonClass}`}
                         >
                           <span className="text-base font-bold tracking-wide">{getShortDate(date)}</span>
                           {isToday && (
-                            <span className={`text-[10px] font-medium mt-0.5 ${isSelected ? 'text-white/80' : 'text-[#32D74B]'}`}>
+                            <span className={`text-[10px] font-bold mt-0.5 ${labelClass}`}>
                               Сегодня
                             </span>
                           )}
@@ -264,7 +281,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                   </label>
                 </div>
 
-                {/* Якорный заголовок контекста */}
                 {data.items.length > 0 && (
                   <div className="px-2 pt-2">
                     <h2 className="text-lg font-bold text-white/90">
@@ -320,14 +336,15 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
 
                 <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
                   <h3 className="font-bold text-white/30 mb-6 text-xs uppercase tracking-[0.2em]">Активность (7 дней)</h3>
-                  <div className="flex items-end justify-between h-32 gap-2">
+                  <div className="flex items-end justify-between h-32 gap-2 mt-4">
                     {chartData.data.map((day, i) => {
                       const height = Math.max((day.total / chartData.max) * 100, day.total > 0 ? 8 : 0);
                       const isToday = i === 6; 
                       
                       return (
-                        <div key={i} className="flex flex-col items-center flex-1 group">
-                          <div className="w-full relative flex justify-center items-end h-full">
+                        // ИСПРАВЛЕНИЕ: Добавлен h-full контейнеру, чтобы flex-1 мог рассчитать высоту бара корректно
+                        <div key={i} className="flex flex-col items-center h-full flex-1 group gap-2">
+                          <div className="w-full flex-1 relative flex justify-center items-end">
                             <div 
                               style={{ height: `${height}%` }}
                               className={`w-full max-w-[32px] rounded-lg transition-all duration-500 ease-out ${
@@ -337,7 +354,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                               }`}
                             />
                           </div>
-                          <span className={`text-[10px] mt-4 font-semibold ${isToday ? 'text-[#32D74B]' : 'text-white/30'}`}>
+                          <span className={`text-[10px] font-semibold ${isToday ? 'text-[#32D74B]' : 'text-white/30'}`}>
                             {day.date}
                           </span>
                         </div>
@@ -471,7 +488,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     : 'bg-[#1C1C1E]/80 text-white/30 border-white/5 shadow-none'
                 }`}
               >
-                {saving ? 'Сохранение...' : hasChanges ? 'Сохранить день' : 'Изменений нет'}
+                {/* Теперь кнопка явно показывает, за какое число идет сохранение */}
+                {saving ? 'Сохранение...' : hasChanges ? `Сохранить за ${getShortDateName(selectedDate)}` : `Изменений за ${getShortDateName(selectedDate)} нет`}
               </button>
             </div>
           </motion.div>
