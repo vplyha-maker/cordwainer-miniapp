@@ -334,4 +334,4 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
       </div>
     </motion.div>
   );
-}
+    }
