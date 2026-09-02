@@ -11,10 +11,11 @@ export interface PaintPart {
   amount: string
 }
 
-let paintIdSeq = 0
+// ИСПРАВЛЕНО: Теперь каждый ID гарантированно уникален
 function nextPaintId(): string {
-  paintIdSeq += 1
-  return `p-\( {paintIdSeq}- \){Date.now().toString(36)}`
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 const DEFAULT_ROWS: PaintPart[] = [
@@ -105,4 +106,4 @@ export function usePaintMix(pigments: Pigment[]) {
     clearAllAmounts,
     applyRecipe,
   }
- }
+}
