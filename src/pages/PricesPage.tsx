@@ -9,6 +9,8 @@ import {
   BookOpen,
   ChevronDown,
   Clock,
+  Bookmark,
+  TrendingDown
 } from 'lucide-react'
 import type { Lang } from '../App'
 
@@ -27,7 +29,10 @@ type Product = {
 type Offer = {
   id: number
   source: string
-  price: number
+  price: number // Исходная цена
+  unitPrice: number // Цена за 1 кг / 1 л / 1 шт
+  baseUnit: 'кг' | 'л' | 'шт'
+  volumeLabel: string // Исходная этикетка объема (например "15 кг")
   url: string | null
   updated_at: string | null
 }
@@ -39,9 +44,9 @@ type GroupedProduct = {
   image_url: string | null
   category: string | null
   offers: Offer[]
-  minPrice: number
-  maxPrice: number
-  maxSavings: number
+  minUnitPrice: number
+  maxUnitPrice: number
+  unitSpread: number // В процентах разница удельой цены
   latestUpdatedAt: string | null
   outOfStockCount: number
   totalOffers: number
@@ -52,7 +57,7 @@ type PricesPageProps = {
   lang: Lang
 }
 
-type SortOption = 'default' | 'price-asc' | 'savings' | 'name'
+type SortOption = 'default' | 'unit-price-asc' | 'savings' | 'name'
 
 const PAGE_SIZE = 15
 
@@ -64,13 +69,14 @@ const DICTIONARY = {
     retry: 'Повторить попытку',
     search: 'Поиск по артикулу или названию...',
     allSources: 'Все рынки',
+    favorites: 'Отслеживаемые',
     sortDefault: 'Популярные',
-    sortPriceAsc: 'Дешевые',
-    sortSavings: 'Макс. выгода',
+    sortUnitPriceAsc: 'Выгодные (за кг/л)',
+    sortSavings: 'Макс. разница',
     sortName: 'Алфавит',
     code: 'Арт.',
     bestPrice: 'ТОП Цена',
-    saveUpTo: 'Выгода',
+    saveUpTo: 'Разница',
     statsTotal: 'товаров',
     statsAvgSpread: 'Средняя разница',
     empty: 'Ничего не найдено',
@@ -83,6 +89,7 @@ const DICTIONARY = {
     deficit: '⚠️ Риск дефицита',
     priceRise: '📈 Ожидается рост цены',
     urgentBuy: '🔥 Срочный выкуп',
+    perUnit: 'за',
   },
   uk: {
     title: 'Аналітика цін',
@@ -91,13 +98,14 @@ const DICTIONARY = {
     retry: 'Повторити спробу',
     search: 'Пошук за артикулом або назвою...',
     allSources: 'Всі ринки',
+    favorites: 'Відстежувані',
     sortDefault: 'Популярні',
-    sortPriceAsc: 'Дешевші',
-    sortSavings: 'Макс. вигода',
+    sortUnitPriceAsc: 'Вигідні (за кг/л)',
+    sortSavings: 'Макс. різниця',
     sortName: 'Алфавіт',
     code: 'Арт.',
     bestPrice: 'ТОП Ціна',
-    saveUpTo: 'Вигода',
+    saveUpTo: 'Різниця',
     statsTotal: 'товарів',
     statsAvgSpread: 'Середня різниця',
     empty: 'Нічого не знайдено',
@@ -110,6 +118,7 @@ const DICTIONARY = {
     deficit: '⚠️ Ризик дефіциту',
     priceRise: '📈 Очікується зростання ціни',
     urgentBuy: '🔥 Терміновий викуп',
+    perUnit: 'за',
   },
 }
 
@@ -147,51 +156,50 @@ const BRAND_ALIASES: Array<[RegExp, string]> = [
   [/\bслоник\b/gi, 'solution'],
 ]
 
-function extractVolumeKey(raw: string): string {
-  if (!raw) return ''
+// Универсальный парсер объемов для приведения к цене за 1 кг / 1 л
+function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; originalLabel: string; multiplier: number } {
+  if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
-  const m = s.match(/(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|грам[іав]*|g|л|l|літр[аів]*|литр[аов]*|мл|ml)(?:\s|$|[.,;)])/i)
-  if (!m) return ''
-
-  let unit = m[2].toLowerCase()
-  if (unit.startsWith('літр') || unit.startsWith('литр') || unit === 'l') unit = 'l'
-  else if (['кг', 'kg'].includes(unit)) unit = 'kg'
-  else if (['г', 'гр', 'g'].includes(unit) || unit.startsWith('грам')) unit = 'g'
-  else if (['мл', 'ml'].includes(unit)) unit = 'ml'
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[а-я]*|литр[а-я]*|мл|ml)\b/i)
+  if (!m) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
 
   const num = parseFloat(m[1])
-  const formatted = num >= 10 ? Math.round(num) : Math.round(num * 100) / 100
-  return `${formatted}${unit}`
+  if (num === 0 || isNaN(num)) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
+
+  const u = m[2].toLowerCase()
+  if (u.startsWith('л') || u === 'l') return { baseUnit: 'л', originalLabel: `${num} л`, multiplier: 1 / num }
+  if (u.startsWith('м') || u === 'ml') return { baseUnit: 'л', originalLabel: `${num} мл`, multiplier: 1000 / num }
+  if (['кг', 'kg'].includes(u)) return { baseUnit: 'кг', originalLabel: `${num} кг`, multiplier: 1 / num }
+  return { baseUnit: 'кг', originalLabel: `${num} г`, multiplier: 1000 / num }
 }
 
+// Жесткая очистка названий от "мусорных" слов для объединения 1кг и 15кг в одну группу
 function normalizeProductName(raw: string): string {
   if (!raw) return ''
   let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−]/g, ' ')
-  for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
-  s = s
-    .replace(/\b(італія|италия|турция|туреччина|нови[йя]|новый|акція|акция|premium)\b/gi, ' ')
-    .replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
-    .replace(/[^a-zа-яіїєґ0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  
+  const stopWords = [
+    'клей', 'взуттєвий', 'обувной', 'банка', 'італія', 'италия', 'чорний', 'черный', 
+    'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 
+    'ремонту', 'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр', 'шт'
+  ]
 
-  return Array.from(
-    new Set(
-      s
-        .split(' ')
-        .filter((t) => t.length > 1 && !['для', 'the', 'and', 'або', 'или', 'тип'].includes(t))
-    )
-  ).join(' ')
+  for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ` ${rep} `)
+  
+  // Вырезаем объемы, чтобы SAR 306 1кг и SAR 306 15кг стали просто SAR 306
+  s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)\b/gi, ' ')
+  
+  const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
+  // Сортируем слова по алфавиту, чтобы порядок не влиял на группировку
+  return Array.from(new Set(words)).sort().join(' ')
 }
 
 function makeGroupingKey(item: Product): string {
   const code = item.product_code?.trim()?.toLowerCase()
-  const vol = extractVolumeKey(item.name)
-
-  if (code && code.length >= 2) return vol ? `code_${code}__${vol}` : `code_${code}`
+  if (code && code.length >= 2) return `code_${code}`
 
   const base = normalizeProductName(item.name)
-  if (base.length >= 4) return vol ? `name_${base}__${vol}` : `name_${base}`
+  if (base.length >= 4) return `name_${base}`
 
   return `raw_${(item.name || '').toLowerCase().replace(/[^a-z0-9]/gi, '').slice(0, 30) || item.id}`
 }
@@ -212,21 +220,26 @@ const ProductCard = memo(
     t,
     eurRate,
     usdRate,
+    isFavorite,
+    onToggleFavorite,
   }: {
     group: GroupedProduct
     lang: Lang
     t: typeof DICTIONARY['ru']
     eurRate: number | null
     usdRate: number | null
+    isFavorite: boolean
+    onToggleFavorite: (key: string) => void
   }) => {
+    // Сортируем предложения по УДЕЛЬНОЙ цене, а не по исходной
     const sortedOffers = [...group.offers].sort((a, b) => {
-      if (a.price <= 0) return 1
-      if (b.price <= 0) return -1
-      return a.price - b.price
+      if (a.unitPrice <= 0) return 1
+      if (b.unitPrice <= 0) return -1
+      return a.unitPrice - b.unitPrice
     })
 
-    const validPrices = sortedOffers.filter((o) => o.price > 0).map((o) => o.price)
-    const avgPrice = validPrices.length ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 0
+    const validPrices = sortedOffers.filter((o) => o.unitPrice > 0).map((o) => o.unitPrice)
+    const avgUnitPrice = validPrices.length ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 0
     const validOffersCount = validPrices.length
 
     const showSpread = validOffersCount > 1
@@ -238,8 +251,8 @@ const ProductCard = memo(
       group.totalOffers >= 3 && group.outOfStockCount >= group.totalOffers - 1 && validOffersCount > 0
 
     return (
-      <div className="rounded-2xl p-4 bg-[#1A1614] border border-white/5 flex flex-col gap-3 relative overflow-hidden">
-        {(group.maxSavings > 200 || isDeficit) && (
+      <div className="rounded-2xl p-4 bg-[#1A1614] border border-white/5 flex flex-col gap-3 relative overflow-hidden group/card">
+        {(group.unitSpread > 30 || isDeficit) && (
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#E4D00A]/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         )}
 
@@ -248,35 +261,31 @@ const ProductCard = memo(
             <img
               src={group.image_url}
               alt=""
-              className="w-16 h-16 rounded-xl object-cover bg-[#25201C] shrink-0 border border-white/5"
+              className="w-14 h-14 rounded-xl object-cover bg-[#25201C] shrink-0 border border-white/5"
               loading="lazy"
             />
           ) : (
-            <div className="w-16 h-16 rounded-xl bg-[#25201C] shrink-0 flex items-center justify-center text-white/10">
-              <Tag size={20} />
+            <div className="w-14 h-14 rounded-xl bg-[#25201C] shrink-0 flex items-center justify-center text-white/10">
+              <Tag size={18} />
             </div>
           )}
-          <div className="flex-1 min-w-0 space-y-1">
-            <h3 className="text-sm font-medium leading-tight text-white line-clamp-2">{group.name}</h3>
-            <div className="flex flex-wrap gap-1.5 mt-1">
+          <div className="flex-1 min-w-0 pr-8">
+            <h3 className="text-sm font-bold leading-tight text-white line-clamp-2">{group.name}</h3>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
               {group.product_code && (
-                <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-mono text-[#B9ACA0] uppercase">
+                <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-mono text-[#B9ACA0] uppercase tracking-wider">
                   {t.code} {group.product_code}
                 </span>
               )}
-              {showSpread && group.maxSavings > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-[#E4D00A]/10 text-[#E4D00A] text-[10px] font-bold">
-                  {t.saveUpTo} {formatPrice(group.maxSavings, lang)}
+              {showSpread && group.unitSpread > 0 && (
+                <span className="px-1.5 py-0.5 rounded bg-[#E4D00A]/10 text-[#E4D00A] text-[10px] font-bold flex items-center gap-1">
+                  <TrendingDown size={10} />
+                  {group.unitSpread.toFixed(0)}%
                 </span>
               )}
               {isStrongDeficit && (
                 <span className="px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400 text-[10px] font-bold">
                   {t.deficit}
-                </span>
-              )}
-              {isDeficit && !isStrongDeficit && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[10px] font-bold">
-                  {t.priceRise}
                 </span>
               )}
               {formattedDate && (
@@ -287,45 +296,39 @@ const ProductCard = memo(
               )}
             </div>
           </div>
+          
+          <button 
+            onClick={() => onToggleFavorite(group.key)}
+            className="absolute top-0 right-0 p-1 rounded-lg text-[#B9ACA0] hover:text-white active:scale-90 transition-all"
+          >
+            <Bookmark size={18} className={isFavorite ? "fill-[#E4D00A] text-[#E4D00A]" : ""} />
+          </button>
         </div>
 
-        <div className="flex flex-col gap-1 mt-1 relative z-10">
+        <div className="flex flex-col gap-1.5 mt-2 relative z-10">
           {!showSpread && (
-            <div className="mb-1 text-[11px] text-[#B9ACA0] flex items-center gap-1.5 px-1">
+            <div className="mb-0.5 text-[11px] text-[#B9ACA0] flex items-center gap-1.5 px-1">
               <Store size={12} className="text-white/20" /> {t.singleOffer}
             </div>
           )}
 
           {sortedOffers.map((offer, idx) => {
-            const isBest = idx === 0 && showSpread && offer.price > 0
-
-            const isArbitrage =
-              offer.price > 0 && validOffersCount > 1 && offer.price < avgPrice * 0.88
-            const isStrongArbitrage =
-              offer.price > 0 && validOffersCount > 1 && offer.price < avgPrice * 0.8
+            const isBest = idx === 0 && showSpread && offer.unitPrice > 0
+            const isArbitrage = offer.unitPrice > 0 && validOffersCount > 1 && offer.unitPrice < avgUnitPrice * 0.88
+            const isStrongArbitrage = offer.unitPrice > 0 && validOffersCount > 1 && offer.unitPrice < avgUnitPrice * 0.8
 
             const Comp = offer.url ? 'a' : 'div'
-            const barWidth =
-              offer.price > 0 && maxCardPrice > 0 ? `${(offer.price / maxCardPrice) * 100}%` : '0%'
-
-            const priceInUsd = usdRate && offer.price > 0 ? (offer.price / usdRate).toFixed(1) : null
-            const priceInEur = eurRate && offer.price > 0 ? (offer.price / eurRate).toFixed(1) : null
+            const barWidth = offer.unitPrice > 0 && maxCardPrice > 0 ? `${(offer.unitPrice / maxCardPrice) * 100}%` : '0%'
 
             return (
               <Comp
                 key={`${offer.source}_${offer.id}`}
-                {...(offer.url
-                  ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' }
-                  : {})}
-                className={`relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors overflow-hidden group ${
-                  isBest
-                    ? 'bg-[#E4D00A]/10 border border-[#E4D00A]/20'
-                    : isStrongArbitrage
-                      ? 'bg-red-500/10 border border-red-500/20'
-                      : 'bg-[#25201C] border border-transparent'
+                {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
+                className={`relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors overflow-hidden ${
+                  isBest ? 'bg-[#E4D00A]/10 border border-[#E4D00A]/20' : isStrongArbitrage ? 'bg-red-500/10 border border-red-500/20' : 'bg-[#25201C] border border-transparent'
                 }`}
               >
-                {showSpread && offer.price > 0 && (
+                {showSpread && offer.unitPrice > 0 && (
                   <div
                     className={`absolute left-0 bottom-0 top-0 opacity-10 pointer-events-none transition-all ${
                       isBest ? 'bg-[#E4D00A]' : isStrongArbitrage ? 'bg-red-400' : 'bg-white'
@@ -334,45 +337,40 @@ const ProductCard = memo(
                   />
                 )}
 
-                <div className="flex items-center gap-2 min-w-0 z-10">
-                  <span
-                    className={`text-[13px] font-medium truncate ${
-                      isBest ? 'text-white' : 'text-[#B9ACA0]'
-                    }`}
-                  >
-                    {formatSourceName(offer.source)}
-                  </span>
-
-                  {isStrongArbitrage && (
-                    <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-red-500/25 text-red-300 border border-red-500/40 font-bold uppercase tracking-wide">
-                      {t.urgentBuy}
+                <div className="flex flex-col justify-center z-10 min-w-0 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[13px] font-medium truncate ${isBest ? 'text-white' : 'text-[#B9ACA0]'}`}>
+                      {formatSourceName(offer.source)}
                     </span>
-                  )}
-                  {isArbitrage && !isStrongArbitrage && (
-                    <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 font-bold uppercase tracking-wide">
-                      {t.priceLag}
-                    </span>
-                  )}
-                  {isBest && !isArbitrage && (
-                    <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-[#E4D00A] text-black font-bold uppercase tracking-wide">
-                      {t.bestPrice}
-                    </span>
+                    {offer.volumeLabel && (
+                      <span className="text-[10px] bg-white/5 text-[#B9ACA0] px-1.5 py-0.5 rounded font-mono">
+                        {offer.volumeLabel}
+                      </span>
+                    )}
+                  </div>
+                  {(isStrongArbitrage || isArbitrage || isBest) && (
+                    <div className="flex gap-1.5 mt-1">
+                      {isStrongArbitrage && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/25 text-red-300 font-bold uppercase tracking-wide">
+                          {t.urgentBuy}
+                        </span>
+                      )}
+                      {isBest && !isArbitrage && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#E4D00A] text-black font-bold uppercase tracking-wide">
+                          {t.bestPrice}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
 
-                <div className="flex flex-col items-end z-10">
-                  <span
-                    className={`text-sm font-bold tabular-nums ${
-                      isBest ? 'text-[#E4D00A]' : isStrongArbitrage ? 'text-red-300' : 'text-white'
-                    }`}
-                  >
+                <div className="flex flex-col items-end z-10 shrink-0">
+                  <span className={`text-sm font-bold tabular-nums ${isBest ? 'text-[#E4D00A]' : isStrongArbitrage ? 'text-red-300' : 'text-white'}`}>
                     {formatPrice(offer.price, lang)}
                   </span>
-                  {(priceInUsd || priceInEur) && (
-                    <span className="text-[10px] text-[#B9ACA0] font-medium tracking-wide">
-                      {priceInUsd && <>≈ ${priceInUsd}</>}
-                      {priceInUsd && priceInEur && ' · '}
-                      {priceInEur && <>≈ €{priceInEur}</>}
+                  {offer.multiplier !== 1 && offer.unitPrice > 0 && (
+                    <span className="text-[10px] text-[#B9ACA0] font-medium tracking-wide mt-0.5">
+                      {Math.round(offer.unitPrice)} ₴ / 1 {offer.baseUnit}
                     </span>
                   )}
                 </div>
@@ -386,6 +384,7 @@ const ProductCard = memo(
   (prev, next) =>
     prev.group.key === next.group.key &&
     prev.lang === next.lang &&
+    prev.isFavorite === next.isFavorite &&
     prev.eurRate === next.eurRate &&
     prev.usdRate === next.usdRate
 )
@@ -401,9 +400,28 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
-  const [selectedSource, setSelectedSource] = useState<string>('all')
+  const [selectedSource, setSelectedSource] = useState<string>('all') // 'all' | 'favorites' | sourceId
   const [sortBy, setSortBy] = useState<SortOption>('default')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('price_favorites')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+
+  const toggleFavorite = useCallback((key: string) => {
+    setFavorites(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      localStorage.setItem('price_favorites', JSON.stringify([...next]))
+      return next
+    })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -419,7 +437,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       const data = await apiRes.json()
       setItems(Array.isArray(data) ? data : [])
 
-      // Корректный разбор ответа от /api/rates
       if (ratesRes && ratesRes.ok) {
         const rates = await ratesRes.json()
         if (rates?.usd) setUsdRate(Number(rates.usd))
@@ -446,9 +463,13 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     const map = new Map<string, GroupedProduct>()
 
     items.forEach((item) => {
-      const rawPrice = item.current_price
-      const validPrice =
-        rawPrice && !isNaN(Number(rawPrice)) && Number(rawPrice) > 0 ? Number(rawPrice) : 0
+      let validPrice = item.current_price && !isNaN(Number(item.current_price)) && Number(item.current_price) > 0 ? Number(item.current_price) : 0
+      
+      // Защита от мусора в базе (например, когда парсер захватил телефон или артикул 306400 как цену)
+      if (validPrice > 50000) validPrice = 0
+
+      const volData = getVolumeData(item.name)
+      const unitPrice = validPrice * volData.multiplier
       const groupingKey = makeGroupingKey(item)
 
       if (!map.has(groupingKey)) {
@@ -459,9 +480,9 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           image_url: item.image_url,
           category: item.category,
           offers: [],
-          minPrice: Infinity,
-          maxPrice: -Infinity,
-          maxSavings: 0,
+          minUnitPrice: Infinity,
+          maxUnitPrice: -Infinity,
+          unitSpread: 0,
           latestUpdatedAt: null,
           outOfStockCount: 0,
           totalOffers: 0,
@@ -483,6 +504,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       const existingOfferIndex = group.offers.findIndex((o) => o.source === item.source)
 
       if (existingOfferIndex >= 0 && !item.product_code) {
+        // Изолируем товары без артикула, если в одном магазине их несколько, чтобы не перезаписывать
         const uniqueKey = `raw_isolate_${item.id}`
         map.set(uniqueKey, {
           key: uniqueKey,
@@ -490,54 +512,35 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           product_code: item.product_code,
           image_url: item.image_url,
           category: item.category,
-          offers: [
-            {
-              id: item.id,
-              source: item.source || 'unknown',
-              price: validPrice,
-              url: item.url,
-              updated_at: item.updated_at,
-            },
-          ],
-          minPrice: validPrice,
-          maxPrice: validPrice,
-          maxSavings: 0,
-          latestUpdatedAt: item.updated_at,
-          outOfStockCount: validPrice <= 0 ? 1 : 0,
-          totalOffers: 1,
+          offers: [{ id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, url: item.url, updated_at: item.updated_at }],
+          minUnitPrice: unitPrice, maxUnitPrice: unitPrice, unitSpread: 0, latestUpdatedAt: item.updated_at,
+          outOfStockCount: validPrice <= 0 ? 1 : 0, totalOffers: 1,
         })
         return
       }
 
       if (existingOfferIndex >= 0) {
         const existingOffer = group.offers[existingOfferIndex]
-        if (validPrice > 0 && (existingOffer.price === 0 || validPrice < existingOffer.price)) {
+        // Оставляем самое выгодное предложение (за удельную единицу) от одного магазина
+        if (unitPrice > 0 && (existingOffer.unitPrice === 0 || unitPrice < existingOffer.unitPrice)) {
           group.offers[existingOfferIndex] = {
-            id: item.id,
-            source: item.source || 'unknown',
-            price: validPrice,
-            url: item.url,
-            updated_at: item.updated_at,
+            id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, url: item.url, updated_at: item.updated_at
           }
         }
       } else {
         group.offers.push({
-          id: item.id,
-          source: item.source || 'unknown',
-          price: validPrice,
-          url: item.url,
-          updated_at: item.updated_at,
+          id: item.id, source: item.source || 'unknown', price: validPrice, unitPrice, baseUnit: volData.baseUnit, volumeLabel: volData.originalLabel, url: item.url, updated_at: item.updated_at
         })
       }
     })
 
     return Array.from(map.values()).map((group) => {
-      const priced = group.offers.filter((o) => o.price > 0)
-      group.minPrice = priced.length ? Math.min(...priced.map((o) => o.price)) : 0
-      group.maxPrice = priced.length ? Math.max(...priced.map((o) => o.price)) : 0
-      group.maxSavings = group.maxPrice > group.minPrice ? group.maxPrice - group.minPrice : 0
+      const priced = group.offers.filter((o) => o.unitPrice > 0)
+      group.minUnitPrice = priced.length ? Math.min(...priced.map((o) => o.unitPrice)) : 0
+      group.maxUnitPrice = priced.length ? Math.max(...priced.map((o) => o.unitPrice)) : 0
+      group.unitSpread = group.minUnitPrice > 0 ? ((group.maxUnitPrice - group.minUnitPrice) / group.minUnitPrice) * 100 : 0
       group.totalOffers = group.offers.length
-      group.outOfStockCount = group.offers.filter((o) => o.price <= 0).length
+      group.outOfStockCount = group.offers.filter((o) => o.unitPrice <= 0).length
       return group
     })
   }, [items])
@@ -545,28 +548,26 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const filteredItems = useMemo(() => {
     let result = baseGroupedItems
 
+    if (selectedSource === 'favorites') {
+      result = result.filter(g => favorites.has(g.key))
+    } else if (selectedSource !== 'all') {
+      result = result.filter((g) => g.offers.some((o) => o.source.toLowerCase() === selectedSource.toLowerCase()))
+    }
+
     if (deferredSearchQuery.trim()) {
       const q = deferredSearchQuery.toLowerCase().trim()
       result = result.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          (g.product_code && g.product_code.toLowerCase().includes(q))
-      )
-    }
-
-    if (selectedSource !== 'all') {
-      result = result.filter((g) =>
-        g.offers.some((o) => o.source.toLowerCase() === selectedSource.toLowerCase())
+        (g) => g.name.toLowerCase().includes(q) || (g.product_code && g.product_code.toLowerCase().includes(q))
       )
     }
 
     return result.sort((a, b) => {
-      if (sortBy === 'price-asc') return a.minPrice - b.minPrice
-      if (sortBy === 'savings') return b.maxSavings - a.maxSavings
+      if (sortBy === 'unit-price-asc') return a.minUnitPrice - b.minUnitPrice
+      if (sortBy === 'savings') return b.unitSpread - a.unitSpread
       if (sortBy === 'name') return a.name.localeCompare(b.name)
-      return b.offers.length - a.offers.length || b.maxSavings - a.maxSavings
+      return b.offers.length - a.offers.length || b.unitSpread - a.unitSpread
     })
-  }, [baseGroupedItems, deferredSearchQuery, selectedSource, sortBy])
+  }, [baseGroupedItems, deferredSearchQuery, selectedSource, sortBy, favorites])
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
@@ -574,13 +575,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
   const stats = useMemo(() => {
     const multi = filteredItems.filter((g) => g.offers.length > 1)
-    const avgSpread =
-      multi.length
-        ? multi.reduce(
-            (acc, g) => acc + (g.minPrice > 0 ? (g.maxSavings / g.minPrice) * 100 : 0),
-            0
-          ) / multi.length
-        : 0
+    const avgSpread = multi.length ? multi.reduce((acc, g) => acc + g.unitSpread, 0) / multi.length : 0
     return {
       total: filteredItems.length,
       multiCount: multi.length,
@@ -653,7 +648,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
             >
               <option value="default">{t.sortDefault}</option>
               <option value="savings">{t.sortSavings}</option>
-              <option value="price-asc">{t.sortPriceAsc}</option>
+              <option value="unit-price-asc">{t.sortUnitPriceAsc}</option>
               <option value="name">{t.sortName}</option>
             </select>
           </div>
@@ -666,6 +661,15 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               }`}
             >
               {t.allSources}
+            </button>
+            <button
+              onClick={() => setSelectedSource('favorites')}
+              className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium shrink-0 flex items-center gap-1.5 transition-colors ${
+                selectedSource === 'favorites' ? 'bg-[#E4D00A] text-black' : 'bg-white/5 text-[#B9ACA0]'
+              }`}
+            >
+              <Bookmark size={14} className={selectedSource === 'favorites' ? "fill-black" : ""} />
+              {t.favorites}
             </button>
             {sources.map((src) => (
               <button
@@ -719,6 +723,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   t={t}
                   eurRate={eurRate}
                   usdRate={usdRate}
+                  isFavorite={favorites.has(g.key)}
+                  onToggleFavorite={toggleFavorite}
                 />
               ))}
             </AnimatePresence>
