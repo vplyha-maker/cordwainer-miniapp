@@ -10,7 +10,6 @@ const TELEGRAM_USER_ID = typeof window !== 'undefined' && (window as any).Telegr
 
 const MOCK_USD_RATE = 41.50; 
 
-// Утилита для получения стабильной локальной даты (решает проблему с пустым графиком)
 const getLocalDateString = (d: Date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
@@ -58,7 +57,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   };
 
   const handleSaveDay = async () => {
-    if (Object.keys(dayForm).length === 0) return;
     triggerHaptic('medium');
     const cleanedForm = Object.fromEntries(
       Object.entries(dayForm).map(([k, v]) => [k, Number(v) || 0])
@@ -102,7 +100,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     });
   };
 
-  // ИСПРАВЛЕННАЯ ЛОГИКА КАЛЕНДАРЯ: Всегда последние 10 дней от СЕГОДНЯ
   const quickDates = useMemo(() => {
     const dates = [];
     const today = new Date();
@@ -113,7 +110,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
       dates.push(getLocalDateString(d));
     }
     
-    // Если выбранная дата старее 10 дней, добавляем ее, чтобы не потерять
     if (!dates.includes(selectedDate)) {
       dates.push(selectedDate);
       dates.sort((a, b) => b.localeCompare(a));
@@ -128,14 +124,13 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     return Object.values(record.quantities).some(v => v > 0);
   };
 
-  // ИСПРАВЛЕННЫЙ ГРАФИК: Локальные даты вместо UTC
   const chartData = useMemo(() => {
     const last7Days = [];
     let maxVal = 1; 
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = getLocalDateString(d); // Использование стабильной локальной даты
+      const dateStr = getLocalDateString(d); 
       
       const record = data?.days?.[dateStr];
       const total = record ? calcDayTotal(record.quantities, record.rates) : 0;
@@ -147,14 +142,33 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     return { data: last7Days, max: maxVal };
   }, [data?.days]);
 
+  // Проверка на то, изменились ли данные по сравнению с сохраненными
+  const hasChanges = useMemo(() => {
+    const saved = data?.days?.[selectedDate]?.quantities || {};
+    const currentKeys = Object.keys(dayForm);
+    const savedKeys = Object.keys(saved);
+    
+    if (currentKeys.length !== savedKeys.length) return true;
+    for (const key of currentKeys) {
+      if (Number(dayForm[key]) !== Number(saved[key] || 0)) return true;
+    }
+    return false;
+  }, [dayForm, data?.days, selectedDate]);
+
   if (loading || error) return null; 
 
   const todayStr = getLocalDateString(new Date());
 
+  // Общие параметры анимации для устранения мигания
+  const tabVariants = {
+    hidden: { opacity: 0, y: 10, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: "easeOut" } },
+    exit: { opacity: 0, scale: 0.98, transition: { duration: 0.15, ease: "easeIn" } }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0E0E0E] text-white pb-32 font-sans overflow-x-hidden selection:bg-[#0A84FF]/30">
       
-      {/* Шапка */}
       <div className="sticky top-0 z-50 p-4 flex items-center gap-4 bg-[#0E0E0E]/95 backdrop-blur-md border-b border-white/5">
         <button onClick={() => { triggerHaptic(); onBack(); }} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/5 active:scale-95 transition-transform text-white/70">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -165,9 +179,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </div>
       </div>
 
-      <div className="p-4 space-y-6 max-w-2xl mx-auto">
+      <div className="p-4 space-y-6 max-w-2xl mx-auto relative">
         
-        {/* Карточка баланса */}
         <div className="bg-gradient-to-br from-[#1C1C1E] to-[#121212] p-6 rounded-[28px] border border-white/5 shadow-xl">
           <div className="flex justify-between items-start mb-1">
             <span className="text-white/50 text-sm font-medium">Итого за месяц</span>
@@ -181,7 +194,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           </div>
         </div>
 
-        {/* Навигация */}
         <div className="flex bg-[#1C1C1E] p-1 rounded-2xl border border-white/5">
           {['daily', 'settings', 'archive'].map(tab => (
             <button 
@@ -196,200 +208,236 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           ))}
         </div>
 
-        <AnimatePresence mode="wait">
-          {activeTab === 'daily' && (
-            <motion.div key="daily" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-              
-              {/* Лента дат и кнопка календаря */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-                  {quickDates.map((date) => {
-                    const isSelected = selectedDate === date;
-                    const isToday = date === todayStr;
-                    const hasData = checkHasData(date);
-                    
-                    return (
-                      <button
-                        key={date}
-                        onClick={() => { triggerHaptic(); setSelectedDate(date); }}
-                        className={`relative flex-shrink-0 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all ${
-                          isSelected 
-                            ? 'bg-[#0A84FF] text-white shadow-lg shadow-[#0A84FF]/25' 
-                            : 'bg-[#1C1C1E] text-white/60 hover:bg-white/10 border border-transparent'
-                        } ${isToday && !isSelected ? 'border-white/10' : ''}`}
-                      >
-                        {isToday ? 'Сегодня' : formatDay(date).split(',')[0]}
-                        {hasData && (
-                          <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <label className="flex-shrink-0 w-12 h-12 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative overflow-hidden active:bg-white/10 border border-white/5 transition-colors">
-                  <input 
-                    type="date" 
-                    value={selectedDate} 
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        triggerHaptic();
-                        setSelectedDate(e.target.value);
-                      }
-                    }} 
-                    className="absolute inset-0 opacity-0 w-full h-full" 
-                  />
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                </label>
-              </div>
-
-              {data.items.length === 0 ? (
-                <div className="bg-[#1C1C1E] p-8 rounded-3xl border border-white/5 text-center">
-                  <p className="text-white/40">Нет изделий для учета.</p>
-                  <button onClick={() => setActiveTab('settings')} className="mt-4 text-[#0A84FF] font-medium">Добавить в настройках</button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {data.items.map(item => (
-                    <div key={item.id} className="bg-[#1C1C1E] p-5 rounded-[24px] border border-white/5 flex flex-col gap-4">
+        {/* mode="popLayout" предотвращает схлопывание высоты контейнера при смене вкладок */}
+        <div className="relative">
+          <AnimatePresence mode="popLayout">
+            {activeTab === 'daily' && (
+              <motion.div key="daily" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-6 w-full">
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+                    {quickDates.map((date) => {
+                      const isSelected = selectedDate === date;
+                      const isToday = date === todayStr;
+                      const hasData = checkHasData(date);
                       
-                      {/* Строка с названием и ручным инпутом */}
-                      <div className="flex justify-between items-center gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-lg text-white/90 truncate">{item.name}</div>
-                          <div className="text-sm text-white/40">{data.rates[item.id]} ₴ / шт</div>
-                        </div>
-                        
-                        <div className="flex-shrink-0 flex items-center bg-black/20 rounded-2xl p-1 border border-white/5">
-                          <button onClick={() => adjustQty(item.id, -1)} className="w-11 h-11 flex items-center justify-center text-2xl text-white/50 active:text-white active:bg-white/10 rounded-xl transition-colors">-</button>
-                          <input 
-                            type="number" 
-                            inputMode="numeric"
-                            value={dayForm[item.id] ?? ''}
-                            onChange={(e) => handleQtyChange(item.id, e.target.value)}
-                            className="w-12 h-11 text-center text-xl bg-transparent font-black text-white focus:outline-none"
-                            placeholder="0"
-                          />
-                          <button onClick={() => adjustQty(item.id, 1)} className="w-11 h-11 flex items-center justify-center text-2xl text-white/50 active:text-white active:bg-white/10 rounded-xl transition-colors">+</button>
-                        </div>
-                      </div>
+                      return (
+                        <button
+                          key={date}
+                          onClick={() => { triggerHaptic(); setSelectedDate(date); }}
+                          className={`relative flex-shrink-0 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all ${
+                            isSelected 
+                              ? 'bg-[#0A84FF] text-white shadow-lg shadow-[#0A84FF]/25' 
+                              : 'bg-[#1C1C1E] text-white/60 hover:bg-white/10 border border-transparent'
+                          } ${isToday && !isSelected ? 'border-white/10' : ''}`}
+                        >
+                          {isToday ? 'Сегодня' : formatDay(date).split(',')[0]}
+                          {hasData && (
+                            <span className={`absolute top-2 right-2 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                      {/* Сетка кнопок быстрого ввода */}
-                      <div className="grid grid-cols-4 gap-2">
-                        {[1, 5, 7, 9].map(num => (
-                          <button 
-                            key={num}
-                            onClick={() => handleQuickAdd(item.id, num)}
-                            className="py-3 bg-white/5 hover:bg-white/10 active:bg-[#0A84FF] active:text-white rounded-xl text-sm font-bold text-white/60 transition-colors"
-                          >
-                            +{num}
-                          </button>
-                        ))}
+                  <label className="flex-shrink-0 w-12 h-12 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative overflow-hidden active:bg-white/10 border border-white/5 transition-colors">
+                    <input 
+                      type="date" 
+                      value={selectedDate} 
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          triggerHaptic();
+                          setSelectedDate(e.target.value);
+                        }
+                      }} 
+                      className="absolute inset-0 opacity-0 w-full h-full" 
+                    />
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  </label>
+                </div>
+
+                {data.items.length === 0 ? (
+                  <div className="bg-[#1C1C1E] p-8 rounded-3xl border border-white/5 text-center">
+                    <p className="text-white/40">Нет изделий для учета.</p>
+                    <button onClick={() => setActiveTab('settings')} className="mt-4 text-[#0A84FF] font-medium">Добавить в настройках</button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {data.items.map(item => (
+                      <div key={item.id} className="bg-[#1C1C1E] p-5 rounded-[24px] border border-white/5 flex flex-col gap-4">
+                        <div className="flex justify-between items-center gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-lg text-white/90 truncate">{item.name}</div>
+                            <div className="text-sm text-white/40">{data.rates[item.id]} ₴ / шт</div>
+                          </div>
+                          
+                          <div className="flex-shrink-0 flex items-center bg-black/20 rounded-2xl p-1 border border-white/5">
+                            <button onClick={() => adjustQty(item.id, -1)} className="w-11 h-11 flex items-center justify-center text-2xl text-white/50 active:text-white active:bg-white/10 rounded-xl transition-colors">-</button>
+                            <input 
+                              type="number" 
+                              inputMode="numeric"
+                              value={dayForm[item.id] ?? ''}
+                              onChange={(e) => handleQtyChange(item.id, e.target.value)}
+                              className="w-12 h-11 text-center text-xl bg-transparent font-black text-white focus:outline-none"
+                              placeholder="0"
+                            />
+                            <button onClick={() => adjustQty(item.id, 1)} className="w-11 h-11 flex items-center justify-center text-2xl text-white/50 active:text-white active:bg-white/10 rounded-xl transition-colors">+</button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2">
+                          {[1, 5, 7, 9].map(num => (
+                            <button 
+                              key={num}
+                              onClick={() => handleQuickAdd(item.id, num)}
+                              className="py-3 bg-white/5 hover:bg-white/10 active:bg-[#0A84FF] active:text-white rounded-xl text-sm font-bold text-white/60 transition-colors"
+                            >
+                              +{num}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
+                  <h3 className="font-bold text-white/30 mb-6 text-xs uppercase tracking-[0.2em]">Активность (7 дней)</h3>
+                  <div className="flex items-end justify-between h-32 gap-2">
+                    {chartData.data.map((day, i) => {
+                      const height = Math.max((day.total / chartData.max) * 100, day.total > 0 ? 8 : 0);
+                      const isToday = i === 6; 
+                      
+                      return (
+                        <div key={i} className="flex flex-col items-center flex-1 group">
+                          <div className="w-full relative flex justify-center items-end h-full">
+                            <div 
+                              style={{ height: `${height}%` }}
+                              className={`w-full max-w-[32px] rounded-lg transition-all duration-500 ease-out ${
+                                isToday 
+                                  ? 'bg-gradient-to-t from-[#32D74B]/40 to-[#32D74B]' 
+                                  : 'bg-gradient-to-t from-white/10 to-white/20 group-hover:to-white/30'
+                              }`}
+                            />
+                          </div>
+                          <span className={`text-[10px] mt-4 font-semibold ${isToday ? 'text-[#32D74B]' : 'text-white/30'}`}>
+                            {day.date}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'settings' && (
+              <motion.div key="settings" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
+                <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
+                  <h2 className="font-bold mb-5 text-lg text-white/90">Добавить изделие</h2>
+                  <div className="flex flex-col gap-4 mb-5">
+                    <input 
+                      type="text" 
+                      placeholder="Название (например: Mac)"
+                      value={newItemName}
+                      onChange={e => setNewItemName(e.target.value)}
+                      className="w-full p-4.5 bg-black/20 text-white placeholder-white/30 rounded-2xl border border-white/5 focus:border-[#0A84FF] focus:outline-none transition-colors"
+                    />
+                    <input 
+                      type="number" 
+                      inputMode="decimal"
+                      placeholder="Стоимость за шт, ₴"
+                      value={newItemRate}
+                      onChange={e => setNewItemRate(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-full p-4.5 bg-black/20 text-white placeholder-white/30 rounded-2xl border border-white/5 focus:border-[#0A84FF] focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <button 
+                    onClick={handleAddNewItem}
+                    disabled={saving || !newItemName || newItemRate === ''}
+                    className="w-full bg-[#0A84FF] text-white font-bold py-4 rounded-2xl active:scale-[0.98] disabled:opacity-30 transition-all shadow-lg shadow-[#0A84FF]/20"
+                  >
+                    Добавить
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {data.items.map(item => (
+                    <div key={item.id} className="bg-[#1C1C1E] p-5 rounded-[20px] flex justify-between items-center border border-white/5">
+                      <div className="min-w-0 pr-4">
+                        <div className="font-bold text-white/90 truncate text-lg">{item.name}</div>
+                        <div className="text-sm text-white/40 mt-1">{data.rates[item.id]} ₴ / шт</div>
+                      </div>
+                      <button 
+                        onClick={() => { if(confirm('Удалить изделие?')) deleteItem(item.id); }}
+                        className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-[#FF453A] bg-[#FF453A]/10 rounded-2xl active:scale-90 transition-transform"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                      </button>
                     </div>
                   ))}
                 </div>
-              )}
+              </motion.div>
+            )}
 
-              {/* График активности */}
-              <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
-                <h3 className="font-bold text-white/30 mb-6 text-xs uppercase tracking-[0.2em]">Активность (7 дней)</h3>
-                <div className="flex items-end justify-between h-32 gap-2">
-                  {chartData.data.map((day, i) => {
-                    const height = Math.max((day.total / chartData.max) * 100, day.total > 0 ? 8 : 0);
-                    const isToday = i === 6; 
-                    
-                    return (
-                      <div key={i} className="flex flex-col items-center flex-1 group">
-                        <div className="w-full relative flex justify-center items-end h-full">
-                          <div 
-                            style={{ height: `${height}%` }}
-                            className={`w-full max-w-[32px] rounded-lg transition-all duration-500 ease-out ${
-                              isToday 
-                                ? 'bg-gradient-to-t from-[#32D74B]/40 to-[#32D74B]' 
-                                : 'bg-gradient-to-t from-white/10 to-white/20 group-hover:to-white/30'
-                            }`}
-                          />
-                        </div>
-                        <span className={`text-[10px] mt-4 font-semibold ${isToday ? 'text-[#32D74B]' : 'text-white/30'}`}>
-                          {day.date}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'settings' && (
-            <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-              <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
-                <h2 className="font-bold mb-5 text-lg text-white/90">Добавить изделие</h2>
-                <div className="flex flex-col gap-4 mb-5">
-                  <input 
-                    type="text" 
-                    placeholder="Название (например: Mac)"
-                    value={newItemName}
-                    onChange={e => setNewItemName(e.target.value)}
-                    className="w-full p-4.5 bg-black/20 text-white placeholder-white/30 rounded-2xl border border-white/5 focus:border-[#0A84FF] focus:outline-none transition-colors"
-                  />
-                  <input 
-                    type="number" 
-                    inputMode="decimal"
-                    placeholder="Стоимость за шт, ₴"
-                    value={newItemRate}
-                    onChange={e => setNewItemRate(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full p-4.5 bg-black/20 text-white placeholder-white/30 rounded-2xl border border-white/5 focus:border-[#0A84FF] focus:outline-none transition-colors"
-                  />
-                </div>
+            {activeTab === 'archive' && (
+              <motion.div key="archive" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
                 <button 
-                  onClick={handleAddNewItem}
-                  disabled={saving || !newItemName || newItemRate === ''}
-                  className="w-full bg-[#0A84FF] text-white font-bold py-4 rounded-2xl active:scale-[0.98] disabled:opacity-30 transition-all shadow-lg shadow-[#0A84FF]/20"
+                  onClick={() => { 
+                    if(confirm('Перенести текущий месяц в архив? Делайте это только в конце месяца.')) closeMonth(); 
+                  }}
+                  className="w-full bg-white/5 border border-dashed border-white/10 text-white/60 hover:text-white hover:bg-white/10 py-6 rounded-[24px] font-bold active:scale-[0.98] transition-all uppercase tracking-wider text-sm"
                 >
-                  Добавить
+                  + Заархивировать месяц
                 </button>
-              </div>
-
-              <div className="space-y-3">
-                {data.items.map(item => (
-                  <div key={item.id} className="bg-[#1C1C1E] p-5 rounded-[20px] flex justify-between items-center border border-white/5">
-                    <div className="min-w-0 pr-4">
-                      <div className="font-bold text-white/90 truncate text-lg">{item.name}</div>
-                      <div className="text-sm text-white/40 mt-1">{data.rates[item.id]} ₴ / шт</div>
-                    </div>
-                    <button 
-                      onClick={() => { if(confirm('Удалить изделие?')) deleteItem(item.id); }}
-                      className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-[#FF453A] bg-[#FF453A]/10 rounded-2xl active:scale-90 transition-transform"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'archive' && (
-            <motion.div key="archive" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-              <button 
-                onClick={() => { 
-                  if(confirm('Перенести текущий месяц в архив? Делайте это только в конце месяца.')) closeMonth(); 
-                }}
-                className="w-full bg-white/5 border border-dashed border-white/10 text-white/60 hover:text-white hover:bg-white/10 py-6 rounded-[24px] font-bold active:scale-[0.98] transition-all uppercase tracking-wider text-sm"
-              >
-                + Заархивировать месяц
-              </button>
-              {/* Остальной код архива без изменений */}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                
+                {Object.keys(data.archive).length === 0 ? (
+                  <p className="text-center text-white/30 mt-8">Архив пуст</p>
+                ) : (
+                  Object.entries(data.archive)
+                    .sort(([monthA], [monthB]) => monthB.localeCompare(monthA))
+                    .map(([month, archiveData]) => (
+                      <div key={month} className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-bold text-lg capitalize">{formatMonth(month, lang)}</h3>
+                          <span className="font-black text-xl text-[#32D74B]">
+                            {archiveData.stats.total.toLocaleString()} ₴
+                          </span>
+                        </div>
+                        <div className="text-sm text-white/40 mb-5">
+                          Дней отработано: <span className="font-bold text-white/90">{archiveData.stats.days}</span>
+                        </div>
+                        
+                        <div className="bg-black/20 p-4 rounded-2xl border border-white/5 text-sm space-y-3">
+                          {Object.entries(archiveData.stats.quantities).map(([itemId, qty]) => {
+                            if (!qty) return null;
+                            const itemName = data.items.find(i => i.id === itemId)?.name || 'Удаленное изделие';
+                            return (
+                              <div key={itemId} className="flex justify-between items-center">
+                                <span className="text-white/50">{itemName}</span>
+                                <span className="font-bold text-white/90">{qty} шт.</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        
+                        <button 
+                          onClick={() => { if(confirm('Точно удалить этот месяц из архива?')) deleteArchiveMonth(month); }}
+                          className="mt-5 text-xs text-[#FF453A]/80 w-full text-center py-2 active:opacity-50 transition-opacity uppercase tracking-wider font-bold"
+                        >
+                          Удалить запись
+                        </button>
+                      </div>
+                    ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* Floating Action Button (FAB) для сохранения - всегда под рукой */}
       <AnimatePresence>
-        {activeTab === 'daily' && data.items.length > 0 && Object.keys(dayForm).length > 0 && (
+        {activeTab === 'daily' && data.items.length > 0 && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
@@ -399,16 +447,19 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <button 
                 onClick={handleSaveDay}
-                disabled={saving}
-                className="w-full bg-[#0A84FF] text-white font-bold text-lg py-5 rounded-[24px] active:scale-[0.97] transition-all shadow-2xl shadow-[#0A84FF]/40 border border-white/10 backdrop-blur-md"
+                disabled={saving || !hasChanges}
+                className={`w-full font-bold text-lg py-5 rounded-[24px] active:scale-[0.97] transition-all border backdrop-blur-md ${
+                  hasChanges 
+                    ? 'bg-[#0A84FF] text-white shadow-2xl shadow-[#0A84FF]/40 border-white/10' 
+                    : 'bg-[#1C1C1E]/80 text-white/30 border-white/5 shadow-none'
+                }`}
               >
-                {saving ? 'Сохранение...' : 'Сохранить день'}
+                {saving ? 'Сохранение...' : hasChanges ? 'Сохранить день' : 'Изменений нет'}
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
     </motion.div>
   );
 }
