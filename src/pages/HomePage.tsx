@@ -19,6 +19,374 @@ type HomePageProps = {
   onOpenFavorites?: () => void
 }
 
+// Оптимизированный и адаптированный сложный SVG кроссовка
+const ComplexSneakerIcon = (
+  <svg
+    version="1.1"
+    xmlns="http://www.w3.org/2000/svg"
+    x="0px"
+    y="0px"
+    viewBox="0 0 3710 3710"
+    style={{ enableBackground: 'new 0 0 3710 3710' }}
+    xmlSpace="preserve"
+    width="18"
+    height="18"
+    className="shrink-0"
+  >
+    <defs>
+      <linearGradient id="sneaker_grad_1" gradientUnits="userSpaceOnUse" x1="3669.8979" y1="3566.0964" x2="1469.3679" y2="1592.0897">
+        <stop offset="0" style={{ stopColor: '#DAE3FE' }} />
+        <stop offset="1" style={{ stopColor: '#E9EFFD' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_2" gradientUnits="userSpaceOnUse" x1="2416.6804" y1="1527.4597" x2="2672.0176" y2="1527.4597">
+        <stop offset="0" style={{ stopColor: '#DAE3FE' }} />
+        <stop offset="1" style={{ stopColor: '#E9EFFD' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_3" gradientUnits="userSpaceOnUse" x1="-945.382" y1="2885.0591" x2="-372.4631" y2="1166.2975" gradientTransform="matrix(-1 0 0 1 1155.7772 0)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_4" gradientUnits="userSpaceOnUse" x1="595.4744" y1="2902.0801" x2="3150.2566" y2="1515.6449">
+        <stop offset="0" style={{ stopColor: '#FF928E' }} />
+        <stop offset="1" style={{ stopColor: '#FE7062' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_5" gradientUnits="userSpaceOnUse" x1="388.1703" y1="2782.2051" x2="-2164.106" y2="3403.0288" gradientTransform="matrix(-1 0 0 1 1155.7772 0)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_6" gradientUnits="userSpaceOnUse" x1="2612.2627" y1="681.8483" x2="3214.6094" y2="32.7676">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_7" gradientUnits="userSpaceOnUse" x1="-2544.8462" y1="2942.2898" x2="-2378.2476" y2="2942.2898" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_8" gradientUnits="userSpaceOnUse" x1="-2544.8557" y1="2909.6387" x2="-2382.9519" y2="2909.6387" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_9" gradientUnits="userSpaceOnUse" x1="2634.4993" y1="2825.8916" x2="2940.8804" y2="2593.9421">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_10" gradientUnits="userSpaceOnUse" x1="-2876.9753" y1="2938.6968" x2="-2813.1318" y2="2938.6968" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_11" gradientUnits="userSpaceOnUse" x1="-2876.5107" y1="2889.5393" x2="-2782.8013" y2="2889.5393" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_12" gradientUnits="userSpaceOnUse" x1="2907.2163" y1="2807.0002" x2="3182.4395" y2="2606.2083">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_13" gradientUnits="userSpaceOnUse" x1="3211.7283" y1="1510.9702" x2="2780.7405" y2="2336.5979">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_14" gradientUnits="userSpaceOnUse" x1="-2122.5125" y1="1654.1929" x2="-3408.198" y2="2772.4133" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_15" gradientUnits="userSpaceOnUse" x1="-2638.8091" y1="2617.2393" x2="-2611.9355" y2="2563.4922" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#53D8FF' }} />
+        <stop offset="1" style={{ stopColor: '#3840F7' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_16" gradientUnits="userSpaceOnUse" x1="-2749.4639" y1="2165.6069" x2="-2949.1104" y2="2342.3984" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_17" gradientUnits="userSpaceOnUse" x1="-2229.6973" y1="1535.6929" x2="-3509.5837" y2="2648.8696" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_18" gradientUnits="userSpaceOnUse" x1="-2028.4998" y1="1767.0204" x2="-3308.3882" y2="2880.1987" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_19" gradientUnits="userSpaceOnUse" x1="-2196.5996" y1="2024.1714" x2="-2039.3702" y2="2024.1714" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_20" gradientUnits="userSpaceOnUse" x1="-2349.4307" y1="1603.9969" x2="-2351.1479" y2="1897.6117" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_21" gradientUnits="userSpaceOnUse" x1="-2527.2078" y1="2703.6191" x2="-2671.7383" y2="2894.8213" gradientTransform="matrix(-0.9897 -0.1428 -0.1428 0.9897 222.066 -1480.9402)">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_22" gradientUnits="userSpaceOnUse" x1="-2637.5881" y1="2749.7417" x2="-2464.9443" y2="2749.7417" gradientTransform="matrix(-0.9897 -0.1428 -0.1428 0.9897 222.066 -1480.9402)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_23" gradientUnits="userSpaceOnUse" x1="-2738.8882" y1="2855.0364" x2="-2622.9631" y2="2736.1003" gradientTransform="matrix(-0.9897 -0.1428 -0.1428 0.9897 222.066 -1480.9402)">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_24" gradientUnits="userSpaceOnUse" x1="-1428.6085" y1="1568.7188" x2="-3803.4404" y2="3301.1172" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_25" gradientUnits="userSpaceOnUse" x1="-1345.3511" y1="1954.2612" x2="-1032.5413" y2="1682.3571" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#09005D' }} />
+        <stop offset="1" style={{ stopColor: '#1A0F91' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_26" gradientUnits="userSpaceOnUse" x1="-1071.8596" y1="1555.1838" x2="-2230.0566" y2="2745.4646" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#FF928E' }} />
+        <stop offset="1" style={{ stopColor: '#FE7062' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_27" gradientUnits="userSpaceOnUse" x1="-1778.1519" y1="1589.9297" x2="-2823.3911" y2="2664.1235" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_28" gradientUnits="userSpaceOnUse" x1="-1751.1276" y1="1684.3281" x2="-2796.3691" y2="2758.5247" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#4F52FF' }} />
+        <stop offset="1" style={{ stopColor: '#4042E2' }} />
+      </linearGradient>
+      <linearGradient id="sneaker_grad_29" gradientUnits="userSpaceOnUse" x1="-2492.019" y1="2096.4819" x2="-2691.6653" y2="2273.2729" gradientTransform="matrix(-1 0 0 1 83.0112 0)">
+        <stop offset="0" style={{ stopColor: '#FEBBBA' }} />
+        <stop offset="1" style={{ stopColor: '#FF928E' }} />
+      </linearGradient>
+    </defs>
+    <g id="Illustration">
+      <path
+        style={{ fill: 'url(#sneaker_grad_1)' }}
+        d="M2936.615,2882.801c-74.154,76.436-89.704,87.447-140.504,121.367 c-495.444,330.813-1212.326,250.854-1387.427,218.264c-282.503-52.58-421.24-71.142-626.13-256.251 c-465.571-420.625-442.927-1298.081-87.174-1841.627c42.182-64.449,391.188-564.514,958.761-638.707 c13.882-1.815,671.415-88.642,1115.069,283.05c63.507,53.206,165.708,149.176,260.481,295.546 C3376.226,1599.637,3377.323,2428.535,2936.615,2882.801z"
+      />
+      <g>
+        <path
+          style={{ fill: '#91B3FA' }}
+          d="M3058.229,762.188c3.532-12.316,20.915-12.685,25.155-0.594 c43.06,122.771,122.202,464.522-143.197,851.853c-332.982,485.963-323.339,731.476-248.853,916.904 c0,0-156.518-150.368-172.874-402.909C2478.306,1507.395,2995.417,981.164,3058.229,762.188z"
+        />
+        <path
+          style={{ fill: '#BDD0FB' }}
+          d="M3038.006,957.536c-19.505,63.232-40.246,126.046-63.255,188.012 c-22.679,62.075-47.229,123.436-73.657,183.943c-26.657,60.4-54.444,120.291-84.733,178.912 c-30.024,58.755-62.538,116.154-95.385,173.67c-32.506,57.666-65.581,115.574-92.828,177.044 c-27.246,61.316-47.61,126.87-55.393,194.202c-1.924,16.789-3.548,33.679-4.162,50.496c-0.926,16.813-1.107,33.671-0.987,50.525 c0.409,33.716,3.056,67.461,8.195,100.857c10.45,66.776,31.061,131.908,59.452,192.724c2.988,6.401,10.6,9.167,17.001,6.179 c6.285-2.934,9.066-10.327,6.335-16.654l-0.019-0.045c-6.487-14.987-12.794-30.031-18.409-45.303 c-2.93-7.593-5.518-15.3-8.249-22.955c-2.438-7.749-5.177-15.406-7.373-23.222c-9.309-31.107-16.423-62.83-21.155-94.922 c-9.77-64.067-10.016-129.926-2.695-194.261c4.026-32.136,10.412-63.92,19.222-95.103c8.835-31.179,20.079-61.727,33.075-91.656 c26.003-59.895,58.266-117.481,90.356-175.377c32.022-57.951,63.802-116.405,93.128-176.076 c14.741-29.792,28.946-59.846,42.605-90.139c6.916-15.106,13.539-30.344,20.188-45.567c6.503-15.287,12.921-30.608,19.212-45.978 c25.053-61.53,48.217-123.794,69.381-186.703c20.863-63.01,40.046-126.553,56.749-190.728c0.477-1.835-0.622-3.708-2.456-4.185 C3040.368,954.763,3038.546,955.796,3038.006,957.536z"
+        />
+      </g>
+      <g>
+        <g>
+          <path
+            style={{ fill: '#BDD0FB' }}
+            d="M2456.699,2079.08c-16.383,16.997-44.801,11.739-54.3-9.873 c-52.415-119.248-170.121-469.806,35.231-869.852c173.41-337.821,235.338-537.48,257.17-630.066 c4.617-19.578,31.543-21.883,39.456-3.39C2821.559,769.933,3050.347,1463.18,2456.699,2079.08z"
+          />
+          <path
+            style={{ fill: 'url(#sneaker_grad_2)' }}
+            d="M2427.431,2066.231 c-0.577,0.097-1.17,0.139-1.778,0.122c-5.088-0.135-9.104-4.369-8.969-9.457c0.154-5.769,17.835-582.343,237.732-1062.952 c2.118-4.624,7.585-6.661,12.218-4.547c4.629,2.12,6.664,7.587,4.547,12.218c-218.297,477.11-235.917,1050.04-236.07,1055.769 C2434.993,2061.867,2431.694,2065.517,2427.431,2066.231z"
+          />
+        </g>
+      </g>
+      <g>
+        <path
+          style={{ fill: 'url(#sneaker_grad_3)' }}
+          d="M621.836,2947.41 c0,24.649,20.187,44.816,44.859,44.816h2425.79c24.672,0,44.859-20.167,44.859-44.816l20.185-1394.035 c0-24.648-29.04-72.769-82.262-69.153l-2370.75-61.343c-30.957-0.801-60.888,11.114-82.81,32.964 c-21.922,21.85-33.917,51.725-33.185,82.653L621.836,2947.41z"
+        />
+        <path
+          style={{ fill: 'url(#sneaker_grad_4)' }}
+          d="M666.123,2904.415 c0,23.341,19.098,42.44,42.44,42.44h2325.423c23.342,0,42.439-19.098,42.439-42.44l19.048-1265.517 c-2.243-76.156-69.01-103.527-109.484-101.911l-2272.148-60.958c-21.748-0.583-42.776,7.796-58.18,23.16 c-15.404,15.364-23.875,36.391-23.33,58.14L666.123,2904.415z"
+        />
+        <g style={{ opacity: 0.6 }}>
+          <path
+            style={{ fill: '#FFFFFF' }}
+            d="M3051.297,2303.206c-0.031,0-0.062,0-0.093,0c-3.436-0.05-6.18-2.874-6.127-6.314l1.505-102.631 c0.05-3.402,2.825-6.127,6.214-6.127c0.031,0,0.062,0,0.093,0c3.436,0.05,6.18,2.875,6.127,6.314l-1.505,102.631 C3057.461,2300.481,3054.687,2303.206,3051.297,2303.206z"
+          />
+          <path
+            style={{ fill: '#FFFFFF' }}
+            d="M3054.991,2051.706c-0.031,0-0.062,0-0.093,0c-3.436-0.05-6.18-2.881-6.127-6.314l5.77-393.08 c-0.109-23.348-7.195-41.991-21.067-55.282c-25.894-24.807-67.003-23.541-68.735-23.46l-726.229-19.475 c-3.433-0.087-6.143-2.949-6.05-6.382c0.09-3.433,2.728-6.357,6.385-6.047l725.797,19.474 c4.516-0.267,48.286-1.024,77.436,26.906c16.399,15.713,24.776,37.36,24.901,64.328l-5.773,393.205 C3061.155,2048.981,3058.38,2051.706,3054.991,2051.706z"
+          />
+        </g>
+        <path
+          style={{ fill: 'url(#sneaker_grad_5)' }}
+          d="M430.699,3107.948h2848.603 c3.109,0,5.654-2.544,5.654-5.654v-111.177c0-3.109-2.544-5.654-5.654-5.654H430.698c-3.109,0-5.654,2.544-5.654,5.654v111.177 C425.045,3105.404,427.589,3107.948,430.699,3107.948z"
+        />
+      </g>
+      <g>
+        <path style={{ fill: '#91B3FA' }} d="M2215.152,819.064l-1439.396-8.812c-47.305-0.29-85.139,39.223-82.796,86.471l99.027,2045.037 h1601.779l88.937-1827.131L2215.152,819.064z" />
+        <path
+          style={{ fill: 'url(#sneaker_grad_6)' }}
+          d="M2275.005,1105.868 c-46.888-1.65-82.935-42.062-79.24-88.832l15.431-195.278l271.79,291.671L2275.005,1105.868z"
+        />
+        <g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M1452.398,1209.423c129.213-0.201,625.257-1.783,750.516-2.187 c15.8-0.051,28.34,15.028,27.712,33.282l0,0c-0.597,17.376-12.975,31.231-28.015,31.359l-750.177,6.391 c-14.45,0.123-26.491-12.499-27.779-29.119l-0.326-4.204C1422.858,1225.94,1435.875,1209.448,1452.398,1209.423z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M1446.507,1352.868c129.213-0.201,625.257-1.783,750.516-2.187 c15.8-0.051,28.34,15.028,27.712,33.282l0,0c-0.597,17.376-12.975,31.231-28.015,31.359l-750.177,6.391 c-14.45,0.123-26.491-12.499-27.778-29.119l-0.326-4.204C1416.967,1369.385,1429.984,1352.893,1446.507,1352.868z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M998.416,1557.294c199.559,0.141,965.633-0.132,1159.079-0.204 c24.401-0.009,44.207,15.108,43.77,33.368l0,0c-0.417,17.381-19.129,31.209-42.354,31.297l-1158.433,4.411 c-22.314,0.085-41.279-12.574-43.751-29.204l-0.625-4.207C953.274,1573.74,972.898,1557.276,998.416,1557.294z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M989.196,1707.84c155.335-0.674,751.648-4.072,902.228-4.934 c18.993-0.109,34.307,14.926,33.84,33.185l0,0c-0.444,17.381-15.106,31.283-33.184,31.466l-901.754,9.138 c-17.37,0.176-32.045-12.404-33.855-29.021l-0.458-4.204C953.944,1724.468,969.333,1707.926,989.196,1707.84z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M996.454,1904.955c199.559,0.14,965.632-0.132,1159.079-0.204 c24.4-0.009,44.208,15.109,43.77,33.368l0,0c-0.417,17.381-19.129,31.209-42.354,31.297l-1158.433,4.411 c-22.314,0.085-41.279-12.574-43.751-29.204l-0.625-4.207C951.312,1921.401,970.936,1904.937,996.454,1904.955z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M979.092,2058.008c156.069,0.284,755.203,0.566,906.495,0.633 c19.083,0.009,34.38,15.137,33.803,33.394l0,0c-0.549,17.378-15.361,31.189-33.526,31.26l-906.044,3.574 c-17.452,0.069-32.122-12.601-33.842-29.229l-0.435-4.207C943.576,2074.418,959.135,2058.008,979.092,2058.008z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M986.615,2259.71c199.559,0.14,965.633-0.132,1159.079-0.204 c24.401-0.009,44.207,15.109,43.77,33.368l0,0c-0.417,17.381-19.129,31.209-42.354,31.297l-1158.433,4.411 c-22.314,0.085-41.279-12.574-43.751-29.204l-0.625-4.207C941.473,2276.156,961.097,2259.692,986.615,2259.71z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ opacity: 0.78, fill: '#FFFFFF' }}
+              d="M974.563,2410.953c156.069,0.284,755.203,0.565,906.495,0.633 c19.083,0.009,34.38,15.137,33.803,33.394l0,0c-0.549,17.378-15.361,31.189-33.526,31.26l-906.044,3.574 c-17.452,0.069-32.122-12.601-33.842-29.23l-0.435-4.207C939.048,2427.363,954.607,2410.917,974.563,2410.953z"
+            />
+          </g>
+          <path
+            style={{ opacity: 0.78, fill: '#FFFFFF' }}
+            d="M998.416,2610.344c199.559,0.141,965.633-0.132,1159.079-0.204 c24.401-0.009,44.207,15.109,43.77,33.368l0,0c-0.417,17.381-19.129,31.209-42.354,31.297l-1158.433,4.411 c-22.314,0.085-41.279-12.574-43.751-29.204l-0.625-4.207C953.274,2626.79,972.898,2610.326,998.416,2610.344z"
+          />
+          <path
+            style={{ opacity: 0.78, fill: '#FFFFFF' }}
+            d="M987.127,2777.969c154.098,0.008,745.665-0.771,895.046-0.971 c18.842-0.025,33.961,15.076,33.409,33.333l0,0c-0.525,17.378-15.136,31.216-33.072,31.32l-894.596,5.177 c-17.232,0.1-31.729-12.544-33.444-29.169l-0.434-4.206C952.076,2794.442,967.422,2777.969,987.127,2777.969z"
+          />
+        </g>
+        <g style={{ opacity: 0.78 }}>
+          <path
+            style={{ fill: '#FFFFFF' }}
+            d="M1141.976,1118.359l-81.111,298.597l-21.942-0.368l-143.11-366.337 c-6.551-17.292-13.219-27.621-19.996-30.991c-6.788-3.363-25.293-5.596-55.6-6.684v-5.63l222.583,8.046v5.57 c-26.298-0.943-44.554-0.252-54.714,2.08c-10.18,2.333-15.269,7.441-15.269,15.319c0,4.152,1.301,9.185,3.902,15.075 l101.541,262.885l58.58-213.127l-13.626-44.555c-5.178-16.75-11.433-26.915-18.773-30.491 c-7.342-3.579-26.153-5.913-56.494-7.002v-5.569l218.82,7.91v5.51c-25.633-0.92-43.427-0.226-53.337,2.086 c-9.919,2.314-14.877,7.781-14.877,16.4c0,4.51,0.844,9.06,2.542,13.628l81.717,260.255l69.255-188.505 c7.036-19.723,10.559-35.901,10.559-48.526c0-34.6-25.073-52.798-75.401-54.604v-5.504l161.43,5.835v5.461 c-29.434-1.056-51.247,12.989-65.391,42.157c-2.089,4.401-9.797,24.07-23.143,59.039l-103.212,283.925l-20.895-0.351 L1141.976,1118.359z"
+          />
+        </g>
+      </g>
+      <g>
+        <g>
+          <g>
+            <path
+              style={{ fill: 'url(#sneaker_grad_7)' }}
+              d="M2465.963,2934.232 c28.54,2.467,78.073,6.475,117.124,8.193c23.474,1.033,36.988-1.265,44.771-4.381c-0.013,0.877-0.038,1.707-0.072,2.477 c-0.185,4.109-3.524,7.396-7.674,7.628c-73.787,4.118-132.469,1.425-153.36,0.154c-4.32-0.263-6.894-4.958-4.685-8.64 C2463.171,2937.82,2464.51,2936.016,2465.963,2934.232z"
+            />
+            <path
+              style={{ fill: 'url(#sneaker_grad_8)' }}
+              d="M2583.087,2942.425 c-39.05-1.719-88.583-5.726-117.124-8.193c28.06-34.426,117.124-57.63,117.124-57.63h25.154 c17.301,24.939,19.806,48.682,19.617,61.442C2620.074,2941.159,2606.56,2943.458,2583.087,2942.425z"
+            />
+            <path
+              style={{ fill: 'url(#sneaker_grad_9)' }}
+              d="M2634.499,2835.536l-2.354,46.581 c-0.255,5.044-4.031,9.283-9.083,10.005c-5.026,0.719-11.758,0.81-18.896-1.566c-4.391-1.462-7.652-5.162-8.461-9.676 l-8.134-45.345H2634.499z"
+            />
+          </g>
+          <g>
+            <g>
+              <path
+                style={{ fill: 'url(#sneaker_grad_10)' }}
+                d="M2939.197,2942.075 c12.377-1.726,17.977-8.156,20.325-15.029c0.016,0.062,0.031,0.124,0.047,0.185c1.821,7.251-2.4,14.766-10.84,18.339 c-10.2,4.32-21.354,5.056-30.012,4.698c-9.29-0.383-17.817-4.227-22.503-10.379l-0.07-0.093 C2905.468,2944.411,2918.557,2944.954,2939.197,2942.075z"
+              />
+              <path
+                style={{ fill: 'url(#sneaker_grad_11)' }}
+                d="M2880.843,2835.237h20.744 c31.598-0.646,51.44,66,57.935,91.809c-2.348,6.874-7.948,13.303-20.325,15.029c-20.641,2.879-33.73,2.336-43.054-2.278 c-17.071-22.464-25.534-55.365-29.602-74.565C2861.914,2843.394,2880.843,2835.237,2880.843,2835.237z"
+              />
+            </g>
+            <path
+              style={{ fill: 'url(#sneaker_grad_12)' }}
+              d="M2898.921,2792.002l11.519,45.815 c1.412,5.617-1.276,11.427-6.47,14.093c-6.444,3.307-15.517,6.782-23.855,5.776c-3.921-0.473-7.178-3.235-8.474-6.927 l-16.912-48.202L2898.921,2792.002z"
+            />
+          </g>
+          <path
+            style={{ fill: 'url(#sneaker_grad_13)' }}
+            d="M2912.661,2805.245 c-14.332,12.713-60.947,14.391-60.947,14.391c-167.915-403.012-236.603-460.265-236.603-460.265 c24.245,152.115,3.909,488.879,3.909,488.879c-27.709,12.227-63.433,0-63.433,0c-2.25-249.033-40.528-466.213-85.747-637.433 c113.49-2.551,173.843-41.387,193.55-56.974C2757.992,2306.359,2912.661,2805.245,2912.661,2805.245z"
+          />
+          <path
+            style={{ fill: 'url(#sneaker_grad_14)' }}
+            d="M2634.568,1690.377 c21.481,107.149,13.782,298.925,8.726,386.399c-1.421,24.586,15.742,58.671,29.615,81.923c2.176,3.647,0.833,8.317-2.945,10.258 c-23.226,11.937-101.91,48.933-193.103,53.536c-6.081,0.307-11.51-3.835-13.085-9.716 c-67.645-252.578-146.215-413.977-146.215-413.977C2404.305,1660.279,2634.568,1690.377,2634.568,1690.377z"
+          />
+          <path
+            style={{ fill: 'url(#sneaker_grad_15)' }}
+            d="M2603.653,2349.829 c0.953,0,1.919-0.257,2.794-0.788c2.534-1.549,3.337-4.853,1.796-7.384c-0.903-1.486-22.624-36.594-66.578-57.8 c-2.67-1.281-5.887-0.173-7.182,2.505c-1.289,2.673-0.168,5.892,2.508,7.179c40.976,19.772,61.859,53.372,62.066,53.708 C2600.072,2348.91,2601.842,2349.829,2603.653,2349.829z"
+          />
+          <g>
+            <path
+              style={{ fill: 'url(#sneaker_grad_16)' }}
+              d="M2769.308,1997.892 c-6.9,49.916-27.286,104.36-68.068,162.193l-15.503-12.638c0,0,17.896-72.609,7.722-155.013 C2718.617,1987.527,2748.328,1992.585,2769.308,1997.892z"
+            />
+            <path
+              style={{ fill: 'url(#sneaker_grad_17)' }}
+              d="M2610.575,1822.585l23.993-132.207 c0,0,160.309,122.538,134.74,307.515c-20.98-5.307-50.691-10.365-75.848-5.458 C2686.131,1933.074,2664.24,1868.632,2610.575,1822.585z"
+            />
+          </g>
+          <g>
+            <path
+              style={{ fill: 'url(#sneaker_grad_18)' }}
+              d="M2317.561,1798.801l61.879,133.266 c-10.005,80.456-53.226,115.245-99.828,128.588c-2.906-36.668-12.178-66.293-20.781-86.785 C2318.375,1912.392,2317.561,1798.801,2317.561,1798.801z"
+            />
+            <path
+              style={{ fill: 'url(#sneaker_grad_19)' }}
+              d="M2258.83,1973.87 c8.604,20.492,17.875,50.116,20.781,86.785c-124.334,48.24-157.229-45.316-157.229-45.316l22.979-4.054 C2197.251,2016.752,2233.499,2000.023,2258.83,1973.87z"
+            />
+          </g>
+          <path
+            style={{ fill: 'url(#sneaker_grad_20)' }}
+            d="M2374.572,1634.275l29.873,109.818 c3.356,12.337,16.7,18.962,28.572,14.216c12.811-5.121,29.065-12.112,43.057-19.666c14.936-8.064,19.609-27.276,10.154-41.373 l-62.108-92.607L2374.572,1634.275z"
+          />
+        </g>
+        <g>
+          <path
+            style={{ fill: 'url(#sneaker_grad_21)' }}
+            d="M2309.215,1550.839 c-0.272,1.886,24.917,125.319,24.917,125.319l70.173-15.88l-6.492-120.536 C2397.813,1539.742,2313.771,1519.268,2309.215,1550.839z"
+          />
+          <path
+            style={{ fill: 'url(#sneaker_grad_22)' }}
+            d="M2382.03,1566.602l8.387,63.185 c0.107,0.81,0.106,1.611-0.009,2.42c-0.708,4.953-4.392,21.814-21.413,16.992c-15.445-4.375-29.605-8.138-39.386-5.146 c-4.392,1.343-7.042,5.792-6.122,10.292c2.292,11.214,7.922,36.389,16.152,57.514c1.67,4.287,6.365,6.538,10.781,5.25 c13.309-3.88,41.149-12.848,61.856-25.31c2.806-1.688,4.477-4.74,4.339-8.012c-0.673-15.951-2.539-64.439-0.968-78.031 c1.474-12.758,17.131-20.4,23.934-23.141c2.23-0.899,3.978-2.656,4.869-4.889c3.15-7.894,7.493-26.161-15.527-33.646 c-4.818-1.567-7.357-6.761-5.645-11.529c3.409-9.492,4.847-23.978-12.961-31.959c-18.101-8.112-31.62,1.537-38.919,9.379 c-2.951,3.171-7.688,3.654-11.35,1.34c-2.084-1.317-4.771-1.749-8.015,0.272c-4.373,2.724-10.163,0.867-12.419-3.764 c-4.335-8.897-13.169-18.428-30.89-15.393c-31.445,5.385-35.007,40.231-26.712,60.65c8.295,20.419,42.056,12.643,58.992,2.348 c12.877-7.827,29.581,0.377,36.848,4.759C2380.152,1561.573,2381.676,1563.937,2382.03,1566.602z"
+          />
+          <path
+            style={{ fill: 'url(#sneaker_grad_23)' }}
+            d="M2418.469,1628.793 c0,0-12.927-36.2,0.354-45.066c13.281-8.865,32.952-4.263,28.621,21.962C2442.058,1638.309,2418.469,1628.793,2418.469,1628.793 z"
+          />
+        </g>
+        <path
+          style={{ fill: 'url(#sneaker_grad_24)' }}
+          d="M3187.32,2334.851l-1637.294-582.309 l-86.624,240.622l1636.728,598.575c34.763,12.713,73.56-1.386,92.187-33.373c19.134-32.856,37.417-84.193,38.519-161.086 C3231.237,2369.324,3213.662,2344.219,3187.32,2334.851z"
+        />
+        <g>
+          <path
+            style={{ fill: 'url(#sneaker_grad_25)' }}
+            d="M1043.496,1690.351l226.165,27.768 c-0.239,31.128-10.432,71.4-44.935,117.6l-188.876-124.595C1025.823,1704.509,1031.573,1688.887,1043.496,1690.351z"
+          />
+          <path
+            style={{ fill: 'url(#sneaker_grad_26)' }}
+            d="M1550.026,1752.542 c10.36,150.798-86.624,240.622-86.624,240.622l-238.675-157.446c34.503-46.2,44.696-86.471,44.935-117.6L1550.026,1752.542z"
+          />
+        </g>
+        <path
+          style={{ fill: 'url(#sneaker_grad_27)' }}
+          d="M3167.009,2408.637 c1.983,0,3.84-1.231,4.535-3.21c0.888-2.505-0.428-5.254-2.933-6.138l-1566.453-553.596c-2.514-0.883-5.259,0.428-6.138,2.933 c-0.888,2.505,0.428,5.254,2.933,6.138l1566.453,553.596C3165.938,2408.548,3166.478,2408.637,3167.009,2408.637z"
+        />
+        <path
+          style={{ fill: 'url(#sneaker_grad_28)' }}
+          d="M3139.986,2503.04 c1.983,0,3.84-1.231,4.535-3.21c0.888-2.505-0.428-5.254-2.933-6.138l-1566.453-553.601c-2.514-0.884-5.254,0.423-6.138,2.933 c-0.888,2.505,0.428,5.254,2.933,6.138l1566.453,553.601C3138.915,2502.95,3139.455,2503.04,3139.986,2503.04z"
+        />
+        <path
+          style={{ fill: 'url(#sneaker_grad_29)' }}
+          d="M2692.13,2145.246l-72.365-5.898 l-31.339,28.889c0,0,7.414,10.249,30.594,4.358c23.18-5.891,54.932-7.336,54.932-7.336s32,14.426,32.39-12.567L2692.13,2145.246z "
+        />
+      </g>
+    </g>
+  </svg>
+)
+
 function glossaryLabel(count: number, lang: Lang): string {
   if (lang === 'uk') {
     const n10 = count % 10
@@ -56,7 +424,7 @@ export function HomePage({
     if (savedLang && (savedLang === 'ru' || savedLang === 'uk')) {
       if (savedLang !== lang) setLang(savedLang)
     }
-  }, [])
+  }, [lang, setLang])
 
   const handleLangChange = (newLang: Lang) => {
     localStorage.setItem('app_lang', newLang)
@@ -91,9 +459,7 @@ export function HomePage({
       pricesSub: 'Клеи, материалы',
       favorites: 'Избранное',
       favoritesSub:
-        articleFavorites.length > 0
-          ? `Сохранено статей: ${articleFavorites.length}`
-          : 'Нет сохраненных статей',
+        articleFavorites.length > 0 ? `Сохранено статей: ${articleFavorites.length}` : 'Нет сохраненных статей',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
     },
     uk: {
@@ -110,7 +476,7 @@ export function HomePage({
       styles: 'Фасони та силуети',
       stylesSub: 'Класика, жіночі, вуличні',
       stylesCount: '186 статей',
-      sizes: 'Розміри, ортопедія',
+      sizes: 'Размеры, ортопедія',
       sizesSub: 'Колодки, підйом, стопа',
       sizesCount: '97 статей',
       calc: 'Калькулятори',
@@ -122,10 +488,7 @@ export function HomePage({
       prices: 'Ціни',
       pricesSub: 'Клеї, матеріали',
       favorites: 'Обране',
-      favoritesSub:
-        articleFavorites.length > 0
-          ? `Збережено статей: ${articleFavorites.length}`
-          : 'Немає збережених статей',
+      favoritesSub: articleFavorites.length > 0 ? `Збережено статей: ${articleFavorites.length}` : 'Немає збережених статей',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
     },
   }[lang]
@@ -138,7 +501,16 @@ export function HomePage({
       count: t.materialsCount,
       iconClass: 'bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
         </svg>
       ),
@@ -150,7 +522,16 @@ export function HomePage({
       count: t.colorsCount,
       iconClass: 'bg-[var(--pigment-azurite,#007FFF)]/15 text-[var(--pigment-azurite,#007FFF)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
           <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
           <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
@@ -166,7 +547,16 @@ export function HomePage({
       count: t.stylesCount,
       iconClass: 'bg-[var(--pigment-egyptian-blue,#1034A6)]/15 text-[var(--pigment-egyptian-blue,#1034A6)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
           <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
           <path d="M 14 11.5 L 9 15" />
@@ -180,7 +570,16 @@ export function HomePage({
       count: t.sizesCount,
       iconClass: 'bg-[var(--pigment-malachite,#0BDA51)]/15 text-[var(--pigment-malachite,#0BDA51)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M19.875 6.27L17.73 4.125a2.25 2.25 0 00-3.18 0L3.375 15.3a2.25 2.25 0 000 3.18l2.145 2.145a2.25 2.25 0 003.18 0l11.175-11.175a2.25 2.25 0 000-3.18z" />
           <path d="M14.5 5.5l4 4M10.5 9.5l4 4M6.5 13.5l4 4" />
         </svg>
@@ -195,7 +594,16 @@ export function HomePage({
       subtitle: t.calcSub,
       iconClass: 'bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="4" y="2" width="16" height="20" rx="3" />
           <path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 18v.01M12 18v.01M8 18v.01M16 10v.01M12 10v.01M8 10v.01" />
         </svg>
@@ -205,13 +613,9 @@ export function HomePage({
       id: 'blog',
       title: t.blog,
       subtitle: t.blogSub,
-      iconClass: 'bg-[var(--pigment-lac-dye,#8B0000)]/15 text-[var(--pigment-lac-dye,#8B0000)]',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
-          <path d="M7 7h10M7 11h10M7 15h6" />
-        </svg>
-      ),
+      // Убрали фон bg-, так как новая иконка цветная
+      iconClass: 'text-[var(--pigment-lac-dye,#8B0000)]',
+      icon: ComplexSneakerIcon, // Встроили новую SVG иконку
     },
     {
       id: 'glossary',
@@ -219,7 +623,16 @@ export function HomePage({
       subtitle: t.glossarySub,
       iconClass: 'bg-[var(--pigment-azurite,#007FFF)]/15 text-[var(--pigment-azurite,#007FFF)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
         </svg>
       ),
@@ -230,7 +643,16 @@ export function HomePage({
       subtitle: t.pricesSub,
       iconClass: 'bg-[var(--pigment-malachite,#0BDA51)]/15 text-[var(--pigment-malachite,#0BDA51)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       ),
@@ -268,7 +690,15 @@ export function HomePage({
               onClick={onBack}
               className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink,#F5F1EA)] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
@@ -281,7 +711,15 @@ export function HomePage({
         {/* Search */}
         <div className="mb-5">
           <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted,#B9ACA0)] shrink-0">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="text-[var(--color-muted,#B9ACA0)] shrink-0"
+            >
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
@@ -356,9 +794,7 @@ export function HomePage({
                     <span className="break-words hyphens-auto" lang={lang}>
                       {item.title}
                     </span>
-                    {isBlog && hasNewBlog && (
-                      <span className="text-[var(--pigment-lac-dye,#8B0000)] shrink-0">•</span>
-                    )}
+                    {isBlog && hasNewBlog && <span className="text-[var(--pigment-lac-dye,#8B0000)] shrink-0">•</span>}
                   </div>
                   <div className="text-[10px] md:text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2 leading-snug">
                     {item.subtitle}
@@ -428,4 +864,4 @@ export function HomePage({
       </div>
     </div>
   )
- }
+}
