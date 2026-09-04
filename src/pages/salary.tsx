@@ -39,26 +39,21 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemRate, setNewItemRate] = useState<number | ''>('');
   
-  // Состояние для реального курса доллара (по умолчанию ставим примерный)
   const [usdRate, setUsdRate] = useState<number>(41.50);
   const [isRateLoading, setIsRateLoading] = useState(true);
 
-  // --- ИНТЕГРАЦИЯ КУРСА НБУ ---
   useEffect(() => {
     const fetchUsdRate = async () => {
       try {
         setIsRateLoading(true);
-        // Попытка 1: Берем из вашего API (как в PricesPage)
         const apiRes = await fetch('/api/rates').catch(() => null);
         if (apiRes && apiRes.ok) {
           const ratesData = await apiRes.json();
           if (ratesData?.usd) {
             setUsdRate(Number(ratesData.usd));
-            return; // Успешно загрузили, выходим
+            return;
           }
         }
-
-        // Попытка 2: Прямой запрос к НБУ (если ваш API недоступен)
         const nbuRes = await fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json');
         if (nbuRes.ok) {
           const nbuData = await nbuRes.json();
@@ -72,10 +67,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         setIsRateLoading(false);
       }
     };
-
     fetchUsdRate();
   }, []);
-  // -----------------------------
 
   useEffect(() => {
     if (data?.days?.[selectedDate]) {
@@ -85,18 +78,33 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     }
   }, [selectedDate, data?.days]);
 
+  // Месяц привязан к ВЫБРАННОЙ дате, а не к текущей
+  const selectedMonth = selectedDate.substring(0, 7);
+
   const currentMonthTotal = useMemo(() => {
     let total = 0;
-    const month = getCurrentMonth();
     if (data?.days) {
       Object.entries(data.days).forEach(([date, record]) => {
-        if (date.startsWith(month)) {
+        if (date.startsWith(selectedMonth)) {
           total += calcDayTotal(record.quantities, data.rates || record.rates);
         }
       });
     }
     return total;
-  }, [data]);
+  }, [data, selectedMonth]);
+
+  // Лайв-сумма за выбранный день (реагирует на плюсы/минусы до сохранения)
+  const selectedDayTotal = useMemo(() => {
+    let total = 0;
+    if (data?.items && data?.rates) {
+      data.items.forEach(item => {
+        const qty = Number(dayForm[item.id]) || 0;
+        const rate = data.rates[item.id] || 0;
+        total += qty * rate;
+      });
+    }
+    return total;
+  }, [dayForm, data?.items, data?.rates]);
 
   const triggerHaptic = (style: 'light' | 'medium' | 'heavy' = 'light') => {
     try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style) } catch {}
@@ -149,18 +157,15 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const quickDates = useMemo(() => {
     const dates = [];
     const today = new Date();
-    
     for (let i = 0; i < 10; i++) {
       const d = new Date();
       d.setDate(today.getDate() - i);
       dates.push(getLocalDateString(d));
     }
-    
     if (!dates.includes(selectedDate)) {
       dates.push(selectedDate);
       dates.sort((a, b) => b.localeCompare(a));
     }
-    
     return dates;
   }, [selectedDate]);
 
@@ -191,7 +196,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const hasChanges = useMemo(() => {
     const saved = data?.days?.[selectedDate]?.quantities || {};
     if (!data?.items) return false;
-    
     for (const item of data.items) {
       const currentVal = Number(dayForm[item.id]) || 0;
       const savedVal = Number(saved[item.id]) || 0;
@@ -210,6 +214,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     exit: { opacity: 0, scale: 0.98, transition: { duration: 0.15, ease: "easeIn" } }
   };
 
+  // Получаем название выбранного месяца для заголовков
+  const monthName = new Date(selectedDate).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'uk-UA', { month: 'long', year: 'numeric' });
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0E0E0E] text-white pb-32 font-sans overflow-x-hidden selection:bg-[#0A84FF]/30">
       
@@ -219,7 +226,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </button>
         <div>
           <h1 className="text-xl font-bold leading-tight">Зарплата</h1>
-          <div className="text-xs text-white/50 capitalize">{formatMonth(getCurrentMonth(), lang)}</div>
+          <div className="text-xs text-white/50 capitalize">{monthName}</div>
         </div>
       </div>
 
@@ -227,7 +234,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         
         <div className="bg-gradient-to-br from-[#1C1C1E] to-[#121212] p-6 rounded-[28px] border border-white/5 shadow-xl">
           <div className="flex justify-between items-start mb-1">
-            <span className="text-white/50 text-sm font-medium">Итого за месяц</span>
+            <span className="text-white/50 text-sm font-medium capitalize">Итого за {monthName.split(' ')[0]}</span>
             <span className="text-white/30 text-xs px-2 py-1 bg-black/20 rounded-lg flex items-center gap-1">
               USD {isRateLoading ? <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" /> : usdRate.toFixed(2)}
             </span>
@@ -237,6 +244,11 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           </div>
           <div className="text-sm font-medium text-white/30 mt-2">
             ≈ ${(currentMonthTotal / usdRate).toFixed(2)}
+          </div>
+          
+          <div className="mt-5 pt-5 border-t border-white/5 flex justify-between items-center">
+            <span className="text-white/50 text-sm">За выбранный день ({getShortDate(selectedDate)}):</span>
+            <span className="text-[#0A84FF] font-bold text-lg">{selectedDayTotal.toLocaleString()} ₴</span>
           </div>
         </div>
 
@@ -316,7 +328,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 {data.items.length > 0 && (
                   <div className="px-2 pt-2">
                     <h2 className="text-lg font-bold text-white/90">
-                      Внесение за: <span className="text-[#0A84FF] ml-1">{selectedDate === todayStr ? 'Сегодня (' + formatDay(selectedDate) + ')' : formatDay(selectedDate)}</span>
+                      Внесение за: <span className="text-[#0A84FF] ml-1">{selectedDate === todayStr ? 'Сегодня (' + getShortDateName(selectedDate) + ')' : getShortDateName(selectedDate)}</span>
                     </h2>
                   </div>
                 )}
