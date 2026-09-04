@@ -187,50 +187,35 @@ export function useSalary({ userId }: UseSalaryOptions) {
     await save(next)
   }, [data, save])
 
-  /** Закрыть месяц (логика как в Python close_month_yes) */
-  const closeMonth = useCallback(async () => {
-    const today = getKyivDate()
-    let month = getCurrentMonth()
-
-    let monthDays = Object.fromEntries(
-      Object.entries(data.days).filter(([k]) => k.startsWith(month))
+  /** Строгая архивация конкретно выбранного месяца */
+  const closeMonth = useCallback(async (targetMonth: string) => {
+    const monthDays = Object.fromEntries(
+      Object.entries(data.days).filter(([k]) => k.startsWith(targetMonth))
     )
 
-    // Если в текущем месяце нет данных и сегодня ≤ 7 число — пробуем прошлый месяц
-    if (Object.keys(monthDays).length === 0 && today.getDate() <= 7) {
-      const prev = new Date(today.getFullYear(), today.getMonth(), 0) // последний день прошлого месяца
-      const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
-
-      const prevDays = Object.fromEntries(
-        Object.entries(data.days).filter(([k]) => k.startsWith(prevMonth))
-      )
-
-      if (Object.keys(prevDays).length > 0 && !data.archive[prevMonth]) {
-        month = prevMonth
-        monthDays = prevDays
-      }
-    }
-
     if (Object.keys(monthDays).length === 0) {
-      throw new Error('NO_DATA')
+      alert('В выбранном месяце нет записей для архивации.');
+      return;
     }
 
-    if (data.archive[month]) {
-      throw new Error('ALREADY_ARCHIVED')
+    if (data.archive[targetMonth]) {
+      alert('Этот месяц уже заархивирован.');
+      return;
     }
 
-    const stats = calcMonthStats(data.days, month, data.items)
+    const stats = calcMonthStats(data.days, targetMonth, data.items)
 
     const nextArchive = {
       ...data.archive,
-      [month]: {
+      [targetMonth]: {
         days: monthDays,
         stats,
       },
     }
 
+    // Сохраняем в базе все дни, которые НЕ относятся к архивируемому месяцу
     const nextDays = Object.fromEntries(
-      Object.entries(data.days).filter(([k]) => !k.startsWith(month))
+      Object.entries(data.days).filter(([k]) => !k.startsWith(targetMonth))
     )
 
     const next: SalaryUserData = {
@@ -240,7 +225,7 @@ export function useSalary({ userId }: UseSalaryOptions) {
     }
 
     await save(next)
-    return month
+    return targetMonth
   }, [data, save])
 
   /** Удалить месяц из архива */
