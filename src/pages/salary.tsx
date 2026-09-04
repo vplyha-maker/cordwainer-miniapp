@@ -216,6 +216,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
 
   // Получаем название выбранного месяца для заголовков
   const monthName = new Date(selectedDate).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'uk-UA', { month: 'long', year: 'numeric' });
+  const displayMonthName = monthName.split(' ')[0];
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0E0E0E] text-white pb-32 font-sans overflow-x-hidden selection:bg-[#0A84FF]/30">
@@ -234,7 +235,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         
         <div className="bg-gradient-to-br from-[#1C1C1E] to-[#121212] p-6 rounded-[28px] border border-white/5 shadow-xl">
           <div className="flex justify-between items-start mb-1">
-            <span className="text-white/50 text-sm font-medium capitalize">Итого за {monthName.split(' ')[0]}</span>
+            <span className="text-white/50 text-sm font-medium capitalize">Итого за {displayMonthName}</span>
             <span className="text-white/30 text-xs px-2 py-1 bg-black/20 rounded-lg flex items-center gap-1">
               USD {isRateLoading ? <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" /> : usdRate.toFixed(2)}
             </span>
@@ -461,11 +462,13 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
               <motion.div key="archive" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
                 <button 
                   onClick={() => { 
-                    if(confirm('Перенести текущий месяц в архив? Делайте это только в конце месяца.')) closeMonth(); 
+                    if(confirm(`Перенести ${displayMonthName} в архив? Все записи за этот месяц будут сгруппированы.`)) {
+                      closeMonth(selectedMonth); 
+                    }
                   }}
                   className="w-full bg-white/5 border border-dashed border-white/10 text-white/60 hover:text-white hover:bg-white/10 py-6 rounded-[24px] font-bold active:scale-[0.98] transition-all uppercase tracking-wider text-sm"
                 >
-                  + Заархивировать месяц
+                  + Заархивировать {displayMonthName}
                 </button>
                 
                 {Object.keys(data.archive).length === 0 ? (
