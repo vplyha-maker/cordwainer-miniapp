@@ -138,7 +138,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [showCopyFallback, setShowCopyFallback] = useState(false)
   
   const [tab, setTab] = useState<TabId>('mix')
-  const [isWet, setIsWet] = useState(false) // НОВОЕ СОСТОЯНИЕ
+  const [isWet, setIsWet] = useState(false)
 
   const {
     paints,
@@ -155,7 +155,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     pigments,
     paints,
     totalAmount,
-    isWet, // ПЕРЕДАЕМ В ХУК
+    isWet,
   })
 
   const [targetHex, setTargetHex] = useState('#8B4513')
@@ -401,7 +401,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     })
   }
 
-  // ВАЖЛИВО: Видалено фільтр !item.isBinder. Тепер база передається у суміш.
   const sendRecipeToMix = () => {
     if (!recipeResult?.recipe?.length) return
     applyRecipe(
@@ -415,14 +414,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     setTab('mix')
   }
 
-  // Обробник зміни системи для авто-коригування інвентарю
   const handleSystemChange = (newSystem: CoverageSystem) => {
     setSystem(newSystem)
     if (newSystem === 'aniline') {
-      // Прибираємо акрилове зв'язуюче для аніліну
       setInventoryIds(prev => prev.filter(id => id !== 'acrylic_binder'))
     } else if (newSystem === 'acrylic') {
-      // Додаємо акрилове зв'язуюче для акрилу
       const hasBinder = pigments.some(p => p.id === 'acrylic_binder')
       if (hasBinder) {
         setInventoryIds(prev => prev.includes('acrylic_binder') ? prev : [...prev, 'acrylic_binder'])
@@ -516,32 +512,46 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             <div className="flex-1 min-w-0 pr-1">
                               <PigmentSelector pigments={pigments} value={paint.pigmentId} onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)} lang={lang} />
                             </div>
-                            <div className="flex items-center gap-1 w-[70px] flex-shrink-0">
-                              <input
-                                ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
-                                type="text" inputMode="decimal" enterKeyHint="done"
-                                value={paint.amount}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(',', '.')
-                                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                    const num = parseFloat(val)
-                                    if (!isNaN(num) && num > 5000) val = '5000'
-                                    updatePaint(paint.id, 'amount', val)
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  let val = e.target.value.replace(',', '.')
-                                  if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
-                                  else {
-                                    const num = parseFloat(val)
-                                    if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                                  }
-                                }}
-                                className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
-                                placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
-                              />
-                              <span className="text-[12px] font-medium flex-shrink-0" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
+                            
+                            <div className="flex flex-col items-end justify-center w-[75px] flex-shrink-0">
+                              <div className="flex items-center gap-1 w-full">
+                                <input
+                                  ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
+                                  type="text" inputMode="decimal" enterKeyHint="done"
+                                  value={paint.amount}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(',', '.')
+                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                      const num = parseFloat(val)
+                                      if (!isNaN(num) && num > 5000) val = '5000'
+                                      updatePaint(paint.id, 'amount', val)
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    let val = e.target.value.replace(',', '.')
+                                    if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
+                                    else {
+                                      const num = parseFloat(val)
+                                      if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                                    }
+                                  }}
+                                  className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
+                                  placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
+                                />
+                                <span className="text-[12px] font-medium flex-shrink-0" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
+                              </div>
+                              
+                              {/* МИНИ-ИНДИКАТОР DELTA E */}
+                              {activeTarget && liveDeltaE !== null && (
+                                <div 
+                                  className="text-[10px] font-bold tracking-wide pr-[18px] -mt-0.5 transition-colors" 
+                                  style={{ color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171' }}
+                                >
+                                  ΔE {liveDeltaE.toFixed(1)}
+                                </div>
+                              )}
                             </div>
+
                             <button onClick={() => removePaint(paint.id)} disabled={paints.length <= 1} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)' }}>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" /></svg>
                             </button>
@@ -575,7 +585,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
             <section className="rounded-2xl px-4 md:px-5 pt-4 pb-5 calc-result-card" style={{ background: 'var(--color-surface, #25201C)' }}>
               
-              {/* --- ОБНОВЛЕННЫЙ БЛОК "РЕЗУЛЬТАТ" С ТУМБЛЕРОМ --- */}
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-[13px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
                   {isUk ? 'Результат' : 'Результат'}
@@ -603,7 +612,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   )}
                 </div>
               </div>
-              {/* --- КОНЕЦ ОБНОВЛЕННОГО БЛОКА --- */}
 
               <div className="flex flex-col items-center">
                 
