@@ -6,11 +6,20 @@ type StylesPageProps = {
   lang: Lang
 }
 
-// Данные для наших "глянцевых" слайдов
-const STYLES_DATA = [
+// Описываем тип данных, чтобы TypeScript знал, что image и video — опциональные поля (?)
+type StyleSlide = {
+  id: string
+  video?: string
+  image?: string
+  title: { ru: string; uk: string }
+  subtitle: { ru: string; uk: string }
+  desc: { ru: string; uk: string }
+}
+
+// Применяем тип к массиву: StyleSlide[]
+const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
-    // Ссылка на твоё видео
     video: '/Fason/Botford.mp4',
     title: { ru: 'Ботфорты', uk: 'Ботфорти' },
     subtitle: { ru: 'Высокий стиль', uk: 'Високий стиль' },
@@ -21,7 +30,6 @@ const STYLES_DATA = [
   },
   {
     id: 'chelsea',
-    // На втором слайде пока картинка (для демонстрации свайпа), потом сможешь заменить на видео челси
     video: '/Fason/chelsi.mp4', 
     title: { ru: 'Челси', uk: 'Челсі' },
     subtitle: { ru: 'Вечная классика', uk: 'Вічна класика' },
@@ -88,13 +96,13 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
                   playsInline
                   className="w-full h-full object-cover"
                 />
-              ) : (
+              ) : slide.image ? (
                 <img
                   src={slide.image}
                   alt={slide.title[lang]}
                   className="w-full h-full object-cover"
                 />
-              )}
+              ) : null}
             </div>
 
             {/* Градиентное затемнение (журнальный эффект) */}
