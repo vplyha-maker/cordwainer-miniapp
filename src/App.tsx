@@ -14,6 +14,9 @@ import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
 import { PricesPage } from './pages/PricesPage'
 
+// Импортируем нашу новую страницу стилей и фасонов
+import { StylesPage } from './pages/StylesPage'
+
 // Именой импорт адаптированного компонента зарплаты
 import { SalaryCalcPage } from './pages/salary' 
 
@@ -45,6 +48,7 @@ export type Screen =
   | 'seo-width'
   | 'glossary'
   | 'prices'
+  | 'styles' // <--- ДОБАВЛЕН НОВЫЙ ЭКРАН
 
 export type Lang = 'ru' | 'uk'
 
@@ -338,6 +342,7 @@ export default function App() {
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
+            onOpenStyles={() => setScreen('styles')} // <--- ДОБАВЛЕН ПРОП
             onOpenGlossary={() => setScreen('glossary')}
             onOpenPrices={() => setScreen('prices')}
             lang={lang}
@@ -448,6 +453,15 @@ export default function App() {
             onBack={() => setScreen('home')}
             lang={lang}
             setLang={handleSetLang}
+          />
+        )}
+
+        {/* НОВЫЙ ЭКРАН "ФАСОНЫ И СИЛУЭТЫ" */}
+        {screen === 'styles' && (
+          <StylesPage
+            key="styles"
+            onBack={() => setScreen('home')}
+            lang={lang}
           />
         )}
 
