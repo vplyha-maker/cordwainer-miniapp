@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useState } from 'react' // <--- ДОБАВИЛИ ИМПОРТ
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -39,7 +40,6 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'martins',
     video: '/Fason/martins.mp4',
-    // Используем \n для красивого журнального переноса строки
     title: { ru: 'Мартинсы\n/ Берцы', uk: 'Мартінси\n/ Берці' },
     subtitle: { ru: 'Бунтарский дух', uk: 'Бунтарський дух' },
     desc: {
@@ -50,6 +50,9 @@ const STYLES_DATA: StyleSlide[] = [
 ]
 
 export function StylesPage({ onBack, lang }: StylesPageProps) {
+  // Добавляем состояние для звука (по умолчанию выключен, чтобы видео могло стартовать)
+  const [isMuted, setIsMuted] = useState(true)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: '100%' }}
@@ -81,6 +84,28 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
         </svg>
       </button>
 
+      {/* Кнопка управления звуком (в правом верхнем углу) */}
+      <button
+        onClick={() => setIsMuted(!isMuted)}
+        className="absolute top-14 right-5 z-[100] w-10 h-10 flex items-center justify-center text-white/80 active:scale-90 transition-transform"
+      >
+        {isMuted ? (
+          // Иконка "Звук выключен"
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        ) : (
+          // Иконка "Звук включен"
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        )}
+      </button>
+
       <div className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth">
         {STYLES_DATA.map((slide, index) => (
           <div
@@ -94,7 +119,7 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
                   src={slide.video}
                   autoPlay
                   loop
-                  muted
+                  muted={isMuted} // <--- ПЕРЕДАЕМ СОСТОЯНИЕ ЗВУКА СЮДА
                   playsInline
                   className="w-full h-full object-cover opacity-90"
                 />
@@ -107,7 +132,6 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
               ) : null}
             </div>
 
-            {/* Легкая кинематографичная виньетка */}
             <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/60 via-transparent to-black/50 pointer-events-none" />
 
             {/* Верхний блок: Разделитель + Подзаголовок + Главный заголовок */}
@@ -125,7 +149,6 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
                 </h3>
               </div>
               
-              {/* Добавили whitespace-pre-line и изменили leading (интерлиньяж) */}
               <h2 className="text-[48px] md:text-7xl font-serif font-light tracking-wide leading-[1.1] drop-shadow-xl whitespace-pre-line">
                 {slide.title[lang]}
               </h2>
