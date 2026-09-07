@@ -36,6 +36,17 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Лаконічний дизайн та максимальний комфорт. Ідеальний баланс між суворою класикою та розслабленим повсякденним стилем.',
     },
   },
+  {
+    id: 'martins',
+    video: '/Fason/martins.mp4',
+    // Используем \n для красивого журнального переноса строки
+    title: { ru: 'Мартинсы\n/ Берцы', uk: 'Мартінси\n/ Берці' },
+    subtitle: { ru: 'Бунтарский дух', uk: 'Бунтарський дух' },
+    desc: {
+      ru: 'Грубая эстетика, покорившая мировые подиумы. Массивная подошва и высокая шнуровка создают дерзкий, но притягательный контраст.',
+      uk: 'Груба естетика, що підкорила світові подіуми. Масивна підошва та висока шнурівка створюють зухвалий, але притягальний контраст.',
+    },
+  }
 ]
 
 export function StylesPage({ onBack, lang }: StylesPageProps) {
@@ -60,7 +71,7 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
         }
       `}</style>
 
-      {/* Кнопка "Назад" - минималистичная, без тяжелого круга */}
+      {/* Кнопка "Назад" */}
       <button
         onClick={onBack}
         className="absolute top-14 left-5 z-[100] w-10 h-10 flex items-center justify-center text-white/80 active:scale-90 transition-transform"
@@ -96,7 +107,7 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
               ) : null}
             </div>
 
-            {/* Легкая кинематографичная виньетка вместо тяжелого нижнего градиента */}
+            {/* Легкая кинематографичная виньетка */}
             <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/60 via-transparent to-black/50 pointer-events-none" />
 
             {/* Верхний блок: Разделитель + Подзаголовок + Главный заголовок */}
@@ -105,7 +116,7 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: false, amount: 0.5 }}
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-              className="absolute top-[22%] left-6 z-20 max-w-[80%]"
+              className="absolute top-[22%] left-6 z-20 max-w-[85%]"
             >
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-8 h-[1px] bg-white/60" />
@@ -114,7 +125,8 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
                 </h3>
               </div>
               
-              <h2 className="text-[56px] md:text-7xl font-serif font-light tracking-wide leading-none drop-shadow-xl">
+              {/* Добавили whitespace-pre-line и изменили leading (интерлиньяж) */}
+              <h2 className="text-[48px] md:text-7xl font-serif font-light tracking-wide leading-[1.1] drop-shadow-xl whitespace-pre-line">
                 {slide.title[lang]}
               </h2>
             </motion.div>
