@@ -11,7 +11,7 @@ const STYLES_DATA = [
   {
     id: 'botford',
     // Ссылка на твоё видео
-    video: '/fason/Botford.mp4',
+    video: '/Fason/Botford.mp4',
     title: { ru: 'Ботфорты', uk: 'Ботфорти' },
     subtitle: { ru: 'Высокий стиль', uk: 'Високий стиль' },
     desc: {
