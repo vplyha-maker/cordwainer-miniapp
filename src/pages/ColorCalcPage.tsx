@@ -136,7 +136,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [loadError, setLoadError] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showCopyFallback, setShowCopyFallback] = useState(false)
+  
   const [tab, setTab] = useState<TabId>('mix')
+  const [isWet, setIsWet] = useState(false) // НОВОЕ СОСТОЯНИЕ
 
   const {
     paints,
@@ -153,6 +155,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     pigments,
     paints,
     totalAmount,
+    isWet, // ПЕРЕДАЕМ В ХУК
   })
 
   const [targetHex, setTargetHex] = useState('#8B4513')
@@ -571,16 +574,36 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </section>
 
             <section className="rounded-2xl px-4 md:px-5 pt-4 pb-5 calc-result-card" style={{ background: 'var(--color-surface, #25201C)' }}>
+              
+              {/* --- ОБНОВЛЕННЫЙ БЛОК "РЕЗУЛЬТАТ" С ТУМБЛЕРОМ --- */}
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-[13px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
                   {isUk ? 'Результат' : 'Результат'}
                 </h2>
-                {activeTarget && (
-                  <button onClick={() => setActiveTarget(null)} className="text-[11px] font-medium text-red-400">
-                    {isUk ? 'Скинути ціль' : 'Сбросить цель'}
+                
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setIsWet(!isWet)}
+                    className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors border flex items-center gap-1.5"
+                    style={{
+                       borderColor: isWet ? 'var(--color-accent, #D8A35C)' : 'transparent',
+                       color: isWet ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 60%, transparent)',
+                       background: isWet ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 6%, transparent)'
+                    }}
+                  >
+                    {isWet 
+                      ? '💧 ' + (isUk ? 'На палітрі (мокра)' : 'На палитре (мокрая)') 
+                      : '💨 ' + (isUk ? 'На полотні (суха)' : 'На холсте (сухая)')}
                   </button>
-                )}
+
+                  {activeTarget && (
+                    <button onClick={() => setActiveTarget(null)} className="text-[11px] font-medium text-red-400 ml-1">
+                      {isUk ? 'Скинути' : 'Сбросить'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {/* --- КОНЕЦ ОБНОВЛЕННОГО БЛОКА --- */}
 
               <div className="flex flex-col items-center">
                 
