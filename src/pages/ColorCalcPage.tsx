@@ -630,11 +630,40 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </div>
 
                     {liveDeltaE !== null && (
-                      <div className="px-4 py-2 rounded-xl text-center transition-colors" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
+                      <div className="px-4 py-2 rounded-xl text-center transition-colors flex flex-col items-center" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
                         <span className="text-[12px] opacity-70 block mb-0.5">{isUk ? 'Відхилення' : 'Отклонение'}</span>
                         <span className="text-[18px] font-bold" style={{ color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171' }}>
                           ΔE = {liveDeltaE.toFixed(1)}
                         </span>
+                      </div>
+                    )}
+
+                    {/* ПРОФЕССИОНАЛЬНАЯ ЛЕГЕНДА DELTA E */}
+                    {liveDeltaE !== null && (
+                      <div className="w-full mt-1 p-3 rounded-xl border" style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)', background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)' }}>
+                        <p className="text-[10px] font-semibold mb-2 opacity-60 uppercase tracking-wider text-center">
+                          {isUk ? 'Стандарт CIE ΔE₂₀₀₀' : 'Стандарт CIE ΔE₂₀₀₀'}
+                        </p>
+                        <div className="flex flex-col gap-1.5 text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#4ade80]" />
+                            <span style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>
+                              <strong>ΔE ≤ 2.0:</strong> {isUk ? 'Візуально невідрізнимо (ідеальний збіг)' : 'Визуально неотличимо (идеальное совпадение)'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#facc15]" />
+                            <span style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>
+                              <strong>ΔE 2.0 – 5.0:</strong> {isUk ? 'Комерційно прийнятно (допустиме відхилення)' : 'Коммерчески приемлемо (допустимое отклонение)'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#f87171]" />
+                            <span style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>
+                              <strong>ΔE &gt; 5.0:</strong> {isUk ? 'Помітна розбіжність (потребує коригування)' : 'Заметное расхождение (требует корректировки)'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
