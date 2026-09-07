@@ -139,7 +139,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   
   const [tab, setTab] = useState<TabId>('mix')
   const [isWet, setIsWet] = useState(false)
-  const [isAutoAdjusting, setIsAutoAdjusting] = useState(false) // Состояние для новой кнопки
+  const [isAutoAdjusting, setIsAutoAdjusting] = useState(false)
 
   const {
     paints,
@@ -402,11 +402,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     })
   }
 
-  // --- НОВАЯ ФУНКЦИЯ: АВТОПОДБОР ПРОПОРЦИЙ В ТЕКУЩЕЙ СМЕСИ ---
   const autoAdjustCurrentMix = () => {
     if (!activeTarget || paints.length === 0) return
 
-    // Берем ID только тех пигментов, которые пользователь сам добавил на экран "Смесь"
     const mixPigmentIds = paints.map(p => p.pigmentId).filter(id => id !== 'acrylic_binder' && id !== 'cardboard')
     if (mixPigmentIds.length === 0) return
 
@@ -424,11 +422,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
       const result = e.data.result as RecipeResult | null
       if (result && result.recipe) {
-        // Применяем найденные идеальные объемы к текущим ползункам
+        // ПРЕДОХРАНИТЕЛЬ: Нормализуем полученные миллилитры, чтобы общий объем не раздувался
+        const rawTotal = result.recipe.reduce((sum, item) => sum + item.ml, 0)
+        const targetVol = totalAmount > 0 ? totalAmount : 20
+        const scale = rawTotal > 0 ? (targetVol / rawTotal) : 1
+
         applyRecipe(
           result.recipe.map((item) => ({ 
             pigmentId: item.pigment.id, 
-            ml: item.ml 
+            ml: Number((item.ml * scale).toFixed(2))
           }))
         )
       }
@@ -439,8 +441,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       id, 
       targetHex: activeTarget, 
       basicPigments: pigments, 
-      maxComponents: mixPigmentIds.length, // Ограничиваемся только текущими компонентами
-      targetVolume: totalAmount > 0 ? totalAmount : 20, // Сохраняем текущий общий объем
+      maxComponents: mixPigmentIds.length, 
+      targetVolume: totalAmount > 0 ? totalAmount : 20, 
       system, 
       activeIds: mixPigmentIds, 
       excludeIds: ['cardboard']
@@ -559,32 +561,43 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               <PigmentSelector pigments={pigments} value={paint.pigmentId} onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)} lang={lang} />
                             </div>
                             
-                            {/* ВОЗВРАЩЕНО В ЧИСТЫЙ ВИД БЕЗ ДУБЛИРОВАНИЯ ДЕЛЬТЫ Е */}
-                            <div className="flex items-center gap-1 w-[70px] flex-shrink-0">
-                              <input
-                                ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
-                                type="text" inputMode="decimal" enterKeyHint="done"
-                                value={paint.amount}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(',', '.')
-                                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                    const num = parseFloat(val)
-                                    if (!isNaN(num) && num > 5000) val = '5000'
-                                    updatePaint(paint.id, 'amount', val)
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  let val = e.target.value.replace(',', '.')
-                                  if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
-                                  else {
-                                    const num = parseFloat(val)
-                                    if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                                  }
-                                }}
-                                className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
-                                placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
-                              />
-                              <span className="text-[12px] font-medium flex-shrink-0" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
+                            <div className="flex flex-col items-end w-[70px] flex-shrink-0">
+                              <div className="flex items-center justify-end gap-1 w-full">
+                                <input
+                                  ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
+                                  type="text" inputMode="decimal" enterKeyHint="done"
+                                  value={paint.amount}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(',', '.')
+                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                      const num = parseFloat(val)
+                                      if (!isNaN(num) && num > 5000) val = '5000'
+                                      updatePaint(paint.id, 'amount', val)
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    let val = e.target.value.replace(',', '.')
+                                    if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
+                                    else {
+                                      const num = parseFloat(val)
+                                      if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                                    }
+                                  }}
+                                  className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
+                                  placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
+                                />
+                                <span className="text-[12px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
+                              </div>
+                              
+                              {/* ВОЗВРАЩЕННЫЙ ЗНАЧОК ДЕЛЬТА Е ПОД ПОЛЗУНКОМ */}
+                              {activeTarget && liveDeltaE !== null && (
+                                <div 
+                                  className="text-[11px] font-bold text-right w-full pr-[18px] transition-colors" 
+                                  style={{ color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171' }}
+                                >
+                                  ΔE {liveDeltaE.toFixed(1)}
+                                </div>
+                              )}
                             </div>
 
                             <button onClick={() => removePaint(paint.id)} disabled={paints.length <= 1} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)' }}>
@@ -613,13 +626,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </div>
                 )}
                 
-                {/* --- КНОПКИ УПРАВЛЕНИЯ СМЕСЬЮ --- */}
                 <div className="flex gap-2 mt-4">
                   <button onClick={addPaint} disabled={loading || loadError} className="flex-1 py-3 rounded-xl text-[14px] font-medium disabled:opacity-40" style={{ border: '1px dashed color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>
                     {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
                   </button>
                   
-                  {/* КНОПКА АВТОПОДБОРА (появляется только если есть цель и пигменты) */}
                   {activeTarget && paints.filter(p => p.pigmentId !== 'acrylic_binder').length > 0 && (
                     <button 
                       onClick={autoAdjustCurrentMix} 
