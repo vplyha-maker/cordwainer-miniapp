@@ -132,7 +132,6 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
         let rMeas = Math.max(0.0001, Math.min(0.9999, spectra[c][i].reflectance * 0.01));
         
         // ВАЖНО: Используем ту же физику, что и в mixSpectra!
-        // Убрали поправку Сондерсона, добавили динамический S (укрывистость)
         const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas);
         const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5); 
         const K = KS * S;
@@ -291,6 +290,15 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
     approximate: bestDE > 2.0,
   }
 }
+
+// ---------------------------------------------------------
+// СПЕКТР ВЛАЖНОЙ ЭМУЛЬСИИ (МОКРОЙ КРАСКИ)
+// Имитирует белое связующее в невысохшем акриле (85% отражения)
+// ---------------------------------------------------------
+export const WET_EMULSION_SPECTRUM: SpectrumPoint[] = Array.from({ length: 81 }, (_, i) => ({
+  wavelength: 380 + i * 5,
+  reflectance: 85
+}));
 
 export function simulateLayersKM(
   baseSpectrum: SpectrumPoint[],
@@ -486,8 +494,22 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
   return normalizeSpectrumToCIE(points)
 }
 
-export function mixSpectra(components: MixComponent[]): SpectrumPoint[] {
-  const pigments = components.filter(c => !c.isBinder)
+// ---------------------------------------------------------
+// ФУНКЦИЯ СМЕШИВАНИЯ (С УЧЕТОМ ЭФФЕКТА ВЛАЖНОЙ КРАСКИ)
+// ---------------------------------------------------------
+export function mixSpectra(components: MixComponent[], isWet = false): SpectrumPoint[] {
+  let pigments = components.filter(c => !c.isBinder)
+
+  // Добавляем виртуальное связующее (белила), если включен режим мокрой краски
+  if (isWet) {
+    let totalVol = 0;
+    for (let c = 0; c < pigments.length; c++) totalVol += pigments[c].volume;
+    if (totalVol > 0) {
+      // 12% от общего объема симулируют белесость невысохшего полимера
+      pigments.push({ spectrum: WET_EMULSION_SPECTRUM, volume: totalVol * 0.12, isBinder: true });
+    }
+  }
+
   const n = pigments.length
   if (n === 0) return []
 
