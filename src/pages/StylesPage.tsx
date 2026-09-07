@@ -6,7 +6,6 @@ type StylesPageProps = {
   lang: Lang
 }
 
-// Описываем тип данных, чтобы TypeScript знал, что image и video — опциональные поля (?)
 type StyleSlide = {
   id: string
   video?: string
@@ -16,7 +15,6 @@ type StyleSlide = {
   desc: { ru: string; uk: string }
 }
 
-// Применяем тип к массиву: StyleSlide[]
 const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
@@ -47,46 +45,39 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-black text-white overflow-hidden"
+      className="fixed inset-0 z-50 bg-[#111] text-white overflow-hidden"
     >
-      {/* Скрываем стандартный скроллбар */}
       <style>{`
-        .snap-container::-webkit-scrollbar {
-          display: none;
+        .snap-container::-webkit-scrollbar { display: none; }
+        .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes subtle-float {
+          0%, 100% { transform: translateY(0) translateX(-50%); }
+          50% { transform: translateY(-8px) translateX(-50%); }
         }
-        .snap-container {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-bounce-slow {
-          animation: bounce-slow 2s ease-in-out infinite;
+        .animate-subtle-float {
+          animation: subtle-float 2.5s ease-in-out infinite;
         }
       `}</style>
 
-      {/* Кнопка "Назад" (опущена ниже для избежания конфликта с шапкой Telegram) */}
+      {/* Кнопка "Назад" - минималистичная, без тяжелого круга */}
       <button
         onClick={onBack}
-        className="absolute top-16 left-4 md:left-6 z-[100] w-10 h-10 rounded-full flex items-center justify-center bg-black/20 backdrop-blur-md border border-white/20 active:scale-90 transition-transform"
+        className="absolute top-14 left-5 z-[100] w-10 h-10 flex items-center justify-center text-white/80 active:scale-90 transition-transform"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
-      {/* Контейнер для полноэкранного скролла (Свайпер) */}
       <div className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth">
-        
         {STYLES_DATA.map((slide, index) => (
           <div
             key={slide.id}
-            className="relative h-[100dvh] w-full snap-start snap-always flex items-end justify-center pb-20 md:pb-24 px-6 overflow-hidden"
+            className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden"
           >
-            {/* Фон (Видео или Картинка) */}
-            <div className="absolute inset-0 w-full h-full z-0">
+            {/* Фон */}
+            <div className="absolute inset-0 w-full h-full z-0 bg-black">
               {slide.video ? (
                 <video
                   src={slide.video}
@@ -94,53 +85,67 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
                   loop
                   muted
                   playsInline
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover opacity-90"
                 />
               ) : slide.image ? (
                 <img
                   src={slide.image}
                   alt={slide.title[lang]}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover opacity-90"
                 />
               ) : null}
             </div>
 
-            {/* Градиентное затемнение (журнальный эффект) */}
-            <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+            {/* Легкая кинематографичная виньетка вместо тяжелого нижнего градиента */}
+            <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/60 via-transparent to-black/50 pointer-events-none" />
 
-            {/* Текстовый контент (с анимацией при попадании в зону видимости) */}
+            {/* Верхний блок: Разделитель + Подзаголовок + Главный заголовок */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: false, amount: 0.5 }}
-              transition={{ duration: 0.7, ease: 'easeOut' }}
-              className="relative z-20 w-full px-6 text-center flex flex-col items-center"
+              transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+              className="absolute top-[22%] left-6 z-20 max-w-[80%]"
             >
-              <h3 className="text-[10px] md:text-[12px] tracking-[0.3em] uppercase text-white/70 mb-4 font-medium drop-shadow-md">
-                {slide.subtitle[lang]}
-              </h3>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-8 h-[1px] bg-white/60" />
+                <h3 className="text-[10px] md:text-[11px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
+                  {slide.subtitle[lang]}
+                </h3>
+              </div>
               
-              <h2 className="text-5xl md:text-6xl font-serif font-light tracking-wide mb-6 drop-shadow-xl">
+              <h2 className="text-[56px] md:text-7xl font-serif font-light tracking-wide leading-none drop-shadow-xl">
                 {slide.title[lang]}
               </h2>
-              
-              <p className="text-[14px] leading-relaxed text-white/80 max-w-[280px] drop-shadow-lg">
+            </motion.div>
+
+            {/* Нижний блок: Компактное описание сбоку */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.5 }}
+              transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+              className="absolute bottom-12 left-6 z-20 max-w-[240px] md:max-w-[280px]"
+            >
+              <p className="text-[13px] leading-[1.6] text-white/70 font-light drop-shadow-lg">
                 {slide.desc[lang]}
               </p>
             </motion.div>
 
-            {/* Индикатор "Свайп вверх" только на первом слайде */}
+            {/* Журнальный вертикальный Swipe сбоку (только на первом экране) */}
             {index === 0 && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center opacity-60 animate-bounce-slow">
-                <span className="text-[10px] tracking-widest uppercase mb-2">Swipe</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
+              <div className="absolute top-1/2 right-4 -translate-y-1/2 z-20 opacity-50 flex items-center justify-center">
+                <span 
+                  className="text-[9px] tracking-[0.4em] uppercase text-white/80 font-medium"
+                  style={{ writingMode: 'vertical-rl' }}
+                >
+                  Swipe
+                </span>
+                <div className="absolute -bottom-10 left-1/2 w-[1px] h-6 bg-white/40 animate-subtle-float" />
               </div>
             )}
           </div>
         ))}
-
       </div>
     </motion.div>
   )
