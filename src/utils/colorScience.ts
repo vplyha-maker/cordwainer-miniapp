@@ -111,8 +111,8 @@ const RATIOS_2 = getDominantShifts([[50, 50], [80, 20], [90, 10], [95, 5], [98, 
 const RATIOS_3 = getDominantShifts([[34, 33, 33], [60, 20, 20], [80, 10, 10], [90, 5, 5], [95, 3, 2], [98, 1, 1], [99, 0.5, 0.5]])
 const RATIOS_4 = getDominantShifts([[25, 25, 25, 25], [40, 20, 20, 20], [60, 20, 10, 10], [80, 10, 5, 5], [90, 5, 3, 2], [95, 3, 1, 1], [98, 1, 0.5, 0.5], [99, 0.5, 0.3, 0.2]])
 
-// --- ОБНОВЛЕННЫЙ И МОЩНЫЙ АЛГОРИТМ ПОИСКА ---
-function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L: number; a: number; b: number }) {
+// ТЕПЕРЬ ФУНКЦИЯ ЭКСПОРТИРУЕТСЯ И ПОНИМАЕТ ФЛАГ isWet
+export function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L: number; a: number; b: number }, isWet = false) {
   const n = indices.length;
   let minDE = Infinity;
   let bestVols = Array(n).fill(100 / n);
@@ -122,22 +122,34 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
   const evalVols = (v: number[]) => {
     let totalVol = 0;
     for (let i = 0; i < n; i++) totalVol += v[i];
-    const invTotal = 1 / totalVol;
+    let emulsionVol = isWet ? totalVol * 0.12 : 0;
+    const invTotal = 1 / (totalVol + emulsionVol);
 
     const result: SpectrumPoint[] = new Array(SPECTRUM_LEN);
     for (let i = 0; i < SPECTRUM_LEN; i++) {
       let totalK = 0;
       let totalS = 0;
+      
       for (let c = 0; c < n; c++) {
         let rMeas = Math.max(0.0001, Math.min(0.9999, spectra[c][i].reflectance * 0.01));
         const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas);
         const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5); 
         const K = KS * S;
-        
         const weight = v[c] * invTotal;
         totalK += weight * K;
         totalS += weight * S;
       }
+
+      if (isWet) {
+        let rMeas = Math.max(0.0001, Math.min(0.9999, WET_EMULSION_SPECTRUM[i].reflectance * 0.01));
+        const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas);
+        const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5);
+        const K = KS * S;
+        const weight = emulsionVol * invTotal;
+        totalK += weight * K;
+        totalS += weight * S;
+      }
+      
       const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001;
       let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS);
       rMix = Math.max(0, Math.min(1, rMix));
@@ -155,7 +167,6 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
     return de;
   }
 
-  // 1. Плотная сетка поиска (не даст упустить экстремумы)
   const vectors: number[][] = [];
   if (n === 1) {
     vectors.push([100]);
@@ -175,13 +186,10 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
     RATIOS_4.forEach(r => vectors.push(r));
   }
 
-  // Считаем все стартовые векторы
   for (const v of vectors) evalVols(v);
 
-  // 2. Снайперский градиентный спуск
   let improved = true;
   let pass = 0;
-  // Добавлены шаги 0.05 и 0.01 для микро-настройки сильных пигментов
   const shifts = [5, 2, 1, 0.5, 0.1, 0.05, 0.01]; 
   while (improved && pass < 40) {
     improved = false;
@@ -190,7 +198,7 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
           if (i === j) continue;
-          if (bestVols[j] - s >= 0.001) { // Позволяем объему падать почти до нуля
+          if (bestVols[j] - s >= 0.001) {
             const test = [...bestVols];
             test[i] += s;
             test[j] -= s;
@@ -206,7 +214,7 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
   return { vols: bestVols, deltaE: minDE };
 }
 
-export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxComponents = 3, targetVolume = 20, system: CoverageSystem = 'acrylic', excludeIds: string[] = []): RecipeResult | null {
+export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxComponents = 3, targetVolume = 20, system: CoverageSystem = 'acrylic', excludeIds: string[] = [], isWet = false): RecipeResult | null {
   if (!pigments.length || !targetHex) return null
 
   const binderPigment = system === 'acrylic' ? pigments.find((p) => p.id === 'acrylic_binder' || (p as { isBinder?: boolean }).isBinder === true) : undefined
@@ -225,7 +233,7 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   const colors = validPigments.filter(p => !isAchromatic(p.id))
 
   const scoredColors = colors.map(p => {
-    const mixed = mixSpectra([{ spectrum: p.spectrum!, volume: 100 }])
+    const mixed = mixSpectra([{ spectrum: p.spectrum!, volume: 100 }], isWet)
     const rgb = spectrumToRGB(mixed)
     return { pigment: p, dist: calculateDeltaE2000(targetLab, rgbToLab(rgb.r, rgb.g, rgb.b)) }
   })
@@ -241,7 +249,7 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   let bestVols: number[] = [];
 
   const evaluateCombo = (indices: number[]) => {
-    const res = optimizeCombo(indices, candidates, targetLab);
+    const res = optimizeCombo(indices, candidates, targetLab, isWet);
     if (res.deltaE < bestDE) {
       bestDE = res.deltaE;
       bestIndices = indices;
@@ -268,7 +276,7 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
 
   const selected: Pigment[] = bestIndices.map((idx: number) => candidates[idx])
   
-  const finalMixed = mixSpectra(selected.map((p, i) => ({ spectrum: p.spectrum!, volume: bestVols[i] })))
+  const finalMixed = mixSpectra(selected.map((p, i) => ({ spectrum: p.spectrum!, volume: bestVols[i] })), isWet)
   const finalRgb = spectrumToRGB(finalMixed)
 
   const totalWeight = bestVols.reduce((sum: number, v: number) => sum + v, 0)
@@ -277,7 +285,6 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   const recipe: RecipeItem[] = []
   for (let i = 0; i < bestIndices.length; i++) {
     const ml = Math.round(bestVols[i] * scale * 100) / 100
-    // ИСПРАВЛЕН КРИТИЧЕСКИЙ БАГ: Теперь не выбрасываем микро-дозы от 0.01 мл
     if (ml >= 0.01) recipe.push({ pigment: candidates[bestIndices[i]], ml }) 
   }
   recipe.sort((a, b) => b.ml - a.ml)
