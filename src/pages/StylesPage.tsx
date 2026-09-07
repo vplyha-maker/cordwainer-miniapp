@@ -22,7 +22,7 @@ const STYLES_DATA = [
   {
     id: 'chelsea',
     // На втором слайде пока картинка (для демонстрации свайпа), потом сможешь заменить на видео челси
-    image: '/blog-hero.webp', 
+    image: '/Fason/chelsi.mp4', 
     title: { ru: 'Челси', uk: 'Челсі' },
     subtitle: { ru: 'Вечная классика', uk: 'Вічна класика' },
     desc: {
