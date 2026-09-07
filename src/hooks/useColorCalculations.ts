@@ -17,6 +17,7 @@ interface UseColorCalculationsParams {
   pigments: Pigment[]
   paints: PaintPart[]
   totalAmount: number
+  isWet?: boolean // <-- Добавили флаг влажной краски
 }
 
 export interface MixedColor {
@@ -29,6 +30,7 @@ export function useColorCalculations({
   pigments,
   paints,
   totalAmount,
+  isWet = false, // <-- Принимаем флаг по умолчанию false
 }: UseColorCalculationsParams) {
   const mixedColor = useMemo((): MixedColor | null => {
     if (pigments.length === 0 || totalAmount <= 0) return null
@@ -57,7 +59,8 @@ export function useColorCalculations({
 
     if (components.length === 0) return null
 
-    const mixedSpectrum = mixSpectra(components)
+    // <-- Передаем isWet в функцию mixSpectra
+    const mixedSpectrum = mixSpectra(components, isWet)
     if (!mixedSpectrum.length) return null
 
     const rgb = spectrumToRGB(mixedSpectrum)
@@ -66,7 +69,7 @@ export function useColorCalculations({
       hex: rgbToHex(rgb),
       spectrum: mixedSpectrum,
     }
-  }, [paints, pigments, totalAmount])
+  }, [paints, pigments, totalAmount, isWet]) // <-- Добавили isWet в массив зависимостей
 
   return { mixedColor }
 }
