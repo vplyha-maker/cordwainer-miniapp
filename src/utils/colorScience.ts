@@ -111,6 +111,7 @@ const RATIOS_2 = getDominantShifts([[50, 50], [80, 20], [90, 10], [95, 5], [98, 
 const RATIOS_3 = getDominantShifts([[34, 33, 33], [60, 20, 20], [80, 10, 10], [90, 5, 5], [95, 3, 2], [98, 1, 1], [99, 0.5, 0.5]])
 const RATIOS_4 = getDominantShifts([[25, 25, 25, 25], [40, 20, 20, 20], [60, 20, 10, 10], [80, 10, 5, 5], [90, 5, 3, 2], [95, 3, 1, 1], [98, 1, 0.5, 0.5], [99, 0.5, 0.3, 0.2]])
 
+// --- ОБНОВЛЕННЫЙ И МОЩНЫЙ АЛГОРИТМ ПОИСКА ---
 function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L: number; a: number; b: number }) {
   const n = indices.length;
   let minDE = Infinity;
@@ -127,11 +128,8 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
     for (let i = 0; i < SPECTRUM_LEN; i++) {
       let totalK = 0;
       let totalS = 0;
-      
       for (let c = 0; c < n; c++) {
         let rMeas = Math.max(0.0001, Math.min(0.9999, spectra[c][i].reflectance * 0.01));
-        
-        // ВАЖНО: Используем ту же физику, что и в mixSpectra!
         const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas);
         const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5); 
         const K = KS * S;
@@ -140,11 +138,9 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
         totalK += weight * K;
         totalS += weight * S;
       }
-      
       const mixedKS = totalS > 1e-8 ? totalK / totalS : 0.0001;
       let rMix = 1 + mixedKS - Math.sqrt(mixedKS * mixedKS + 2 * mixedKS);
       rMix = Math.max(0, Math.min(1, rMix));
-      
       result[i] = { wavelength: WL[i], reflectance: rMix * 100 };
     }
 
@@ -159,39 +155,48 @@ function optimizeCombo(indices: number[], candidates: Pigment[], targetLab: { L:
     return de;
   }
 
+  // 1. Плотная сетка поиска (не даст упустить экстремумы)
+  const vectors: number[][] = [];
   if (n === 1) {
-    evalVols([100]);
+    vectors.push([100]);
   } else if (n === 2) {
-    for (let i = 5; i <= 95; i += 5) evalVols([i, 100 - i]);
+    for (let i = 1; i < 100; i += 2) vectors.push([i, 100 - i]);
+    vectors.push([99.5, 0.5], [99.9, 0.1], [0.5, 99.5], [0.1, 99.9]);
   } else if (n === 3) {
-    for (let i = 5; i <= 90; i += 15)
-      for (let j = 5; j <= 95 - i; j += 15)
-        evalVols([i, j, 100 - i - j]);
+    for (let i = 1; i < 100; i += 5)
+      for (let j = 1; j < 100 - i; j += 5)
+        vectors.push([i, j, 100 - i - j]);
+    RATIOS_3.forEach(r => vectors.push(r));
   } else if (n === 4) {
-    for (let i = 5; i <= 85; i += 25)
-      for (let j = 5; j <= 90 - i; j += 25)
-        for (let k = 5; k <= 95 - i - j; k += 25)
-          evalVols([i, j, k, 100 - i - j - k]);
+    for (let i = 1; i < 100; i += 12)
+      for (let j = 1; j < 100 - i; j += 12)
+        for (let k = 1; k < 100 - i - j; k += 12)
+          vectors.push([i, j, k, 100 - i - j - k]);
+    RATIOS_4.forEach(r => vectors.push(r));
   }
 
-  // Градиентный спуск (тонкая настройка)
+  // Считаем все стартовые векторы
+  for (const v of vectors) evalVols(v);
+
+  // 2. Снайперский градиентный спуск
   let improved = true;
   let pass = 0;
-  const shifts = [10, 5, 1, 0.5, 0.1]; 
-  while (improved && pass < 20) {
+  // Добавлены шаги 0.05 и 0.01 для микро-настройки сильных пигментов
+  const shifts = [5, 2, 1, 0.5, 0.1, 0.05, 0.01]; 
+  while (improved && pass < 40) {
     improved = false;
     pass++;
     for (const s of shifts) {
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
           if (i === j) continue;
-          if (bestVols[j] - s >= 0.1) {
+          if (bestVols[j] - s >= 0.001) { // Позволяем объему падать почти до нуля
             const test = [...bestVols];
             test[i] += s;
             test[j] -= s;
             const oldDE = minDE;
             evalVols(test);
-            if (minDE < oldDE - 0.001) improved = true;
+            if (minDE < oldDE - 0.0001) improved = true;
           }
         }
       }
@@ -272,7 +277,8 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   const recipe: RecipeItem[] = []
   for (let i = 0; i < bestIndices.length; i++) {
     const ml = Math.round(bestVols[i] * scale * 100) / 100
-    if (ml > 0.05) recipe.push({ pigment: candidates[bestIndices[i]], ml })
+    // ИСПРАВЛЕН КРИТИЧЕСКИЙ БАГ: Теперь не выбрасываем микро-дозы от 0.01 мл
+    if (ml >= 0.01) recipe.push({ pigment: candidates[bestIndices[i]], ml }) 
   }
   recipe.sort((a, b) => b.ml - a.ml)
 
@@ -291,10 +297,6 @@ export function findRecipeByHex(targetHex: string, pigments: Pigment[], maxCompo
   }
 }
 
-// ---------------------------------------------------------
-// СПЕКТР ВЛАЖНОЙ ЭМУЛЬСИИ (МОКРОЙ КРАСКИ)
-// Имитирует белое связующее в невысохшем акриле (85% отражения)
-// ---------------------------------------------------------
 export const WET_EMULSION_SPECTRUM: SpectrumPoint[] = Array.from({ length: 81 }, (_, i) => ({
   wavelength: 380 + i * 5,
   reflectance: 85
@@ -494,18 +496,13 @@ export function parseSpectrum(text: string): SpectrumPoint[] {
   return normalizeSpectrumToCIE(points)
 }
 
-// ---------------------------------------------------------
-// ФУНКЦИЯ СМЕШИВАНИЯ (С УЧЕТОМ ЭФФЕКТА ВЛАЖНОЙ КРАСКИ)
-// ---------------------------------------------------------
 export function mixSpectra(components: MixComponent[], isWet = false): SpectrumPoint[] {
   let pigments = components.filter(c => !c.isBinder)
 
-  // Добавляем виртуальное связующее (белила), если включен режим мокрой краски
   if (isWet) {
     let totalVol = 0;
     for (let c = 0; c < pigments.length; c++) totalVol += pigments[c].volume;
     if (totalVol > 0) {
-      // 12% от общего объема симулируют белесость невысохшего полимера
       pigments.push({ spectrum: WET_EMULSION_SPECTRUM, volume: totalVol * 0.12, isBinder: true });
     }
   }
@@ -534,8 +531,6 @@ export function mixSpectra(components: MixComponent[], isWet = false): SpectrumP
       rMeas = Math.max(0.0001, Math.min(0.9999, rMeas))
       
       const KS = ((1 - rMeas) * (1 - rMeas)) / (2 * rMeas)
-      
-      // Идеальный баланс укрывистости
       const S = 0.1 + 6.0 * Math.pow(rMeas, 2.5)
       const K = KS * S
 
