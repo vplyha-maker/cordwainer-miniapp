@@ -9,6 +9,9 @@ import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
 import type { CoverageSystem, RecipeResult } from '../utils/calculatorLogic'
 
+// ВАЖНО: Добавлен импорт для локального автоподбора
+import { mixSpectra, spectrumToRGB } from '../utils/colorScience'
+
 interface ColorCalcPageProps {
   lang: Lang
   onBack: () => void
@@ -31,7 +34,6 @@ const DEFAULT_INVENTORY_IDS = [
   'acrylic_binder',                    // Обязательная прозрачная база
 ] as const
 
-
 function detectIOS(): boolean {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent || ''
@@ -42,7 +44,7 @@ function detectIOS(): boolean {
   return false
 }
 
-// --- Утилиты для расчета DeltaE CIEDE2000 в реальном времени ---
+// --- Утилиты для расчета DeltaE CIEDE2000 ---
 function hexToRgb(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
   return result
@@ -402,51 +404,110 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     })
   }
 
+  // --- ИСПРАВЛЕННЫЙ АВТОПОДБОР: Локальный, точный, без раздутия объемов ---
   const autoAdjustCurrentMix = () => {
-    if (!activeTarget || paints.length === 0) return
+    if (!activeTarget || paints.length === 0 || pigments.length === 0) return;
+    setIsAutoAdjusting(true);
 
-    const mixPigmentIds = paints.map(p => p.pigmentId).filter(id => id !== 'acrylic_binder' && id !== 'cardboard')
-    if (mixPigmentIds.length === 0) return
+    // Небольшая задержка, чтобы UI успел показать статус "Подбор..."
+    setTimeout(() => {
+      try {
+        const targetLab = rgbToLab(hexToRgb(activeTarget));
+        
+        // Отделяем цветные пигменты от биндера
+        const colorPaints = paints.filter(p => p.pigmentId !== 'acrylic_binder' && p.pigmentId !== 'cardboard');
+        const binderPaint = paints.find(p => p.pigmentId === 'acrylic_binder');
+        
+        if (colorPaints.length === 0) {
+          setIsAutoAdjusting(false);
+          return;
+        }
 
-    setIsAutoAdjusting(true)
+        const activePigments = colorPaints.map(p => ({
+          paintId: p.id,
+          pigment: pigments.find(pig => pig.id === p.pigmentId)!
+        })).filter(p => p.pigment !== undefined);
 
-    const id = ++reqIdRef.current
-    const worker = ensureWorker()
+        const n = activePigments.length;
+        let bestVols = colorPaints.map(p => parseFloat(p.amount) || 0.1);
+        let minDE = Infinity;
 
-    const onMsg = (e: MessageEvent) => {
-      if (e.data.id !== id) return
-      worker.removeEventListener('message', onMsg)
-      setIsAutoAdjusting(false)
+        // Внутренний хелпер для оценки объемов
+        const evalVols = (v: number[]) => {
+          const components = activePigments.map((ap, i) => ({ spectrum: ap.pigment.spectrum!, volume: v[i] }));
+          const mixedSpectrum = mixSpectra(components, false); // Всегда подгоняем под сухой цвет!
+          if (!mixedSpectrum.length) return Infinity;
+          
+          const rgb = spectrumToRGB(mixedSpectrum);
+          const lab = rgbToLab([rgb.r, rgb.g, rgb.b]);
+          
+          // Локальная конвертация для совместимости
+          const toHex = (n: number) => {
+            const hex = Math.max(0, Math.min(255, Math.round(n))).toString(16);
+            return hex.length === 1 ? '0' + hex : hex;
+          };
+          const mixedHex = '#' + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b);
+          
+          const de = calculateDeltaE2000(activeTarget, mixedHex);
+          
+          if (de < minDE) {
+            minDE = de;
+            bestVols = [...v];
+          }
+          return de;
+        };
 
-      if (e.data.error) return
+        // Точка старта
+        evalVols(bestVols);
 
-      const result = e.data.result as RecipeResult | null
-      if (result && result.recipe) {
-        // ПРЕДОХРАНИТЕЛЬ: Нормализуем полученные миллилитры, чтобы общий объем не раздувался
-        const rawTotal = result.recipe.reduce((sum, item) => sum + item.ml, 0)
-        const targetVol = totalAmount > 0 ? totalAmount : 20
-        const scale = rawTotal > 0 ? (targetVol / rawTotal) : 1
+        // Градиентный спуск для поиска идеальных объемов
+        let improved = true;
+        let pass = 0;
+        const shifts = [5, 1, 0.5, 0.1, 0.05, 0.01];
+        
+        while (improved && pass < 50) {
+          improved = false;
+          pass++;
+          for (const s of shifts) {
+            for (let i = 0; i < n; i++) {
+              let test = [...bestVols];
+              test[i] += s;
+              let de = evalVols(test);
+              if (de < minDE - 0.001) improved = true;
+              
+              if (bestVols[i] - s >= 0.01) { // Не даем опуститься ниже 0.01 мл
+                test = [...bestVols];
+                test[i] -= s;
+                de = evalVols(test);
+                if (de < minDE - 0.001) improved = true;
+              }
+            }
+          }
+        }
 
-        applyRecipe(
-          result.recipe.map((item) => ({ 
-            pigmentId: item.pigment.id, 
-            ml: Number((item.ml * scale).toFixed(2))
-          }))
-        )
+        // ЖЕЛЕЗНОЕ ПРАВИЛО: Сохраняем изначальный общий объем смеси!
+        const oldColorVol = colorPaints.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        const newColorVol = bestVols.reduce((sum, v) => sum + v, 0);
+        const scale = oldColorVol > 0 && newColorVol > 0 ? (oldColorVol / newColorVol) : 1;
+
+        activePigments.forEach((ap, i) => {
+          const newVol = Number((bestVols[i] * scale).toFixed(2));
+          updatePaint(ap.paintId, 'amount', String(newVol));
+        });
+
+        if (binderPaint) {
+          const oldBinderVol = parseFloat(binderPaint.amount) || 0;
+          const binderRatio = oldColorVol > 0 ? oldBinderVol / oldColorVol : 0;
+          const newBinderVol = Number((newColorVol * scale * binderRatio).toFixed(2));
+          updatePaint(binderPaint.id, 'amount', String(newBinderVol));
+        }
+
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsAutoAdjusting(false);
       }
-    }
-
-    worker.addEventListener('message', onMsg)
-    worker.postMessage({
-      id, 
-      targetHex: activeTarget, 
-      basicPigments: pigments, 
-      maxComponents: mixPigmentIds.length, 
-      targetVolume: totalAmount > 0 ? totalAmount : 20, 
-      system, 
-      activeIds: mixPigmentIds, 
-      excludeIds: ['cardboard']
-    })
+    }, 50); // Микропауза для UI
   }
 
   const sendRecipeToMix = () => {
@@ -561,7 +622,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               <PigmentSelector pigments={pigments} value={paint.pigmentId} onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)} lang={lang} />
                             </div>
                             
-                            <div className="flex flex-col items-end w-[70px] flex-shrink-0">
+                            {/* --- ИСПРАВЛЕННЫЙ БЛОК ВВОДА С DELTA E --- */}
+                            <div className="flex flex-col items-end w-[75px] flex-shrink-0 relative">
                               <div className="flex items-center justify-end gap-1 w-full">
                                 <input
                                   ref={(el) => { if (el) amountRefs.current.set(paint.id, el); else amountRefs.current.delete(paint.id) }}
@@ -589,16 +651,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                                 <span className="text-[12px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
                               </div>
                               
-                              {/* ВОЗВРАЩЕННЫЙ ЗНАЧОК ДЕЛЬТА Е ПОД ПОЛЗУНКОМ */}
+                              {/* Индикатор Delta E под цифрами */}
                               {activeTarget && liveDeltaE !== null && (
                                 <div 
-                                  className="text-[11px] font-bold text-right w-full pr-[18px] transition-colors" 
+                                  className="text-[10px] font-bold text-right w-full pr-[18px] transition-colors leading-none pt-1" 
                                   style={{ color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171' }}
                                 >
                                   ΔE {liveDeltaE.toFixed(1)}
                                 </div>
                               )}
                             </div>
+                            {/* --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА --- */}
 
                             <button onClick={() => removePaint(paint.id)} disabled={paints.length <= 1} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)' }}>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" /></svg>
