@@ -59,10 +59,10 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
         }
       `}</style>
 
-      {/* Кнопка "Назад" (поверх всего) */}
+      {/* Кнопка "Назад" (опущена ниже для избежания конфликта с шапкой Telegram) */}
       <button
         onClick={onBack}
-        className="absolute top-5 left-4 md:left-6 z-[100] w-10 h-10 rounded-full flex items-center justify-center bg-black/20 backdrop-blur-md border border-white/20 active:scale-90 transition-transform"
+        className="absolute top-16 left-4 md:left-6 z-[100] w-10 h-10 rounded-full flex items-center justify-center bg-black/20 backdrop-blur-md border border-white/20 active:scale-90 transition-transform"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
@@ -106,17 +106,17 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.5 }}
               transition={{ duration: 0.7, ease: 'easeOut' }}
-              className="relative z-20 w-full max-w-lg text-center flex flex-col items-center"
+              className="relative z-20 w-full px-6 text-center flex flex-col items-center"
             >
-              <h3 className="text-[11px] md:text-[13px] tracking-[0.25em] uppercase text-white/70 mb-3 font-medium">
+              <h3 className="text-[10px] md:text-[12px] tracking-[0.3em] uppercase text-white/70 mb-4 font-medium drop-shadow-md">
                 {slide.subtitle[lang]}
               </h3>
               
-              <h2 className="text-5xl md:text-6xl font-serif font-light tracking-wide mb-5 drop-shadow-lg">
+              <h2 className="text-5xl md:text-6xl font-serif font-light tracking-wide mb-6 drop-shadow-xl">
                 {slide.title[lang]}
               </h2>
               
-              <p className="text-[14px] md:text-[15px] leading-relaxed text-white/80 max-w-sm drop-shadow-md">
+              <p className="text-[14px] leading-relaxed text-white/80 max-w-[280px] drop-shadow-lg">
                 {slide.desc[lang]}
               </p>
             </motion.div>
@@ -137,4 +137,3 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
     </motion.div>
   )
 }
-
