@@ -9,6 +9,7 @@ type HomePageProps = {
   onOpenBlog?: () => void
   onOpenCalcMenu?: () => void
   onOpenColors?: () => void
+  onOpenStyles?: () => void
   onOpenGlossary?: () => void
   onOpenPrices?: () => void
   lang: Lang
@@ -276,6 +277,7 @@ export function HomePage({
   onOpenBlog,
   onOpenCalcMenu,
   onOpenColors,
+  onOpenStyles,
   onOpenGlossary,
   onOpenPrices,
   lang,
@@ -538,10 +540,15 @@ export function HomePage({
         <div className="grid grid-cols-2 gap-3 mb-6">
           {LEARNING.map((item) => {
             const isColors = item.id === 'colors'
+            const isStyles = item.id === 'styles'
             return (
               <button
                 key={item.id}
-                onClick={isColors ? onOpenColors : undefined}
+                onClick={
+                  isColors ? onOpenColors : 
+                  isStyles ? onOpenStyles : 
+                  undefined
+                }
                 className="min-h-[116px] h-auto p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
               >
                 <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
