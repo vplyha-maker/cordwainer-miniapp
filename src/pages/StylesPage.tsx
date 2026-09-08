@@ -46,12 +46,35 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Грубая эстетика, покорившая мировые подиумы. Массивная подошва и высокая шнуровка создают дерзкий, но притягательный контраст.',
       uk: 'Груба естетика, що підкорила світові подіуми. Масивна підошва та висока шнурівка створюють зухвалий, але притягальний контраст.',
     },
+  },
+  {
+    id: 'lofer',
+    video: '/Fason/lofer.mp4',
+    title: { ru: 'Лоферы', uk: 'Лофери' },
+    subtitle: { ru: 'Тихая роскошь', uk: 'Тиха розкіш' },
+    desc: {
+      ru: 'Воплощение элегантности и абсолютного комфорта. Идеальная база, которая делает любой образ статусным и расслабленным одновременно.',
+      uk: 'Втілення елегантності та абсолютного комфорту. Ідеальна база, яка робить будь-який образ статусним і розслабленим водночас.',
+    },
+  },
+  {
+    id: 'sock_boots',
+    video: '/Fason/Sock_boots.mp4',
+    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи' }, 
+    subtitle: { ru: 'Гибридная эстетика', uk: 'Гібридна естетика' },
+    desc: {
+      ru: 'Смелый гибрид классической лодочки и эластичного трикотажа. Безупречно облегает щиколотку, добавляя образу утонченной дерзости и абсолютного комфорта.',
+      uk: 'Сміливий гібрид класичного човника та еластичного трикотажу. Бездоганно облягає кісточку, додаючи образу вишуканої зухвалості та абсолютного комфорту.',
+    },
   }
 ]
 
 // НОВЫЙ КОМПОНЕНТ: Отдельный слайд, который сам управляет своим видео
 function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  
+  // Железобетонная страховка языка
+  const currentLang = (lang === 'uk' || lang === 'ru') ? lang : 'ru'
 
   // Эта магия включает видео только когда оно на экране (минимум на 50%)
   useEffect(() => {
@@ -105,7 +128,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         ) : slide.image ? (
           <img
             src={slide.image}
-            alt={slide.title[lang]}
+            alt={slide.title[currentLang]}
             className="w-full h-full object-cover opacity-90"
           />
         ) : null}
@@ -125,12 +148,12 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         <div className="flex items-center gap-4 mb-4">
           <div className="w-8 h-[1px] bg-white/60" />
           <h3 className="text-[10px] md:text-[11px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
-            {slide.subtitle[lang]}
+            {slide.subtitle[currentLang]}
           </h3>
         </div>
         
         <h2 className="text-[48px] md:text-7xl font-serif font-light tracking-wide leading-[1.1] drop-shadow-xl whitespace-pre-line">
-          {slide.title[lang]}
+          {slide.title[currentLang]}
         </h2>
       </motion.div>
 
@@ -143,7 +166,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         className="absolute bottom-12 left-6 z-20 max-w-[240px] md:max-w-[280px]"
       >
         <p className="text-[13px] leading-[1.6] text-white/70 font-light drop-shadow-lg">
-          {slide.desc[lang]}
+          {slide.desc[currentLang]}
         </p>
       </motion.div>
 
@@ -163,7 +186,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   )
 }
 
-export function StylesPage({ onBack, lang }: StylesPageProps) {
+export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [isMuted, setIsMuted] = useState(true)
 
   return (
