@@ -67,7 +67,6 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Сміливий гібрид класичного човника та еластичного трикотажу. Бездоганно облягає кісточку, додаючи образу вишуканої зухвалості та абсолютного комфорту.',
     },
   },
-  // НОВЫЙ ФАСОН: Казаки
   {
     id: 'cozaki',
     video: '/Fason/cozaki.mp4',
@@ -78,7 +77,6 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Знаковий скошений каблук та характерний мис. Ідеальний баланс між естетикою дикого заходу та ритмом сучасного мегаполіса.',
     },
   },
-  // НОВЫЙ ФАСОН: Классические ботильоны
   {
     id: 'boti',
     video: '/Fason/boti.mp4',
@@ -123,8 +121,8 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
   return (
     <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      {/* 1. ФОН: Чистое видео */}
-      <div className="absolute inset-0 w-full h-full z-0">
+      {/* 1. ФОН: Чистое видео с object-contain, чтобы не обрезалось */}
+      <div className="absolute inset-0 w-full h-full z-0 flex items-center justify-center">
         {slide.video ? (
           <video
             ref={videoRef}
@@ -132,21 +130,21 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
             loop
             muted={isMuted}
             playsInline
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
           />
         ) : slide.image ? (
           <img
             src={slide.image}
             alt={slide.title[currentLang]}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
           />
         ) : null}
       </div>
 
-      {/* 2. РАВНОМЕРНЫЙ ОВЕРЛЕЙ: Только 15% затемнение для белого текста */}
-      <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
+      {/* 2. РАВНОМЕРНЫЙ ОВЕРЛЕЙ */}
+      <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/40 via-black/10 to-black/10 pointer-events-none" />
 
-      {/* 3. ТИПОГРАФИКА: Экстремальный верхний левый угол */}
+      {/* 3. ТИПОГРАФИКА: Верхний левый угол */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -154,24 +152,22 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         transition={{ duration: 1.5, ease: "easeInOut" }}
         className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%]"
       >
-        {/* Надстрочник: Гротеск, ультра-трекинг */}
         <h3 className="text-[9px] md:text-[10px] tracking-[0.5em] uppercase text-white/90 font-sans font-light">
           {slide.subtitle[currentLang]}
         </h3>
-        
-        {/* Название: Классическая антиква, чистый белый */}
         <h2 className="text-[44px] md:text-[56px] font-serif font-light leading-[1.05] tracking-wide text-white whitespace-pre-line">
           {slide.title[currentLang]}
         </h2>
       </motion.div>
 
-      {/* 4. ОПИСАНИЕ: Экстремальный нижний угол */}
+      {/* 4. ОПИСАНИЕ: Внизу. Используем inline style для защиты от обрезки снизу */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: false, amount: 0.4 }}
         transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
-        className="absolute bottom-12 left-6 z-20 max-w-[280px]"
+        className="absolute bottom-16 md:bottom-20 left-6 z-20 max-w-[280px]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide">
           {slide.desc[currentLang]}
@@ -197,7 +193,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Элементы управления: строгие и прозрачные */}
+      {/* Кнопка "Назад" */}
       <button
         onClick={onBack}
         className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
@@ -207,6 +203,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </svg>
       </button>
 
+      {/* Кнопка звука */}
       <button
         onClick={() => setIsMuted(!isMuted)}
         className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
