@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react' // <--- ДОБАВИЛИ ИМПОРТ
+import { useState, useRef, useEffect } from 'react'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -49,8 +49,121 @@ const STYLES_DATA: StyleSlide[] = [
   }
 ]
 
+// НОВЫЙ КОМПОНЕНТ: Отдельный слайд, который сам управляет своим видео
+function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  // Эта магия включает видео только когда оно на экране (минимум на 50%)
+  useEffect(() => {
+    if (!videoRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Если слайд виден - играем
+            videoRef.current?.play().catch(() => {
+              // Игнорируем ошибки автоплея (браузер может блокировать)
+            })
+          } else {
+            // Если ушел с экрана - пауза (экономим память и батарею!)
+            videoRef.current?.pause()
+          }
+        })
+      },
+      { threshold: 0.5 } // Срабатывает, когда половина слайда на экране
+    )
+
+    observer.observe(videoRef.current)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
+
+  // Если глобально включили звук, а видео играет - обновляем
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted
+    }
+  }, [isMuted])
+
+  return (
+    <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden">
+      {/* Фон */}
+      <div className="absolute inset-0 w-full h-full z-0 bg-black">
+        {slide.video ? (
+          <video
+            ref={videoRef}
+            src={slide.video}
+            // Убрали autoPlay, теперь им управляет observer
+            loop
+            muted={isMuted}
+            playsInline
+            className="w-full h-full object-cover opacity-90"
+          />
+        ) : slide.image ? (
+          <img
+            src={slide.image}
+            alt={slide.title[lang]}
+            className="w-full h-full object-cover opacity-90"
+          />
+        ) : null}
+      </div>
+
+      {/* Легкая кинематографичная виньетка */}
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/60 via-transparent to-black/50 pointer-events-none" />
+
+      {/* Верхний блок: Разделитель + Подзаголовок + Главный заголовок */}
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: false, amount: 0.5 }}
+        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+        className="absolute top-[22%] left-6 z-20 max-w-[85%]"
+      >
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-8 h-[1px] bg-white/60" />
+          <h3 className="text-[10px] md:text-[11px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
+            {slide.subtitle[lang]}
+          </h3>
+        </div>
+        
+        <h2 className="text-[48px] md:text-7xl font-serif font-light tracking-wide leading-[1.1] drop-shadow-xl whitespace-pre-line">
+          {slide.title[lang]}
+        </h2>
+      </motion.div>
+
+      {/* Нижний блок: Компактное описание сбоку */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false, amount: 0.5 }}
+        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+        className="absolute bottom-12 left-6 z-20 max-w-[240px] md:max-w-[280px]"
+      >
+        <p className="text-[13px] leading-[1.6] text-white/70 font-light drop-shadow-lg">
+          {slide.desc[lang]}
+        </p>
+      </motion.div>
+
+      {/* Журнальный вертикальный Swipe сбоку (только на первом экране) */}
+      {index === 0 && (
+        <div className="absolute top-1/2 right-4 -translate-y-1/2 z-20 opacity-50 flex items-center justify-center">
+          <span 
+            className="text-[9px] tracking-[0.4em] uppercase text-white/80 font-medium"
+            style={{ writingMode: 'vertical-rl' }}
+          >
+            Swipe
+          </span>
+          <div className="absolute -bottom-10 left-1/2 w-[1px] h-6 bg-white/40 animate-subtle-float" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function StylesPage({ onBack, lang }: StylesPageProps) {
-  // Добавляем состояние для звука (по умолчанию выключен, чтобы видео могло стартовать)
   const [isMuted, setIsMuted] = useState(true)
 
   return (
@@ -84,20 +197,18 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
         </svg>
       </button>
 
-      {/* Кнопка управления звуком (в правом верхнем углу) */}
+      {/* Кнопка управления звуком */}
       <button
         onClick={() => setIsMuted(!isMuted)}
         className="absolute top-14 right-5 z-[100] w-10 h-10 flex items-center justify-center text-white/80 active:scale-90 transition-transform"
       >
         {isMuted ? (
-          // Иконка "Звук выключен"
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <line x1="23" y1="9" x2="17" y2="15"></line>
             <line x1="17" y1="9" x2="23" y2="15"></line>
           </svg>
         ) : (
-          // Иконка "Звук включен"
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
@@ -108,78 +219,13 @@ export function StylesPage({ onBack, lang }: StylesPageProps) {
 
       <div className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth">
         {STYLES_DATA.map((slide, index) => (
-          <div
-            key={slide.id}
-            className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden"
-          >
-            {/* Фон */}
-            <div className="absolute inset-0 w-full h-full z-0 bg-black">
-              {slide.video ? (
-                <video
-                  src={slide.video}
-                  autoPlay
-                  loop
-                  muted={isMuted} // <--- ПЕРЕДАЕМ СОСТОЯНИЕ ЗВУКА СЮДА
-                  playsInline
-                  className="w-full h-full object-cover opacity-90"
-                />
-              ) : slide.image ? (
-                <img
-                  src={slide.image}
-                  alt={slide.title[lang]}
-                  className="w-full h-full object-cover opacity-90"
-                />
-              ) : null}
-            </div>
-
-            <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/60 via-transparent to-black/50 pointer-events-none" />
-
-            {/* Верхний блок: Разделитель + Подзаголовок + Главный заголовок */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: false, amount: 0.5 }}
-              transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-              className="absolute top-[22%] left-6 z-20 max-w-[85%]"
-            >
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-8 h-[1px] bg-white/60" />
-                <h3 className="text-[10px] md:text-[11px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
-                  {slide.subtitle[lang]}
-                </h3>
-              </div>
-              
-              <h2 className="text-[48px] md:text-7xl font-serif font-light tracking-wide leading-[1.1] drop-shadow-xl whitespace-pre-line">
-                {slide.title[lang]}
-              </h2>
-            </motion.div>
-
-            {/* Нижний блок: Компактное описание сбоку */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0.5 }}
-              transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
-              className="absolute bottom-12 left-6 z-20 max-w-[240px] md:max-w-[280px]"
-            >
-              <p className="text-[13px] leading-[1.6] text-white/70 font-light drop-shadow-lg">
-                {slide.desc[lang]}
-              </p>
-            </motion.div>
-
-            {/* Журнальный вертикальный Swipe сбоку (только на первом экране) */}
-            {index === 0 && (
-              <div className="absolute top-1/2 right-4 -translate-y-1/2 z-20 opacity-50 flex items-center justify-center">
-                <span 
-                  className="text-[9px] tracking-[0.4em] uppercase text-white/80 font-medium"
-                  style={{ writingMode: 'vertical-rl' }}
-                >
-                  Swipe
-                </span>
-                <div className="absolute -bottom-10 left-1/2 w-[1px] h-6 bg-white/40 animate-subtle-float" />
-              </div>
-            )}
-          </div>
+          <SlideItem 
+            key={slide.id} 
+            slide={slide} 
+            lang={lang} 
+            index={index} 
+            isMuted={isMuted} 
+          />
         ))}
       </div>
     </motion.div>
