@@ -69,14 +69,11 @@ const STYLES_DATA: StyleSlide[] = [
   }
 ]
 
-// НОВЫЙ КОМПОНЕНТ: Отдельный слайд, который сам управляет своим видео
 function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   
-  // Железобетонная страховка языка
   const currentLang = (lang === 'uk' || lang === 'ru') ? lang : 'ru'
 
-  // Эта магия включает видео только когда оно на экране (минимум на 50%)
   useEffect(() => {
     if (!videoRef.current) return
 
@@ -84,27 +81,20 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Если слайд виден - играем
-            videoRef.current?.play().catch(() => {
-              // Игнорируем ошибки автоплея (браузер может блокировать)
-            })
+            videoRef.current?.play().catch(() => {})
           } else {
-            // Если ушел с экрана - пауза (экономим память и батарею!)
             videoRef.current?.pause()
           }
         })
       },
-      { threshold: 0.5 } // Срабатывает, когда половина слайда на экране
+      { threshold: 0.5 }
     )
 
     observer.observe(videoRef.current)
 
-    return () => {
-      observer.disconnect()
-    }
+    return () => observer.disconnect()
   }, [])
 
-  // Если глобально включили звук, а видео играет - обновляем
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.muted = isMuted
@@ -112,14 +102,13 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   }, [isMuted])
 
   return (
-    <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden">
+    <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
       {/* Фон */}
-      <div className="absolute inset-0 w-full h-full z-0 bg-black">
+      <div className="absolute inset-0 w-full h-full z-0">
         {slide.video ? (
           <video
             ref={videoRef}
             src={slide.video}
-            // Убрали autoPlay, теперь им управляет observer
             loop
             muted={isMuted}
             playsInline
@@ -134,38 +123,32 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         ) : null}
       </div>
 
-      {/* Легкая кинематографичная виньетка */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/60 via-transparent to-black/50 pointer-events-none" />
+      {/* Журнальный градиент: затемняем ТОЛЬКО ВЕРХ для текста, низ (обувь) оставляем чистым */}
+      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-      {/* Верхний блок: Разделитель + Подзаголовок + Главный заголовок */}
+      {/* ЕДИНЫЙ ТЕКСТОВОЙ БЛОК: Сгруппирован вверху, чтобы не перекрывать обувь */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: false, amount: 0.5 }}
         transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-        className="absolute top-[22%] left-6 z-20 max-w-[85%]"
+        className="absolute top-[20%] md:top-[22%] left-6 z-20 flex flex-col gap-4 max-w-[85%]"
       >
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-8 h-[1px] bg-white/60" />
-          <h3 className="text-[10px] md:text-[11px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
+        {/* Надстрочник */}
+        <div className="flex items-center gap-3">
+          <div className="w-6 h-[1px] bg-white/60" />
+          <h3 className="text-[9px] md:text-[10px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
             {slide.subtitle[currentLang]}
           </h3>
         </div>
         
-        <h2 className="text-[48px] md:text-7xl font-serif font-light tracking-wide leading-[1.1] drop-shadow-xl whitespace-pre-line">
+        {/* Главный заголовок */}
+        <h2 className="text-[44px] md:text-6xl font-serif font-light tracking-wide leading-[1.05] drop-shadow-xl whitespace-pre-line text-white">
           {slide.title[currentLang]}
         </h2>
-      </motion.div>
 
-      {/* Нижний блок: Компактное описание сбоку */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: false, amount: 0.5 }}
-        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
-        className="absolute bottom-12 left-6 z-20 max-w-[240px] md:max-w-[280px]"
-      >
-        <p className="text-[13px] leading-[1.6] text-white/70 font-light drop-shadow-lg">
+        {/* Описание (теперь оно тут, компактное и легкое) */}
+        <p className="text-[12px] md:text-[13px] leading-[1.7] text-white/70 font-light max-w-[260px] md:max-w-[300px] drop-shadow-lg mt-2">
           {slide.desc[currentLang]}
         </p>
       </motion.div>
@@ -213,7 +196,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       {/* Кнопка "Назад" */}
       <button
         onClick={onBack}
-        className="absolute top-14 left-5 z-[100] w-10 h-10 flex items-center justify-center text-white/80 active:scale-90 transition-transform"
+        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/90 active:scale-90 transition-transform drop-shadow-md"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
@@ -223,7 +206,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       {/* Кнопка управления звуком */}
       <button
         onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-14 right-5 z-[100] w-10 h-10 flex items-center justify-center text-white/80 active:scale-90 transition-transform"
+        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/90 active:scale-90 transition-transform drop-shadow-md"
       >
         {isMuted ? (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
