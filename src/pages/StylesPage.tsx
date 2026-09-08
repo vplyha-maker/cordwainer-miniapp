@@ -7,7 +7,6 @@ type StylesPageProps = {
   lang: Lang
 }
 
-// Добавили свойство hideWatermark
 type StyleSlide = {
   id: string
   video?: string
@@ -98,7 +97,7 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
       uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний тон.',
     },
-    hideWatermark: true, // Включаем зум
+    hideWatermark: true,
   },
   {
     id: 'topsaed',
@@ -109,7 +108,7 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Элитарная расслабленность и дух закрытых яхт-клубов. Нескользящая подошва и круговая шнуровка — безупречная база для теплого сезона.',
       uk: 'Елітарна розслабленість та дух закритих яхт-клубів. Нековзна підошва та кругова шнурівка — бездоганна база для теплого сезону.',
     },
-    hideWatermark: true, // Включаем зум
+    hideWatermark: true,
   },
   {
     id: 'slingback',
@@ -120,18 +119,36 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
       uk: 'Чуттєвий компроміс між класичним човником та босоніжкою. Відкрита п\'ята візуально полегшує силует, роблячи кожен крок невагомим.',
     },
-    hideWatermark: true, // Включаем зум
+    hideWatermark: true,
   }
 ]
 
 function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
+  // Добавляем реф на сам контейнер слайда
+  const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = (lang === 'uk' || lang === 'ru') ? lang : 'ru'
 
-  useEffect(() => {
-    if (!videoRef.current) return
+  // LAZY LOADING: Первые 2 видео загружаем сразу. Остальные ждут своей очереди.
+  const [shouldLoad, setShouldLoad] = useState(index <= 1)
 
-    const observer = new IntersectionObserver(
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    // 1. Обозреватель для ЗАГРУЗКИ (Начинает грузить видео за 1 экран до того, как человек до него доскроллит)
+    const loadObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setShouldLoad(true)
+          }
+        })
+      },
+      { rootMargin: '100% 0px' } 
+    )
+
+    // 2. Обозреватель для ПЛЕЕРА (Включает видео только когда оно прямо на экране)
+    const playObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
@@ -144,8 +161,13 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
       { threshold: 0.5 }
     )
 
-    observer.observe(videoRef.current)
-    return () => observer.disconnect()
+    loadObserver.observe(containerRef.current)
+    playObserver.observe(containerRef.current)
+
+    return () => {
+      loadObserver.disconnect()
+      playObserver.disconnect()
+    }
   }, [])
 
   useEffect(() => {
@@ -155,19 +177,20 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   }, [isMuted])
 
   return (
-    <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      {/* 1. ФОН: Чистое видео. Если стоит флаг hideWatermark, добавляем scale-110 */}
+    <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
+      {/* 1. ФОН: Рендерим видео ТОЛЬКО если shouldLoad стало true */}
       <div className="absolute inset-0 w-full h-full z-0">
-        {slide.video ? (
+        {shouldLoad && slide.video ? (
           <video
             ref={videoRef}
             src={slide.video}
+            preload="auto"
             loop
             muted={isMuted}
             playsInline
             className={`w-full h-full object-cover ${slide.hideWatermark ? 'scale-110' : ''}`}
           />
-        ) : slide.image ? (
+        ) : shouldLoad && slide.image ? (
           <img
             src={slide.image}
             alt={slide.title[currentLang]}
@@ -228,7 +251,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Элементы управления: строгие и прозрачные */}
+      {/* Элементы управления */}
       <button
         onClick={onBack}
         className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
