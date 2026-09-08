@@ -7,6 +7,7 @@ type StylesPageProps = {
   lang: Lang
 }
 
+// Добавили свойство hideWatermark
 type StyleSlide = {
   id: string
   video?: string
@@ -14,6 +15,7 @@ type StyleSlide = {
   title: { ru: string; uk: string }
   subtitle: { ru: string; uk: string }
   desc: { ru: string; uk: string }
+  hideWatermark?: boolean 
 }
 
 const STYLES_DATA: StyleSlide[] = [
@@ -87,7 +89,6 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Бездоганна архітектура взуття, що м\'яко обіймає кісточку. Універсальний силует для створення вивірених, елегантних образів.',
     },
   },
-  // НОВЫЙ ФАСОН: Мэри Джейн
   {
     id: 'mary_jane',
     video: '/Fason/Mary_Jane.mp4',
@@ -97,8 +98,8 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
       uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний тон.',
     },
+    hideWatermark: true, // Включаем зум
   },
-  // НОВЫЙ ФАСОН: Топсайдеры
   {
     id: 'topsaed',
     video: '/Fason/Topsaed.mp4',
@@ -108,8 +109,8 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Элитарная расслабленность и дух закрытых яхт-клубов. Нескользящая подошва и круговая шнуровка — безупречная база для теплого сезона.',
       uk: 'Елітарна розслабленість та дух закритих яхт-клубів. Нековзна підошва та кругова шнурівка — бездоганна база для теплого сезону.',
     },
+    hideWatermark: true, // Включаем зум
   },
-  // НОВЫЙ ФАСОН: Слингбэки
   {
     id: 'slingback',
     video: '/Fason/slingback1.mp4',
@@ -119,6 +120,7 @@ const STYLES_DATA: StyleSlide[] = [
       ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
       uk: 'Чуттєвий компроміс між класичним човником та босоніжкою. Відкрита п\'ята візуально полегшує силует, роблячи кожен крок невагомим.',
     },
+    hideWatermark: true, // Включаем зум
   }
 ]
 
@@ -154,7 +156,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
   return (
     <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      {/* 1. ФОН: Чистое видео */}
+      {/* 1. ФОН: Чистое видео. Если стоит флаг hideWatermark, добавляем scale-110 */}
       <div className="absolute inset-0 w-full h-full z-0">
         {slide.video ? (
           <video
@@ -163,7 +165,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
             loop
             muted={isMuted}
             playsInline
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${slide.hideWatermark ? 'scale-110' : ''}`}
           />
         ) : slide.image ? (
           <img
@@ -174,10 +176,10 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         ) : null}
       </div>
 
-      {/* 2. РАВНОМЕРНЫЙ ОВЕРЛЕЙ: Только 15% затемнение для белого текста */}
+      {/* 2. РАВНОМЕРНЫЙ ОВЕРЛЕЙ */}
       <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
 
-      {/* 3. ТИПОГРАФИКА: Экстремальный верхний левый угол */}
+      {/* 3. ТИПОГРАФИКА */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -185,18 +187,16 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         transition={{ duration: 1.5, ease: "easeInOut" }}
         className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%]"
       >
-        {/* Надстрочник: Гротеск, ультра-трекинг */}
         <h3 className="text-[9px] md:text-[10px] tracking-[0.5em] uppercase text-white/90 font-sans font-light">
           {slide.subtitle[currentLang]}
         </h3>
         
-        {/* Название: Классическая антиква, чистый белый */}
         <h2 className="text-[44px] md:text-[56px] font-serif font-light leading-[1.05] tracking-wide text-white whitespace-pre-line">
           {slide.title[currentLang]}
         </h2>
       </motion.div>
 
-      {/* 4. ОПИСАНИЕ: Экстремальный нижний угол */}
+      {/* 4. ОПИСАНИЕ */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
