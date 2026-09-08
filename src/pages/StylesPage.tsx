@@ -71,7 +71,6 @@ const STYLES_DATA: StyleSlide[] = [
 
 function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  
   const currentLang = (lang === 'uk' || lang === 'ru') ? lang : 'ru'
 
   useEffect(() => {
@@ -91,7 +90,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
     )
 
     observer.observe(videoRef.current)
-
     return () => observer.disconnect()
   }, [])
 
@@ -103,7 +101,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
   return (
     <div className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      {/* Фон */}
+      {/* 1. ФОН: Чистое видео */}
       <div className="absolute inset-0 w-full h-full z-0">
         {slide.video ? (
           <video
@@ -112,59 +110,51 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
             loop
             muted={isMuted}
             playsInline
-            className="w-full h-full object-cover opacity-90"
+            className="w-full h-full object-cover"
           />
         ) : slide.image ? (
           <img
             src={slide.image}
             alt={slide.title[currentLang]}
-            className="w-full h-full object-cover opacity-90"
+            className="w-full h-full object-cover"
           />
         ) : null}
       </div>
 
-      {/* Журнальный градиент: затемняем ТОЛЬКО ВЕРХ для текста, низ (обувь) оставляем чистым */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/80 via-black/20 to-transparent pointer-events-none" />
+      {/* 2. РАВНОМЕРНЫЙ ОВЕРЛЕЙ: Без грязных градиентов. Только 15% затемнение для белого текста */}
+      <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
 
-      {/* ЕДИНЫЙ ТЕКСТОВОЙ БЛОК: Сгруппирован вверху, чтобы не перекрывать обувь */}
+      {/* 3. ТИПОГРАФИКА: Экстремальный верхний левый угол */}
       <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: false, amount: 0.5 }}
-        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-        className="absolute top-[20%] md:top-[22%] left-6 z-20 flex flex-col gap-4 max-w-[85%]"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: false, amount: 0.4 }}
+        transition={{ duration: 1.5, ease: "easeInOut" }}
+        className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%]"
       >
-        {/* Надстрочник */}
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-[1px] bg-white/60" />
-          <h3 className="text-[9px] md:text-[10px] tracking-[0.4em] uppercase text-white/80 font-medium drop-shadow-md">
-            {slide.subtitle[currentLang]}
-          </h3>
-        </div>
+        {/* Надстрочник: Гротеск, ультра-трекинг */}
+        <h3 className="text-[9px] md:text-[10px] tracking-[0.5em] uppercase text-white/90 font-sans font-light">
+          {slide.subtitle[currentLang]}
+        </h3>
         
-        {/* Главный заголовок */}
-        <h2 className="text-[44px] md:text-6xl font-serif font-light tracking-wide leading-[1.05] drop-shadow-xl whitespace-pre-line text-white">
+        {/* Название: Классическая антиква, чистый белый, никаких теней */}
+        <h2 className="text-[44px] md:text-[56px] font-serif font-light leading-[1.05] tracking-wide text-white whitespace-pre-line">
           {slide.title[currentLang]}
         </h2>
+      </motion.div>
 
-        {/* Описание (теперь оно тут, компактное и легкое) */}
-        <p className="text-[12px] md:text-[13px] leading-[1.7] text-white/70 font-light max-w-[260px] md:max-w-[300px] drop-shadow-lg mt-2">
+      {/* 4. ОПИСАНИЕ: Экстремальный нижний угол. Никаких перекрытий обуви */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: false, amount: 0.4 }}
+        transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
+        className="absolute bottom-12 left-6 z-20 max-w-[280px]"
+      >
+        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide">
           {slide.desc[currentLang]}
         </p>
       </motion.div>
-
-      {/* Журнальный вертикальный Swipe сбоку (только на первом экране) */}
-      {index === 0 && (
-        <div className="absolute top-1/2 right-4 -translate-y-1/2 z-20 opacity-50 flex items-center justify-center">
-          <span 
-            className="text-[9px] tracking-[0.4em] uppercase text-white/80 font-medium"
-            style={{ writingMode: 'vertical-rl' }}
-          >
-            Swipe
-          </span>
-          <div className="absolute -bottom-10 left-1/2 w-[1px] h-6 bg-white/40 animate-subtle-float" />
-        </div>
-      )}
     </div>
   )
 }
@@ -178,44 +168,35 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-[#111] text-white overflow-hidden"
+      className="fixed inset-0 z-50 bg-black text-white overflow-hidden"
     >
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        @keyframes subtle-float {
-          0%, 100% { transform: translateY(0) translateX(-50%); }
-          50% { transform: translateY(-8px) translateX(-50%); }
-        }
-        .animate-subtle-float {
-          animation: subtle-float 2.5s ease-in-out infinite;
-        }
       `}</style>
 
-      {/* Кнопка "Назад" */}
+      {/* Элементы управления: строгие и прозрачные */}
       <button
         onClick={onBack}
-        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/90 active:scale-90 transition-transform drop-shadow-md"
+        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
-      {/* Кнопка управления звуком */}
       <button
         onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/90 active:scale-90 transition-transform drop-shadow-md"
+        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
       >
         {isMuted ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <line x1="23" y1="9" x2="17" y2="15"></line>
             <line x1="17" y1="9" x2="23" y2="15"></line>
           </svg>
         ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
