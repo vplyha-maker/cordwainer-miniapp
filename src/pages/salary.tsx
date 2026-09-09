@@ -23,100 +23,104 @@ const getShortDateName = (dateStr: string, lang: Lang) => {
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '');
 };
 
-const DICTIONARY = {
-  ru: {
-    title: 'Зарплата',
-    totalFor: 'Итого за',
-    selectedDay: 'За выбранный день',
-    tabDaily: 'Записи',
-    tabSettings: 'Изделия',
-    tabArchive: 'Архив',
-    today: 'Сегодня',
-    entryFor: 'Внесение за:',
-    noItems: 'Нет изделий для учета.',
-    addInSettings: 'Добавить в настройках',
-    perPiece: '₴ / шт',
-    activity7Days: 'Активность (7 дней)',
-    addItem: 'Добавить изделие',
-    namePlaceholder: 'Название (например: Mac)',
-    pricePlaceholder: 'Стоимость за шт, ₴',
-    addBtn: 'Добавить',
-    confirmDelete: 'Удалить изделие?',
-    confirmArchive: 'Перенести {month} в архив? Все записи за этот месяц будут сгруппированы.',
-    archiveBtn: '+ Заархивировать',
-    archiveEmpty: 'Архив пуст',
-    daysWorked: 'Дней отработано:',
-    deletedItem: 'Удаленное изделие',
-    pcs: 'шт.',
-    confirmDeleteArchive: 'Точно удалить этот месяц из архива?',
-    deleteRecord: 'Удалить запись',
-    saving: 'Сохранение...',
-    saveFor: 'Сохранить за',
-    noChangesFor: 'Изменений за',
-    noChangesSuffix: 'нет',
-  },
-  uk: {
-    title: 'Зарплата',
-    totalFor: 'Разом за',
-    selectedDay: 'За обраний день',
-    tabDaily: 'Записи',
-    tabSettings: 'Вироби',
-    tabArchive: 'Архів',
-    today: 'Сьогодні',
-    entryFor: 'Внесення за:',
-    noItems: 'Немає виробів для обліку.',
-    addInSettings: 'Додати в налаштуваннях',
-    perPiece: '₴ / шт',
-    activity7Days: 'Активність (7 днів)',
-    addItem: 'Додати виріб',
-    namePlaceholder: 'Назва (наприклад: Mac)',
-    pricePlaceholder: "Вартість за шт, ₴",
-    addBtn: 'Додати',
-    confirmDelete: 'Видалити виріб?',
-    confirmArchive: 'Перенести {month} в архів? Усі записи за цей місяць будуть згруповані.',
-    archiveBtn: '+ Заархівувати',
-    archiveEmpty: 'Архів порожній',
-    daysWorked: 'Днів відпрацьовано:',
-    deletedItem: 'Видалений виріб',
-    pcs: 'шт.',
-    confirmDeleteArchive: 'Точно видалити цей місяць з архіву?',
-    deleteRecord: 'Видалити запис',
-    saving: 'Збереження...',
-    saveFor: 'Зберегти за',
-    noChangesFor: 'Змін за',
-    noChangesSuffix: 'немає',
-  },
-  de: {
-    title: 'Lohn',
-    totalFor: 'Gesamt für',
-    selectedDay: 'Für den gewählten Tag',
-    tabDaily: 'Einträge',
-    tabSettings: 'Artikel',
-    tabArchive: 'Archiv',
-    today: 'Heute',
-    entryFor: 'Eintrag für:',
-    noItems: 'Keine Artikel zur Erfassung.',
-    addInSettings: 'In den Einstellungen hinzufügen',
-    perPiece: '₴ / Stk',
-    activity7Days: 'Aktivität (7 Tage)',
-    addItem: 'Artikel hinzufügen',
-    namePlaceholder: 'Name (z.B. Mac)',
-    pricePlaceholder: 'Stückpreis, ₴',
-    addBtn: 'Hinzufügen',
-    confirmDelete: 'Artikel löschen?',
-    confirmArchive: '{month} ins Archiv verschieben? Alle Einträge für diesen Monat werden gruppiert.',
-    archiveBtn: '+ Archivieren',
-    archiveEmpty: 'Archiv ist leer',
-    daysWorked: 'Gearbeitete Tage:',
-    deletedItem: 'Gelöschter Artikel',
-    pcs: 'Stk.',
-    confirmDeleteArchive: 'Diesen Monat wirklich aus dem Archiv löschen?',
-    deleteRecord: 'Eintrag löschen',
-    saving: 'Speichern...',
-    saveFor: "Speichern für",
-    noChangesFor: 'Keine Änderungen für',
-    noChangesSuffix: '',
-  }
+// Словари генерируем через функцию, чтобы прокидывать нужный символ валюты
+const getDictionary = (lang: Lang, curr: string) => {
+  const dict = {
+    ru: {
+      title: 'Зарплата',
+      totalFor: 'Итого за',
+      selectedDay: 'За выбранный день',
+      tabDaily: 'Записи',
+      tabSettings: 'Изделия',
+      tabArchive: 'Архив',
+      today: 'Сегодня',
+      entryFor: 'Внесение за:',
+      noItems: 'Нет изделий для учета.',
+      addInSettings: 'Добавить в настройках',
+      perPiece: `${curr} / шт`,
+      activity7Days: 'Активность (7 дней)',
+      addItem: 'Добавить изделие',
+      namePlaceholder: 'Название (например: Mac)',
+      pricePlaceholder: `Стоимость за шт, ${curr}`,
+      addBtn: 'Добавить',
+      confirmDelete: 'Удалить изделие?',
+      confirmArchive: 'Перенести {month} в архив? Все записи за этот месяц будут сгруппированы.',
+      archiveBtn: '+ Заархивировать',
+      archiveEmpty: 'Архив пуст',
+      daysWorked: 'Дней отработано:',
+      deletedItem: 'Удаленное изделие',
+      pcs: 'шт.',
+      confirmDeleteArchive: 'Точно удалить этот месяц из архива?',
+      deleteRecord: 'Удалить запись',
+      saving: 'Сохранение...',
+      saveFor: 'Сохранить за',
+      noChangesFor: 'Изменений за',
+      noChangesSuffix: 'нет',
+    },
+    uk: {
+      title: 'Зарплата',
+      totalFor: 'Разом за',
+      selectedDay: 'За обраний день',
+      tabDaily: 'Записи',
+      tabSettings: 'Вироби',
+      tabArchive: 'Архів',
+      today: 'Сьогодні',
+      entryFor: 'Внесення за:',
+      noItems: 'Немає виробів для обліку.',
+      addInSettings: 'Додати в налаштуваннях',
+      perPiece: `${curr} / шт`,
+      activity7Days: 'Активність (7 днів)',
+      addItem: 'Додати виріб',
+      namePlaceholder: 'Назва (наприклад: Mac)',
+      pricePlaceholder: `Вартість за шт, ${curr}`,
+      addBtn: 'Додати',
+      confirmDelete: 'Видалити виріб?',
+      confirmArchive: 'Перенести {month} в архів? Усі записи за цей місяць будуть згруповані.',
+      archiveBtn: '+ Заархівувати',
+      archiveEmpty: 'Архів порожній',
+      daysWorked: 'Днів відпрацьовано:',
+      deletedItem: 'Видалений виріб',
+      pcs: 'шт.',
+      confirmDeleteArchive: 'Точно видалити цей місяць з архіву?',
+      deleteRecord: 'Видалити запис',
+      saving: 'Збереження...',
+      saveFor: 'Зберегти за',
+      noChangesFor: 'Змін за',
+      noChangesSuffix: 'немає',
+    },
+    de: {
+      title: 'Lohn',
+      totalFor: 'Gesamt für',
+      selectedDay: 'Für den gewählten Tag',
+      tabDaily: 'Einträge',
+      tabSettings: 'Artikel',
+      tabArchive: 'Archiv',
+      today: 'Heute',
+      entryFor: 'Eintrag für:',
+      noItems: 'Keine Artikel zur Erfassung.',
+      addInSettings: 'In den Einstellungen hinzufügen',
+      perPiece: `${curr} / Stk`,
+      activity7Days: 'Aktivität (7 Tage)',
+      addItem: 'Artikel hinzufügen',
+      namePlaceholder: 'Name (z.B. Mac)',
+      pricePlaceholder: `Stückpreis, ${curr}`,
+      addBtn: 'Hinzufügen',
+      confirmDelete: 'Artikel löschen?',
+      confirmArchive: '{month} ins Archiv verschieben? Alle Einträge für diesen Monat werden gruppiert.',
+      archiveBtn: '+ Archivieren',
+      archiveEmpty: 'Archiv ist leer',
+      daysWorked: 'Gearbeitete Tage:',
+      deletedItem: 'Gelöschter Artikel',
+      pcs: 'Stk.',
+      confirmDeleteArchive: 'Diesen Monat wirklich aus dem Archiv löschen?',
+      deleteRecord: 'Eintrag löschen',
+      saving: 'Speichern...',
+      saveFor: "Speichern für",
+      noChangesFor: 'Keine Änderungen für',
+      noChangesSuffix: '',
+    }
+  };
+  return dict[lang] || dict.ru;
 };
 
 type SalaryCalcPageProps = {
@@ -125,11 +129,14 @@ type SalaryCalcPageProps = {
 }
 
 export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
-  const t = DICTIONARY[lang] || DICTIONARY.ru;
+  // Глобальная валюта учета пользователя (не меняется при смене языка)
+  const primaryCurrency = '₴';
+  const t = getDictionary(lang, primaryCurrency);
+  
   const {
     data, loading, saving, error,
     addItem, deleteItem, saveDay, closeMonth, deleteArchiveMonth
-  } = useSalary({ userId: TELEGRAM_USER_ID });
+  } = useSalary({ userId: TELEGRAM_USER_ID, lang });
 
   const [activeTab, setActiveTab] = useState<'daily' | 'settings' | 'archive'>('daily');
   const [selectedDate, setSelectedDate] = useState(getToday());
@@ -137,35 +144,48 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemRate, setNewItemRate] = useState<number | ''>('');
   
-  const [usdRate, setUsdRate] = useState<number>(41.50);
+  // Храним курсы сразу для двух валют (USD и EUR)
+  const [fiatRates, setFiatRates] = useState({ USD: 41.50, EUR: 45.00 });
   const [isRateLoading, setIsRateLoading] = useState(true);
 
+  // Выбор эквивалентной валюты в зависимости от языка
+  const secCurrencyCode = lang === 'de' ? 'EUR' : 'USD';
+  const secCurrencySymbol = lang === 'de' ? '€' : '$';
+  const activeFiatRate = fiatRates[secCurrencyCode as keyof typeof fiatRates] || 1;
+
   useEffect(() => {
-    const fetchUsdRate = async () => {
+    const fetchRates = async () => {
       try {
         setIsRateLoading(true);
+        // Сначала пробуем наш API (если он возвращает сразу все курсы)
         const apiRes = await fetch('/api/rates').catch(() => null);
         if (apiRes && apiRes.ok) {
           const ratesData = await apiRes.json();
-          if (ratesData?.usd) {
-            setUsdRate(Number(ratesData.usd));
+          if (ratesData?.usd || ratesData?.eur) {
+            setFiatRates({ 
+              USD: Number(ratesData.usd || 41.50), 
+              EUR: Number(ratesData.eur || 45.00) 
+            });
             return;
           }
         }
-        const nbuRes = await fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json');
-        if (nbuRes.ok) {
-          const nbuData = await nbuRes.json();
-          if (nbuData && nbuData.length > 0) {
-            setUsdRate(nbuData[0].rate);
-          }
-        }
+        // Фолбек: берем курсы из НБУ для USD и EUR параллельно
+        const [nbuUsd, nbuEur] = await Promise.all([
+          fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json').then(r => r.json()).catch(() => null),
+          fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=EUR&json').then(r => r.json()).catch(() => null)
+        ]);
+        
+        setFiatRates({
+          USD: nbuUsd?.[0]?.rate || 41.50,
+          EUR: nbuEur?.[0]?.rate || 45.00
+        });
       } catch (err) {
         console.error('Ошибка при загрузке курса валют:', err);
       } finally {
         setIsRateLoading(false);
       }
     };
-    fetchUsdRate();
+    fetchRates();
   }, []);
 
   useEffect(() => {
@@ -336,19 +356,19 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           <div className="flex justify-between items-start mb-1">
             <span className="text-white/50 text-sm font-medium capitalize">{t.totalFor} {displayMonthName}</span>
             <span className="text-white/30 text-xs px-2 py-1 bg-black/20 rounded-lg flex items-center gap-1">
-              USD {isRateLoading ? <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" /> : usdRate.toFixed(2)}
+              {secCurrencyCode} {isRateLoading ? <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" /> : activeFiatRate.toFixed(2)}
             </span>
           </div>
           <div className="text-[40px] leading-none font-black text-[#32D74B] tracking-tight">
-            {currentMonthTotal.toLocaleString()} <span className="text-2xl text-white/20 font-bold ml-1">₴</span>
+            {currentMonthTotal.toLocaleString()} <span className="text-2xl text-white/20 font-bold ml-1">{primaryCurrency}</span>
           </div>
           <div className="text-sm font-medium text-white/30 mt-2">
-            ≈ ${(currentMonthTotal / usdRate).toFixed(2)}
+            ≈ {secCurrencySymbol}{(currentMonthTotal / activeFiatRate).toFixed(2)}
           </div>
           
           <div className="mt-5 pt-5 border-t border-white/5 flex justify-between items-center">
             <span className="text-white/50 text-sm">{t.selectedDay} ({getShortDate(selectedDate)}):</span>
-            <span className="text-[#0A84FF] font-bold text-lg">{selectedDayTotal.toLocaleString()} ₴</span>
+            <span className="text-[#0A84FF] font-bold text-lg">{selectedDayTotal.toLocaleString()} {primaryCurrency}</span>
           </div>
         </div>
 
@@ -580,7 +600,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         <div className="flex justify-between items-center mb-4">
                           <h3 className="font-bold text-lg capitalize">{formatMonth(month, lang)}</h3>
                           <span className="font-black text-xl text-[#32D74B]">
-                            {archiveData.stats.total.toLocaleString()} ₴
+                            {archiveData.stats.total.toLocaleString()} {primaryCurrency}
                           </span>
                         </div>
                         <div className="text-sm text-white/40 mb-5">
