@@ -17,8 +17,16 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
-    if (savedLang && (savedLang === 'ru' || savedLang === 'uk')) {
+    const supportedLangs = ['ru', 'uk', 'de']
+    
+    if (savedLang && supportedLangs.includes(savedLang)) {
       if (savedLang !== lang) setLang(savedLang)
+    } else if (!savedLang) {
+      // Автоматическое определение языка системы
+      const sysLang = navigator.language.slice(0, 2)
+      const defaultLang = supportedLangs.includes(sysLang) ? (sysLang as Lang) : 'uk'
+      setLang(defaultLang)
+      localStorage.setItem('app_lang', defaultLang)
     }
   }, [])
 
@@ -71,6 +79,28 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       widgetStep2: '2. У меню браузера оберіть «На головний екран»',
       widgetStep3: '3. Підтвердіть встановлення',
       widgetAction: 'Відкрити в браузері',
+    },
+    de: {
+      tagline: 'Enzyklopädie der Schuhmacherkunst',
+      idea1: 'Objekt als Idee.',
+      idea2: 'Form als Sprache.',
+      idea3: 'Handwerk als Erfahrung.',
+      materials: 'Materialien',
+      materialsSub: 'Leder · Wildleder\nSohlen',
+      colors: 'Farben',
+      colorsSub: 'Farbgebung\nPatina',
+      styles: 'Leisten\n& Silhouetten', // Leisten — профессиональный термин для обувных колодок/фасонов
+      stylesSub: 'Klassik\nStreetwear',
+      start: 'Wissen entdecken', // Адаптировано под люкс, "Начать обучение" по-немецки слишком сухо
+      favorites: 'Favoriten',
+      seeAll: 'Alle ansehen',
+      addToHomeShort: 'Installieren',
+      widgetTitle: 'App installieren',
+      widgetText: 'Telegram erlaubt kein direktes Speichern von Icons. Öffnen Sie die App in Ihrem Browser (Chrome oder Safari), um sie zum Startbildschirm hinzuzufügen.',
+      widgetStep1: '1. Tippen Sie unten auf „Im Browser öffnen“',
+      widgetStep2: '2. Wählen Sie im Browsermenü „Zum Startbildschirm hinzufügen“',
+      widgetStep3: '3. Bestätigen Sie die Installation',
+      widgetAction: 'Im Browser öffnen',
     },
   }[lang]
 
@@ -183,8 +213,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 Cordwainer
               </h1>
               <p
-                className="mt-2 text-[10px] tracking-[0.2em] uppercase"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
+                className={`mt-2 tracking-[0.2em] uppercase ${lang === 'de' ? 'text-[8.5px]' : 'text-[10px]'}`}
+                style={{ color: 'var(--color-muted, #B9ACA0)', transition: 'font-size 0.2s' }}
               >
                 {t.tagline}
               </p>
@@ -200,27 +230,24 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 role="group"
                 aria-label="Language selection"
               >
-                <button
-                  onClick={() => handleLangChange('ru')}
-                  className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}
-                  aria-pressed={lang === 'ru'}
-                  role="button"
-                >
-                  RU
-                </button>
-                <button
-                  onClick={() => handleLangChange('uk')}
-                  className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}
-                  aria-pressed={lang === 'uk'}
-                  role="button"
-                >
-                  UA
-                </button>
+                {['ru', 'uk', 'de'].map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => handleLangChange(l as Lang)}
+                    className={`lang-toggle px-2 py-1 text-[10px] sm:text-[11px] uppercase rounded-full transition-colors ${
+                      lang === l ? 'active bg-white/10 text-white' : 'inactive text-white/50'
+                    }`}
+                    aria-pressed={lang === l}
+                    role="button"
+                  >
+                    {l}
+                  </button>
+                ))}
               </div>
 
               <button
                 onClick={handleAddToHome}
-                className="action-pill w-full flex items-center justify-center"
+                className="action-pill w-full flex items-center justify-center gap-1.5"
                 aria-label={t.addToHomeShort}
                 role="button"
               >
@@ -228,7 +255,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                   <rect x="5" y="2" width="14" height="20" rx="2" />
                   <path d="M12 18h.01" />
                 </svg>
-                {t.addToHomeShort}
+                <span className={lang === 'de' ? 'text-[9.5px]' : ''}>{t.addToHomeShort}</span>
               </button>
             </div>
           </div>
@@ -271,13 +298,13 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
               </div>
               <div className="relative z-10 flex-1 flex flex-col justify-end">
                 <div
-                  className="text-[11px] font-semibold leading-tight whitespace-pre-line"
-                  style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                  className="text-[10px] sm:text-[11px] font-semibold leading-tight whitespace-pre-line"
+                  style={{ color: 'var(--color-ink, #F5F1EA)', wordBreak: 'break-word' }}
                 >
                   {item.title}
                 </div>
                 <div
-                  className="text-[9px] mt-1.5 leading-snug whitespace-pre-line"
+                  className="text-[8.5px] sm:text-[9px] mt-1.5 leading-snug whitespace-pre-line"
                   style={{ color: 'var(--color-muted, #B9ACA0)' }}
                 >
                   {item.sub}
@@ -302,7 +329,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 ISSUE 01
               </span>
               <span
-                className="mt-1 text-[20px] font-bold"
+                className={`${lang === 'de' ? 'text-[17px]' : 'text-[20px]'} font-bold mt-1 transition-all`}
                 style={{ color: 'var(--color-bg, #1C1816)' }}
               >
                 {t.start}
@@ -481,4 +508,4 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       </AnimatePresence>
     </div>
   )
- }
+}
