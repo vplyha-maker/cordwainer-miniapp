@@ -149,7 +149,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
                 boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 35%, transparent)`,
               }}
             >
-              {term.letter}
+              {title.charAt(0).toUpperCase()}
             </span>
           </div>
 
