@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-type Lang = 'ru' | 'uk'
+import type { Lang } from '../App'
 
 type ArticleAudioPlayerProps = {
   text: string
@@ -14,6 +13,7 @@ type ArticleAudioPlayerProps = {
 const LANG_MAP: Record<Lang, string> = {
   ru: 'ru-RU',
   uk: 'uk-UA',
+  de: 'de-DE',
 }
 
 function stripMarkdown(md: string): string {
@@ -142,6 +142,7 @@ export function ArticleAudioPlayer({ text, lang, className = '', onProgress }: A
           voices.find((v) => v.lang.startsWith(lang)) ||
           voices.find((v) => lang === 'uk' && (v.lang.includes('uk') || v.name.toLowerCase().includes('ukrain'))) ||
           voices.find((v) => lang === 'ru' && (v.lang.includes('ru') || v.name.toLowerCase().includes('russian'))) ||
+          voices.find((v) => lang === 'de' && (v.lang.includes('de') || v.name.toLowerCase().includes('german'))) ||
           voices[0]
 
         if (preferred) utterance.voice = preferred
@@ -188,8 +189,8 @@ export function ArticleAudioPlayer({ text, lang, className = '', onProgress }: A
   }
 
   const label = isSpeaking
-    ? (lang === 'ru' ? 'Остановить' : 'Зупинити')
-    : (lang === 'ru' ? 'Слушать' : 'Слухати')
+    ? (lang === 'de' ? 'Stoppen' : lang === 'uk' ? 'Зупинити' : 'Остановить')
+    : (lang === 'de' ? 'Anhören' : lang === 'uk' ? 'Слухати' : 'Слушать')
 
   return (
     <motion.button
