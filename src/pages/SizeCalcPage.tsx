@@ -81,7 +81,7 @@ const THEMES = {
 } as const
 
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
-  // Словарь вынесен наверх, чтобы использовать его значения для единиц измерения
+  // Словарь с четким контролем регистра для единиц измерения
   const t = {
     ru: {
       title: 'Размер обуви',
@@ -104,6 +104,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       kids: 'Дет',
       cm: 'см',
       mm: 'мм',
+      cmLabel: 'СМ', // Для крупных подписей
+      mmLabel: 'ММ',
       standardsTitle: 'Стандарты',
       standardsNote:
         'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
@@ -133,6 +135,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       kids: 'Дит',
       cm: 'см',
       mm: 'мм',
+      cmLabel: 'СМ', // Для крупных подписей
+      mmLabel: 'ММ',
       standardsTitle: 'Стандарти',
       standardsNote:
         'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
@@ -162,6 +166,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       kids: 'Kinder',
       cm: 'cm',
       mm: 'mm',
+      cmLabel: 'cm', // Для крупных подписей (в немецком всегда маленькие)
+      mmLabel: 'mm',
       standardsTitle: 'Standards',
       standardsNote:
         'Basierend auf ISO 19407:2023 und ISO 9407 (Mondopoint). Tatsächliche Markengrößen können abweichen.',
@@ -197,7 +203,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       ? (footMm / 10).toFixed(1).replace('.', ',')
       : String(Math.round(footMm))
 
-  // Теперь единицы измерения берутся строго из словаря (t.cm / t.mm)
   const displayUnit = unit === 'cm' ? t.cm : t.mm
   const pct = ((footMm - range.min) / (range.max - range.min)) * 100
 
@@ -476,10 +481,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     {displayValue}
                   </span>
                   <span
-                    className="text-[18px] ml-1.5 align-top uppercase"
+                    className="text-[18px] ml-1.5 align-top"
                     style={{ color: 'var(--color-muted, #B9ACA0)' }}
                   >
-                    {displayUnit}
+                    {/* Убран uppercase, теперь берется напрямую из словаря */}
+                    {unit === 'cm' ? t.cmLabel : t.mmLabel}
                   </span>
                 </div>
               )}
@@ -623,8 +629,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
             <div className="flex flex-col items-center gap-1.5 min-w-0">
               <div className="flex items-center h-4">
-                <span className="text-[11px] uppercase" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  {t.cm}
+                {/* Убран uppercase, теперь берется напрямую из словаря */}
+                <span className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  {t.cmLabel}
                 </span>
               </div>
               <span
