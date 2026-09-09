@@ -196,6 +196,31 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       standardsNote:
         'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
     },
+    de: {
+      title: 'Schuhgröße',
+      subtitle: 'nach Fußlänge',
+      step1: 'Fußlänge',
+      step1Hint: 'Von der Ferse bis zum längsten Zeh',
+      howToMeasureBtn: 'Wie messen?',
+      measureGuide1: '1. Stellen Sie sich auf ein Blatt Papier (in Socken).',
+      measureGuide2: '2. Umranden Sie den Fuß, halten Sie den Stift dabei senkrecht.',
+      measureGuide3: '3. Messen Sie den Abstand von der Ferse bis zum längsten Zeh.',
+      measureTip:
+        '💡 Am besten messen Sie am Nachmittag — Füße schwellen im Laufe des Tages leicht an und werden größer.',
+      recommended: 'Empfohlene Größe',
+      disclaimer: 'Die Größen sind Richtwerte und können je nach Leisten und Marke abweichen.',
+      howCalculated: 'Wie wird gerechnet?',
+      hide: 'Verbergen',
+      save: 'Ergebnis speichern',
+      men: 'Herren',
+      women: 'Damen',
+      kids: 'Kinder',
+      cm: 'cm',
+      mm: 'mm',
+      standardsTitle: 'Standards',
+      standardsNote:
+        'Basierend auf ISO 19407:2023 und ISO 9407 (Mondopoint). Tatsächliche Markengrößen können abweichen.',
+    },
   }[lang]
 
   const usLabel = gender === 'kids' ? 'US' : gender === 'men' ? 'US M' : 'US W'
