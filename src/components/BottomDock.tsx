@@ -28,6 +28,12 @@ export function BottomDock({
       collection: 'Колекція',
       profile: 'Кабінет',
     },
+    de: {
+      search: 'Suche',
+      workspace: 'Werkzeuge',
+      collection: 'Kollektion',
+      profile: 'Profil',
+    },
   }[lang]
 
   const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
@@ -169,4 +175,4 @@ export function BottomDock({
       </div>
     </div>
   )
- }
+}
