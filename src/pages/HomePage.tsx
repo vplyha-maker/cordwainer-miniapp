@@ -10,7 +10,7 @@ type HomePageProps = {
   onOpenCalcMenu?: () => void
   onOpenColors?: () => void
   onOpenStyles?: () => void
-  onOpenGlossary?: () => void
+  onOpenGlossary?: (termId?: string) => void
   onOpenPrices?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
@@ -53,8 +53,10 @@ const getDisplayTitle = (item: any, lang: Lang): string => {
   if (!item) return '...'
   if (typeof item.title === 'string') return item.title
   if (item.title && item.title[lang]) return item.title[lang]
-  if (item.name && typeof item.name === 'string') return item.name
+  if (typeof item.name === 'string') return item.name
   if (item.name && item.name[lang]) return item.name[lang]
+  if (typeof item.term === 'string') return item.term
+  if (item.term && item.term[lang]) return item.term[lang]
   return '...'
 }
 
@@ -348,7 +350,7 @@ export function HomePage({
     } else if (res.type === 'article') {
       onOpenArticle?.(res.id)
     } else if (res.type === 'glossary') {
-      onOpenGlossary?.()
+      onOpenGlossary?.(res.id)
     }
     setSearchQuery('')
   }
