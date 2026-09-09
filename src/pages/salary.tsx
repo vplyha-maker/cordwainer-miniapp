@@ -17,9 +17,106 @@ const getShortDate = (dateStr: string) => {
   return `${d}.${m}`;
 };
 
-const getShortDateName = (dateStr: string) => {
+const getShortDateName = (dateStr: string, lang: Lang) => {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+  const locale = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU';
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '');
+};
+
+const DICTIONARY = {
+  ru: {
+    title: 'Зарплата',
+    totalFor: 'Итого за',
+    selectedDay: 'За выбранный день',
+    tabDaily: 'Записи',
+    tabSettings: 'Изделия',
+    tabArchive: 'Архив',
+    today: 'Сегодня',
+    entryFor: 'Внесение за:',
+    noItems: 'Нет изделий для учета.',
+    addInSettings: 'Добавить в настройках',
+    perPiece: '₴ / шт',
+    activity7Days: 'Активность (7 дней)',
+    addItem: 'Добавить изделие',
+    namePlaceholder: 'Название (например: Mac)',
+    pricePlaceholder: 'Стоимость за шт, ₴',
+    addBtn: 'Добавить',
+    confirmDelete: 'Удалить изделие?',
+    confirmArchive: 'Перенести {month} в архив? Все записи за этот месяц будут сгруппированы.',
+    archiveBtn: '+ Заархивировать',
+    archiveEmpty: 'Архив пуст',
+    daysWorked: 'Дней отработано:',
+    deletedItem: 'Удаленное изделие',
+    pcs: 'шт.',
+    confirmDeleteArchive: 'Точно удалить этот месяц из архива?',
+    deleteRecord: 'Удалить запись',
+    saving: 'Сохранение...',
+    saveFor: 'Сохранить за',
+    noChangesFor: 'Изменений за',
+    noChangesSuffix: 'нет',
+  },
+  uk: {
+    title: 'Зарплата',
+    totalFor: 'Разом за',
+    selectedDay: 'За обраний день',
+    tabDaily: 'Записи',
+    tabSettings: 'Вироби',
+    tabArchive: 'Архів',
+    today: 'Сьогодні',
+    entryFor: 'Внесення за:',
+    noItems: 'Немає виробів для обліку.',
+    addInSettings: 'Додати в налаштуваннях',
+    perPiece: '₴ / шт',
+    activity7Days: 'Активність (7 днів)',
+    addItem: 'Додати виріб',
+    namePlaceholder: 'Назва (наприклад: Mac)',
+    pricePlaceholder: "Вартість за шт, ₴",
+    addBtn: 'Додати',
+    confirmDelete: 'Видалити виріб?',
+    confirmArchive: 'Перенести {month} в архів? Усі записи за цей місяць будуть згруповані.',
+    archiveBtn: '+ Заархівувати',
+    archiveEmpty: 'Архів порожній',
+    daysWorked: 'Днів відпрацьовано:',
+    deletedItem: 'Видалений виріб',
+    pcs: 'шт.',
+    confirmDeleteArchive: 'Точно видалити цей місяць з архіву?',
+    deleteRecord: 'Видалити запис',
+    saving: 'Збереження...',
+    saveFor: 'Зберегти за',
+    noChangesFor: 'Змін за',
+    noChangesSuffix: 'немає',
+  },
+  de: {
+    title: 'Lohn',
+    totalFor: 'Gesamt für',
+    selectedDay: 'Für den gewählten Tag',
+    tabDaily: 'Einträge',
+    tabSettings: 'Artikel',
+    tabArchive: 'Archiv',
+    today: 'Heute',
+    entryFor: 'Eintrag für:',
+    noItems: 'Keine Artikel zur Erfassung.',
+    addInSettings: 'In den Einstellungen hinzufügen',
+    perPiece: '₴ / Stk',
+    activity7Days: 'Aktivität (7 Tage)',
+    addItem: 'Artikel hinzufügen',
+    namePlaceholder: 'Name (z.B. Mac)',
+    pricePlaceholder: 'Stückpreis, ₴',
+    addBtn: 'Hinzufügen',
+    confirmDelete: 'Artikel löschen?',
+    confirmArchive: '{month} ins Archiv verschieben? Alle Einträge für diesen Monat werden gruppiert.',
+    archiveBtn: '+ Archivieren',
+    archiveEmpty: 'Archiv ist leer',
+    daysWorked: 'Gearbeitete Tage:',
+    deletedItem: 'Gelöschter Artikel',
+    pcs: 'Stk.',
+    confirmDeleteArchive: 'Diesen Monat wirklich aus dem Archiv löschen?',
+    deleteRecord: 'Eintrag löschen',
+    saving: 'Speichern...',
+    saveFor: "Speichern für",
+    noChangesFor: 'Keine Änderungen für',
+    noChangesSuffix: '',
+  }
 };
 
 type SalaryCalcPageProps = {
@@ -28,6 +125,7 @@ type SalaryCalcPageProps = {
 }
 
 export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
+  const t = DICTIONARY[lang] || DICTIONARY.ru;
   const {
     data, loading, saving, error,
     addItem, deleteItem, saveDay, closeMonth, deleteArchiveMonth
@@ -215,7 +313,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   };
 
   // Получаем название выбранного месяца для заголовков
-  const monthName = new Date(selectedDate).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'uk-UA', { month: 'long', year: 'numeric' });
+  const localeStr = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU';
+  const monthName = new Date(selectedDate).toLocaleDateString(localeStr, { month: 'long', year: 'numeric' });
   const displayMonthName = monthName.split(' ')[0];
 
   return (
@@ -226,7 +325,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div>
-          <h1 className="text-xl font-bold leading-tight">Зарплата</h1>
+          <h1 className="text-xl font-bold leading-tight">{t.title}</h1>
           <div className="text-xs text-white/50 capitalize">{monthName}</div>
         </div>
       </div>
@@ -235,7 +334,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         
         <div className="bg-gradient-to-br from-[#1C1C1E] to-[#121212] p-6 rounded-[28px] border border-white/5 shadow-xl">
           <div className="flex justify-between items-start mb-1">
-            <span className="text-white/50 text-sm font-medium capitalize">Итого за {displayMonthName}</span>
+            <span className="text-white/50 text-sm font-medium capitalize">{t.totalFor} {displayMonthName}</span>
             <span className="text-white/30 text-xs px-2 py-1 bg-black/20 rounded-lg flex items-center gap-1">
               USD {isRateLoading ? <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" /> : usdRate.toFixed(2)}
             </span>
@@ -248,7 +347,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           </div>
           
           <div className="mt-5 pt-5 border-t border-white/5 flex justify-between items-center">
-            <span className="text-white/50 text-sm">За выбранный день ({getShortDate(selectedDate)}):</span>
+            <span className="text-white/50 text-sm">{t.selectedDay} ({getShortDate(selectedDate)}):</span>
             <span className="text-[#0A84FF] font-bold text-lg">{selectedDayTotal.toLocaleString()} ₴</span>
           </div>
         </div>
@@ -262,7 +361,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 activeTab === tab ? 'bg-[#32D74B] text-black shadow-md' : 'text-white/40 hover:text-white/70'
               }`}
             >
-              {tab === 'daily' ? 'Записи' : tab === 'settings' ? 'Изделия' : 'Архив'}
+              {tab === 'daily' ? t.tabDaily : tab === 'settings' ? t.tabSettings : t.tabArchive}
             </button>
           ))}
         </div>
@@ -299,7 +398,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                           <span className="text-base font-bold tracking-wide">{getShortDate(date)}</span>
                           {isToday && (
                             <span className={`text-[10px] font-bold mt-0.5 ${labelClass}`}>
-                              Сегодня
+                              {t.today}
                             </span>
                           )}
                           {hasData && (
@@ -329,15 +428,15 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 {data.items.length > 0 && (
                   <div className="px-2 pt-2">
                     <h2 className="text-lg font-bold text-white/90">
-                      Внесение за: <span className="text-[#0A84FF] ml-1">{selectedDate === todayStr ? 'Сегодня (' + getShortDateName(selectedDate) + ')' : getShortDateName(selectedDate)}</span>
+                      {t.entryFor} <span className="text-[#0A84FF] ml-1">{selectedDate === todayStr ? t.today + ' (' + getShortDateName(selectedDate, lang) + ')' : getShortDateName(selectedDate, lang)}</span>
                     </h2>
                   </div>
                 )}
 
                 {data.items.length === 0 ? (
                   <div className="bg-[#1C1C1E] p-8 rounded-3xl border border-white/5 text-center">
-                    <p className="text-white/40">Нет изделий для учета.</p>
-                    <button onClick={() => setActiveTab('settings')} className="mt-4 text-[#0A84FF] font-medium">Добавить в настройках</button>
+                    <p className="text-white/40">{t.noItems}</p>
+                    <button onClick={() => setActiveTab('settings')} className="mt-4 text-[#0A84FF] font-medium">{t.addInSettings}</button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -346,7 +445,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         <div className="flex justify-between items-center gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-lg text-white/90 truncate">{item.name}</div>
-                            <div className="text-sm text-white/40">{data.rates[item.id]} ₴ / шт</div>
+                            <div className="text-sm text-white/40">{data.rates[item.id]} {t.perPiece}</div>
                           </div>
                           
                           <div className="flex-shrink-0 flex items-center bg-black/20 rounded-2xl p-1 border border-white/5">
@@ -380,7 +479,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 )}
 
                 <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
-                  <h3 className="font-bold text-white/30 mb-6 text-xs uppercase tracking-[0.2em]">Активность (7 дней)</h3>
+                  <h3 className="font-bold text-white/30 mb-6 text-xs uppercase tracking-[0.2em]">{t.activity7Days}</h3>
                   <div className="flex items-end justify-between h-32 gap-2 mt-4">
                     {chartData.data.map((day, i) => {
                       const height = Math.max((day.total / chartData.max) * 100, day.total > 0 ? 8 : 0);
@@ -412,11 +511,11 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             {activeTab === 'settings' && (
               <motion.div key="settings" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
                 <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
-                  <h2 className="font-bold mb-5 text-lg text-white/90">Добавить изделие</h2>
+                  <h2 className="font-bold mb-5 text-lg text-white/90">{t.addItem}</h2>
                   <div className="flex flex-col gap-4 mb-5">
                     <input 
                       type="text" 
-                      placeholder="Название (например: Mac)"
+                      placeholder={t.namePlaceholder}
                       value={newItemName}
                       onChange={e => setNewItemName(e.target.value)}
                       className="w-full p-4.5 bg-black/20 text-white placeholder-white/30 rounded-2xl border border-white/5 focus:border-[#0A84FF] focus:outline-none transition-colors"
@@ -424,7 +523,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     <input 
                       type="number" 
                       inputMode="decimal"
-                      placeholder="Стоимость за шт, ₴"
+                      placeholder={t.pricePlaceholder}
                       value={newItemRate}
                       onChange={e => setNewItemRate(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-full p-4.5 bg-black/20 text-white placeholder-white/30 rounded-2xl border border-white/5 focus:border-[#0A84FF] focus:outline-none transition-colors"
@@ -435,7 +534,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     disabled={saving || !newItemName || newItemRate === ''}
                     className="w-full bg-[#0A84FF] text-white font-bold py-4 rounded-2xl active:scale-[0.98] disabled:opacity-30 transition-all shadow-lg shadow-[#0A84FF]/20"
                   >
-                    Добавить
+                    {t.addBtn}
                   </button>
                 </div>
 
@@ -444,10 +543,10 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     <div key={item.id} className="bg-[#1C1C1E] p-5 rounded-[20px] flex justify-between items-center border border-white/5">
                       <div className="min-w-0 pr-4">
                         <div className="font-bold text-white/90 truncate text-lg">{item.name}</div>
-                        <div className="text-sm text-white/40 mt-1">{data.rates[item.id]} ₴ / шт</div>
+                        <div className="text-sm text-white/40 mt-1">{data.rates[item.id]} {t.perPiece}</div>
                       </div>
                       <button 
-                        onClick={() => { if(confirm('Удалить изделие?')) deleteItem(item.id); }}
+                        onClick={() => { if(confirm(t.confirmDelete)) deleteItem(item.id); }}
                         className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-[#FF453A] bg-[#FF453A]/10 rounded-2xl active:scale-90 transition-transform"
                       >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -462,17 +561,17 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
               <motion.div key="archive" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
                 <button 
                   onClick={() => { 
-                    if(confirm(`Перенести ${displayMonthName} в архив? Все записи за этот месяц будут сгруппированы.`)) {
+                    if(confirm(t.confirmArchive.replace('{month}', displayMonthName))) {
                       closeMonth(selectedMonth); 
                     }
                   }}
                   className="w-full bg-white/5 border border-dashed border-white/10 text-white/60 hover:text-white hover:bg-white/10 py-6 rounded-[24px] font-bold active:scale-[0.98] transition-all uppercase tracking-wider text-sm"
                 >
-                  + Заархивировать {displayMonthName}
+                  {t.archiveBtn} {displayMonthName}
                 </button>
                 
                 {Object.keys(data.archive).length === 0 ? (
-                  <p className="text-center text-white/30 mt-8">Архив пуст</p>
+                  <p className="text-center text-white/30 mt-8">{t.archiveEmpty}</p>
                 ) : (
                   Object.entries(data.archive)
                     .sort(([monthA], [monthB]) => monthB.localeCompare(monthA))
@@ -485,27 +584,27 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                           </span>
                         </div>
                         <div className="text-sm text-white/40 mb-5">
-                          Дней отработано: <span className="font-bold text-white/90">{archiveData.stats.days}</span>
+                          {t.daysWorked} <span className="font-bold text-white/90">{archiveData.stats.days}</span>
                         </div>
                         
                         <div className="bg-black/20 p-4 rounded-2xl border border-white/5 text-sm space-y-3">
                           {Object.entries(archiveData.stats.quantities).map(([itemId, qty]) => {
                             if (!qty) return null;
-                            const itemName = data.items.find(i => i.id === itemId)?.name || 'Удаленное изделие';
+                            const itemName = data.items.find(i => i.id === itemId)?.name || t.deletedItem;
                             return (
                               <div key={itemId} className="flex justify-between items-center">
                                 <span className="text-white/50">{itemName}</span>
-                                <span className="font-bold text-white/90">{qty} шт.</span>
+                                <span className="font-bold text-white/90">{qty} {t.pcs}</span>
                               </div>
                             );
                           })}
                         </div>
                         
                         <button 
-                          onClick={() => { if(confirm('Точно удалить этот месяц из архива?')) deleteArchiveMonth(month); }}
+                          onClick={() => { if(confirm(t.confirmDeleteArchive)) deleteArchiveMonth(month); }}
                           className="mt-5 text-xs text-[#FF453A]/80 w-full text-center py-2 active:opacity-50 transition-opacity uppercase tracking-wider font-bold"
                         >
-                          Удалить запись
+                          {t.deleteRecord}
                         </button>
                       </div>
                     ))
@@ -534,7 +633,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     : 'bg-[#1C1C1E]/80 text-white/30 border-white/5 shadow-none'
                 }`}
               >
-                {saving ? 'Сохранение...' : hasChanges ? `Сохранить за ${getShortDateName(selectedDate)}` : `Изменений за ${getShortDateName(selectedDate)} нет`}
+                {saving ? t.saving : hasChanges ? `${t.saveFor} ${getShortDateName(selectedDate, lang)}` : `${t.noChangesFor} ${getShortDateName(selectedDate, lang)} ${t.noChangesSuffix}`}
               </button>
             </div>
           </motion.div>
