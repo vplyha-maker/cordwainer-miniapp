@@ -1,5 +1,3 @@
-// src/pages/WidthCalcPage.tsx
-
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import type { Lang } from '../App'
@@ -136,6 +134,19 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       modal: {
         gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова та літерна системи). Визначає базові обхвати колодки.' },
         iso: { title: 'Стандарт ISO', text: 'Міжнародний стандарт ISO / EU для маркування параметрів взуття та колодок.' }
+      }
+    },
+    de: {
+      title: 'Schuhweite', subtitle: 'Parameter und Markierungen',
+      men: 'Herren', women: 'Damen', kids: 'Kinder',
+      step1: 'Größe (EU)', step2: 'Weite',
+      cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
+      proModules: 'PRO: Konstruktionsdaten',
+      gostNum: 'GOST (Zahl)', gostLet: 'GOST (Buchstabe)', iso: 'EU / ISO',
+      tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
+      modal: {
+        gostNum: { title: 'GOST Standards', text: 'GOST 3927-88 (Zahlen- und Buchstabensystem). Definiert die grundlegenden Leistenumfänge.' },
+        iso: { title: 'ISO Standard', text: 'Internationaler ISO / EU Standard für die Markierung von Schuh- und Leistenparametern.' }
       }
     }
   }[lang]
@@ -289,7 +300,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               US SIZE
             </span>
             <motion.span 
-              key={`\( {result.us}- \){widthCat}`}
+              key={`${result.us}-${widthCat}`}
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="text-[28px] font-medium leading-none"
               style={{ color: 'var(--color-ink, #F5F1EA)' }}
@@ -308,7 +319,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               UK SIZE
             </span>
             <motion.span 
-              key={`\( {result.uk}- \){widthCat}`}
+              key={`${result.uk}-${widthCat}`}
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="text-[28px] font-medium leading-none"
               style={{ color: 'var(--color-ink, #F5F1EA)' }}
@@ -337,7 +348,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 {t.proModules}
               </span>
-              <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={result.colorName[lang]} />
+              <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={(result.colorName as any)[lang] || result.colorName.ru} />
             </div>
             <motion.div
               animate={{ rotate: showPro ? 180 : 0 }}
@@ -441,13 +452,13 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`\( {row.valMm}- \){unit}`} />
+                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
                             <span className="text-[12px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
                               {row.label}
                             </span>
                           </div>
                           <motion.span 
-                            key={`\( {row.valMm}- \){unit}`}
+                            key={`${row.valMm}-${unit}`}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                             className="text-[14px] font-medium"
                             style={{ color: 'var(--color-ink, #F5F1EA)' }}
@@ -503,7 +514,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 className="w-full py-2.5 rounded-xl font-medium text-[13px]"
                 style={{ backgroundColor: theme.accentBg, color: theme.accentSoft }}
               >
-                {lang === 'ru' ? 'Понятно' : 'Зрозуміло'}
+                {lang === 'de' ? 'Verstanden' : lang === 'uk' ? 'Зрозуміло' : 'Понятно'}
               </button>
             </motion.div>
           </motion.div>
@@ -516,4 +527,4 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       `}} />
     </motion.div>
   )
- }
+}
