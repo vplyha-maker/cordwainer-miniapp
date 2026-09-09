@@ -233,7 +233,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipe: 'Рецепт',
       inexactMatch: ' — неточное совпадение',
       binder: 'Связующее',
-      moveToMix: 'Перенести в смесь'
+      moveToMix: 'Перенести в смесь',
+      ml: 'мл',
+      l: 'л'
     },
     uk: {
       title: 'Калькулятор кольору',
@@ -277,7 +279,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipe: 'Рецепт',
       inexactMatch: ' — неточне співпадіння',
       binder: 'Зв’язуюче',
-      moveToMix: 'Перенести в суміш'
+      moveToMix: 'Перенести в суміш',
+      ml: 'мл',
+      l: 'л'
     },
     de: {
       title: 'Farbkalkulator',
@@ -321,7 +325,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipe: 'Rezept',
       inexactMatch: ' — ungenaue Übereinstimmung',
       binder: 'Bindemittel',
-      moveToMix: 'In Mischung übernehmen'
+      moveToMix: 'In Mischung übernehmen',
+      ml: 'ml',
+      l: 'l'
     }
   }[lang]
 
@@ -760,7 +766,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               <PigmentSelector pigments={pigments} value={paint.pigmentId} onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)} lang={lang} />
                             </div>
                             
-                            {/* --- ИСПРАВЛЕННЫЙ БЛОК ВВОДА С DELTA E --- */}
                             <div className="flex flex-col items-end w-[75px] flex-shrink-0 relative">
                               <div className="flex items-center justify-end gap-1 w-full">
                                 <input
@@ -786,7 +791,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                                   className="w-full bg-transparent border-0 text-right font-semibold focus:outline-none p-0"
                                   placeholder="0" style={{ fontSize: '16px', color: 'var(--color-ink, #F5F1EA)' }}
                                 />
-                                <span className="text-[12px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>мл</span>
+                                <span className="text-[12px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>{t.ml}</span>
                               </div>
                               
                               {/* Индикатор Delta E под цифрами */}
@@ -799,7 +804,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                                 </div>
                               )}
                             </div>
-                            {/* --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА --- */}
 
                             <button onClick={() => removePaint(paint.id)} disabled={paints.length <= 1} className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 disabled:opacity-15 active:bg-white/10" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 28%, transparent)' }}>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" /></svg>
@@ -951,7 +955,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               <div className="flex items-center justify-between">
                 <span className="text-[14px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{t.totalVolume}</span>
                 <span className="text-[17px] font-semibold tabular-nums" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                  {totalAmount > 1000 ? (totalAmount / 1000).toFixed(2) + ' л' : totalAmount.toFixed(1) + ' мл'}
+                  {totalAmount > 1000 ? (totalAmount / 1000).toFixed(2) + ' ' + t.l : totalAmount.toFixed(1) + ' ' + t.ml}
                 </span>
               </div>
             </section>
@@ -1050,7 +1054,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   {recipeResult.recipe.map((item, i) => (
                     <div key={i} className="flex items-center justify-between py-2 px-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 5%, transparent)' }}>
                       <span className="text-[13px] font-medium truncate pr-2">{item.isBinder ? t.binder : pigmentName(item.pigment)}</span>
-                      <span className="text-[14px] font-semibold tabular-nums flex-shrink-0">{item.ml.toFixed(1)} мл</span>
+                      <span className="text-[14px] font-semibold tabular-nums flex-shrink-0">{item.ml.toFixed(1)} {t.ml}</span>
                     </div>
                   ))}
                 </div>
