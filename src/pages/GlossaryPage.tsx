@@ -3,7 +3,6 @@ import { BottomDock } from '../components/BottomDock'
 import { FlipCard } from '../components/FlipCard'
 import {
   GLOSSARY_TERMS,
-  GLOSSARY_LETTERS,
   searchTerms,
   type GlossaryTerm,
 } from '../data/glossary'
@@ -33,6 +32,11 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
   const [activeLetter, setActiveLetter] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  // Сбрасываем выбранную букву при смене языка, так как алфавиты разные
+  useEffect(() => {
+    setActiveLetter(null)
+  }, [lang])
 
   const t = {
     ru: {
@@ -67,10 +71,20 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
     },
   }[lang]
 
+  // Помощник для получения локализованного названия термина
+  const getLocalizedTitle = (item: GlossaryTerm, currentLang: Lang) => {
+    if (currentLang === 'de' && (item as any).termDe) return (item as any).termDe as string
+    if (currentLang === 'uk' && item.termUk) return item.termUk
+    return item.term
+  }
+
   const filtered = useMemo(() => {
     let list = searchTerms(query, lang)
     if (activeLetter) {
-      list = list.filter((item) => item.letter === activeLetter)
+      list = list.filter((item) => {
+        const title = getLocalizedTitle(item, lang)
+        return title.charAt(0).toUpperCase() === activeLetter
+      })
     }
     if (activeCategory) {
       list = list.filter((item) => (item.category ?? 'other') === activeCategory)
@@ -82,10 +96,16 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
     listRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [query, activeLetter, activeCategory])
 
+  // Динамическое формирование алфавита на основе текущего языка
   const availableLetters = useMemo(() => {
-    const set = new Set(GLOSSARY_TERMS.map((x) => x.letter))
-    return GLOSSARY_LETTERS.filter((l) => set.has(l))
-  }, [])
+    const letters = new Set<string>()
+    GLOSSARY_TERMS.forEach((item) => {
+      const title = getLocalizedTitle(item, lang)
+      if (title) letters.add(title.charAt(0).toUpperCase())
+    })
+    const locale = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU'
+    return Array.from(letters).sort((a, b) => a.localeCompare(b, locale))
+  }, [lang])
 
   const categories = useMemo(() => {
     const set = new Set(GLOSSARY_TERMS.map((x) => x.category ?? 'other'))
