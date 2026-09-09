@@ -66,15 +66,26 @@ const CATEGORY_COLOR: Record<NonNullable<GlossaryTerm['category']>, string> = {
 export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
 
-  const title = lang === 'uk' && term.termUk ? term.termUk : term.term
-  const definition = lang === 'uk' && term.definitionUk ? term.definitionUk : term.definition
-  const example = lang === 'uk' && term.exampleUk ? term.exampleUk : term.example
+  // Языковая логика с поддержкой немецкого 'de'
+  const title = lang === 'de' && (term as any).termDe ? (term as any).termDe 
+              : lang === 'uk' && term.termUk ? term.termUk 
+              : term.term
+              
+  const definition = lang === 'de' && (term as any).definitionDe ? (term as any).definitionDe 
+                   : lang === 'uk' && term.definitionUk ? term.definitionUk 
+                   : term.definition
+                   
+  const example = lang === 'de' && (term as any).exampleDe ? (term as any).exampleDe 
+                : lang === 'uk' && term.exampleUk ? term.exampleUk 
+                : term.example
+                
   const cat = term.category ?? 'other'
   const accent = CATEGORY_COLOR[cat]
   const icon = CATEGORY_ICON[cat]
 
-  const hint = lang === 'uk' ? 'Натисніть, щоб відкрити' : 'Нажмите, чтобы открыть'
-  const backHint = lang === 'uk' ? 'Натисніть, щоб згорнути' : 'Нажмите, чтобы свернуть'
+  const hint = lang === 'de' ? 'Klicken zum Öffnen' : lang === 'uk' ? 'Натисніть, щоб відкрити' : 'Нажмите, чтобы открыть'
+  const backHint = lang === 'de' ? 'Klicken zum Schließen' : lang === 'uk' ? 'Натисніть, щоб згорнути' : 'Нажмите, чтобы свернуть'
+  const exampleLabel = lang === 'de' ? 'Beispiel:' : lang === 'uk' ? 'Приклад:' : 'Пример:'
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -229,7 +240,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
                   className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider opacity-80"
                   style={{ color: accent }}
                 >
-                  {lang === 'uk' ? 'Приклад:' : 'Пример:'}
+                  {exampleLabel}
                 </span>
                 {example}
               </div>
@@ -244,4 +255,4 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
       </div>
     </div>
   )
- }
+}
