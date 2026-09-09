@@ -121,6 +121,34 @@ const DICTIONARY = {
     priceRise: '📈 Очікується зростання ціни',
     urgentBuy: '🔥 Терміновий викуп',
   },
+  de: {
+    title: 'Preisanalyse',
+    loading: 'Markt wird analysiert…',
+    error: 'Daten konnten nicht geladen werden',
+    retry: 'Erneut versuchen',
+    search: 'Suche nach Artikelnummer oder Name...',
+    allSources: 'Alle Märkte',
+    favorites: 'Beobachtet',
+    sortDefault: 'Beliebt',
+    sortUnitPriceAsc: 'Günstigste pro 1kg/1L zuerst',
+    sortSavings: 'Max. Ersparnis',
+    sortName: 'Alphabetisch',
+    code: 'Art.',
+    bestPrice: 'TOP Preis',
+    saveUpTo: 'Unterschied',
+    statsTotal: 'Artikel',
+    statsAvgSpread: 'Durchschn. Spanne',
+    empty: 'Nichts gefunden',
+    emptyHint: 'Ändern Sie die Filter oder die Suche',
+    noPrice: 'Nicht auf Lager',
+    singleOffer: 'Artikel nur in einem Shop gefunden',
+    loadMore: 'Mehr anzeigen',
+    updatedAt: 'Aktualisiert',
+    priceLag: '⚡ Preisverzögerung',
+    deficit: '⚠️ Engpassrisiko',
+    priceRise: '📈 Preisanstieg erwartet',
+    urgentBuy: '🔥 Dringend kaufen',
+  },
 }
 
 const formatSourceName = (sourceId: string) => {
@@ -139,7 +167,9 @@ const formatDate = (dateStr: string | null, lang: Lang) => {
   if (!dateStr) return null
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return null
-  return new Intl.DateTimeFormat(lang === 'uk' ? 'uk-UA' : 'ru-RU', {
+  
+  const locale = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU'
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
   }).format(d)
@@ -230,7 +260,8 @@ function calculateWordSimilarity(name1: string, name2: string): number {
 
 const formatPrice = (val: number, lang: Lang) => {
   if (!val || val <= 0) return DICTIONARY[lang].noPrice
-  return new Intl.NumberFormat(lang === 'uk' ? 'uk-UA' : 'ru-RU', {
+  const locale = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU'
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: 'UAH',
     maximumFractionDigits: 0,
