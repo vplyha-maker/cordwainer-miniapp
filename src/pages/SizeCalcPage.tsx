@@ -81,6 +81,97 @@ const THEMES = {
 } as const
 
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
+  // Словарь вынесен наверх, чтобы использовать его значения для единиц измерения
+  const t = {
+    ru: {
+      title: 'Размер обуви',
+      subtitle: 'по длине стопы',
+      step1: 'Длина стопы',
+      step1Hint: 'От пятки до самого длинного пальца',
+      howToMeasureBtn: 'Как мерить?',
+      measureGuide1: '1. Встаньте на лист бумаги (в носках).',
+      measureGuide2: '2. Обведите стопу, держа ручку строго вертикально.',
+      measureGuide3: '3. Измерьте линейкой расстояние от пятки до самого длинного пальца.',
+      measureTip:
+        '💡 Лучше всего измерять стопу во второй половине дня — к вечеру ноги немного отекают и становятся больше.',
+      recommended: 'Рекомендуемый размер',
+      disclaimer: 'Размеры ориентировочные и могут отличаться в зависимости от колодки и бренда.',
+      howCalculated: 'Как считается?',
+      hide: 'Скрыть',
+      save: 'Сохранить результат',
+      men: 'Муж',
+      women: 'Жен',
+      kids: 'Дет',
+      cm: 'см',
+      mm: 'мм',
+      standardsTitle: 'Стандарты',
+      standardsNote:
+        'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
+      isoEu: 'ISO 19407 · Paris Point',
+      isoUk: 'ISO 19407 · Barleycorn',
+      isoUs: 'ISO 19407 · UK + сдвиг',
+      isoMondo: 'ISO 9407 · мм стопы',
+    },
+    uk: {
+      title: 'Розмір взуття',
+      subtitle: 'за довжиною стопи',
+      step1: 'Довжина стопи',
+      step1Hint: 'Від п’яти до найдовшого пальця',
+      howToMeasureBtn: 'Як міряти?',
+      measureGuide1: '1. Станьте на аркуш паперу (у шкарпетках).',
+      measureGuide2: '2. Обведіть стопу, тримаючи ручку строго вертикально.',
+      measureGuide3: '3. Виміряйте лінійкою відстань від п’яти до найдовшого пальця.',
+      measureTip:
+        '💡 Найкраще вимірювати стопу в другій половині дня — до вечора ноги трохи набрякають і стають більшими.',
+      recommended: 'Рекомендований розмір',
+      disclaimer: 'Розміри орієнтовні і можуть відрізнятися залежно від колодки та бренду.',
+      howCalculated: 'Як рахується?',
+      hide: 'Сховати',
+      save: 'Зберегти результат',
+      men: 'Чол',
+      women: 'Жін',
+      kids: 'Дит',
+      cm: 'см',
+      mm: 'мм',
+      standardsTitle: 'Стандарти',
+      standardsNote:
+        'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
+      isoEu: 'ISO 19407 · Paris Point',
+      isoUk: 'ISO 19407 · Barleycorn',
+      isoUs: 'ISO 19407 · UK + зсув',
+      isoMondo: 'ISO 9407 · мм стопи',
+    },
+    de: {
+      title: 'Schuhgröße',
+      subtitle: 'nach Fußlänge',
+      step1: 'Fußlänge',
+      step1Hint: 'Von der Ferse bis zum längsten Zeh',
+      howToMeasureBtn: 'Wie messen?',
+      measureGuide1: '1. Stellen Sie sich auf ein Blatt Papier (in Socken).',
+      measureGuide2: '2. Umranden Sie den Fuß, halten Sie den Stift dabei senkrecht.',
+      measureGuide3: '3. Messen Sie den Abstand von der Ferse bis zum längsten Zeh.',
+      measureTip:
+        '💡 Am besten messen Sie am Nachmittag — Füße schwellen im Laufe des Tages leicht an und werden größer.',
+      recommended: 'Empfohlene Größe',
+      disclaimer: 'Die Größen sind Richtwerte und können je nach Leisten und Marke abweichen.',
+      howCalculated: 'Wie wird gerechnet?',
+      hide: 'Verbergen',
+      save: 'Ergebnis speichern',
+      men: 'Herren',
+      women: 'Damen',
+      kids: 'Kinder',
+      cm: 'cm',
+      mm: 'mm',
+      standardsTitle: 'Standards',
+      standardsNote:
+        'Basierend auf ISO 19407:2023 und ISO 9407 (Mondopoint). Tatsächliche Markengrößen können abweichen.',
+      isoEu: 'ISO 19407 · Paris Point',
+      isoUk: 'ISO 19407 · Barleycorn',
+      isoUs: 'ISO 19407 · UK + Offset',
+      isoMondo: 'ISO 9407 · Fuß in mm',
+    },
+  }[lang]
+
   const [gender, setGender] = useState<Gender>('men')
   const [unit, setUnit] = useState<'cm' | 'mm'>('cm')
   const [footMm, setFootMm] = useState<number>(RANGES.men.default)
@@ -106,7 +197,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       ? (footMm / 10).toFixed(1).replace('.', ',')
       : String(Math.round(footMm))
 
-  const displayUnit = unit === 'cm' ? 'см' : 'мм'
+  // Теперь единицы измерения берутся строго из словаря (t.cm / t.mm)
+  const displayUnit = unit === 'cm' ? t.cm : t.mm
   const pct = ((footMm - range.min) / (range.max - range.min)) * 100
 
   const triggerHaptic = (style: 'light' | 'medium' = 'light') => {
@@ -144,84 +236,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   useEffect(() => {
     if (isEditing) inputRef.current?.focus()
   }, [isEditing])
-
-  const t = {
-    ru: {
-      title: 'Размер обуви',
-      subtitle: 'по длине стопы',
-      step1: 'Длина стопы',
-      step1Hint: 'От пятки до самого длинного пальца',
-      howToMeasureBtn: 'Как мерить?',
-      measureGuide1: '1. Встаньте на лист бумаги (в носках).',
-      measureGuide2: '2. Обведите стопу, держа ручку строго вертикально.',
-      measureGuide3: '3. Измерьте линейкой расстояние от пятки до самого длинного пальца.',
-      measureTip:
-        '💡 Лучше всего измерять стопу во второй половине дня — к вечеру ноги немного отекают и становятся больше.',
-      recommended: 'Рекомендуемый размер',
-      disclaimer: 'Размеры ориентировочные и могут отличаться в зависимости от колодки и бренда.',
-      howCalculated: 'Как считается?',
-      hide: 'Скрыть',
-      save: 'Сохранить результат',
-      men: 'Муж',
-      women: 'Жен',
-      kids: 'Дет',
-      cm: 'см',
-      mm: 'мм',
-      standardsTitle: 'Стандарты',
-      standardsNote:
-        'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
-    },
-    uk: {
-      title: 'Розмір взуття',
-      subtitle: 'за довжиною стопи',
-      step1: 'Довжина стопи',
-      step1Hint: 'Від п’яти до найдовшого пальця',
-      howToMeasureBtn: 'Як міряти?',
-      measureGuide1: '1. Станьте на аркуш паперу (у шкарпетках).',
-      measureGuide2: '2. Обведіть стопу, тримаючи ручку строго вертикально.',
-      measureGuide3: '3. Виміряйте лінійкою відстань від п’яти до найдовшого пальця.',
-      measureTip:
-        '💡 Найкраще вимірювати стопу в другій половині дня — до вечора ноги трохи набрякають і стають більшими.',
-      recommended: 'Рекомендований розмір',
-      disclaimer: 'Розміри орієнтовні і можуть відрізнятися залежно від колодки та бренду.',
-      howCalculated: 'Як рахується?',
-      hide: 'Сховати',
-      save: 'Зберегти результат',
-      men: 'Чол',
-      women: 'Жін',
-      kids: 'Дит',
-      cm: 'см',
-      mm: 'мм',
-      standardsTitle: 'Стандарти',
-      standardsNote:
-        'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
-    },
-    de: {
-      title: 'Schuhgröße',
-      subtitle: 'nach Fußlänge',
-      step1: 'Fußlänge',
-      step1Hint: 'Von der Ferse bis zum längsten Zeh',
-      howToMeasureBtn: 'Wie messen?',
-      measureGuide1: '1. Stellen Sie sich auf ein Blatt Papier (in Socken).',
-      measureGuide2: '2. Umranden Sie den Fuß, halten Sie den Stift dabei senkrecht.',
-      measureGuide3: '3. Messen Sie den Abstand von der Ferse bis zum längsten Zeh.',
-      measureTip:
-        '💡 Am besten messen Sie am Nachmittag — Füße schwellen im Laufe des Tages leicht an und werden größer.',
-      recommended: 'Empfohlene Größe',
-      disclaimer: 'Die Größen sind Richtwerte und können je nach Leisten und Marke abweichen.',
-      howCalculated: 'Wie wird gerechnet?',
-      hide: 'Verbergen',
-      save: 'Ergebnis speichern',
-      men: 'Herren',
-      women: 'Damen',
-      kids: 'Kinder',
-      cm: 'cm',
-      mm: 'mm',
-      standardsTitle: 'Standards',
-      standardsNote:
-        'Basierend auf ISO 19407:2023 und ISO 9407 (Mondopoint). Tatsächliche Markengrößen können abweichen.',
-    },
-  }[lang]
 
   const usLabel = gender === 'kids' ? 'US' : gender === 'men' ? 'US M' : 'US W'
 
@@ -462,7 +476,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     {displayValue}
                   </span>
                   <span
-                    className="text-[18px] ml-1.5 align-top"
+                    className="text-[18px] ml-1.5 align-top uppercase"
                     style={{ color: 'var(--color-muted, #B9ACA0)' }}
                   >
                     {displayUnit}
@@ -609,8 +623,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
             <div className="flex flex-col items-center gap-1.5 min-w-0">
               <div className="flex items-center h-4">
-                <span className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  CM
+                <span className="text-[11px] uppercase" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  {t.cm}
                 </span>
               </div>
               <span
@@ -670,25 +684,25 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
                       EU / UKR
                     </span>
-                    <span>ISO 19407 · Paris Point</span>
+                    <span>{t.isoEu}</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
                       UK
                     </span>
-                    <span>ISO 19407 · Barleycorn</span>
+                    <span>{t.isoUk}</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
                       US
                     </span>
-                    <span>ISO 19407 · UK + offset</span>
+                    <span>{t.isoUs}</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
                       Mondopoint
                     </span>
-                    <span>ISO 9407 · мм стопы</span>
+                    <span>{t.isoMondo}</span>
                   </div>
                 </div>
                 <p
