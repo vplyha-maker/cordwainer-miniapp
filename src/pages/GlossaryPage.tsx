@@ -17,15 +17,15 @@ type GlossaryPageProps = {
 
 const CATEGORY_LABELS: Record<
   NonNullable<GlossaryTerm['category']>,
-  { ru: string; uk: string }
+  { ru: string; uk: string; de: string }
 > = {
-  material: { ru: 'Материалы', uk: 'Матеріали' },
-  part: { ru: 'Детали', uk: 'Деталі' },
-  process: { ru: 'Процессы', uk: 'Процеси' },
-  tool: { ru: 'Инструменты', uk: 'Інструменти' },
-  type: { ru: 'Виды обуви', uk: 'Види взуття' },
-  defect: { ru: 'Дефекты', uk: 'Дефекти' },
-  other: { ru: 'Прочее', uk: 'Інше' },
+  material: { ru: 'Материалы', uk: 'Матеріали', de: 'Materialien' },
+  part: { ru: 'Детали', uk: 'Деталі', de: 'Schuhteile' },
+  process: { ru: 'Процессы', uk: 'Процеси', de: 'Verfahren' },
+  tool: { ru: 'Инструменты', uk: 'Інструменти', de: 'Werkzeuge' },
+  type: { ru: 'Виды обуви', uk: 'Види взуття', de: 'Schuharten' },
+  defect: { ru: 'Дефекты', uk: 'Дефекти', de: 'Defekte' },
+  other: { ru: 'Прочее', uk: 'Інше', de: 'Sonstiges' },
 }
 
 export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
@@ -54,6 +54,16 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
       emptyHint: 'Спробуйте інший запит або скиньте фільтри',
       source: 'Короткий словник термінів взуттєвої справи',
       flipHint: 'Натисніть на картку, щоб побачити визначення',
+    },
+    de: {
+      title: 'Glossar',
+      search: 'Begriff suchen...',
+      all: 'Alle',
+      terms: 'Begriffe',
+      empty: 'Nichts gefunden',
+      emptyHint: 'Versuchen Sie eine andere Suchanfrage oder setzen Sie die Filter zurück',
+      source: 'Kurzes Wörterbuch der Schuhmacher-Begriffe',
+      flipHint: 'Klicken Sie auf die Karte, um die Definition zu sehen',
     },
   }[lang]
 
@@ -91,7 +101,7 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
             <button
               onClick={onBack}
               className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink,#F5F1EA)] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform shrink-0"
-              aria-label={lang === 'uk' ? 'Назад' : 'Назад'}
+              aria-label={lang === 'de' ? 'Zurück' : (lang === 'uk' ? 'Назад' : 'Назад')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <path d="M15 18l-6-6 6-6" />
@@ -277,4 +287,4 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
       `}</style>
     </div>
   )
- }
+}
