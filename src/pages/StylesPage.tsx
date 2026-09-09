@@ -130,17 +130,27 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
   const [shouldLoad, setShouldLoad] = useState(index <= 1)
 
-  // ФУНКЦИЯ ДЛЯ КНОПКИ SHARE
+  // НОВАЯ ФУНКЦИЯ ДЛЯ КНОПКИ SHARE
   const handleShare = async () => {
     const shareText = currentLang === 'ru' 
-      ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии обувного мастерства Cordwainer!`
-      : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії взуттєвої майстерності Cordwainer!`;
+      ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии Cordwainer!`
+      : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії Cordwainer!`;
     
-    // Твоя веб-ссылка
     const siteUrl = "https://www.cordwaine.app"; 
+    
+    // Получаем объект Telegram WebApp безопасно для TypeScript
+    const tg = (window as any).Telegram?.WebApp;
 
     try {
-      // 1. Нативный шеринг в телефоне (откроется шторка выбора приложения)
+      // 1. СНАЧАЛА проверяем, открыты ли мы внутри Telegram
+      if (tg && tg.initData) {
+        // Формируем специальную ссылку для нативного шеринга в Telegram
+        const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`;
+        tg.openTelegramLink(tgShareUrl);
+        return;
+      }
+
+      // 2. Если мы НЕ в Телеграме, пробуем нативный шеринг браузера (Safari/Chrome на телефоне)
       if (navigator.share) {
         await navigator.share({
           title: 'Cordwainer',
@@ -148,11 +158,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
           url: siteUrl
         });
       } 
-      // 2. Если открыто внутри Telegram Web App
-      else if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.switchInlineQuery(shareText, ['users', 'groups', 'channels']);
-      }
-      // 3. Запасной вариант (копируем ссылку)
+      // 3. Если мы открыты на компьютере без поддержки share (копируем ссылку)
       else {
         await navigator.clipboard.writeText(`${shareText}\n${siteUrl}`);
         alert(currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена' : 'Посилання скопійовано');
@@ -206,7 +212,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
   return (
     <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      {/* 1. ФОН */}
       <div className="absolute inset-0 w-full h-full z-0">
         {shouldLoad && slide.video ? (
           <video
@@ -227,10 +232,8 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         ) : null}
       </div>
 
-      {/* 2. РАВНОМЕРНЫЙ ОВЕРЛЕЙ */}
       <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
 
-      {/* 3. ТИПОГРАФИКА */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -247,7 +250,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         </h2>
       </motion.div>
 
-      {/* 4. ОПИСАНИЕ И КНОПКА SHARE */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -259,7 +261,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
           {slide.desc[currentLang]}
         </p>
         
-        {/* Кнопка Поделиться */}
         <button 
           onClick={handleShare}
           className="w-12 h-12 flex flex-col items-center justify-center text-white/70 hover:text-white active:scale-90 transition-all duration-300 gap-[2px] shrink-0"
@@ -294,7 +295,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Элементы управления */}
       <button
         onClick={onBack}
         className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
