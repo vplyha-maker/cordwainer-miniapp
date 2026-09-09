@@ -4,24 +4,37 @@ import { Lang } from '../App'
 export type CoverageSystem = 'aniline' | 'acrylic'
 
 export const PURE_BASIC_COLORS = [
-  { id: 'pure_white', name: { uk: 'Білий', ru: 'Белый', en: 'White' }, sourceIds: ['pw_6_anatase', 'titanium_white', 'zinc_white', 'lithopone', 'pw_7_zinc_sulfide', 'pw_11_antimony_white', 'pw_21_barium_sulfate'] },
-  { id: 'pure_black', name: { uk: 'Чорний', ru: 'Чёрный', en: 'Black' }, sourceIds: ['pbk_1_aniline_black', 'ivory_black', 'lamp_black', 'bone_black'] },
-  { id: 'pure_red', name: { uk: 'Червоний', ru: 'Красный', en: 'Red' }, sourceIds: ['cadmium_red', 'pyrrole_red', 'carmine_lake', 'pr_254_pyrrole_red', 'pr_122_quinacridone_magenta', 'pr_255_pyrrole_scarlet'] },
-  { id: 'pure_yellow', name: { uk: 'Жовтий', ru: 'Жёлтый', en: 'Yellow' }, sourceIds: ['cadmium_yellow', 'yellow_ochre', 'hansa_yellow', 'py_154_benzimidazolone_yellow_h3g', 'py_83_diarylide_yellow_hr', 'py_150_nickel_azo_yellow'] },
-  { id: 'pure_blue', name: { uk: 'Синій', ru: 'Синий', en: 'Blue' }, sourceIds: ['ultramarine', 'phthalo_blue', 'prussian_blue', 'pb_66_synthetic_indigo'] },
-  { id: 'pure_green', name: { uk: 'Зелений', ru: 'Зелёный', en: 'Green' }, sourceIds: ['phthalo_green', 'green_earth', 'viridian', 'pg_36_phthalo_green_ys'] },
+  { id: 'pure_white', name: { uk: 'Білий', ru: 'Белый', en: 'White', de: 'Weiß' }, sourceIds: ['pw_6_anatase', 'titanium_white', 'zinc_white', 'lithopone', 'pw_7_zinc_sulfide', 'pw_11_antimony_white', 'pw_21_barium_sulfate'] },
+  { id: 'pure_black', name: { uk: 'Чорний', ru: 'Чёрный', en: 'Black', de: 'Schwarz' }, sourceIds: ['pbk_1_aniline_black', 'ivory_black', 'lamp_black', 'bone_black'] },
+  { id: 'pure_red', name: { uk: 'Червоний', ru: 'Красный', en: 'Red', de: 'Rot' }, sourceIds: ['cadmium_red', 'pyrrole_red', 'carmine_lake', 'pr_254_pyrrole_red', 'pr_122_quinacridone_magenta', 'pr_255_pyrrole_scarlet'] },
+  { id: 'pure_yellow', name: { uk: 'Жовтий', ru: 'Жёлтый', en: 'Yellow', de: 'Gelb' }, sourceIds: ['cadmium_yellow', 'yellow_ochre', 'hansa_yellow', 'py_154_benzimidazolone_yellow_h3g', 'py_83_diarylide_yellow_hr', 'py_150_nickel_azo_yellow'] },
+  { id: 'pure_blue', name: { uk: 'Синій', ru: 'Синий', en: 'Blue', de: 'Blau' }, sourceIds: ['ultramarine', 'phthalo_blue', 'prussian_blue', 'pb_66_synthetic_indigo'] },
+  { id: 'pure_green', name: { uk: 'Зелений', ru: 'Зелёный', en: 'Green', de: 'Grün' }, sourceIds: ['phthalo_green', 'green_earth', 'viridian', 'pg_36_phthalo_green_ys'] },
 ] as const
 
 export function getPigmentCategory(id: string, lang: Lang) {
-  const isUk = lang === 'uk'
-  if (id.includes('cadmium')) return isUk ? 'Кадмієва група' : 'Кадмиевая группа'
-  if (id.includes('cobalt')) return isUk ? 'Кобальтова група' : 'Кобальтовая группа'
-  if (id.includes('white') || id.startsWith('pw_') || ['lithopone', 'chalk', 'gypsum'].includes(id)) return isUk ? 'Білила / Наповнювачі' : 'Белила / Наполнители'
-  if (id.includes('ochre') || id.includes('sienna') || id.includes('umber') || id === 'green_earth' || id.startsWith('pbr_')) return isUk ? 'Земляні пігменти' : 'Земляные пигменты'
-  if (id.includes('black') || id.startsWith('pbk_') || id === 'bitumen') return isUk ? 'Чорні / Вуглецеві' : 'Черные / Углеродные'
-  if (id.includes('phthalo') || id.startsWith('pg_36') || id.startsWith('pb_15')) return isUk ? 'Фталоціаніни (синтетика)' : 'Фталоцианины (синтетика)'
-  if (['ultramarine', 'ultramarine_nat', 'prussian_blue', 'azurite'].includes(id)) return isUk ? 'Традиційні сині' : 'Традиционные синие'
-  return isUk ? 'Органічний / Інший' : 'Органический / Прочий'
+  if (id.includes('cadmium')) {
+    return lang === 'de' ? 'Cadmium-Gruppe' : lang === 'uk' ? 'Кадмієва група' : 'Кадмиевая группа'
+  }
+  if (id.includes('cobalt')) {
+    return lang === 'de' ? 'Kobalt-Gruppe' : lang === 'uk' ? 'Кобальтова група' : 'Кобальтовая группа'
+  }
+  if (id.includes('white') || id.startsWith('pw_') || ['lithopone', 'chalk', 'gypsum'].includes(id)) {
+    return lang === 'de' ? 'Weißpigmente / Füllstoffe' : lang === 'uk' ? 'Білила / Наповнювачі' : 'Белила / Наполнители'
+  }
+  if (id.includes('ochre') || id.includes('sienna') || id.includes('umber') || id === 'green_earth' || id.startsWith('pbr_')) {
+    return lang === 'de' ? 'Erdpigmente' : lang === 'uk' ? 'Земляні пігменти' : 'Земляные пигменты'
+  }
+  if (id.includes('black') || id.startsWith('pbk_') || id === 'bitumen') {
+    return lang === 'de' ? 'Schwarzpigmente / Kohlenstoff' : lang === 'uk' ? 'Чорні / Вуглецеві' : 'Черные / Углеродные'
+  }
+  if (id.includes('phthalo') || id.startsWith('pg_36') || id.startsWith('pb_15')) {
+    return lang === 'de' ? 'Phthalocyanine (Synthetisch)' : lang === 'uk' ? 'Фталоціаніни (синтетика)' : 'Фталоцианины (синтетика)'
+  }
+  if (['ultramarine', 'ultramarine_nat', 'prussian_blue', 'azurite'].includes(id)) {
+    return lang === 'de' ? 'Traditionelle Blautöne' : lang === 'uk' ? 'Традиційні сині' : 'Традиционные синие'
+  }
+  return lang === 'de' ? 'Organisch / Sonstige' : lang === 'uk' ? 'Органічний / Інший' : 'Органический / Прочий'
 }
 
 function rgbToLab(r: number, g: number, b: number) {
