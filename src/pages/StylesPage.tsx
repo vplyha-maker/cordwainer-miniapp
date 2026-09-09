@@ -124,18 +124,47 @@ const STYLES_DATA: StyleSlide[] = [
 ]
 
 function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
-  // Добавляем реф на сам контейнер слайда
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = (lang === 'uk' || lang === 'ru') ? lang : 'ru'
 
-  // LAZY LOADING: Первые 2 видео загружаем сразу. Остальные ждут своей очереди.
   const [shouldLoad, setShouldLoad] = useState(index <= 1)
+
+  // ФУНКЦИЯ ДЛЯ КНОПКИ SHARE
+  const handleShare = async () => {
+    const shareText = currentLang === 'ru' 
+      ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии обувного мастерства Cordwainer!`
+      : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії взуттєвої майстерності Cordwainer!`;
+    
+    // Твоя веб-ссылка
+    const siteUrl = "https://www.cordwaine.app"; 
+
+    try {
+      // 1. Нативный шеринг в телефоне (откроется шторка выбора приложения)
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Cordwainer',
+          text: shareText,
+          url: siteUrl
+        });
+      } 
+      // 2. Если открыто внутри Telegram Web App
+      else if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.switchInlineQuery(shareText, ['users', 'groups', 'channels']);
+      }
+      // 3. Запасной вариант (копируем ссылку)
+      else {
+        await navigator.clipboard.writeText(`${shareText}\n${siteUrl}`);
+        alert(currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена' : 'Посилання скопійовано');
+      }
+    } catch (err) {
+      console.log('Error sharing:', err);
+    }
+  }
 
   useEffect(() => {
     if (!containerRef.current) return
 
-    // 1. Обозреватель для ЗАГРУЗКИ (Начинает грузить видео за 1 экран до того, как человек до него доскроллит)
     const loadObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -147,7 +176,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
       { rootMargin: '100% 0px' } 
     )
 
-    // 2. Обозреватель для ПЛЕЕРА (Включает видео только когда оно прямо на экране)
     const playObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -178,7 +206,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
   return (
     <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      {/* 1. ФОН: Рендерим видео ТОЛЬКО если shouldLoad стало true */}
+      {/* 1. ФОН */}
       <div className="absolute inset-0 w-full h-full z-0">
         {shouldLoad && slide.video ? (
           <video
@@ -188,7 +216,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
             loop
             muted={isMuted}
             playsInline
-            className={`w-full h-full object-cover ${slide.hideWatermark ? 'scale-110' : ''}`}
+            className={`w-full h-full object-cover transition-transform duration-700 ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
         ) : shouldLoad && slide.image ? (
           <img
@@ -219,17 +247,32 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         </h2>
       </motion.div>
 
-      {/* 4. ОПИСАНИЕ */}
+      {/* 4. ОПИСАНИЕ И КНОПКА SHARE */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: false, amount: 0.4 }}
         transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
-        className="absolute bottom-12 left-6 z-20 max-w-[280px]"
+        className="absolute bottom-12 left-6 right-6 z-20 flex items-end justify-between"
       >
-        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide">
+        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[75%]">
           {slide.desc[currentLang]}
         </p>
+        
+        {/* Кнопка Поделиться */}
+        <button 
+          onClick={handleShare}
+          className="w-12 h-12 flex flex-col items-center justify-center text-white/70 hover:text-white active:scale-90 transition-all duration-300 gap-[2px] shrink-0"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+            <polyline points="16 6 12 2 8 6"></polyline>
+            <line x1="12" y1="2" x2="12" y2="15"></line>
+          </svg>
+          <span className="text-[8px] tracking-widest uppercase opacity-90 mt-1">
+            Share
+          </span>
+        </button>
       </motion.div>
     </div>
   )
