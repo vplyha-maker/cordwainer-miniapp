@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-
-type Lang = 'ru' | 'uk';
+import type { Lang } from '../App';
 
 type CreditLine = {
   text: string;
@@ -14,8 +13,8 @@ type AboutProjectProps = {
 
 // Настройки синхронизации с музыкой (подбираем под 8-bit трек)
 const SONG_BPM = 122; // Темп трека (удары в минуту)
-const MS_PER_BEAT = 60000 / SONG_BPM; // Длительность одного удара (\~491.8 мс)
-const CHAR_DELAY = MS_PER_BEAT / 16; // Скорость печати (16 символов на 1 удар = \~30.7 мс)
+const MS_PER_BEAT = 60000 / SONG_BPM; // Длительность одного удара (~491.8 мс)
+const CHAR_DELAY = MS_PER_BEAT / 16; // Скорость печати (16 символов на 1 удар = ~30.7 мс)
 const LINE_DELAY = MS_PER_BEAT * 1; // Пауза в конце строки (ровно 1 удар)
 const EMPTY_LINE_DELAY = MS_PER_BEAT / 2; // Пауза на пустых строках (половина удара)
 
@@ -195,6 +194,92 @@ const CREDITS: Record<Lang, CreditLine[]> = {
     { text: '' },
     { text: '' },
   ],
+  de: [
+    { text: 'C:\\> INIT.EXE --boot-sequence' },
+    { text: 'Loading CORDWAINER.SYS... [OK]' },
+    { text: 'Mounting virtual drives... [OK]' },
+    { text: 'Initializing neural core... [WARNING]' },
+    { text: 'Bypassing security protocols... [DONE]' },
+    { text: '' },
+    { text: '════════════════════════════════════════════════' },
+    { text: '' },
+    { text: 'C:\\> TYPE GRATITUDE.TXT' },
+    { text: '' },
+    { text: 'DANKSAGUNG' },
+    { text: '' },
+    { text: 'Besonders möchte ich meine aufrichtige' },
+    { text: 'Dankbarkeit gegenüber dem Team von' },
+    { text: '«Forward Ortho» ausdrücken.' },
+    { text: '' },
+    { text: 'Vielen Dank an meine Kollegen für die' },
+    { text: 'Erfahrung, das Wissen, die Unterstützung' },
+    { text: 'und die Möglichkeit, in einem Umfeld zu' },
+    { text: 'arbeiten, in dem ich ein praktisches' },
+    { text: 'Verständnis für die Schuhherstellung' },
+    { text: 'und das Handwerk erlangen konnte.' },
+    { text: '' },
+    { text: 'Diese Erfahrung wurde zu einem wichtigen' },
+    { text: 'Teil des Fundaments, auf dem das' },
+    { text: 'Cordwainer-Projekt entstand.' },
+    { text: '' },
+    { text: 'Vielen Dank an das Team von «Forward Ortho»' },
+    { text: 'für den Beitrag zu meinem beruflichen Werdegang.' },
+    { text: '' },
+    { text: '════════════════════════════════════════════════' },
+    { text: '' },
+    { text: 'Meiner Mutter gewidmet', customStyle: 'text-pink-400 text-lg drop-shadow-[0_0_12px_rgba(244,114,182,0.95)] tracking-[0.25em]' },
+    { text: '' },
+    { text: '════════════════════════════════════════════════' },
+    { text: '' },
+    { text: 'C:\\> EXECUTE TECH_SPECS.BAT' },
+    { text: 'Analyzing architecture... [DONE]' },
+    { text: 'Loading system profiles... [OK]' },
+    { text: '' },
+    { text: 'TECHNISCHE BASIS UND ARCHITEKTUR' },
+    { text: '' },
+    { text: '[ PLATTFORM ]' },
+    { text: '> Telegram Mini Apps (TMA)' },
+    { text: '  * SDK: @tma.js/sdk — Theme, Safe-Area, Haptic Feedback' },
+    { text: '  * Native Dark / Light Synchronisation' },
+    { text: '' },
+    { text: '[ FRONTEND ]' },
+    { text: '> React 18 + TypeScript (strict) + Vite' },
+    { text: '  * SPA, funktionale Komponenten, HMR' },
+    { text: '  * Tailwind CSS, Framer Motion, React Markdown' },
+    { text: '' },
+    { text: '[ FARBWISSENSCHAFT UND BERECHNUNGEN ]' },
+    { text: '> Spektralkolorimetrie (380–780 nm)' },
+    { text: '  * Datenbank der Reflexionsspektren von Pigmenten' },
+    { text: '> Two-Constant Kubelka–Munk + Saunderson' },
+    { text: '  * Mischmodell (K/S), Berücksichtigung der' },
+    { text: '    Oberflächenreflexion an der Grenze Luft–Farbe' },
+    { text: '  * Reflectance → XYZ (CIE 1931, 2°) → sRGB' },
+    { text: '  * Lichtquellen: D65, A, Cool, Twilight' },
+    { text: '> CIEDE2000 (ΔE₀₀)' },
+    { text: '  * Farbabstandsmetrik, abgestimmt auf' },
+    { text: '    die menschliche Wahrnehmung; Rezepturfindung' },
+    { text: '  * Suche nach Volumenanteilen + lokale Optimierung' },
+    { text: '> Web Worker für ressourcenintensive Rezeptberechnungen' },
+    { text: '  * UI bleibt während der Optimierung reaktionsschnell' },
+    { text: '' },
+    { text: '[ LEISTUNG ]' },
+    { text: '> Custom Performance Profiler' },
+    { text: '  * FPS (requestAnimationFrame), deviceMemory / CPU' },
+    { text: '  * Fast Mode auf Android: Effekte deaktiviert' },
+    { text: '  * Ziel: stabile 60 FPS' },
+    { text: '' },
+    { text: '[ DATEN UND INFRASTRUKTUR ]' },
+    { text: '> State + Web Storage (Cache, Favoriten, Einstellungen)' },
+    { text: '> Vercel Edge + GitHub CI/CD + globales CDN' },
+    { text: '' },
+    { text: 'SYS.STATUS: ALL SYSTEMS NOMINAL' },
+    { text: '════════════════════════════════════════════════' },
+    { text: '' },
+    { text: 'C:\\> LOGOUT' },
+    { text: 'Sitzung beendet. Danke, dass Sie das Terminal geöffnet haben.' },
+    { text: '' },
+    { text: '' },
+  ]
 };
 
 export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps) {
@@ -338,7 +423,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
               onClick={onClose}
               className="px-8 py-2.5 border-2 border-[#00FF41] text-[#00FF41] hover:bg-[#00FF41] hover:text-black transition tracking-[0.3em] uppercase text-sm font-bold"
             >
-              {lang === 'uk' ? '[ ПОВЕРНУТИСЯ ]' : '[ ВЕРНУТЬСЯ ]'}
+              {lang === 'de' ? '[ ZURÜCK ]' : lang === 'uk' ? '[ ПОВЕРНУТИСЯ ]' : '[ ВЕРНУТЬСЯ ]'}
             </button>
           </div>
         )}
