@@ -181,6 +181,9 @@ export default function App() {
   const [showPerfHint, setShowPerfHint] = useState(false)
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
+  
+  // Добавляем состояние для хранения ID выбранного термина глоссария
+  const [selectedGlossaryTermId, setSelectedGlossaryTermId] = useState<string | null>(null)
 
   const handleSetLang = (next: Lang) => {
     setLang(next)
@@ -361,7 +364,11 @@ export default function App() {
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
             onOpenStyles={() => setScreen('styles')}
-            onOpenGlossary={() => setScreen('glossary')}
+            // Обновляем onOpenGlossary, чтобы он принимал termId
+            onOpenGlossary={(termId) => {
+              setSelectedGlossaryTermId(termId || null)
+              setScreen('glossary')
+            }}
             onOpenPrices={() => setScreen('prices')}
             lang={lang}
             setLang={handleSetLang}
@@ -486,7 +493,12 @@ export default function App() {
           <GlossaryPage
             key="glossary"
             lang={lang}
-            onBack={() => setScreen('home')}
+            // Передаем ID термина в глоссарий
+            initialTermId={selectedGlossaryTermId}
+            onBack={() => {
+              setSelectedGlossaryTermId(null) // Очищаем стейт при выходе
+              setScreen('home')
+            }}
           />
         )}
 
