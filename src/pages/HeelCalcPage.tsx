@@ -618,17 +618,14 @@ function getLabels(lang: Lang) {
     rearfoot: 'Пятка',
     invertRisk: 'Риск инверсии',
     entryAngle: 'Угол въезда',
-    // Клинико-ортопедические
     padPos: 'Пелот Зейца (поз.)',
     padHeight: 'Высота пелота',
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
     carbonInsert: 'Карбон (толщ.)',
-    // Пресеты рокера
     rockerForefoot: 'Метатарзалгия',
     rockerHeelToToe: 'Артроз',
     rockerNegative: 'Диабет. стопа',
-    // Подписи в спеке
     specПерекат: 'Перекат',
     specГеленок: 'Геленок',
     specСталь: 'Сталь 65Г',
@@ -680,7 +677,54 @@ function getLabels(lang: Lang) {
     specСмещение: 'Зміщення',
     specНабойка: 'Набійка',
   }
-  return lang === 'uk' ? uk : ru
+  const de = {
+    title: 'Engineering & Balance',
+    desc: 'Leisten- und Absatzprofil Audit',
+    size: 'Größe', heel: 'Absatz', toe: 'Plateau', angle: 'Winkel', start: 'Rolle',
+    fixBtn: 'Balance', offset: 'Versatz', tipW: 'Fleck',
+    internalSlope: 'Leisten Neigung:', loadLbl: 'Belastung auf Ballen:',
+    successTitle: '✅ BALANCE OPTIMAL', successDesc: 'Physiologische Norm erreicht.',
+    warnTitle: '⚠️ HOHER SPRENGUNGSWINKEL',
+    warn1Desc: `Winkel über ${C.COMFORT_ANGLE}°. Bitte Plateau erhöhen oder Absatz reduzieren.`,
+    warn2Desc: 'Zu starker Rocker bei niedrigem Absatz.',
+    errTitle: '⚠️ KRITISCHE NEIGUNG',
+    errDesc: `Leistenwinkel > ${C.CRITICAL_ANGLE}°. Plateaudicke erhöhen oder Absatzhöhe verringern zwingend erforderlich.`,
+    padTitle: '⚠️ KRITISCHE BALLENBELASTUNG',
+    padDesc: 'Einbau einer retrokapitalen Pelotte (Spreizfußpelotte) in die Brandsohle zur Entlastung zwingend erforderlich.',
+    negDropTitle: '⚠️ NEGATIVE SPRENGUNG', negDropDesc: 'Plateau ist höher als der Absatz. Störung der Biomechanik.',
+    heelBackTitle: '⚠️ ABSATZ NACH HINTEN GENEIGT',
+    heelBackDesc: 'Fehler: Absatz steht zu weit nach hinten. Gefahr des Gelenkfederbruchs unter Belastung.',
+    heelFwdTitle: '⚠️ ABSATZ NACH VORNE VERLAGERT',
+    heelFwdDesc: `Absatzfleck ist mehr als ${C.MAX_HEEL_OFFSET_MM} mm nach vorne verschoben. Reduzierte Stabilität, Gefahr des Absatzbruchs.`,
+    invertTitle: '⚠️ INVERSIONSRISIKO',
+    invertDesc: 'Absatzfleck zu schmal bei hohem Absatz — hohes Risiko des Umknickens.',
+    heelLbl: 'FERSE', toeLbl: 'SPITZE',
+    stiletto: 'Stiletto', block: 'Block', kitten: 'Kitten', flared: 'Ausgestellt',
+    flat: 'Standard', rocker: 'Rocker',
+    specsBtn: '⚙️ Spezifikationen & Mathematik', dropLbl: 'Sprengung',
+    massTitle: 'Gewichtsverteilung',
+    forefoot: 'Vorfuß',
+    rearfoot: 'Ferse',
+    invertRisk: 'Inversionsrisiko',
+    entryAngle: 'Eintrittswinkel',
+    padPos: 'Pelotte Pos.',
+    padHeight: 'Pelottenhöhe',
+    apexM1: 'Apex M1',
+    apexM5: 'Apex M5',
+    carbonInsert: 'Carbon (Dicke)',
+    rockerForefoot: 'Metatarsalgie',
+    rockerHeelToToe: 'Arthrose',
+    rockerNegative: 'Diabet. Fuß',
+    specПерекат: 'Rolle',
+    specГеленок: 'Gelenk',
+    specСталь: 'Stahlfeder',
+    specСмещение: 'Versatz',
+    specНабойка: 'Fleck',
+  }
+  
+  if (lang === 'uk') return uk;
+  if (lang === 'de') return de;
+  return ru;
 }
 
 function getInfoTexts(lang: Lang): Record<InfoKey, string> {
@@ -703,7 +747,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
       invertRisk:
         'Імовірність підвертання щиколотки. Розраховується з ширини набійки, типу каблука і висоти. ≥55% — критично, потрібна ширша набійка.',
       entryAngle:
-        'Кут «вʼїзду» каблука (kitten/flared): atan2(перепад, половина ширини набійки). Показує, наскільки агресивно каблук «заходить» у опору.',
+        'Кут «вʼїзду» каблука (kitten/flared): atan2(перепад, половина ширины набійки). Показує, наскільки агресивно каблук «заходить» у опору.',
       padPos:
         'Позиція метатарзального пелота Зейца від пʼятки. Ставиться під головками плюсни (\~60% довжини колодки − 12 мм) для розвантаження нервів при критичному навантаженні.',
       padHeight:
@@ -714,6 +758,38 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
         'Апекс M5 — зовнішня точка (V палець). Зсунута проксимально відносно M1 на \~4.5% довжини колодки через діагональний скос суглобової лінії.',
       carbonInsert:
         'Мінімальна товщина карбонової вставки в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках — потрібна жорсткість.',
+    }
+  }
+  if (lang === 'de') {
+    return {
+      перекат:
+        'Ballenrolle (rocker start) — Prozentsatz der Leistenlänge, bei dem die Sohlenbiegung beginnt. Typischerweise 55–75%. Beeinflusst die Gelenklänge und die Entlastung des Vorfußes.',
+      геленок:
+        'Die Gelenkfeder (Shank) von der Fersenmitte bis zur Ballenlinie. Verhindert das Durchbiegen der Sohle unter Belastung und stabilisiert den Absatz.',
+      сталь:
+        'Empfohlene Dicke der Stahlfeder (Federstahl) basierend auf der effektiven Sprengung (net rise). Je höher Plateau/Absatz, desto dicker die Feder.',
+      lEff:
+        'Effektive Hebellänge (≈ 73% der Leistenlänge). In der Winkelformel: Angle = arcsin((H − T) / L_eff). Bestimmt die innere Neigung und die Vorfußbelastung.',
+      heelCenter:
+        'Bedingter Fersenauflagepunkt (\~15% der Leistenlänge von der Ferse entfernt). Von diesem Punkt aus wird die Gelenklänge bis zur Abrollzone gemessen.',
+      смещение:
+        'Versatz des Absatzflecks relativ zur Absatzachse. Zu weit hinten — Gefahr des Gelenkfederbruchs; zu weit vorne (>5 mm) — instabiler Stand.',
+      набойка:
+        'Breite der Kontaktfläche des Absatzes mit dem Boden (Absatzfleck). Ein schmaler Fleck bei hohen Absätzen erhöht das Inversionsrisiko (Umknicken) drastisch.',
+      invertRisk:
+        'Wahrscheinlichkeit des Umknickens des Sprunggelenks. Berechnet aus Fleckbreite, Absatztyp und -höhe. ≥55% — kritisch, breiterer Fleck erforderlich.',
+      entryAngle:
+        'Eintrittswinkel des Absatzes (Kitten/Flared): atan2(Sprengung, halbe Fleckbreite). Zeigt an, wie aggressiv der Absatz auf den Boden trifft.',
+      padPos:
+        'Position der Spreizfußpelotte (retrokapital) von der Ferse aus. Wird hinter den Metatarsalköpfchen (\~60% der Leistenlänge − 12 mm) platziert, um Nerven bei kritischer Belastung zu entlasten.',
+      padHeight:
+        'Pelottenhöhe (4–6 mm) ist abhängig von der Sprengung: je höher die Absatzsprengung, desto höher die Pelotte für adäquate Entlastung.',
+      apexM1:
+        'Apex M1 — innerer Punkt der Gelenklinie (1. Strahl / Großzehe). Schrägung 12–15°: apexM1 ≈ Rollenpunkt − 5 mm. Orientierungspunkt für Rocker und Pelotte.',
+      apexM5:
+        'Apex M5 — äußerer Punkt (5. Strahl / Kleinzehe). Proximal (nach hinten) verschoben relativ zu M1 um \~4.5% der Leistenlänge aufgrund des diagonalen Verlaufs der Gelenklinie.',
+      carbonInsert:
+        'Mindestdicke der Carbonfasereinlage im Ballenbereich. Eine Abrollsohle (Rocker) funktioniert nur, wenn sich die Sohle im Vorfuß nicht biegt — Versteifung ist zwingend erforderlich.',
     }
   }
   return {
@@ -746,4 +822,4 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
     carbonInsert:
       'Минимальная толщина карбоновой вставки в зоне плюсен. Рокер работает только если подошва не гнётся в пучках — нужна жёсткость.',
   }
- }
+}
