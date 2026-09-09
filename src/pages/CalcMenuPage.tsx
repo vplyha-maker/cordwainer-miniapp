@@ -70,6 +70,24 @@ export function CalcMenuPage({
       salarySub: 'Відрядна оплата',
       backMenu: 'Назад в меню',
     },
+    de: {
+      title: 'PRO Rechner',
+      sizeTitle: 'Größen',
+      sizeSub: 'UK, US, EU, UKR',
+      widthTitle: 'Weite',
+      widthSub: 'Umfangsberechnung',
+      heelTitle: 'Absatz (H)',
+      heelSub: 'Biomechanik & Winkel',
+      saveAddTitle: 'Zur Startseite',
+      saveAddSub: 'Hinzufügen',
+      saveRemoveTitle: 'In Favoriten',
+      saveRemoveSub: 'Gespeichert',
+      colorTitle: 'Farben',
+      colorSub: 'Farbmischung',
+      salaryTitle: 'Lohn',
+      salarySub: 'Akkordlohn',
+      backMenu: 'Zurück zum Menü',
+    },
   }[lang]
 
   const cardBase =
