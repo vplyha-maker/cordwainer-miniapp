@@ -21,15 +21,12 @@ type StyleSlide = {
 const getDeviceId = () => {
   if (typeof window === 'undefined') return 'unknown';
   
-  // 1. Пытаемся получить ID из Telegram
   const tg = (window as any).Telegram?.WebApp;
   const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
   if (tgUserId) return tgUserId; 
 
-  // 2. Если это обычный браузер - ищем сохраненный ID или создаем новый
   let deviceId = localStorage.getItem('cordwainer_device_id');
   if (!deviceId) {
-    // Генерируем случайный ID (например: web_x4k9m2p)
     deviceId = 'web_' + Math.random().toString(36).substring(2, 15);
     localStorage.setItem('cordwainer_device_id', deviceId);
   }
@@ -165,7 +162,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   const [likesCount, setLikesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Получаем уникальный ID пользователя (Telegram или сгенерированный для браузера)
   const userId = getDeviceId()
   const tg = (window as any).Telegram?.WebApp
 
@@ -297,18 +293,19 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         </h2>
       </motion.div>
 
+      {/* ОПУЩЕННЫЙ ВНИЗ БЛОК С ОПИСАНИЕМ И КНОПКАМИ */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: false, amount: 0.4 }}
         transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
-        className="absolute bottom-12 left-6 right-4 z-20 flex items-end justify-between"
+        className="absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between"
       >
-        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[75%] pb-2">
+        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[70%]">
           {slide.desc[currentLang]}
         </p>
         
-        <div className="flex flex-col gap-6 items-center shrink-0">
+        <div className="flex flex-col gap-5 items-center shrink-0">
           
           <motion.button 
             whileTap={{ scale: 0.8 }}
