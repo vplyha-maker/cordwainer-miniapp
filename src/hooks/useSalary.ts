@@ -8,16 +8,41 @@ import {
   getKyivDate,
   isDayRecorded,
 } from '../lib/salaryHelpers'
+import type { Lang } from '../App'
 
 type UseSalaryOptions = {
   userId: number | null | undefined
+  lang?: Lang
 }
 
-export function useSalary({ userId }: UseSalaryOptions) {
+const MESSAGES = {
+  ru: {
+    noRecords: 'В выбранном месяце нет записей для архивации.',
+    alreadyArchived: 'Этот месяц уже заархивирован.',
+    loadError: 'Ошибка загрузки',
+    saveError: 'Ошибка сохранения',
+  },
+  uk: {
+    noRecords: 'У вибраному місяці немає записів для архівації.',
+    alreadyArchived: 'Цей місяць вже заархівований.',
+    loadError: 'Помилка завантаження',
+    saveError: 'Помилка збереження',
+  },
+  de: {
+    noRecords: 'Der ausgewählte Monat enthält keine Einträge zur Archivierung.',
+    alreadyArchived: 'Dieser Monat ist bereits archiviert.',
+    loadError: 'Fehler beim Laden',
+    saveError: 'Fehler beim Speichern',
+  },
+}
+
+export function useSalary({ userId, lang = 'ru' }: UseSalaryOptions) {
   const [data, setData] = useState<SalaryUserData>(createEmptySalaryData())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const t = MESSAGES[lang] || MESSAGES.ru
 
   // ─── Загрузка ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -43,12 +68,12 @@ export function useSalary({ userId }: UseSalaryOptions) {
       })
     } catch (e: any) {
       console.error('useSalary load error', e)
-      setError(e.message || 'Ошибка загрузки')
+      setError(e.message || t.loadError)
       setData(createEmptySalaryData())
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [userId, t.loadError])
 
   useEffect(() => {
     load()
@@ -74,12 +99,12 @@ export function useSalary({ userId }: UseSalaryOptions) {
       setData({ ...next, updatedAt: result.updatedAt || next.updatedAt })
     } catch (e: any) {
       console.error('useSalary save error', e)
-      setError(e.message || 'Ошибка сохранения')
+      setError(e.message || t.saveError)
       throw e
     } finally {
       setSaving(false)
     }
-  }, [userId])
+  }, [userId, t.saveError])
 
   // ─── Удобные действия ──────────────────────────────────────────────────
 
@@ -194,12 +219,12 @@ export function useSalary({ userId }: UseSalaryOptions) {
     )
 
     if (Object.keys(monthDays).length === 0) {
-      alert('В выбранном месяце нет записей для архивации.');
+      alert(t.noRecords);
       return;
     }
 
     if (data.archive[targetMonth]) {
-      alert('Этот месяц уже заархивирован.');
+      alert(t.alreadyArchived);
       return;
     }
 
@@ -226,7 +251,7 @@ export function useSalary({ userId }: UseSalaryOptions) {
 
     await save(next)
     return targetMonth
-  }, [data, save])
+  }, [data, save, t])
 
   /** Удалить месяц из архива */
   const deleteArchiveMonth = useCallback(async (month: string) => {
