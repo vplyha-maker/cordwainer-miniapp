@@ -32,8 +32,8 @@ export function formatDay(dayStr: string): string {
   return `${d}.${m}.${y}`
 }
 
-/** 2025-03 → Март 2025 / Березень 2025 */
-export function formatMonth(monthStr: string, lang: 'ru' | 'uk'): string {
+/** 2025-03 → Март 2025 / Березень 2025 / März 2025 */
+export function formatMonth(monthStr: string, lang: 'ru' | 'uk' | 'de'): string {
   const monthsRu: Record<string, string> = {
     '01': 'Январь', '02': 'Февраль', '03': 'Март', '04': 'Апрель',
     '05': 'Май', '06': 'Июнь', '07': 'Июль', '08': 'Август',
@@ -44,9 +44,19 @@ export function formatMonth(monthStr: string, lang: 'ru' | 'uk'): string {
     '05': 'Травень', '06': 'Червень', '07': 'Липень', '08': 'Серпень',
     '09': 'Вересень', '10': 'Жовтень', '11': 'Листопад', '12': 'Грудень',
   }
+  const monthsDe: Record<string, string> = {
+    '01': 'Januar', '02': 'Februar', '03': 'März', '04': 'April',
+    '05': 'Mai', '06': 'Juni', '07': 'Juli', '08': 'August',
+    '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Dezember',
+  }
 
   const [year, month] = monthStr.split('-')
-  const name = lang === 'uk' ? (monthsUk[month] || month) : (monthsRu[month] || month)
+  
+  let name = month
+  if (lang === 'uk') name = monthsUk[month] || month
+  else if (lang === 'de') name = monthsDe[month] || month
+  else name = monthsRu[month] || month
+
   return `${name} ${year}`
 }
 
