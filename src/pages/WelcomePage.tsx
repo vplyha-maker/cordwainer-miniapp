@@ -89,9 +89,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       materialsSub: 'Leder · Wildleder\nSohlen',
       colors: 'Farben',
       colorsSub: 'Farbgebung\nPatina',
-      styles: 'Leisten\n& Silhouetten', // Leisten — профессиональный термин для обувных колодок/фасонов
+      styles: 'Leisten\n& Silhouetten',
       stylesSub: 'Klassik\nStreetwear',
-      start: 'Wissen entdecken', // Адаптировано под люкс, "Начать обучение" по-немецки слишком сухо
+      start: 'Wissen entdecken',
       favorites: 'Favoriten',
       seeAll: 'Alle ansehen',
       addToHomeShort: 'Installieren',
@@ -202,9 +202,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         />
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
           <div className="flex items-start justify-between">
-            <div className="flex-1 pr-2">
+            <div className="flex-1 min-w-0 pr-2">
               <h1
-                className="font-display text-[2.5rem] leading-[0.9]"
+                className="font-display text-[2rem] sm:text-[2.5rem] leading-[0.9] truncate"
                 style={{
                   color: 'var(--color-ink, #F5F1EA)',
                   textShadow: '0 2px 20px color-mix(in srgb, var(--color-bg, #1C1816) 60%, transparent)',
@@ -220,12 +220,13 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
               </p>
             </div>
 
-            <div className="flex flex-col items-end gap-2 shrink-0">
+            <div className="flex flex-col items-end gap-1.5 shrink-0 ml-1 z-50">
               <div
-                className="flex rounded-full p-1"
+                className="flex rounded-full p-0.5"
                 style={{
                   background: 'color-mix(in srgb, var(--color-surface, #25201C) 80%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
+                  backdropFilter: 'blur(4px)'
                 }}
                 role="group"
                 aria-label="Language selection"
@@ -234,8 +235,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                   <button
                     key={l}
                     onClick={() => handleLangChange(l as Lang)}
-                    className={`lang-toggle px-2 py-1 text-[10px] sm:text-[11px] uppercase rounded-full transition-colors ${
-                      lang === l ? 'active bg-white/10 text-white' : 'inactive text-white/50'
+                    className={`px-2.5 py-1 text-[9px] sm:text-[10px] font-medium tracking-wide uppercase rounded-full transition-colors ${
+                      lang === l ? 'bg-white/15 text-white' : 'text-white/50'
                     }`}
                     aria-pressed={lang === l}
                     role="button"
@@ -247,15 +248,22 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
               <button
                 onClick={handleAddToHome}
-                className="action-pill w-full flex items-center justify-center gap-1.5"
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full active:scale-95 transition-transform cursor-pointer"
+                style={{
+                  background: 'color-mix(in srgb, var(--color-surface, #25201C) 80%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)',
+                  backdropFilter: 'blur(4px)'
+                }}
                 aria-label={t.addToHomeShort}
                 role="button"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #D8A35C)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="5" y="2" width="14" height="20" rx="2" />
                   <path d="M12 18h.01" />
                 </svg>
-                <span className={lang === 'de' ? 'text-[9.5px]' : ''}>{t.addToHomeShort}</span>
+                <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+                  {t.addToHomeShort}
+                </span>
               </button>
             </div>
           </div>
