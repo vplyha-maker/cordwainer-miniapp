@@ -12,6 +12,7 @@ type GlossaryPageProps = {
   onBack?: () => void
   lang: Lang
   setLang?: (lang: Lang) => void
+  initialTermId?: string | null // Принимаем ID искомого термина
 }
 
 const CATEGORY_LABELS: Record<
@@ -27,7 +28,7 @@ const CATEGORY_LABELS: Record<
   other: { ru: 'Прочее', uk: 'Інше', de: 'Sonstiges' },
 }
 
-export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
+export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps) {
   const [query, setQuery] = useState('')
   const [activeLetter, setActiveLetter] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
@@ -77,6 +78,20 @@ export function GlossaryPage({ onBack, lang }: GlossaryPageProps) {
     if (currentLang === 'uk' && item.termUk) return item.termUk
     return item.term
   }
+
+  // === АВТО-ФИЛЬТРАЦИЯ ПО ID ТЕРМИНА ===
+  useEffect(() => {
+    if (initialTermId) {
+      const term = GLOSSARY_TERMS.find((t) => t.id === initialTermId)
+      if (term) {
+        // Устанавливаем в поисковую строку название нужного термина, 
+        // чтобы на экране осталась только его карточка
+        setQuery(getLocalizedTitle(term, lang))
+        setActiveLetter(null)
+        setActiveCategory(null)
+      }
+    }
+  }, [initialTermId, lang])
 
   const filtered = useMemo(() => {
     let list = searchTerms(query, lang)
