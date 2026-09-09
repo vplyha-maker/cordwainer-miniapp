@@ -17,6 +17,25 @@ type StyleSlide = {
   hideWatermark?: boolean 
 }
 
+// УМНАЯ ГЕНЕРАЦИЯ ID ДЛЯ ПОЛЬЗОВАТЕЛЕЙ
+const getDeviceId = () => {
+  if (typeof window === 'undefined') return 'unknown';
+  
+  // 1. Пытаемся получить ID из Telegram
+  const tg = (window as any).Telegram?.WebApp;
+  const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
+  if (tgUserId) return tgUserId; 
+
+  // 2. Если это обычный браузер - ищем сохраненный ID или создаем новый
+  let deviceId = localStorage.getItem('cordwainer_device_id');
+  if (!deviceId) {
+    // Генерируем случайный ID (например: web_x4k9m2p)
+    deviceId = 'web_' + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('cordwainer_device_id', deviceId);
+  }
+  return deviceId;
+}
+
 const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
@@ -135,11 +154,10 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   const [likesCount, setLikesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Идентификация пользователя (Telegram ID или браузерный фолбэк)
+  // Получаем уникальный ID пользователя (Telegram или сгенерированный для браузера)
+  const userId = getDeviceId()
   const tg = (window as any).Telegram?.WebApp
-  const userId = tg?.initDataUnsafe?.user?.id?.toString() || 'browser_test_user'
 
-  // 1. ПОЛУЧАЕМ ДАННЫЕ ИЗ БАЗЫ
   useEffect(() => {
     const fetchLikes = async () => {
       try {
@@ -161,9 +179,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
     }
   }, [slide.id, userId, shouldLoad])
 
-  // 2. СТАВИМ ЛАЙК В БАЗУ
   const handleLike = async () => {
-    // Оптимистичный UI: переключаем визуал ДО ответа сервера
     const newIsLiked = !isLiked
     setIsLiked(newIsLiked)
     setLikesCount(prev => newIsLiked ? prev + 1 : prev - 1)
@@ -185,7 +201,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
     }
   }
 
-  // 3. ФУНКЦИЯ SHARE
   const handleShare = async () => {
     const shareText = currentLang === 'ru' 
       ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии Cordwainer!`
@@ -209,7 +224,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
     }
   }
 
-  // Intersection Observers для загрузки и автоплея
   useEffect(() => {
     if (!containerRef.current) return
     const loadObserver = new IntersectionObserver(
@@ -283,10 +297,8 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
           {slide.desc[currentLang]}
         </p>
         
-        {/* КОЛОНКА КНОПОК */}
         <div className="flex flex-col gap-6 items-center shrink-0">
           
-          {/* Кнопка ЛАЙК */}
           <motion.button 
             whileTap={{ scale: 0.8 }}
             onClick={handleLike}
@@ -310,7 +322,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
             )}
           </motion.button>
 
-          {/* Кнопка SHARE */}
           <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all duration-300 gap-1">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
