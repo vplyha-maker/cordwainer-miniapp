@@ -48,9 +48,10 @@ export type Screen =
   | 'seo-width'
   | 'glossary'
   | 'prices'
-  | 'styles' // <--- ДОБАВЛЕН НОВЫЙ ЭКРАН
+  | 'styles'
 
-export type Lang = 'ru' | 'uk'
+// Добавляем немецкий язык 'de'
+export type Lang = 'ru' | 'uk' | 'de'
 
 export type FavoriteType = 'blog' | 'article'
 
@@ -138,8 +139,17 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [lang, setLang] = useState<Lang>(() => {
     try {
-      const saved = localStorage.getItem('cordwainer_lang')
-      return saved === 'uk' ? 'uk' : 'ru'
+      const saved = localStorage.getItem('cordwainer_lang') as Lang
+      if (saved && ['ru', 'uk', 'de'].includes(saved)) {
+        return saved
+      }
+      
+      // Автоопределение, если нет сохраненного (синхронно с WelcomePage)
+      const sysLang = navigator.language.slice(0, 2)
+      if (['ru', 'uk', 'de'].includes(sysLang)) {
+        return sysLang as Lang
+      }
+      return 'ru'
     } catch {
       return 'ru'
     }
@@ -175,7 +185,9 @@ export default function App() {
   const handleSetLang = (next: Lang) => {
     setLang(next)
     try {
+      // Обновляем оба ключа, если где-то используется app_lang (из WelcomePage)
       localStorage.setItem('cordwainer_lang', next)
+      localStorage.setItem('app_lang', next)
     } catch {}
   }
 
@@ -292,7 +304,9 @@ export default function App() {
           }}
         >
           <div className="mb-2 leading-snug text-[#B9ACA0]">
-            {lang === 'uk'
+            {lang === 'de'
+              ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert — Effekte sind vereinfacht.'
+              : lang === 'uk'
               ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим — ефекти спрощено.'
               : 'Интерфейс работает неравномерно. Включён быстрый режим — эффекты упрощены.'}
           </div>
@@ -317,7 +331,11 @@ export default function App() {
                 setShowPerfHint(false)
               }}
             >
-              {lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
+              {lang === 'de' 
+                ? 'Hohe Qualität beibehalten' 
+                : lang === 'uk' 
+                ? 'Залишити красивий' 
+                : 'Оставить красивый'}
             </button>
           </div>
         </div>
@@ -342,7 +360,7 @@ export default function App() {
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
-            onOpenStyles={() => setScreen('styles')} // <--- ДОБАВЛЕН ПРОП
+            onOpenStyles={() => setScreen('styles')}
             onOpenGlossary={() => setScreen('glossary')}
             onOpenPrices={() => setScreen('prices')}
             lang={lang}
@@ -456,7 +474,6 @@ export default function App() {
           />
         )}
 
-        {/* НОВЫЙ ЭКРАН "ФАСОНЫ И СИЛУЭТЫ" */}
         {screen === 'styles' && (
           <StylesPage
             key="styles"
