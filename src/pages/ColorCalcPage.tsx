@@ -186,12 +186,150 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const reqIdRef = useRef(0)
   const isIOSRef = useRef(detectIOS())
 
-  const isUk = lang === 'uk'
   const isIOS = isIOSRef.current
   const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
   const squareColor = displayHex || '#2A2522'
 
-  const pigmentName = (p: Pigment) => (isUk ? p.name.uk : p.name.ru)
+  const t = {
+    ru: {
+      title: 'Калькулятор цвета',
+      mixTab: 'Смесь',
+      mixComposition: 'Состав смеси',
+      clear: 'Очистить',
+      loading: 'Загрузка…',
+      loadError: 'Ошибка загрузки пигментов',
+      retry: 'Повторить',
+      addPigment: '+ Добавить пигмент',
+      autoAdjust: '✨ Автоподбор',
+      adjusting: 'Подбор...',
+      result: 'Результат',
+      wet: '💧 На палитре (мокрая)',
+      dry: '💨 На холсте (сухая)',
+      reset: 'Сбросить',
+      target: 'Цель',
+      mix: 'Смесь',
+      deviation: 'Отклонение',
+      cieStandard: 'Стандарт CIE ΔE₂₀₀₀',
+      ciePerfect: 'Визуально неотличимо (идеальное совпадение)',
+      cieAcceptable: 'Коммерчески приемлемо (допустимое отклонение)',
+      cieBad: 'Заметное расхождение (требует корректировки)',
+      copy: 'Копировать',
+      totalVolume: 'Общий объём',
+      targetColor: 'Целевой цвет',
+      uploadPhoto: 'Загрузить фото',
+      camera: 'Камера',
+      photo: 'Фото',
+      pickColor: 'Снять цвет',
+      maxPigments: 'пигмента',
+      acrylic: 'Акрил',
+      aniline: 'Анилин',
+      inventory: 'Инвентарь',
+      default: 'По умолч.',
+      all: 'Все',
+      picking: 'Подбор…',
+      pickRecipe: 'Подобрать рецепт',
+      recipeError: 'Не удалось подобрать рецепт',
+      cameraNotReady: 'Камера ещё не готова, подождите секунду',
+      recipe: 'Рецепт',
+      inexactMatch: ' — неточное совпадение',
+      binder: 'Связующее',
+      moveToMix: 'Перенести в смесь'
+    },
+    uk: {
+      title: 'Калькулятор кольору',
+      mixTab: 'Суміш',
+      mixComposition: 'Склад суміші',
+      clear: 'Очистити',
+      loading: 'Завантаження…',
+      loadError: 'Помилка завантаження пігментів',
+      retry: 'Спробувати знову',
+      addPigment: '+ Додати пігмент',
+      autoAdjust: '✨ Автопідбір',
+      adjusting: 'Підбір...',
+      result: 'Результат',
+      wet: '💧 На палітрі (мокра)',
+      dry: '💨 На полотні (суха)',
+      reset: 'Скинути',
+      target: 'Ціль',
+      mix: 'Суміш',
+      deviation: 'Відхилення',
+      cieStandard: 'Стандарт CIE ΔE₂₀₀₀',
+      ciePerfect: 'Візуально невідрізнимо (ідеальний збіг)',
+      cieAcceptable: 'Комерційно прийнятно (допустиме відхилення)',
+      cieBad: 'Помітна розбіжність (потребує коригування)',
+      copy: 'Копіювати',
+      totalVolume: 'Загальний об’єм',
+      targetColor: 'Цільовий колір',
+      uploadPhoto: 'Завантажити фото',
+      camera: 'Камера',
+      photo: 'Фото',
+      pickColor: 'Зняти колір',
+      maxPigments: 'пігменти',
+      acrylic: 'Акрил',
+      aniline: 'Анілін',
+      inventory: 'Інвентар',
+      default: 'За замовч.',
+      all: 'Усі',
+      picking: 'Підбір…',
+      pickRecipe: 'Підібрати рецепт',
+      recipeError: 'Не вдалося підібрати рецепт',
+      cameraNotReady: 'Камера ще не готова, зачекайте секунду',
+      recipe: 'Рецепт',
+      inexactMatch: ' — неточне співпадіння',
+      binder: 'Зв’язуюче',
+      moveToMix: 'Перенести в суміш'
+    },
+    de: {
+      title: 'Farbkalkulator',
+      mixTab: 'Mischung',
+      mixComposition: 'Mischungszusammensetzung',
+      clear: 'Leeren',
+      loading: 'Laden…',
+      loadError: 'Fehler beim Laden der Pigmente',
+      retry: 'Wiederholen',
+      addPigment: '+ Pigment hinzufügen',
+      autoAdjust: '✨ Auto-Anpassung',
+      adjusting: 'Anpassen...',
+      result: 'Ergebnis',
+      wet: '💧 Auf Palette (nass)',
+      dry: '💨 Auf Leinwand (trocken)',
+      reset: 'Zurücksetzen',
+      target: 'Ziel',
+      mix: 'Mischung',
+      deviation: 'Abweichung',
+      cieStandard: 'CIE ΔE₂₀₀₀ Standard',
+      ciePerfect: 'Optisch nicht unterscheidbar (perfekte Übereinstimmung)',
+      cieAcceptable: 'Kommerziell akzeptabel (zulässige Abweichung)',
+      cieBad: 'Spürbare Diskrepanz (Korrektur erforderlich)',
+      copy: 'Kopieren',
+      totalVolume: 'Gesamtvolumen',
+      targetColor: 'Zielfarbe',
+      uploadPhoto: 'Foto hochladen',
+      camera: 'Kamera',
+      photo: 'Foto',
+      pickColor: 'Farbe aufnehmen',
+      maxPigments: 'Pigmente',
+      acrylic: 'Acryl',
+      aniline: 'Anilin',
+      inventory: 'Inventar',
+      default: 'Standard',
+      all: 'Alle',
+      picking: 'Suchen…',
+      pickRecipe: 'Rezept finden',
+      recipeError: 'Rezept konnte nicht gefunden werden',
+      cameraNotReady: 'Kamera ist noch nicht bereit, bitte warten',
+      recipe: 'Rezept',
+      inexactMatch: ' — ungenaue Übereinstimmung',
+      binder: 'Bindemittel',
+      moveToMix: 'In Mischung übernehmen'
+    }
+  }[lang]
+
+  const pigmentName = (p: Pigment) => {
+    if (lang === 'uk') return p.name.uk;
+    if (lang === 'de') return (p.name as any).de || p.name.ru;
+    return p.name.ru;
+  }
 
   const resetInventoryDefaults = useCallback(() => {
     const available = new Set(pigments.map((p) => p.id))
@@ -369,7 +507,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const captureFromCamera = () => {
     const video = videoRef.current
     if (!video || !video.videoWidth) {
-      setRecipeError(isUk ? 'Камера ще не готова, зачекайте секунду' : 'Камера ещё не готова, подождите секунду')
+      setRecipeError(t.cameraNotReady)
       return
     }
     sampleFromSource(video)
@@ -395,7 +533,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }
       const result = e.data.result as RecipeResult | null
       setRecipeResult(result)
-      if (!result) setRecipeError(isUk ? 'Не вдалося підібрати рецепт' : 'Не удалось подобрать рецепт')
+      if (!result) setRecipeError(t.recipeError)
     }
 
     worker.addEventListener('message', onMsg)
@@ -574,12 +712,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
         <h1 className="flex-1 text-[17px] font-semibold tracking-tight calc-page-title" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-          {isUk ? 'Калькулятор кольору' : 'Калькулятор цвета'}
+          {t.title}
         </h1>
       </header>
 
       <div className="flex gap-2 mb-4">
-        {tabBtn('mix', isUk ? 'Суміш' : 'Смесь')}
+        {tabBtn('mix', t.mixTab)}
         {tabBtn('pro', 'Pro')}
       </div>
 
@@ -589,23 +727,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <section className="rounded-2xl overflow-visible relative z-10" style={{ background: 'var(--color-surface, #25201C)' }}>
               <div className="px-4 md:px-5 pt-4 pb-3 flex items-center justify-between">
                 <h2 className="text-[13px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
-                  {isUk ? 'Склад суміші' : 'Состав смеси'}
+                  {t.mixComposition}
                 </h2>
                 {totalAmount > 0 && (
                   <button onClick={clearAllAmounts} className="text-[12px] font-medium px-2 py-1 -mr-1 rounded-lg" style={{ color: 'var(--color-danger, #f87171)' }}>
-                    {isUk ? 'Очистити' : 'Очистить'}
+                    {t.clear}
                   </button>
                 )}
               </div>
 
               <div className="px-4 md:px-5 pb-4">
                 {loading ? (
-                  <div className="py-8 text-center text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>{isUk ? 'Завантаження…' : 'Загрузка…'}</div>
+                  <div className="py-8 text-center text-[13px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 40%, transparent)' }}>{t.loading}</div>
                 ) : loadError ? (
                   <div className="py-6 flex flex-col items-center gap-3">
-                    <p className="text-[13px] text-center" style={{ color: 'var(--color-danger, #f87171)' }}>{isUk ? 'Помилка завантаження пігментів' : 'Ошибка загрузки пигментов'}</p>
+                    <p className="text-[13px] text-center" style={{ color: 'var(--color-danger, #f87171)' }}>{t.loadError}</p>
                     <button onClick={loadPigments} className="px-4 py-2 rounded-xl text-[13px] font-semibold" style={{ background: 'var(--color-accent, #D8A35C)', color: 'var(--color-bg, #1C1816)' }}>
-                      {isUk ? 'Спробувати знову' : 'Повторить'}
+                      {t.retry}
                     </button>
                   </div>
                 ) : (
@@ -691,7 +829,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 
                 <div className="flex gap-2 mt-4">
                   <button onClick={addPaint} disabled={loading || loadError} className="flex-1 py-3 rounded-xl text-[14px] font-medium disabled:opacity-40" style={{ border: '1px dashed color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>
-                    {isUk ? '+ Додати пігмент' : '+ Добавить пигмент'}
+                    {t.addPigment}
                   </button>
                   
                   {activeTarget && paints.filter(p => p.pigmentId !== 'acrylic_binder').length > 0 && (
@@ -705,7 +843,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 40%, transparent)' 
                       }}
                     >
-                      {isAutoAdjusting ? (isUk ? 'Підбір...' : 'Подбор...') : (isUk ? '✨ Автопідбір' : '✨ Автоподбор')}
+                      {isAutoAdjusting ? t.adjusting : t.autoAdjust}
                     </button>
                   )}
                 </div>
@@ -717,7 +855,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-[13px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
-                  {isUk ? 'Результат' : 'Результат'}
+                  {t.result}
                 </h2>
                 
                 <div className="flex items-center gap-2">
@@ -730,14 +868,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                        background: isWet ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 6%, transparent)'
                     }}
                   >
-                    {isWet 
-                      ? '💧 ' + (isUk ? 'На палітрі (мокра)' : 'На палитре (мокрая)') 
-                      : '💨 ' + (isUk ? 'На полотні (суха)' : 'На холсте (сухая)')}
+                    {isWet ? t.wet : t.dry}
                   </button>
 
                   {activeTarget && (
                     <button onClick={() => setActiveTarget(null)} className="text-[11px] font-medium text-red-400 ml-1">
-                      {isUk ? 'Скинути' : 'Сбросить'}
+                      {t.reset}
                     </button>
                   )}
                 </div>
@@ -750,18 +886,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     <div className="flex w-full justify-center gap-4">
                       <div className="flex flex-col items-center">
                         <div className="w-20 h-20 rounded-2xl shadow-lg mb-2" style={{ backgroundColor: activeTarget, border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }} />
-                        <span className="text-[11px] font-semibold uppercase">{isUk ? 'Ціль' : 'Цель'}</span>
+                        <span className="text-[11px] font-semibold uppercase">{t.target}</span>
                       </div>
                       
                       <div className="flex flex-col items-center">
                         <div className="w-20 h-20 rounded-2xl shadow-lg mb-2" style={{ backgroundColor: squareColor, border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }} />
-                        <span className="text-[11px] font-semibold uppercase">{isUk ? 'Суміш' : 'Смесь'}</span>
+                        <span className="text-[11px] font-semibold uppercase">{t.mix}</span>
                       </div>
                     </div>
 
                     {liveDeltaE !== null && (
                       <div className="px-4 py-2 rounded-xl text-center transition-colors flex flex-col items-center" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}>
-                        <span className="text-[12px] opacity-70 block mb-0.5">{isUk ? 'Відхилення' : 'Отклонение'}</span>
+                        <span className="text-[12px] opacity-70 block mb-0.5">{t.deviation}</span>
                         <span className="text-[18px] font-bold" style={{ color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171' }}>
                           ΔE = {liveDeltaE.toFixed(1)}
                         </span>
@@ -771,25 +907,25 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     {liveDeltaE !== null && (
                       <div className="w-full mt-1 p-3 rounded-xl border" style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)', background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)' }}>
                         <p className="text-[10px] font-semibold mb-2 opacity-60 uppercase tracking-wider text-center">
-                          {isUk ? 'Стандарт CIE ΔE₂₀₀₀' : 'Стандарт CIE ΔE₂₀₀₀'}
+                          {t.cieStandard}
                         </p>
                         <div className="flex flex-col gap-1.5 text-[11px]">
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#4ade80]" />
                             <span style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>
-                              <strong>ΔE ≤ 2.0:</strong> {isUk ? 'Візуально невідрізнимо (ідеальний збіг)' : 'Визуально неотличимо (идеальное совпадение)'}
+                              <strong>ΔE ≤ 2.0:</strong> {t.ciePerfect}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#facc15]" />
                             <span style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>
-                              <strong>ΔE 2.0 – 5.0:</strong> {isUk ? 'Комерційно прийнятно (допустиме відхилення)' : 'Коммерчески приемлемо (допустимое отклонение)'}
+                              <strong>ΔE 2.0 – 5.0:</strong> {t.cieAcceptable}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full flex-shrink-0 bg-[#f87171]" />
                             <span style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>
-                              <strong>ΔE &gt; 5.0:</strong> {isUk ? 'Помітна розбіжність (потребує коригування)' : 'Заметное расхождение (требует корректировки)'}
+                              <strong>ΔE &gt; 5.0:</strong> {t.cieBad}
                             </span>
                           </div>
                         </div>
@@ -805,7 +941,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     {displayHex || '#------'}
                   </div>
                   <button onClick={copyHex} disabled={!displayHex} className="flex-shrink-0 h-12 px-4 rounded-xl text-[13px] font-semibold disabled:opacity-35" style={{ background: 'var(--color-accent, #D8A35C)', color: 'var(--color-bg, #1C1816)' }}>
-                    {copied ? 'OK' : isUk ? 'Копіювати' : 'Копировать'}
+                    {copied ? 'OK' : t.copy}
                   </button>
                 </div>
               </div>
@@ -813,7 +949,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             
             <section className="rounded-2xl px-4 md:px-5 py-3.5" style={{ background: 'var(--color-surface, #25201C)' }}>
               <div className="flex items-center justify-between">
-                <span className="text-[14px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Загальний об’єм' : 'Общий объём'}</span>
+                <span className="text-[14px] font-medium" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{t.totalVolume}</span>
                 <span className="text-[17px] font-semibold tabular-nums" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
                   {totalAmount > 1000 ? (totalAmount / 1000).toFixed(2) + ' л' : totalAmount.toFixed(1) + ' мл'}
                 </span>
@@ -825,7 +961,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         {tab === 'pro' && (
           <>
             <section className="rounded-2xl px-4 md:px-5 pt-4 pb-5" style={{ background: 'var(--color-surface, #25201C)' }}>
-              <h2 className="text-[13px] font-semibold mb-3" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>{isUk ? 'Цільовий колір' : 'Целевой цвет'}</h2>
+              <h2 className="text-[13px] font-semibold mb-3" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>{t.targetColor}</h2>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-16 h-16 rounded-xl flex-shrink-0 shadow-inner" style={{ backgroundColor: targetHex, border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)' }} />
                 <div className="flex-1 min-w-0">
@@ -838,15 +974,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
               <div className="flex gap-2 mb-3">
                 {isIOS ? (
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{isUk ? 'Завантажити фото' : 'Загрузить фото'}</button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{t.uploadPhoto}</button>
                 ) : !cameraActive ? (
                   <>
-                    <button type="button" onClick={startCamera} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{isUk ? 'Камера' : 'Камера'}</button>
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{isUk ? 'Фото' : 'Фото'}</button>
+                    <button type="button" onClick={startCamera} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{t.camera}</button>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 20%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{t.photo}</button>
                   </>
                 ) : (
                   <>
-                    <button type="button" onClick={captureFromCamera} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'var(--color-accent, #D8A35C)', color: 'var(--color-bg, #1C1816)' }}>{isUk ? 'Зняти колір' : 'Снять цвет'}</button>
+                    <button type="button" onClick={captureFromCamera} className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold" style={{ background: 'var(--color-accent, #D8A35C)', color: 'var(--color-bg, #1C1816)' }}>{t.pickColor}</button>
                     <button type="button" onClick={stopCamera} className="px-3 py-2.5 rounded-xl text-[13px] font-medium" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)', color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>✕</button>
                   </>
                 )}
@@ -863,22 +999,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
             <section className="rounded-2xl px-4 md:px-5 py-4" style={{ background: 'var(--color-surface, #25201C)' }}>
               <div className="flex gap-2 mb-3">
-                 <button onClick={() => setMaxComponents(3)} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: maxComponents === 3 ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: maxComponents === 3 ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>≤ 3 {isUk ? 'пігменти' : 'пигмента'}</button>
+                 <button onClick={() => setMaxComponents(3)} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: maxComponents === 3 ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: maxComponents === 3 ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>≤ 3 {t.maxPigments}</button>
                  <button onClick={() => setMaxComponents(4)} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: maxComponents === 4 ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: maxComponents === 4 ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>≤ 4</button>
               </div>
               <div className="flex gap-2">
-                 <button onClick={() => handleSystemChange('acrylic')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'acrylic' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'acrylic' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Акрил' : 'Акрил'}</button>
-                 <button onClick={() => handleSystemChange('aniline')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'aniline' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'aniline' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{isUk ? 'Анілін' : 'Анилин'}</button>
+                 <button onClick={() => handleSystemChange('acrylic')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'acrylic' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'acrylic' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{t.acrylic}</button>
+                 <button onClick={() => handleSystemChange('aniline')} className="flex-1 py-2 rounded-lg text-[12px] font-semibold" style={{ background: system === 'aniline' ? 'var(--color-accent, #D8A35C)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)', color: system === 'aniline' ? 'var(--color-bg, #1C1816)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 70%, transparent)' }}>{t.aniline}</button>
               </div>
             </section>
 
             <section className="rounded-2xl px-4 md:px-5 py-4" style={{ background: 'var(--color-surface, #25201C)' }}>
                <div className="flex items-center justify-between mb-2 gap-2">
-                <h2 className="text-[13px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>{isUk ? `Інвентар (${inventoryIds.length})` : `Инвентарь (${inventoryIds.length})`}</h2>
+                <h2 className="text-[13px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>{t.inventory} ({inventoryIds.length})</h2>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={resetInventoryDefaults} className="text-[11px] font-semibold px-2 py-1 rounded-lg" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>По умолч.</button>
-                  <button onClick={selectAllInventory} className="text-[11px] font-medium px-2 py-1 rounded-lg" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 55%, transparent)' }}>Все</button>
-                  <button onClick={clearInventory} className="text-[11px] font-medium px-2 py-1 rounded-lg" style={{ color: 'var(--color-danger, #f87171)' }}>Сбросить</button>
+                  <button onClick={resetInventoryDefaults} className="text-[11px] font-semibold px-2 py-1 rounded-lg" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 22%, transparent)', color: 'var(--color-accent, #D8A35C)' }}>{t.default}</button>
+                  <button onClick={selectAllInventory} className="text-[11px] font-medium px-2 py-1 rounded-lg" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 55%, transparent)' }}>{t.all}</button>
+                  <button onClick={clearInventory} className="text-[11px] font-medium px-2 py-1 rounded-lg" style={{ color: 'var(--color-danger, #f87171)' }}>{t.reset}</button>
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
@@ -894,32 +1030,32 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             </section>
 
             <button onClick={runRecipeSearch} disabled={recipeLoading || loading || !targetHex || targetHex.length < 7 || inventoryIds.length === 0} className="w-full py-3.5 rounded-xl text-[15px] font-semibold disabled:opacity-40" style={{ background: 'var(--color-accent, #D8A35C)', color: 'var(--color-bg, #1C1816)' }}>
-              {recipeLoading ? (isUk ? 'Підбір…' : 'Подбор…') : (isUk ? 'Підібрати рецепт' : 'Подобрать рецепт')}
+              {recipeLoading ? t.picking : t.pickRecipe}
             </button>
             {recipeError && <p className="text-[13px] text-center mt-2" style={{ color: 'var(--color-danger, #f87171)' }}>{recipeError}</p>}
 
             {recipeResult && (
               <section className="rounded-2xl px-4 md:px-5 pt-4 pb-5 mt-4" style={{ background: 'var(--color-surface, #25201C)' }}>
-                <h2 className="text-[13px] font-semibold mb-3" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>{isUk ? 'Рецепт' : 'Рецепт'}</h2>
+                <h2 className="text-[13px] font-semibold mb-3" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>{t.recipe}</h2>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-14 h-14 rounded-xl flex-shrink-0" style={{ backgroundColor: recipeResult.resultHex || '#333', border: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)' }} />
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-[15px] tracking-wider">{(recipeResult.resultHex || '').toUpperCase()}</p>
                     <p className="text-[12px] mt-0.5" style={{ color: recipeResult.deltaE > 2 || recipeResult.approximate ? 'var(--color-danger, #f87171)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 50%, transparent)' }}>
-                      ΔE₀₀ ≈ {recipeResult.deltaE.toFixed(1)} {(recipeResult.deltaE > 2 || recipeResult.approximate) && (isUk ? ' — неточне співпадіння' : ' — неточное совпадение')}
+                      ΔE₀₀ ≈ {recipeResult.deltaE.toFixed(1)} {(recipeResult.deltaE > 2 || recipeResult.approximate) && t.inexactMatch}
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 mb-4">
                   {recipeResult.recipe.map((item, i) => (
                     <div key={i} className="flex items-center justify-between py-2 px-3 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 5%, transparent)' }}>
-                      <span className="text-[13px] font-medium truncate pr-2">{item.isBinder ? (isUk ? 'Зв’язуюче' : 'Связующее') : pigmentName(item.pigment)}</span>
+                      <span className="text-[13px] font-medium truncate pr-2">{item.isBinder ? t.binder : pigmentName(item.pigment)}</span>
                       <span className="text-[14px] font-semibold tabular-nums flex-shrink-0">{item.ml.toFixed(1)} мл</span>
                     </div>
                   ))}
                 </div>
                 <button onClick={sendRecipeToMix} className="w-full py-3 rounded-xl text-[14px] font-semibold" style={{ background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 25%, transparent)', color: 'var(--color-accent, #D8A35C)', border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 45%, transparent)' }}>
-                  {isUk ? 'Перенести в суміш' : 'Перенести в смесь'}
+                  {t.moveToMix}
                 </button>
               </section>
             )}
