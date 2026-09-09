@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BottomDock } from '../components/BottomDock'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
@@ -38,6 +38,26 @@ function glossaryLabel(count: number, lang: Lang): string {
   return `${count} терминов`
 }
 
+// Рекурсивный поиск по всем свойствам объекта (ищет сразу по RU, UK, DE)
+const deepSearch = (obj: any, query: string): boolean => {
+  if (!obj) return false
+  if (typeof obj === 'string') return obj.toLowerCase().includes(query)
+  if (typeof obj === 'object') {
+    return Object.values(obj).some(val => deepSearch(val, query))
+  }
+  return false
+}
+
+// Функция для безопасного извлечения заголовка для текущего языка
+const getDisplayTitle = (item: any, lang: Lang): string => {
+  if (!item) return '...'
+  if (typeof item.title === 'string') return item.title
+  if (item.title && item.title[lang]) return item.title[lang]
+  if (item.name && typeof item.name === 'string') return item.name
+  if (item.name && item.name[lang]) return item.name[lang]
+  return '...'
+}
+
 export function HomePage({
   onBack,
   onOpenBlog,
@@ -52,6 +72,8 @@ export function HomePage({
   onOpenArticle,
   onOpenFavorites,
 }: HomePageProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  
   const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
   const articleFavorites = favorites.filter((f) => f.type === 'article')
   const glossaryCount = GLOSSARY_TERMS.length
@@ -102,6 +124,9 @@ export function HomePage({
           ? `Сохранено статей: ${articleFavorites.length}`
           : 'Нет сохраненных статей',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
+      searchResults: 'Результаты поиска',
+      noResults: 'Ничего не найдено',
+      section: 'Раздел',
     },
     uk: {
       menu: 'Меню',
@@ -134,6 +159,9 @@ export function HomePage({
           ? `Збережено статей: ${articleFavorites.length}`
           : 'Немає збережених статей',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
+      searchResults: 'Результати пошуку',
+      noResults: 'Нічого не знайдено',
+      section: 'Розділ',
     },
     de: {
       menu: 'Menü',
@@ -166,6 +194,9 @@ export function HomePage({
           ? `${articleFavorites.length} Artikel gespeichert`
           : 'Keine Artikel gespeichert',
       quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
+      searchResults: 'Suchergebnisse',
+      noResults: 'Nichts gefunden',
+      section: 'Bereich',
     }
   }[lang]
 
@@ -244,7 +275,6 @@ export function HomePage({
       id: 'blog',
       title: t.blog,
       subtitle: t.blogSub,
-      // Добавили стандартную иконку вместо SVG компонента
       iconClass: 'bg-[var(--pigment-lac-dye,#8B0000)]/15 text-[var(--pigment-lac-dye,#8B0000)]',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -277,6 +307,52 @@ export function HomePage({
     },
   ]
 
+  // === ЛОГИКА ПОИСКА ===
+  const query = searchQuery.trim().toLowerCase()
+  const searchResults: Array<{ id: string; type: string; title: string; subtitle: string }> = []
+
+  if (query) {
+    // 1. Поиск по разделам (Обучение и Инструменты)
+    [...LEARNING, ...TOOLS].forEach((item) => {
+      if (item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)) {
+        searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
+      }
+    })
+
+    // 2. Поиск по статьям блога
+    BLOG_ARTICLES.forEach((article) => {
+      if (deepSearch(article, query)) {
+        searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, lang), subtitle: t.blog })
+      }
+    })
+
+    // 3. Поиск по глоссарию
+    GLOSSARY_TERMS.forEach((term) => {
+      if (deepSearch(term, query)) {
+        searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, lang), subtitle: t.glossary })
+      }
+    })
+  }
+
+  // Обработчик клика по результату поиска
+  const handleResultClick = (res: any) => {
+    if (res.type === 'category') {
+      switch (res.id) {
+        case 'colors': onOpenColors?.(); break
+        case 'styles': onOpenStyles?.(); break
+        case 'calc': onOpenCalcMenu?.(); break
+        case 'blog': onOpenBlog?.(); break
+        case 'glossary': onOpenGlossary?.(); break
+        case 'prices': onOpenPrices?.(); break
+      }
+    } else if (res.type === 'article') {
+      onOpenArticle?.(res.id)
+    } else if (res.type === 'glossary') {
+      onOpenGlossary?.()
+    }
+    setSearchQuery('')
+  }
+
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
       {/* Header */}
@@ -286,7 +362,6 @@ export function HomePage({
         </h1>
 
         <div className="flex items-center gap-2">
-          {/* Обновленный переключатель языков */}
           <div className="flex rounded-full p-1 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
             {['ru', 'uk', 'de'].map((l) => (
               <button
@@ -317,154 +392,195 @@ export function HomePage({
 
       {/* Content */}
       <div className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
-        {/* Search */}
-        <div className="mb-5">
-          <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+        
+        {/* АКТИВНЫЙ ПОИСК */}
+        <div className="mb-5 relative">
+          <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] focus-within:border-[var(--color-accent,#E4D00A)] focus-within:shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent,#E4D00A)_15%,transparent)] transition-all">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted,#B9ACA0)] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
-            <span className="text-[13px] text-[var(--color-muted,#B9ACA0)] truncate">{t.search}</span>
-          </div>
-        </div>
-
-        {/* Learning */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
-          {t.learning}
-        </p>
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {LEARNING.map((item) => {
-            const isColors = item.id === 'colors'
-            const isStyles = item.id === 'styles'
-            return (
-              <button
-                key={item.id}
-                onClick={
-                  isColors ? onOpenColors : 
-                  isStyles ? onOpenStyles : 
-                  undefined
-                }
-                className="min-h-[116px] h-auto p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
-              >
-                <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
-                  {item.icon}
-                </div>
-                <div className="min-w-0 mt-2">
-                  <div className="text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] break-words">
-                    {item.title}
-                  </div>
-                  <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2">
-                    {item.subtitle}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Tools */}
-        <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
-          {t.tools}
-        </p>
-        <div className="grid grid-cols-4 gap-2.5 md:gap-3 mb-6">
-          {TOOLS.map((item) => {
-            const isBlog = item.id === 'blog'
-            const isCalc = item.id === 'calc'
-            const isGlossary = item.id === 'glossary'
-            const isPrices = item.id === 'prices'
-
-            // Теперь все инструменты рендерятся одинаково, без SVG
-            return (
-              <button
-                key={item.id}
-                onClick={
-                  isCalc
-                    ? onOpenCalcMenu
-                    : isBlog
-                      ? onOpenBlog
-                      : isGlossary
-                        ? onOpenGlossary
-                        : isPrices
-                          ? onOpenPrices
-                          : undefined
-                }
-                className={`relative min-h-[116px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border ${
-                  isBlog && hasNewBlog 
-                    ? 'border-[var(--pigment-lac-dye,#8B0000)]/50 shadow-[0_0_10px_color-mix(in_srgb,var(--pigment-lac-dye,#8B0000)_15%,transparent)]' 
-                    : 'border-[var(--color-border,rgba(255,255,255,0.12))]'
-                } flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm overflow-hidden`}
-              >
-                <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 ${item.iconClass}`}>
-                  {item.icon}
-                </div>
-                <div className="min-w-0 mt-2 w-full">
-                  <div className="text-[11px] md:text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] flex items-start gap-0.5">
-                    <span className="break-words hyphens-auto" lang={lang}>
-                      {item.title}
-                    </span>
-                    {/* Точка-индикатор для новых статей блога */}
-                    {isBlog && hasNewBlog && (
-                      <span className="text-[var(--pigment-lac-dye,#8B0000)] shrink-0">•</span>
-                    )}
-                  </div>
-                  <div className="text-[9.5px] md:text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2 leading-snug">
-                    {item.subtitle}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Избранное */}
-        <button
-          className="w-full min-h-[80px] px-4 py-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98] shadow-sm"
-          onClick={() => {
-            if (articleFavorites.length === 0) return
-            if (articleFavorites.length === 1) {
-              onOpenArticle?.(articleFavorites[0].id)
-            } else {
-              onOpenFavorites?.()
-            }
-          }}
-        >
-          <div className="w-10 h-10 rounded-[10px] bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)] flex items-center justify-center shrink-0 text-xl">
-            ★
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium text-[var(--color-ink,#F5F1EA)]">{t.favorites}</div>
-            <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5">{t.favoritesSub}</div>
-          </div>
-          <div className="flex -space-x-2.5 shrink-0">
-            {articleFavorites.length === 0 && (
-              <div className="w-9 h-9 rounded-full bg-[var(--color-surface-2,#2F2924)] border border-[var(--color-border,rgba(255,255,255,0.12))] border-dashed flex items-center justify-center text-[var(--color-muted,#B9ACA0)]/40">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.search}
+              className="bg-transparent border-none outline-none text-[13px] text-[var(--color-ink,#F5F1EA)] w-full placeholder:text-[var(--color-muted,#B9ACA0)]"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-[var(--color-muted,#B9ACA0)] hover:text-white shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-              </div>
+              </button>
             )}
-            {articleFavorites.slice(0, 3).map((item, idx) => (
-              <div
-                key={item.id}
-                className="w-9 h-9 rounded-full border-2 border-[var(--color-bg,#1C1816)] overflow-hidden bg-[var(--color-surface-2,#2F2924)]"
-                style={{ zIndex: 10 - idx }}
-              >
-                <img src={item.imagePng} alt="" className="w-full h-full object-cover" draggable={false} />
+          </div>
+        </div>
+
+        {/* УСЛОВНЫЙ РЕНДЕР: Поиск ИЛИ Обычное меню */}
+        {query ? (
+          <div className="search-results pb-6">
+            <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-3">
+              {t.searchResults} ({searchResults.length})
+            </p>
+            {searchResults.length > 0 ? (
+              <div className="flex flex-col gap-2.5">
+                {searchResults.map((res, i) => (
+                  <button
+                    key={`${res.type}-${res.id}-${i}`}
+                    onClick={() => handleResultClick(res)}
+                    className="w-full text-left p-3.5 rounded-[16px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] hover:border-[var(--color-accent,#E4D00A)]/50 transition-colors active:scale-[0.98]"
+                  >
+                    <div className="text-[13px] font-medium text-[var(--color-ink,#F5F1EA)] line-clamp-1">{res.title}</div>
+                    <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-1">{res.subtitle}</div>
+                  </button>
+                ))}
               </div>
-            ))}
-            {articleFavorites.length > 3 && (
-              <div className="w-9 h-9 rounded-full border-2 border-[var(--color-bg,#1C1816)] flex items-center justify-center bg-[var(--color-surface,#25201C)] text-[10px] font-bold text-[var(--color-accent,#E4D00A)]">
-                +{articleFavorites.length - 3}
+            ) : (
+              <div className="text-[13px] text-[var(--color-muted,#B9ACA0)] text-center py-12 bg-[var(--color-surface,#25201C)] rounded-[18px] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+                {t.noResults}
               </div>
             )}
           </div>
-        </button>
+        ) : (
+          <>
+            {/* ОБУЧЕНИЕ */}
+            <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
+              {t.learning}
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {LEARNING.map((item) => {
+                const isColors = item.id === 'colors'
+                const isStyles = item.id === 'styles'
+                return (
+                  <button
+                    key={item.id}
+                    onClick={
+                      isColors ? onOpenColors : 
+                      isStyles ? onOpenStyles : 
+                      undefined
+                    }
+                    className="min-h-[116px] h-auto p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
+                  >
+                    <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
+                      {item.icon}
+                    </div>
+                    <div className="min-w-0 mt-2">
+                      <div className="text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] break-words">
+                        {item.title}
+                      </div>
+                      <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2">
+                        {item.subtitle}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
 
-        {/* Quote */}
-        <div className="rounded-[18px] p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] shadow-sm">
-          <p className="text-[13px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
-          <p className="mt-2 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
-        </div>
+            {/* ИНСТРУМЕНТЫ */}
+            <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
+              {t.tools}
+            </p>
+            <div className="grid grid-cols-4 gap-2.5 md:gap-3 mb-6">
+              {TOOLS.map((item) => {
+                const isBlog = item.id === 'blog'
+                const isCalc = item.id === 'calc'
+                const isGlossary = item.id === 'glossary'
+                const isPrices = item.id === 'prices'
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={
+                      isCalc
+                        ? onOpenCalcMenu
+                        : isBlog
+                          ? onOpenBlog
+                          : isGlossary
+                            ? onOpenGlossary
+                            : isPrices
+                              ? onOpenPrices
+                              : undefined
+                    }
+                    className={`relative min-h-[116px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border ${
+                      isBlog && hasNewBlog 
+                        ? 'border-[var(--pigment-lac-dye,#8B0000)]/50 shadow-[0_0_10px_color-mix(in_srgb,var(--pigment-lac-dye,#8B0000)_15%,transparent)]' 
+                        : 'border-[var(--color-border,rgba(255,255,255,0.12))]'
+                    } flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm overflow-hidden`}
+                  >
+                    <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 ${item.iconClass}`}>
+                      {item.icon}
+                    </div>
+                    <div className="min-w-0 mt-2 w-full">
+                      <div className="text-[11px] md:text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] flex items-start gap-0.5">
+                        <span className="break-words hyphens-auto" lang={lang}>
+                          {item.title}
+                        </span>
+                        {isBlog && hasNewBlog && (
+                          <span className="text-[var(--pigment-lac-dye,#8B0000)] shrink-0">•</span>
+                        )}
+                      </div>
+                      <div className="text-[9.5px] md:text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2 leading-snug">
+                        {item.subtitle}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* ИЗБРАННОЕ */}
+            <button
+              className="w-full min-h-[80px] px-4 py-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98] shadow-sm"
+              onClick={() => {
+                if (articleFavorites.length === 0) return
+                if (articleFavorites.length === 1) {
+                  onOpenArticle?.(articleFavorites[0].id)
+                } else {
+                  onOpenFavorites?.()
+                }
+              }}
+            >
+              <div className="w-10 h-10 rounded-[10px] bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)] flex items-center justify-center shrink-0 text-xl">
+                ★
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-[var(--color-ink,#F5F1EA)]">{t.favorites}</div>
+                <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5">{t.favoritesSub}</div>
+              </div>
+              <div className="flex -space-x-2.5 shrink-0">
+                {articleFavorites.length === 0 && (
+                  <div className="w-9 h-9 rounded-full bg-[var(--color-surface-2,#2F2924)] border border-[var(--color-border,rgba(255,255,255,0.12))] border-dashed flex items-center justify-center text-[var(--color-muted,#B9ACA0)]/40">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
+                    </svg>
+                  </div>
+                )}
+                {articleFavorites.slice(0, 3).map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="w-9 h-9 rounded-full border-2 border-[var(--color-bg,#1C1816)] overflow-hidden bg-[var(--color-surface-2,#2F2924)]"
+                    style={{ zIndex: 10 - idx }}
+                  >
+                    <img src={item.imagePng} alt="" className="w-full h-full object-cover" draggable={false} />
+                  </div>
+                ))}
+                {articleFavorites.length > 3 && (
+                  <div className="w-9 h-9 rounded-full border-2 border-[var(--color-bg,#1C1816)] flex items-center justify-center bg-[var(--color-surface,#25201C)] text-[10px] font-bold text-[var(--color-accent,#E4D00A)]">
+                    +{articleFavorites.length - 3}
+                  </div>
+                )}
+              </div>
+            </button>
+
+            {/* QUOTE */}
+            <div className="rounded-[18px] p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] shadow-sm">
+              <p className="text-[13px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
+              <p className="mt-2 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Bottom Dock */}
