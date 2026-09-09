@@ -38,10 +38,10 @@ const getPlural = (count: number, forms: [string, string, string]) => {
 
 const getTagSlug = (tag: string) => {
   const upper = tag.toUpperCase()
-  if (upper === 'ИНДУСТРИЯ' || upper === 'ІНДУСТРІЯ') return 'industry'
-  if (upper === 'МАРКЕТИНГ') return 'marketing'
-  if (upper === 'ДИЗАЙН') return 'design'
-  if (upper === 'ПРОИЗВОДСТВО' || upper === 'ВИРОБНИЦТВО') return 'production'
+  if (upper === 'ИНДУСТРИЯ' || upper === 'ІНДУСТРІЯ' || upper === 'INDUSTRIE') return 'industry'
+  if (upper === 'МАРКЕТИНГ' || upper === 'MARKETING') return 'marketing'
+  if (upper === 'ДИЗАЙН' || upper === 'DESIGN') return 'design'
+  if (upper === 'ПРОИЗВОДСТВО' || upper === 'ВИРОБНИЦТВО' || upper === 'PRODUKTION') return 'production'
   return tag
 }
 
@@ -163,7 +163,7 @@ export function BlogPage({
     triggerHaptic('medium')
     const tg = getWebApp()
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
-    const text = `Прочитал статью «\( {title}» ( \){tag}) в PRO Обувь.`
+    const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
 
     if (navigator.share) {
       try {
@@ -174,7 +174,7 @@ export function BlogPage({
       }
     }
 
-    const shareUrl = `https://t.me/share/url?url=\( {encodeURIComponent(appUrl)}&text= \){encodeURIComponent(text)}`
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(shareUrl)
     } else {
@@ -277,6 +277,50 @@ export function BlogPage({
         articleFavAdd: 'Зберегти статтю',
         articleFavRemove: 'В обраному',
       },
+      de: {
+        title: 'PRO Schuhe',
+        subtitle: 'BLOG & ARTIKEL',
+        tagline: 'Hinter den Kulissen der Schuhindustrie. Design, Technologie und Produktionsgeheimnisse',
+        read: 'Lesen',
+        readSub: count === 0 ? 'Artikel folgen bald' : `${count} Artikel`,
+        contact: 'Kooperation',
+        contactSub: 'Idee vorschlagen',
+        favoriteAdd: 'Zu Favoriten',
+        favoriteAddSub: 'Auf Startseite speichern',
+        favoriteRemove: 'In Favoriten',
+        favoriteRemoveSub: 'Von Startseite entfernen',
+        backToMenu: 'Zurück zum Menü',
+        journalTitle: 'Journal',
+        journalDesc: 'Gedanken über die Industrie, Menschen, Design, Produktion und alles rund um Schuhe.',
+        searchPlaceholder: 'Artikel suchen...',
+        fresh: 'NEU',
+        emptyTitle: 'Nichts gefunden',
+        emptyDesc: 'Versuchen Sie, die Suchanfrage zu ändern oder die Filter zurückzusetzen',
+        emptyBtn: 'Filter zurücksetzen',
+        emptyFavoritesTitle: 'Keine gespeicherten Artikel',
+        emptyFavoritesDesc: 'Klicken Sie auf das Stern-Symbol in der Artikelkarte, um ihn hier hinzuzufügen',
+        emptyFavoritesBtn: 'Alle Artikel',
+        filters: [
+          { id: 'all', label: 'Alle' },
+          { id: 'favorites', label: '★ Favoriten' },
+          { id: 'industry', label: 'Industrie' },
+          { id: 'marketing', label: 'Marketing' },
+          { id: 'design', label: 'Design' },
+          { id: 'production', label: 'Produktion' },
+        ],
+        readBtn: 'Lesen',
+        collabTitle: 'Zusammenarbeit',
+        collabSubtitle: 'DIGITALE VISITENKARTE',
+        collabText:
+          'Dies ist ein Hobbyprojekt über die Schuhindustrie. Ich bin offen für den Dialog: Ideen, Kommentare, Feedback, Kooperationsvorschläge oder einfach interessante Beobachtungen. Schreiben Sie mir – ich diskutiere gerne mit Ihnen.',
+        collabEmailLabel: 'Direkter Kontakt',
+        copyBtn: 'Kopieren',
+        copiedBtn: 'Kopiert!',
+        aboutBtn: 'Über das Projekt',
+        shareBtn: 'Teilen',
+        articleFavAdd: 'Artikel speichern',
+        articleFavRemove: 'In Favoriten',
+      },
     }[lang]
   }, [lang, count])
 
@@ -286,7 +330,8 @@ export function BlogPage({
       favorites: BLOG_ARTICLES.filter((a) => favoriteArticleIds.includes(a.id)).length,
     }
     BLOG_ARTICLES.forEach((a) => {
-      const tag = lang === 'ru' ? a.tagRu : a.tagUk
+      // Безопасный фоллбэк для немецких тегов (пока их нет в data файле)
+      const tag = lang === 'ru' ? a.tagRu : lang === 'uk' ? a.tagUk : (a as any).tagDe || a.tagRu
       const slug = getTagSlug(tag)
       counts[slug] = (counts[slug] || 0) + 1
     })
@@ -311,8 +356,10 @@ export function BlogPage({
     if (isFavoritesActive) {
       return favoriteArticleIds.includes(article.id)
     }
-    const title = lang === 'ru' ? article.titleRu : article.titleUk
-    const tag = lang === 'ru' ? article.tagRu : article.tagUk
+    
+    // Безопасный фоллбэк для немецких данных
+    const title = lang === 'ru' ? article.titleRu : lang === 'uk' ? article.titleUk : (article as any).titleDe || article.titleRu
+    const tag = lang === 'ru' ? article.tagRu : lang === 'uk' ? article.tagUk : (article as any).tagDe || article.tagRu
     const slug = getTagSlug(tag)
     const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilter = activeFilter === 'all' || slug === activeFilter
@@ -324,6 +371,20 @@ export function BlogPage({
   const activeArticle = activeArticleId ? BLOG_ARTICLES.find((a) => a.id === activeArticleId) : null
   const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
   const isCurrentArticleFavorite = activeArticleId ? favoriteArticleIds.includes(activeArticleId) : false
+
+  // Безопасный доступ к немецким данным статьи (защита от TS ошибок)
+  const activeTitle = activeArticle 
+    ? (lang === 'ru' ? activeArticle.titleRu : lang === 'uk' ? activeArticle.titleUk : (activeArticle as any).titleDe || activeArticle.titleRu) 
+    : ''
+  const activeTag = activeArticle 
+    ? (lang === 'ru' ? activeArticle.tagRu : lang === 'uk' ? activeArticle.tagUk : (activeArticle as any).tagDe || activeArticle.tagRu) 
+    : ''
+  const activeReadTime = activeArticle 
+    ? (lang === 'ru' ? activeArticle.readTimeRu : lang === 'uk' ? activeArticle.readTimeUk : (activeArticle as any).readTimeDe || activeArticle.readTimeRu) 
+    : ''
+
+  // Контент статьи с фоллбэком на русский язык
+  const activeContentHtml = content ? ((content as any)[lang] || content.ru) : ''
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
@@ -630,26 +691,30 @@ export function BlogPage({
                 {isFavoritesActive
                   ? lang === 'ru'
                     ? 'ИЗБРАННОЕ'
-                    : 'ОБРАНЕ'
+                    : lang === 'de' 
+                      ? 'FAVORITEN' 
+                      : 'ОБРАНЕ'
                   : searchQuery
                     ? lang === 'ru'
                       ? 'Результаты'
-                      : 'Результати'
+                      : lang === 'de'
+                        ? 'Ergebnisse'
+                        : 'Результати'
                     : t.fresh}
               </p>
 
               <div className="flex flex-col gap-3">
                 {filteredArticles.map((article) => {
-                  const title = lang === 'ru' ? article.titleRu : article.titleUk
-                  const excerpt = lang === 'ru' ? article.excerptRu : article.excerptUk
-                  const tag = lang === 'ru' ? article.tagRu : article.tagUk
-                  const readTime = lang === 'ru' ? article.readTimeRu : article.readTimeUk
+                  const title = lang === 'ru' ? article.titleRu : lang === 'uk' ? article.titleUk : (article as any).titleDe || article.titleRu
+                  const excerpt = lang === 'ru' ? article.excerptRu : lang === 'uk' ? article.excerptUk : (article as any).excerptDe || article.excerptRu
+                  const tag = lang === 'ru' ? article.tagRu : lang === 'uk' ? article.tagUk : (article as any).tagDe || article.tagRu
+                  const readTime = lang === 'ru' ? article.readTimeRu : lang === 'uk' ? article.readTimeUk : (article as any).readTimeDe || article.readTimeRu
 
                   return (
                     <button
                       key={article.id}
                       type="button"
-                      aria-label={`Читать статью ${title}`}
+                      aria-label={`${t.readBtn} ${title}`}
                       onClick={() => {
                         triggerHaptic()
                         setActiveArticleId(article.id)
@@ -849,18 +914,13 @@ export function BlogPage({
                 className="flex-1 truncate mx-4 text-center text-[12px] font-semibold tracking-wide"
                 style={{ color: 'var(--color-ink, #F5F1EA)' }}
               >
-                {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
+                {activeTitle}
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   aria-label="Share"
-                  onClick={() =>
-                    handleShareArticle(
-                      lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk,
-                      lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk
-                    )
-                  }
+                  onClick={() => handleShareArticle(activeTitle, activeTag)}
                   className="w-8 h-8 flex items-center justify-center rounded-full active:scale-90 transition-transform focus-visible"
                   style={{
                     background: 'var(--color-surface, #25201C)',
@@ -910,7 +970,7 @@ export function BlogPage({
             <div className="relative w-full h-[35vh] shrink-0">
               <img
                 src={activeArticle.cover || '/blog-hero.webp'}
-                alt={lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
+                alt={activeTitle}
                 loading="lazy"
                 decoding="async"
                 className="w-full h-full object-cover"
@@ -929,7 +989,7 @@ export function BlogPage({
                     background: 'var(--color-accent, #D8A35C)',
                   }}
                 >
-                  {lang === 'ru' ? activeArticle.tagRu : activeArticle.tagUk}
+                  {activeTag}
                 </span>
                 <span
                   className="text-[10px] px-2 py-1 rounded-sm"
@@ -939,19 +999,19 @@ export function BlogPage({
                     backdropFilter: 'blur(8px)',
                   }}
                 >
-                  {lang === 'ru' ? activeArticle.readTimeRu : activeArticle.readTimeUk}
+                  {activeReadTime}
                 </span>
               </div>
             </div>
 
             <div className="px-5 py-6 pb-8">
               <h1 className="font-display text-[1.8rem] leading-tight mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                {lang === 'ru' ? activeArticle.titleRu : activeArticle.titleUk}
+                {activeTitle}
               </h1>
 
               {/* Кнопка озвучки */}
               <div className="mb-6">
-                <ArticleAudioPlayer text={content[lang]} lang={lang} />
+                <ArticleAudioPlayer text={activeContentHtml} lang={lang} />
               </div>
 
               <div className="article-content">
@@ -1018,7 +1078,7 @@ export function BlogPage({
                     ),
                   }}
                 >
-                  {content[lang]}
+                  {activeContentHtml}
                 </Markdown>
               </div>
 
@@ -1091,7 +1151,7 @@ export function BlogPage({
                 }}
               >
                 <div className="text-[11px]" style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 60%, transparent)' }}>
-                  {lang === 'ru' ? 'Опубликовано:' : 'Опубліковано:'} {activeArticle.createdAt}
+                  {lang === 'ru' ? 'Опубликовано:' : lang === 'uk' ? 'Опубліковано:' : 'Veröffentlicht:'} {activeArticle.createdAt}
                 </div>
               </div>
             </div>
