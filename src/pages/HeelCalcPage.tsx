@@ -1,4 +1,3 @@
-// src/pages/HeelCalcPage.tsx
 import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
@@ -264,14 +263,14 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         {/* Степперы */}
         <div className="grid grid-cols-2 gap-1.5 md:gap-3">
           <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
-          <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit="мм" onHaptic={() => haptic()} />
+          <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit={t.mm} onHaptic={() => haptic()} />
           <HeelStepper
             label={t.toe}
             min={0}
             max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)}
             value={toeThickness}
             onChange={setToeThickness}
-            unit="мм"
+            unit={t.mm}
             onHaptic={() => haptic()}
           />
           <HeelStepper
@@ -302,7 +301,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 max={15}
                 value={heelTipOffsetMm}
                 onChange={setHeelTipOffsetMm}
-                unit="мм"
+                unit={t.mm}
                 onHaptic={() => haptic()}
               />
               <HeelStepper
@@ -311,7 +310,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 max={45}
                 value={tipWidthMm}
                 onChange={setTipWidthMm}
-                unit="мм"
+                unit={t.mm}
                 onHaptic={() => haptic()}
               />
             </>
@@ -364,7 +363,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 />
                 <SpecRow
                   label={t.specГеленок}
-                  value={`${eng.shankLength} мм`}
+                  value={`${eng.shankLength} ${t.mm}`}
                   infoKey="геленок"
                   openInfo={openInfo}
                   onToggleInfo={toggleInfo}
@@ -372,7 +371,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 />
                 <SpecRow
                   label={t.specСталь}
-                  value={`${eng.steelThickness.toFixed(1)} мм`}
+                  value={`${eng.steelThickness.toFixed(1)} ${t.mm}`}
                   infoKey="сталь"
                   openInfo={openInfo}
                   onToggleInfo={toggleInfo}
@@ -380,7 +379,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 />
                 <SpecRow
                   label="L_eff"
-                  value={`${eng.lEff.toFixed(1)} мм`}
+                  value={`${eng.lEff.toFixed(1)} ${t.mm}`}
                   infoKey="lEff"
                   openInfo={openInfo}
                   onToggleInfo={toggleInfo}
@@ -399,7 +398,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   <>
                     <SpecRow
                       label={t.specСмещение}
-                      value={`${heelTipOffsetMm} мм`}
+                      value={`${heelTipOffsetMm} ${t.mm}`}
                       danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
                       infoKey="смещение"
                       openInfo={openInfo}
@@ -408,7 +407,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     />
                     <SpecRow
                       label={t.specНабойка}
-                      value={`${tipWidthMm} мм`}
+                      value={`${tipWidthMm} ${t.mm}`}
                       infoKey="набойка"
                       openInfo={openInfo}
                       onToggleInfo={toggleInfo}
@@ -441,7 +440,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   <>
                     <SpecRow
                       label={t.padPos}
-                      value={`${eng.metatarsalPadPosMm} мм`}
+                      value={`${eng.metatarsalPadPosMm} ${t.mm}`}
                       infoKey="padPos"
                       openInfo={openInfo}
                       onToggleInfo={toggleInfo}
@@ -449,7 +448,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     />
                     <SpecRow
                       label={t.padHeight}
-                      value={`${eng.metatarsalPadHeightMm} мм`}
+                      value={`${eng.metatarsalPadHeightMm} ${t.mm}`}
                       infoKey="padHeight"
                       openInfo={openInfo}
                       onToggleInfo={toggleInfo}
@@ -462,7 +461,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   <>
                     <SpecRow
                       label={t.apexM1}
-                      value={`${eng.apexM1_Mm} мм`}
+                      value={`${eng.apexM1_Mm} ${t.mm}`}
                       infoKey="apexM1"
                       openInfo={openInfo}
                       onToggleInfo={toggleInfo}
@@ -470,7 +469,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     />
                     <SpecRow
                       label={t.apexM5}
-                      value={`${eng.apexM5_Mm} мм`}
+                      value={`${eng.apexM5_Mm} ${t.mm}`}
                       infoKey="apexM5"
                       openInfo={openInfo}
                       onToggleInfo={toggleInfo}
@@ -482,7 +481,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 {soleType === 'rocker' && eng.carbonInsertThicknessMm > 0 && (
                   <SpecRow
                     label={t.carbonInsert}
-                    value={`${eng.carbonInsertThicknessMm} мм`}
+                    value={`${eng.carbonInsertThicknessMm} ${t.mm}`}
                     infoKey="carbonInsert"
                     openInfo={openInfo}
                     onToggleInfo={toggleInfo}
@@ -631,6 +630,7 @@ function getLabels(lang: Lang) {
     specСталь: 'Сталь 65Г',
     specСмещение: 'Смещение',
     specНабойка: 'Набойка',
+    mm: 'мм'
   }
   const uk = {
     ...ru,
@@ -676,6 +676,7 @@ function getLabels(lang: Lang) {
     specСталь: 'Сталь 65Г',
     specСмещение: 'Зміщення',
     specНабойка: 'Набійка',
+    mm: 'мм'
   }
   const de = {
     title: 'Engineering & Balance',
@@ -720,6 +721,7 @@ function getLabels(lang: Lang) {
     specСталь: 'Stahlfeder',
     specСмещение: 'Versatz',
     specНабойка: 'Fleck',
+    mm: 'mm'
   }
   
   if (lang === 'uk') return uk;
@@ -757,7 +759,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
       apexM5:
         'Апекс M5 — зовнішня точка (V палець). Зсунута проксимально відносно M1 на \~4.5% довжини колодки через діагональний скос суглобової лінії.',
       carbonInsert:
-        'Мінімальна товщина карбонової вставки в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках — потрібна жорсткість.',
+        'Мінімальна товщина карбоновой вставки в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках — потрібна жорсткість.',
     }
   }
   if (lang === 'de') {
