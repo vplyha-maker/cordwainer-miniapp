@@ -34,6 +34,13 @@ function shortName(name: string): string {
   return name.replace(/\s*\([^)]*\)\s*$/, '').trim()
 }
 
+// Вспомогательная функция для получения названия на нужном языке
+function getLocalizedName(p: Pigment, lang: Lang): string {
+  if (lang === 'de' && (p.name as any).de) return (p.name as any).de as string
+  if (lang === 'uk' && p.name.uk) return p.name.uk
+  return p.name.ru
+}
+
 export function PigmentSelector({
   pigments,
   value,
@@ -48,13 +55,41 @@ export function PigmentSelector({
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
+  // Словарик переводов для интерфейса селектора
+  const t = {
+    ru: {
+      placeholder: 'Выберите пигмент',
+      searchPlaceholder: 'Поиск: название, CI, HEX…',
+      itemsCount: 'пигментов',
+      empty: 'Ничего не найдено',
+      spectrum: 'Спектр отражения',
+    },
+    uk: {
+      placeholder: 'Оберіть пігмент',
+      searchPlaceholder: 'Пошук: назва, CI, HEX…',
+      itemsCount: 'пігментів',
+      empty: 'Нічого не знайдено',
+      spectrum: 'Спектр відбиття',
+    },
+    de: {
+      placeholder: 'Pigment wählen',
+      searchPlaceholder: 'Suche: Name, CI, HEX…',
+      itemsCount: 'Pigmente',
+      empty: 'Nichts gefunden',
+      spectrum: 'Reflexionsspektrum',
+    },
+  }[lang] || {
+    placeholder: 'Выберите пигмент',
+    searchPlaceholder: 'Поиск: название, CI, HEX…',
+    itemsCount: 'пигментов',
+    empty: 'Ничего не найдено',
+    spectrum: 'Спектр отражения',
+  }
+
   const selectedPigment = pigments.find((p) => p.id === value)
-  const isUk = lang === 'uk'
 
   const displayName = selectedPigment
-    ? isUk
-      ? selectedPigment.name.uk
-      : selectedPigment.name.ru
+    ? getLocalizedName(selectedPigment, lang)
     : ''
 
   const bgColor = selectedPigment?.hex || '#2A2522'
@@ -69,6 +104,7 @@ export function PigmentSelector({
       const uk = p.name.uk.toLowerCase()
       const ru = p.name.ru.toLowerCase()
       const en = p.name.en.toLowerCase()
+      const de = ((p.name as any).de || '').toLowerCase()
       const id = p.id.toLowerCase()
       const hex = (p.hex || '').toLowerCase()
       const cat = getPigmentCategory(p.id, lang).toLowerCase()
@@ -76,6 +112,7 @@ export function PigmentSelector({
         uk.includes(term) ||
         ru.includes(term) ||
         en.includes(term) ||
+        de.includes(term) ||
         id.includes(term) ||
         hex.includes(term) ||
         cat.includes(term)
@@ -111,10 +148,10 @@ export function PigmentSelector({
   useEffect(() => {
     if (!isOpen) return
     const handleOutside = (e: MouseEvent | TouchEvent) => {
-      const t = e.target as Node
-      if (wrapperRef.current?.contains(t)) return
+      const targetNode = e.target as Node
+      if (wrapperRef.current?.contains(targetNode)) return
       // dropdown fixed — проверяем по классу
-      const el = t as HTMLElement
+      const el = targetNode as HTMLElement
       if (el.closest?.('[data-pigment-dropdown]')) return
       setIsOpen(false)
       setSearch('')
@@ -176,11 +213,7 @@ export function PigmentSelector({
               overflow: 'hidden',
             }}
           >
-            {selectedPigment
-              ? shortName(displayName)
-              : isUk
-                ? 'Оберіть пігмент'
-                : 'Выберите пигмент'}
+            {selectedPigment ? shortName(displayName) : t.placeholder}
           </span>
           {selectedPigment && (
             <span className="text-[10px] opacity-70 leading-none">
@@ -246,11 +279,7 @@ export function PigmentSelector({
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder={
-                      isUk
-                        ? 'Пошук: назва, CI, HEX…'
-                        : 'Поиск: название, CI, HEX…'
-                    }
+                    placeholder={t.searchPlaceholder}
                     className="flex-1 bg-transparent outline-none text-[14px] text-[#F5F1EA] placeholder:text-[#F5F1EA]/35"
                     style={{ fontSize: '16px' }}
                     autoComplete="off"
@@ -268,8 +297,7 @@ export function PigmentSelector({
                   )}
                 </div>
                 <p className="mt-1.5 text-[10px] text-[#F5F1EA]/30">
-                  {filteredPigments.length}{' '}
-                  {isUk ? 'пігментів' : 'пигментов'}
+                  {filteredPigments.length} {t.itemsCount}
                 </p>
               </div>
 
@@ -285,7 +313,7 @@ export function PigmentSelector({
               >
                 {filteredPigments.length === 0 ? (
                   <div className="p-6 text-center text-sm text-[#F5F1EA]/45">
-                    {isUk ? 'Нічого не знайдено' : 'Ничего не найдено'}
+                    {t.empty}
                   </div>
                 ) : (
                   grouped.map(([category, items]) => (
@@ -297,7 +325,7 @@ export function PigmentSelector({
                       </div>
 
                       {items.map((p) => {
-                        const name = isUk ? p.name.uk : p.name.ru
+                        const name = getLocalizedName(p, lang)
                         const ci = extractCI(name)
                         const isSelected = p.id === value
                         const isExpanded = expandedId === p.id
@@ -387,9 +415,7 @@ export function PigmentSelector({
                                 {p.spectrum && p.spectrum.length > 0 && (
                                   <div className="mt-2 p-2 bg-black/30 rounded-lg">
                                     <p className="text-[10px] text-[#F5F1EA]/45 mb-1">
-                                      {isUk
-                                        ? 'Спектр відбиття'
-                                        : 'Спектр отражения'}
+                                      {t.spectrum}
                                     </p>
                                     <SpectrumGraph
                                       spectrum={p.spectrum}
@@ -406,7 +432,6 @@ export function PigmentSelector({
                     </div>
                   ))
                 )}
-                {/* Отступ внизу, чтобы последний элемент был доступен */}
                 <div className="h-6" />
               </div>
             </motion.div>
