@@ -500,7 +500,7 @@ export function HomePage({
                         : isBlog
                           ? onOpenBlog
                           : isGlossary
-                            ? onOpenGlossary
+                            ? () => onOpenGlossary?.()
                             : isPrices
                               ? onOpenPrices
                               : undefined
