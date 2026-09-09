@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useRef, useEffect } from 'react'
 import type { Lang } from '../App'
 
@@ -129,37 +129,78 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   const currentLang = (lang === 'uk' || lang === 'ru') ? lang : 'ru'
 
   const [shouldLoad, setShouldLoad] = useState(index <= 1)
+  
+  // ГЛОБАЛЬНЫЕ ЛАЙКИ ИЗ NEON
+  const [isLiked, setIsLiked] = useState(false)
+  const [likesCount, setLikesCount] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // НОВАЯ ФУНКЦИЯ ДЛЯ КНОПКИ SHARE
+  // Идентификация пользователя (Telegram ID или браузерный фолбэк)
+  const tg = (window as any).Telegram?.WebApp
+  const userId = tg?.initDataUnsafe?.user?.id?.toString() || 'browser_test_user'
+
+  // 1. ПОЛУЧАЕМ ДАННЫЕ ИЗ БАЗЫ
+  useEffect(() => {
+    const fetchLikes = async () => {
+      try {
+        const response = await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setLikesCount(data.total || 0)
+          setIsLiked(data.isLiked || false)
+        }
+      } catch (err) {
+        console.error("Не удалось загрузить лайки", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    if (shouldLoad) {
+      fetchLikes()
+    }
+  }, [slide.id, userId, shouldLoad])
+
+  // 2. СТАВИМ ЛАЙК В БАЗУ
+  const handleLike = async () => {
+    // Оптимистичный UI: переключаем визуал ДО ответа сервера
+    const newIsLiked = !isLiked
+    setIsLiked(newIsLiked)
+    setLikesCount(prev => newIsLiked ? prev + 1 : prev - 1)
+
+    if (tg && tg.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred(newIsLiked ? 'medium' : 'light')
+    }
+
+    try {
+      await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: newIsLiked ? 'like' : 'unlike' })
+      })
+    } catch (err) {
+      console.error("Ошибка при сохранении лайка", err)
+      setIsLiked(!newIsLiked)
+      setLikesCount(prev => newIsLiked ? prev - 1 : prev + 1)
+    }
+  }
+
+  // 3. ФУНКЦИЯ SHARE
   const handleShare = async () => {
     const shareText = currentLang === 'ru' 
       ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии Cordwainer!`
       : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії Cordwainer!`;
-    
     const siteUrl = "https://www.cordwaine.app"; 
-    
-    // Получаем объект Telegram WebApp безопасно для TypeScript
-    const tg = (window as any).Telegram?.WebApp;
 
     try {
-      // 1. СНАЧАЛА проверяем, открыты ли мы внутри Telegram
       if (tg && tg.initData) {
-        // Формируем специальную ссылку для нативного шеринга в Telegram
         const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`;
         tg.openTelegramLink(tgShareUrl);
         return;
       }
-
-      // 2. Если мы НЕ в Телеграме, пробуем нативный шеринг браузера (Safari/Chrome на телефоне)
       if (navigator.share) {
-        await navigator.share({
-          title: 'Cordwainer',
-          text: shareText,
-          url: siteUrl
-        });
-      } 
-      // 3. Если мы открыты на компьютере без поддержки share (копируем ссылку)
-      else {
+        await navigator.share({ title: 'Cordwainer', text: shareText, url: siteUrl });
+      } else {
         await navigator.clipboard.writeText(`${shareText}\n${siteUrl}`);
         alert(currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена' : 'Посилання скопійовано');
       }
@@ -168,46 +209,27 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
     }
   }
 
+  // Intersection Observers для загрузки и автоплея
   useEffect(() => {
     if (!containerRef.current) return
-
     const loadObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setShouldLoad(true)
-          }
-        })
-      },
+      (entries) => { entries.forEach((entry) => { if (entry.isIntersecting) setShouldLoad(true) }) },
       { rootMargin: '100% 0px' } 
     )
-
     const playObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            videoRef.current?.play().catch(() => {})
-          } else {
-            videoRef.current?.pause()
-          }
-        })
-      },
+      (entries) => { entries.forEach((entry) => {
+          if (entry.isIntersecting) videoRef.current?.play().catch(() => {})
+          else videoRef.current?.pause()
+      }) },
       { threshold: 0.5 }
     )
-
     loadObserver.observe(containerRef.current)
     playObserver.observe(containerRef.current)
-
-    return () => {
-      loadObserver.disconnect()
-      playObserver.disconnect()
-    }
+    return () => { loadObserver.disconnect(); playObserver.disconnect() }
   }, [])
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = isMuted
-    }
+    if (videoRef.current) videoRef.current.muted = isMuted
   }, [isMuted])
 
   return (
@@ -255,25 +277,49 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         whileInView={{ opacity: 1 }}
         viewport={{ once: false, amount: 0.4 }}
         transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
-        className="absolute bottom-12 left-6 right-6 z-20 flex items-end justify-between"
+        className="absolute bottom-12 left-6 right-4 z-20 flex items-end justify-between"
       >
-        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[75%]">
+        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[75%] pb-2">
           {slide.desc[currentLang]}
         </p>
         
-        <button 
-          onClick={handleShare}
-          className="w-12 h-12 flex flex-col items-center justify-center text-white/70 hover:text-white active:scale-90 transition-all duration-300 gap-[2px] shrink-0"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-            <polyline points="16 6 12 2 8 6"></polyline>
-            <line x1="12" y1="2" x2="12" y2="15"></line>
-          </svg>
-          <span className="text-[8px] tracking-widest uppercase opacity-90 mt-1">
-            Share
-          </span>
-        </button>
+        {/* КОЛОНКА КНОПОК */}
+        <div className="flex flex-col gap-6 items-center shrink-0">
+          
+          {/* Кнопка ЛАЙК */}
+          <motion.button 
+            whileTap={{ scale: 0.8 }}
+            onClick={handleLike}
+            className="w-12 flex flex-col items-center justify-center gap-[2px] transition-colors duration-300"
+          >
+            <AnimatePresence mode="wait">
+              {isLiked ? (
+                <motion.svg key="liked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </motion.svg>
+              ) : (
+                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-white/80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </motion.svg>
+              )}
+            </AnimatePresence>
+            {!isLoading && likesCount > 0 && (
+              <span className="text-[10px] font-sans font-medium text-white/90 drop-shadow-md mt-1">
+                {likesCount > 999 ? (likesCount / 1000).toFixed(1) + 'k' : likesCount}
+              </span>
+            )}
+          </motion.button>
+
+          {/* Кнопка SHARE */}
+          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all duration-300 gap-1">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+              <polyline points="16 6 12 2 8 6"></polyline>
+              <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+          </button>
+          
+        </div>
       </motion.div>
     </div>
   )
@@ -297,25 +343,25 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
       <button
         onClick={onBack}
-        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
+        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
       <button
         onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/70 active:scale-90 transition-transform"
+        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md"
       >
         {isMuted ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <line x1="23" y1="9" x2="17" y2="15"></line>
             <line x1="17" y1="9" x2="23" y2="15"></line>
           </svg>
         ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
