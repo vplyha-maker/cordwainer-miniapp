@@ -80,7 +80,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   useEffect(() => {
     const saved = localStorage.getItem('app_lang') as Lang | null
-    if (saved === 'ru' || saved === 'uk') {
+    if (saved === 'ru' || saved === 'uk' || saved === 'de') {
       if (saved !== lang) setLang(saved)
     }
   }, [])
@@ -188,6 +188,55 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
       guideTip:
         'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильніше, ніж здається.',
+    },
+    de: {
+      title: 'Farben & Finish',
+      complementary: 'Komplementär',
+      analogous: 'Analog',
+      triadic: 'Triadisch',
+      tetradic: 'Tetradisch (Quadrat)',
+      rectangular: 'Tetradisch (Rechteck)',
+      'split-complementary': 'Split-Komplementär',
+      monochromatic: 'Monochromatisch',
+      main60: '60%',
+      secondary30: '30%',
+      accent10: '10%',
+      main55: '55%',
+      secondary20: '20%',
+      secondary15: '15%',
+      quote: '«Farbe ist die Seele des Schuhs.»',
+      white: 'Zu Weiß',
+      black: 'Zu Schwarz',
+      pure: 'Rein',
+      ittenLabel: 'Farbkreis',
+      guideBtn: 'Guide',
+      guideTitle: 'Farbe im Design',
+      guideClose: 'Schließen',
+      guideIntro:
+        'Der Itten-Farbkreis ist ein klassisches Werkzeug zur Farbharmonisierung. Bei Schuhen ist er besonders wichtig: Die Grundpalette ist fast immer um neutrale Farben (Schwarz, Weiß, Beige, Grau) herum aufgebaut, und Farbe taucht punktuell auf — im Oberleder, im Futter, in den Nähten, der Sohle oder den Beschlägen.',
+      guideBalanceTitle: 'Die Balance-Regel',
+      guideBalance:
+        '60 % — Hauptfarbe (meist neutral oder der dominierende Lederton).\n30 % — Unterstützende Farbe (Futter, Zunge, Fersenkappe).\n10 % — Akzent (Nähte, Logo, Metallbeschläge, Sohle).',
+      guideSchemesTitle: 'Farbschemata & Anwendung',
+      guideComplementary:
+        'Komplementär — zwei gegenüberliegende Farben. Ergibt einen starken, energetischen Kontrast. Gut für Sport- und Fashion-Schuhe, bei denen ein leuchtender Akzent auf neutralem Grund benötigt wird.',
+      guideAnalogous:
+        'Analog — benachbarte Farben auf dem Kreis. Schafft einen weichen, ruhigen Übergang. Ideal für klassische und Freizeitschuhe, wenn man eine reiche Tonalität ohne Härte wünscht.',
+      guideTriadic:
+        'Triadisch — drei Farben im 120°-Abstand. Lebendig und ausgewogen. Geeignet für Capsule-Kollektionen und saisonale Farbgeschichten.',
+      guideTetradic:
+        'Tetradisch (Quadrat) — vier Farben im 90°-Abstand. Das lebhafteste Schema. Verwenden Sie einen dominierenden Ton, zwei unterstützende und einen reinen Akzent, sonst wird die Komposition zu bunt.',
+      guideRectangular:
+        'Tetradisch (Rechteck) — zwei komplementäre Paare mit Verschiebung. Weicher als das Quadrat, bietet mehr Raum für Nuancen. Funktioniert hervorragend bei Premium- und Designerschuhen.',
+      guideSplit:
+        'Split-Komplementär — Hauptfarbe + die zwei Nachbarn ihrer Komplementärfarbe. Kontrast ist vorhanden, aber weicher als rein komplementär. Eine universelle Wahl für die meisten Modelle.',
+      guideMono:
+        'Monochromatisch — eine Farbe in verschiedenen Tönen und Sättigungen. Das eleganteste und „teuerste“ Schema. Ideal für Minimalismus, Abendschuhe und wenn das Leder an sich schon ausdrucksstark ist.',
+      guideFootwearTitle: 'Besonderheiten bei Schuhen',
+      guideFootwear:
+        '• Obermaterial: Hauptfarbe (60–70 %).\n• Futter und Innensohle: unterstützender oder hellerer Ton.\n• Sohle und Absatz: oft neutral oder Akzent.\n• Beschläge und Nähte: der reinste und hellste Akzent (5–10 %).\n• Schwarz und Weiß sind keine „Farblosigkeit“, sondern mächtige Werkzeuge für Kontrast und Form.',
+      guideTip:
+        'Tipp: Überprüfen Sie Farbkombinationen immer bei unterschiedlichen Lichtverhältnissen — Tageslicht, warmes Kunstlicht und kaltes Licht. Leder und Wildleder verändern ihren Farbton stärker als es scheint.',
     },
   }[lang]
 
@@ -355,8 +404,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
         <div className="flex items-center gap-2">
           <div className="hidden md:flex rounded-full p-0.5 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
-            <button onClick={() => handleLangChange('ru')} className={`lang-toggle ${lang === 'ru' ? 'active' : 'inactive'}`}>RU</button>
-            <button onClick={() => handleLangChange('uk')} className={`lang-toggle ${lang === 'uk' ? 'active' : 'inactive'}`}>UA</button>
+            {['ru', 'uk', 'de'].map((l) => (
+              <button
+                key={l}
+                onClick={() => handleLangChange(l as Lang)}
+                className={`lang-toggle ${lang === l ? 'active' : 'inactive'} uppercase`}
+              >
+                {l}
+              </button>
+            ))}
           </div>
           <button
             onClick={() => setShowGuide(true)}
