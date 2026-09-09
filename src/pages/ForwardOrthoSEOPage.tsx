@@ -1,4 +1,3 @@
-
 // src/pages/ForwardOrthoSEOPage.tsx
 // Скрытая SEO-страница (orphan page) для поискового трафика.
 // URL: /forward-ortho-converter
@@ -51,6 +50,24 @@ const SEO = {
     aboutText:
       'Паперові таблиці повноти та класичні лекала (зокрема методи, відомі з практики Форвард Орто) потребують ручного пошуку рядка і часто дають похибку при градації. Цей калькулятор одразу перераховує повноту й обхвати за розміром, прискорює підбір колодки для ортопедичного та серійного взуття. Підходить конструкторам, ортопедам і майстрам-шевцям.',
     backLabel: 'На головну Cordwainer',
+  },
+  de: {
+    title: 'Leistenweiten-Rechner Online — Größentabelle, Fußumfänge',
+    description:
+      'Kostenloser Leistenweiten-Rechner und Größenumrechner: GOST (Ukraine), US, UK, EU. Berechnung des Ballen-, Rist- und Fersenumfangs in mm. Digitale Alternative zu Papiertabellen.',
+    h1: 'Leistenweiten- und Fußumfang-Rechner',
+    lead:
+      'Online-Tabelle für Schuhweiten nach internationalen Standards. Geben Sie die Größe ein — erhalten Sie die numerische und alphabetische Weite sowie Umfänge an Ballen, Rist und Ferse. Für Schuhmacher, Orthopäden und Designer.',
+    bullets: [
+      'Weiten: numerisch (1–12) und alphabetisch (A–E und weiter)',
+      'Umrechner US / UK / EU (ISO) ↔ GOST Ukraine',
+      'Umfänge von Ballen, Rist, Ferse — mm und Zoll',
+      'Herren-, Damen- und Kinderleisten',
+    ],
+    aboutTitle: 'Warum ein Online-Rechner statt Papiertabellen?',
+    aboutText:
+      'Gedruckte Weitentabellen und klassische Schablonen erfordern manuelles Suchen und führen oft zu Fehlern bei der Gradierung. Dieser Rechner berechnet Weiten und Umfänge sofort passend zur Größe und beschleunigt die Leistenauswahl für orthopädische und Serienschuhe. Geeignet für Designer, Orthopäden und Schuhmacher.',
+    backLabel: 'Zurück zu Cordwainer',
   },
 } as const
 
@@ -123,28 +140,20 @@ export function ForwardOrthoSEOPage({ lang, setLang, onBack }: Props) {
             </p>
           </div>
           <div className="flex gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setLang('ru')}
-              className="px-2 py-1 rounded-lg text-[11px] font-medium"
-              style={{
-                background: lang === 'ru' ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
-                color: lang === 'ru' ? '#151210' : 'var(--color-muted)',
-              }}
-            >
-              RU
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang('uk')}
-              className="px-2 py-1 rounded-lg text-[11px] font-medium"
-              style={{
-                background: lang === 'uk' ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
-                color: lang === 'uk' ? '#151210' : 'var(--color-muted)',
-              }}
-            >
-              UK
-            </button>
+            {['ru', 'uk', 'de'].map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLang(l as Lang)}
+                className="px-2 py-1 rounded-lg text-[11px] font-medium uppercase"
+                style={{
+                  background: lang === l ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
+                  color: lang === l ? '#151210' : 'var(--color-muted)',
+                }}
+              >
+                {l}
+              </button>
+            ))}
           </div>
         </div>
 
