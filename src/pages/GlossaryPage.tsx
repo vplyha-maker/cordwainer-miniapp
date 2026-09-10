@@ -129,62 +129,22 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   }, [])
 
   return (
-    <div className="glossary-theme-root relative flex flex-col h-[100dvh] bg-[var(--color-bg,#F5F1EA)] text-[var(--color-ink,#1C1816)] overflow-hidden">
-      <style>{`
-        :root, .glossary-theme-root {
-          /* Light (Day) Theme - Надежные HEX цвета без DCI-P3 для стабильности iOS */
-          --color-bg: #F5F1EA;
-          --color-ink: #1C1816;
-          --color-surface: #FFFFFF;
-          --color-surface-2: #E8E3DA;
-          --color-border: rgba(0, 0, 0, 0.12);
-          --color-muted: #665E57;
-          --color-accent: #E4D00A;
-        }
-
-        @media (prefers-color-scheme: dark) {
-          :root, .glossary-theme-root {
-            /* Dark (Night) Theme */
-            --color-bg: #1C1816;
-            --color-ink: #F5F1EA;
-            --color-surface: #25201C;
-            --color-surface-2: #2F2924;
-            --color-border: rgba(255, 255, 255, 0.12);
-            --color-muted: #B9ACA0;
-            --color-accent: #E4D00A;
-          }
-        }
-
-        @keyframes glossaryIn {
-          from {
-            opacity: 0;
-            transform: scale(0.92) translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        .perspective-\\[1000px\\] { perspective: 1000px; }
-        .preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden {
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-        }
-        .scrollbar-none::-webkit-scrollbar { display: none; }
-        .scrollbar-none {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
-
+    <div 
+      className="relative flex flex-col h-[100dvh] overflow-hidden"
+      style={{ background: 'var(--color-bg, #1C1816)', color: 'var(--color-ink, #F5F1EA)' }}
+    >
       {/* Header */}
       <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
         <div className="flex items-center gap-3 min-w-0">
           {onBack && (
             <button
               onClick={onBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink,#1C1816)] bg-[var(--color-surface,#FFFFFF)] border border-[var(--color-border,rgba(0,0,0,0.12))] active:scale-90 transition-transform shrink-0"
+              className="w-10 h-10 rounded-full flex items-center justify-center border active:scale-90 transition-transform shrink-0"
+              style={{ 
+                background: 'var(--color-surface, #25201C)', 
+                color: 'var(--color-ink, #F5F1EA)',
+                borderColor: 'var(--color-border, rgba(255,255,255,0.12))' 
+              }}
               aria-label={lang === 'de' ? 'Zurück' : (lang === 'uk' ? 'Назад' : 'Назад')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -193,10 +153,16 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
             </button>
           )}
           <div className="min-w-0">
-            <h1 className="text-[28px] md:text-[34px] font-serif font-normal tracking-wide leading-none text-[var(--color-ink,#1C1816)] truncate">
+            <h1 
+              className="text-[28px] md:text-[34px] font-serif font-normal tracking-wide leading-none truncate"
+              style={{ color: 'var(--color-ink, #F5F1EA)' }}
+            >
               {t.title}
             </h1>
-            <p className="text-[11px] text-[var(--color-muted,#665E57)] mt-1">
+            <p 
+              className="text-[11px] mt-1"
+              style={{ color: 'var(--color-muted, #B9ACA0)' }}
+            >
               {filtered.length} {t.terms}
             </p>
           </div>
@@ -207,7 +173,13 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
       <div ref={listRef} className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
         {/* Search */}
         <div className="mb-4">
-          <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#FFFFFF)] border border-[var(--color-border,rgba(0,0,0,0.12))]">
+          <div 
+            className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 border"
+            style={{ 
+              background: 'var(--color-surface, #25201C)',
+              borderColor: 'var(--color-border, rgba(255,255,255,0.12))'
+            }}
+          >
             <svg
               width="16"
               height="16"
@@ -215,7 +187,8 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
               fill="none"
               stroke="currentColor"
               strokeWidth="1.8"
-              className="text-[var(--color-muted,#665E57)] shrink-0"
+              className="shrink-0"
+              style={{ color: 'var(--color-muted, #B9ACA0)' }}
             >
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
@@ -228,13 +201,15 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
                 setActiveLetter(null)
               }}
               placeholder={t.search}
-              className="flex-1 bg-transparent border-0 outline-none text-[13px] text-[var(--color-ink,#1C1816)] placeholder:text-[var(--color-muted,#665E57)] min-w-0"
+              className="flex-1 bg-transparent border-0 outline-none text-[13px] min-w-0"
+              style={{ color: 'var(--color-ink, #F5F1EA)' }}
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                className="text-[var(--color-muted,#665E57)] hover:text-[var(--color-ink,#1C1816)] p-0.5"
+                className="p-0.5 active:opacity-70"
+                style={{ color: 'var(--color-muted, #B9ACA0)' }}
                 aria-label="Clear"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -251,11 +226,12 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
             <button
               type="button"
               onClick={() => setActiveLetter(null)}
-              className={`h-8 px-3 rounded-full text-[12px] font-medium transition-colors shrink-0 ${
-                activeLetter === null
-                  ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]'
-                  : 'bg-[var(--color-surface,#FFFFFF)] text-[var(--color-muted,#665E57)] border border-[var(--color-border,rgba(0,0,0,0.12))]'
-              }`}
+              className="h-8 px-3 rounded-full text-[12px] font-medium transition-colors shrink-0 border"
+              style={{
+                background: activeLetter === null ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
+                color: activeLetter === null ? '#1C1816' : 'var(--color-muted, #B9ACA0)',
+                borderColor: activeLetter === null ? 'transparent' : 'var(--color-border, rgba(255,255,255,0.12))'
+              }}
             >
               {t.all}
             </button>
@@ -267,13 +243,12 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
                   type="button"
                   disabled={!hasTerms}
                   onClick={() => setActiveLetter(activeLetter === letter ? null : letter)}
-                  className={`w-8 h-8 rounded-full text-[13px] font-serif font-medium transition-colors shrink-0 flex items-center justify-center ${
-                    activeLetter === letter
-                      ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]'
-                      : hasTerms
-                        ? 'bg-[var(--color-surface,#FFFFFF)] text-[var(--color-muted,#665E57)] border border-[var(--color-border,rgba(0,0,0,0.12))]'
-                        : 'bg-[var(--color-surface,#FFFFFF)] text-[var(--color-muted,#665E57)] border border-[var(--color-border,rgba(0,0,0,0.12))] opacity-30 pointer-events-none'
-                  }`}
+                  className={`w-8 h-8 rounded-full text-[13px] font-serif font-medium transition-colors shrink-0 flex items-center justify-center border ${!hasTerms ? 'opacity-30 pointer-events-none' : ''}`}
+                  style={{
+                    background: activeLetter === letter ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
+                    color: activeLetter === letter ? '#1C1816' : 'var(--color-muted, #B9ACA0)',
+                    borderColor: activeLetter === letter ? 'transparent' : 'var(--color-border, rgba(255,255,255,0.12))'
+                  }}
                 >
                   {letter}
                 </button>
@@ -293,11 +268,12 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
                   key={cat}
                   type="button"
                   onClick={() => setActiveCategory(active ? null : cat)}
-                  className={`h-7 px-2.5 rounded-full text-[11px] transition-colors shrink-0 ${
-                    active
-                      ? 'bg-[var(--color-surface-2,#E8E3DA)] text-[var(--color-ink,#1C1816)] border border-[var(--color-accent,#E4D00A)]/50'
-                      : 'bg-[var(--color-surface,#FFFFFF)] text-[var(--color-muted,#665E57)] border border-[var(--color-border,rgba(0,0,0,0.08))]'
-                  }`}
+                  className="h-7 px-2.5 rounded-full text-[11px] transition-colors shrink-0 border"
+                  style={{
+                    background: active ? 'var(--color-surface-2, #2F2924)' : 'var(--color-surface, #25201C)',
+                    color: active ? 'var(--color-ink, #F5F1EA)' : 'var(--color-muted, #B9ACA0)',
+                    borderColor: active ? 'color-mix(in srgb, var(--color-accent, #E4D00A) 50%, transparent)' : 'color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 70%, transparent)'
+                  }}
                 >
                   {label}
                 </button>
@@ -306,15 +282,24 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         </div>
 
-        <p className="text-[11px] text-[var(--color-muted,#665E57)] mb-3">
+        <p 
+          className="text-[11px] mb-3"
+          style={{ color: 'var(--color-muted, #B9ACA0)' }}
+        >
           {t.flipHint}
         </p>
 
         {/* Cards grid */}
         {filtered.length === 0 ? (
-          <div className="rounded-[18px] p-8 bg-[var(--color-surface,#FFFFFF)] border border-[var(--color-border,rgba(0,0,0,0.12))] text-center">
-            <p className="text-[14px] text-[var(--color-ink,#1C1816)]">{t.empty}</p>
-            <p className="text-[12px] text-[var(--color-muted,#665E57)] mt-1">{t.emptyHint}</p>
+          <div 
+            className="rounded-[18px] p-8 border text-center"
+            style={{ 
+              background: 'var(--color-surface, #25201C)',
+              borderColor: 'var(--color-border, rgba(255,255,255,0.12))'
+            }}
+          >
+            <p className="text-[14px]" style={{ color: 'var(--color-ink, #F5F1EA)' }}>{t.empty}</p>
+            <p className="text-[12px] mt-1" style={{ color: 'var(--color-muted, #B9ACA0)' }}>{t.emptyHint}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
@@ -333,7 +318,10 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         )}
 
-        <p className="text-[10px] text-[var(--color-muted,#665E57)] text-center mb-4">
+        <p 
+          className="text-[10px] text-center mb-4"
+          style={{ color: 'var(--color-muted, #B9ACA0)' }}
+        >
           {t.source}
         </p>
       </div>
@@ -344,6 +332,24 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           <BottomDock active="search" lang={lang} />
         </div>
       </div>
+
+      <style>{`
+        @keyframes glossaryIn {
+          from { opacity: 0; transform: scale(0.92) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .perspective-\\[1000px\\] { perspective: 1000px; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden {
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+        }
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+        .scrollbar-none {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   )
 }
