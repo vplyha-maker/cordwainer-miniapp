@@ -202,15 +202,16 @@ export function HomePage({
     }
   }[lang]
 
+  // Использование более насыщенных и контрастных fallback-цветов, корректная генерация фонов
   const LEARNING = [
     {
       id: 'materials',
       title: t.materials,
       subtitle: t.materialsSub,
       count: t.materialsCount,
-      iconClass: 'bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--color-accent,#B46513)_15%,var(--color-surface))] text-[var(--color-accent,#B46513)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
         </svg>
       ),
@@ -220,9 +221,9 @@ export function HomePage({
       title: t.colors,
       subtitle: t.colorsSub,
       count: t.colorsCount,
-      iconClass: 'bg-[var(--pigment-azurite,#007FFF)]/15 text-[var(--pigment-azurite,#007FFF)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-azurite,#1D4ED8)_15%,var(--color-surface))] text-[var(--pigment-azurite,#1D4ED8)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
           <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
           <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
@@ -236,9 +237,9 @@ export function HomePage({
       title: t.styles,
       subtitle: t.stylesSub,
       count: t.stylesCount,
-      iconClass: 'bg-[var(--pigment-egyptian-blue,#1034A6)]/15 text-[var(--pigment-egyptian-blue,#1034A6)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-egyptian-blue,#1E3A8A)_15%,var(--color-surface))] text-[var(--pigment-egyptian-blue,#1E3A8A)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
           <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
           <path d="M 14 11.5 L 9 15" />
@@ -250,9 +251,9 @@ export function HomePage({
       title: t.sizes,
       subtitle: t.sizesSub,
       count: t.sizesCount,
-      iconClass: 'bg-[var(--pigment-malachite,#0BDA51)]/15 text-[var(--pigment-malachite,#0BDA51)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-malachite,#047857)_15%,var(--color-surface))] text-[var(--pigment-malachite,#047857)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19.875 6.27L17.73 4.125a2.25 2.25 0 00-3.18 0L3.375 15.3a2.25 2.25 0 000 3.18l2.145 2.145a2.25 2.25 0 003.18 0l11.175-11.175a2.25 2.25 0 000-3.18z" />
           <path d="M14.5 5.5l4 4M10.5 9.5l4 4M6.5 13.5l4 4" />
         </svg>
@@ -265,9 +266,9 @@ export function HomePage({
       id: 'calc',
       title: t.calc,
       subtitle: t.calcSub,
-      iconClass: 'bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--color-accent,#B46513)_15%,var(--color-surface))] text-[var(--color-accent,#B46513)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="2" width="16" height="20" rx="3" />
           <path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 18v.01M12 18v.01M8 18v.01M16 10v.01M12 10v.01M8 10v.01" />
         </svg>
@@ -277,9 +278,9 @@ export function HomePage({
       id: 'blog',
       title: t.blog,
       subtitle: t.blogSub,
-      iconClass: 'bg-[var(--pigment-lac-dye,#8B0000)]/15 text-[var(--pigment-lac-dye,#8B0000)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-lac-dye,#991B1B)_15%,var(--color-surface))] text-[var(--pigment-lac-dye,#991B1B)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 20h9" />
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
         </svg>
@@ -289,9 +290,9 @@ export function HomePage({
       id: 'glossary',
       title: t.glossary,
       subtitle: t.glossarySub,
-      iconClass: 'bg-[var(--pigment-azurite,#007FFF)]/15 text-[var(--pigment-azurite,#007FFF)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-azurite,#1D4ED8)_15%,var(--color-surface))] text-[var(--pigment-azurite,#1D4ED8)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
         </svg>
       ),
@@ -300,9 +301,9 @@ export function HomePage({
       id: 'prices',
       title: t.prices,
       subtitle: t.pricesSub,
-      iconClass: 'bg-[var(--pigment-malachite,#0BDA51)]/15 text-[var(--pigment-malachite,#0BDA51)]',
+      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-malachite,#047857)_15%,var(--color-surface))] text-[var(--pigment-malachite,#047857)]',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       ),
@@ -356,25 +357,24 @@ export function HomePage({
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
+    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden">
       {/* Header */}
       <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <h1 className="text-[34px] font-serif font-normal tracking-wide leading-none text-[var(--color-ink,#F5F1EA)]">
+        <h1 className="text-[34px] font-serif font-bold tracking-wide leading-none text-[var(--color-ink)]">
           {t.menu}
         </h1>
 
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-full p-1 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-full p-1 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
             {['ru', 'uk', 'de'].map((l) => (
               <button
                 key={l}
                 onClick={() => handleLangChange(l as Lang)}
-                className={`lang-toggle px-2 py-1 text-[10px] sm:text-[11px] uppercase rounded-full transition-colors ${
-                  lang === l ? 'active bg-white/10 text-white' : 'inactive text-white/50'
+                className={`px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase rounded-full transition-colors ${
+                  lang === l ? 'bg-[var(--color-ink)] text-[var(--color-bg)]' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
                 aria-pressed={lang === l}
               >
-                {/* ЗАМЕНА ЗДЕСЬ: отображаем UKR вместо UK */}
                 {l === 'uk' ? 'UKR' : l}
               </button>
             ))}
@@ -383,9 +383,9 @@ export function HomePage({
           {onBack && (
             <button
               onClick={onBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink,#F5F1EA)] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink)] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm active:scale-90 transition-transform"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
@@ -398,8 +398,8 @@ export function HomePage({
         
         {/* АКТИВНЫЙ ПОИСК */}
         <div className="mb-5 relative">
-          <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] focus-within:border-[var(--color-accent,#E4D00A)] focus-within:shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent,#E4D00A)_15%,transparent)] transition-all">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-muted,#B9ACA0)] shrink-0">
+          <div className="rounded-[18px] px-4 py-3.5 flex items-center gap-2.5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_20%,transparent)] transition-all">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-accent,var(--color-ink))] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
             </svg>
@@ -408,11 +408,11 @@ export function HomePage({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className="bg-transparent border-none outline-none text-[13px] text-[var(--color-ink,#F5F1EA)] w-full placeholder:text-[var(--color-muted,#B9ACA0)]"
+              className="bg-transparent border-none outline-none text-[14px] font-medium text-[var(--color-ink)] w-full placeholder:text-[var(--color-muted)] placeholder:font-medium"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="text-[var(--color-muted,#B9ACA0)] hover:text-white shrink-0">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <button onClick={() => setSearchQuery('')} className="text-[var(--color-muted)] hover:text-[var(--color-ink)] shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
@@ -423,7 +423,7 @@ export function HomePage({
         {/* УСЛОВНЫЙ РЕНДЕР: Поиск ИЛИ Обычное меню */}
         {query ? (
           <div className="search-results pb-6">
-            <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-3">
+            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
               {t.searchResults} ({searchResults.length})
             </p>
             {searchResults.length > 0 ? (
@@ -432,15 +432,15 @@ export function HomePage({
                   <button
                     key={`${res.type}-${res.id}-${i}`}
                     onClick={() => handleResultClick(res)}
-                    className="w-full text-left p-3.5 rounded-[16px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] hover:border-[var(--color-accent,#E4D00A)]/50 transition-colors active:scale-[0.98]"
+                    className="w-full text-left p-4 rounded-[16px] bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] shadow-sm transition-colors active:scale-[0.98]"
                   >
-                    <div className="text-[13px] font-medium text-[var(--color-ink,#F5F1EA)] line-clamp-1">{res.title}</div>
-                    <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-1">{res.subtitle}</div>
+                    <div className="text-[14px] font-bold text-[var(--color-ink)] line-clamp-1">{res.title}</div>
+                    <div className="text-[12px] font-medium text-[var(--color-muted)] mt-1.5">{res.subtitle}</div>
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="text-[13px] text-[var(--color-muted,#B9ACA0)] text-center py-12 bg-[var(--color-surface,#25201C)] rounded-[18px] border border-[var(--color-border,rgba(255,255,255,0.12))]">
+              <div className="text-[14px] font-medium text-[var(--color-muted)] text-center py-12 bg-[var(--color-surface)] rounded-[18px] border border-[var(--color-border)] shadow-sm">
                 {t.noResults}
               </div>
             )}
@@ -448,7 +448,7 @@ export function HomePage({
         ) : (
           <>
             {/* ОБУЧЕНИЕ */}
-            <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
+            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
               {t.learning}
             </p>
             <div className="grid grid-cols-2 gap-3 mb-6">
@@ -463,16 +463,16 @@ export function HomePage({
                       isStyles ? onOpenStyles : 
                       undefined
                     }
-                    className="min-h-[116px] h-auto p-4 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm"
+                    className="min-h-[124px] h-auto p-4 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95"
                   >
-                    <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
+                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
                       {item.icon}
                     </div>
-                    <div className="min-w-0 mt-2">
-                      <div className="text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] break-words">
+                    <div className="min-w-0 mt-3">
+                      <div className="text-[13px] font-bold leading-snug text-[var(--color-ink)] break-words">
                         {item.title}
                       </div>
-                      <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2">
+                      <div className="text-[11px] font-medium text-[var(--color-muted)] mt-1 line-clamp-2">
                         {item.subtitle}
                       </div>
                     </div>
@@ -482,7 +482,7 @@ export function HomePage({
             </div>
 
             {/* ИНСТРУМЕНТЫ */}
-            <p className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted,#B9ACA0)] mb-2.5">
+            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
               {t.tools}
             </p>
             <div className="grid grid-cols-4 gap-2.5 md:gap-3 mb-6">
@@ -506,25 +506,25 @@ export function HomePage({
                               ? onOpenPrices
                               : undefined
                     }
-                    className={`relative min-h-[116px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border ${
+                    className={`relative min-h-[124px] h-auto p-3 rounded-[18px] bg-[var(--color-surface)] border ${
                       isBlog && hasNewBlog 
-                        ? 'border-[var(--pigment-lac-dye,#8B0000)]/50 shadow-[0_0_10px_color-mix(in_srgb,var(--pigment-lac-dye,#8B0000)_15%,transparent)]' 
-                        : 'border-[var(--color-border,rgba(255,255,255,0.12))]'
-                    } flex flex-col justify-between text-left transition-transform active:scale-95 shadow-sm overflow-hidden`}
+                        ? 'border-[var(--pigment-lac-dye,#991B1B)] shadow-[0_0_12px_color-mix(in_srgb,var(--pigment-lac-dye,#991B1B)_20%,transparent)]' 
+                        : 'border-[var(--color-border)]'
+                    } shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95 overflow-hidden`}
                   >
-                    <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 ${item.iconClass}`}>
+                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${item.iconClass}`}>
                       {item.icon}
                     </div>
-                    <div className="min-w-0 mt-2 w-full">
-                      <div className="text-[11px] md:text-[13px] font-medium leading-snug text-[var(--color-ink,#F5F1EA)] flex items-start gap-0.5">
+                    <div className="min-w-0 mt-3 w-full">
+                      <div className="text-[11px] md:text-[13px] font-bold leading-snug text-[var(--color-ink)] flex items-start gap-0.5">
                         <span className="break-words hyphens-auto" lang={lang}>
                           {item.title}
                         </span>
                         {isBlog && hasNewBlog && (
-                          <span className="text-[var(--pigment-lac-dye,#8B0000)] shrink-0">•</span>
+                          <span className="text-[var(--pigment-lac-dye,#991B1B)] shrink-0">•</span>
                         )}
                       </div>
-                      <div className="text-[9.5px] md:text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5 line-clamp-2 leading-snug">
+                      <div className="text-[9.5px] md:text-[11px] font-medium text-[var(--color-muted)] mt-1 line-clamp-2 leading-snug">
                         {item.subtitle}
                       </div>
                     </div>
@@ -535,7 +535,7 @@ export function HomePage({
 
             {/* ИЗБРАННОЕ */}
             <button
-              className="w-full min-h-[80px] px-4 py-3 rounded-[18px] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98] shadow-sm"
+              className="w-full min-h-[80px] px-4 py-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98]"
               onClick={() => {
                 if (articleFavorites.length === 0) return
                 if (articleFavorites.length === 1) {
@@ -545,17 +545,17 @@ export function HomePage({
                 }
               }}
             >
-              <div className="w-10 h-10 rounded-[10px] bg-[var(--color-accent,#E4D00A)]/15 text-[var(--color-accent,#E4D00A)] flex items-center justify-center shrink-0 text-xl">
+              <div className="w-10 h-10 rounded-[10px] bg-[color-mix(in_srgb,var(--color-accent,#B46513)_15%,var(--color-surface))] text-[var(--color-accent,#B46513)] flex items-center justify-center shrink-0 text-xl font-bold">
                 ★
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-[var(--color-ink,#F5F1EA)]">{t.favorites}</div>
-                <div className="text-[11px] text-[var(--color-muted,#B9ACA0)] mt-0.5">{t.favoritesSub}</div>
+                <div className="text-[14px] font-bold text-[var(--color-ink)]">{t.favorites}</div>
+                <div className="text-[12px] font-medium text-[var(--color-muted)] mt-0.5">{t.favoritesSub}</div>
               </div>
-              <div className="flex -space-x-2.5 shrink-0">
+              <div className="flex -space-x-3 shrink-0">
                 {articleFavorites.length === 0 && (
-                  <div className="w-9 h-9 rounded-full bg-[var(--color-surface-2,#2F2924)] border border-[var(--color-border,rgba(255,255,255,0.12))] border-dashed flex items-center justify-center text-[var(--color-muted,#B9ACA0)]/40">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <div className="w-10 h-10 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-border)] border-dashed flex items-center justify-center text-[var(--color-muted)]">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
                     </svg>
                   </div>
@@ -563,14 +563,14 @@ export function HomePage({
                 {articleFavorites.slice(0, 3).map((item, idx) => (
                   <div
                     key={item.id}
-                    className="w-9 h-9 rounded-full border-2 border-[var(--color-bg,#1C1816)] overflow-hidden bg-[var(--color-surface-2,#2F2924)]"
+                    className="w-10 h-10 rounded-full border-[3px] border-[var(--color-surface)] overflow-hidden bg-[var(--color-bg)]"
                     style={{ zIndex: 10 - idx }}
                   >
                     <img src={item.imagePng} alt="" className="w-full h-full object-cover" draggable={false} />
                   </div>
                 ))}
                 {articleFavorites.length > 3 && (
-                  <div className="w-9 h-9 rounded-full border-2 border-[var(--color-bg,#1C1816)] flex items-center justify-center bg-[var(--color-surface,#25201C)] text-[10px] font-bold text-[var(--color-accent,#E4D00A)]">
+                  <div className="w-10 h-10 rounded-full border-[3px] border-[var(--color-surface)] flex items-center justify-center bg-[var(--color-bg)] text-[11px] font-black text-[var(--color-accent,#B46513)]" style={{ zIndex: 1 }}>
                     +{articleFavorites.length - 3}
                   </div>
                 )}
@@ -578,16 +578,22 @@ export function HomePage({
             </button>
 
             {/* QUOTE */}
-            <div className="rounded-[18px] p-4 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] shadow-sm">
-              <p className="text-[13px] leading-relaxed text-[var(--color-ink,#F5F1EA)]/80 italic">{t.quote}</p>
-              <p className="mt-2 text-[11px] text-[var(--color-accent,#E4D00A)] font-serif">Cordwainer</p>
+            <div className="rounded-[18px] p-5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
+              <p className="text-[14px] font-medium leading-relaxed text-[var(--color-ink)] italic">{t.quote}</p>
+              <p className="mt-2.5 text-[12px] font-bold text-[var(--color-accent,#B46513)] font-serif uppercase tracking-widest">Cordwainer</p>
             </div>
           </>
         )}
       </div>
 
-      {/* Bottom Dock */}
-      <div className="fixed bottom-[10px] left-0 right-0 z-50 pointer-events-auto">
+      {/* Плотная подложка для BottomDock */}
+      <div 
+        className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto shadow-[0_-4px_24px_rgba(0,0,0,0.06)]"
+        style={{
+          background: 'var(--color-surface)', 
+          borderTop: '1px solid var(--color-border)'
+        }}
+      >
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
           <BottomDock active="search" lang={lang} />
         </div>
