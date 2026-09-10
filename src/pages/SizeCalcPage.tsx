@@ -55,33 +55,25 @@ const FlagUS = () => (
 
 const THEMES = {
   men: {
-    accent: '#C6A47A',
-    accentSoft: '#E8C9A0',
-    accentBg: 'rgba(198,164,122,0.18)',
-    accentBorder: 'rgba(198,164,122,0.22)',
-    thumbBorder: '#C6A47A',
-    buttonText: '#0F0D0B',
+    accent: '#B46513',
+    bg: 'color-mix(in srgb, #B46513 12%, var(--color-surface))',
+    text: '#B46513',
   },
   women: {
-    accent: '#E8A0B5',
-    accentSoft: '#F2C4D0',
-    accentBg: 'rgba(232,160,181,0.16)',
-    accentBorder: 'rgba(232,160,181,0.25)',
-    thumbBorder: '#E8A0B5',
-    buttonText: '#1A1214',
+    accent: '#BE185D',
+    bg: 'color-mix(in srgb, #BE185D 12%, var(--color-surface))',
+    text: '#BE185D',
   },
   kids: {
-    accent: '#7EB8D4',
-    accentSoft: '#A8D4E8',
-    accentBg: 'rgba(126,184,212,0.16)',
-    accentBorder: 'rgba(126,184,212,0.25)',
-    thumbBorder: '#7EB8D4',
-    buttonText: '#0F1418',
+    accent: '#0369A1',
+    bg: 'color-mix(in srgb, #0369A1 12%, var(--color-surface))',
+    text: '#0369A1',
   },
 } as const
 
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
-  // Словарь с четким контролем регистра для единиц измерения
+  const safeLang = (lang && ['ru', 'uk', 'de'].includes(lang)) ? lang : 'uk'
+
   const t = {
     ru: {
       title: 'Размер обуви',
@@ -92,23 +84,20 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       measureGuide1: '1. Встаньте на лист бумаги (в носках).',
       measureGuide2: '2. Обведите стопу, держа ручку строго вертикально.',
       measureGuide3: '3. Измерьте линейкой расстояние от пятки до самого длинного пальца.',
-      measureTip:
-        '💡 Лучше всего измерять стопу во второй половине дня — к вечеру ноги немного отекают и становятся больше.',
+      measureTip: '💡 Лучше всего измерять стопу во второй половине дня — к вечеру ноги немного отекают и становятся больше.',
       recommended: 'Рекомендуемый размер',
       disclaimer: 'Размеры ориентировочные и могут отличаться в зависимости от колодки и бренда.',
       howCalculated: 'Как считается?',
       hide: 'Скрыть',
-      save: 'Сохранить результат',
       men: 'Муж',
       women: 'Жен',
       kids: 'Дет',
       cm: 'см',
       mm: 'мм',
-      cmLabel: 'СМ', // Для крупных подписей
+      cmLabel: 'СМ',
       mmLabel: 'ММ',
       standardsTitle: 'Стандарты',
-      standardsNote:
-        'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры брендов могут отличаться.',
+      standardsNote: 'Основано на ISO 19407:2023 и ISO 9407 (Mondopoint). Реальные размеры могут отличаться.',
       isoEu: 'ISO 19407 · Paris Point',
       isoUk: 'ISO 19407 · Barleycorn',
       isoUs: 'ISO 19407 · UK + сдвиг',
@@ -123,23 +112,20 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       measureGuide1: '1. Станьте на аркуш паперу (у шкарпетках).',
       measureGuide2: '2. Обведіть стопу, тримаючи ручку строго вертикально.',
       measureGuide3: '3. Виміряйте лінійкою відстань від п’яти до найдовшого пальця.',
-      measureTip:
-        '💡 Найкраще вимірювати стопу в другій половині дня — до вечора ноги трохи набрякають і стають більшими.',
+      measureTip: '💡 Найкраще вимірювати стопу в другій половині дня — до вечора ноги трохи набрякають.',
       recommended: 'Рекомендований розмір',
       disclaimer: 'Розміри орієнтовні і можуть відрізнятися залежно від колодки та бренду.',
       howCalculated: 'Як рахується?',
       hide: 'Сховати',
-      save: 'Зберегти результат',
       men: 'Чол',
       women: 'Жін',
       kids: 'Дит',
       cm: 'см',
       mm: 'мм',
-      cmLabel: 'СМ', // Для крупных подписей
+      cmLabel: 'СМ',
       mmLabel: 'ММ',
       standardsTitle: 'Стандарти',
-      standardsNote:
-        'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри брендів можуть відрізнятися.',
+      standardsNote: 'На основі ISO 19407:2023 та ISO 9407 (Mondopoint). Реальні розміри можуть відрізнятися.',
       isoEu: 'ISO 19407 · Paris Point',
       isoUk: 'ISO 19407 · Barleycorn',
       isoUs: 'ISO 19407 · UK + зсув',
@@ -154,29 +140,26 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       measureGuide1: '1. Stellen Sie sich auf ein Blatt Papier (in Socken).',
       measureGuide2: '2. Umranden Sie den Fuß, halten Sie den Stift dabei senkrecht.',
       measureGuide3: '3. Messen Sie den Abstand von der Ferse bis zum längsten Zeh.',
-      measureTip:
-        '💡 Am besten messen Sie am Nachmittag — Füße schwellen im Laufe des Tages leicht an und werden größer.',
+      measureTip: '💡 Am besten messen Sie am Nachmittag — Füße schwellen im Laufe des Tages leicht an.',
       recommended: 'Empfohlene Größe',
       disclaimer: 'Die Größen sind Richtwerte und können je nach Leisten und Marke abweichen.',
       howCalculated: 'Wie wird gerechnet?',
       hide: 'Verbergen',
-      save: 'Ergebnis speichern',
       men: 'Herren',
       women: 'Damen',
       kids: 'Kinder',
       cm: 'cm',
       mm: 'mm',
-      cmLabel: 'cm', // Для крупных подписей (в немецком всегда маленькие)
+      cmLabel: 'cm',
       mmLabel: 'mm',
       standardsTitle: 'Standards',
-      standardsNote:
-        'Basierend auf ISO 19407:2023 und ISO 9407 (Mondopoint). Tatsächliche Markengrößen können abweichen.',
+      standardsNote: 'Basierend auf ISO 19407:2023 und ISO 9407 (Mondopoint). Tatsächliche Größen können abweichen.',
       isoEu: 'ISO 19407 · Paris Point',
       isoUk: 'ISO 19407 · Barleycorn',
       isoUs: 'ISO 19407 · UK + Offset',
       isoMondo: 'ISO 9407 · Fuß in mm',
     },
-  }[lang]
+  }[safeLang]
 
   const [gender, setGender] = useState<Gender>('men')
   const [unit, setUnit] = useState<'cm' | 'mm'>('cm')
@@ -185,6 +168,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [editValue, setEditValue] = useState('')
   const [showStandards, setShowStandards] = useState(false)
   const [showMeasureGuide, setShowMeasureGuide] = useState(false)
+  
+  // Состояние для иконки "Избранное"
+  const [isSaved, setIsSaved] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const theme = THEMES[gender]
@@ -250,70 +236,51 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative flex flex-col h-[100dvh] overflow-hidden"
-      style={{
-        background: 'var(--color-bg, #1C1816)',
-        color: 'var(--color-ink, #F5F1EA)',
-      }}
+      className="relative flex flex-col h-[100dvh] overflow-hidden bg-[var(--color-bg)] text-[var(--color-ink)]"
     >
-      <div className="relative z-20 flex items-center justify-between px-4 md:px-6 pt-3 pb-1">
+      {/* Header */}
+      <div className="relative z-20 flex items-center justify-between px-4 md:px-6 pt-5 pb-3">
         <button
-          onClick={() => {
-            triggerHaptic()
-            onBack()
-          }}
-          className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-          }}
+          onClick={() => { triggerHaptic(); onBack(); }}
+          className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-transform bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm text-[var(--color-ink)]"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
 
         <div className="text-center">
-          <h1 className="text-[16px] font-medium tracking-wide calc-page-title">{t.title}</h1>
-          <p className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-            {t.subtitle}
-          </p>
+          <h1 className="text-[17px] font-bold tracking-wide text-[var(--color-ink)]">{t.title}</h1>
+          <p className="text-[12px] font-medium text-[var(--color-muted)]">{t.subtitle}</p>
         </div>
 
         <button
-          className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-            color: theme.accent,
+          onClick={() => {
+            triggerHaptic('medium')
+            setIsSaved(!isSaved)
           }}
+          className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-transform bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm"
+          style={{ color: theme.accent }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-28 scrollbar-hide calc-page-content">
-        <div
-          className="mt-4 mb-6 flex p-[3px] rounded-2xl calc-segment"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-          }}
-        >
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-8 scrollbar-hide">
+        
+        {/* Gender Tabs */}
+        <div className="mt-2 mb-5 flex p-1.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
           {(['men', 'women', 'kids'] as Gender[]).map((g) => (
             <button
               key={g}
-              onClick={() => {
-                triggerHaptic()
-                handleGenderChange(g)
-              }}
-              className="flex-1 py-2.5 rounded-[14px] text-[13px] font-medium transition-all duration-200"
+              onClick={() => { triggerHaptic(); handleGenderChange(g); }}
+              className="flex-1 py-2.5 rounded-[14px] text-[14px] font-bold transition-all duration-200"
               style={
                 gender === g
-                  ? { background: THEMES[g].accentBg, color: THEMES[g].accentSoft }
-                  : { color: 'var(--color-muted, #B9ACA0)' }
+                  ? { background: THEMES[g].bg, color: THEMES[g].text }
+                  : { color: 'var(--color-muted)' }
               }
             >
               {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
@@ -321,36 +288,20 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           ))}
         </div>
 
-        <div
-          className="rounded-3xl p-5 mb-4 shadow-sm"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-          }}
-        >
+        {/* Foot Length Card */}
+        <div className="rounded-[24px] p-5 mb-4 shadow-sm bg-[var(--color-surface)] border border-[var(--color-border)]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[13px] font-medium" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-              {t.step1}
-            </span>
-            <div
-              className="flex rounded-full p-0.5"
-              style={{
-                background: 'var(--color-bg, #1C1816)',
-                border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-              }}
-            >
+            <span className="text-[14px] font-bold text-[var(--color-ink)]">{t.step1}</span>
+            <div className="flex rounded-full p-1 bg-[var(--color-bg)] border border-[var(--color-border)]">
               {(['cm', 'mm'] as const).map((u) => (
                 <button
                   key={u}
-                  onClick={() => {
-                    triggerHaptic()
-                    setUnit(u)
-                  }}
-                  className="px-3 py-1 rounded-full text-[11px] font-semibold transition-all"
+                  onClick={() => { triggerHaptic(); setUnit(u); }}
+                  className="px-3.5 py-1 rounded-full text-[12px] font-bold transition-all uppercase"
                   style={
                     unit === u
-                      ? { background: theme.accent, color: theme.buttonText }
-                      : { color: 'var(--color-muted, #B9ACA0)' }
+                      ? { background: theme.accent, color: '#FFFFFF' }
+                      : { color: 'var(--color-muted)' }
                   }
                 >
                   {u === 'cm' ? t.cm : t.mm}
@@ -359,25 +310,21 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-5">
-            <p className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-              {t.step1Hint}
-            </p>
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-[12px] font-medium text-[var(--color-muted)]">{t.step1Hint}</p>
             <button
-              onClick={() => {
-                triggerHaptic()
-                setShowMeasureGuide((v) => !v)
-              }}
-              className="flex items-center gap-1 text-[11px] font-medium transition-opacity active:opacity-70"
+              onClick={() => { triggerHaptic(); setShowMeasureGuide((v) => !v); }}
+              className="flex items-center gap-1 text-[12px] font-bold transition-opacity active:opacity-70"
               style={{ color: theme.accent }}
             >
               {t.howToMeasureBtn}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 {showMeasureGuide ? <path d="M18 15l-6-6-6 6" /> : <path d="M6 9l6 6 6-6" />}
               </svg>
             </button>
           </div>
 
+          {/* Measure Guide Accordion */}
           <AnimatePresence>
             {showMeasureGuide && (
               <motion.div
@@ -386,77 +333,48 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 exit={{ opacity: 0, height: 0, y: -10 }}
                 className="overflow-hidden mb-6"
               >
-                <div
-                  className="flex items-center gap-3 p-3 mb-2 rounded-2xl"
-                  style={{
-                    background: 'var(--color-bg, #1C1816)',
-                    border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-                  }}
-                >
+                <div className="flex items-center gap-3 p-4 mb-2 rounded-[18px] bg-[var(--color-bg)] border border-[var(--color-border)]">
                   <div className="shrink-0 flex items-center justify-center w-12 relative">
                     <svg width="40" height="84" viewBox="0 0 40 84" fill="none">
-                      <path
-                        d="M19.5 82C13 82 10 75 11 65C12.5 50 8 42 7 30C6 15 11 5 18 3C25 1 29 8 30 15C31 22 30 35 32 45C34.5 57 32 70 28 75C24.5 79.5 22 82 19.5 82Z"
-                        stroke="var(--color-muted, #B9ACA0)"
-                        strokeWidth="1.5"
-                      />
-                      <line x1="2" y1="82" x2="38" y2="82" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
-                      <line x1="2" y1="2" x2="38" y2="2" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="1.5" />
-                      <path
-                        d="M35 6L35 78M32 9L35 3L38 9M32 75L35 81L38 75"
-                        stroke={theme.accent}
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                      <path d="M19.5 82C13 82 10 75 11 65C12.5 50 8 42 7 30C6 15 11 5 18 3C25 1 29 8 30 15C31 22 30 35 32 45C34.5 57 32 70 28 75C24.5 79.5 22 82 19.5 82Z" stroke="var(--color-muted)" strokeWidth="1.5" />
+                      <line x1="2" y1="82" x2="38" y2="82" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="2" />
+                      <line x1="2" y1="2" x2="38" y2="2" stroke={theme.accent} strokeDasharray="2 2" strokeWidth="2" />
+                      <path d="M35 6L35 78M32 9L35 3L38 9M32 75L35 81L38 75" stroke={theme.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <motion.div
                       animate={{ y: [0, 80, 0] }}
                       transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-                      className="absolute top-[2px] left-0 w-full h-[1px]"
-                      style={{ background: theme.accent, boxShadow: `0 0 6px ${theme.accent}` }}
+                      className="absolute top-[2px] left-0 w-full h-[2px]"
+                      style={{ background: theme.accent, boxShadow: `0 0 8px ${theme.accent}` }}
                     />
                   </div>
-                  <div
-                    className="flex flex-col justify-center space-y-2 text-[11px] leading-tight"
-                    style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                  >
+                  <div className="flex flex-col justify-center space-y-2 text-[12px] font-medium text-[var(--color-muted)] leading-tight">
                     <p>{t.measureGuide1}</p>
                     <p>{t.measureGuide2}</p>
                     <p>{t.measureGuide3}</p>
                   </div>
                 </div>
-                <div
-                  className="text-[11px] p-3 rounded-xl"
-                  style={{
-                    color: 'var(--color-muted, #B9ACA0)',
-                    background: 'var(--color-bg, #1C1816)',
-                    border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-                  }}
-                >
+                <div className="text-[12px] font-medium p-4 rounded-[18px] bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-muted)]">
                   {t.measureTip}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="flex items-center justify-center gap-4 mb-7">
+          {/* Stepper + Input */}
+          <div className="flex items-center justify-center gap-4 mb-8">
             <button
               onClick={(e) => stepValue(-1, e)}
               disabled={footMm <= range.min}
-              className="w-10 h-10 calc-stepper-btn flex shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors disabled:opacity-30"
-              style={{
-                background: 'var(--color-bg, #1C1816)',
-                border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-                color: theme.accentSoft,
-              }}
+              className="w-12 h-12 flex shrink-0 items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-95 transition-all disabled:opacity-30 shadow-sm"
+              style={{ color: theme.accent }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M5 12h14" />
               </svg>
             </button>
 
-            <div className="text-center w-36" onClick={startEdit}>
+            <div className="text-center w-40" onClick={startEdit}>
               {isEditing ? (
                 <input
                   ref={inputRef}
@@ -468,23 +386,16 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   }}
                   onBlur={commitEdit}
                   onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                  className="w-full text-center text-[48px] font-light bg-transparent outline-none border-b tabular-nums"
-                  style={{ color: theme.accentSoft, borderColor: `${theme.accent}66` }}
+                  className="w-full text-center text-[52px] font-bold bg-transparent outline-none tabular-nums"
+                  style={{ color: theme.text, borderBottom: `2px solid ${theme.accent}` }}
                   inputMode="decimal"
                 />
               ) : (
                 <div className="cursor-pointer active:opacity-70 transition-opacity whitespace-nowrap">
-                  <span
-                    className="text-[48px] font-light tracking-tight leading-none tabular-nums"
-                    style={{ color: theme.accentSoft }}
-                  >
+                  <span className="text-[52px] font-bold tracking-tight leading-none tabular-nums" style={{ color: theme.text }}>
                     {displayValue}
                   </span>
-                  <span
-                    className="text-[18px] ml-1.5 align-top"
-                    style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                  >
-                    {/* Убран uppercase, теперь берется напрямую из словаря */}
+                  <span className="text-[18px] font-bold ml-1.5 align-top text-[var(--color-muted)]">
                     {unit === 'cm' ? t.cmLabel : t.mmLabel}
                   </span>
                 </div>
@@ -494,20 +405,17 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             <button
               onClick={(e) => stepValue(1, e)}
               disabled={footMm >= range.max}
-              className="w-10 h-10 calc-stepper-btn flex shrink-0 items-center justify-center rounded-full active:bg-white/10 transition-colors disabled:opacity-30"
-              style={{
-                background: 'var(--color-bg, #1C1816)',
-                border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-                color: theme.accentSoft,
-              }}
+              className="w-12 h-12 flex shrink-0 items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-95 transition-all disabled:opacity-30 shadow-sm"
+              style={{ color: theme.accent }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </button>
           </div>
 
-          <div className="px-1">
+          {/* Slider */}
+          <div className="px-1 relative">
             <input
               type="range"
               min={range.min}
@@ -516,150 +424,99 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               value={footMm}
               onChange={(e) => setFootMm(Number(e.target.value))}
               onPointerUp={() => triggerHaptic('light')}
-              className="w-full h-2 appearance-none bg-transparent cursor-pointer
+              className="w-full h-2.5 appearance-none bg-transparent cursor-pointer relative z-10
                 [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:w-[22px]
-                [&::-webkit-slider-thumb]:h-[22px]
+                [&::-webkit-slider-thumb]:w-[24px]
+                [&::-webkit-slider-thumb]:h-[24px]
                 [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:border-[3px]
                 [&::-webkit-slider-thumb]:cursor-pointer
-                [&::-moz-range-thumb]:w-[22px]
-                [&::-moz-range-thumb]:h-[22px]
-                [&::-moz-range-thumb]:rounded-full
-                [&::-moz-range-thumb]:border-[3px]"
+                [&::-moz-range-thumb]:w-[24px]
+                [&::-moz-range-thumb]:h-[24px]
+                [&::-moz-range-thumb]:rounded-full"
               style={{
-                background: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${pct}%, color-mix(in srgb, var(--color-surface-2, #2F2924) 90%, transparent) ${pct}%, color-mix(in srgb, var(--color-surface-2, #2F2924) 90%, transparent) 100%)`,
+                background: `linear-gradient(to right, ${theme.accent} 0%, ${theme.accent} ${pct}%, var(--color-border) ${pct}%, var(--color-border) 100%)`,
                 borderRadius: 999,
               }}
             />
             <style>{`
               input[type=range]::-webkit-slider-thumb {
-                background: ${theme.accentSoft} !important;
-                border-color: ${theme.thumbBorder} !important;
-                box-shadow: 0 0 16px ${theme.accent}66 !important;
+                background: ${theme.accent} !important;
+                border: 4px solid var(--color-surface) !important;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
               }
               input[type=range]::-moz-range-thumb {
-                background: ${theme.accentSoft} !important;
-                border-color: ${theme.thumbBorder} !important;
+                background: ${theme.accent} !important;
+                border: 4px solid var(--color-surface) !important;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
               }
             `}</style>
-            <div
-              className="flex justify-between mt-2.5 text-[10px] tabular-nums"
-              style={{ color: 'var(--color-muted, #B9ACA0)' }}
-            >
-              <span>
-                {unit === 'cm' ? (range.min / 10).toFixed(1) : range.min} {displayUnit}
-              </span>
-              <span>
-                {unit === 'cm' ? (range.max / 10).toFixed(1) : range.max} {displayUnit}
-              </span>
+            <div className="flex justify-between mt-3 text-[11px] font-bold tabular-nums text-[var(--color-muted)]">
+              <span>{unit === 'cm' ? (range.min / 10).toFixed(1) : range.min} {displayUnit}</span>
+              <span>{unit === 'cm' ? (range.max / 10).toFixed(1) : range.max} {displayUnit}</span>
             </div>
           </div>
         </div>
 
-        <div
-          className="rounded-3xl p-6 mb-4 text-center shadow-sm calc-result-card"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: `1px solid ${theme.accentBorder}`,
-          }}
-        >
-          <div className="flex items-center justify-center gap-1.5 mb-2">
+        {/* Result Card */}
+        <div className="rounded-[24px] p-6 mb-4 text-center shadow-sm bg-[var(--color-surface)] border border-[var(--color-border)]">
+          <div className="flex items-center justify-center gap-2 mb-2">
             <FlagEU />
             <FlagUA />
-            <span
-              className="text-[11px] tracking-[0.12em] uppercase ml-1"
-              style={{ color: 'var(--color-muted, #B9ACA0)' }}
-            >
+            <span className="text-[12px] font-bold tracking-[0.12em] uppercase ml-1 text-[var(--color-muted)]">
               EU / UKR
             </span>
           </div>
 
-          <div
-            className="text-[64px] font-light leading-none tracking-tight mb-1 tabular-nums"
-            style={{ color: theme.accentSoft }}
-          >
+          <div className="text-[72px] font-bold leading-none tracking-tight mb-2 tabular-nums" style={{ color: theme.text }}>
             {formatSize(result.eu)}
           </div>
-          <div className="text-[12px] mb-5" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+          <div className="text-[13px] font-medium mb-6 text-[var(--color-muted)]">
             {t.recommended}
           </div>
 
-          {/* Стабильная сетка — без прыжков при смене цифр */}
-          <div
-            className="grid grid-cols-3 gap-2 pt-4 items-start"
-            style={{
-              borderTop: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 10%, transparent)',
-            }}
-          >
-            <div className="flex flex-col items-center gap-1.5 min-w-0">
-              <div className="flex items-center gap-1 h-4">
+          <div className="grid grid-cols-3 gap-2 pt-5 items-start border-t border-[var(--color-border)]">
+            <div className="flex flex-col items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 h-4">
                 <FlagUK />
-                <span className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  UK
-                </span>
+                <span className="text-[12px] font-bold text-[var(--color-muted)]">UK</span>
               </div>
-              <span
-                className="text-[15px] font-medium tabular-nums leading-none"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
+              <span className="text-[16px] font-bold tabular-nums leading-none text-[var(--color-ink)]">
                 {formatSize(result.uk)}
               </span>
             </div>
 
-            <div
-              className="flex flex-col items-center gap-1.5 min-w-0 border-x px-1"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--color-accent, #C6A47A) 15%, transparent)',
-              }}
-            >
-              <div className="flex items-center gap-1 h-4">
+            <div className="flex flex-col items-center gap-2 min-w-0 border-x border-[var(--color-border)] px-1">
+              <div className="flex items-center gap-1.5 h-4">
                 <FlagUS />
-                <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  {usLabel}
-                </span>
+                <span className="text-[12px] font-bold whitespace-nowrap text-[var(--color-muted)]">{usLabel}</span>
               </div>
-              <span
-                className="text-[15px] font-medium tabular-nums leading-none"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
+              <span className="text-[16px] font-bold tabular-nums leading-none text-[var(--color-ink)]">
                 {formatSize(result.us)}
               </span>
             </div>
 
-            <div className="flex flex-col items-center gap-1.5 min-w-0">
+            <div className="flex flex-col items-center gap-2 min-w-0">
               <div className="flex items-center h-4">
-                {/* Убран uppercase, теперь берется напрямую из словаря */}
-                <span className="text-[11px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  {t.cmLabel}
-                </span>
+                <span className="text-[12px] font-bold text-[var(--color-muted)]">{t.cmLabel}</span>
               </div>
-              <span
-                className="text-[15px] font-medium tabular-nums leading-none"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
+              <span className="text-[16px] font-bold tabular-nums leading-none text-[var(--color-ink)]">
                 {result.cm.toFixed(1).replace('.', ',')}
               </span>
             </div>
           </div>
         </div>
 
-        <p
-          className="text-[11px] leading-snug px-1 mb-3"
-          style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 70%, transparent)' }}
-        >
+        <p className="text-[12px] font-medium leading-snug px-2 mb-4 text-[var(--color-muted)]">
           {t.disclaimer}
         </p>
 
+        {/* Standards Toggle */}
         <button
-          onClick={() => {
-            triggerHaptic()
-            setShowStandards((v) => !v)
-          }}
-          className="flex items-center gap-1.5 text-[12px] font-medium mb-4 px-1"
+          onClick={() => { triggerHaptic(); setShowStandards((v) => !v); }}
+          className="flex items-center gap-1.5 text-[13px] font-bold mb-5 px-2 active:opacity-70 transition-opacity"
           style={{ color: theme.accent }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             {showStandards ? <path d="M18 15l-6-6-6 6" /> : <path d="M6 9l6 6 6-6" />}
           </svg>
           {showStandards ? t.hide : t.howCalculated}
@@ -673,74 +530,35 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden mb-6"
             >
-              <div
-                className="rounded-2xl p-4 shadow-sm"
-                style={{
-                  background: 'var(--color-surface, #25201C)',
-                  border: '1px solid color-mix(in srgb, var(--color-accent, #C6A47A) 20%, transparent)',
-                }}
-              >
-                <div
-                  className="text-[11px] font-medium tracking-wide uppercase mb-3"
-                  style={{ color: theme.accent }}
-                >
+              <div className="rounded-[20px] p-5 shadow-sm bg-[var(--color-surface)] border border-[var(--color-border)]">
+                <div className="text-[12px] font-bold tracking-wide uppercase mb-4" style={{ color: theme.accent }}>
                   {t.standardsTitle}
                 </div>
-                <div className="space-y-2 text-[12px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
-                      EU / UKR
-                    </span>
+                <div className="space-y-3 text-[13px] font-medium text-[var(--color-muted)]">
+                  <div className="flex gap-4">
+                    <span className="w-[72px] shrink-0 font-bold" style={{ color: theme.text }}>EU / UKR</span>
                     <span>{t.isoEu}</span>
                   </div>
-                  <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
-                      UK
-                    </span>
+                  <div className="flex gap-4">
+                    <span className="w-[72px] shrink-0 font-bold" style={{ color: theme.text }}>UK</span>
                     <span>{t.isoUk}</span>
                   </div>
-                  <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
-                      US
-                    </span>
+                  <div className="flex gap-4">
+                    <span className="w-[72px] shrink-0 font-bold" style={{ color: theme.text }}>US</span>
                     <span>{t.isoUs}</span>
                   </div>
-                  <div className="flex gap-3">
-                    <span className="w-[72px] shrink-0" style={{ color: theme.accent }}>
-                      Mondopoint
-                    </span>
+                  <div className="flex gap-4">
+                    <span className="w-[72px] shrink-0 font-bold" style={{ color: theme.text }}>Mondopoint</span>
                     <span>{t.isoMondo}</span>
                   </div>
                 </div>
-                <p
-                  className="mt-3 text-[11px] leading-snug"
-                  style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 70%, transparent)' }}
-                >
+                <p className="mt-4 text-[12px] font-medium leading-snug pt-3 border-t border-[var(--color-border)] text-[var(--color-muted)]">
                   {t.standardsNote}
                 </p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      <div className="fixed bottom-6 left-0 right-0 z-40 pointer-events-none">
-        <div className="mx-auto w-full max-w-[var(--app-max-width)] px-4 md:px-6">
-          <button
-            onClick={() => triggerHaptic('medium')}
-            className="w-full py-3.5 rounded-2xl text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform pointer-events-auto"
-            style={{
-              background: theme.accent,
-              color: theme.buttonText,
-              boxShadow: `0 8px 28px ${theme.accent}40`,
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            {t.save}
-          </button>
-        </div>
       </div>
     </motion.div>
   )
