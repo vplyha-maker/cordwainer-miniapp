@@ -14,23 +14,9 @@ type Labels = {
   forefoot?: string
   rearfoot?: string
   entryAngle?: string
+  mm?: string
 }
 
-type Props = {
-  geometry: HeelGeometry
-  eng: HeelEngineering
-  audit: HeelAudit
-  auditTitle: string
-  auditMessage: string
-  soleType: SoleType
-  heelType: HeelType
-  heelHeight: number
-  toeThickness: number
-  labels: Labels
-  onFix?: () => void
-}
-
-// Адаптивные стили для алёртов на основе CSS-переменных
 const AUDIT_STYLES = {
   SUCCESS: {
     color: 'var(--pigment-malachite, #047857)',
@@ -67,7 +53,6 @@ export function HeelCanvas({
   labels: t,
   onFix,
 }: Props) {
-  // Выбор стиля в зависимости от статуса аудита
   const isInfo = audit.titleKey === 'negDropTitle'
   const styleObj = isInfo ? AUDIT_STYLES.INFO : AUDIT_STYLES[audit.status]
 
@@ -80,7 +65,6 @@ export function HeelCanvas({
   const entryLabel = t.entryAngle ?? 'Угол въезда'
   const dropMm = heelHeight - toeThickness
 
-  // Определение цвета для линии смещения каблука
   const offsetColor = eng.heelOffsetTooFarBack
     ? 'var(--pigment-lac-dye, #E11D48)'
     : eng.heelOffsetTooFarForward
@@ -95,7 +79,6 @@ export function HeelCanvas({
         borderColor: styleObj.border,
       }}
     >
-      {/* Alert Header */}
       <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2">
         <div className="min-w-0">
           <div className="text-[13px] font-bold leading-tight" style={{ color: styleObj.color }}>
@@ -119,7 +102,6 @@ export function HeelCanvas({
         )}
       </div>
 
-      {/* SVG Canvas */}
       <div className="relative w-full" style={{ height: g.svgHeight }}>
         <svg
           width="100%"
@@ -128,7 +110,6 @@ export function HeelCanvas({
           preserveAspectRatio="xMidYMax meet"
           className="overflow-visible"
         >
-          {/* Main Title */}
           <text
             x={(g.xHeel + g.xToe) / 2 - 42}
             y="8"
@@ -139,7 +120,6 @@ export function HeelCanvas({
             {massTitle}
           </text>
 
-          {/* Heel Mass - Top Left */}
           <text x={Math.max(2, g.xHeel - 2)} y="18" fill="var(--color-muted)" fontSize="7" fontWeight="bold">
             {rearLabel}
           </text>
@@ -147,7 +127,6 @@ export function HeelCanvas({
             {eng.heelLoad}%
           </text>
 
-          {/* Forefoot Mass - Top Right */}
           <text x={g.xToe - 32} y="18" fill="var(--color-muted)" fontSize="7" fontWeight="bold">
             {foreLabel}
           </text>
@@ -155,7 +134,6 @@ export function HeelCanvas({
             {eng.forefootLoad}%
           </text>
 
-          {/* Entry Angle */}
           {showEntry && (
             <>
               <text
@@ -179,7 +157,6 @@ export function HeelCanvas({
             </>
           )}
 
-          {/* Ground Line */}
           <line
             x1="0"
             y1={g.yGround}
@@ -190,7 +167,6 @@ export function HeelCanvas({
             strokeDasharray="2 2"
           />
           
-          {/* Platform Line */}
           <line
             x1={g.xHeel - 8}
             y1={g.yFootBall}
@@ -202,7 +178,6 @@ export function HeelCanvas({
             opacity="0.6"
           />
 
-          {/* Heel Center Line (Flat Only) */}
           {soleType === 'flat' && (
             <>
               <line
@@ -223,7 +198,6 @@ export function HeelCanvas({
             </>
           )}
 
-          {/* Drop Label */}
           {soleType === 'rocker' ? (
             <text
               x={g.xBall + 8}
@@ -246,7 +220,6 @@ export function HeelCanvas({
             </text>
           )}
 
-          {/* Geometry Layers */}
           <path 
             d={g.heelPath} 
             fill="color-mix(in srgb, var(--color-accent, #B46513) 90%, transparent)" 
@@ -259,7 +232,6 @@ export function HeelCanvas({
             strokeLinejoin="round"
           />
 
-          {/* Shank (Flat Only) */}
           {soleType === 'flat' && (
             <path
               d={g.shankCurve}
@@ -270,7 +242,6 @@ export function HeelCanvas({
             />
           )}
 
-          {/* Rocker Apex */}
           {soleType === 'rocker' && (
             <>
               <circle cx={g.xBall} cy={g.yFootBall} r="3" fill="var(--pigment-lac-dye, #E11D48)" />
@@ -288,7 +259,6 @@ export function HeelCanvas({
         </svg>
       </div>
 
-      {/* Bottom Info Bar */}
       <div 
         className="px-4 py-2.5 flex justify-between text-[11px] font-medium"
         style={{
