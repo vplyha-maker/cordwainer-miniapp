@@ -117,7 +117,9 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
       gostNum: 'ГОСТ (цифра)', gostLet: 'ГОСТ (буква)', iso: 'EU / ISO',
+      mondopointLabel: 'Mondopoint (мм/дюймы)',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
+      understood: 'Понятно',
       modal: {
         gostNum: { title: 'Стандарты ГОСТ', text: 'ГОСТ 3927-88 (цифровая и буквенная системы). Определяет базовые обхваты колодки.' },
         iso: { title: 'Стандарт ISO', text: 'Международный стандарт ISO / EU для маркировки параметров обуви и колодок.' }
@@ -130,7 +132,9 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
       gostNum: 'ДСТУ (цифра)', gostLet: 'ДСТУ (буква)', iso: 'EU / ISO',
+      mondopointLabel: 'Mondopoint (мм/дюйми)',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
+      understood: 'Зрозуміло',
       modal: {
         gostNum: { title: 'Стандарти ДСТУ', text: 'ДСТУ 3927-88 (цифрова та літерна системи). Визначає базові обхвати колодки.' },
         iso: { title: 'Стандарт ISO', text: 'Міжнародний стандарт ISO / EU для маркування параметрів взуття та колодок.' }
@@ -143,7 +147,9 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
       gostNum: 'GOST (Zahl)', gostLet: 'GOST (Buchstabe)', iso: 'EU / ISO',
+      mondopointLabel: 'Mondopoint (mm/Zoll)',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
+      understood: 'Verstanden',
       modal: {
         gostNum: { title: 'GOST Standards', text: 'GOST 3927-88 (Zahlen- und Buchstabensystem). Definiert die grundlegenden Leistenumfänge.' },
         iso: { title: 'ISO Standard', text: 'Internationaler ISO / EU Standard für die Markierung von Schuh- und Leistenparametern.' }
@@ -417,7 +423,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       }}
                     >
                       <span className="text-[11px] font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                        Mondopoint (мм/дюймы)
+                        {t.mondopointLabel}
                       </span>
                       <div
                         className="flex rounded-md p-0.5"
@@ -514,7 +520,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 className="w-full py-2.5 rounded-xl font-medium text-[13px]"
                 style={{ backgroundColor: theme.accentBg, color: theme.accentSoft }}
               >
-                {lang === 'de' ? 'Verstanden' : lang === 'uk' ? 'Зрозуміло' : 'Понятно'}
+                {t.understood}
               </button>
             </motion.div>
           </motion.div>
