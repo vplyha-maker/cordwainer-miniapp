@@ -395,11 +395,15 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
         .react-datepicker__day {
           color: white !important;
-          border-radius: 12px !important;
+          border-radius: 50% !important; /* Идеальный круг */
           width: 2.2rem !important;
-          line-height: 2.2rem !important;
+          height: 2.2rem !important;
           margin: 0.2rem !important;
-          transition: background-color 0.2s;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          transition: all 0.2s;
+          padding: 0 !important;
         }
         .react-datepicker__day:hover {
           background-color: rgba(255, 255, 255, 0.1) !important;
@@ -408,6 +412,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           background-color: #0A84FF !important;
           color: white !important;
           font-weight: bold !important;
+          border: none !important;
         }
         .react-datepicker__day--outside-month {
           color: rgba(255, 255, 255, 0.2) !important;
@@ -536,19 +541,24 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       
                       const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
                       
+                      // Логика обводки: зеленая для дней с данными, красная для праздников
+                      let borderClass = 'border border-transparent';
+                      if (!isSelected) {
+                        if (hasData) {
+                          borderClass = 'border-[1.5px] border-[#32D74B]';
+                        } else if (isHol) {
+                          borderClass = 'border-[1.5px] border-[#FF453A]/80';
+                        }
+                      } else {
+                        // Если день выбран, обводка для данных становится белой
+                        if (hasData) {
+                          borderClass = 'border-[1.5px] border-white/80';
+                        }
+                      }
+                      
                       return (
-                        <div className="relative flex flex-col items-center justify-center h-full w-full">
+                        <div className={`flex items-center justify-center w-full h-full rounded-full box-border ${borderClass}`}>
                           <span className={`text-sm ${textColor}`}>{day}</span>
-                          
-                          {/* Индикаторы под датой (точки) */}
-                          <div className="flex gap-1 mt-0.5 absolute bottom-1">
-                            {hasData && (
-                              <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
-                            )}
-                            {isHol && (
-                              <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/50' : 'bg-[#FF453A]'}`} />
-                            )}
-                          </div>
                         </div>
                       );
                     }}
