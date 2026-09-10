@@ -161,11 +161,13 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     fetchRates();
   }, []);
 
+  // Синхронизация формы только при изменении глобальных данных
   useEffect(() => {
     setDayForm(data?.days?.[selectedDate]?.quantities || {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data?.days]);
 
+  // Абсолютно синхронная смена даты (исключает мигание кнопки сохранения)
   const changeDate = useCallback((newDate: string) => {
     setSelectedDate(newDate);
     setDayForm(data?.days?.[newDate]?.quantities || {});
@@ -313,7 +315,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const currentSelectedDateObj = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans antialiased [-webkit-tap-highlight-color:transparent]">
+    // ФУНДАМЕНТ: фиксированный лейаут без скролла body (решает 100% проблем с миганием в Safari)
+    <div className="fixed inset-0 flex flex-col bg-[var(--color-bg)] text-[var(--color-ink)] font-sans antialiased overflow-hidden">
       
       <style>{`
         .react-datepicker-popper {
@@ -344,8 +347,10 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           font-weight: 700 !important;
           font-size: 0.8rem !important;
         }
+        /* Жестко очищаем дефолтные стили библиотеки для дней */
         .react-datepicker__day {
-          color: var(--color-ink) !important;
+          background-color: transparent !important;
+          border: none !important;
           border-radius: 50% !important;
           width: 2.2rem !important;
           height: 2.2rem !important;
@@ -356,37 +361,21 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           padding: 0 !important;
           font-weight: 500 !important;
         }
-        .react-datepicker__day:hover {
-          background-color: var(--color-border) !important;
-        }
-        .react-datepicker__day--selected {
-          background-color: var(--color-ink) !important;
-          color: var(--color-bg) !important;
-          font-weight: bold !important;
-        }
-        .react-datepicker__day--keyboard-selected:not(.react-datepicker__day--selected) {
+        .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
           background-color: transparent !important;
         }
         .react-datepicker__day--outside-month {
-          color: color-mix(in srgb, var(--color-muted) 50%, transparent) !important;
+          opacity: 0.3 !important;
         }
         .react-datepicker-popper[data-placement^="bottom"] .react-datepicker__triangle {
           fill: var(--color-surface) !important;
           color: var(--color-surface) !important;
           stroke: var(--color-border) !important;
         }
-        .react-datepicker__navigation-icon::before {
-          border-color: var(--color-muted) !important;
-        }
-        .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
-          border-color: var(--color-ink) !important;
-        }
       `}</style>
 
-      {/* Верхний Header - 100% сплошной фон, никакого блюра */}
-      <div 
-        className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 bg-[var(--color-bg)] border-b border-[var(--color-border)] ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
-      >
+      {/* HEADER (Зафиксирован, без блюров и прозрачностей) */}
+      <header className="flex-shrink-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 bg-[var(--color-bg)] border-b border-[var(--color-border)] z-50">
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
           className="w-11 h-11 flex items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm active:scale-90 transition-transform text-[var(--color-ink)]"
@@ -397,349 +386,356 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           <h1 className="text-[17px] font-bold leading-tight text-[var(--color-ink)]">{t.title}</h1>
           <div className="text-[12px] font-medium text-[var(--color-muted)] capitalize mt-0.5">{monthName}</div>
         </div>
-      </div>
+      </header>
 
-      <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto relative">
-        
-        {/* Total Card */}
-        <div className="bg-[var(--color-surface)] p-5 md:p-6 rounded-[24px] border border-[var(--color-border)] shadow-sm">
-          <div className="flex justify-between items-start mb-2">
-            <span className="text-[var(--color-muted)] text-[13px] font-bold capitalize">{t.totalFor} {displayMonthName}</span>
-            <span className="text-[var(--color-muted)] text-[11px] font-bold px-2.5 py-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-[8px] flex items-center gap-1.5 shadow-sm">
-              {secCurrencyCode} {isRateLoading ? <span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--color-muted)] border-t-[var(--color-ink)] animate-spin" /> : activeFiatRate.toFixed(2)}
-            </span>
-          </div>
-          <div className="text-[44px] md:text-[52px] leading-none font-bold tracking-tight text-[var(--pigment-malachite, #047857)]">
-            {currentMonthTotal.toLocaleString()} <span className="text-[22px] md:text-[26px] text-[var(--color-muted)] font-bold ml-1">{primaryCurrency}</span>
-          </div>
-          <div className="text-[14px] font-bold text-[var(--color-muted)] mt-2">
-            ≈ {secCurrencySymbol}{(currentMonthTotal / activeFiatRate).toFixed(2)}
-          </div>
+      {/* Скроллируемая область (теперь скроллится только этот блок, а не все окно) */}
+      <main className="flex-1 overflow-y-auto relative pb-32">
+        <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
           
-          <div className="mt-5 pt-4 border-t border-[var(--color-border)] flex justify-between items-center">
-            <span className="text-[var(--color-muted)] text-[13px] font-bold">{t.selectedDay} ({getShortDate(selectedDate)}):</span>
-            <span className="text-[var(--color-ink)] font-bold text-[18px]">{selectedDayTotal.toLocaleString()} {primaryCurrency}</span>
+          <div className="bg-[var(--color-surface)] p-5 md:p-6 rounded-[24px] border border-[var(--color-border)] shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[var(--color-muted)] text-[13px] font-bold capitalize">{t.totalFor} {displayMonthName}</span>
+              <span className="text-[var(--color-muted)] text-[11px] font-bold px-2.5 py-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-[8px] flex items-center gap-1.5 shadow-sm">
+                {secCurrencyCode} {isRateLoading ? <span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--color-muted)] border-t-[var(--color-ink)] animate-spin" /> : activeFiatRate.toFixed(2)}
+              </span>
+            </div>
+            <div className="text-[44px] md:text-[52px] leading-none font-bold tracking-tight text-[var(--pigment-malachite, #047857)]">
+              {currentMonthTotal.toLocaleString()} <span className="text-[22px] md:text-[26px] text-[var(--color-muted)] font-bold ml-1">{primaryCurrency}</span>
+            </div>
+            <div className="text-[14px] font-bold text-[var(--color-muted)] mt-2">
+              ≈ {secCurrencySymbol}{(currentMonthTotal / activeFiatRate).toFixed(2)}
+            </div>
+            
+            <div className="mt-5 pt-4 border-t border-[var(--color-border)] flex justify-between items-center">
+              <span className="text-[var(--color-muted)] text-[13px] font-bold">{t.selectedDay} ({getShortDate(selectedDate)}):</span>
+              <span className="text-[var(--color-ink)] font-bold text-[18px]">{selectedDayTotal.toLocaleString()} {primaryCurrency}</span>
+            </div>
           </div>
-        </div>
 
-        {/* Tab Switcher */}
-        <div className="flex bg-[var(--color-bg)] p-1.5 rounded-[18px] border border-[var(--color-border)] shadow-inner">
-          {['daily', 'settings', 'archive'].map(tab => (
-            <button 
-              key={tab}
-              onClick={() => { triggerHaptic(); setActiveTab(tab as any); }}
-              className={`flex-1 py-2.5 text-[13px] font-bold rounded-[14px] transition-colors ${
-                activeTab === tab ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {tab === 'daily' ? t.tabDaily : tab === 'settings' ? t.tabSettings : t.tabArchive}
-            </button>
-          ))}
-        </div>
+          <div className="flex bg-[var(--color-bg)] p-1.5 rounded-[18px] border border-[var(--color-border)] shadow-inner">
+            {['daily', 'settings', 'archive'].map(tab => (
+              <button 
+                key={tab}
+                onClick={() => { triggerHaptic(); setActiveTab(tab as any); }}
+                className={`flex-1 py-2.5 text-[13px] font-bold rounded-[14px] transition-colors ${
+                  activeTab === tab ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                }`}
+              >
+                {tab === 'daily' ? t.tabDaily : tab === 'settings' ? t.tabSettings : t.tabArchive}
+              </button>
+            ))}
+          </div>
 
-        <div className="relative">
-          <AnimatePresence mode="wait">
-            {/* DAILY TAB */}
-            {activeTab === 'daily' && (
-              <motion.div key="daily" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-5 w-full">
-                
-                {/* Лента дат и календарь */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 flex overflow-x-auto gap-2.5 pb-2 scrollbar-hide items-end">
-                    {quickDates.map((date) => {
-                      const isSelected = selectedDate === date;
-                      const isToday = date === todayStr;
-                      const hasData = checkHasData(date);
-                      
-                      const [qY, qM, qD] = date.split('-');
-                      const qDateObj = new Date(Number(qY), Number(qM) - 1, Number(qD));
-                      const isWeekend = qDateObj.getDay() === 0 || qDateObj.getDay() === 6;
-                      const isHol = isHoliday(qDateObj, lang);
-                      const isOffDay = isWeekend || isHol;
-                      
-                      let buttonClass = 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-ink)] shadow-sm';
-                      let labelClass = 'text-[var(--color-ink)]';
-                      
-                      if (isSelected) {
-                        buttonClass = 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md border-[var(--color-ink)]';
-                        labelClass = 'text-[var(--color-bg)] opacity-80';
-                      } else if (isOffDay) {
-                        // КРАСНАЯ ОБВОДКА И КРАСНЫЙ ТЕКСТ ДЛЯ ВЫХОДНЫХ
-                        buttonClass = 'bg-[var(--color-surface)] text-[var(--pigment-lac-dye, #E11D48)] border-[var(--pigment-lac-dye, #E11D48)] shadow-sm';
-                        labelClass = 'text-[var(--pigment-lac-dye, #E11D48)]';
-                      } else if (isToday) {
-                        buttonClass = 'bg-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] text-[var(--color-ink)] border-[color-mix(in_srgb,var(--color-ink)_30%,transparent)]';
-                        labelClass = 'text-[var(--color-ink)]';
-                      }
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              {/* DAILY TAB */}
+              {activeTab === 'daily' && (
+                <motion.div key="daily" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-5 w-full">
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 flex overflow-x-auto gap-2.5 pb-2 scrollbar-hide items-end">
+                      {quickDates.map((date) => {
+                        const isSelected = selectedDate === date;
+                        const isToday = date === todayStr;
+                        const hasData = checkHasData(date);
+                        
+                        const [qY, qM, qD] = date.split('-');
+                        const qDateObj = new Date(Number(qY), Number(qM) - 1, Number(qD));
+                        const isWeekend = qDateObj.getDay() === 0 || qDateObj.getDay() === 6;
+                        const isHol = isHoliday(qDateObj, lang);
+                        const isOffDay = isWeekend || isHol;
+                        
+                        let buttonStyle: React.CSSProperties = {
+                          backgroundColor: 'var(--color-surface)',
+                          borderColor: 'var(--color-border)',
+                          color: 'var(--color-ink)'
+                        };
+                        let labelColor = 'var(--color-muted)';
 
-                      return (
-                        <button
-                          key={date}
-                          onClick={() => { triggerHaptic('light'); changeDate(date); }}
-                          className={`relative flex-shrink-0 px-4 py-3 rounded-[16px] flex flex-col items-center justify-center min-w-[68px] border ${buttonClass}`}
-                        >
-                          <span className="text-[15px] font-bold tracking-wide">{getShortDate(date)}</span>
-                          {isToday && (
-                            <span className={`text-[10px] font-bold mt-0.5 ${labelClass}`}>
-                              {t.today}
-                            </span>
-                          )}
-                          {/* ЗЕЛЕНАЯ (ИЛИ БЕЛАЯ) ТОЧКА ЕСЛИ ЕСТЬ ДАННЫЕ */}
-                          {hasData && (
-                            <span className={`absolute top-2.5 right-2.5 w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--color-bg)]' : 'bg-[var(--pigment-malachite, #047857)]'}`} />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <DatePicker 
-                    selected={currentSelectedDateObj} 
-                    onChange={(date: Date | null) => {
-                      if (date) {
-                        triggerHaptic('light');
-                        changeDate(getLocalDateString(date));
-                      }
-                    }} 
-                    onCalendarOpen={() => setIsCalendarOpen(true)}
-                    onCalendarClose={() => setIsCalendarOpen(false)}
-                    locale={getLocaleObj(lang)}
-                    customInput={<CustomCalendarInput />}
-                    popperPlacement="bottom-end"
-                    renderDayContents={(day, date) => {
-                      if (!date) return <span>{day}</span>;
-
-                      const dateStr = getLocalDateString(date);
-                      const hasData = checkHasData(dateStr);
-                      const isSelected = selectedDate === dateStr;
-                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                      const isHol = isHoliday(date, lang);
-                      const isOffDay = isWeekend || isHol;
-                      
-                      let circleClasses = 'border-[2px] border-transparent';
-                      let textClasses = 'text-[var(--color-ink)]';
-
-                      if (isSelected) {
-                        circleClasses = 'bg-[var(--color-ink)] border-[var(--color-ink)]';
-                        textClasses = 'text-[var(--color-bg)]';
-                      } else {
-                        if (isOffDay) {
-                          circleClasses = 'border-[2px] border-[var(--pigment-lac-dye, #E11D48)]'; 
-                          textClasses = 'text-[var(--pigment-lac-dye, #E11D48)]';
-                        } else if (hasData) {
-                          circleClasses = 'border-[2px] border-[var(--color-ink)]';
+                        if (isSelected) {
+                          buttonStyle = { backgroundColor: 'var(--color-ink)', borderColor: 'var(--color-ink)', color: 'var(--color-bg)' };
+                          labelColor = 'var(--color-bg)';
+                        } else if (isOffDay) {
+                          // ЖЕСТКАЯ КРАСНАЯ ОБВОДКА И ТЕКСТ В ЛЕНТЕ
+                          buttonStyle = { backgroundColor: 'var(--color-surface)', borderColor: '#FF453A', color: '#FF453A' };
+                          labelColor = '#FF453A';
+                        } else if (isToday) {
+                          buttonStyle = { backgroundColor: 'color-mix(in srgb, var(--color-ink) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--color-ink) 30%, transparent)', color: 'var(--color-ink)' };
+                          labelColor = 'var(--color-ink)';
                         }
-                      }
-                      
-                      return (
-                        <div className={`flex items-center justify-center w-full h-full rounded-full box-border ${circleClasses}`}>
-                          <span className={`text-[13px] font-bold ${textClasses}`}>{day}</span>
+
+                        return (
+                          <button
+                            key={date}
+                            onClick={() => { triggerHaptic('light'); changeDate(date); }}
+                            className="relative flex-shrink-0 px-4 py-3 rounded-[16px] flex flex-col items-center justify-center min-w-[68px] border shadow-sm transition-transform active:scale-95"
+                            style={buttonStyle}
+                          >
+                            <span className="text-[15px] font-bold tracking-wide">{getShortDate(date)}</span>
+                            {isToday && (
+                              <span className="text-[10px] font-bold mt-0.5" style={{ color: labelColor }}>
+                                {t.today}
+                              </span>
+                            )}
+                            {/* БЕЗУСЛОВНАЯ ЗЕЛЕНАЯ ТОЧКА */}
+                            {hasData && (
+                              <span 
+                                className="absolute top-2 right-2 w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: '#32D74B', boxShadow: '0 0 4px rgba(50,215,75,0.5)' }} 
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <DatePicker 
+                      selected={currentSelectedDateObj} 
+                      onChange={(date: Date | null) => {
+                        if (date) {
+                          triggerHaptic('light');
+                          changeDate(getLocalDateString(date));
+                        }
+                      }} 
+                      onCalendarOpen={() => setIsCalendarOpen(true)}
+                      onCalendarClose={() => setIsCalendarOpen(false)}
+                      locale={getLocaleObj(lang)}
+                      customInput={<CustomCalendarInput />}
+                      popperPlacement="bottom-end"
+                      renderDayContents={(day, date) => {
+                        if (!date) return <span>{day}</span>;
+
+                        const dateStr = getLocalDateString(date);
+                        const hasData = checkHasData(dateStr);
+                        const isSelected = selectedDate === dateStr;
+                        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                        const isHol = isHoliday(date, lang);
+                        const isOffDay = isWeekend || isHol;
+                        
+                        let circleStyle: React.CSSProperties = { border: '2px solid transparent' };
+                        let textStyle: React.CSSProperties = { color: 'var(--color-ink)' };
+
+                        if (isSelected) {
+                          circleStyle = { backgroundColor: 'var(--color-ink)', borderColor: 'var(--color-ink)' };
+                          textStyle = { color: 'var(--color-bg)', fontWeight: 'bold' };
+                        } else if (isOffDay) {
+                          // ЖЕСТКАЯ КРАСНАЯ ОБВОДКА И ТЕКСТ В КАЛЕНДАРЕ
+                          circleStyle = { borderColor: '#FF453A' };
+                          textStyle = { color: '#FF453A', fontWeight: 'bold' };
+                        } else if (hasData) {
+                          circleStyle = { borderColor: 'var(--color-ink)' };
+                        }
+                        
+                        return (
+                          <div className="flex items-center justify-center w-full h-full rounded-full box-border" style={circleStyle}>
+                            <span className="text-[13px] font-bold" style={textStyle}>{day}</span>
+                          </div>
+                        );
+                      }}
+                    />
+                  </div>
+
+                  {data.items.length > 0 && (
+                    <div className="px-2 pt-1">
+                      <h2 className="text-[16px] font-bold text-[var(--color-ink)]">
+                        {t.entryFor} <span className="opacity-80 ml-1">{selectedDate === todayStr ? t.today + ' (' + getShortDateName(selectedDate, lang) + ')' : getShortDateName(selectedDate, lang)}</span>
+                      </h2>
+                    </div>
+                  )}
+
+                  {data.items.length === 0 ? (
+                    <div className="bg-[var(--color-surface)] p-8 rounded-[24px] border border-[var(--color-border)] shadow-sm text-center">
+                      <p className="text-[var(--color-muted)] font-bold text-[14px]">{t.noItems}</p>
+                      <button onClick={() => setActiveTab('settings')} className="mt-4 text-[var(--color-ink)] font-bold underline decoration-2 underline-offset-4">{t.addInSettings}</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.items.map(item => (
+                        <div key={item.id} className="bg-[var(--color-surface)] p-4 md:p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm flex flex-col gap-4">
+                          <div className="flex justify-between items-center gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-[16px] text-[var(--color-ink)] truncate">{item.name}</div>
+                              <div className="text-[12px] font-medium text-[var(--color-muted)] mt-1">{data.rates[item.id]} {t.perPiece}</div>
+                            </div>
+                            
+                            <div className="flex-shrink-0 flex items-center bg-[var(--color-bg)] rounded-[16px] p-1 border border-[var(--color-border)]">
+                              <button onClick={() => adjustQty(item.id, -1)} className="w-10 h-10 flex items-center justify-center text-xl font-bold text-[var(--color-muted)] hover:text-[var(--color-ink)] active:bg-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] rounded-[12px] transition-colors">-</button>
+                              <input 
+                                type="number" 
+                                inputMode="numeric"
+                                value={dayForm[item.id] ?? ''}
+                                onChange={(e) => handleQtyChange(item.id, e.target.value)}
+                                className="w-12 h-10 text-center text-[18px] bg-transparent font-black text-[var(--color-ink)] focus:outline-none tabular-nums"
+                                placeholder="0"
+                              />
+                              <button onClick={() => adjustQty(item.id, 1)} className="w-10 h-10 flex items-center justify-center text-xl font-bold text-[var(--color-muted)] hover:text-[var(--color-ink)] active:bg-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] rounded-[12px] transition-colors">+</button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-2">
+                            {[1, 5, 10, 20].map(num => (
+                              <button 
+                                key={num}
+                                onClick={() => handleQuickAdd(item.id, num)}
+                                className="py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] active:scale-95 active:bg-[var(--color-ink)] active:text-[var(--color-bg)] rounded-[14px] text-[13px] font-bold text-[var(--color-ink)] transition-transform shadow-sm"
+                              >
+                                +{num}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      );
-                    }}
-                  />
-                </div>
+                      ))}
+                    </div>
+                  )}
 
-                {data.items.length > 0 && (
-                  <div className="px-2 pt-1">
-                    <h2 className="text-[16px] font-bold text-[var(--color-ink)]">
-                      {t.entryFor} <span className="opacity-80 ml-1">{selectedDate === todayStr ? t.today + ' (' + getShortDateName(selectedDate, lang) + ')' : getShortDateName(selectedDate, lang)}</span>
-                    </h2>
+                  <div className="bg-[var(--color-surface)] p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm mt-6">
+                    <h3 className="font-bold text-[var(--color-muted)] mb-5 text-[11px] uppercase tracking-[0.2em]">{t.activity7Days}</h3>
+                    <div className="flex items-end justify-between h-[120px] gap-2 mt-4">
+                      {chartData.data.map((day, i) => {
+                        const height = Math.max((day.total / chartData.max) * 100, day.total > 0 ? 8 : 0);
+                        const isToday = i === 6; 
+                        
+                        return (
+                          <div key={i} className="flex flex-col items-center h-full flex-1 group gap-2.5">
+                            <div className="w-full flex-1 relative flex justify-center items-end">
+                              <div 
+                                style={{ height: `${height}%` }}
+                                className={`w-full max-w-[32px] rounded-[6px] transition-all duration-500 ease-out ${
+                                  isToday 
+                                    ? 'bg-[var(--color-ink)] shadow-md' 
+                                    : 'bg-[var(--color-border)] group-hover:bg-[color-mix(in_srgb,var(--color-border)_80%,var(--color-ink))]'
+                                }`}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-bold ${isToday ? 'text-[var(--color-ink)]' : 'text-[var(--color-muted)]'}`}>
+                              {day.date}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                )}
+                </motion.div>
+              )}
 
-                {data.items.length === 0 ? (
-                  <div className="bg-[var(--color-surface)] p-8 rounded-[24px] border border-[var(--color-border)] shadow-sm text-center">
-                    <p className="text-[var(--color-muted)] font-bold text-[14px]">{t.noItems}</p>
-                    <button onClick={() => setActiveTab('settings')} className="mt-4 text-[var(--color-ink)] font-bold underline decoration-2 underline-offset-4">{t.addInSettings}</button>
+              {/* SETTINGS TAB */}
+              {activeTab === 'settings' && (
+                <motion.div key="settings" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
+                  <div className="bg-[var(--color-surface)] p-5 md:p-6 rounded-[24px] border border-[var(--color-border)] shadow-sm">
+                    <h2 className="font-bold mb-4 text-[16px] text-[var(--color-ink)]">{t.addItem}</h2>
+                    <div className="flex flex-col gap-3 mb-5">
+                      <input 
+                        type="text" 
+                        placeholder={t.namePlaceholder}
+                        value={newItemName}
+                        onChange={e => setNewItemName(e.target.value)}
+                        className="w-full p-4 bg-[var(--color-bg)] text-[var(--color-ink)] placeholder-[var(--color-muted)] font-medium rounded-[16px] border border-[var(--color-border)] focus:border-[var(--color-ink)] focus:outline-none transition-colors"
+                      />
+                      <input 
+                        type="number" 
+                        inputMode="decimal"
+                        placeholder={t.pricePlaceholder}
+                        value={newItemRate}
+                        onChange={e => setNewItemRate(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full p-4 bg-[var(--color-bg)] text-[var(--color-ink)] placeholder-[var(--color-muted)] font-medium rounded-[16px] border border-[var(--color-border)] focus:border-[var(--color-ink)] focus:outline-none transition-colors tabular-nums"
+                      />
+                    </div>
+                    <button 
+                      onClick={handleAddNewItem}
+                      disabled={saving || !newItemName || newItemRate === ''}
+                      className="w-full bg-[var(--color-ink)] text-[var(--color-bg)] font-bold py-4 rounded-[16px] active:scale-[0.98] disabled:opacity-30 transition-transform shadow-md"
+                    >
+                      {t.addBtn}
+                    </button>
                   </div>
-                ) : (
+
                   <div className="space-y-3">
                     {data.items.map(item => (
-                      <div key={item.id} className="bg-[var(--color-surface)] p-4 md:p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm flex flex-col gap-4">
-                        <div className="flex justify-between items-center gap-4">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-bold text-[16px] text-[var(--color-ink)] truncate">{item.name}</div>
-                            <div className="text-[12px] font-medium text-[var(--color-muted)] mt-1">{data.rates[item.id]} {t.perPiece}</div>
-                          </div>
-                          
-                          <div className="flex-shrink-0 flex items-center bg-[var(--color-bg)] rounded-[16px] p-1 border border-[var(--color-border)]">
-                            <button onClick={() => adjustQty(item.id, -1)} className="w-10 h-10 flex items-center justify-center text-xl font-bold text-[var(--color-muted)] hover:text-[var(--color-ink)] active:bg-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] rounded-[12px] transition-colors">-</button>
-                            <input 
-                              type="number" 
-                              inputMode="numeric"
-                              value={dayForm[item.id] ?? ''}
-                              onChange={(e) => handleQtyChange(item.id, e.target.value)}
-                              className="w-12 h-10 text-center text-[18px] bg-transparent font-black text-[var(--color-ink)] focus:outline-none tabular-nums"
-                              placeholder="0"
-                            />
-                            <button onClick={() => adjustQty(item.id, 1)} className="w-10 h-10 flex items-center justify-center text-xl font-bold text-[var(--color-muted)] hover:text-[var(--color-ink)] active:bg-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] rounded-[12px] transition-colors">+</button>
-                          </div>
+                      <div key={item.id} className="bg-[var(--color-surface)] p-4 md:p-5 rounded-[20px] flex justify-between items-center border border-[var(--color-border)] shadow-sm">
+                        <div className="min-w-0 pr-4">
+                          <div className="font-bold text-[var(--color-ink)] truncate text-[16px]">{item.name}</div>
+                          <div className="text-[12px] font-medium text-[var(--color-muted)] mt-1">{data.rates[item.id]} {t.perPiece}</div>
                         </div>
-
-                        <div className="grid grid-cols-4 gap-2">
-                          {[1, 5, 10, 20].map(num => (
-                            <button 
-                              key={num}
-                              onClick={() => handleQuickAdd(item.id, num)}
-                              className="py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] active:scale-95 active:bg-[var(--color-ink)] active:text-[var(--color-bg)] rounded-[14px] text-[13px] font-bold text-[var(--color-ink)] transition-transform shadow-sm"
-                            >
-                              +{num}
-                            </button>
-                          ))}
-                        </div>
+                        <button 
+                          onClick={() => { if(confirm(t.confirmDelete)) deleteItem(item.id); }}
+                          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--pigment-lac-dye, #E11D48)] bg-[color-mix(in_srgb,var(--pigment-lac-dye,#E11D48)_10%,var(--color-surface))] rounded-[14px] border border-[color-mix(in_srgb,var(--pigment-lac-dye,#E11D48)_30%,transparent)] active:scale-90 transition-transform"
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
                       </div>
                     ))}
                   </div>
-                )}
+                </motion.div>
+              )}
 
-                <div className="bg-[var(--color-surface)] p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm mt-6">
-                  <h3 className="font-bold text-[var(--color-muted)] mb-5 text-[11px] uppercase tracking-[0.2em]">{t.activity7Days}</h3>
-                  <div className="flex items-end justify-between h-[120px] gap-2 mt-4">
-                    {chartData.data.map((day, i) => {
-                      const height = Math.max((day.total / chartData.max) * 100, day.total > 0 ? 8 : 0);
-                      const isToday = i === 6; 
-                      
-                      return (
-                        <div key={i} className="flex flex-col items-center h-full flex-1 group gap-2.5">
-                          <div className="w-full flex-1 relative flex justify-center items-end">
-                            <div 
-                              style={{ height: `${height}%` }}
-                              className={`w-full max-w-[32px] rounded-[6px] transition-all duration-500 ease-out ${
-                                isToday 
-                                  ? 'bg-[var(--color-ink)] shadow-md' 
-                                  : 'bg-[var(--color-border)] group-hover:bg-[color-mix(in_srgb,var(--color-border)_80%,var(--color-ink))]'
-                              }`}
-                            />
-                          </div>
-                          <span className={`text-[10px] font-bold ${isToday ? 'text-[var(--color-ink)]' : 'text-[var(--color-muted)]'}`}>
-                            {day.date}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* SETTINGS TAB */}
-            {activeTab === 'settings' && (
-              <motion.div key="settings" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
-                <div className="bg-[var(--color-surface)] p-5 md:p-6 rounded-[24px] border border-[var(--color-border)] shadow-sm">
-                  <h2 className="font-bold mb-4 text-[16px] text-[var(--color-ink)]">{t.addItem}</h2>
-                  <div className="flex flex-col gap-3 mb-5">
-                    <input 
-                      type="text" 
-                      placeholder={t.namePlaceholder}
-                      value={newItemName}
-                      onChange={e => setNewItemName(e.target.value)}
-                      className="w-full p-4 bg-[var(--color-bg)] text-[var(--color-ink)] placeholder-[var(--color-muted)] font-medium rounded-[16px] border border-[var(--color-border)] focus:border-[var(--color-ink)] focus:outline-none transition-colors"
-                    />
-                    <input 
-                      type="number" 
-                      inputMode="decimal"
-                      placeholder={t.pricePlaceholder}
-                      value={newItemRate}
-                      onChange={e => setNewItemRate(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full p-4 bg-[var(--color-bg)] text-[var(--color-ink)] placeholder-[var(--color-muted)] font-medium rounded-[16px] border border-[var(--color-border)] focus:border-[var(--color-ink)] focus:outline-none transition-colors tabular-nums"
-                    />
-                  </div>
+              {/* ARCHIVE TAB */}
+              {activeTab === 'archive' && (
+                <motion.div key="archive" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
                   <button 
-                    onClick={handleAddNewItem}
-                    disabled={saving || !newItemName || newItemRate === ''}
-                    className="w-full bg-[var(--color-ink)] text-[var(--color-bg)] font-bold py-4 rounded-[16px] active:scale-[0.98] disabled:opacity-30 transition-transform shadow-md"
+                    onClick={() => { 
+                      if(confirm(t.confirmArchive.replace('{month}', displayMonthName))) {
+                        closeMonth(selectedMonth); 
+                      }
+                    }}
+                    className="w-full bg-[var(--color-surface)] border-2 border-dashed border-[var(--color-border)] text-[var(--color-ink)] hover:bg-[var(--color-border)] py-5 rounded-[24px] font-bold active:scale-[0.98] transition-colors uppercase tracking-wider text-[12px]"
                   >
-                    {t.addBtn}
+                    {t.archiveBtn} {displayMonthName}
                   </button>
-                </div>
-
-                <div className="space-y-3">
-                  {data.items.map(item => (
-                    <div key={item.id} className="bg-[var(--color-surface)] p-4 md:p-5 rounded-[20px] flex justify-between items-center border border-[var(--color-border)] shadow-sm">
-                      <div className="min-w-0 pr-4">
-                        <div className="font-bold text-[var(--color-ink)] truncate text-[16px]">{item.name}</div>
-                        <div className="text-[12px] font-medium text-[var(--color-muted)] mt-1">{data.rates[item.id]} {t.perPiece}</div>
-                      </div>
-                      <button 
-                        onClick={() => { if(confirm(t.confirmDelete)) deleteItem(item.id); }}
-                        className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--pigment-lac-dye, #E11D48)] bg-[color-mix(in_srgb,var(--pigment-lac-dye,#E11D48)_10%,var(--color-surface))] rounded-[14px] border border-[color-mix(in_srgb,var(--pigment-lac-dye,#E11D48)_30%,transparent)] active:scale-90 transition-transform"
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-
-            {/* ARCHIVE TAB */}
-            {activeTab === 'archive' && (
-              <motion.div key="archive" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-4 w-full">
-                <button 
-                  onClick={() => { 
-                    if(confirm(t.confirmArchive.replace('{month}', displayMonthName))) {
-                      closeMonth(selectedMonth); 
-                    }
-                  }}
-                  className="w-full bg-[var(--color-surface)] border-2 border-dashed border-[var(--color-border)] text-[var(--color-ink)] hover:bg-[var(--color-border)] py-5 rounded-[24px] font-bold active:scale-[0.98] transition-colors uppercase tracking-wider text-[12px]"
-                >
-                  {t.archiveBtn} {displayMonthName}
-                </button>
-                
-                {Object.keys(data.archive).length === 0 ? (
-                  <p className="text-center text-[var(--color-muted)] font-bold mt-8 text-[14px]">{t.archiveEmpty}</p>
-                ) : (
-                  Object.entries(data.archive)
-                    .sort(([monthA], [monthB]) => monthB.localeCompare(monthA))
-                    .map(([month, archiveData]) => (
-                      <div key={month} className="bg-[var(--color-surface)] p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm">
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-bold text-[16px] capitalize text-[var(--color-ink)]">{formatMonth(month, lang)}</h3>
-                          <span className="font-black text-[20px] text-[var(--pigment-malachite, #047857)]">
-                            {archiveData.stats.total.toLocaleString()} {primaryCurrency}
-                          </span>
+                  
+                  {Object.keys(data.archive).length === 0 ? (
+                    <p className="text-center text-[var(--color-muted)] font-bold mt-8 text-[14px]">{t.archiveEmpty}</p>
+                  ) : (
+                    Object.entries(data.archive)
+                      .sort(([monthA], [monthB]) => monthB.localeCompare(monthA))
+                      .map(([month, archiveData]) => (
+                        <div key={month} className="bg-[var(--color-surface)] p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm">
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-[16px] capitalize text-[var(--color-ink)]">{formatMonth(month, lang)}</h3>
+                            <span className="font-black text-[20px] text-[var(--pigment-malachite, #047857)]">
+                              {archiveData.stats.total.toLocaleString()} {primaryCurrency}
+                            </span>
+                          </div>
+                          <div className="text-[12px] font-medium text-[var(--color-muted)] mb-4">
+                            {t.daysWorked} <span className="font-bold text-[var(--color-ink)] ml-1">{archiveData.stats.days}</span>
+                          </div>
+                          
+                          <div className="bg-[var(--color-bg)] p-4 rounded-[16px] border border-[var(--color-border)] text-[13px] space-y-3">
+                            {Object.entries(archiveData.stats.quantities).map(([itemId, qty]) => {
+                              if (!qty) return null;
+                              const itemName = data.items.find(i => i.id === itemId)?.name || t.deletedItem;
+                              return (
+                                <div key={itemId} className="flex justify-between items-center">
+                                  <span className="text-[var(--color-muted)] font-medium">{itemName}</span>
+                                  <span className="font-bold text-[var(--color-ink)]">{qty} <span className="text-[10px] font-medium opacity-70 ml-0.5">{t.pcs}</span></span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          <button 
+                            onClick={() => { if(confirm(t.confirmDeleteArchive)) deleteArchiveMonth(month); }}
+                            className="mt-4 text-[11px] text-[var(--pigment-lac-dye, #E11D48)] w-full text-center py-2 active:opacity-50 transition-opacity uppercase tracking-wider font-bold"
+                          >
+                            {t.deleteRecord}
+                          </button>
                         </div>
-                        <div className="text-[12px] font-medium text-[var(--color-muted)] mb-4">
-                          {t.daysWorked} <span className="font-bold text-[var(--color-ink)] ml-1">{archiveData.stats.days}</span>
-                        </div>
-                        
-                        <div className="bg-[var(--color-bg)] p-4 rounded-[16px] border border-[var(--color-border)] text-[13px] space-y-3">
-                          {Object.entries(archiveData.stats.quantities).map(([itemId, qty]) => {
-                            if (!qty) return null;
-                            const itemName = data.items.find(i => i.id === itemId)?.name || t.deletedItem;
-                            return (
-                              <div key={itemId} className="flex justify-between items-center">
-                                <span className="text-[var(--color-muted)] font-medium">{itemName}</span>
-                                <span className="font-bold text-[var(--color-ink)]">{qty} <span className="text-[10px] font-medium opacity-70 ml-0.5">{t.pcs}</span></span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        
-                        <button 
-                          onClick={() => { if(confirm(t.confirmDeleteArchive)) deleteArchiveMonth(month); }}
-                          className="mt-4 text-[11px] text-[var(--pigment-lac-dye, #E11D48)] w-full text-center py-2 active:opacity-50 transition-opacity uppercase tracking-wider font-bold"
-                        >
-                          {t.deleteRecord}
-                        </button>
-                      </div>
-                    ))
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                      ))
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
+      </main>
 
-      {/* Нижняя кнопка - полностью сплошная */}
+      {/* ФИКСИРОВАННАЯ КНОПКА (Лежит поверх main, не скроллится, без блюра) */}
       <AnimatePresence>
         {activeTab === 'daily' && data.items.length > 0 && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }}
-            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none bg-transparent ${isCalendarOpen ? 'z-10' : 'z-50'}`}
+            className={`absolute bottom-6 left-0 right-0 px-4 pointer-events-none z-50`}
           >
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <button 
@@ -748,7 +744,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 className={`w-full font-bold text-[15px] py-4 rounded-[20px] active:scale-[0.98] transition-transform shadow-md ${
                   hasChanges 
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border border-[var(--color-ink)]' 
-                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]'
+                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] opacity-100'
                 }`}
               >
                 {saving ? t.saving : hasChanges ? `${t.saveFor} ${getShortDateName(selectedDate, lang)}` : `${t.noChangesFor} ${getShortDateName(selectedDate, lang)} ${t.noChangesSuffix}`}
