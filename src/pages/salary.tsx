@@ -461,6 +461,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       customInput={<button className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />}
                       popperPlacement="bottom-end"
                       renderDayContents={(day, date) => {
+                        // ИСПРАВЛЕНИЕ ЗДЕСЬ: Предотвращает ошибку TS18048 в Vercel
+                        if (!date) return <span>{day}</span>;
+
                         const dateStr = getLocalDateString(date);
                         const hasData = checkHasData(dateStr);
                         const isSelected = selectedDate === dateStr;
