@@ -17,7 +17,21 @@ type Labels = {
   mm?: string
 }
 
-const AUDIT_STYLES = {
+type Props = {
+  geometry: HeelGeometry
+  eng: HeelEngineering
+  audit: HeelAudit
+  auditTitle: string
+  auditMessage: string
+  soleType: SoleType
+  heelType: HeelType
+  heelHeight: number
+  toeThickness: number
+  labels: Labels
+  onFix?: () => void
+}
+
+const AUDIT_STYLES: Record<string, { color: string; bg: string; border: string }> = {
   SUCCESS: {
     color: 'var(--pigment-malachite, #047857)',
     bg: 'color-mix(in srgb, var(--pigment-malachite, #047857) 12%, var(--color-surface))',
@@ -38,7 +52,7 @@ const AUDIT_STYLES = {
     bg: 'color-mix(in srgb, var(--pigment-azurite, #1D4ED8) 12%, var(--color-surface))',
     border: 'color-mix(in srgb, var(--pigment-azurite, #1D4ED8) 30%, transparent)',
   },
-} as const
+}
 
 export function HeelCanvas({
   geometry: g,
@@ -54,7 +68,7 @@ export function HeelCanvas({
   onFix,
 }: Props) {
   const isInfo = audit.titleKey === 'negDropTitle'
-  const styleObj = isInfo ? AUDIT_STYLES.INFO : AUDIT_STYLES[audit.status]
+  const styleObj = isInfo ? AUDIT_STYLES.INFO : AUDIT_STYLES[audit.status] || AUDIT_STYLES.INFO
 
   const showEntry =
     soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
