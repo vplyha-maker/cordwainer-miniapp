@@ -177,7 +177,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemRate, setNewItemRate] = useState<number | ''>('');
   
-  // Состояние открытого календаря для управления слоями
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   const [fiatRates, setFiatRates] = useState({ USD: 41.50, EUR: 45.00 });
@@ -372,10 +371,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0E0E0E] text-white pb-32 font-sans overflow-x-hidden selection:bg-[#0A84FF]/30">
       
-      {/* ВСТРОЕННЫЕ СТИЛИ ДЛЯ ТЕМНОГО КАЛЕНДАРЯ */}
       <style>{`
         .react-datepicker-popper {
-          z-index: 9999 !important; /* Гарантируем, что календарь всегда сверху */
+          z-index: 9999 !important;
         }
         .react-datepicker {
           background-color: #1C1C1E !important;
@@ -442,7 +440,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
-      {/* ШАПКА: динамически меняет z-index при открытом календаре */}
       <div className={`sticky top-0 p-4 flex items-center gap-4 bg-[#0E0E0E]/95 backdrop-blur-md border-b border-white/5 transition-all duration-300 ${isCalendarOpen ? 'z-10' : 'z-50'}`}>
         <button onClick={() => { triggerHaptic(); onBack(); }} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/5 active:scale-95 transition-transform text-white/70">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -616,7 +613,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         </div>
 
                         <div className="grid grid-cols-4 gap-2">
-                          {[1, 5, 7, 9].map(num => (
+                          {[1, 5, 10, 20].map(num => (
                             <button 
                               key={num}
                               onClick={() => handleQuickAdd(item.id, num)}
@@ -768,7 +765,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </div>
       </div>
 
-      {/* КНОПКА СОХРАНИТЬ: тоже понижаем z-index при открытом календаре */}
       <AnimatePresence>
         {activeTab === 'daily' && data.items.length > 0 && (
           <motion.div 
