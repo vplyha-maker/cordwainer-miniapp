@@ -27,7 +27,6 @@ const getShortDateName = (dateStr: string, lang: Lang) => {
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '');
 };
 
-// --- НАСТРОЙКИ ПРАЗДНИКОВ (Формат ММ-ДД) ---
 const HOLIDAYS_UA = ['01-01', '03-08', '05-01', '05-08', '06-28', '07-15', '08-24', '10-01', '12-25'];
 const HOLIDAYS_DE = ['01-01', '04-03', '04-06', '05-01', '05-14', '05-25', '10-03', '12-25', '12-26'];
 
@@ -42,7 +41,6 @@ const getLocaleObj = (lang: Lang) => {
   return ru;
 };
 
-// --- КАСТОМНАЯ КНОПКА КАЛЕНДАРЯ ---
 const CustomCalendarInput = React.forwardRef<HTMLDivElement, any>(({ onClick }, ref) => (
   <div 
     onClick={onClick} 
@@ -313,7 +311,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const currentSelectedDateObj = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans overflow-x-hidden">
+    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans overflow-x-hidden antialiased">
       
       <style>{`
         .react-datepicker-popper {
@@ -353,7 +351,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           display: inline-flex !important;
           align-items: center !important;
           justify-content: center !important;
-          transition: all 0.2s;
+          transition: background-color 0.2s;
           padding: 0 !important;
           font-weight: 500 !important;
         }
@@ -384,10 +382,12 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
+      {/* Аппаратное ускорение (transform-gpu) и явное указание WebkitBackdropFilter убирают фликер при скролле */}
       <div 
-        className={`sticky top-0 p-4 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 transition-all duration-300 ${isCalendarOpen ? 'z-10' : 'z-50'}`}
+        className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 transform-gpu ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
         style={{ 
-          background: 'color-mix(in srgb, var(--color-bg) 95%, transparent)', 
+          background: 'color-mix(in srgb, var(--color-bg) 85%, transparent)', 
+          WebkitBackdropFilter: 'blur(12px)',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--color-border)' 
         }}
@@ -406,7 +406,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
 
       <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto relative">
         
-        {/* Total Card */}
         <div className="bg-[var(--color-surface)] p-5 md:p-6 rounded-[24px] border border-[var(--color-border)] shadow-sm">
           <div className="flex justify-between items-start mb-2">
             <span className="text-[var(--color-muted)] text-[13px] font-bold capitalize">{t.totalFor} {displayMonthName}</span>
@@ -427,13 +426,12 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           </div>
         </div>
 
-        {/* Tab Switcher */}
         <div className="flex bg-[var(--color-bg)] p-1.5 rounded-[18px] border border-[var(--color-border)] shadow-inner">
           {['daily', 'settings', 'archive'].map(tab => (
             <button 
               key={tab}
               onClick={() => { triggerHaptic(); setActiveTab(tab as any); }}
-              className={`flex-1 py-2.5 text-[13px] font-bold rounded-[14px] transition-all ${
+              className={`flex-1 py-2.5 text-[13px] font-bold rounded-[14px] transition-colors ${
                 activeTab === tab ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-sm' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
               }`}
             >
@@ -443,12 +441,11 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </div>
 
         <div className="relative">
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence mode="wait">
             {/* DAILY TAB */}
             {activeTab === 'daily' && (
               <motion.div key="daily" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-5 w-full">
                 
-                {/* Date Slider & Calendar */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 flex overflow-x-auto gap-2.5 pb-2 scrollbar-hide items-end">
                     {quickDates.map((date) => {
@@ -471,7 +468,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         <button
                           key={date}
                           onClick={() => { triggerHaptic(); setSelectedDate(date); }}
-                          className={`relative flex-shrink-0 px-4 py-3 rounded-[16px] flex flex-col items-center justify-center min-w-[68px] transition-all border ${buttonClass}`}
+                          className={`relative flex-shrink-0 px-4 py-3 rounded-[16px] flex flex-col items-center justify-center min-w-[68px] transition-colors border ${buttonClass}`}
                         >
                           <span className="text-[15px] font-bold tracking-wide">{getShortDate(date)}</span>
                           {isToday && (
@@ -575,7 +572,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                             <button 
                               key={num}
                               onClick={() => handleQuickAdd(item.id, num)}
-                              className="py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] active:scale-95 active:bg-[var(--color-ink)] active:text-[var(--color-bg)] rounded-[14px] text-[13px] font-bold text-[var(--color-ink)] transition-transform shadow-sm"
+                              className="py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] active:scale-95 active:bg-[var(--color-ink)] active:text-[var(--color-bg)] rounded-[14px] text-[13px] font-bold text-[var(--color-ink)] transition-colors shadow-sm"
                             >
                               +{num}
                             </button>
@@ -586,7 +583,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                   </div>
                 )}
 
-                {/* Activity Chart */}
                 <div className="bg-[var(--color-surface)] p-5 rounded-[24px] border border-[var(--color-border)] shadow-sm mt-6">
                   <h3 className="font-bold text-[var(--color-muted)] mb-5 text-[11px] uppercase tracking-[0.2em]">{t.activity7Days}</h3>
                   <div className="flex items-end justify-between h-[120px] gap-2 mt-4">
@@ -676,7 +672,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       closeMonth(selectedMonth); 
                     }
                   }}
-                  className="w-full bg-[var(--color-surface)] border-2 border-dashed border-[var(--color-border)] text-[var(--color-ink)] hover:bg-[var(--color-border)] py-5 rounded-[24px] font-bold active:scale-[0.98] transition-all uppercase tracking-wider text-[12px]"
+                  className="w-full bg-[var(--color-surface)] border-2 border-dashed border-[var(--color-border)] text-[var(--color-ink)] hover:bg-[var(--color-border)] py-5 rounded-[24px] font-bold active:scale-[0.98] transition-colors uppercase tracking-wider text-[12px]"
                 >
                   {t.archiveBtn} {displayMonthName}
                 </button>
@@ -732,7 +728,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }}
-            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none transition-all duration-300 ${isCalendarOpen ? 'z-10' : 'z-50'}`}
+            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none transform-gpu ${isCalendarOpen ? 'z-10' : 'z-50'}`}
           >
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <button 
@@ -741,7 +737,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 className={`w-full font-bold text-[15px] py-4 rounded-[20px] active:scale-[0.98] transition-transform shadow-md ${
                   hasChanges 
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border border-[var(--color-ink)]' 
-                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] opacity-90 backdrop-blur-md'
+                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] opacity-95 backdrop-blur-md'
                 }`}
               >
                 {saving ? t.saving : hasChanges ? `${t.saveFor} ${getShortDateName(selectedDate, lang)}` : `${t.noChangesFor} ${getShortDateName(selectedDate, lang)} ${t.noChangesSuffix}`}
@@ -750,6 +746,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
