@@ -1,5 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { ru, uk, de } from 'date-fns/locale';
+
 import { useSalary } from '../hooks/useSalary';
 import { getToday, formatDay, formatMonth, calcDayTotal, getCurrentMonth } from '../lib/salaryHelpers';
 import type { Lang } from '../App';
@@ -23,7 +27,23 @@ const getShortDateName = (dateStr: string, lang: Lang) => {
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '');
 };
 
-// Словари генерируем через функцию, чтобы прокидывать нужный символ валюты
+// --- НАСТРОЙКИ ПРАЗДНИКОВ (Формат ММ-ДД) ---
+// Праздники Украины (по новому календарю)
+const HOLIDAYS_UA = ['01-01', '03-08', '05-01', '05-08', '06-28', '07-15', '08-24', '10-01', '12-25'];
+// Национальные праздники Германии (вкл. основные и переходящие даты 2026 года)
+const HOLIDAYS_DE = ['01-01', '04-03', '04-06', '05-01', '05-14', '05-25', '10-03', '12-25', '12-26'];
+
+const isHoliday = (date: Date, lang: Lang) => {
+  const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return lang === 'de' ? HOLIDAYS_DE.includes(mmdd) : HOLIDAYS_UA.includes(mmdd);
+};
+
+const getLocaleObj = (lang: Lang) => {
+  if (lang === 'de') return de;
+  if (lang === 'uk') return uk;
+  return ru;
+};
+
 const getDictionary = (lang: Lang, curr: string) => {
   const dict = {
     ru: {
@@ -129,7 +149,6 @@ type SalaryCalcPageProps = {
 }
 
 export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
-  // Глобальная валюта учета пользователя (не меняется при смене языка)
   const primaryCurrency = '₴';
   const t = getDictionary(lang, primaryCurrency);
   
@@ -144,11 +163,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemRate, setNewItemRate] = useState<number | ''>('');
   
-  // Храним курсы сразу для двух валют (USD и EUR)
   const [fiatRates, setFiatRates] = useState({ USD: 41.50, EUR: 45.00 });
   const [isRateLoading, setIsRateLoading] = useState(true);
 
-  // Выбор эквивалентной валюты в зависимости от языка
   const secCurrencyCode = lang === 'de' ? 'EUR' : 'USD';
   const secCurrencySymbol = lang === 'de' ? '€' : '$';
   const activeFiatRate = fiatRates[secCurrencyCode as keyof typeof fiatRates] || 1;
@@ -157,7 +174,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     const fetchRates = async () => {
       try {
         setIsRateLoading(true);
-        // Сначала пробуем наш API (если он возвращает сразу все курсы)
         const apiRes = await fetch('/api/rates').catch(() => null);
         if (apiRes && apiRes.ok) {
           const ratesData = await apiRes.json();
@@ -169,7 +185,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             return;
           }
         }
-        // Фолбек: берем курсы из НБУ для USD и EUR параллельно
         const [nbuUsd, nbuEur] = await Promise.all([
           fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json').then(r => r.json()).catch(() => null),
           fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=EUR&json').then(r => r.json()).catch(() => null)
@@ -196,7 +211,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     }
   }, [selectedDate, data?.days]);
 
-  // Месяц привязан к ВЫБРАННОЙ дате, а не к текущей
   const selectedMonth = selectedDate.substring(0, 7);
 
   const currentMonthTotal = useMemo(() => {
@@ -211,7 +225,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     return total;
   }, [data, selectedMonth]);
 
-  // Лайв-сумма за выбранный день (реагирует на плюсы/минусы до сохранения)
   const selectedDayTotal = useMemo(() => {
     let total = 0;
     if (data?.items && data?.rates) {
@@ -272,6 +285,12 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     });
   };
 
+  const checkHasData = (dateStr: string) => {
+    const record = data?.days?.[dateStr];
+    if (!record || !record.quantities) return false;
+    return Object.values(record.quantities).some(v => v > 0);
+  };
+
   const quickDates = useMemo(() => {
     const dates = [];
     const today = new Date();
@@ -286,12 +305,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     }
     return dates;
   }, [selectedDate]);
-
-  const checkHasData = (dateStr: string) => {
-    const record = data?.days?.[dateStr];
-    if (!record || !record.quantities) return false;
-    return Object.values(record.quantities).some(v => v > 0);
-  };
 
   const chartData = useMemo(() => {
     const last7Days = [];
@@ -332,7 +345,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     exit: { opacity: 0, scale: 0.98, transition: { duration: 0.15, ease: "easeIn" } }
   };
 
-  // Получаем название выбранного месяца для заголовков
   const localeStr = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU';
   const monthName = new Date(selectedDate).toLocaleDateString(localeStr, { month: 'long', year: 'numeric' });
   const displayMonthName = monthName.split(' ')[0];
@@ -429,20 +441,45 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     })}
                   </div>
 
-                  <label className="flex-shrink-0 w-14 h-14 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative overflow-hidden active:bg-white/10 border border-white/5 transition-colors">
-                    <input 
-                      type="date" 
-                      value={selectedDate} 
-                      onChange={(e) => {
-                        if (e.target.value) {
+                  <div className="flex-shrink-0 w-14 h-14 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative active:bg-white/10 border border-white/5 transition-colors cursor-pointer">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60 absolute pointer-events-none z-10">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    
+                    <DatePicker 
+                      selected={new Date(selectedDate)} 
+                      onChange={(date: Date | null) => {
+                        if (date) {
                           triggerHaptic();
-                          setSelectedDate(e.target.value);
+                          setSelectedDate(getLocalDateString(date));
                         }
                       }} 
-                      className="absolute inset-0 opacity-0 w-full h-full" 
+                      locale={getLocaleObj(lang)}
+                      customInput={<button className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />}
+                      popperPlacement="bottom-end"
+                      renderDayContents={(day, date) => {
+                        const dateStr = getLocalDateString(date);
+                        const hasData = checkHasData(dateStr);
+                        const isSelected = selectedDate === dateStr;
+                        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                        const isHol = isHoliday(date, lang);
+                        
+                        const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
+                        
+                        return (
+                          <div className="relative flex items-center justify-center h-full w-full py-1">
+                            <span className={textColor}>{day}</span>
+                            {hasData && (
+                              <span className={`absolute bottom-0 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
+                            )}
+                          </div>
+                        );
+                      }}
                     />
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                  </label>
+                  </div>
                 </div>
 
                 {data.items.length > 0 && (
