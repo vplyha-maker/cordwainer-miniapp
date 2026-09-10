@@ -162,7 +162,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Größe (EU)', step2: 'Weite',
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
-      gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchstabe)', iso: 'EU / ISO',
+      gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)', // Сократил чтобы точно влезало
+      iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint (mm/Zoll)',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
       understood: 'Verstanden',
@@ -252,7 +253,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             </div>
           </div>
 
-          {/* Width categories */}
+          {/* Width categories - ТЕПЕРЬ С ДИНАМИЧЕСКИМ ЦВЕТОМ PRO */}
           <div className="pt-2 border-t border-[var(--color-border)]">
             <span className="text-[14px] font-bold block mb-3 px-1 text-[var(--color-ink)]">
               {t.step2}
@@ -264,14 +265,17 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                   <button
                     key={cat} 
                     onClick={() => { triggerHaptic(); setWidthCat(cat) }}
-                    // Используем flex и break-words, чтобы длинный текст переносился на новую строку
                     className={`py-2 px-1 rounded-[14px] text-[11px] font-bold transition-all flex items-center justify-center break-words whitespace-normal leading-[1.1] min-h-[48px] border ${
                       isSelected 
                         ? 'shadow-sm' 
                         : 'border-[var(--color-border)] hover:border-[var(--color-muted)]'
                     }`}
                     style={isSelected 
-                      ? { background: theme.bg, color: theme.text, borderColor: theme.border }
+                      ? { 
+                          background: `color-mix(in srgb, ${result.color} 15%, var(--color-surface))`, 
+                          color: result.color, 
+                          borderColor: `color-mix(in srgb, ${result.color} 40%, transparent)` 
+                        }
                       : { background: 'var(--color-bg)', color: 'var(--color-muted)' }
                     }
                   >
@@ -346,7 +350,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-4 space-y-3">
                   
-                  {/* Standards Grid */}
+                  {/* Standards Grid - ИСПРАВЛЕНЫ ПЕРЕНОСЫ */}
                   <div className="grid grid-cols-3 gap-2">
                     {([
                       { key: 'gostNum' as const, label: t.gostNum, value: result.gostNum },
@@ -358,7 +362,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                         onClick={() => setActiveInfo(item.key)}
                         className="rounded-[16px] p-2.5 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform bg-[var(--color-bg)] border border-[var(--color-border)] shadow-sm hover:border-[var(--color-muted)]"
                       >
-                        <span className="text-[10px] mb-1.5 font-bold text-center leading-tight whitespace-nowrap text-[var(--color-muted)]">
+                        <span className="text-[9.5px] mb-1.5 font-bold text-center leading-tight break-words whitespace-normal text-[var(--color-muted)]">
                           {item.label}
                         </span>
                         <motion.span
