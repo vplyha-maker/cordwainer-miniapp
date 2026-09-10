@@ -11,22 +11,22 @@ type WidthCalcPageProps = {
 // Насыщенные DCI-P3 цвета, контрастные как в светлой, так и в темной теме
 const THEMES = {
   men: { 
-    accent: 'var(--color-accent, #B46513)', 
-    bg: 'color-mix(in srgb, var(--color-accent, #B46513) 12%, var(--color-surface))', 
-    text: 'var(--color-accent, #B46513)', 
-    border: 'color-mix(in srgb, var(--color-accent, #B46513) 30%, transparent)' 
+    accent: '#B46513', // Мужской: Золотисто-коричневый
+    bg: 'color-mix(in srgb, #B46513 15%, var(--color-surface))', 
+    text: '#B46513', 
+    border: 'color-mix(in srgb, #B46513 35%, transparent)' 
   },
   women: { 
-    accent: 'var(--pigment-lac-dye, #BE185D)', 
-    bg: 'color-mix(in srgb, var(--pigment-lac-dye, #BE185D) 12%, var(--color-surface))', 
-    text: 'var(--pigment-lac-dye, #BE185D)', 
-    border: 'color-mix(in srgb, var(--pigment-lac-dye, #BE185D) 30%, transparent)' 
+    accent: '#BE185D', // Женский: Глубокий малиновый
+    bg: 'color-mix(in srgb, #BE185D 15%, var(--color-surface))', 
+    text: '#BE185D', 
+    border: 'color-mix(in srgb, #BE185D 35%, transparent)' 
   },
   kids: { 
-    accent: 'var(--pigment-azurite, #0369A1)', 
-    bg: 'color-mix(in srgb, var(--pigment-azurite, #0369A1) 12%, var(--color-surface))', 
-    text: 'var(--pigment-azurite, #0369A1)', 
-    border: 'color-mix(in srgb, var(--pigment-azurite, #0369A1) 30%, transparent)' 
+    accent: '#0369A1', // Детский: Глубокий синий
+    bg: 'color-mix(in srgb, #0369A1 15%, var(--color-surface))', 
+    text: '#0369A1', 
+    border: 'color-mix(in srgb, #0369A1 35%, transparent)' 
   },
 } as const
 
@@ -264,7 +264,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                   <button
                     key={cat} 
                     onClick={() => { triggerHaptic(); setWidthCat(cat) }}
-                    className={`py-2.5 px-1 rounded-[14px] text-[12px] font-bold transition-all text-center leading-tight border ${
+                    // Используем flex и break-words, чтобы длинный текст переносился на новую строку
+                    className={`py-2 px-1 rounded-[14px] text-[11px] font-bold transition-all flex items-center justify-center break-words whitespace-normal leading-[1.1] min-h-[48px] border ${
                       isSelected 
                         ? 'shadow-sm' 
                         : 'border-[var(--color-border)] hover:border-[var(--color-muted)]'
