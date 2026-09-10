@@ -264,7 +264,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   }, [isMuted])
 
   return (
-    <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-[var(--color-bg)]">
+    <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
       <div className="absolute inset-0 w-full h-full z-0">
         {shouldLoad && slide.video ? (
           <video
@@ -285,16 +285,15 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         ) : null}
       </div>
 
-      {/* Адаптивный градиент для читаемости текста (WCAG 2.1) в любой теме */}
+      {/* 
+        Чистый классический градиент: 
+        Никаких привязок к светлой/темной теме приложения.
+        Черная полутень только снизу для читаемости текста.
+      */}
       <div 
         className="absolute inset-0 z-10 pointer-events-none" 
         style={{
-          background: `linear-gradient(to bottom, 
-            color-mix(in srgb, var(--color-bg) 40%, transparent) 0%,
-            transparent 20%,
-            transparent 60%,
-            color-mix(in srgb, var(--color-bg) 95%, transparent) 100%
-          )`
+          background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 30%, transparent 50%, transparent 85%, rgba(0,0,0,0.2) 100%)'
         }}
       />
 
@@ -305,16 +304,19 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         transition={{ duration: 1.5, ease: "easeInOut" }}
         className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%]"
       >
-        <h3 className="text-[10px] md:text-[11px] font-bold tracking-[0.4em] uppercase text-[var(--color-ink)]" style={{ textShadow: '0 2px 8px color-mix(in srgb, var(--color-bg) 80%, transparent)' }}>
+        <h3 
+          className="text-[10px] md:text-[11px] font-bold tracking-[0.4em] uppercase text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+        >
           {slide.subtitle[currentLang]}
         </h3>
         
-        <h2 className="text-[44px] md:text-[56px] font-serif font-bold leading-[1.05] tracking-wide text-[var(--color-ink)] whitespace-pre-line" style={{ textShadow: '0 2px 12px color-mix(in srgb, var(--color-bg) 80%, transparent)' }}>
+        <h2 
+          className="text-[44px] md:text-[56px] font-serif font-bold leading-[1.05] tracking-wide text-white whitespace-pre-line drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+        >
           {slide.title[currentLang]}
         </h2>
       </motion.div>
 
-      {/* Нижний блок контента */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
@@ -322,7 +324,9 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         transition={{ duration: 1.5, ease: "easeInOut", delay: 0.2 }}
         className="absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between"
       >
-        <p className="text-[12px] md:text-[13px] font-medium leading-[1.7] text-[var(--color-ink)] tracking-wide max-w-[75%]">
+        <p 
+          className="text-[12px] md:text-[13px] font-medium leading-[1.7] text-white/95 tracking-wide max-w-[75%] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+        >
           {slide.desc[currentLang]}
         </p>
         
@@ -331,27 +335,27 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
           <motion.button 
             whileTap={{ scale: 0.8 }}
             onClick={handleLike}
-            className="w-12 flex flex-col items-center justify-center gap-1 transition-colors duration-300 drop-shadow-md"
+            className="w-12 flex flex-col items-center justify-center gap-1 transition-colors duration-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
           >
             <AnimatePresence mode="wait">
               {isLiked ? (
-                <motion.svg key="liked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="30" height="30" viewBox="0 0 24 24" fill="var(--pigment-lac-dye, #E11D48)" stroke="var(--pigment-lac-dye, #E11D48)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <motion.svg key="liked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="30" height="30" viewBox="0 0 24 24" fill="#E11D48" stroke="#E11D48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </motion.svg>
               ) : (
-                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-[var(--color-ink)]" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </motion.svg>
               )}
             </AnimatePresence>
             {!isLoading && likesCount > 0 && (
-              <span className="text-[11px] font-bold text-[var(--color-ink)]">
+              <span className="text-[11px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                 {likesCount > 999 ? (likesCount / 1000).toFixed(1) + 'k' : likesCount}
               </span>
             )}
           </motion.button>
 
-          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-[var(--color-ink)] active:scale-90 transition-all duration-300 drop-shadow-md">
+          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white active:scale-90 transition-all duration-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
               <polyline points="16 6 12 2 8 6"></polyline>
@@ -374,20 +378,20 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden"
+      className="fixed inset-0 z-50 bg-black overflow-hidden"
     >
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* Кнопки управления с подложкой для читаемости на любом фоне */}
+      {/* Принудительно белые иконки с темной прозрачной подложкой */}
       <button
         onClick={onBack}
-        className="absolute top-12 left-4 z-[100] w-11 h-11 rounded-full flex items-center justify-center text-[var(--color-ink)] active:scale-90 transition-transform shadow-sm"
+        className="absolute top-12 left-4 z-[100] w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform"
         style={{
-          background: 'color-mix(in srgb, var(--color-surface) 70%, transparent)',
-          border: '1px solid var(--color-border)',
+          background: 'rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(8px)'
         }}
       >
@@ -398,10 +402,10 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
       <button
         onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-12 right-4 z-[100] w-11 h-11 rounded-full flex items-center justify-center text-[var(--color-ink)] active:scale-90 transition-transform shadow-sm"
+        className="absolute top-12 right-4 z-[100] w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform"
         style={{
-          background: 'color-mix(in srgb, var(--color-surface) 70%, transparent)',
-          border: '1px solid var(--color-border)',
+          background: 'rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
           backdropFilter: 'blur(8px)'
         }}
       >
