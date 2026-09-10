@@ -28,7 +28,6 @@ const CATEGORY_LABELS: Record<
   other: { ru: 'Прочее', uk: 'Інше', de: 'Sonstiges' },
 }
 
-// Фиксированные алфавиты, чтобы буквы не пропадали, даже если терминов на них пока нет
 const ALPHABETS = {
   ru: 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЭЮЯ'.split(''),
   uk: 'АБВГҐДЕЄЖЗИІЇЙКЛМНОПРСТУФХЦЧШЩЮЯ'.split(''),
@@ -113,7 +112,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
     listRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [query, activeLetter, activeCategory])
 
-  // Собираем реально существующие первые буквы для подсветки активных
   const activeLetters = useMemo(() => {
     const letters = new Set<string>()
     GLOSSARY_TERMS.forEach((item) => {
@@ -123,7 +121,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
     return letters
   }, [lang])
 
-  // Берем полный алфавит для текущего языка
   const availableLetters = ALPHABETS[lang] || ALPHABETS.ru
 
   const categories = useMemo(() => {
@@ -133,7 +130,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
 
   return (
     <div className="glossary-theme-root relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
-      {/* Header */}
       <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
         <div className="flex items-center gap-3 min-w-0">
           {onBack && (
@@ -158,9 +154,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
         </div>
       </div>
 
-      {/* Content */}
       <div ref={listRef} className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
-        {/* Search */}
         <div className="mb-4">
           <div className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))]">
             <svg
@@ -200,7 +194,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         </div>
 
-        {/* Alphabet filter */}
         <div className="mb-3 -mx-1 overflow-x-auto scrollbar-none">
           <div className="flex gap-1.5 px-1 pb-1 min-w-max">
             <button
@@ -208,7 +201,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
               onClick={() => setActiveLetter(null)}
               className={`h-8 px-3 rounded-full text-[12px] font-medium transition-colors shrink-0 ${
                 activeLetter === null
-                  ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]' // Жесткий темный цвет для контраста на желтом (WCAG)
+                  ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]'
                   : 'bg-[var(--color-surface,#25201C)] text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
               }`}
             >
@@ -224,7 +217,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
                   onClick={() => setActiveLetter(activeLetter === letter ? null : letter)}
                   className={`w-8 h-8 rounded-full text-[13px] font-serif font-medium transition-colors shrink-0 flex items-center justify-center ${
                     activeLetter === letter
-                      ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]' // Жесткий темный цвет для контраста 4.5:1 (WCAG)
+                      ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]'
                       : hasTerms
                         ? 'bg-[var(--color-surface,#25201C)] text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
                         : 'bg-[var(--color-surface,#25201C)] text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))] opacity-30 pointer-events-none'
@@ -237,7 +230,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         </div>
 
-        {/* Category chips */}
         <div className="mb-4 -mx-1 overflow-x-auto scrollbar-none">
           <div className="flex gap-1.5 px-1 pb-1 min-w-max">
             {categories.map((cat) => {
@@ -261,12 +253,10 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         </div>
 
-        {/* Убрана opacity-70 для соответствия WCAG 2.1 Contrast (минимум 4.5:1 для обычного текста) */}
         <p className="text-[11px] text-[var(--color-muted,#B9ACA0)] mb-3">
           {t.flipHint}
         </p>
 
-        {/* Cards grid */}
         {filtered.length === 0 ? (
           <div className="rounded-[18px] p-8 bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] text-center">
             <p className="text-[14px] text-[var(--color-ink,#F5F1EA)]">{t.empty}</p>
@@ -289,13 +279,11 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         )}
 
-        {/* Убрана opacity-50 для соответствия WCAG 2.1 (сохраняем читаемость > 4.5:1) */}
         <p className="text-[10px] text-[var(--color-muted,#B9ACA0)] text-center mb-4">
           {t.source}
         </p>
       </div>
 
-      {/* Bottom Dock */}
       <div className="fixed bottom-[10px] left-0 right-0 z-50 pointer-events-auto">
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
           <BottomDock active="search" lang={lang} />
@@ -303,10 +291,8 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
       </div>
 
       <style>{`
-        /* Ночная и Дневная схемы с поддержкой цветового охвата DCI-P3 (без отсебятины - используются 100% эквиваленты заданных HEX) */
-        
         .glossary-theme-root {
-          /* Light (Day) Theme */
+          /* Light (Day) Theme - Baseline iOS Fallback */
           --color-bg: #F5F1EA;
           --color-ink: #1C1816;
           --color-surface: #FFFFFF;
@@ -318,7 +304,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
 
         @media (prefers-color-scheme: dark) {
           .glossary-theme-root {
-            /* Dark (Night) Theme */
+            /* Dark (Night) Theme - Baseline iOS Fallback */
             --color-bg: #1C1816;
             --color-ink: #F5F1EA;
             --color-surface: #25201C;
@@ -329,26 +315,27 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           }
         }
 
-        @media (color-gamut: p3) {
-          .glossary-theme-root {
-            /* Light P3 */
-            --color-bg: color(display-p3 0.961 0.945 0.918);
-            --color-ink: color(display-p3 0.110 0.094 0.086);
-            --color-surface: color(display-p3 1 1 1);
-            --color-surface-2: color(display-p3 0.910 0.890 0.855);
-            --color-border: color(display-p3 0 0 0 / 0.12);
-            --color-muted: color(display-p3 0.400 0.369 0.341);
-            --color-accent: color(display-p3 0.894 0.816 0.039);
+        /* Безопасное применение P3 только если браузер 100% его читает */
+        @supports (color: color(display-p3 1 1 1)) {
+          @media (color-gamut: p3) {
+            .glossary-theme-root {
+              --color-bg: color(display-p3 0.961 0.945 0.918);
+              --color-ink: color(display-p3 0.110 0.094 0.086);
+              --color-surface: color(display-p3 1 1 1);
+              --color-surface-2: color(display-p3 0.910 0.890 0.855);
+              --color-border: rgba(0, 0, 0, 0.12);
+              --color-muted: color(display-p3 0.400 0.369 0.341);
+              --color-accent: color(display-p3 0.894 0.816 0.039);
+            }
           }
           
-          @media (prefers-color-scheme: dark) {
+          @media (color-gamut: p3) and (prefers-color-scheme: dark) {
             .glossary-theme-root {
-              /* Dark P3 */
               --color-bg: color(display-p3 0.110 0.094 0.086);
               --color-ink: color(display-p3 0.961 0.945 0.918);
               --color-surface: color(display-p3 0.145 0.125 0.110);
               --color-surface-2: color(display-p3 0.184 0.161 0.141);
-              --color-border: color(display-p3 1 1 1 / 0.12);
+              --color-border: rgba(255, 255, 255, 0.12);
               --color-muted: color(display-p3 0.725 0.675 0.627);
               --color-accent: color(display-p3 0.894 0.816 0.039);
             }
