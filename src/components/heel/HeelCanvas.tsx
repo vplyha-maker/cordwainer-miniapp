@@ -1,4 +1,3 @@
-// src/components/heel/HeelCanvas.tsx
 import React from 'react'
 import type { HeelEngineering, HeelAudit, SoleType, HeelType } from '../../lib/heelCalc'
 import type { HeelGeometry } from '../../lib/heelGeometry'
@@ -31,18 +30,27 @@ type Props = {
   onFix?: () => void
 }
 
+// Адаптивные стили для алёртов на основе CSS-переменных
 const AUDIT_STYLES = {
   SUCCESS: {
-    colors: 'text-green-400',
-    box: 'border-green-500/20 bg-[#1C1816]',
+    color: 'var(--pigment-malachite, #047857)',
+    bg: 'color-mix(in srgb, var(--pigment-malachite, #047857) 12%, var(--color-surface))',
+    border: 'color-mix(in srgb, var(--pigment-malachite, #047857) 30%, transparent)',
   },
   WARNING: {
-    colors: 'text-amber-400',
-    box: 'border-amber-500/40 bg-amber-950/20',
+    color: 'var(--color-accent, #B46513)',
+    bg: 'color-mix(in srgb, var(--color-accent, #B46513) 12%, var(--color-surface))',
+    border: 'color-mix(in srgb, var(--color-accent, #B46513) 30%, transparent)',
   },
   ERROR: {
-    colors: 'text-red-400',
-    box: 'border-red-500/40 bg-red-950/20',
+    color: 'var(--pigment-lac-dye, #E11D48)',
+    bg: 'color-mix(in srgb, var(--pigment-lac-dye, #E11D48) 12%, var(--color-surface))',
+    border: 'color-mix(in srgb, var(--pigment-lac-dye, #E11D48) 30%, transparent)',
+  },
+  INFO: {
+    color: 'var(--pigment-azurite, #1D4ED8)',
+    bg: 'color-mix(in srgb, var(--pigment-azurite, #1D4ED8) 12%, var(--color-surface))',
+    border: 'color-mix(in srgb, var(--pigment-azurite, #1D4ED8) 30%, transparent)',
   },
 } as const
 
@@ -59,11 +67,9 @@ export function HeelCanvas({
   labels: t,
   onFix,
 }: Props) {
-  const style = AUDIT_STYLES[audit.status]
-  const boxColors =
-    audit.titleKey === 'negDropTitle' ? 'border-blue-500/40 bg-blue-950/20' : style.box
-  const textColor =
-    audit.titleKey === 'negDropTitle' ? 'text-blue-400' : style.colors
+  // Выбор стиля в зависимости от статуса аудита
+  const isInfo = audit.titleKey === 'negDropTitle'
+  const styleObj = isInfo ? AUDIT_STYLES.INFO : AUDIT_STYLES[audit.status]
 
   const showEntry =
     soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
@@ -74,25 +80,46 @@ export function HeelCanvas({
   const entryLabel = t.entryAngle ?? 'Угол въезда'
   const dropMm = heelHeight - toeThickness
 
+  // Определение цвета для линии смещения каблука
+  const offsetColor = eng.heelOffsetTooFarBack
+    ? 'var(--pigment-lac-dye, #E11D48)'
+    : eng.heelOffsetTooFarForward
+    ? 'var(--color-accent, #B46513)'
+    : 'var(--pigment-malachite, #047857)'
+
   return (
-    <div className={`flex flex-col rounded-[14px] border overflow-hidden ${boxColors}`}>
-      {/* Алерт */}
-      <div className="flex items-start justify-between gap-2 px-2.5 pt-2 pb-1">
+    <div 
+      className="flex flex-col rounded-[20px] border overflow-hidden shadow-sm transition-colors"
+      style={{
+        backgroundColor: styleObj.bg,
+        borderColor: styleObj.border,
+      }}
+    >
+      {/* Alert Header */}
+      <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2">
         <div className="min-w-0">
-          <div className={`text-[11px] font-bold leading-tight ${textColor}`}>{auditTitle}</div>
-          <div className="text-[9px] opacity-75 mt-0.5 leading-snug line-clamp-2">{auditMessage}</div>
+          <div className="text-[13px] font-bold leading-tight" style={{ color: styleObj.color }}>
+            {auditTitle}
+          </div>
+          <div className="text-[11px] font-medium mt-1 leading-snug line-clamp-2 text-[var(--color-ink)] opacity-80">
+            {auditMessage}
+          </div>
         </div>
         {audit.status === 'ERROR' && onFix && (
           <button
             onClick={onFix}
-            className="shrink-0 bg-[#8B5CF6] text-white text-[10px] font-bold py-1 px-2 rounded-md active:scale-95"
+            className="shrink-0 text-[11px] font-bold py-1.5 px-3 rounded-[10px] active:scale-95 transition-transform shadow-sm whitespace-nowrap"
+            style={{
+              background: 'var(--color-ink)',
+              color: 'var(--color-bg)',
+            }}
           >
             🪄 {t.fixBtn}
           </button>
         )}
       </div>
 
-      {/* SVG */}
+      {/* SVG Canvas */}
       <div className="relative w-full" style={{ height: g.svgHeight }}>
         <svg
           width="100%"
@@ -101,79 +128,81 @@ export function HeelCanvas({
           preserveAspectRatio="xMidYMax meet"
           className="overflow-visible"
         >
-          {/* Заголовок */}
+          {/* Main Title */}
           <text
             x={(g.xHeel + g.xToe) / 2 - 42}
             y="8"
-            fill="#A3988E"
-            fontSize="6.5"
-            fontWeight="600"
+            fill="var(--color-muted)"
+            fontSize="7"
+            fontWeight="bold"
           >
             {massTitle}
           </text>
 
-          {/* Пятка — слева вверху, не на каблуке */}
-          <text x={Math.max(2, g.xHeel - 2)} y="18" fill="#A3988E" fontSize="6.5" fontWeight="500">
+          {/* Heel Mass - Top Left */}
+          <text x={Math.max(2, g.xHeel - 2)} y="18" fill="var(--color-muted)" fontSize="7" fontWeight="bold">
             {rearLabel}
           </text>
-          <text x={Math.max(2, g.xHeel - 2)} y="29" fill="#22C55E" fontSize="11" fontWeight="700">
+          <text x={Math.max(2, g.xHeel - 2)} y="30" fill="var(--pigment-malachite, #047857)" fontSize="12" fontWeight="bold">
             {eng.heelLoad}%
           </text>
 
-          {/* Носок — справа вверху */}
-          <text x={g.xToe - 32} y="18" fill="#A3988E" fontSize="6.5" fontWeight="500">
+          {/* Forefoot Mass - Top Right */}
+          <text x={g.xToe - 32} y="18" fill="var(--color-muted)" fontSize="7" fontWeight="bold">
             {foreLabel}
           </text>
-          <text x={g.xToe - 32} y="29" fill="#EF4444" fontSize="11" fontWeight="700">
+          <text x={g.xToe - 32} y="30" fill="var(--pigment-lac-dye, #E11D48)" fontSize="12" fontWeight="bold">
             {eng.forefootLoad}%
           </text>
 
-          {/* Угол въезда */}
+          {/* Entry Angle */}
           {showEntry && (
             <>
               <text
                 x={(g.xHeel + g.xToe) / 2 - 28}
                 y="18"
-                fill="#A3988E"
-                fontSize="6.5"
-                fontWeight="500"
+                fill="var(--color-muted)"
+                fontSize="7"
+                fontWeight="bold"
               >
                 {entryLabel}
               </text>
               <text
                 x={(g.xHeel + g.xToe) / 2 - 14}
-                y="29"
-                fill="#D49A5C"
-                fontSize="11"
-                fontWeight="700"
+                y="30"
+                fill="var(--color-accent, #B46513)"
+                fontSize="12"
+                fontWeight="bold"
               >
                 {eng.entryAngleDeg}°
               </text>
             </>
           )}
 
-          {/* Земля и линия платформы */}
+          {/* Ground Line */}
           <line
             x1="0"
             y1={g.yGround}
             x2={g.svgWidth}
             y2={g.yGround}
-            stroke="#4A423C"
-            strokeWidth="1"
+            stroke="var(--color-border)"
+            strokeWidth="1.5"
             strokeDasharray="2 2"
           />
+          
+          {/* Platform Line */}
           <line
             x1={g.xHeel - 8}
             y1={g.yFootBall}
             x2={g.xToe + 8}
             y2={g.yFootBall}
-            stroke="#3B82F6"
-            strokeWidth="1"
+            stroke="var(--pigment-azurite, #1D4ED8)"
+            strokeWidth="1.5"
             strokeDasharray="3 3"
-            opacity="0.4"
+            opacity="0.6"
           />
 
-          {/* Heel Center Line — только стандарт */}
+          {/* Heel Center Line (Flat Only) */}
           {soleType === 'flat' && (
             <>
               <line
@@ -181,87 +210,77 @@ export function HeelCanvas({
                 y1={g.yFootHeel - 8}
                 x2={g.xHeelCenter}
                 y2={g.yGround + 4}
-                stroke={
-                  eng.heelOffsetTooFarBack
-                    ? '#EF4444'
-                    : eng.heelOffsetTooFarForward
-                      ? '#F59E0B'
-                      : '#22C55E'
-                }
-                strokeWidth="1.4"
+                stroke={offsetColor}
+                strokeWidth="1.5"
                 strokeDasharray="4 3"
-                opacity="0.95"
               />
               <circle
                 cx={g.xTipCenter}
                 cy={g.yGround}
-                r="2.8"
-                fill={
-                  eng.heelOffsetTooFarBack
-                    ? '#EF4444'
-                    : eng.heelOffsetTooFarForward
-                      ? '#F59E0B'
-                      : '#22C55E'
-                }
+                r="3"
+                fill={offsetColor}
               />
             </>
           )}
 
-          {/* Перепад: стандарт — у земли; рокер — у точки переката сверху */}
+          {/* Drop Label */}
           {soleType === 'rocker' ? (
             <text
               x={g.xBall + 8}
               y={Math.min(g.yFootBall - 10, g.yGround - 14)}
-              fill="#3B82F6"
+              fill="var(--pigment-azurite, #1D4ED8)"
               fontSize="8"
-              fontWeight="600"
+              fontWeight="bold"
             >
-              {t.dropLbl}: {dropMm} мм
+              {t.dropLbl}: {dropMm} {t.mm || 'мм'}
             </text>
           ) : (
             <text
               x={g.xHeelCenter + 12}
-              y={g.yGround - 6}
-              fill="#3B82F6"
+              y={g.yGround - 8}
+              fill="var(--pigment-azurite, #1D4ED8)"
               fontSize="8"
-              fontWeight="600"
+              fontWeight="bold"
             >
-              {t.dropLbl}: {dropMm} мм
+              {t.dropLbl}: {dropMm} {t.mm || 'мм'}
             </text>
           )}
 
-          {/* Геометрия */}
-          <path d={g.heelPath} fill="#D49A5C" opacity="0.9" />
+          {/* Geometry Layers */}
+          <path 
+            d={g.heelPath} 
+            fill="color-mix(in srgb, var(--color-accent, #B46513) 90%, transparent)" 
+          />
           <path
             d={g.solePath}
-            fill="#2A2421"
-            stroke="#D49A5C"
-            strokeWidth="1.4"
+            fill="var(--color-ink)"
+            stroke="var(--color-accent, #B46513)"
+            strokeWidth="1.5"
             strokeLinejoin="round"
           />
 
-          {/* Супинатор — только стандарт */}
+          {/* Shank (Flat Only) */}
           {soleType === 'flat' && (
             <path
               d={g.shankCurve}
               fill="none"
-              stroke="#94A3B8"
-              strokeWidth={Math.max(1.1, eng.steelThickness * g.scale)}
+              stroke="var(--color-muted)"
+              strokeWidth={Math.max(1.5, eng.steelThickness * g.scale)}
               strokeLinecap="round"
             />
           )}
 
-          {/* Точка переката — рокер */}
+          {/* Rocker Apex */}
           {soleType === 'rocker' && (
             <>
-              <circle cx={g.xBall} cy={g.yFootBall} r="2.8" fill="#EF4444" />
+              <circle cx={g.xBall} cy={g.yFootBall} r="3" fill="var(--pigment-lac-dye, #E11D48)" />
               <line
                 x1={g.xBall}
                 y1={g.yFootBall}
                 x2={g.xBall}
                 y2={g.yGround}
-                stroke="#EF4444"
-                strokeWidth="1"
+                stroke="var(--pigment-lac-dye, #E11D48)"
+                strokeWidth="1.5"
                 strokeDasharray="2 2"
               />
             </>
@@ -269,18 +288,30 @@ export function HeelCanvas({
         </svg>
       </div>
 
-      {/* Низ */}
-      <div className="px-2.5 py-1.5 border-t border-white/5 flex justify-between text-[9px] bg-black/20">
+      {/* Bottom Info Bar */}
+      <div 
+        className="px-4 py-2.5 flex justify-between text-[11px] font-medium"
+        style={{
+          borderTop: '1px solid var(--color-border)',
+          background: 'color-mix(in srgb, var(--color-ink) 4%, transparent)',
+          color: 'var(--color-muted)'
+        }}
+      >
         <span>
           {t.internalSlope}{' '}
-          <strong className="text-[10px]">{eng.internalSlope.toFixed(1)}°</strong>
+          <strong className="text-[12px] font-bold text-[var(--color-ink)]">
+            {eng.internalSlope.toFixed(1)}°
+          </strong>
         </span>
         <span>
           {t.loadLbl}{' '}
           <strong
-            className={`text-[10px] ${
-              eng.forefootLoad >= HEEL_CONST.CRITICAL_LOAD ? 'text-red-400' : ''
-            }`}
+            className="text-[12px] font-bold"
+            style={{
+              color: eng.forefootLoad >= HEEL_CONST.CRITICAL_LOAD 
+                ? 'var(--pigment-lac-dye, #E11D48)' 
+                : 'var(--color-ink)'
+            }}
           >
             {eng.forefootLoad}%
           </strong>
