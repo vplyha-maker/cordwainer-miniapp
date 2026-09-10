@@ -146,12 +146,12 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Größe (EU)', step2: 'Weite',
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
-      gostNum: 'GOST RU (Zahl)', gostLet: 'GOST RU (Buchstabe)', iso: 'EU / ISO',
+      gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchstabe)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint (mm/Zoll)',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
       understood: 'Verstanden',
       modal: {
-        gostNum: { title: 'GOST RU Standards', text: 'GOST 3927-88 (Zahlen- und Buchstabensystem). Definiert die grundlegenden Leistenumfänge.' },
+        gostNum: { title: 'Osteuropäische Norm', text: 'Der Standard 3927-88 (GOST/DSTU in Russland und der Ukraine) nutzt ein Zahlen- und Buchstabensystem zur Definition der grundlegenden Leistenumfänge.' },
         iso: { title: 'ISO Standard', text: 'Internationaler ISO / EU Standard für die Markierung von Schuh- und Leistenparametern.' }
       }
     }
