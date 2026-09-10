@@ -38,7 +38,6 @@ function glossaryLabel(count: number, lang: Lang): string {
   return `${count} терминов`
 }
 
-// Рекурсивный поиск по всем свойствам объекта (ищет сразу по RU, UK, DE)
 const deepSearch = (obj: any, query: string): boolean => {
   if (!obj) return false
   if (typeof obj === 'string') return obj.toLowerCase().includes(query)
@@ -48,7 +47,6 @@ const deepSearch = (obj: any, query: string): boolean => {
   return false
 }
 
-// Функция для безопасного извлечения заголовка для текущего языка
 const getDisplayTitle = (item: any, lang: Lang): string => {
   if (!item) return '...'
   if (typeof item.title === 'string') return item.title
@@ -76,9 +74,10 @@ export function HomePage({
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   
-  const hasNewBlog = BLOG_ARTICLES.some((a) => a.isNew)
-  const articleFavorites = favorites.filter((f) => f.type === 'article')
-  const glossaryCount = GLOSSARY_TERMS.length
+  // Безопасное чтение массивов на случай ошибок импорта
+  const hasNewBlog = BLOG_ARTICLES?.some((a) => a.isNew) || false
+  const articleFavorites = favorites?.filter((f) => f.type === 'article') || []
+  const glossaryCount = GLOSSARY_TERMS?.length || 0
 
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
@@ -87,12 +86,15 @@ export function HomePage({
     if (savedLang && supportedLangs.includes(savedLang)) {
       if (savedLang !== lang) setLang(savedLang)
     }
-  }, [])
+  }, [lang, setLang])
 
   const handleLangChange = (newLang: Lang) => {
     localStorage.setItem('app_lang', newLang)
     setLang(newLang)
   }
+
+  // Защита от краша React, если lang временно undefined
+  const safeLang = (lang && ['ru', 'uk', 'de'].includes(lang)) ? lang : 'uk'
 
   const t = {
     ru: {
@@ -200,16 +202,15 @@ export function HomePage({
       noResults: 'Nichts gefunden',
       section: 'Bereich',
     }
-  }[lang]
+  }[safeLang]
 
-  // Использование более насыщенных и контрастных fallback-цветов, корректная генерация фонов
   const LEARNING = [
     {
       id: 'materials',
       title: t.materials,
       subtitle: t.materialsSub,
       count: t.materialsCount,
-      iconClass: 'bg-[color-mix(in_srgb,var(--color-accent,#B46513)_15%,var(--color-surface))] text-[var(--color-accent,#B46513)]',
+      accent: 'var(--color-accent, #B46513)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
@@ -221,7 +222,7 @@ export function HomePage({
       title: t.colors,
       subtitle: t.colorsSub,
       count: t.colorsCount,
-      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-azurite,#1D4ED8)_15%,var(--color-surface))] text-[var(--pigment-azurite,#1D4ED8)]',
+      accent: 'var(--pigment-azurite, #1D4ED8)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
@@ -237,7 +238,7 @@ export function HomePage({
       title: t.styles,
       subtitle: t.stylesSub,
       count: t.stylesCount,
-      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-egyptian-blue,#1E3A8A)_15%,var(--color-surface))] text-[var(--pigment-egyptian-blue,#1E3A8A)]',
+      accent: 'var(--pigment-egyptian-blue, #1E3A8A)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
@@ -251,7 +252,7 @@ export function HomePage({
       title: t.sizes,
       subtitle: t.sizesSub,
       count: t.sizesCount,
-      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-malachite,#047857)_15%,var(--color-surface))] text-[var(--pigment-malachite,#047857)]',
+      accent: 'var(--pigment-malachite, #047857)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19.875 6.27L17.73 4.125a2.25 2.25 0 00-3.18 0L3.375 15.3a2.25 2.25 0 000 3.18l2.145 2.145a2.25 2.25 0 003.18 0l11.175-11.175a2.25 2.25 0 000-3.18z" />
@@ -266,7 +267,7 @@ export function HomePage({
       id: 'calc',
       title: t.calc,
       subtitle: t.calcSub,
-      iconClass: 'bg-[color-mix(in_srgb,var(--color-accent,#B46513)_15%,var(--color-surface))] text-[var(--color-accent,#B46513)]',
+      accent: 'var(--color-accent, #B46513)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="2" width="16" height="20" rx="3" />
@@ -278,7 +279,7 @@ export function HomePage({
       id: 'blog',
       title: t.blog,
       subtitle: t.blogSub,
-      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-lac-dye,#991B1B)_15%,var(--color-surface))] text-[var(--pigment-lac-dye,#991B1B)]',
+      accent: 'var(--pigment-lac-dye, #991B1B)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 20h9" />
@@ -290,7 +291,7 @@ export function HomePage({
       id: 'glossary',
       title: t.glossary,
       subtitle: t.glossarySub,
-      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-azurite,#1D4ED8)_15%,var(--color-surface))] text-[var(--pigment-azurite,#1D4ED8)]',
+      accent: 'var(--pigment-azurite, #1D4ED8)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
@@ -301,7 +302,7 @@ export function HomePage({
       id: 'prices',
       title: t.prices,
       subtitle: t.pricesSub,
-      iconClass: 'bg-[color-mix(in_srgb,var(--pigment-malachite,#047857)_15%,var(--color-surface))] text-[var(--pigment-malachite,#047857)]',
+      accent: 'var(--pigment-malachite, #047857)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -310,34 +311,33 @@ export function HomePage({
     },
   ]
 
-  // === ЛОГИКА ПОИСКА ===
   const query = searchQuery.trim().toLowerCase()
   const searchResults: Array<{ id: string; type: string; title: string; subtitle: string }> = []
 
   if (query) {
-    // 1. Поиск по разделам (Обучение и Инструменты)
     [...LEARNING, ...TOOLS].forEach((item) => {
       if (item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)) {
         searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
       }
     })
 
-    // 2. Поиск по статьям блога
-    BLOG_ARTICLES.forEach((article) => {
-      if (deepSearch(article, query)) {
-        searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, lang), subtitle: t.blog })
-      }
-    })
+    if (BLOG_ARTICLES) {
+      BLOG_ARTICLES.forEach((article) => {
+        if (deepSearch(article, query)) {
+          searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, safeLang), subtitle: t.blog })
+        }
+      })
+    }
 
-    // 3. Поиск по глоссарию
-    GLOSSARY_TERMS.forEach((term) => {
-      if (deepSearch(term, query)) {
-        searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, lang), subtitle: t.glossary })
-      }
-    })
+    if (GLOSSARY_TERMS) {
+      GLOSSARY_TERMS.forEach((term) => {
+        if (deepSearch(term, query)) {
+          searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, safeLang), subtitle: t.glossary })
+        }
+      })
+    }
   }
 
-  // Обработчик клика по результату поиска
   const handleResultClick = (res: any) => {
     if (res.type === 'category') {
       switch (res.id) {
@@ -371,9 +371,9 @@ export function HomePage({
                 key={l}
                 onClick={() => handleLangChange(l as Lang)}
                 className={`px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase rounded-full transition-colors ${
-                  lang === l ? 'bg-[var(--color-ink)] text-[var(--color-bg)]' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                  safeLang === l ? 'bg-[var(--color-ink)] text-[var(--color-bg)]' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                 }`}
-                aria-pressed={lang === l}
+                aria-pressed={safeLang === l}
               >
                 {l === 'uk' ? 'UKR' : l}
               </button>
@@ -398,7 +398,7 @@ export function HomePage({
         
         {/* АКТИВНЫЙ ПОИСК */}
         <div className="mb-5 relative">
-          <div className="rounded-[18px] px-4 py-3.5 flex items-center gap-2.5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_20%,transparent)] transition-all">
+          <div className="rounded-[18px] px-4 py-3.5 flex items-center gap-2.5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm transition-all focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_2px_var(--color-accent)]">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-accent,var(--color-ink))] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
@@ -420,7 +420,6 @@ export function HomePage({
           </div>
         </div>
 
-        {/* УСЛОВНЫЙ РЕНДЕР: Поиск ИЛИ Обычное меню */}
         {query ? (
           <div className="search-results pb-6">
             <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
@@ -465,7 +464,13 @@ export function HomePage({
                     }
                     className="min-h-[124px] h-auto p-4 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95"
                   >
-                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center ${item.iconClass}`}>
+                    <div
+                      className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
+                      style={{
+                        background: `color-mix(in srgb, ${item.accent} 15%, var(--color-surface))`,
+                        color: item.accent
+                      }}
+                    >
                       {item.icon}
                     </div>
                     <div className="min-w-0 mt-3">
@@ -508,16 +513,27 @@ export function HomePage({
                     }
                     className={`relative min-h-[124px] h-auto p-3 rounded-[18px] bg-[var(--color-surface)] border ${
                       isBlog && hasNewBlog 
-                        ? 'border-[var(--pigment-lac-dye,#991B1B)] shadow-[0_0_12px_color-mix(in_srgb,var(--pigment-lac-dye,#991B1B)_20%,transparent)]' 
+                        ? 'border-[var(--pigment-lac-dye,#991B1B)]' 
                         : 'border-[var(--color-border)]'
                     } shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95 overflow-hidden`}
+                    style={
+                      isBlog && hasNewBlog 
+                        ? { boxShadow: '0 0 12px color-mix(in srgb, var(--pigment-lac-dye,#991B1B) 20%, transparent)' } 
+                        : undefined
+                    }
                   >
-                    <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${item.iconClass}`}>
+                    <div
+                      className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
+                      style={{
+                        background: `color-mix(in srgb, ${item.accent} 15%, var(--color-surface))`,
+                        color: item.accent
+                      }}
+                    >
                       {item.icon}
                     </div>
                     <div className="min-w-0 mt-3 w-full">
                       <div className="text-[11px] md:text-[13px] font-bold leading-snug text-[var(--color-ink)] flex items-start gap-0.5">
-                        <span className="break-words hyphens-auto" lang={lang}>
+                        <span className="break-words hyphens-auto" lang={safeLang}>
                           {item.title}
                         </span>
                         {isBlog && hasNewBlog && (
@@ -545,7 +561,13 @@ export function HomePage({
                 }
               }}
             >
-              <div className="w-10 h-10 rounded-[10px] bg-[color-mix(in_srgb,var(--color-accent,#B46513)_15%,var(--color-surface))] text-[var(--color-accent,#B46513)] flex items-center justify-center shrink-0 text-xl font-bold">
+              <div
+                className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0 text-xl font-bold"
+                style={{
+                  background: 'color-mix(in srgb, var(--color-accent, #B46513) 15%, var(--color-surface))',
+                  color: 'var(--color-accent, #B46513)'
+                }}
+              >
                 ★
               </div>
               <div className="flex-1 min-w-0">
@@ -586,7 +608,6 @@ export function HomePage({
         )}
       </div>
 
-      {/* Плотная подложка для BottomDock */}
       <div 
         className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto shadow-[0_-4px_24px_rgba(0,0,0,0.06)]"
         style={{
@@ -595,7 +616,7 @@ export function HomePage({
         }}
       >
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
-          <BottomDock active="search" lang={lang} />
+          <BottomDock active="search" lang={safeLang} />
         </div>
       </div>
     </div>
