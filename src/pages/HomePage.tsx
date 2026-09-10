@@ -374,7 +374,8 @@ export function HomePage({
                 }`}
                 aria-pressed={lang === l}
               >
-                {l}
+                {/* ЗАМЕНА ЗДЕСЬ: отображаем UKR вместо UK */}
+                {l === 'uk' ? 'UKR' : l}
               </button>
             ))}
           </div>
