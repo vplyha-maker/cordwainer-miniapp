@@ -311,7 +311,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const currentSelectedDateObj = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans overflow-x-hidden antialiased">
+    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans antialiased">
       
       <style>{`
         .react-datepicker-popper {
@@ -382,15 +382,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
-      {/* Аппаратное ускорение (transform-gpu) и явное указание WebkitBackdropFilter убирают фликер при скролле */}
+      {/* Сплошной фон без блюра и транзишенов, чтобы убрать артефакты (фликеры) при скролле */}
       <div 
-        className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 transform-gpu ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
-        style={{ 
-          background: 'color-mix(in srgb, var(--color-bg) 85%, transparent)', 
-          WebkitBackdropFilter: 'blur(12px)',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid var(--color-border)' 
-        }}
+        className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 bg-[var(--color-bg)] border-b border-[var(--color-border)] ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
       >
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
@@ -572,7 +566,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                             <button 
                               key={num}
                               onClick={() => handleQuickAdd(item.id, num)}
-                              className="py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] active:scale-95 active:bg-[var(--color-ink)] active:text-[var(--color-bg)] rounded-[14px] text-[13px] font-bold text-[var(--color-ink)] transition-colors shadow-sm"
+                              className="py-2.5 bg-[var(--color-bg)] border border-[var(--color-border)] active:scale-95 active:bg-[var(--color-ink)] active:text-[var(--color-bg)] rounded-[14px] text-[13px] font-bold text-[var(--color-ink)] transition-transform shadow-sm"
                             >
                               +{num}
                             </button>
@@ -728,7 +722,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }}
-            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none transform-gpu ${isCalendarOpen ? 'z-10' : 'z-50'}`}
+            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none ${isCalendarOpen ? 'z-10' : 'z-50'}`}
           >
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <button 
@@ -737,7 +731,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                 className={`w-full font-bold text-[15px] py-4 rounded-[20px] active:scale-[0.98] transition-transform shadow-md ${
                   hasChanges 
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border border-[var(--color-ink)]' 
-                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)] opacity-95 backdrop-blur-md'
+                    : 'bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]'
                 }`}
               >
                 {saving ? t.saving : hasChanges ? `${t.saveFor} ${getShortDateName(selectedDate, lang)}` : `${t.noChangesFor} ${getShortDateName(selectedDate, lang)} ${t.noChangesSuffix}`}
