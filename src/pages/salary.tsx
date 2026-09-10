@@ -43,7 +43,6 @@ const getLocaleObj = (lang: Lang) => {
 };
 
 // --- КАСТОМНАЯ КНОПКА КАЛЕНДАРЯ ---
-// Используем forwardRef, чтобы DatePicker мог правильно повесить onClick
 const CustomCalendarInput = React.forwardRef<HTMLDivElement, any>(({ onClick }, ref) => (
   <div 
     onClick={onClick} 
@@ -367,6 +366,65 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0E0E0E] text-white pb-32 font-sans overflow-x-hidden selection:bg-[#0A84FF]/30">
       
+      {/* ВСТРОЕННЫЕ СТИЛИ ДЛЯ ТЕМНОГО КАЛЕНДАРЯ */}
+      <style>{`
+        .react-datepicker {
+          background-color: #1C1C1E !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          font-family: inherit !important;
+          border-radius: 20px !important;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+          padding: 12px 8px !important;
+        }
+        .react-datepicker__header {
+          background-color: transparent !important;
+          border-bottom: none !important;
+          padding-top: 0 !important;
+        }
+        .react-datepicker__current-month {
+          color: white !important;
+          font-weight: 700 !important;
+          font-size: 1.1rem !important;
+          text-transform: capitalize;
+          margin-bottom: 12px !important;
+        }
+        .react-datepicker__day-name {
+          color: rgba(255, 255, 255, 0.3) !important;
+          font-weight: 600 !important;
+          font-size: 0.8rem !important;
+        }
+        .react-datepicker__day {
+          color: white !important;
+          border-radius: 12px !important;
+          width: 2.2rem !important;
+          line-height: 2.2rem !important;
+          margin: 0.2rem !important;
+          transition: background-color 0.2s;
+        }
+        .react-datepicker__day:hover {
+          background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+          background-color: #0A84FF !important;
+          color: white !important;
+          font-weight: bold !important;
+        }
+        .react-datepicker__day--outside-month {
+          color: rgba(255, 255, 255, 0.2) !important;
+        }
+        .react-datepicker-popper[data-placement^="bottom"] .react-datepicker__triangle {
+          fill: #1C1C1E !important;
+          color: #1C1C1E !important;
+          stroke: rgba(255, 255, 255, 0.1) !important;
+        }
+        .react-datepicker__navigation-icon::before {
+          border-color: rgba(255, 255, 255, 0.5) !important;
+        }
+        .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+          border-color: white !important;
+        }
+      `}</style>
+
       <div className="sticky top-0 z-50 p-4 flex items-center gap-4 bg-[#0E0E0E]/95 backdrop-blur-md border-b border-white/5">
         <button onClick={() => { triggerHaptic(); onBack(); }} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/5 active:scale-95 transition-transform text-white/70">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
@@ -456,7 +514,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     })}
                   </div>
 
-                  {/* ПОДКЛЮЧАЕМ НОВЫЙ CUSTOM INPUT */}
                   <DatePicker 
                     selected={new Date(selectedDate)} 
                     onChange={(date: Date | null) => {
@@ -480,11 +537,18 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
                       
                       return (
-                        <div className="relative flex items-center justify-center h-full w-full py-1">
-                          <span className={textColor}>{day}</span>
-                          {hasData && (
-                            <span className={`absolute bottom-0 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
-                          )}
+                        <div className="relative flex flex-col items-center justify-center h-full w-full">
+                          <span className={`text-sm ${textColor}`}>{day}</span>
+                          
+                          {/* Индикаторы под датой (точки) */}
+                          <div className="flex gap-1 mt-0.5 absolute bottom-1">
+                            {hasData && (
+                              <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
+                            )}
+                            {isHol && (
+                              <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/50' : 'bg-[#FF453A]'}`} />
+                            )}
+                          </div>
                         </div>
                       );
                     }}
