@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -161,13 +161,17 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     fetchRates();
   }, []);
 
+  // Первичная синхронизация при загрузке данных с сервера
   useEffect(() => {
-    if (data?.days?.[selectedDate]) {
-      setDayForm(data.days[selectedDate].quantities || {});
-    } else {
-      setDayForm({});
-    }
-  }, [selectedDate, data?.days]);
+    setDayForm(data?.days?.[selectedDate]?.quantities || {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.days]);
+
+  // Единая функция для смены даты, которая полностью исключает мигание (черную кнопку)
+  const changeDate = useCallback((newDate: string) => {
+    setSelectedDate(newDate);
+    setDayForm(data?.days?.[newDate]?.quantities || {});
+  }, [data?.days]);
 
   const selectedMonth = selectedDate.substring(0, 7);
 
@@ -311,7 +315,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const currentSelectedDateObj = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans antialiased">
+    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-32 font-sans antialiased [-webkit-tap-highlight-color:transparent]">
       
       <style>{`
         .react-datepicker-popper {
@@ -351,7 +355,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           display: inline-flex !important;
           align-items: center !important;
           justify-content: center !important;
-          transition: background-color 0.2s;
           padding: 0 !important;
           font-weight: 500 !important;
         }
@@ -382,7 +385,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
-      {/* Сплошной фон без блюра и транзишенов, чтобы убрать артефакты (фликеры) при скролле */}
+      {/* Сплошной фон вместо backdrop-filter, чтобы не было фликеров при прокрутке */}
       <div 
         className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 bg-[var(--color-bg)] border-b border-[var(--color-border)] ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
       >
@@ -461,8 +464,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       return (
                         <button
                           key={date}
-                          onClick={() => { triggerHaptic(); setSelectedDate(date); }}
-                          className={`relative flex-shrink-0 px-4 py-3 rounded-[16px] flex flex-col items-center justify-center min-w-[68px] transition-colors border ${buttonClass}`}
+                          onClick={() => { triggerHaptic('light'); changeDate(date); }}
+                          className={`relative flex-shrink-0 px-4 py-3 rounded-[16px] flex flex-col items-center justify-center min-w-[68px] border ${buttonClass}`}
                         >
                           <span className="text-[15px] font-bold tracking-wide">{getShortDate(date)}</span>
                           {isToday && (
@@ -470,6 +473,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                               {t.today}
                             </span>
                           )}
+                          {/* Индикатор наличия внесенных данных (точка) */}
                           {hasData && (
                             <span className={`absolute top-2.5 right-2.5 w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--color-bg)]' : 'bg-[var(--pigment-malachite, #047857)]'}`} />
                           )}
@@ -482,8 +486,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     selected={currentSelectedDateObj} 
                     onChange={(date: Date | null) => {
                       if (date) {
-                        triggerHaptic();
-                        setSelectedDate(getLocalDateString(date));
+                        triggerHaptic('light');
+                        changeDate(getLocalDateString(date));
                       }
                     }} 
                     onCalendarOpen={() => setIsCalendarOpen(true)}
@@ -499,25 +503,26 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       const isSelected = selectedDate === dateStr;
                       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                       const isHol = isHoliday(date, lang);
+                      const isOffDay = isWeekend || isHol;
                       
-                      const textColor = (isWeekend || isHol) && !isSelected ? 'text-[var(--pigment-lac-dye, #E11D48)]' : '';
-                      
-                      let borderClass = 'border border-transparent';
-                      if (!isSelected) {
-                        if (hasData) {
-                          borderClass = 'border-[2px] border-[var(--color-ink)]';
-                        } else if (isHol) {
-                          borderClass = 'border-[2px] border-[color-mix(in_srgb,var(--pigment-lac-dye,#E11D48)_50%,transparent)]';
-                        }
-                      } else {
-                        if (hasData) {
-                          borderClass = 'border-[2px] border-[var(--color-bg)]';
-                        }
+                      let circleClasses = 'border-[2px] border-transparent';
+                      let textClasses = 'text-[var(--color-ink)]';
+
+                      if (isSelected) {
+                        circleClasses = 'bg-[var(--color-ink)] border-[var(--color-ink)]';
+                        textClasses = 'text-[var(--color-bg)]';
+                      } else if (hasData) {
+                        circleClasses = 'border-[2px] border-[var(--color-ink)]';
+                        textClasses = isOffDay ? 'text-[var(--pigment-lac-dye, #E11D48)]' : 'text-[var(--color-ink)]';
+                      } else if (isOffDay) {
+                        // Красный кружок для праздников и выходных
+                        circleClasses = 'border-[2px] border-[var(--pigment-lac-dye, #E11D48)]';
+                        textClasses = 'text-[var(--pigment-lac-dye, #E11D48)]';
                       }
                       
                       return (
-                        <div className={`flex items-center justify-center w-full h-full rounded-full box-border ${borderClass}`}>
-                          <span className={`text-[13px] font-bold ${textColor}`}>{day}</span>
+                        <div className={`flex items-center justify-center w-full h-full rounded-full box-border ${circleClasses}`}>
+                          <span className={`text-[13px] font-bold ${textClasses}`}>{day}</span>
                         </div>
                       );
                     }}
@@ -725,6 +730,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none ${isCalendarOpen ? 'z-10' : 'z-50'}`}
           >
             <div className="max-w-2xl mx-auto pointer-events-auto">
+              {/* Сплошная кнопка без блюра и сложных транзишенов */}
               <button 
                 onClick={handleSaveDay}
                 disabled={saving || !hasChanges}
