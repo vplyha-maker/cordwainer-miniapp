@@ -161,13 +161,13 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     fetchRates();
   }, []);
 
-  // Первичная синхронизация при загрузке данных с сервера
+  // Синхронизация формы ТОЛЬКО при загрузке новых данных по сети
   useEffect(() => {
     setDayForm(data?.days?.[selectedDate]?.quantities || {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.days]);
+  }, [data]);
 
-  // Единая функция для смены даты, которая полностью исключает мигание (черную кнопку)
+  // АТОМАРНАЯ смена даты: меняем и дату, и форму одновременно, чтобы не было "черной вспышки" кнопки
   const changeDate = useCallback((newDate: string) => {
     setSelectedDate(newDate);
     setDayForm(data?.days?.[newDate]?.quantities || {});
@@ -385,7 +385,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
-      {/* Сплошной фон вместо backdrop-filter, чтобы не было фликеров при прокрутке */}
+      {/* УБРАН blur и backdrop-filter, убран transition. Только сплошной фон. */}
       <div 
         className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 bg-[var(--color-bg)] border-b border-[var(--color-border)] ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
       >
@@ -473,9 +473,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                               {t.today}
                             </span>
                           )}
-                          {/* Индикатор наличия внесенных данных (точка) */}
+                          {/* Индикатор наличия данных — четкая точка */}
                           {hasData && (
-                            <span className={`absolute top-2.5 right-2.5 w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--color-bg)]' : 'bg-[var(--pigment-malachite, #047857)]'}`} />
+                            <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--color-bg)]' : 'bg-[var(--pigment-malachite, #047857)]'}`} />
                           )}
                         </button>
                       );
@@ -511,13 +511,14 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       if (isSelected) {
                         circleClasses = 'bg-[var(--color-ink)] border-[var(--color-ink)]';
                         textClasses = 'text-[var(--color-bg)]';
-                      } else if (hasData) {
-                        circleClasses = 'border-[2px] border-[var(--color-ink)]';
-                        textClasses = isOffDay ? 'text-[var(--pigment-lac-dye, #E11D48)]' : 'text-[var(--color-ink)]';
-                      } else if (isOffDay) {
-                        // Красный кружок для праздников и выходных
-                        circleClasses = 'border-[2px] border-[var(--pigment-lac-dye, #E11D48)]';
-                        textClasses = 'text-[var(--pigment-lac-dye, #E11D48)]';
+                      } else {
+                        // Жесткая красная обводка для выходных/праздников
+                        if (isOffDay) {
+                          circleClasses = 'border-[2px] border-[#EF4444]'; 
+                          textClasses = 'text-[#EF4444]';
+                        } else if (hasData) {
+                          circleClasses = 'border-[2px] border-[var(--color-ink)]';
+                        }
                       }
                       
                       return (
@@ -721,16 +722,16 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </div>
       </div>
 
+      {/* Без транзишенов, чтобы избежать подергиваний при рендеринге */}
       <AnimatePresence>
         {activeTab === 'daily' && data.items.length > 0 && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }}
-            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none ${isCalendarOpen ? 'z-10' : 'z-50'}`}
+            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none bg-transparent ${isCalendarOpen ? 'z-10' : 'z-50'}`}
           >
             <div className="max-w-2xl mx-auto pointer-events-auto">
-              {/* Сплошная кнопка без блюра и сложных транзишенов */}
               <button 
                 onClick={handleSaveDay}
                 disabled={saving || !hasChanges}
