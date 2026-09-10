@@ -28,9 +28,7 @@ const getShortDateName = (dateStr: string, lang: Lang) => {
 };
 
 // --- НАСТРОЙКИ ПРАЗДНИКОВ (Формат ММ-ДД) ---
-// Праздники Украины (по новому календарю)
 const HOLIDAYS_UA = ['01-01', '03-08', '05-01', '05-08', '06-28', '07-15', '08-24', '10-01', '12-25'];
-// Национальные праздники Германии (вкл. основные и переходящие даты 2026 года)
 const HOLIDAYS_DE = ['01-01', '04-03', '04-06', '05-01', '05-14', '05-25', '10-03', '12-25', '12-26'];
 
 const isHoliday = (date: Date, lang: Lang) => {
@@ -43,6 +41,23 @@ const getLocaleObj = (lang: Lang) => {
   if (lang === 'uk') return uk;
   return ru;
 };
+
+// --- КАСТОМНАЯ КНОПКА КАЛЕНДАРЯ ---
+// Используем forwardRef, чтобы DatePicker мог правильно повесить onClick
+const CustomCalendarInput = React.forwardRef<HTMLDivElement, any>(({ onClick }, ref) => (
+  <div 
+    onClick={onClick} 
+    ref={ref}
+    className="flex-shrink-0 w-14 h-14 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative active:bg-white/10 border border-white/5 transition-colors cursor-pointer"
+  >
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60 pointer-events-none">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+    </svg>
+  </div>
+));
 
 const getDictionary = (lang: Lang, curr: string) => {
   const dict = {
@@ -441,47 +456,39 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                     })}
                   </div>
 
-                  <div className="flex-shrink-0 w-14 h-14 mb-2 rounded-2xl bg-[#1C1C1E] flex items-center justify-center relative active:bg-white/10 border border-white/5 transition-colors cursor-pointer">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60 absolute pointer-events-none z-10">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    
-                    <DatePicker 
-                      selected={new Date(selectedDate)} 
-                      onChange={(date: Date | null) => {
-                        if (date) {
-                          triggerHaptic();
-                          setSelectedDate(getLocalDateString(date));
-                        }
-                      }} 
-                      locale={getLocaleObj(lang)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                      popperPlacement="bottom-end"
-                      renderDayContents={(day, date) => {
-                        if (!date) return <span>{day}</span>;
+                  {/* ПОДКЛЮЧАЕМ НОВЫЙ CUSTOM INPUT */}
+                  <DatePicker 
+                    selected={new Date(selectedDate)} 
+                    onChange={(date: Date | null) => {
+                      if (date) {
+                        triggerHaptic();
+                        setSelectedDate(getLocalDateString(date));
+                      }
+                    }} 
+                    locale={getLocaleObj(lang)}
+                    customInput={<CustomCalendarInput />}
+                    popperPlacement="bottom-end"
+                    renderDayContents={(day, date) => {
+                      if (!date) return <span>{day}</span>;
 
-                        const dateStr = getLocalDateString(date);
-                        const hasData = checkHasData(dateStr);
-                        const isSelected = selectedDate === dateStr;
-                        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                        const isHol = isHoliday(date, lang);
-                        
-                        const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
-                        
-                        return (
-                          <div className="relative flex items-center justify-center h-full w-full py-1">
-                            <span className={textColor}>{day}</span>
-                            {hasData && (
-                              <span className={`absolute bottom-0 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                  </div>
+                      const dateStr = getLocalDateString(date);
+                      const hasData = checkHasData(dateStr);
+                      const isSelected = selectedDate === dateStr;
+                      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                      const isHol = isHoliday(date, lang);
+                      
+                      const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
+                      
+                      return (
+                        <div className="relative flex items-center justify-center h-full w-full py-1">
+                          <span className={textColor}>{day}</span>
+                          {hasData && (
+                            <span className={`absolute bottom-0 w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#32D74B]'}`} />
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
                 </div>
 
                 {data.items.length > 0 && (
