@@ -33,7 +33,8 @@ const THEMES = {
 type InfoModalType = 'gostNum' | 'iso' | null
 type Unit = 'mm' | 'in'
 
-const AnimatedIcon = ({ type, color, animKey }: { type: 'length' | 'ball' | 'instep' | 'heel', color: string, animKey: string | number }) => {
+// Анимируется только 1 раз при открытии PRO меню, больше не перерисовывается
+const AnimatedIcon = ({ type, color }: { type: 'length' | 'ball' | 'instep' | 'heel', color: string }) => {
   const prefersReducedMotion = useReducedMotion()
   
   const paths = {
@@ -46,7 +47,6 @@ const AnimatedIcon = ({ type, color, animKey }: { type: 'length' | 'ball' | 'ins
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mr-2" style={{ color }}>
       <motion.path
-        key={animKey}
         d={paths[type]}
         stroke="currentColor"
         strokeWidth="2"
@@ -162,7 +162,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step1: 'Größe (EU)', step2: 'Weite',
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
-      gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)', // Сократил чтобы точно влезало
+      gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)',
       iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint (mm/Zoll)',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
@@ -209,7 +209,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             {(['men', 'women', 'kids'] as Gender[]).map((g) => (
               <button
                 key={g} onClick={() => handleGender(g)}
-                className="flex-1 py-2.5 rounded-[14px] text-[14px] font-bold transition-all"
+                className="flex-1 py-2.5 rounded-[14px] text-[14px] font-bold transition-colors"
                 style={
                   gender === g
                     ? { background: THEMES[g].bg, color: THEMES[g].text }
@@ -240,6 +240,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
               </button>
+              {/* Значение меняется моментально, без анимаций */}
               <div aria-live="polite" className="text-[28px] font-bold w-12 text-center tabular-nums" style={{ color: theme.text }}>
                 {sizeEu}
               </div>
@@ -253,7 +254,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             </div>
           </div>
 
-          {/* Width categories - ТЕПЕРЬ С ДИНАМИЧЕСКИМ ЦВЕТОМ PRO */}
+          {/* Width categories */}
           <div className="pt-2 border-t border-[var(--color-border)]">
             <span className="text-[14px] font-bold block mb-3 px-1 text-[var(--color-ink)]">
               {t.step2}
@@ -265,7 +266,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                   <button
                     key={cat} 
                     onClick={() => { triggerHaptic(); setWidthCat(cat) }}
-                    className={`py-2 px-1 rounded-[14px] text-[11px] font-bold transition-all flex items-center justify-center break-words whitespace-normal leading-[1.1] min-h-[48px] border ${
+                    className={`py-2 px-1 rounded-[14px] text-[11px] font-bold transition-colors flex items-center justify-center break-words whitespace-normal leading-[1.1] min-h-[48px] border ${
                       isSelected 
                         ? 'shadow-sm' 
                         : 'border-[var(--color-border)] hover:border-[var(--color-muted)]'
@@ -287,31 +288,23 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* US / UK result cards */}
+        {/* US / UK result cards - Убраны анимации (motion.span), теперь данные подставляются мгновенно */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-[20px] py-4 flex flex-col items-center justify-center bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
             <span className="text-[11px] mb-1 font-bold tracking-wide text-[var(--color-muted)]">
               US SIZE
             </span>
-            <motion.span 
-              key={`${result.us}-${widthCat}`}
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="text-[36px] font-bold leading-none text-[var(--color-ink)]"
-            >
+            <span className="text-[36px] font-bold leading-none text-[var(--color-ink)] tabular-nums">
               {result.us}
-            </motion.span>
+            </span>
           </div>
           <div className="rounded-[20px] py-4 flex flex-col items-center justify-center bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
             <span className="text-[11px] mb-1 font-bold tracking-wide text-[var(--color-muted)]">
               UK SIZE
             </span>
-            <motion.span 
-              key={`${result.uk}-${widthCat}`}
-              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="text-[36px] font-bold leading-none text-[var(--color-ink)]"
-            >
+            <span className="text-[36px] font-bold leading-none text-[var(--color-ink)] tabular-nums">
               {result.uk}
-            </motion.span>
+            </span>
           </div>
         </div>
 
@@ -326,7 +319,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 {t.proModules}
               </span>
               <div 
-                className="w-3 h-3 rounded-full shadow-sm" 
+                className="w-3 h-3 rounded-full shadow-sm transition-colors" 
                 style={{ backgroundColor: result.color, border: '1px solid var(--color-border)' }} 
                 title={(result.colorName as any)[lang] || result.colorName.ru} 
               />
@@ -350,7 +343,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               >
                 <div className="pt-4 space-y-3">
                   
-                  {/* Standards Grid - ИСПРАВЛЕНЫ ПЕРЕНОСЫ */}
+                  {/* Standards Grid - Убраны анимации (motion.span) */}
                   <div className="grid grid-cols-3 gap-2">
                     {([
                       { key: 'gostNum' as const, label: t.gostNum, value: result.gostNum },
@@ -365,19 +358,14 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                         <span className="text-[9.5px] mb-1.5 font-bold text-center leading-tight break-words whitespace-normal text-[var(--color-muted)]">
                           {item.label}
                         </span>
-                        <motion.span
-                          key={String(item.value)}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-[16px] font-bold leading-none text-[var(--color-ink)]"
-                        >
+                        <span className="text-[16px] font-bold leading-none text-[var(--color-ink)] tabular-nums">
                           {item.value}
-                        </motion.span>
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  {/* Table Details */}
+                  {/* Table Details - Убраны анимации значений */}
                   <div className="rounded-[20px] p-4 bg-[var(--color-bg)] border border-[var(--color-border)] shadow-sm">
                     <div className="flex justify-between items-center pb-3 mb-3 border-b border-[var(--color-border)]">
                       <span className="text-[12px] font-bold text-[var(--color-muted)]">
@@ -409,19 +397,16 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={theme.text} animKey={`${row.valMm}-${unit}`} />
+                            {/* Убран animKey, чтобы иконка рисовалась 1 раз и не дергалась при смене размера */}
+                            <AnimatedIcon type={row.id} color={theme.text} />
                             <span className="text-[13px] font-medium text-[var(--color-ink)]">
                               {row.label}
                             </span>
                           </div>
-                          <motion.span 
-                            key={`${row.valMm}-${unit}`}
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-[15px] font-bold text-[var(--color-ink)] tabular-nums"
-                          >
+                          <span className="text-[15px] font-bold text-[var(--color-ink)] tabular-nums">
                             {unit === 'mm' ? row.valMm : row.valIn}{' '}
                             <span className="text-[11px] font-medium text-[var(--color-muted)] ml-0.5">{unit}</span>
-                          </motion.span>
+                          </span>
                         </div>
                       ))}
                     </div>
