@@ -53,7 +53,6 @@ const CATEGORY_ICON: Record<NonNullable<GlossaryTerm['category']>, React.ReactNo
   ),
 }
 
-// Заменяем жесткие цвета на CSS-переменные для поддержки DCI-P3 через медиа-запрос, сохраняя оригинальные цвета как фоллбэк
 const CATEGORY_COLOR: Record<NonNullable<GlossaryTerm['category']>, string> = {
   material: 'var(--color-cat-material, var(--color-accent, #E4D00A))',
   part: 'var(--color-cat-part, var(--pigment-azurite, #3B82F6))',
@@ -67,7 +66,6 @@ const CATEGORY_COLOR: Record<NonNullable<GlossaryTerm['category']>, string> = {
 export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
 
-  // Языковая логика с поддержкой немецкого 'de'
   const title = lang === 'de' && (term as any).termDe ? (term as any).termDe 
               : lang === 'uk' && term.termUk ? term.termUk 
               : term.term
@@ -97,23 +95,24 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
 
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
 
-  // Непрозрачный фон — критично для Safari / iOS
-  const solidBg = 'var(--color-surface, #25201C)'
+  // ИЗМЕНЕНО: Запасной фон теперь #FFFFFF (светлый), а не #25201C (тёмный)
+  const solidBg = 'var(--color-surface, #FFFFFF)'
 
   return (
     <>
-      {/* Инициализируем DCI-P3 цвета только один раз для производительности */}
       {index === 0 && (
         <style>{`
-          @media (color-gamut: p3) {
-            :root {
-              --color-cat-material: color(display-p3 0.894 0.816 0.039);
-              --color-cat-part: color(display-p3 0.231 0.510 0.965);
-              --color-cat-process: color(display-p3 0.063 0.725 0.506);
-              --color-cat-tool: color(display-p3 0.388 0.400 0.945);
-              --color-cat-type: color(display-p3 0.925 0.282 0.600);
-              --color-cat-defect: color(display-p3 0.976 0.451 0.086);
-              --color-cat-other: color(display-p3 0.612 0.639 0.686);
+          @supports (color: color(display-p3 1 1 1)) {
+            @media (color-gamut: p3) {
+              :root {
+                --color-cat-material: color(display-p3 0.894 0.816 0.039);
+                --color-cat-part: color(display-p3 0.231 0.510 0.965);
+                --color-cat-process: color(display-p3 0.063 0.725 0.506);
+                --color-cat-tool: color(display-p3 0.388 0.400 0.945);
+                --color-cat-type: color(display-p3 0.925 0.282 0.600);
+                --color-cat-defect: color(display-p3 0.976 0.451 0.086);
+                --color-cat-other: color(display-p3 0.612 0.639 0.686);
+              }
             }
           }
         `}</style>
@@ -131,7 +130,6 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
           perspective: 1000,
           WebkitPerspective: 1000,
           animationDelay: `${Math.min(index * 35, 350)}ms`,
-          // убираем tap-highlight на iOS
           WebkitTapHighlightColor: 'transparent',
         }}
       >
@@ -147,18 +145,16 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
         >
           {/* ───── FRONT ───── */}
           <div
-            className="absolute inset-0 rounded-[20px] flex flex-col items-center justify-between p-5 overflow-hidden select-none border border-[var(--color-border,rgba(255,255,255,0.1))] shadow-md"
+            className="absolute inset-0 rounded-[20px] flex flex-col items-center justify-between p-5 overflow-hidden select-none border border-[var(--color-border,rgba(0,0,0,0.12))] shadow-md"
             style={{
               backgroundColor: solidBg,
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
-              // отдельный слой GPU — Safari не смешивает с оборотом
               transform: 'translateZ(1px)',
               WebkitTransform: 'translateZ(1px)',
               pointerEvents: flipped ? 'none' : 'auto',
             }}
           >
-            {/* Header: буква */}
             <div className="w-full flex items-center justify-between z-10">
               <span
                 className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold tracking-wider"
@@ -172,7 +168,6 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               </span>
             </div>
 
-            {/* Иконка + термин */}
             <div className="flex flex-col items-center text-center z-10 px-1 my-auto">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-105"
@@ -185,13 +180,14 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
                 {icon}
               </div>
 
-              <h3 className="text-[16px] md:text-[17px] font-semibold tracking-tight leading-snug text-[var(--color-ink,#F5F1EA)] break-words">
+              {/* ИЗМЕНЕНО: Запасной текст #1C1816 (тёмный для светлой темы) */}
+              <h3 className="text-[16px] md:text-[17px] font-semibold tracking-tight leading-snug text-[var(--color-ink,#1C1816)] break-words">
                 {title}
               </h3>
             </div>
 
-            {/* Подсказка (убрано opacity-70 для соответствия WCAG 2.1 Contrast 4.5:1) */}
-            <div className="z-10 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase text-[var(--color-muted,#B9ACA0)] transition-opacity">
+            {/* ИЗМЕНЕНО: Запасной текст #665E57 */}
+            <div className="z-10 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase text-[var(--color-muted,#665E57)] transition-opacity">
               <span>{hint}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 1l4 4-4 4" />
@@ -202,7 +198,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
 
           {/* ───── BACK ───── */}
           <div
-            className="absolute inset-0 rounded-[20px] flex flex-col p-4 overflow-hidden border border-[var(--color-border,rgba(255,255,255,0.12))] shadow-md"
+            className="absolute inset-0 rounded-[20px] flex flex-col p-4 overflow-hidden border border-[var(--color-border,rgba(0,0,0,0.12))] shadow-md"
             style={{
               backgroundColor: solidBg,
               backfaceVisibility: 'hidden',
@@ -212,8 +208,8 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               pointerEvents: flipped ? 'auto' : 'none',
             }}
           >
-            {/* Заголовок */}
-            <div className="flex items-center gap-2.5 pb-2.5 mb-2.5 border-b border-[var(--color-border,rgba(255,255,255,0.1))] shrink-0 select-none">
+            {/* ИЗМЕНЕНО: Запасной бордер rgba(0,0,0,0.12) вместо белого */}
+            <div className="flex items-center gap-2.5 pb-2.5 mb-2.5 border-b border-[var(--color-border,rgba(0,0,0,0.12))] shrink-0 select-none">
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                 style={{
@@ -224,12 +220,11 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               >
                 {icon}
               </div>
-              <h3 className="text-[14px] font-semibold leading-tight text-[var(--color-ink,#F5F1EA)] truncate">
+              <h3 className="text-[14px] font-semibold leading-tight text-[var(--color-ink,#1C1816)] truncate">
                 {title}
               </h3>
             </div>
 
-            {/* Текст — скролл */}
             <div
               className="flex-1 overflow-y-auto overscroll-contain min-h-0 pr-1 space-y-2.5 text-left select-text"
               onClick={stopEvent}
@@ -238,24 +233,22 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               onWheel={stopEvent}
               style={{
                 WebkitOverflowScrolling: 'touch',
-                // Safari: скролл внутри 3D
                 transform: 'translateZ(0)',
                 WebkitTransform: 'translateZ(0)',
               }}
             >
-              <p className="text-[13px] leading-relaxed font-normal text-[var(--color-ink,#F5F1EA)] tracking-normal">
+              <p className="text-[13px] leading-relaxed font-normal text-[var(--color-ink,#1C1816)] tracking-normal">
                 {definition}
               </p>
 
               {example && (
                 <div
-                  className="p-2.5 rounded-xl text-[11px] leading-relaxed text-[var(--color-muted,#D1C7BD)] border-l-2"
+                  className="p-2.5 rounded-xl text-[11px] leading-relaxed text-[var(--color-muted,#665E57)] border-l-2"
                   style={{
-                    backgroundColor: 'var(--color-surface-2, #2F2924)',
+                    backgroundColor: 'var(--color-surface-2, #E8E3DA)', // Светлый фон для блока с примером
                     borderColor: accent,
                   }}
                 >
-                  {/* Убрано opacity-80 для соответствия WCAG 2.1 */}
                   <span
                     className="font-semibold block mb-0.5 text-[10px] uppercase tracking-wider"
                     style={{ color: accent }}
@@ -267,8 +260,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               )}
             </div>
 
-            {/* Подсказка (убрано opacity-50 для соответствия WCAG 2.1 Contrast 4.5:1) */}
-            <div className="pt-2 mt-auto border-t border-[var(--color-border,rgba(255,255,255,0.1))] shrink-0 flex items-center justify-center gap-1 text-[10px] font-medium text-[var(--color-muted,#B9ACA0)] select-none">
+            <div className="pt-2 mt-auto border-t border-[var(--color-border,rgba(0,0,0,0.12))] shrink-0 flex items-center justify-center gap-1 text-[10px] font-medium text-[var(--color-muted,#665E57)] select-none">
               <span>{backHint}</span>
             </div>
           </div>
