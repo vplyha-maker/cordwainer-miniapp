@@ -161,13 +161,11 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
     fetchRates();
   }, []);
 
-  // Синхронизация формы ТОЛЬКО при загрузке новых данных по сети
   useEffect(() => {
     setDayForm(data?.days?.[selectedDate]?.quantities || {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // АТОМАРНАЯ смена даты: меняем и дату, и форму одновременно, чтобы не было "черной вспышки" кнопки
   const changeDate = useCallback((newDate: string) => {
     setSelectedDate(newDate);
     setDayForm(data?.days?.[newDate]?.quantities || {});
@@ -385,7 +383,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
-      {/* УБРАН blur и backdrop-filter, убран transition. Только сплошной фон. */}
+      {/* Верхний Header - 100% сплошной фон, никакого блюра */}
       <div 
         className={`sticky top-0 px-4 md:px-6 pt-5 pb-3 flex items-center gap-4 bg-[var(--color-bg)] border-b border-[var(--color-border)] ${isCalendarOpen ? 'z-[60]' : 'z-50'}`}
       >
@@ -403,6 +401,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
 
       <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto relative">
         
+        {/* Total Card */}
         <div className="bg-[var(--color-surface)] p-5 md:p-6 rounded-[24px] border border-[var(--color-border)] shadow-sm">
           <div className="flex justify-between items-start mb-2">
             <span className="text-[var(--color-muted)] text-[13px] font-bold capitalize">{t.totalFor} {displayMonthName}</span>
@@ -423,6 +422,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           </div>
         </div>
 
+        {/* Tab Switcher */}
         <div className="flex bg-[var(--color-bg)] p-1.5 rounded-[18px] border border-[var(--color-border)] shadow-inner">
           {['daily', 'settings', 'archive'].map(tab => (
             <button 
@@ -443,6 +443,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
             {activeTab === 'daily' && (
               <motion.div key="daily" variants={tabVariants} initial="hidden" animate="visible" exit="exit" className="space-y-5 w-full">
                 
+                {/* Лента дат и календарь */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 flex overflow-x-auto gap-2.5 pb-2 scrollbar-hide items-end">
                     {quickDates.map((date) => {
@@ -450,12 +451,22 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       const isToday = date === todayStr;
                       const hasData = checkHasData(date);
                       
+                      const [qY, qM, qD] = date.split('-');
+                      const qDateObj = new Date(Number(qY), Number(qM) - 1, Number(qD));
+                      const isWeekend = qDateObj.getDay() === 0 || qDateObj.getDay() === 6;
+                      const isHol = isHoliday(qDateObj, lang);
+                      const isOffDay = isWeekend || isHol;
+                      
                       let buttonClass = 'bg-[var(--color-surface)] text-[var(--color-muted)] border-[var(--color-border)] hover:border-[var(--color-ink)] shadow-sm';
                       let labelClass = 'text-[var(--color-ink)]';
                       
                       if (isSelected) {
                         buttonClass = 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md border-[var(--color-ink)]';
                         labelClass = 'text-[var(--color-bg)] opacity-80';
+                      } else if (isOffDay) {
+                        // КРАСНАЯ ОБВОДКА И КРАСНЫЙ ТЕКСТ ДЛЯ ВЫХОДНЫХ
+                        buttonClass = 'bg-[var(--color-surface)] text-[var(--pigment-lac-dye, #E11D48)] border-[var(--pigment-lac-dye, #E11D48)] shadow-sm';
+                        labelClass = 'text-[var(--pigment-lac-dye, #E11D48)]';
                       } else if (isToday) {
                         buttonClass = 'bg-[color-mix(in_srgb,var(--color-ink)_10%,transparent)] text-[var(--color-ink)] border-[color-mix(in_srgb,var(--color-ink)_30%,transparent)]';
                         labelClass = 'text-[var(--color-ink)]';
@@ -473,9 +484,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                               {t.today}
                             </span>
                           )}
-                          {/* Индикатор наличия данных — четкая точка */}
+                          {/* ЗЕЛЕНАЯ (ИЛИ БЕЛАЯ) ТОЧКА ЕСЛИ ЕСТЬ ДАННЫЕ */}
                           {hasData && (
-                            <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--color-bg)]' : 'bg-[var(--pigment-malachite, #047857)]'}`} />
+                            <span className={`absolute top-2.5 right-2.5 w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--color-bg)]' : 'bg-[var(--pigment-malachite, #047857)]'}`} />
                           )}
                         </button>
                       );
@@ -512,10 +523,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         circleClasses = 'bg-[var(--color-ink)] border-[var(--color-ink)]';
                         textClasses = 'text-[var(--color-bg)]';
                       } else {
-                        // Жесткая красная обводка для выходных/праздников
                         if (isOffDay) {
-                          circleClasses = 'border-[2px] border-[#EF4444]'; 
-                          textClasses = 'text-[#EF4444]';
+                          circleClasses = 'border-[2px] border-[var(--pigment-lac-dye, #E11D48)]'; 
+                          textClasses = 'text-[var(--pigment-lac-dye, #E11D48)]';
                         } else if (hasData) {
                           circleClasses = 'border-[2px] border-[var(--color-ink)]';
                         }
@@ -722,7 +732,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </div>
       </div>
 
-      {/* Без транзишенов, чтобы избежать подергиваний при рендеринге */}
+      {/* Нижняя кнопка - полностью сплошная */}
       <AnimatePresence>
         {activeTab === 'daily' && data.items.length > 0 && (
           <motion.div 
