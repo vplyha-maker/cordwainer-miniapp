@@ -363,6 +363,10 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const monthName = new Date(selectedDate).toLocaleDateString(localeStr, { month: 'long', year: 'numeric' });
   const displayMonthName = monthName.split(' ')[0];
 
+  // Безопасный парсинг выбранной даты (исключает прыжки часовых поясов)
+  const [sYear, sMonth, sDay] = selectedDate.split('-');
+  const currentSelectedDateObj = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0E0E0E] text-white pb-32 font-sans overflow-x-hidden selection:bg-[#0A84FF]/30">
       
@@ -408,11 +412,15 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         .react-datepicker__day:hover {
           background-color: rgba(255, 255, 255, 0.1) !important;
         }
-        .react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+        .react-datepicker__day--selected {
           background-color: #0A84FF !important;
           color: white !important;
           font-weight: bold !important;
           border: none !important;
+        }
+        /* УБИРАЕМ ФОН У ФОКУСА, ЧТОБЫ В БУДУЩИХ МЕСЯЦАХ НЕ БЫЛО СИНЕГО КВАДРАТА */
+        .react-datepicker__day--keyboard-selected:not(.react-datepicker__day--selected) {
+          background-color: transparent !important;
         }
         .react-datepicker__day--outside-month {
           color: rgba(255, 255, 255, 0.2) !important;
@@ -520,7 +528,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                   </div>
 
                   <DatePicker 
-                    selected={new Date(selectedDate)} 
+                    selected={currentSelectedDateObj} 
                     onChange={(date: Date | null) => {
                       if (date) {
                         triggerHaptic();
@@ -541,18 +549,17 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       
                       const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
                       
-                      // Логика обводки: зеленая для дней с данными, красная для праздников
+                      // Логика круговой обводки
                       let borderClass = 'border border-transparent';
                       if (!isSelected) {
                         if (hasData) {
-                          borderClass = 'border-[1.5px] border-[#32D74B]';
+                          borderClass = 'border-[1.5px] border-[#32D74B]'; // Данные - зеленый контур
                         } else if (isHol) {
-                          borderClass = 'border-[1.5px] border-[#FF453A]/80';
+                          borderClass = 'border-[1.5px] border-[#FF453A]/80'; // Праздник - красный контур
                         }
                       } else {
-                        // Если день выбран, обводка для данных становится белой
                         if (hasData) {
-                          borderClass = 'border-[1.5px] border-white/80';
+                          borderClass = 'border-[1.5px] border-white/80'; // Если выбран и есть данные - белый контур
                         }
                       }
                       
