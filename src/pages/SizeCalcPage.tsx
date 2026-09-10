@@ -169,7 +169,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [showStandards, setShowStandards] = useState(false)
   const [showMeasureGuide, setShowMeasureGuide] = useState(false)
   
-  // Состояние для иконки "Избранное"
   const [isSaved, setIsSaved] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -297,7 +296,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 <button
                   key={u}
                   onClick={() => { triggerHaptic(); setUnit(u); }}
-                  className="px-3.5 py-1 rounded-full text-[12px] font-bold transition-all uppercase"
+                  className="px-3.5 py-1 rounded-full text-[12px] font-bold transition-all"
                   style={
                     unit === u
                       ? { background: theme.accent, color: '#FFFFFF' }
