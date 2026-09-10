@@ -55,12 +55,12 @@ const CATEGORY_ICON: Record<NonNullable<GlossaryTerm['category']>, React.ReactNo
 
 const CATEGORY_COLOR: Record<NonNullable<GlossaryTerm['category']>, string> = {
   material: 'var(--color-cat-material, var(--color-accent, #E4D00A))',
-  part: 'var(--color-cat-part, var(--pigment-azurite, #3B82F6))',
-  process: 'var(--color-cat-process, var(--pigment-malachite, #10B981))',
-  tool: 'var(--color-cat-tool, var(--pigment-egyptian-blue, #6366F1))',
-  type: 'var(--color-cat-type, var(--pigment-lac-dye, #EC4899))',
+  part: 'var(--color-cat-part, #3B82F6)',
+  process: 'var(--color-cat-process, #10B981)',
+  tool: 'var(--color-cat-tool, #6366F1)',
+  type: 'var(--color-cat-type, #EC4899)',
   defect: 'var(--color-cat-defect, #F97316)',
-  other: 'var(--color-cat-other, var(--color-muted, #9CA3AF))',
+  other: 'var(--color-cat-other, #9CA3AF)',
 }
 
 export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
@@ -95,9 +95,6 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
 
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
 
-  // ИЗМЕНЕНО: Запасной фон теперь #FFFFFF (светлый), а не #25201C (тёмный)
-  const solidBg = 'var(--color-surface, #FFFFFF)'
-
   return (
     <>
       {index === 0 && (
@@ -125,7 +122,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
         onKeyDown={handleKeyDown}
         aria-expanded={flipped}
         aria-label={`${title}. ${flipped ? backHint : hint}`}
-        className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent,#E4D00A)] rounded-[20px] cursor-pointer"
+        className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left focus:outline-none cursor-pointer"
         style={{
           perspective: 1000,
           WebkitPerspective: 1000,
@@ -145,9 +142,10 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
         >
           {/* ───── FRONT ───── */}
           <div
-            className="absolute inset-0 rounded-[20px] flex flex-col items-center justify-between p-5 overflow-hidden select-none border border-[var(--color-border,rgba(0,0,0,0.12))] shadow-md"
+            className="absolute inset-0 rounded-[20px] flex flex-col items-center justify-between p-5 overflow-hidden select-none border shadow-md"
             style={{
-              backgroundColor: solidBg,
+              background: 'var(--color-surface, #25201C)',
+              borderColor: 'var(--color-border, rgba(255,255,255,0.12))',
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
               transform: 'translateZ(1px)',
@@ -159,7 +157,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               <span
                 className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-mono font-bold tracking-wider"
                 style={{
-                  backgroundColor: solidBg,
+                  background: 'var(--color-surface, #25201C)',
                   color: accent,
                   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 35%, transparent)`,
                 }}
@@ -172,7 +170,7 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-105"
                 style={{
-                  backgroundColor: solidBg,
+                  background: 'var(--color-surface, #25201C)',
                   color: accent,
                   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 28%, transparent)`,
                 }}
@@ -180,14 +178,18 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
                 {icon}
               </div>
 
-              {/* ИЗМЕНЕНО: Запасной текст #1C1816 (тёмный для светлой темы) */}
-              <h3 className="text-[16px] md:text-[17px] font-semibold tracking-tight leading-snug text-[var(--color-ink,#1C1816)] break-words">
+              <h3 
+                className="text-[16px] md:text-[17px] font-semibold tracking-tight leading-snug break-words"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
                 {title}
               </h3>
             </div>
 
-            {/* ИЗМЕНЕНО: Запасной текст #665E57 */}
-            <div className="z-10 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase text-[var(--color-muted,#665E57)] transition-opacity">
+            <div 
+              className="z-10 flex items-center gap-1.5 text-[10px] font-medium tracking-wide uppercase transition-opacity"
+              style={{ color: 'var(--color-muted, #B9ACA0)' }}
+            >
               <span>{hint}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 1l4 4-4 4" />
@@ -198,9 +200,10 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
 
           {/* ───── BACK ───── */}
           <div
-            className="absolute inset-0 rounded-[20px] flex flex-col p-4 overflow-hidden border border-[var(--color-border,rgba(0,0,0,0.12))] shadow-md"
+            className="absolute inset-0 rounded-[20px] flex flex-col p-4 overflow-hidden border shadow-md"
             style={{
-              backgroundColor: solidBg,
+              background: 'var(--color-surface, #25201C)',
+              borderColor: 'var(--color-border, rgba(255,255,255,0.12))',
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
               transform: 'rotateY(180deg) translateZ(1px)',
@@ -208,19 +211,24 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               pointerEvents: flipped ? 'auto' : 'none',
             }}
           >
-            {/* ИЗМЕНЕНО: Запасной бордер rgba(0,0,0,0.12) вместо белого */}
-            <div className="flex items-center gap-2.5 pb-2.5 mb-2.5 border-b border-[var(--color-border,rgba(0,0,0,0.12))] shrink-0 select-none">
+            <div 
+              className="flex items-center gap-2.5 pb-2.5 mb-2.5 border-b shrink-0 select-none"
+              style={{ borderColor: 'color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)' }}
+            >
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                 style={{
-                  backgroundColor: solidBg,
+                  background: 'var(--color-surface, #25201C)',
                   color: accent,
                   boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 30%, transparent)`,
                 }}
               >
                 {icon}
               </div>
-              <h3 className="text-[14px] font-semibold leading-tight text-[var(--color-ink,#1C1816)] truncate">
+              <h3 
+                className="text-[14px] font-semibold leading-tight truncate"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
                 {title}
               </h3>
             </div>
@@ -237,16 +245,20 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
                 WebkitTransform: 'translateZ(0)',
               }}
             >
-              <p className="text-[13px] leading-relaxed font-normal text-[var(--color-ink,#1C1816)] tracking-normal">
+              <p 
+                className="text-[13px] leading-relaxed font-normal tracking-normal"
+                style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              >
                 {definition}
               </p>
 
               {example && (
                 <div
-                  className="p-2.5 rounded-xl text-[11px] leading-relaxed text-[var(--color-muted,#665E57)] border-l-2"
+                  className="p-2.5 rounded-xl text-[11px] leading-relaxed border-l-2"
                   style={{
-                    backgroundColor: 'var(--color-surface-2, #E8E3DA)', // Светлый фон для блока с примером
+                    background: 'var(--color-surface-2, #2F2924)',
                     borderColor: accent,
+                    color: 'var(--color-muted, #B9ACA0)'
                   }}
                 >
                   <span
@@ -260,7 +272,13 @@ export function FlipCard({ term, lang, index = 0 }: FlipCardProps) {
               )}
             </div>
 
-            <div className="pt-2 mt-auto border-t border-[var(--color-border,rgba(0,0,0,0.12))] shrink-0 flex items-center justify-center gap-1 text-[10px] font-medium text-[var(--color-muted,#665E57)] select-none">
+            <div 
+              className="pt-2 mt-auto border-t shrink-0 flex items-center justify-center gap-1 text-[10px] font-medium select-none"
+              style={{ 
+                borderColor: 'color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+                color: 'var(--color-muted, #B9ACA0)' 
+              }}
+            >
               <span>{backHint}</span>
             </div>
           </div>
