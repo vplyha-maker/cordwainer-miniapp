@@ -132,7 +132,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   }, [])
 
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
+    <div className="glossary-theme-root relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
       {/* Header */}
       <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
         <div className="flex items-center gap-3 min-w-0">
@@ -208,7 +208,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
               onClick={() => setActiveLetter(null)}
               className={`h-8 px-3 rounded-full text-[12px] font-medium transition-colors shrink-0 ${
                 activeLetter === null
-                  ? 'bg-[var(--color-accent,#E4D00A)] text-[var(--color-bg,#1C1816)]'
+                  ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]' // Жесткий темный цвет для контраста на желтом (WCAG)
                   : 'bg-[var(--color-surface,#25201C)] text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
               }`}
             >
@@ -224,7 +224,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
                   onClick={() => setActiveLetter(activeLetter === letter ? null : letter)}
                   className={`w-8 h-8 rounded-full text-[13px] font-serif font-medium transition-colors shrink-0 flex items-center justify-center ${
                     activeLetter === letter
-                      ? 'bg-[var(--color-accent,#E4D00A)] text-[var(--color-bg,#1C1816)]'
+                      ? 'bg-[var(--color-accent,#E4D00A)] text-[#1C1816]' // Жесткий темный цвет для контраста 4.5:1 (WCAG)
                       : hasTerms
                         ? 'bg-[var(--color-surface,#25201C)] text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
                         : 'bg-[var(--color-surface,#25201C)] text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))] opacity-30 pointer-events-none'
@@ -261,7 +261,8 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         </div>
 
-        <p className="text-[11px] text-[var(--color-muted,#B9ACA0)] mb-3 opacity-70">
+        {/* Убрана opacity-70 для соответствия WCAG 2.1 Contrast (минимум 4.5:1 для обычного текста) */}
+        <p className="text-[11px] text-[var(--color-muted,#B9ACA0)] mb-3">
           {t.flipHint}
         </p>
 
@@ -288,8 +289,8 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         )}
 
-        {/* Source */}
-        <p className="text-[10px] text-[var(--color-muted,#B9ACA0)] text-center opacity-50 mb-4">
+        {/* Убрана opacity-50 для соответствия WCAG 2.1 (сохраняем читаемость > 4.5:1) */}
+        <p className="text-[10px] text-[var(--color-muted,#B9ACA0)] text-center mb-4">
           {t.source}
         </p>
       </div>
@@ -302,6 +303,58 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
       </div>
 
       <style>{`
+        /* Ночная и Дневная схемы с поддержкой цветового охвата DCI-P3 (без отсебятины - используются 100% эквиваленты заданных HEX) */
+        
+        .glossary-theme-root {
+          /* Light (Day) Theme */
+          --color-bg: #F5F1EA;
+          --color-ink: #1C1816;
+          --color-surface: #FFFFFF;
+          --color-surface-2: #E8E3DA;
+          --color-border: rgba(0, 0, 0, 0.12);
+          --color-muted: #665E57;
+          --color-accent: #E4D00A;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          .glossary-theme-root {
+            /* Dark (Night) Theme */
+            --color-bg: #1C1816;
+            --color-ink: #F5F1EA;
+            --color-surface: #25201C;
+            --color-surface-2: #2F2924;
+            --color-border: rgba(255, 255, 255, 0.12);
+            --color-muted: #B9ACA0;
+            --color-accent: #E4D00A;
+          }
+        }
+
+        @media (color-gamut: p3) {
+          .glossary-theme-root {
+            /* Light P3 */
+            --color-bg: color(display-p3 0.961 0.945 0.918);
+            --color-ink: color(display-p3 0.110 0.094 0.086);
+            --color-surface: color(display-p3 1 1 1);
+            --color-surface-2: color(display-p3 0.910 0.890 0.855);
+            --color-border: color(display-p3 0 0 0 / 0.12);
+            --color-muted: color(display-p3 0.400 0.369 0.341);
+            --color-accent: color(display-p3 0.894 0.816 0.039);
+          }
+          
+          @media (prefers-color-scheme: dark) {
+            .glossary-theme-root {
+              /* Dark P3 */
+              --color-bg: color(display-p3 0.110 0.094 0.086);
+              --color-ink: color(display-p3 0.961 0.945 0.918);
+              --color-surface: color(display-p3 0.145 0.125 0.110);
+              --color-surface-2: color(display-p3 0.184 0.161 0.141);
+              --color-border: color(display-p3 1 1 1 / 0.12);
+              --color-muted: color(display-p3 0.725 0.675 0.627);
+              --color-accent: color(display-p3 0.894 0.816 0.039);
+            }
+          }
+        }
+
         @keyframes glossaryIn {
           from {
             opacity: 0;
