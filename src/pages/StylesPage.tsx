@@ -17,6 +17,7 @@ type StyleSlide = {
   hideWatermark?: boolean 
 }
 
+// УМНАЯ ГЕНЕРАЦИЯ ID ДЛЯ ПОЛЬЗОВАТЕЛЕЙ
 const getDeviceId = () => {
   if (typeof window === 'undefined') return 'unknown';
   
@@ -163,9 +164,12 @@ const STYLES_DATA: StyleSlide[] = [
 function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  
+  // Безопасный фоллбэк: если lang не 'ru', 'uk' или 'de', используем 'ru'
   const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
+
   const [shouldLoad, setShouldLoad] = useState(index <= 1)
+  
+  // ГЛОБАЛЬНЫЕ ЛАЙКИ ИЗ NEON
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -264,7 +268,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   }, [isMuted])
 
   return (
-    <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black transform-gpu">
+    <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
       <div className="absolute inset-0 w-full h-full z-0">
         {shouldLoad && slide.video ? (
           <video
@@ -285,56 +289,52 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         ) : null}
       </div>
 
-      <div 
-        className="absolute inset-0 z-10 pointer-events-none" 
-        style={{
-          background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 30%, transparent 50%, transparent 85%, rgba(0,0,0,0.2) 100%)'
-        }}
-      />
+      <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
 
-      {/* УБРАНЫ motion.div и whileInView. Текст просто рендерится. */}
-      <div className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%] transform-gpu">
-        <h3 className="text-[10px] md:text-[11px] font-bold tracking-[0.4em] uppercase text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+      {/* Убрано motion.div и whileInView, чтобы текст не мигал при скролле */}
+      <div className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%]">
+        <h3 className="text-[9px] md:text-[10px] tracking-[0.5em] uppercase text-white/90 font-sans font-light">
           {slide.subtitle[currentLang]}
         </h3>
         
-        <h2 className="text-[44px] md:text-[56px] font-serif font-bold leading-[1.05] tracking-wide text-white whitespace-pre-line drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
+        <h2 className="text-[44px] md:text-[56px] font-serif font-light leading-[1.05] tracking-wide text-white whitespace-pre-line">
           {slide.title[currentLang]}
         </h2>
       </div>
 
-      <div className="absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between transform-gpu">
-        <p className="text-[12px] md:text-[13px] font-medium leading-[1.7] text-white/95 tracking-wide max-w-[75%] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+      {/* Убрано motion.div и whileInView, чтобы блок описания не мигал при скролле */}
+      <div className="absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between">
+        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[70%]">
           {slide.desc[currentLang]}
         </p>
         
-        <div className="flex flex-col gap-6 items-center shrink-0">
+        <div className="flex flex-col gap-5 items-center shrink-0">
           
           <motion.button 
             whileTap={{ scale: 0.8 }}
             onClick={handleLike}
-            className="w-12 flex flex-col items-center justify-center gap-1 transition-colors duration-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
+            className="w-12 flex flex-col items-center justify-center gap-[2px] transition-colors duration-300"
           >
             <AnimatePresence mode="wait">
               {isLiked ? (
-                <motion.svg key="liked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="30" height="30" viewBox="0 0 24 24" fill="#E11D48" stroke="#E11D48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <motion.svg key="liked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </motion.svg>
               ) : (
-                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-white/80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </motion.svg>
               )}
             </AnimatePresence>
             {!isLoading && likesCount > 0 && (
-              <span className="text-[11px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <span className="text-[10px] font-sans font-medium text-white/90 drop-shadow-md mt-1">
                 {likesCount > 999 ? (likesCount / 1000).toFixed(1) + 'k' : likesCount}
               </span>
             )}
           </motion.button>
 
-          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white active:scale-90 transition-all duration-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all duration-300 gap-1">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
               <polyline points="16 6 12 2 8 6"></polyline>
               <line x1="12" y1="2" x2="12" y2="15"></line>
@@ -356,7 +356,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: '100%' }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-black overflow-hidden"
+      className="fixed inset-0 z-50 bg-black text-white overflow-hidden"
     >
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
@@ -365,35 +365,25 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
       <button
         onClick={onBack}
-        className="absolute top-12 left-4 z-[100] w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform transform-gpu"
-        style={{
-          background: 'rgba(0, 0, 0, 0.25)',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(8px)'
-        }}
+        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md"
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
         </svg>
       </button>
 
       <button
         onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-12 right-4 z-[100] w-11 h-11 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform transform-gpu"
-        style={{
-          background: 'rgba(0, 0, 0, 0.25)',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(8px)'
-        }}
+        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md"
       >
         {isMuted ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <line x1="23" y1="9" x2="17" y2="15"></line>
             <line x1="17" y1="9" x2="23" y2="15"></line>
           </svg>
         ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
@@ -401,7 +391,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         )}
       </button>
 
-      <div className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth transform-gpu">
+      <div className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth">
         {STYLES_DATA.map((slide, index) => (
           <SlideItem 
             key={slide.id} 
