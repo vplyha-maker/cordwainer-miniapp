@@ -8,10 +8,26 @@ type WidthCalcPageProps = {
   lang: Lang
 }
 
+// Насыщенные DCI-P3 цвета, контрастные как в светлой, так и в темной теме
 const THEMES = {
-  men: { accent: '#C6A47A', accentSoft: '#E8C9A0', accentBg: 'rgba(198,164,122,0.16)', border: 'rgba(198,164,122,0.3)' },
-  women: { accent: '#E8A0B5', accentSoft: '#F2C4D0', accentBg: 'rgba(232,160,181,0.16)', border: 'rgba(232,160,181,0.3)' },
-  kids: { accent: '#7EB8D4', accentSoft: '#A8D4E8', accentBg: 'rgba(126,184,212,0.16)', border: 'rgba(126,184,212,0.3)' },
+  men: { 
+    accent: 'var(--color-accent, #B46513)', 
+    bg: 'color-mix(in srgb, var(--color-accent, #B46513) 12%, var(--color-surface))', 
+    text: 'var(--color-accent, #B46513)', 
+    border: 'color-mix(in srgb, var(--color-accent, #B46513) 30%, transparent)' 
+  },
+  women: { 
+    accent: 'var(--pigment-lac-dye, #BE185D)', 
+    bg: 'color-mix(in srgb, var(--pigment-lac-dye, #BE185D) 12%, var(--color-surface))', 
+    text: 'var(--pigment-lac-dye, #BE185D)', 
+    border: 'color-mix(in srgb, var(--pigment-lac-dye, #BE185D) 30%, transparent)' 
+  },
+  kids: { 
+    accent: 'var(--pigment-azurite, #0369A1)', 
+    bg: 'color-mix(in srgb, var(--pigment-azurite, #0369A1) 12%, var(--color-surface))', 
+    text: 'var(--pigment-azurite, #0369A1)', 
+    border: 'color-mix(in srgb, var(--pigment-azurite, #0369A1) 30%, transparent)' 
+  },
 } as const
 
 type InfoModalType = 'gostNum' | 'iso' | null
@@ -28,12 +44,12 @@ const AnimatedIcon = ({ type, color, animKey }: { type: 'length' | 'ball' | 'ins
   }
 
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mr-2 opacity-80" style={{ color }}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mr-2" style={{ color }}>
       <motion.path
         key={animKey}
         d={paths[type]}
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         initial={prefersReducedMotion ? { pathLength: 1, opacity: 1 } : { pathLength: 0, opacity: 0 }}
@@ -163,62 +179,40 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
       transition={{ duration: 0.22, ease: 'easeOut' }}
-      className="relative flex flex-col h-[100dvh] overflow-hidden"
-      style={{
-        background: 'var(--color-bg, #1C1816)',
-        color: 'var(--color-ink, #F5F1EA)',
-      }}
+      className="relative flex flex-col h-[100dvh] overflow-hidden bg-[var(--color-bg)] text-[var(--color-ink)]"
     >
       {/* Header */}
-      <div
-        className="relative z-20 flex items-center justify-between px-4 md:px-6 py-2 backdrop-blur"
-        style={{ background: 'color-mix(in srgb, var(--color-bg, #1C1816) 95%, transparent)' }}
-      >
+      <div className="relative z-20 flex items-center justify-between px-4 md:px-6 pt-5 pb-3 bg-[var(--color-bg)] border-b border-[var(--color-border)] shadow-sm">
         <button 
           onClick={() => { triggerHaptic(); onBack(); }} 
-          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-          }}
+          className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-transform bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm text-[var(--color-ink)]"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <div className="text-center">
-          <h1 className="text-[14px] font-semibold tracking-wide calc-page-title">{t.title}</h1>
-          <p className="text-[10px] leading-none mt-0.5" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+          <h1 className="text-[17px] font-bold tracking-wide">{t.title}</h1>
+          <p className="text-[12px] font-medium text-[var(--color-muted)] mt-0.5">
             {t.subtitle}
           </p>
         </div>
-        <div className="w-9 h-9 md:w-10 md:h-10" />
+        <div className="w-11 h-11" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-4 space-y-3 scrollbar-hide calc-page-content">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-4 scrollbar-hide">
         
         {/* Main controls card */}
-        <div
-          className="rounded-3xl p-3.5 md:p-5 space-y-4"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 50%, transparent)',
-          }}
-        >
+        <div className="rounded-[24px] p-4 md:p-5 space-y-5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
+          
           {/* Gender segmented */}
-          <div
-            className="flex p-1 rounded-2xl calc-segment"
-            style={{
-              background: 'var(--color-bg, #1C1816)',
-              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-            }}
-          >
+          <div className="flex p-1.5 rounded-[18px] bg-[var(--color-bg)] border border-[var(--color-border)] shadow-inner">
             {(['men', 'women', 'kids'] as Gender[]).map((g) => (
               <button
                 key={g} onClick={() => handleGender(g)}
-                className="flex-1 py-1.5 rounded-[12px] text-[12px] font-medium transition-all"
+                className="flex-1 py-2.5 rounded-[14px] text-[14px] font-bold transition-all"
                 style={
                   gender === g
-                    ? { background: THEMES[g].accentBg, color: THEMES[g].accentSoft }
-                    : { color: 'var(--color-muted, #B9ACA0)' }
+                    ? { background: THEMES[g].bg, color: THEMES[g].text }
+                    : { color: 'var(--color-muted)' }
                 }
               >
                 {g === 'men' ? t.men : g === 'women' ? t.women : t.kids}
@@ -229,44 +223,38 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           {/* Size stepper */}
           <div className="flex items-center justify-between px-1">
             <div className="flex flex-col">
-              <span className="text-[13px] font-medium" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              <span className="text-[14px] font-bold text-[var(--color-ink)]">
                 {t.step1}
               </span>
-              <span className="text-[10px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+              <span className="text-[11px] font-medium text-[var(--color-muted)] mt-0.5">
                 ({limits.min} - {limits.max})
               </span>
             </div>
             
-            <div
-              className="flex items-center gap-3 p-1.5 rounded-full"
-              style={{
-                background: 'var(--color-bg, #1C1816)',
-                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-              }}
-            >
+            <div className="flex items-center gap-4 p-1.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] shadow-inner">
               <button
                 disabled={sizeEu <= limits.min} onClick={() => handleSizeChange(sizeEu - 1)}
-                className="w-9 h-9 calc-stepper-btn flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
-                style={{ color: theme.accentSoft }}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm active:scale-95 transition-transform disabled:opacity-30"
+                style={{ color: theme.text }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14" /></svg>
               </button>
-              <div aria-live="polite" className="text-[24px] font-light w-10 text-center" style={{ color: theme.accentSoft }}>
+              <div aria-live="polite" className="text-[28px] font-bold w-12 text-center tabular-nums" style={{ color: theme.text }}>
                 {sizeEu}
               </div>
               <button
                 disabled={sizeEu >= limits.max} onClick={() => handleSizeChange(sizeEu + 1)}
-                className="w-9 h-9 calc-stepper-btn flex items-center justify-center rounded-full active:bg-white/10 disabled:opacity-30"
-                style={{ color: theme.accentSoft }}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm active:scale-95 transition-transform disabled:opacity-30"
+                style={{ color: theme.text }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
               </button>
             </div>
           </div>
 
           {/* Width categories */}
-          <div>
-            <span className="text-[13px] font-medium block mb-2 px-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+          <div className="pt-2 border-t border-[var(--color-border)]">
+            <span className="text-[14px] font-bold block mb-3 px-1 text-[var(--color-ink)]">
               {t.step2}
             </span>
             <div className="grid grid-cols-4 gap-1.5 md:gap-2">
@@ -276,14 +264,15 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                   <button
                     key={cat} 
                     onClick={() => { triggerHaptic(); setWidthCat(cat) }}
-                    className="py-2 px-1 rounded-xl text-[11px] font-medium transition-all text-center leading-tight"
+                    className={`py-2.5 px-1 rounded-[14px] text-[12px] font-bold transition-all text-center leading-tight border ${
+                      isSelected 
+                        ? 'shadow-sm' 
+                        : 'border-[var(--color-border)] hover:border-[var(--color-muted)]'
+                    }`}
                     style={isSelected 
-                      ? { background: theme.accentBg, color: theme.accentSoft, border: `1px solid ${theme.border}` }
-                      : {
-                          background: 'var(--color-bg, #1C1816)',
-                          color: 'var(--color-muted, #B9ACA0)',
-                          border: '1px solid transparent',
-                        }}
+                      ? { background: theme.bg, color: theme.text, borderColor: theme.border }
+                      : { background: 'var(--color-bg)', color: 'var(--color-muted)' }
+                    }
                   >
                     {t.cats[cat]}
                   </button>
@@ -294,41 +283,27 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
 
         {/* US / UK result cards */}
-        <div className="grid grid-cols-2 gap-2 md:gap-3">
-          <div
-            className="rounded-2xl py-3 md:py-4 flex flex-col items-center justify-center calc-result-card"
-            style={{
-              background: 'var(--color-surface, #25201C)',
-              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-            }}
-          >
-            <span className="text-[10px] mb-0.5 font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-[20px] py-4 flex flex-col items-center justify-center bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
+            <span className="text-[11px] mb-1 font-bold tracking-wide text-[var(--color-muted)]">
               US SIZE
             </span>
             <motion.span 
               key={`${result.us}-${widthCat}`}
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="text-[28px] font-medium leading-none"
-              style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              className="text-[36px] font-bold leading-none text-[var(--color-ink)]"
             >
               {result.us}
             </motion.span>
           </div>
-          <div
-            className="rounded-2xl py-3 md:py-4 flex flex-col items-center justify-center calc-result-card"
-            style={{
-              background: 'var(--color-surface, #25201C)',
-              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-            }}
-          >
-            <span className="text-[10px] mb-0.5 font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+          <div className="rounded-[20px] py-4 flex flex-col items-center justify-center bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
+            <span className="text-[11px] mb-1 font-bold tracking-wide text-[var(--color-muted)]">
               UK SIZE
             </span>
             <motion.span 
               key={`${result.uk}-${widthCat}`}
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              className="text-[28px] font-medium leading-none"
-              style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              className="text-[36px] font-bold leading-none text-[var(--color-ink)]"
             >
               {result.uk}
             </motion.span>
@@ -336,32 +311,27 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         </div>
 
         {/* PRO DATA */}
-        <div
-          className="rounded-3xl p-3.5 md:p-5"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-          }}
-        >
+        <div className="rounded-[24px] p-4 md:p-5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
            <button
             onClick={() => { triggerHaptic(); setShowPro(!showPro) }}
-            className="flex items-center justify-between w-full group"
+            className="flex items-center justify-between w-full group py-1"
           >
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[13px] font-medium transition-colors"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
+            <div className="flex items-center gap-3">
+              <span className="text-[14px] font-bold text-[var(--color-ink)]">
                 {t.proModules}
               </span>
-              <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: result.color }} title={(result.colorName as any)[lang] || result.colorName.ru} />
+              <div 
+                className="w-3 h-3 rounded-full shadow-sm" 
+                style={{ backgroundColor: result.color, border: '1px solid var(--color-border)' }} 
+                title={(result.colorName as any)[lang] || result.colorName.ru} 
+              />
             </div>
             <motion.div
               animate={{ rotate: showPro ? 180 : 0 }}
               transition={{ duration: 0.2 }}
-              style={{ color: 'var(--color-muted, #B9ACA0)' }}
+              className="text-[var(--color-muted)]"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 9l-7 7-7-7" /></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7" /></svg>
             </motion.div>
           </button>
 
@@ -373,9 +343,10 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="pt-3 space-y-3">
+                <div className="pt-4 space-y-3">
                   
-                  <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+                  {/* Standards Grid */}
+                  <div className="grid grid-cols-3 gap-2">
                     {([
                       { key: 'gostNum' as const, label: t.gostNum, value: result.gostNum },
                       { key: 'gostNum' as const, label: t.gostLet, value: result.gostLetter },
@@ -384,24 +355,16 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       <div
                         key={idx}
                         onClick={() => setActiveInfo(item.key)}
-                        className="rounded-xl p-2 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform"
-                        style={{
-                          background: 'var(--color-bg, #1C1816)',
-                          border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-                        }}
+                        className="rounded-[16px] p-2.5 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform bg-[var(--color-bg)] border border-[var(--color-border)] shadow-sm hover:border-[var(--color-muted)]"
                       >
-                        <span
-                          className="text-[9px] mb-1 text-center leading-tight whitespace-nowrap"
-                          style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                        >
+                        <span className="text-[10px] mb-1.5 font-bold text-center leading-tight whitespace-nowrap text-[var(--color-muted)]">
                           {item.label}
                         </span>
                         <motion.span
                           key={String(item.value)}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="text-[15px] font-medium leading-none"
-                          style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                          className="text-[16px] font-bold leading-none text-[var(--color-ink)]"
                         >
                           {item.value}
                         </motion.span>
@@ -409,39 +372,22 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                     ))}
                   </div>
 
-                  <div
-                    className="rounded-xl p-2.5 md:p-3.5"
-                    style={{
-                      background: 'var(--color-bg, #1C1816)',
-                      border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-                    }}
-                  >
-                    <div
-                      className="flex justify-between items-center pb-2 mb-2"
-                      style={{
-                        borderBottom: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-                      }}
-                    >
-                      <span className="text-[11px] font-medium" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+                  {/* Table Details */}
+                  <div className="rounded-[20px] p-4 bg-[var(--color-bg)] border border-[var(--color-border)] shadow-sm">
+                    <div className="flex justify-between items-center pb-3 mb-3 border-b border-[var(--color-border)]">
+                      <span className="text-[12px] font-bold text-[var(--color-muted)]">
                         {t.mondopointLabel}
                       </span>
-                      <div
-                        className="flex rounded-md p-0.5"
-                        style={{ background: 'var(--color-surface, #25201C)' }}
-                      >
+                      <div className="flex rounded-[10px] p-1 bg-[var(--color-surface)] border border-[var(--color-border)]">
                         {(['mm', 'in'] as Unit[]).map(u => (
                           <button 
                             key={u}
                             onClick={() => { triggerHaptic('light'); setUnit(u) }}
-                            className="px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors"
-                            style={
+                            className={`px-3 py-1 rounded-[8px] text-[11px] font-bold transition-colors ${
                               unit === u
-                                ? {
-                                    background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
-                                    color: 'var(--color-ink, #F5F1EA)',
-                                  }
-                                : { color: 'var(--color-muted, #B9ACA0)' }
-                            }
+                                ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-sm'
+                                : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                            }`}
                           >
                             {u}
                           </button>
@@ -449,7 +395,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {[
                         { id: 'length' as const, label: t.tableLength, valMm: result.footLengthMm, valIn: result.footLengthIn },
                         { id: 'ball' as const, label: t.tableBall, valMm: result.girthMm, valIn: result.girthIn },
@@ -458,19 +404,18 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       ].map((row) => (
                         <div key={row.id} className="flex justify-between items-center">
                           <div className="flex items-center">
-                            <AnimatedIcon type={row.id} color={theme.accentSoft} animKey={`${row.valMm}-${unit}`} />
-                            <span className="text-[12px]" style={{ color: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 90%, transparent)' }}>
+                            <AnimatedIcon type={row.id} color={theme.text} animKey={`${row.valMm}-${unit}`} />
+                            <span className="text-[13px] font-medium text-[var(--color-ink)]">
                               {row.label}
                             </span>
                           </div>
                           <motion.span 
                             key={`${row.valMm}-${unit}`}
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-[14px] font-medium"
-                            style={{ color: 'var(--color-ink, #F5F1EA)' }}
+                            className="text-[15px] font-bold text-[var(--color-ink)] tabular-nums"
                           >
                             {unit === 'mm' ? row.valMm : row.valIn}{' '}
-                            <span className="text-[10px] font-normal opacity-50">{unit}</span>
+                            <span className="text-[11px] font-medium text-[var(--color-muted)] ml-0.5">{unit}</span>
                           </motion.span>
                         </div>
                       ))}
@@ -489,8 +434,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         {activeInfo && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-            style={{ background: 'color-mix(in srgb, var(--color-bg, #1C1816) 80%, transparent)' }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
             onClick={() => setActiveInfo(null)}
           >
             <motion.div
@@ -499,26 +444,19 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               animate={{ scale: 1, y: 0 }}
               exit={prefersReducedMotion ? { scale: 1 } : { scale: 0.95, y: 10 }}
               onClick={e => e.stopPropagation()}
-              className="w-full max-w-[280px] rounded-3xl p-5 shadow-2xl"
-              style={{
-                background: 'var(--color-surface, #25201C)',
-                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-              }}
+              className="w-full max-w-[300px] rounded-[24px] p-6 shadow-2xl bg-[var(--color-surface)] border border-[var(--color-border)]"
             >
-              <h3 className="text-[15px] font-medium mb-2" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+              <h3 className="text-[16px] font-bold mb-2.5 text-[var(--color-ink)]">
                 {t.modal[activeInfo].title}
               </h3>
-              <p
-                className="text-[12px] leading-relaxed mb-5"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
-              >
+              <p className="text-[13px] font-medium leading-relaxed mb-6 text-[var(--color-muted)]">
                 {t.modal[activeInfo].text}
               </p>
               
               <button
                 onClick={() => setActiveInfo(null)}
-                className="w-full py-2.5 rounded-xl font-medium text-[13px]"
-                style={{ backgroundColor: theme.accentBg, color: theme.accentSoft }}
+                className="w-full py-3.5 rounded-[16px] font-bold text-[14px] active:scale-95 transition-transform"
+                style={{ backgroundColor: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}
               >
                 {t.understood}
               </button>
