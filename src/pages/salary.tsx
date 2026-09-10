@@ -177,6 +177,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const [newItemName, setNewItemName] = useState('');
   const [newItemRate, setNewItemRate] = useState<number | ''>('');
   
+  // Состояние открытого календаря для управления слоями
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  
   const [fiatRates, setFiatRates] = useState({ USD: 41.50, EUR: 45.00 });
   const [isRateLoading, setIsRateLoading] = useState(true);
 
@@ -363,7 +366,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
   const monthName = new Date(selectedDate).toLocaleDateString(localeStr, { month: 'long', year: 'numeric' });
   const displayMonthName = monthName.split(' ')[0];
 
-  // Безопасный парсинг выбранной даты (исключает прыжки часовых поясов)
   const [sYear, sMonth, sDay] = selectedDate.split('-');
   const currentSelectedDateObj = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
 
@@ -372,6 +374,9 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
       
       {/* ВСТРОЕННЫЕ СТИЛИ ДЛЯ ТЕМНОГО КАЛЕНДАРЯ */}
       <style>{`
+        .react-datepicker-popper {
+          z-index: 9999 !important; /* Гарантируем, что календарь всегда сверху */
+        }
         .react-datepicker {
           background-color: #1C1C1E !important;
           border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -399,7 +404,7 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
         .react-datepicker__day {
           color: white !important;
-          border-radius: 50% !important; /* Идеальный круг */
+          border-radius: 50% !important;
           width: 2.2rem !important;
           height: 2.2rem !important;
           margin: 0.2rem !important;
@@ -418,7 +423,6 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
           font-weight: bold !important;
           border: none !important;
         }
-        /* УБИРАЕМ ФОН У ФОКУСА, ЧТОБЫ В БУДУЩИХ МЕСЯЦАХ НЕ БЫЛО СИНЕГО КВАДРАТА */
         .react-datepicker__day--keyboard-selected:not(.react-datepicker__day--selected) {
           background-color: transparent !important;
         }
@@ -438,7 +442,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         }
       `}</style>
 
-      <div className="sticky top-0 z-50 p-4 flex items-center gap-4 bg-[#0E0E0E]/95 backdrop-blur-md border-b border-white/5">
+      {/* ШАПКА: динамически меняет z-index при открытом календаре */}
+      <div className={`sticky top-0 p-4 flex items-center gap-4 bg-[#0E0E0E]/95 backdrop-blur-md border-b border-white/5 transition-all duration-300 ${isCalendarOpen ? 'z-10' : 'z-50'}`}>
         <button onClick={() => { triggerHaptic(); onBack(); }} className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/5 active:scale-95 transition-transform text-white/70">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
@@ -535,6 +540,8 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                         setSelectedDate(getLocalDateString(date));
                       }
                     }} 
+                    onCalendarOpen={() => setIsCalendarOpen(true)}
+                    onCalendarClose={() => setIsCalendarOpen(false)}
                     locale={getLocaleObj(lang)}
                     customInput={<CustomCalendarInput />}
                     popperPlacement="bottom-end"
@@ -549,17 +556,16 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
                       
                       const textColor = (isWeekend || isHol) && !isSelected ? 'text-[#FF453A]' : '';
                       
-                      // Логика круговой обводки
                       let borderClass = 'border border-transparent';
                       if (!isSelected) {
                         if (hasData) {
-                          borderClass = 'border-[1.5px] border-[#32D74B]'; // Данные - зеленый контур
+                          borderClass = 'border-[1.5px] border-[#32D74B]';
                         } else if (isHol) {
-                          borderClass = 'border-[1.5px] border-[#FF453A]/80'; // Праздник - красный контур
+                          borderClass = 'border-[1.5px] border-[#FF453A]/80';
                         }
                       } else {
                         if (hasData) {
-                          borderClass = 'border-[1.5px] border-white/80'; // Если выбран и есть данные - белый контур
+                          borderClass = 'border-[1.5px] border-white/80';
                         }
                       }
                       
@@ -762,13 +768,14 @@ export function SalaryCalcPage({ onBack, lang = 'ru' }: SalaryCalcPageProps) {
         </div>
       </div>
 
+      {/* КНОПКА СОХРАНИТЬ: тоже понижаем z-index при открытом календаре */}
       <AnimatePresence>
         {activeTab === 'daily' && data.items.length > 0 && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-6 left-0 right-0 px-4 z-50 pointer-events-none"
+            className={`fixed bottom-6 left-0 right-0 px-4 pointer-events-none transition-all duration-300 ${isCalendarOpen ? 'z-10' : 'z-50'}`}
           >
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <button 
