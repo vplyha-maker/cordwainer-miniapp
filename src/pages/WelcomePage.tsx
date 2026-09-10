@@ -241,7 +241,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                     aria-pressed={lang === l}
                     role="button"
                   >
-                    {l}
+                    {/* ЗАМЕНА ЗДЕСЬ: отображаем UKR вместо UK */}
+                    {l === 'uk' ? 'UKR' : l}
                   </button>
                 ))}
               </div>
