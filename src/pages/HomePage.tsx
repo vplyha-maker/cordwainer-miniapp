@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BottomDock } from '../components/BottomDock'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
+import { CALCULATORS_COUNT } from './CalcMenuPage' // Импортируем счетчик калькуляторов
 import type { Lang, FavoriteItem } from '../App'
 
 type HomePageProps = {
@@ -74,7 +75,6 @@ export function HomePage({
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   
-  // Безопасное чтение массивов на случай ошибок импорта
   const hasNewBlog = BLOG_ARTICLES?.some((a) => a.isNew) || false
   const articleFavorites = favorites?.filter((f) => f.type === 'article') || []
   const glossaryCount = GLOSSARY_TERMS?.length || 0
@@ -93,7 +93,6 @@ export function HomePage({
     setLang(newLang)
   }
 
-  // Защита от краша React, если lang временно undefined
   const safeLang = (lang && ['ru', 'uk', 'de'].includes(lang)) ? lang : 'uk'
 
   const t = {
@@ -115,13 +114,13 @@ export function HomePage({
       sizesSub: 'Колодки, подъём, стопа',
       sizesCount: '97 статей',
       calc: 'Калькуляторы',
-      calcSub: '12 инструментов',
+      calcSub: `${CALCULATORS_COUNT} модулей`,
       blog: 'Блог',
-      blogSub: hasNewBlog ? 'Новая статья' : 'Статьи мастерской',
+      blogSub: hasNewBlog ? 'Новое' : 'Статьи',
       glossary: 'Глоссарий',
       glossarySub: glossaryLabel(glossaryCount, 'ru'),
       prices: 'Цены',
-      pricesSub: 'Клеи, материалы',
+      pricesSub: 'Клеи, химия',
       favorites: 'Избранное',
       favoritesSub:
         articleFavorites.length > 0
@@ -150,13 +149,13 @@ export function HomePage({
       sizesSub: 'Колодки, підйом, стопа',
       sizesCount: '97 статей',
       calc: 'Калькулятори',
-      calcSub: '12 інструментів',
+      calcSub: `${CALCULATORS_COUNT} модулів`,
       blog: 'Блог',
-      blogSub: hasNewBlog ? 'Нова стаття' : 'Статті майстерні',
+      blogSub: hasNewBlog ? 'Нове' : 'Статті',
       glossary: 'Глосарій',
       glossarySub: glossaryLabel(glossaryCount, 'uk'),
       prices: 'Ціни',
-      pricesSub: 'Клеї, матеріали',
+      pricesSub: 'Клеї, хімія',
       favorites: 'Обране',
       favoritesSub:
         articleFavorites.length > 0
@@ -185,13 +184,13 @@ export function HomePage({
       sizesSub: 'Leisten, Rist, Fuß',
       sizesCount: '97 Artikel',
       calc: 'Rechner',
-      calcSub: '12 Werkzeuge',
+      calcSub: `${CALCULATORS_COUNT} Tools`,
       blog: 'Journal',
-      blogSub: hasNewBlog ? 'Neuer Artikel' : 'Werkstatt-Journal',
+      blogSub: hasNewBlog ? 'Neu' : 'Artikel',
       glossary: 'Glossar',
       glossarySub: glossaryLabel(glossaryCount, 'de'),
       prices: 'Preise',
-      pricesSub: 'Klebstoffe, Materialien',
+      pricesSub: 'Materialien',
       favorites: 'Favoriten',
       favoritesSub:
         articleFavorites.length > 0
@@ -209,7 +208,6 @@ export function HomePage({
       id: 'materials',
       title: t.materials,
       subtitle: t.materialsSub,
-      count: t.materialsCount,
       accent: 'var(--color-accent, #B46513)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -221,7 +219,6 @@ export function HomePage({
       id: 'colors',
       title: t.colors,
       subtitle: t.colorsSub,
-      count: t.colorsCount,
       accent: 'var(--pigment-azurite, #1D4ED8)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -237,7 +234,6 @@ export function HomePage({
       id: 'styles',
       title: t.styles,
       subtitle: t.stylesSub,
-      count: t.stylesCount,
       accent: 'var(--pigment-egyptian-blue, #1E3A8A)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -251,7 +247,6 @@ export function HomePage({
       id: 'sizes',
       title: t.sizes,
       subtitle: t.sizesSub,
-      count: t.sizesCount,
       accent: 'var(--pigment-malachite, #047857)',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -358,7 +353,6 @@ export function HomePage({
 
   return (
     <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden">
-      {/* Header */}
       <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
         <h1 className="text-[34px] font-serif font-bold tracking-wide leading-none text-[var(--color-ink)]">
           {t.menu}
@@ -393,12 +387,10 @@ export function HomePage({
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
         
-        {/* АКТИВНЫЙ ПОИСК */}
         <div className="mb-5 relative">
-          <div className="rounded-[18px] px-4 py-3.5 flex items-center gap-2.5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm transition-all focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_2px_var(--color-accent)]">
+          <div className="rounded-[18px] px-4 py-3.5 flex items-center gap-2.5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm transition-all focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_20%,transparent)]">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-accent,var(--color-ink))] shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="M20 20l-3.5-3.5" />
@@ -446,7 +438,6 @@ export function HomePage({
           </div>
         ) : (
           <>
-            {/* ОБУЧЕНИЕ */}
             <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
               {t.learning}
             </p>
@@ -474,10 +465,10 @@ export function HomePage({
                       {item.icon}
                     </div>
                     <div className="min-w-0 mt-3">
-                      <div className="text-[13px] font-bold leading-snug text-[var(--color-ink)] break-words">
+                      <div className="text-[13px] font-bold leading-snug text-[var(--color-ink)] truncate">
                         {item.title}
                       </div>
-                      <div className="text-[11px] font-medium text-[var(--color-muted)] mt-1 line-clamp-2">
+                      <div className="text-[11px] font-medium text-[var(--color-muted)] mt-1 truncate">
                         {item.subtitle}
                       </div>
                     </div>
@@ -486,7 +477,6 @@ export function HomePage({
               })}
             </div>
 
-            {/* ИНСТРУМЕНТЫ */}
             <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
               {t.tools}
             </p>
@@ -511,16 +501,11 @@ export function HomePage({
                               ? onOpenPrices
                               : undefined
                     }
-                    className={`relative min-h-[124px] h-auto p-3 rounded-[18px] bg-[var(--color-surface)] border ${
+                    className={`relative min-h-[124px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface)] border ${
                       isBlog && hasNewBlog 
-                        ? 'border-[var(--pigment-lac-dye,#991B1B)]' 
+                        ? 'border-[var(--pigment-lac-dye,#991B1B)] shadow-[0_0_12px_color-mix(in_srgb,var(--pigment-lac-dye,#991B1B)_20%,transparent)]' 
                         : 'border-[var(--color-border)]'
                     } shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95 overflow-hidden`}
-                    style={
-                      isBlog && hasNewBlog 
-                        ? { boxShadow: '0 0 12px color-mix(in srgb, var(--pigment-lac-dye,#991B1B) 20%, transparent)' } 
-                        : undefined
-                    }
                   >
                     <div
                       className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
@@ -531,16 +516,17 @@ export function HomePage({
                     >
                       {item.icon}
                     </div>
+                    
                     <div className="min-w-0 mt-3 w-full">
-                      <div className="text-[11px] md:text-[13px] font-bold leading-snug text-[var(--color-ink)] flex items-start gap-0.5">
-                        <span className="break-words hyphens-auto" lang={safeLang}>
+                      <div className="text-[11px] md:text-[13px] font-bold leading-snug text-[var(--color-ink)] flex items-center justify-between gap-0.5">
+                        <span className="truncate" lang={safeLang}>
                           {item.title}
                         </span>
                         {isBlog && hasNewBlog && (
-                          <span className="text-[var(--pigment-lac-dye,#991B1B)] shrink-0">•</span>
+                          <span className="text-[var(--pigment-lac-dye,#991B1B)] text-[16px] leading-none shrink-0" style={{ transform: 'translateY(-1px)' }}>•</span>
                         )}
                       </div>
-                      <div className="text-[9.5px] md:text-[11px] font-medium text-[var(--color-muted)] mt-1 line-clamp-2 leading-snug">
+                      <div className="text-[9.5px] md:text-[11px] font-medium text-[var(--color-muted)] mt-1 truncate">
                         {item.subtitle}
                       </div>
                     </div>
