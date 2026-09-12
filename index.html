@@ -21,6 +21,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Cordwainer" />
 
+    <!-- Динамический canonical для SPA -->
+    <script>
+      (function() {
+        var link = document.createElement('link');
+        link.rel = 'canonical';
+        link.href = window.location.origin + window.location.pathname;
+        document.head.appendChild(link);
+      })();
+    </script>
+
     <!-- LCP: hero сразу в HTML -->
     <link
       rel="preload"
