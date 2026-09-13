@@ -255,7 +255,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   )
 
   return (
-    <div className={`relative flex flex-col min-h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
       
       <style>{`
         @keyframes fadeUp {
@@ -269,7 +269,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       `}</style>
 
       {/* МИНИМАЛИСТИЧНЫЙ HEADER */}
-      <header className="px-6 pt-8 pb-4 shrink-0 flex items-start justify-between z-20">
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
         <button 
           onClick={onBack || (() => onChangeTab('search'))} 
           className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}
@@ -279,8 +279,8 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
         </button>
       </header>
 
-      {/* ОСНОВНОЙ СКРОЛЛ */}
-      <div className="flex-1 px-6 overflow-y-auto pb-24 overscroll-none scrollbar-hide">
+      {/* ОСНОВНОЙ КОНТЕНТ (Убраны flex-1 и overflow-y-auto для нативного скролла) */}
+      <div className="px-6 pb-24">
         
         {/* ЗАГОЛОВОК */}
         <div className="stagger-item mb-8" style={{ animationDelay: '0.1s' }}>
@@ -367,7 +367,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
 
       </div>
 
-      {/* МОДАЛЬНОЕ ОКНО ИНСТРУКЦИИ (Адаптировано под стиль) */}
+      {/* МОДАЛЬНОЕ ОКНО ИНСТРУКЦИИ */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
