@@ -72,11 +72,11 @@ export function BottomDock({
       <div
         className="pointer-events-auto relative mx-auto w-full max-w-[340px] overflow-hidden rounded-[20px] p-1 flex items-center justify-between"
         style={{
-          background: 'rgba(17, 17, 17, 0.75)',
+          background: 'color-mix(in srgb, var(--color-surface) 75%, transparent)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05)',
+          border: '1px solid color-mix(in srgb, var(--color-ink) 8%, transparent)',
+          boxShadow: 'var(--shadow-card), inset 0 1px 1px color-mix(in srgb, var(--color-ink) 5%, transparent)',
         }}
       >
         <div className="relative z-10 flex w-full justify-between gap-1">
@@ -90,7 +90,7 @@ export function BottomDock({
                 onClick={() => onChange?.(tab.id)}
                 className="relative flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-[16px] cursor-pointer"
                 style={{
-                  color: isActive ? '#D8A35C' : 'rgba(255, 255, 255, 0.4)',
+                  color: isActive ? 'var(--color-accent)' : 'var(--color-muted)',
                 }}
               >
                 {isActive && (
@@ -103,9 +103,9 @@ export function BottomDock({
                     }}
                     className="absolute inset-0 rounded-[16px] z-0"
                     style={{
-                      background: 'rgba(216, 163, 92, 0.08)',
-                      border: '1px solid rgba(216, 163, 92, 0.35)',
-                      boxShadow: '0 0 12px rgba(216, 163, 92, 0.1)',
+                      background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)',
+                      boxShadow: '0 0 12px color-mix(in srgb, var(--color-accent) 15%, transparent)',
                     }}
                   />
                 )}
@@ -130,9 +130,10 @@ export function BottomDock({
                 {isActive && (
                   <motion.div
                     layoutId="activeDot"
-                    className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-[#D8A35C]"
+                    className="absolute -bottom-0.5 w-1 h-1 rounded-full"
                     style={{
-                      boxShadow: '0 0 6px rgba(216, 163, 92, 0.8)',
+                      background: 'var(--color-accent)',
+                      boxShadow: '0 0 6px color-mix(in srgb, var(--color-accent) 60%, transparent)',
                     }}
                   />
                 )}
