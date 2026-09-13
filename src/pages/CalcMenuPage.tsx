@@ -1,5 +1,4 @@
 import { useState, useLayoutEffect } from 'react'
-import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 
 // ЭКСПОРТИРУЕМ КОЛИЧЕСТВО ДЛЯ HOMEPAGE
@@ -133,64 +132,30 @@ export function CalcMenuPage({
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/90' : 'from-[#F2EFE9] via-[#F2EFE9]/90'
-  const imgOpacity = isDark ? '0.35' : '0.6'
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={`relative min-h-[100dvh] w-full ${cBg} ${cText}`}
-    >
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
       <style>{`
-        /* Жесткое отключение вспышек и мерцания при тапе на мобилках */
+        /* Полное отключение вспышек и подсветки тапов на мобильных устройствах */
         * {
           -webkit-tap-highlight-color: transparent !important;
           -webkit-touch-callout: none;
         }
         
-        button {
-          background-color: transparent;
-        }
-
         @keyframes fadeUp {
           0% { opacity: 0; transform: translateY(12px); }
           100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes coutureZoom {
-          0% { opacity: 0; transform: scale(1.03); }
-          100% { opacity: var(--img-opacity); transform: scale(1); }
         }
         .stagger-item {
           opacity: 0;
           animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        .anim-bg {
-          animation: coutureZoom 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
       `}</style>
-
-      {/* ФОН */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <img
-          src="/CalcMenuPage/size.jpg"
-          alt=""
-          style={{ '--img-opacity': imgOpacity } as React.CSSProperties}
-          className={`anim-bg absolute inset-0 w-full h-full object-cover object-[center_top] ${isDark ? 'grayscale-[40%]' : 'grayscale-[10%]'}`}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
-        <div className={`absolute bottom-0 left-0 right-0 h-[85%] bg-gradient-to-t ${cGrad} to-transparent`} />
-      </div>
 
       {/* HEADER */}
       <header className="relative z-20 px-6 pt-8 pb-4 flex items-start justify-between">
         <button 
           onClick={() => { haptic('light'); onBack(); }}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none cursor-pointer ${cTextMuted} ${cHover}`}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover}`}
         >
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
           <span>Back</span>
@@ -271,6 +236,6 @@ export function CalcMenuPage({
         </div>
 
       </div>
-    </motion.div>
+    </div>
   )
 }
