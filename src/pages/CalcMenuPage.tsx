@@ -141,52 +141,56 @@ export function CalcMenuPage({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
-      className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={`relative min-h-[100dvh] w-full ${cBg} ${cText}`}
     >
       <style>{`
-        /* Отключаем системное мерцание при клике на мобильных устройствах */
-        button, a, div {
-          -webkit-tap-highlight-color: transparent;
+        /* Жесткое отключение вспышек и мерцания при тапе на мобилках */
+        * {
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none;
         }
         
+        button {
+          background-color: transparent;
+        }
+
         @keyframes fadeUp {
-          0% { opacity: 0; transform: translateY(16px); }
+          0% { opacity: 0; transform: translateY(12px); }
           100% { opacity: 1; transform: translateY(0); }
         }
         @keyframes coutureZoom {
-          0% { opacity: 0; transform: scale(1.05); }
+          0% { opacity: 0; transform: scale(1.03); }
           100% { opacity: var(--img-opacity); transform: scale(1); }
         }
         .stagger-item {
           opacity: 0;
-          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .anim-bg {
-          animation: coutureZoom 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: coutureZoom 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
 
-      {/* ФОН С ОБРАБОТЧИКОМ ОШИБОК */}
+      {/* ФОН */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img
           src="/CalcMenuPage/size.jpg"
           alt=""
           style={{ '--img-opacity': imgOpacity } as React.CSSProperties}
-          className={`anim-bg absolute inset-0 w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[40%]' : 'grayscale-[10%]'}`}
+          className={`anim-bg absolute inset-0 w-full h-full object-cover object-[center_top] ${isDark ? 'grayscale-[40%]' : 'grayscale-[10%]'}`}
           onError={(e) => {
-            // Если картинки нет, скрываем ее, чтобы не было сломанного значка
             e.currentTarget.style.display = 'none'
           }}
         />
-        <div className={`absolute bottom-0 left-0 right-0 h-[85%] bg-gradient-to-t ${cGrad} to-transparent transition-colors duration-1000`} />
+        <div className={`absolute bottom-0 left-0 right-0 h-[85%] bg-gradient-to-t ${cGrad} to-transparent`} />
       </div>
 
       {/* HEADER */}
       <header className="relative z-20 px-6 pt-8 pb-4 flex items-start justify-between">
         <button 
           onClick={() => { haptic('light'); onBack(); }}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none ${cTextMuted} ${cHover} transition-colors`}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none cursor-pointer ${cTextMuted} ${cHover}`}
         >
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
           <span>Back</span>
@@ -197,7 +201,7 @@ export function CalcMenuPage({
       <div className="relative z-10 px-6 pb-24 mt-4">
         
         {/* ЗАГОЛОВОК */}
-        <div className="stagger-item mb-16" style={{ animationDelay: '0.1s' }}>
+        <div className="stagger-item mb-16" style={{ animationDelay: '0.05s' }}>
           <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
             {t.subtitle}
           </p>
@@ -213,16 +217,16 @@ export function CalcMenuPage({
             const numStr = num < 10 ? `0${num}` : `${num}`
             
             return (
-              <div key={item.id} className="stagger-item" style={{ animationDelay: `${0.15 + idx * 0.05}s` }}>
+              <div key={item.id} className="stagger-item" style={{ animationDelay: `${0.1 + idx * 0.04}s` }}>
                 <button
                   onClick={() => { haptic('medium'); item.action?.(); }}
-                  className={`w-full group relative flex items-end justify-between py-6 border-b outline-none ${cLine} text-left transition-all active:opacity-50`}
+                  className={`w-full group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent cursor-pointer ${cLine} text-left`}
                 >
                   <div className="flex items-start gap-4">
                     <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
                       {numStr}
                     </span>
-                    <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
+                    <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-hover:translate-x-1">
                       {item.title}
                     </div>
                   </div>
@@ -236,25 +240,25 @@ export function CalcMenuPage({
         </div>
 
         {/* ИЗБРАННОЕ */}
-        <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
+        <div className="stagger-item" style={{ animationDelay: '0.3s' }}>
           <button
             onClick={() => { haptic(isFavorite ? 'light' : 'medium'); onToggleFavorite?.(); }}
-            className={`w-full flex items-center justify-between p-6 border outline-none transition-all duration-500 ${
+            className={`w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors duration-300 ${
               isFavorite 
                 ? `${isDark ? 'border-white/30 bg-white/5' : 'border-black/30 bg-black/5'}` 
-                : `${cLine} active:bg-current/5`
+                : `${cLine}`
             }`}
           >
             <div className="text-left">
               <div className="font-serif text-[26px] leading-none mb-2">
                 {isFavorite ? t.saveRemoveTitle : t.saveAddTitle}
               </div>
-              <div className={`text-[10px] font-sans uppercase tracking-[0.2em] transition-colors ${isFavorite ? cText : cTextMuted}`}>
+              <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${isFavorite ? cText : cTextMuted}`}>
                 {isFavorite ? t.saveRemoveSub : t.saveAddSub}
               </div>
             </div>
             
-            <div className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 ${
+            <div className={`w-12 h-12 rounded-full border flex items-center justify-center transition-colors duration-300 ${
               isFavorite 
                 ? `${isDark ? 'bg-white text-black border-white' : 'bg-black text-white border-black'}` 
                 : `bg-transparent ${cLine} ${cTextMuted}`
