@@ -20,7 +20,7 @@ type HomePageProps = {
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void 
 }
 
-// Добавляем строгий тип для элементов меню, где dot опционален
+// 1. ДОБАВЛЯЕМ СТРОГИЙ ТИП ДЛЯ ЭЛЕМЕНТОВ МЕНЮ (чтобы Vercel не ругался на свойство dot)
 type MenuItem = {
   id: string
   title: string
@@ -214,6 +214,7 @@ export function HomePage({
     }
   }[safeLang]
 
+  // 2. ЯВНО УКАЗЫВАЕМ ТИП MenuItem[] ДЛЯ МАССИВОВ
   const LEARNING: MenuItem[] = [
     { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: undefined },
     { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
@@ -272,7 +273,7 @@ export function HomePage({
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // Используем интерфейс MenuItem для типизации
+  // 3. УКАЗЫВАЕМ ТИП MenuItem[] ЗДЕСЬ
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
@@ -307,7 +308,7 @@ export function HomePage({
   )
 
   return (
-    <div className={`relative flex flex-col h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
+    <div className={`relative flex flex-col min-h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
       
       <style>{`
         @keyframes fadeUp {
