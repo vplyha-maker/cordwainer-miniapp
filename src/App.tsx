@@ -58,12 +58,22 @@ export interface FavoriteItem {
 }
 
 function getIsDarkTheme(): boolean {
+  // 1. Сначала проверяем, не сохранил ли пользователь свой выбор вручную
+  try {
+    const savedTheme = localStorage.getItem('cordwainer_theme')
+    if (savedTheme === 'dark') return true
+    if (savedTheme === 'light') return false
+  } catch {}
+
+  // 2. Если ручного выбора нет, смотрим на тему Телеграма
   const tg = window.Telegram?.WebApp
   const isRealTelegram = Boolean(tg?.initData && tg.initData.trim().length > 0)
 
   if (isRealTelegram) {
     return tg?.colorScheme === 'dark'
   }
+  
+  // 3. Значение по умолчанию
   return true
 }
 
