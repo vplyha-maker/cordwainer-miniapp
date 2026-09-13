@@ -47,6 +47,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   useLayoutEffect(() => {
+    // 1. ИСПРАВЛЕНИЕ СКРОЛЛА: Принудительно скроллим в начало при открытии
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+
     const savedGraphics = getSavedPerfMode()
     setGraphics(savedGraphics === 'fast' ? 'fast' : 'full')
 
@@ -154,7 +157,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       close: 'Закрыть',
     },
     uk: {
-      title: 'Система',
+      title: 'Налаштування',
       language: 'Мова',
       theme: 'Тема',
       themeLight: 'Світла',
@@ -177,7 +180,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       close: 'Закрити',
     },
     de: {
-      title: 'System',
+      title: 'Einstellungen',
       language: 'Sprache',
       theme: 'Design',
       themeLight: 'Hell',
@@ -201,14 +204,12 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     },
   }[lang]
 
-  // Токены Digital Couture
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // Утилита для рендера журнальных блоков настроек
   const renderOptionGroup = (
     title: string, 
     options: { label: string; value: string }[], 
@@ -268,7 +269,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
         }
       `}</style>
 
-      {/* МИНИМАЛИСТИЧНЫЙ HEADER */}
+      {/* HEADER */}
       <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
         <button 
           onClick={onBack || (() => onChangeTab('search'))} 
@@ -279,17 +280,16 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
         </button>
       </header>
 
-      {/* ОСНОВНОЙ КОНТЕНТ (Убраны flex-1 и overflow-y-auto для нативного скролла) */}
+      {/* ОСНОВНОЙ КОНТЕНТ */}
       <div className="px-6 pb-24">
         
-        {/* ЗАГОЛОВОК */}
-        <div className="stagger-item mb-8" style={{ animationDelay: '0.1s' }}>
-          <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
+        {/* 2. ИСПРАВЛЕНИЕ ЗАГОЛОВКА: Убран vw, задан фиксированный изящный размер и добавлены отступы */}
+        <div className="stagger-item mt-2 mb-12" style={{ animationDelay: '0.1s' }}>
+          <h1 className="font-serif text-5xl min-[400px]:text-6xl leading-[0.95] tracking-tight">
             {t.title}
           </h1>
         </div>
 
-        {/* НАСТРОЙКИ: ЯЗЫК */}
         {renderOptionGroup(
           t.language,
           [
@@ -302,7 +302,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           '0.15s'
         )}
 
-        {/* НАСТРОЙКИ: ТЕМА */}
         {renderOptionGroup(
           t.theme,
           [
@@ -314,7 +313,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           '0.2s'
         )}
 
-        {/* НАСТРОЙКИ: ШРИФТ */}
         {renderOptionGroup(
           t.font,
           [
@@ -326,7 +324,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           '0.25s'
         )}
 
-        {/* НАСТРОЙКИ: МАСШТАБ */}
         {renderOptionGroup(
           t.fontSize,
           [
@@ -339,7 +336,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           '0.3s'
         )}
 
-        {/* НАСТРОЙКИ: ГРАФИКА */}
         {renderOptionGroup(
           t.graphics,
           [
@@ -352,7 +348,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           t.graphicsDesc
         )}
 
-        {/* УСТАНОВКА ПРИЛОЖЕНИЯ */}
         <div className="stagger-item py-12" style={{ animationDelay: '0.4s' }}>
           <button 
             onClick={handleAddToHome} 
@@ -367,7 +362,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
 
       </div>
 
-      {/* МОДАЛЬНОЕ ОКНО ИНСТРУКЦИИ */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
