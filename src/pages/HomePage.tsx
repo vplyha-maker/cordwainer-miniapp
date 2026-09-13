@@ -20,7 +20,6 @@ type HomePageProps = {
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void 
 }
 
-// 1. ДОБАВЛЯЕМ СТРОГИЙ ТИП ДЛЯ ЭЛЕМЕНТОВ МЕНЮ (чтобы Vercel не ругался на свойство dot)
 type MenuItem = {
   id: string
   title: string
@@ -214,7 +213,6 @@ export function HomePage({
     }
   }[safeLang]
 
-  // 2. ЯВНО УКАЗЫВАЕМ ТИП MenuItem[] ДЛЯ МАССИВОВ
   const LEARNING: MenuItem[] = [
     { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: undefined },
     { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
@@ -273,7 +271,6 @@ export function HomePage({
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // 3. УКАЗЫВАЕМ ТИП MenuItem[] ЗДЕСЬ
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
@@ -308,7 +305,8 @@ export function HomePage({
   )
 
   return (
-    <div className={`relative flex flex-col min-h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
+    // Заменили жесткую высоту на min-h-[100dvh] w-full для нативного скролла
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
       
       <style>{`
         @keyframes fadeUp {
@@ -322,7 +320,7 @@ export function HomePage({
       `}</style>
 
       {/* HEADER */}
-      <header className="px-6 pt-8 pb-4 shrink-0 flex items-start justify-between z-20">
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
         {onBack ? (
           <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}>
             <span className="transform transition-transform group-hover:-translate-x-1">←</span>
@@ -347,8 +345,8 @@ export function HomePage({
         </div>
       </header>
 
-      {/* СКРОЛЛИРУЕМАЯ ОБЛАСТЬ */}
-      <div className="flex-1 px-6 overflow-y-auto pb-24 overscroll-none scrollbar-hide">
+      {/* КОНТЕНТ БЕЗ ОГРАНИЧЕНИЙ ВЫСОТЫ */}
+      <div className="px-6 pb-24">
         
         {/* ЗАГОЛОВОК СТРАНИЦЫ */}
         <div className="stagger-item mb-12" style={{ animationDelay: '0.1s' }}>
