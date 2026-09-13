@@ -32,6 +32,17 @@ function hasVisitedBefore(): boolean {
 export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
   const [firstName] = useState(getTelegramFirstName)
   const [returning] = useState(hasVisitedBefore)
+  const [isDark, setIsDark] = useState(true)
+
+  // Отслеживание светлой/темной темы
+  useEffect(() => {
+    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    checkTheme()
+    
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
@@ -86,17 +97,26 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
     ? firstName ? `${t.helloBack}, ${firstName}` : t.welcomeBack
     : firstName ? `${t.hello}, ${firstName}` : t.welcome
 
+  // Динамические цветовые токены для "Digital Couture" стиля
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/70' : 'text-[#1C1816]/70'
+  const cTextFaint = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'bg-[#F4F0E8]/30' : 'bg-[#1C1816]/20'
+  const cBtnLine = isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
+  
+  // Адаптация картинки и градиентов под тему, чтобы текст всегда читался
+  const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/85' : 'from-[#F2EFE9] via-[#F2EFE9]/85'
+  const cOverlay = isDark ? 'bg-black/20' : 'bg-[#F2EFE9]/40'
+  const imgOpacity = isDark ? '0.75' : '0.5' // В светлой теме картинка должна быть бледнее
+
   return (
-    <main className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0A0A0A]">
+    <main className={`relative flex h-[100dvh] w-full flex-col overflow-hidden transition-colors duration-[1.5s] ${cBg}`}>
       
-      {/* 
-        ИНЖЕКЦИЯ CSS KEYFRAMES
-        Гарантирует запуск анимаций без зависимости от React State 
-      */}
       <style>{`
         @keyframes coutureZoom {
           0% { opacity: 0; transform: scale(1.1); }
-          100% { opacity: 0.8; transform: scale(1); }
+          100% { opacity: var(--img-opacity); transform: scale(1); }
         }
         @keyframes coutureFadeUp {
           0% { opacity: 0; transform: translateY(24px); }
@@ -108,56 +128,57 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
         }
         
         .anim-item {
-          opacity: 0; /* Скрыто до начала анимации */
+          opacity: 0;
           animation: coutureFadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
 
-      {/* 1. АНИМИРОВАННЫЙ ФОН */}
+      {/* 1. ФОН */}
       <div className="absolute inset-0 z-0">
         <img
           src="/hero-cover.webp"
           alt=""
           fetchPriority="high"
           decoding="async"
-          className="anim-bg absolute inset-0 h-full w-full object-cover object-[center_top]"
+          style={{ '--img-opacity': imgOpacity } as React.CSSProperties}
+          className={`anim-bg absolute inset-0 h-full w-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-0' : 'grayscale-[20%]'}`}
         />
-        <div className="absolute inset-0 bg-black/20 z-10" />
-        <div className="absolute bottom-0 left-0 right-0 h-[65%] z-10 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/85 to-transparent pointer-events-none" />
+        <div className={`absolute inset-0 z-10 transition-colors duration-1000 ${cOverlay}`} />
+        <div className={`absolute bottom-0 left-0 right-0 h-[65%] z-10 bg-gradient-to-t ${cGrad} to-transparent pointer-events-none transition-colors duration-1000`} />
       </div>
 
-      {/* 2. МЕТА-ДАННЫЕ ВВЕРХУ */}
+      {/* 2. МЕТА-ДАННЫЕ */}
       <div 
         className="anim-item absolute top-6 left-6 right-6 z-30 flex items-start justify-between"
         style={{ animationDelay: '0.1s' }}
       >
-        <span className="text-[10px] font-sans font-medium uppercase tracking-[0.35em] text-[#F4F0E8]/70">
+        <span className={`text-[10px] font-sans font-medium uppercase tracking-[0.35em] transition-colors duration-1000 ${cTextMuted}`}>
           {t.issue}
         </span>
-        <span className="max-w-[120px] text-right text-[10px] font-sans font-medium uppercase tracking-[0.2em] text-[#F4F0E8]/50">
+        <span className={`max-w-[120px] text-right text-[10px] font-sans font-medium uppercase tracking-[0.2em] transition-colors duration-1000 ${cTextFaint}`}>
           {greeting}
         </span>
       </div>
 
-      {/* 3. ОСНОВНОЙ КОНТЕНТ СНИЗУ */}
+      {/* 3. ОСНОВНОЙ КОНТЕНТ */}
       <section className="relative z-30 flex h-full w-full flex-col justify-end px-6 pb-12 sm:pb-16">
         <div className="flex w-full flex-col">
           
           <div className="anim-item" style={{ animationDelay: '0.3s' }}>
-            <p className="mb-3 text-[10px] font-sans font-medium uppercase leading-[1.6] tracking-[0.25em] text-[#F4F0E8]/70">
+            <p className={`mb-3 text-[10px] font-sans font-medium uppercase leading-[1.6] tracking-[0.25em] transition-colors duration-1000 ${cTextMuted}`}>
               {t.tagline}
             </p>
           </div>
 
           <div className="anim-item" style={{ animationDelay: '0.45s' }}>
-            <h1 className="mb-6 font-serif text-[12.5vw] min-[375px]:text-5xl sm:text-6xl leading-[0.9] tracking-[-0.02em] text-[#F4F0E8]">
+            <h1 className={`mb-6 font-serif text-[12.5vw] min-[375px]:text-5xl sm:text-6xl leading-[0.9] tracking-[-0.02em] transition-colors duration-1000 ${cText}`}>
               Cordwainer
             </h1>
           </div>
 
           <div className="anim-item" style={{ animationDelay: '0.6s' }}>
-            <div className="mb-6 h-px w-10 bg-[#F4F0E8]/30" />
-            <p className="mb-10 max-w-[320px] text-[14px] font-sans font-light leading-[1.6] text-[#F4F0E8]/80">
+            <div className={`mb-6 h-px w-10 transition-colors duration-1000 ${cLine}`} />
+            <p className={`mb-10 max-w-[320px] text-[14px] font-sans font-light leading-[1.6] transition-colors duration-1000 ${isDark ? 'text-[#F4F0E8]/80' : 'text-[#1C1816]/80'}`}>
               {t.value}
             </p>
           </div>
@@ -167,12 +188,12 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
             <button
               type="button"
               onClick={onStart}
-              className="group relative inline-flex items-center gap-4 self-start text-[11px] font-sans font-medium uppercase tracking-[0.2em] text-[#F4F0E8] transition-opacity active:opacity-60"
+              className={`group relative inline-flex items-center gap-4 self-start text-[11px] font-sans font-medium uppercase tracking-[0.2em] transition-colors duration-1000 active:opacity-60 ${cText}`}
             >
               <span className="relative z-10 transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">
                 {t.start}
               </span>
-              <span className="relative z-10 block h-[1px] w-12 bg-[#F4F0E8] transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-16" />
+              <span className={`relative z-10 block h-[1px] w-12 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-16 ${cBtnLine}`} />
             </button>
           </div>
           
@@ -182,3 +203,4 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
     </main>
   )
 }
+
