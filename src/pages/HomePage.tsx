@@ -265,11 +265,12 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
-  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
-  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
-  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+  // Используем переменные Telegram с фолбеком на ваши цвета
+  const cBg = isDark ? 'bg-[var(--tg-theme-bg-color,#0A0A0A)]' : 'bg-[var(--tg-theme-bg-color,#F2EFE9)]'
+  const cText = isDark ? 'text-[var(--tg-theme-text-color,#F4F0E8)]' : 'text-[var(--tg-theme-text-color,#1C1816)]'
+  const cTextMuted = isDark ? 'text-[var(--tg-theme-hint-color,#F4F0E8)]/50' : 'text-[var(--tg-theme-hint-color,#1C1816)]/50'
+  const cLine = isDark ? 'border-[var(--tg-theme-hint-color,#F4F0E8)]/15' : 'border-[var(--tg-theme-hint-color,#1C1816)]/15'
+  const cHover = isDark ? 'hover:text-[var(--tg-theme-link-color,#ffffff)]' : 'hover:text-[var(--tg-theme-link-color,#000000)]'
 
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
@@ -307,18 +308,7 @@ export function HomePage({
   return (
     <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
       
-      {/* ПАТТЕРН ТЕЛЕГРАМА (СНЕЖИНКИ) */}
-      <div 
-        className="pointer-events-none fixed inset-0 z-0 transition-colors duration-[1.5s]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg stroke='${isDark ? '%23ffffff' : '%231C1816'}' stroke-width='1.2' fill='none' stroke-linecap='round' opacity='0.07'%3E%3Cpath d='M40 10v60M10 40h60M18 18l44 44M18 62l44-44M33 33l14 14M33 47l14-14M40 20l-6 6h12zM40 60l-6-6h12zM20 40l6-6v12zM60 40l-6-6v12z'/%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundSize: '90px 90px',
-          backgroundRepeat: 'repeat',
-          backgroundPosition: 'center'
-        }}
-      />
-
-      {/* ВЕСЬ СУЩЕСТВУЮЩИЙ КОНТЕНТ (ОБЕРНУТ В relative z-10) */}
+      {/* Искусственные снежинки удалены. Фон полностью определяется системными переменными TG. */}
       <div className="relative z-10">
         <style>{`
           @keyframes fadeUp {
@@ -357,7 +347,7 @@ export function HomePage({
           </div>
         </header>
 
-        {/* КОНТЕНТ БЕЗ ОГРАНИЧЕНИЙ ВЫСОТЫ */}
+        {/* КОНТЕНТ */}
         <div className="px-6 pb-24">
           
           {/* ЗАГОЛОВОК СТРАНИЦЫ */}
@@ -376,7 +366,7 @@ export function HomePage({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
-                className={`w-full bg-transparent outline-none text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
+                className={`w-full bg-transparent outline-none text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[var(--tg-theme-text-color,#F4F0E8)]/30' : 'placeholder:text-[var(--tg-theme-text-color,#1C1816)]/30'}`}
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest ${cTextMuted}`}>
@@ -438,10 +428,9 @@ export function HomePage({
                 {renderList(SYSTEM, 9)}
               </div>
 
-              {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
               <div className="stagger-item mb-16" style={{ animationDelay: '0.5s' }}>
                 <button
-                  className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--color-ink)]/5`}
+                  className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--tg-theme-button-color,var(--color-ink))]/5`}
                   onClick={() => {
                     if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
                     else if (articleFavorites.length > 1) onOpenFavorites?.()
@@ -461,7 +450,6 @@ export function HomePage({
                 </button>
               </div>
 
-              {/* ЦИТАТА */}
               <div className="stagger-item pb-10" style={{ animationDelay: '0.6s' }}>
                 <div className="flex flex-col items-center text-center px-4">
                   <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
