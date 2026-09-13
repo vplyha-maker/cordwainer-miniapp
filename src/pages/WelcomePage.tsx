@@ -9,7 +9,6 @@ type WelcomePageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
-  // ДОБАВЛЕНО: функция переключения вкладок
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
 }
 
@@ -39,7 +38,6 @@ function hasVisitedBefore(): boolean {
 }
 
 export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [], onChangeTab }: WelcomePageProps) {
-  const blogFavorites = favorites.filter((f) => f.type === 'blog')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
   const [heroReady, setHeroReady] = useState(false)
   const [firstName] = useState(getTelegramFirstName)
@@ -60,13 +58,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     }
   }, [lang, setLang])
 
-  const handleLangChange = (newLang: Lang) => {
-    haptic('light')
-    localStorage.setItem('app_lang', newLang)
-    localStorage.setItem('cordwainer_lang', newLang)
-    setLang(newLang)
-  }
-
   const t = {
     ru: {
       welcome: 'Добро пожаловать',
@@ -79,14 +70,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Начать обучение',
       continue: 'Продолжить',
       issue: 'ISSUE 01',
-      favorites: 'Избранное',
-      addToHomeShort: 'Установить',
-      widgetTitle: 'Установка приложения',
-      widgetText: 'Telegram не позволяет сохранять иконки напрямую. Откройте приложение в вашем браузере (Chrome или Safari).',
-      widgetStep1: '1. Нажмите «Открыть в браузере»',
-      widgetStep2: '2. Выберите «На главный экран»',
-      widgetStep3: '3. Подтвердите установку',
-      widgetAction: 'Открыть в браузере',
     },
     uk: {
       welcome: 'Ласкаво просимо',
@@ -99,14 +82,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Почати навчання',
       continue: 'Продовжити',
       issue: 'ISSUE 01',
-      favorites: 'Обране',
-      addToHomeShort: 'Встановити',
-      widgetTitle: 'Встановлення застосунку',
-      widgetText: 'Telegram не дозволяє зберігати іконки безпосередньо. Відкрийте застосунок у вашому браузері (Chrome або Safari).',
-      widgetStep1: '1. Натисніть «Відкрити в браузері»',
-      widgetStep2: '2. Оберіть «На головний екран»',
-      widgetStep3: '3. Підтвердіть встановлення',
-      widgetAction: 'Відкрити в браузері',
     },
     de: {
       welcome: 'Willkommen',
@@ -119,14 +94,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       start: 'Wissen entdecken',
       continue: 'Weiter',
       issue: 'ISSUE 01',
-      favorites: 'Favoriten',
-      addToHomeShort: 'Installieren',
-      widgetTitle: 'App installieren',
-      widgetText: 'Telegram erlaubt kein direktes Speichern von Icons. Öffnen Sie die App in Ihrem Browser.',
-      widgetStep1: '1. Tippen Sie auf „Im Browser öffnen“',
-      widgetStep2: '2. Wählen Sie „Zum Startbildschirm hinzufügen“',
-      widgetStep3: '3. Bestätigen Sie',
-      widgetAction: 'Im Browser öffnen',
     },
   }[lang]
 
@@ -140,49 +107,11 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
   const ctaLabel = returning ? t.continue : t.start
 
-  const handleAddToHome = async () => {
-    haptic('light')
-    const deferredPrompt = (window as any).deferredPrompt
-    if (deferredPrompt) {
-      try {
-        deferredPrompt.prompt()
-        const { outcome } = await deferredPrompt.userChoice
-        if (outcome === 'accepted') {
-          ;(window as any).deferredPrompt = null
-          return
-        }
-      } catch {}
-    }
-    setShowWidgetHint(true)
-  }
-
-  const handleOpenInBrowser = () => {
-    haptic('medium')
-    const appUrl = 'https://cordwainer-miniapp.vercel.app'
-    const tg = window.Telegram?.WebApp
-    if (tg && tg.openLink) {
-      tg.openLink(appUrl)
-    } else {
-      window.open(appUrl, '_blank')
-    }
-    setShowWidgetHint(false)
-  }
-
   const handleStart = () => {
     haptic('medium')
     try {
       localStorage.setItem('cordwainer_visited', '1')
     } catch {}
-    onStart?.()
-  }
-
-  const handleOpenFavorites = () => {
-    haptic('light')
-    const first = blogFavorites[0]
-    if (first?.id === 'blog-orvard' && onOpenBlog) {
-      onOpenBlog()
-      return
-    }
     onStart?.()
   }
 
@@ -215,38 +144,8 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         />
       </div>
 
-      <div className="relative z-20 flex items-start justify-between p-4">
-        <div
-          className="flex rounded-full p-1 bg-black/20 backdrop-blur-md border border-white/10"
-        >
-          {(['ru', 'uk', 'de'] as const).map((l) => (
-            <button
-              key={l}
-              type="button"
-              onClick={() => handleLangChange(l)}
-              className={`min-h-8 min-w-8 px-2.5 text-[9px] font-bold tracking-widest uppercase rounded-full transition-colors ${
-                lang === l ? 'bg-white/90 text-black' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              {l === 'uk' ? 'UKR' : l}
-            </button>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={handleAddToHome}
-          className="flex items-center gap-1.5 min-h-8 px-3 rounded-full bg-black/20 backdrop-blur-md border border-white/10 active:scale-95 transition-transform"
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="5" y="2" width="14" height="20" rx="2" />
-            <path d="M12 18h.01" />
-          </svg>
-          <span className="text-[9px] font-bold uppercase tracking-widest text-white/90">
-            {t.addToHomeShort}
-          </span>
-        </button>
-      </div>
+      {/* Пустое место сверху вместо языков и кнопки установки */}
+      <div className="relative z-20 h-14" />
 
       <div className="relative z-20 flex-1 flex flex-col justify-end px-5 pb-[110px]">
         <div className="mb-6">
@@ -272,29 +171,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           {t.idea}
         </p>
 
-        {blogFavorites.length > 0 && (
-          <button
-            type="button"
-            onClick={handleOpenFavorites}
-            className="w-full mb-3 rounded-xl p-3 flex items-center gap-3 bg-white/5 border border-white/10 backdrop-blur-md active:scale-95 transition-all text-left"
-          >
-            <div className="flex -space-x-2 shrink-0">
-              {blogFavorites.slice(0, 3).map((item) => (
-                <img
-                  key={item.id}
-                  src={item.imagePng}
-                  alt=""
-                  className="w-6 h-6 rounded-full object-cover border border-[#111]"
-                />
-              ))}
-            </div>
-            <span className="text-[11px] uppercase tracking-widest font-medium opacity-80">
-              {t.favorites} · {blogFavorites.length}
-            </span>
-            <span className="ml-auto opacity-50 text-[14px]">→</span>
-          </button>
-        )}
-
         <button
           type="button"
           onClick={handleStart}
@@ -307,55 +183,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         </button>
       </div>
 
-      {/* ПЕРЕДАЕМ onChangeTab в панель */}
       <BottomDock active="profile" lang={lang} onChange={onChangeTab} />
-
-      <AnimatePresence>
-        {showWidgetHint && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end justify-center"
-            onClick={() => setShowWidgetHint(false)}
-          >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 60, opacity: 0 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md mx-4 mb-6 rounded-2xl bg-[#1A1816] border border-white/10 p-5 shadow-2xl"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 text-white">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="5" y="2" width="14" height="20" rx="2" />
-                    <path d="M12 18h.01" />
-                  </svg>
-                </div>
-                <div className="text-[15px] font-medium">{t.widgetTitle}</div>
-              </div>
-              <p className="text-[13px] font-light leading-relaxed opacity-70 mb-5">
-                {t.widgetText}
-              </p>
-              <div className="space-y-2.5 mb-6 opacity-80 text-[12px] font-light">
-                <div>{t.widgetStep1}</div>
-                <div>{t.widgetStep2}</div>
-                <div>{t.widgetStep3}</div>
-              </div>
-              <button
-                type="button"
-                onClick={handleOpenInBrowser}
-                className="w-full py-3.5 rounded-xl bg-white/90 text-black text-[11px] font-bold uppercase tracking-widest active:scale-95 transition-transform"
-              >
-                {t.widgetAction}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
-}
+ }
