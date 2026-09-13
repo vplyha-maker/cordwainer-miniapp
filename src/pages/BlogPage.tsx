@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Markdown from 'react-markdown'
 import { BLOG_ARTICLES } from '../data/blog'
 import { ARTICLE_CONTENTS } from '../data/articleContents'
 import type { Lang } from '../App'
 import AboutProject from '../components/AboutProject'
-import { EmptyState } from '../components/EmptyState'
 import { ArticleAudioPlayer } from '../components/ArticleAudioPlayer'
 
 type BlogPageProps = {
@@ -45,6 +44,16 @@ const getTagSlug = (tag: string) => {
   return tag
 }
 
+function haptic(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') {
+  try {
+    const tg = getWebApp()
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+    else if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(style === 'light' ? 20 : 40)
+    }
+  } catch {}
+}
+
 export function BlogPage({
   onBack,
   lang,
@@ -64,14 +73,23 @@ export function BlogPage({
   const [emailCopied, setEmailCopied] = useState(false)
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
+  const [isDark, setIsDark] = useState(true)
 
-  const articleScrollRef = useRef<HTMLDivElement>(null)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onArticleOpenedRef = useRef(onArticleOpened)
 
-  const hasNew = BLOG_ARTICLES.some((a) => a.isNew)
   const count = BLOG_ARTICLES.length
+
+  // Сброс скролла и тема
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    checkTheme()
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [view, activeArticleId])
 
   useEffect(() => {
     onArticleOpenedRef.current = onArticleOpened
@@ -96,30 +114,12 @@ export function BlogPage({
   }, [initialArticleId, initialShowFavorites])
 
   useEffect(() => {
-    if (view === 'article' && articleScrollRef.current) {
-      articleScrollRef.current.scrollTo(0, 0)
-    }
-  }, [view, activeArticleId])
-
-  useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
-      // Останавливаем озвучку при полном размонтировании страницы
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel()
-      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
     }
   }, [])
-
-  const triggerHaptic = (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
-    const tg = getWebApp()
-    if (tg?.HapticFeedback) {
-      tg.HapticFeedback.impactOccurred(style)
-    } else if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(style === 'light' ? 20 : 40)
-    }
-  }
 
   const showToastMessage = (message: string) => {
     setToast({ message, visible: true })
@@ -129,13 +129,8 @@ export function BlogPage({
     }, 2000)
   }
 
-  const handleAboutClick = () => {
-    triggerHaptic('medium')
-    setView('about')
-  }
-
   const handleCopyEmail = async () => {
-    triggerHaptic('medium')
+    haptic('medium')
     const email = 'support@cordwaine.app'
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
@@ -152,34 +147,28 @@ export function BlogPage({
         textArea.remove()
       }
       setEmailCopied(true)
+      showToastMessage(t.copiedBtn)
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = setTimeout(() => setEmailCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy email:', err)
-    }
+    } catch (err) {}
   }
 
   const handleShareArticle = async (title: string, tag: string) => {
-    triggerHaptic('medium')
+    haptic('medium')
     const tg = getWebApp()
-    const appUrl = 'https://cordwainer-miniapp.vercel.app'
+    const appUrl = 'https://cordwaine.app'
     const text = `Прочитал статью «${title}» (${tag}) в PRO Обувь.`
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'PRO Обувь', text, url: appUrl })
+        await navigator.share({ title: 'Cordwainer', text, url: appUrl })
         return
-      } catch (error) {
-        console.log('Share canceled or failed', error)
-      }
+      } catch (error) {}
     }
 
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appUrl)}&text=${encodeURIComponent(text)}`
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(shareUrl)
-    } else {
-      window.open(shareUrl, '_blank')
-    }
+    if (tg?.openTelegramLink) tg.openTelegramLink(shareUrl)
+    else window.open(shareUrl, '_blank')
   }
 
   const t = useMemo(() => {
@@ -189,30 +178,30 @@ export function BlogPage({
     return {
       ru: {
         title: 'PRO Обувь',
-        subtitle: 'БЛОГ И СТАТЬИ',
-        tagline: 'Изнанка обувной индустрии. Дизайн, технологии и секреты производства',
+        subtitle: 'Архив & Журнал',
+        tagline: 'Изнанка индустрии. Дизайн, технологии и секреты производства.',
         read: 'Читать',
-        readSub: count === 0 ? 'Статьи скоро появятся' : `${count} ${ruPlural}`,
+        readSub: count === 0 ? 'Скоро' : `${count} ${ruPlural}`,
         contact: 'Сотрудничество',
         contactSub: 'Предложить идею',
-        favoriteAdd: 'В избранное',
-        favoriteAddSub: 'Сохранить на главной',
-        favoriteRemove: 'В избранном',
-        favoriteRemoveSub: 'Убрать с главной',
-        backToMenu: 'Назад в меню',
+        favoriteAdd: 'В закладки',
+        favoriteAddSub: 'Сохранить раздел',
+        favoriteRemove: 'Сохранено',
+        favoriteRemoveSub: 'Убрать раздел',
+        backToMenu: 'Назад',
         journalTitle: 'Журнал',
-        journalDesc: 'Размышления об индустрии, людях, дизайне, производстве и всем, что происходит вокруг обуви.',
-        searchPlaceholder: 'Найти статью...',
-        fresh: 'СВЕЖЕЕ',
-        emptyTitle: 'Ничего не найдено',
-        emptyDesc: 'Попробуйте изменить запрос или сбросить фильтры',
+        journalDesc: 'Размышления об индустрии, людях, дизайне и производстве.',
+        searchPlaceholder: 'Найти материал...',
+        fresh: 'Свежее',
+        emptyTitle: 'Материалы не найдены',
+        emptyDesc: 'Попробуйте изменить поисковый запрос.',
         emptyBtn: 'Сбросить фильтры',
-        emptyFavoritesTitle: 'Нет сохранённых статей',
-        emptyFavoritesDesc: 'Нажмите на иконку звезды в карточке статьи, чтобы добавить её в этот раздел',
+        emptyFavoritesTitle: 'Архив пуст',
+        emptyFavoritesDesc: 'Сохраняйте статьи, чтобы читать их позже.',
         emptyFavoritesBtn: 'Все статьи',
         filters: [
           { id: 'all', label: 'Все' },
-          { id: 'favorites', label: '★ Избранное' },
+          { id: 'favorites', label: 'Избранное' },
           { id: 'industry', label: 'Индустрия' },
           { id: 'marketing', label: 'Маркетинг' },
           { id: 'design', label: 'Дизайн' },
@@ -220,45 +209,42 @@ export function BlogPage({
         ],
         readBtn: 'Читать',
         collabTitle: 'Сотрудничество',
-        collabSubtitle: 'ЦИФРОВАЯ ВИЗИТКА',
-        collabText:
-          'Это хобби-проект об обувной индустрии. Я открыт к диалогу: идеи, замечания, обратная связь, предложения по сотрудничеству или просто интересные наблюдения. Пишите — с удовольствием обсудим.',
-        collabEmailLabel: 'Прямая связь',
+        collabSubtitle: 'Связь',
+        collabText: 'Это проект об обувной индустрии. Я открыт к диалогу: идеи, замечания, обратная связь или предложения. Пишите — обсудим.',
+        collabEmailLabel: 'Почта',
         copyBtn: 'Скопировать',
         copiedBtn: 'Скопировано!',
         aboutBtn: 'О проекте',
         shareBtn: 'Поделиться',
-        articleFavAdd: 'Сохранить статью',
-        articleFavRemove: 'В избранном',
+        articleFavAdd: 'В закладки',
+        articleFavRemove: 'Сохранено',
       },
       uk: {
         title: 'PRO Взуття',
-        subtitle: 'БЛОГ ТА СТАТТІ',
-        tagline: 'Виворіт взуттєвої індустрії. Дизайн, технології та секрети виробництва',
+        subtitle: 'Архів & Журнал',
+        tagline: 'Виворіт індустрії. Дизайн, технології та секрети виробництва.',
         read: 'Читати',
-        readSub: count === 0 ? 'Статті зʼявляться незабаром' : `${count} ${ukPlural}`,
+        readSub: count === 0 ? 'Незабаром' : `${count} ${ukPlural}`,
         contact: 'Співпраця',
         contactSub: 'Запропонувати ідею',
-        favoriteAdd: 'В обране',
-        favoriteAddSub: 'Зберегти на головній',
-        favoriteRemove: 'В обраному',
-        favoriteRemoveSub: 'Видалити з головної',
-        backToMenu: 'Назад до меню',
+        favoriteAdd: 'У закладки',
+        favoriteAddSub: 'Зберегти розділ',
+        favoriteRemove: 'Збережено',
+        favoriteRemoveSub: 'Видалити розділ',
+        backToMenu: 'Назад',
         journalTitle: 'Журнал',
-        journalDesc:
-          'Роздуми про індустрію, людей, дизайн, виробництво та все, що відбувається навколо взуття.',
-        searchPlaceholder: 'Знайти статтю...',
-        fresh: 'СВІЖЕ',
-        emptyTitle: 'Нічого не знайдено',
-        emptyDesc: 'Спробуйте змінити запит або скинути фільтри',
+        journalDesc: 'Роздуми про індустрію, людей, дизайн та виробництво.',
+        searchPlaceholder: 'Знайти матеріал...',
+        fresh: 'Свіже',
+        emptyTitle: 'Матеріали не знайдено',
+        emptyDesc: 'Спробуйте змінити пошуковий запит.',
         emptyBtn: 'Скинути фільтри',
-        emptyFavoritesTitle: 'Немає збережених статей',
-        emptyFavoritesDesc:
-          'Натисніть на іконку зірочки в картці статті, щоб додати її до цього розділу',
+        emptyFavoritesTitle: 'Архів порожній',
+        emptyFavoritesDesc: 'Зберігайте статті, щоб читати їх пізніше.',
         emptyFavoritesBtn: 'Усі статті',
         filters: [
           { id: 'all', label: 'Усі' },
-          { id: 'favorites', label: '★ Обране' },
+          { id: 'favorites', label: 'Обране' },
           { id: 'industry', label: 'Індустрія' },
           { id: 'marketing', label: 'Маркетинг' },
           { id: 'design', label: 'Дизайн' },
@@ -266,43 +252,42 @@ export function BlogPage({
         ],
         readBtn: 'Читати',
         collabTitle: 'Співпраця',
-        collabSubtitle: 'ЦИФРОВА ВІЗИТКА',
-        collabText:
-          'Це хобі-проєкт про взуттєву індустрію. Я відкритий до діалогу: ідеї, зауваження, зворотний звʼязок, пропозиції щодо співпраці або просто цікаві спостереження. Пишіть — із задоволенням обговоримо.',
-        collabEmailLabel: 'Прямий звʼязок',
+        collabSubtitle: 'Зв\'язок',
+        collabText: 'Це проєкт про взуттєву індустрію. Я відкритий до діалогу: ідеї, зауваження, зворотний звʼязок або пропозиції. Пишіть — обговоримо.',
+        collabEmailLabel: 'Пошта',
         copyBtn: 'Скопіювати',
         copiedBtn: 'Скопійовано!',
         aboutBtn: 'Про проєкт',
         shareBtn: 'Поділитися',
-        articleFavAdd: 'Зберегти статтю',
-        articleFavRemove: 'В обраному',
+        articleFavAdd: 'У закладки',
+        articleFavRemove: 'Збережено',
       },
       de: {
         title: 'PRO Schuhe',
-        subtitle: 'BLOG & ARTIKEL',
-        tagline: 'Hinter den Kulissen der Schuhindustrie. Design, Technologie und Produktionsgeheimnisse',
+        subtitle: 'Archiv & Journal',
+        tagline: 'Hinter den Kulissen. Design, Technologie und Produktion.',
         read: 'Lesen',
-        readSub: count === 0 ? 'Artikel folgen bald' : `${count} Artikel`,
+        readSub: count === 0 ? 'Bald' : `${count} Artikel`,
         contact: 'Kooperation',
         contactSub: 'Idee vorschlagen',
-        favoriteAdd: 'Zu Favoriten',
-        favoriteAddSub: 'Auf Startseite speichern',
-        favoriteRemove: 'In Favoriten',
-        favoriteRemoveSub: 'Von Startseite entfernen',
-        backToMenu: 'Zurück zum Menü',
+        favoriteAdd: 'Speichern',
+        favoriteAddSub: 'Kategorie speichern',
+        favoriteRemove: 'Gespeichert',
+        favoriteRemoveSub: 'Kategorie entfernen',
+        backToMenu: 'Zurück',
         journalTitle: 'Journal',
-        journalDesc: 'Gedanken über die Industrie, Menschen, Design, Produktion und alles rund um Schuhe.',
+        journalDesc: 'Gedanken über die Industrie, Menschen, Design und Produktion.',
         searchPlaceholder: 'Artikel suchen...',
-        fresh: 'NEU',
+        fresh: 'Neu',
         emptyTitle: 'Nichts gefunden',
-        emptyDesc: 'Versuchen Sie, die Suchanfrage zu ändern oder die Filter zurückzusetzen',
+        emptyDesc: 'Versuchen Sie, die Suchanfrage zu ändern.',
         emptyBtn: 'Filter zurücksetzen',
-        emptyFavoritesTitle: 'Keine gespeicherten Artikel',
-        emptyFavoritesDesc: 'Klicken Sie auf das Stern-Symbol in der Artikelkarte, um ihn hier hinzuzufügen',
+        emptyFavoritesTitle: 'Leeres Archiv',
+        emptyFavoritesDesc: 'Speichern Sie Artikel, um sie später zu lesen.',
         emptyFavoritesBtn: 'Alle Artikel',
         filters: [
           { id: 'all', label: 'Alle' },
-          { id: 'favorites', label: '★ Favoriten' },
+          { id: 'favorites', label: 'Favoriten' },
           { id: 'industry', label: 'Industrie' },
           { id: 'marketing', label: 'Marketing' },
           { id: 'design', label: 'Design' },
@@ -310,16 +295,15 @@ export function BlogPage({
         ],
         readBtn: 'Lesen',
         collabTitle: 'Zusammenarbeit',
-        collabSubtitle: 'DIGITALE VISITENKARTE',
-        collabText:
-          'Dies ist ein Hobbyprojekt über die Schuhindustrie. Ich bin offen für den Dialog: Ideen, Kommentare, Feedback, Kooperationsvorschläge oder einfach interessante Beobachtungen. Schreiben Sie mir – ich diskutiere gerne mit Ihnen.',
-        collabEmailLabel: 'Direkter Kontakt',
+        collabSubtitle: 'Kontakt',
+        collabText: 'Dies ist ein Projekt über die Schuhindustrie. Ich bin offen für Dialoge: Ideen, Feedback oder Kooperationsvorschläge. Schreiben Sie mir.',
+        collabEmailLabel: 'E-Mail',
         copyBtn: 'Kopieren',
         copiedBtn: 'Kopiert!',
         aboutBtn: 'Über das Projekt',
         shareBtn: 'Teilen',
-        articleFavAdd: 'Artikel speichern',
-        articleFavRemove: 'In Favoriten',
+        articleFavAdd: 'Speichern',
+        articleFavRemove: 'Gespeichert',
       },
     }[lang]
   }, [lang, count])
@@ -330,7 +314,6 @@ export function BlogPage({
       favorites: BLOG_ARTICLES.filter((a) => favoriteArticleIds.includes(a.id)).length,
     }
     BLOG_ARTICLES.forEach((a) => {
-      // Безопасный фоллбэк для немецких тегов (пока их нет в data файле)
       const tag = lang === 'ru' ? a.tagRu : lang === 'uk' ? a.tagUk : (a as any).tagDe || a.tagRu
       const slug = getTagSlug(tag)
       counts[slug] = (counts[slug] || 0) + 1
@@ -338,41 +321,22 @@ export function BlogPage({
     return counts
   }, [lang, favoriteArticleIds])
 
-  const cardStyle = {
-    background:
-      'linear-gradient(180deg, color-mix(in srgb, var(--color-surface, #25201C) 92%, transparent) 10%, color-mix(in srgb, var(--color-bg, #1C1816) 20%, transparent) 100%)',
-    boxShadow: `
-      inset 0 1px 0 color-mix(in srgb, var(--color-accent, #D8A35C) 35%, transparent),
-      inset 1px 0 0 color-mix(in srgb, var(--color-accent, #D8A35C) 5%, transparent),
-      inset -1px 0 0 color-mix(in srgb, var(--color-accent, #D8A35C) 5%, transparent),
-      0 6px 18px color-mix(in srgb, var(--color-bg, #1C1816) 50%, transparent)
-    `,
-    border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-  }
-
   const isFavoritesActive = showOnlyFavorites || activeFilter === 'favorites'
 
   const filteredArticles = BLOG_ARTICLES.filter((article) => {
-    if (isFavoritesActive) {
-      return favoriteArticleIds.includes(article.id)
-    }
-    
-    // Безопасный фоллбэк для немецких данных
+    if (isFavoritesActive) return favoriteArticleIds.includes(article.id)
     const title = lang === 'ru' ? article.titleRu : lang === 'uk' ? article.titleUk : (article as any).titleDe || article.titleRu
     const tag = lang === 'ru' ? article.tagRu : lang === 'uk' ? article.tagUk : (article as any).tagDe || article.tagRu
     const slug = getTagSlug(tag)
     const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesFilter = activeFilter === 'all' || slug === activeFilter
     return matchesSearch && matchesFilter
-  })
-    .slice()
-    .reverse()
+  }).slice().reverse()
 
   const activeArticle = activeArticleId ? BLOG_ARTICLES.find((a) => a.id === activeArticleId) : null
   const content = activeArticleId ? ARTICLE_CONTENTS[activeArticleId] : null
   const isCurrentArticleFavorite = activeArticleId ? favoriteArticleIds.includes(activeArticleId) : false
 
-  // Безопасный доступ к немецким данным статьи (защита от TS ошибок)
   const activeTitle = activeArticle 
     ? (lang === 'ru' ? activeArticle.titleRu : lang === 'uk' ? activeArticle.titleUk : (activeArticle as any).titleDe || activeArticle.titleRu) 
     : ''
@@ -382,328 +346,192 @@ export function BlogPage({
   const activeReadTime = activeArticle 
     ? (lang === 'ru' ? activeArticle.readTimeRu : lang === 'uk' ? activeArticle.readTimeUk : (activeArticle as any).readTimeDe || activeArticle.readTimeRu) 
     : ''
-
-  // Контент статьи с фоллбэком на русский язык
   const activeContentHtml = content ? ((content as any)[lang] || content.ru) : ''
 
+  // Цветовые токены
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+
+  const MENU_ITEMS = [
+    { id: 'journal', title: t.journalTitle, subtitle: t.readSub, action: () => { setView('journal'); setShowOnlyFavorites(false); setActiveFilter('all') } },
+    { id: 'collab', title: t.collabTitle, subtitle: t.contactSub, action: () => setView('collaboration') },
+    { id: 'favs', title: isFavorite ? t.favoriteRemove : t.favoriteAdd, subtitle: isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub, action: onToggleFavorite }
+  ]
+
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${cBg} ${cText}`}>
+      <style>{`
+        * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes fadeUp {
+          0% { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+          opacity: 0;
+          animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Markdown Typography Styles */
+        .article-content p { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-weight: 300; font-size: 14px; line-height: 1.8; margin-bottom: 1.5rem; opacity: 0.8; }
+        .article-content h2 { font-family: "Playfair Display", serif; font-size: 2rem; margin-top: 3rem; margin-bottom: 1rem; line-height: 1.1; }
+        .article-content h3 { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; margin-top: 2rem; margin-bottom: 1rem; opacity: 0.6; }
+        .article-content ul, .article-content ol { font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 300; font-size: 14px; line-height: 1.8; margin-bottom: 1.5rem; padding-left: 1.2rem; opacity: 0.8; }
+        .article-content li { margin-bottom: 0.5rem; }
+        .article-content strong { font-weight: 600; opacity: 1; }
+        .article-content blockquote { border-left: 1px solid currentColor; opacity: 0.7; padding-left: 1.2rem; font-family: "Playfair Display", serif; font-size: 1.2rem; font-style: italic; margin: 2rem 0; }
+        .article-content img { width: 100%; border-radius: 12px; margin: 2rem 0; filter: grayscale(20%); }
+      `}</style>
+
+      {/* TOAST NOTIFICATION */}
       <AnimatePresence>
         {toast.visible && (
           <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-[12px] font-medium tracking-wide shadow-xl whitespace-nowrap"
-            style={{
-              background: 'color-mix(in srgb, var(--color-surface, #25201C) 90%, transparent)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)',
-              color: 'var(--color-ink, #F5F1EA)',
-            }}
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-none border ${isDark ? 'bg-white text-black border-white' : 'bg-black text-white border-black'} text-[10px] font-sans uppercase tracking-[0.2em] shadow-2xl whitespace-nowrap`}
           >
             {toast.message}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {view !== 'article' && view !== 'about' && (
-        <button
-          type="button"
-          aria-label="Go back"
-          onClick={() => {
-            triggerHaptic('light')
-            if (view === 'journal') {
-              setShowOnlyFavorites(false)
-              setActiveFilter('all')
-              setView('cover')
-            } else if (view === 'collaboration') setView('cover')
-            else onBack?.()
-          }}
-          className="absolute top-4 left-4 z-50 w-9 h-9 rounded-full flex items-center justify-center active:scale-90 transition-transform cursor-pointer focus-visible"
-          style={{
-            background: 'color-mix(in srgb, var(--color-surface, #25201C) 75%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)',
-            backdropFilter: 'blur(12px)',
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink, #F5F1EA)" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
+      {/* GLOBAL HEADER (Except Cover) */}
+      {view !== 'cover' && view !== 'article' && (
+        <header className="px-6 pt-8 pb-4 flex items-start justify-between sticky top-0 z-50 mix-blend-difference pointer-events-none">
+          <button 
+            onClick={() => {
+              haptic('light')
+              if (view === 'journal') { setShowOnlyFavorites(false); setActiveFilter('all'); setView('cover') } 
+              else if (view === 'collaboration' || view === 'about') setView('cover')
+              else onBack?.()
+            }}
+            className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#F4F0E8]/60 hover:text-white transition-colors"
+          >
+            <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+            <span>{t.backToMenu}</span>
+          </button>
+        </header>
       )}
 
-      <AnimatePresence mode="wait">
-        {/* ========== COVER ========== */}
-        {view === 'cover' && (
-          <motion.div
-            key="cover"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col justify-between"
-          >
-            <div className="absolute inset-0 z-0 h-[65vh] overflow-hidden pointer-events-none">
-              <img
-                src="/blog-hero.webp"
-                alt="PRO"
-                width={780}
-                height={520}
-                decoding="async"
-                className="w-full h-full object-cover object-center"
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(
-                    to bottom,
-                    color-mix(in srgb, var(--color-bg, #1C1816) 15%, transparent) 0%,
-                    color-mix(in srgb, var(--color-bg, #1C1816) 65%, transparent) 55%,
-                    var(--color-bg, #1C1816) 100%
-                  )`,
-                }}
-              />
-            </div>
+      {/* ================= COVER VIEW ================= */}
+      {view === 'cover' && (
+        <div className="relative min-h-[100dvh] flex flex-col justify-end">
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-center transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
+            <div className={`absolute bottom-0 left-0 right-0 h-[80%] bg-gradient-to-t ${isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/80' : 'from-[#F2EFE9] via-[#F2EFE9]/80'} to-transparent`} />
+          </div>
 
-            <div className="relative z-10 flex-1 flex flex-col justify-end px-4 md:px-6 pb-6 pt-16">
-              <div className="mb-5">
-                <p
-                  className="text-[9px] tracking-[0.22em] uppercase font-semibold mb-1"
-                  style={{ color: 'var(--color-accent, #D8A35C)' }}
-                >
-                  {t.subtitle}
-                </p>
-                <h1
-                  className="font-display text-[2.2rem] leading-tight tracking-wide"
-                  style={{
-                    color: 'var(--color-ink, #F5F1EA)',
-                    textShadow: '0 2px 20px color-mix(in srgb, var(--color-bg, #1C1816) 80%, transparent)',
-                  }}
-                >
-                  {t.title}
-                </h1>
-                <p
-                  className="mt-1.5 text-[11.5px] leading-relaxed max-w-[92%]"
-                  style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                >
-                  {t.tagline}
-                </p>
-              </div>
+          <div className="relative z-10 px-6 pb-24 w-full">
+            <header className="absolute top-8 left-6">
+              <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#F4F0E8]/60 hover:text-white transition-colors mix-blend-difference`}>
+                <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+                <span>Back</span>
+              </button>
+            </header>
 
-              <div className="grid grid-cols-3 gap-2.5 mb-6 items-stretch">
-                <motion.button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic()
-                    setShowOnlyFavorites(false)
-                    setActiveFilter('all')
-                    setView('journal')
-                  }}
-                  whileTap={{ scale: 0.96 }}
-                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px] focus-visible"
-                  style={{ ...cardStyle, willChange: 'transform' }}
-                >
-                  {hasNew && (
-                    <motion.div
-                      className="absolute inset-0 rounded-xl pointer-events-none"
-                      animate={{ opacity: [0.15, 0.4, 0.15] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                      style={{
-                        boxShadow:
-                          'inset 0 0 0 1px color-mix(in srgb, var(--color-accent, #D8A35C) 50%, transparent), 0 0 20px color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)',
-                      }}
-                    />
-                  )}
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0 relative z-10"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)',
-                      color: 'var(--color-accent, #D8A35C)',
-                    }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-                    </svg>
-                  </div>
-                  <div className="relative z-10 flex-1 flex flex-col justify-end">
-                    <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                      {t.read}
-                    </div>
-                    <div className="text-[9px] mt-1 leading-snug" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                      {t.readSub}
-                    </div>
-                  </div>
-                </motion.button>
-
-                <motion.button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic()
-                    setView('collaboration')
-                  }}
-                  whileTap={{ scale: 0.96 }}
-                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px] focus-visible"
-                  style={{ ...cardStyle, willChange: 'transform' }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-info, #60A5FA) 18%, transparent)',
-                      color: 'var(--color-info, #60A5FA)',
-                    }}
-                  >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 flex flex-col justify-end">
-                    <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                      {t.contact}
-                    </div>
-                    <div className="text-[9px] mt-1 leading-snug" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                      {t.contactSub}
-                    </div>
-                  </div>
-                </motion.button>
-
-                <motion.button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic()
-                    onToggleFavorite?.()
-                  }}
-                  whileTap={{ scale: 0.96 }}
-                  className="relative rounded-xl p-3 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full min-h-[115px] focus-visible"
-                  style={{ ...cardStyle, willChange: 'transform' }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 shrink-0"
-                    style={{
-                      background: isFavorite
-                        ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)'
-                        : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 12%, transparent)',
-                      color: isFavorite ? 'var(--color-accent, #D8A35C)' : 'var(--color-muted, #B9ACA0)',
-                    }}
-                  >
-                    <svg
-                      width="17"
-                      height="17"
-                      viewBox="0 0 24 24"
-                      fill={isFavorite ? 'currentColor' : 'none'}
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                    >
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 flex flex-col justify-end">
-                    <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                      {isFavorite ? t.favoriteRemove : t.favoriteAdd}
-                    </div>
-                    <div className="text-[9px] mt-1 leading-snug" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                      {isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub}
-                    </div>
-                  </div>
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ========== JOURNAL ========== */}
-        {view === 'journal' && (
-          <motion.div
-            key="journal"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col"
-          >
-            <div className="px-4 md:px-6 pt-16 pb-3 shrink-0">
-              <h2 className="font-display text-[1.75rem] leading-tight mb-1" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                {t.journalTitle}
-              </h2>
-              <p className="text-[12px] leading-relaxed mb-4" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                {t.journalDesc}
+            <div className="stagger-item mb-16" style={{ animationDelay: '0.1s' }}>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted}`}>
+                {t.subtitle}
               </p>
-
-              <div
-                className="rounded-2xl px-3.5 py-2.5 flex items-center gap-2 mb-3"
-                style={{
-                  background: 'var(--color-surface, #25201C)',
-                  border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="shrink-0" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="M20 20l-3.5-3.5" />
-                </svg>
-                <input
-                  type="search"
-                  value={rawSearchQuery}
-                  onChange={(e) => setRawSearchQuery(e.target.value)}
-                  placeholder={t.searchPlaceholder}
-                  className="flex-1 bg-transparent outline-none text-[13px] min-w-0"
-                  style={{ color: 'var(--color-ink, #F5F1EA)' }}
-                />
-              </div>
-
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 snap-x">
-                {t.filters.map((filter) => {
-                  const isActive = activeFilter === filter.id || (filter.id === 'favorites' && showOnlyFavorites)
-                  const cnt = filterCounts[filter.id] ?? 0
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light')
-                        if (filter.id === 'favorites') setShowOnlyFavorites(true)
-                        else setShowOnlyFavorites(false)
-                        setActiveFilter(filter.id)
-                      }}
-                      className="snap-start shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border focus-visible flex items-center gap-1.5"
-                      style={{
-                        background: isActive
-                          ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)'
-                          : 'transparent',
-                        color: isActive ? 'var(--color-accent, #D8A35C)' : 'var(--color-muted, #B9ACA0)',
-                        borderColor: isActive
-                          ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)'
-                          : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 20%, transparent)',
-                      }}
-                    >
-                      {filter.label}
-                      <span className="opacity-60 text-[9px]">{cnt}</span>
-                    </button>
-                  )
-                })}
-              </div>
+              <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight whitespace-nowrap">
+                {t.title}
+              </h1>
+              <p className={`mt-6 text-[11px] font-sans font-light leading-[1.8] max-w-[260px] ${cTextMuted}`}>
+                {t.tagline}
+              </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 mt-2 pb-8">
-              <p
-                className="text-[10px] tracking-[0.14em] uppercase mb-3 font-semibold"
-                style={{ color: 'var(--color-accent, #D8A35C)' }}
-              >
-                {isFavoritesActive
-                  ? lang === 'ru'
-                    ? 'ИЗБРАННОЕ'
-                    : lang === 'de' 
-                      ? 'FAVORITEN' 
-                      : 'ОБРАНЕ'
-                  : searchQuery
-                    ? lang === 'ru'
-                      ? 'Результаты'
-                      : lang === 'de'
-                        ? 'Ergebnisse'
-                        : 'Результати'
-                    : t.fresh}
-              </p>
+            <div className="flex flex-col">
+              {MENU_ITEMS.map((item, idx) => (
+                <div key={item.id} className="stagger-item" style={{ animationDelay: `${0.2 + idx * 0.05}s` }}>
+                  <button
+                    onClick={() => { haptic('medium'); item.action?.(); }}
+                    className={`w-full group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent cursor-pointer ${cLine} text-left transition-all active:opacity-50`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+                        0{idx + 1}
+                      </span>
+                      <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-hover:translate-x-1">
+                        {item.title}
+                      </div>
+                    </div>
+                    <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+                      {item.subtitle}
+                    </div>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="flex flex-col gap-3">
+      {/* ================= JOURNAL VIEW ================= */}
+      {view === 'journal' && (
+        <div className="px-6 pb-24 pt-16 md:pt-24 min-h-[100dvh]">
+          <div className="stagger-item mb-12" style={{ animationDelay: '0.05s' }}>
+            <h1 className="font-serif text-[16vw] min-[400px]:text-6xl leading-[0.85] tracking-tight mb-4">
+              {t.journalTitle}
+            </h1>
+            <p className={`text-[11px] font-sans font-light leading-[1.8] max-w-[280px] ${cTextMuted}`}>
+              {t.journalDesc}
+            </p>
+          </div>
+
+          <div className="stagger-item mb-10" style={{ animationDelay: '0.1s' }}>
+            <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
+              <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
+              <input
+                type="text"
+                value={rawSearchQuery}
+                onChange={(e) => setRawSearchQuery(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
+              />
+              {rawSearchQuery && (
+                <button onClick={() => setRawSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="stagger-item mb-12" style={{ animationDelay: '0.15s' }}>
+            <div className={`flex overflow-x-auto gap-6 pb-4 border-b ${cLine} scrollbar-hide`}>
+              {t.filters.map(filter => {
+                const isActive = activeFilter === filter.id || (filter.id === 'favorites' && showOnlyFavorites)
+                return (
+                  <button 
+                    key={filter.id}
+                    onClick={() => {
+                      haptic('light')
+                      if (filter.id === 'favorites') setShowOnlyFavorites(true)
+                      else setShowOnlyFavorites(false)
+                      setActiveFilter(filter.id)
+                    }} 
+                    className={`flex items-center gap-2 text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all duration-300 outline-none border-none bg-transparent cursor-pointer ${
+                      isActive ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                    }`}
+                  >
+                    {filter.label}
+                    <span className="opacity-40 tracking-normal text-[8px]">({filterCounts[filter.id] || 0})</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
+            {filteredArticles.length > 0 ? (
+              <div className="flex flex-col gap-10">
                 {filteredArticles.map((article) => {
                   const title = lang === 'ru' ? article.titleRu : lang === 'uk' ? article.titleUk : (article as any).titleDe || article.titleRu
                   const excerpt = lang === 'ru' ? article.excerptRu : lang === 'uk' ? article.excerptUk : (article as any).excerptDe || article.excerptRu
@@ -713,453 +541,164 @@ export function BlogPage({
                   return (
                     <button
                       key={article.id}
-                      type="button"
-                      aria-label={`${t.readBtn} ${title}`}
-                      onClick={() => {
-                        triggerHaptic()
-                        setActiveArticleId(article.id)
-                        setView('article')
-                      }}
-                      className="w-full text-left relative rounded-2xl p-4 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform focus-visible block"
-                      style={cardStyle}
+                      onClick={() => { haptic('medium'); setActiveArticleId(article.id); setView('article') }}
+                      className="group text-left outline-none border-none bg-transparent cursor-pointer active:opacity-50 transition-opacity flex flex-col items-start"
                     >
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 rounded-sm"
-                            style={{
-                              color: 'var(--color-accent, #D8A35C)',
-                              background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 10%, transparent)',
-                            }}
-                          >
-                            {tag}
-                          </span>
-                          <span className="text-[9px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
-                            · {readTime}
-                          </span>
-                        </div>
-                        {article.isNew && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#F472B6] animate-pulse" />
-                        )}
+                      <div className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-3 ${cTextMuted}`}>
+                        {tag} <span className="mx-2">—</span> {readTime}
                       </div>
-                      <h3 className="text-[15px] font-semibold leading-snug mb-1.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+                      <h3 className="font-serif text-[26px] min-[400px]:text-3xl leading-[1.1] mb-3 transition-transform group-hover:translate-x-1">
                         {title}
                       </h3>
-                      <p
-                        className="text-[11.5px] leading-relaxed line-clamp-2 mb-3"
-                        style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 80%, transparent)' }}
-                      >
+                      <p className={`text-[12px] font-sans font-light leading-[1.6] line-clamp-2 max-w-sm ${cTextMuted}`}>
                         {excerpt}
                       </p>
-                      <div className="flex items-center text-[11px] font-medium" style={{ color: 'var(--color-accent, #D8A35C)' }}>
-                        {t.readBtn}
-                        <span className="ml-1 opacity-70">→</span>
-                      </div>
                     </button>
                   )
                 })}
-
-                {filteredArticles.length === 0 && (
-                  <EmptyState
-                    variant={isFavoritesActive ? 'favorites' : 'search'}
-                    title={isFavoritesActive ? t.emptyFavoritesTitle : t.emptyTitle}
-                    description={isFavoritesActive ? t.emptyFavoritesDesc : t.emptyDesc}
-                    action={
-                      isFavoritesActive
-                        ? {
-                            label: t.emptyFavoritesBtn,
-                            onClick: () => {
-                              triggerHaptic('light')
-                              setShowOnlyFavorites(false)
-                              setActiveFilter('all')
-                            },
-                          }
-                        : {
-                            label: t.emptyBtn,
-                            onClick: () => {
-                              triggerHaptic('light')
-                              setRawSearchQuery('')
-                              setActiveFilter('all')
-                            },
-                          }
-                    }
-                  />
-                )}
               </div>
-            </div>
-          </motion.div>
-        )}
+            ) : (
+              <div className={`py-12 text-center flex flex-col items-center gap-6`}>
+                <p className={`font-serif text-2xl italic ${cTextMuted}`}>
+                  {isFavoritesActive ? t.emptyFavoritesTitle : t.emptyTitle}
+                </p>
+                <button 
+                  onClick={() => { haptic('light'); setShowOnlyFavorites(false); setActiveFilter('all'); setRawSearchQuery('') }}
+                  className={`text-[9px] font-sans uppercase tracking-[0.3em] border-b pb-1 transition-colors hover:text-white ${cTextMuted} ${cLine}`}
+                >
+                  {isFavoritesActive ? t.emptyFavoritesBtn : t.emptyBtn}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-        {/* ========== COLLABORATION ========== */}
-        {view === 'collaboration' && (
-          <motion.div
-            key="collaboration"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col px-4 md:px-6 pt-16 pb-8 overflow-y-auto"
-          >
-            <p className="text-[9px] tracking-[0.2em] uppercase font-semibold mb-1" style={{ color: 'var(--color-accent, #D8A35C)' }}>
+      {/* ================= COLLABORATION VIEW ================= */}
+      {view === 'collaboration' && (
+        <div className="px-6 pb-24 pt-24 min-h-[100dvh] flex flex-col justify-center max-w-lg mx-auto">
+          <div className="stagger-item text-center flex flex-col items-center" style={{ animationDelay: '0.1s' }}>
+            <p className={`text-[9px] font-sans uppercase tracking-[0.4em] mb-6 ${cTextMuted}`}>
               {t.collabSubtitle}
             </p>
-            <h2 className="font-display text-[1.75rem] leading-tight mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+            <h2 className="font-serif text-4xl min-[400px]:text-5xl leading-tight mb-8">
               {t.collabTitle}
             </h2>
-            <p className="text-[13px] leading-relaxed mb-6" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+            <p className={`text-[13px] font-sans font-light leading-[1.8] mb-12 ${cTextMuted}`}>
               {t.collabText}
             </p>
 
-            <div
-              className="rounded-2xl p-4 mb-4"
-              style={{
-                background: 'var(--color-surface, #25201C)',
-                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-              }}
+            <button 
+              onClick={handleCopyEmail}
+              className={`w-full py-6 border transition-all duration-300 active:scale-95 flex flex-col items-center gap-2 ${emailCopied ? (isDark ? 'border-white bg-white text-black' : 'border-black bg-black text-white') : `${cLine} ${cHover} bg-transparent`}`}
             >
-              <p className="text-[10px] tracking-[0.12em] uppercase mb-2" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+              <span className={`text-[9px] font-sans uppercase tracking-[0.3em] ${emailCopied ? 'opacity-60' : 'opacity-40'}`}>
                 {t.collabEmailLabel}
-              </p>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[14px] font-medium truncate" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                  support@cordwaine.app
-                </span>
-                <button
-                  type="button"
-                  onClick={handleCopyEmail}
-                  className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold active:scale-95 transition-transform"
-                  style={{
-                    background: emailCopied
-                      ? 'color-mix(in srgb, var(--color-success, #0BDA51) 20%, transparent)'
-                      : 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)',
-                    color: emailCopied ? 'var(--color-success, #0BDA51)' : 'var(--color-accent, #D8A35C)',
-                  }}
-                >
-                  {emailCopied ? t.copiedBtn : t.copyBtn}
-                </button>
-              </div>
-            </div>
+              </span>
+              <span className="font-serif text-xl tracking-wide">
+                support@cordwaine.app
+              </span>
+            </button>
 
-            <button
-              type="button"
-              onClick={handleAboutClick}
-              className="w-full py-3.5 rounded-2xl text-[12px] font-semibold uppercase tracking-wider active:scale-[0.98] transition-transform"
-              style={{
-                background: 'var(--color-surface, #25201C)',
-                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                color: 'var(--color-muted, #B9ACA0)',
-              }}
+            <button 
+              onClick={() => { haptic('light'); setView('about') }}
+              className={`mt-6 text-[10px] font-sans uppercase tracking-[0.3em] border-b pb-1 transition-colors ${cTextMuted} hover:text-current ${cLine}`}
             >
               {t.aboutBtn}
             </button>
-          </motion.div>
-        )}
+          </div>
+        </div>
+      )}
 
-        {/* ========== ABOUT ========== */}
-        {view === 'about' && (
-          <motion.div
-            key="about"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 overflow-y-auto pt-14"
-          >
-            <AboutProject lang={lang} onClose={() => setView('collaboration')} />
-          </motion.div>
-        )}
+      {/* ================= ABOUT VIEW ================= */}
+      {view === 'about' && (
+        <div className="absolute inset-0 z-50 bg-[#0A0A0A] text-[#F4F0E8] overflow-y-auto pb-24 pt-6">
+           <AboutProject lang={lang} onClose={() => setView('collaboration')} />
+        </div>
+      )}
 
-        {/* ========== ARTICLE ========== */}
-        {view === 'article' && activeArticle && content && (
-          <motion.div
-            key="article"
-            ref={articleScrollRef}
-            initial={{ opacity: 0, x: 15 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 15 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute inset-0 flex flex-col z-30 overflow-y-auto overflow-x-hidden"
-            style={{ background: 'var(--color-bg, #1C1816)' }}
-          >
-            <div
-              className="sticky top-0 z-50 px-4 py-3 flex items-center justify-between"
-              style={{
-                background: 'color-mix(in srgb, var(--color-bg, #1C1816) 85%, transparent)',
-                backdropFilter: 'blur(12px)',
-                borderBottom: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 60%, transparent)',
+      {/* ================= ARTICLE VIEW ================= */}
+      {view === 'article' && activeArticle && content && (
+        <div className="min-h-[100dvh] w-full bg-[#0A0A0A] text-[#F4F0E8]">
+          
+          {/* Article Sticky Header */}
+          <header className="sticky top-0 z-50 px-6 py-4 flex items-center justify-between mix-blend-difference pointer-events-none">
+            <button 
+              onClick={() => {
+                haptic('light')
+                if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
+                setView('journal')
               }}
+              className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#F4F0E8] hover:text-white transition-colors"
             >
-              <button
-                aria-label="Back"
-                onClick={() => {
-                  triggerHaptic('light')
-                  // Останавливаем озвучку при выходе из статьи
-                  if (typeof window !== 'undefined' && window.speechSynthesis) {
-                    window.speechSynthesis.cancel()
-                  }
-                  setView('journal')
-                }}
-                className="w-8 h-8 flex items-center justify-center rounded-full active:scale-90 transition-transform focus-visible"
-                style={{
-                  background: 'var(--color-surface, #25201C)',
-                  border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                  color: 'var(--color-ink, #F5F1EA)',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-
-              <div
-                className="flex-1 truncate mx-4 text-center text-[12px] font-semibold tracking-wide"
-                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-              >
-                {activeTitle}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  aria-label="Share"
-                  onClick={() => handleShareArticle(activeTitle, activeTag)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full active:scale-90 transition-transform focus-visible"
-                  style={{
-                    background: 'var(--color-surface, #25201C)',
-                    border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                    color: 'var(--color-muted, #B9ACA0)',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+              <span>Back</span>
+            </button>
+            <div className="pointer-events-auto flex items-center gap-4">
+               <button onClick={() => handleShareArticle(activeTitle, activeTag)} className="text-[#F4F0E8] hover:text-white active:scale-90 transition-transform">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                     <polyline points="16 6 12 2 8 6" />
                     <line x1="12" y1="2" x2="12" y2="15" />
                   </svg>
-                </button>
-                <button
-                  aria-label="Favorite"
-                  onClick={() => {
-                    triggerHaptic(isCurrentArticleFavorite ? 'light' : 'medium')
-                    onToggleArticleFavorite?.(activeArticle.id, activeArticle.cover || '/blog-hero.webp')
-                  }}
-                  className="w-8 h-8 flex items-center justify-center rounded-full border active:scale-90 transition-all focus-visible"
-                  style={{
-                    background: isCurrentArticleFavorite
-                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent)'
-                      : 'var(--color-surface, #25201C)',
-                    borderColor: isCurrentArticleFavorite
-                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 40%, transparent)'
-                      : 'color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-                    color: isCurrentArticleFavorite
-                      ? 'var(--color-accent, #D8A35C)'
-                      : 'var(--color-muted, #B9ACA0)',
-                  }}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill={isCurrentArticleFavorite ? 'currentColor' : 'none'}
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                  </svg>
-                </button>
-              </div>
+               </button>
+            </div>
+          </header>
+
+          {/* Article Cover */}
+          <div className="relative w-full h-[45vh] -mt-[60px]">
+            <img src={activeArticle.cover || '/blog-hero.webp'} alt={activeTitle} className="w-full h-full object-cover grayscale-[20%]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent" />
+          </div>
+
+          <div className="px-6 -mt-16 relative z-10 pb-24 max-w-2xl mx-auto">
+            {/* Meta */}
+            <div className="flex items-center gap-3 mb-6">
+               <span className="text-[9px] font-sans uppercase tracking-[0.3em] text-[#F4F0E8]/60">
+                 {activeTag}
+               </span>
+               <span className="w-4 h-px bg-[#F4F0E8]/20" />
+               <span className="text-[9px] font-sans uppercase tracking-[0.3em] text-[#F4F0E8]/60">
+                 {activeReadTime}
+               </span>
             </div>
 
-            <div className="relative w-full h-[35vh] shrink-0">
-              <img
-                src={activeArticle.cover || '/blog-hero.webp'}
-                alt={activeTitle}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover"
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(to bottom, color-mix(in srgb, var(--color-bg, #1C1816) 10%, transparent) 0%, var(--color-bg, #1C1816) 100%)`,
-                }}
-              />
-              <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                <span
-                  className="text-[10px] font-bold tracking-[0.1em] uppercase px-2 py-1 rounded-sm"
-                  style={{
-                    color: 'var(--color-bg, #1C1816)',
-                    background: 'var(--color-accent, #D8A35C)',
-                  }}
-                >
-                  {activeTag}
-                </span>
-                <span
-                  className="text-[10px] px-2 py-1 rounded-sm"
-                  style={{
-                    color: 'var(--color-muted, #B9ACA0)',
-                    background: 'color-mix(in srgb, var(--color-bg, #1C1816) 50%, transparent)',
-                    backdropFilter: 'blur(8px)',
-                  }}
-                >
-                  {activeReadTime}
-                </span>
-              </div>
+            <h1 className="font-serif text-4xl sm:text-5xl leading-[1.05] tracking-tight mb-8">
+              {activeTitle}
+            </h1>
+
+            <div className="mb-12">
+              <ArticleAudioPlayer text={activeContentHtml} lang={lang} />
             </div>
 
-            <div className="px-5 py-6 pb-8">
-              <h1 className="font-display text-[1.8rem] leading-tight mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-                {activeTitle}
-              </h1>
+            {/* Markdown Content */}
+            <div className="article-content">
+              <Markdown>{activeContentHtml}</Markdown>
+            </div>
 
-              {/* Кнопка озвучки */}
-              <div className="mb-6">
-                <ArticleAudioPlayer text={activeContentHtml} lang={lang} />
-              </div>
-
-              <div className="article-content">
-                <Markdown
-                  components={{
-                    p: ({ node, ...props }) => (
-                      <p className="text-[14.5px] leading-relaxed mb-4" style={{ color: 'var(--color-muted, #B9ACA0)' }} {...props} />
-                    ),
-                    h2: ({ node, ...props }) => (
-                      <h2 className="font-display text-[1.4rem] font-bold mt-8 mb-4" style={{ color: 'var(--color-ink, #F5F1EA)' }} {...props} />
-                    ),
-                    h3: ({ node, ...props }) => (
-                      <h3 className="font-display text-[1.1rem] font-semibold mt-6 mb-3" style={{ color: 'var(--color-accent, #D8A35C)' }} {...props} />
-                    ),
-                    ul: ({ node, ...props }) => (
-                      <ul className="list-disc pl-5 mb-5 text-[14.5px] space-y-2" style={{ color: 'var(--color-muted, #B9ACA0)' }} {...props} />
-                    ),
-                    ol: ({ node, ...props }) => (
-                      <ol className="list-decimal pl-5 mb-5 text-[14.5px] space-y-2" style={{ color: 'var(--color-muted, #B9ACA0)' }} {...props} />
-                    ),
-                    li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-                    strong: ({ node, ...props }) => (
-                      <strong className="font-semibold" style={{ color: 'var(--color-ink, #F5F1EA)' }} {...props} />
-                    ),
-                    blockquote: ({ node, ...props }) => (
-                      <blockquote
-                        className="border-l-2 pl-4 py-2 my-6 text-[14px] italic rounded-r-lg"
-                        style={{
-                          borderColor: 'var(--color-accent, #D8A35C)',
-                          color: 'var(--color-muted, #B9ACA0)',
-                          background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 5%, transparent)',
-                        }}
-                        {...props}
-                      />
-                    ),
-                    a: ({ node, href, children, ...props }) => (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-4 transition-colors focus-visible"
-                        style={{
-                          color: 'var(--color-info, #60A5FA)',
-                          textDecorationColor: 'color-mix(in srgb, var(--color-info, #60A5FA) 30%, transparent)',
-                        }}
-                        {...props}
-                      >
-                        {children}
-                      </a>
-                    ),
-                    img: ({ node, alt, ...props }) => (
-                      <div
-                        className="my-6 w-full flex justify-center rounded-xl p-2"
-                        style={{ background: 'color-mix(in srgb, var(--color-surface, #25201C) 60%, transparent)' }}
-                      >
-                        <img
-                          className="max-w-full max-h-[360px] w-auto h-auto object-contain rounded-lg"
-                          loading="lazy"
-                          decoding="async"
-                          alt={alt || 'Иллюстрация к статье'}
-                          {...props}
-                        />
-                      </div>
-                    ),
-                  }}
-                >
-                  {activeContentHtml}
-                </Markdown>
-              </div>
-
-              <div className="mt-10 mb-4">
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => {
-                    const cover = activeArticle.cover || '/blog-hero.webp'
-                    triggerHaptic(isCurrentArticleFavorite ? 'light' : 'medium')
-                    onToggleArticleFavorite?.(activeArticle.id, cover)
-                  }}
-                  className="btn-favorite-overlay w-full relative overflow-hidden flex items-center justify-center gap-3 py-4 rounded-2xl border transition-colors duration-300 focus-visible"
-                  style={{
-                    willChange: 'transform',
-                    borderColor: isCurrentArticleFavorite
-                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 40%, transparent)'
-                      : 'color-mix(in srgb, var(--color-muted, #B9ACA0) 20%, transparent)',
-                  }}
-                >
-                  <div
-                    className={`absolute inset-0 transition-opacity duration-300 ${
-                      isCurrentArticleFavorite ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    style={{
-                      background:
-                        'linear-gradient(to bottom, color-mix(in srgb, var(--color-accent, #D8A35C) 15%, transparent), color-mix(in srgb, var(--color-accent, #D8A35C) 5%, transparent))',
-                    }}
-                  />
-                  <div
-                    className={`absolute inset-0 transition-opacity duration-300 ${
-                      isCurrentArticleFavorite ? 'opacity-0' : 'opacity-100'
-                    }`}
-                    style={{
-                      background:
-                        'linear-gradient(to bottom, color-mix(in srgb, var(--color-surface, #25201C) 70%, transparent), color-mix(in srgb, var(--color-surface, #25201C) 50%, transparent))',
-                    }}
-                  />
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill={isCurrentArticleFavorite ? 'var(--color-accent, #D8A35C)' : 'none'}
-                    stroke={
-                      isCurrentArticleFavorite
-                        ? 'var(--color-accent, #D8A35C)'
-                        : 'var(--color-muted, #B9ACA0)'
-                    }
-                    strokeWidth="1.8"
-                    className="relative z-10"
-                  >
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                  </svg>
-                  <span
-                    className="relative z-10 text-[12px] font-bold uppercase tracking-wider"
-                    style={{
-                      color: isCurrentArticleFavorite
-                        ? 'var(--color-accent, #D8A35C)'
-                        : 'var(--color-ink, #F5F1EA)',
-                    }}
-                  >
-                    {isCurrentArticleFavorite ? t.articleFavRemove : t.articleFavAdd}
-                  </span>
-                </motion.button>
-              </div>
-
-              <div
-                className="mt-6 pt-5 flex items-center justify-between"
-                style={{
-                  borderTop: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
+            {/* Bottom Actions */}
+            <div className="mt-16 pt-12 border-t border-white/10 flex flex-col items-center">
+              <button 
+                onClick={() => {
+                  haptic(isCurrentArticleFavorite ? 'light' : 'medium')
+                  onToggleArticleFavorite?.(activeArticle.id, activeArticle.cover || '/blog-hero.webp')
                 }}
+                className={`group flex flex-col items-center gap-3 outline-none transition-transform active:scale-95`}
               >
-                <div className="text-[11px]" style={{ color: 'color-mix(in srgb, var(--color-muted, #B9ACA0) 60%, transparent)' }}>
-                  {lang === 'ru' ? 'Опубликовано:' : lang === 'uk' ? 'Опубліковано:' : 'Veröffentlicht:'} {activeArticle.createdAt}
+                <div className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 ${isCurrentArticleFavorite ? 'border-white bg-white text-black' : 'border-white/20 text-white hover:border-white/60'}`}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill={isCurrentArticleFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
                 </div>
-              </div>
+                <span className="text-[9px] font-sans tracking-widest uppercase text-white/60">
+                  {isCurrentArticleFavorite ? t.articleFavRemove : t.articleFavAdd}
+                </span>
+              </button>
             </div>
 
-            <div className="h-10 shrink-0" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
