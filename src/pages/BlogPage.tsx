@@ -81,7 +81,7 @@ export function BlogPage({
 
   const count = BLOG_ARTICLES.length
 
-  // Сброс скролла и тема
+  // Сброс скролла и отслеживание темы
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
@@ -348,7 +348,7 @@ export function BlogPage({
     : ''
   const activeContentHtml = content ? ((content as any)[lang] || content.ru) : ''
 
-  // Цветовые токены
+  // Цветовые токены для Журнала (Зависят от темы ОС)
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
@@ -402,9 +402,9 @@ export function BlogPage({
         )}
       </AnimatePresence>
 
-      {/* GLOBAL HEADER (Except Cover) */}
+      {/* GLOBAL HEADER (Except Cover & Article) */}
       {view !== 'cover' && view !== 'article' && (
-        <header className="px-6 pt-8 pb-4 flex items-start justify-between sticky top-0 z-50 mix-blend-difference pointer-events-none">
+        <header className="px-6 pt-8 pb-4 flex items-start justify-between sticky top-0 z-50 pointer-events-none">
           <button 
             onClick={() => {
               haptic('light')
@@ -412,7 +412,7 @@ export function BlogPage({
               else if (view === 'collaboration' || view === 'about') setView('cover')
               else onBack?.()
             }}
-            className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#F4F0E8]/60 hover:text-white transition-colors"
+            className={`pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer transition-colors ${cTextMuted} ${cHover}`}
           >
             <span className="transform transition-transform group-hover:-translate-x-1">←</span>
             <span>{t.backToMenu}</span>
@@ -422,28 +422,29 @@ export function BlogPage({
 
       {/* ================= COVER VIEW ================= */}
       {view === 'cover' && (
-        <div className="relative min-h-[100dvh] flex flex-col justify-end">
+        <div className="relative min-h-[100dvh] flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8]">
           <div className="absolute inset-0 z-0 pointer-events-none">
-            <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-center transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
-            <div className={`absolute bottom-0 left-0 right-0 h-[80%] bg-gradient-to-t ${isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/80' : 'from-[#F2EFE9] via-[#F2EFE9]/80'} to-transparent`} />
+            <img src="/blog-hero.webp" alt="Cover" className="w-full h-full object-cover object-[center_top] grayscale-[20%]" />
+            {/* Жесткий темный градиент для обложки, чтобы белый текст всегда читался идеально */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-black/30" />
           </div>
 
           <div className="relative z-10 px-6 pb-24 w-full">
             <header className="absolute top-8 left-6">
-              <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#F4F0E8]/60 hover:text-white transition-colors mix-blend-difference`}>
+              <button onClick={onBack} className="group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-white/80 hover:text-white transition-colors drop-shadow-md">
                 <span className="transform transition-transform group-hover:-translate-x-1">←</span>
                 <span>Back</span>
               </button>
             </header>
 
             <div className="stagger-item mb-16" style={{ animationDelay: '0.1s' }}>
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted}`}>
+              <p className="text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 text-white/60 drop-shadow-md">
                 {t.subtitle}
               </p>
-              <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight whitespace-nowrap">
+              <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight whitespace-nowrap text-[#F4F0E8] drop-shadow-lg">
                 {t.title}
               </h1>
-              <p className={`mt-6 text-[11px] font-sans font-light leading-[1.8] max-w-[260px] ${cTextMuted}`}>
+              <p className="mt-6 text-[11px] font-sans font-light leading-[1.8] max-w-[260px] text-white/70 drop-shadow-md">
                 {t.tagline}
               </p>
             </div>
@@ -453,17 +454,17 @@ export function BlogPage({
                 <div key={item.id} className="stagger-item" style={{ animationDelay: `${0.2 + idx * 0.05}s` }}>
                   <button
                     onClick={() => { haptic('medium'); item.action?.(); }}
-                    className={`w-full group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent cursor-pointer ${cLine} text-left transition-all active:opacity-50`}
+                    className="w-full group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent cursor-pointer border-white/20 text-left transition-all active:opacity-50"
                   >
                     <div className="flex items-start gap-4">
-                      <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+                      <span className="text-[9px] font-sans tracking-widest mt-2 text-white/50">
                         0{idx + 1}
                       </span>
-                      <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-hover:translate-x-1">
+                      <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] text-white transition-transform group-hover:translate-x-1 drop-shadow-md">
                         {item.title}
                       </div>
                     </div>
-                    <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+                    <div className="text-[10px] font-sans tracking-[0.1em] text-right w-[40%] text-white/50">
                       {item.subtitle}
                     </div>
                   </button>
@@ -476,7 +477,7 @@ export function BlogPage({
 
       {/* ================= JOURNAL VIEW ================= */}
       {view === 'journal' && (
-        <div className="px-6 pb-24 pt-16 md:pt-24 min-h-[100dvh]">
+        <div className="px-6 pb-24 pt-10 min-h-[100dvh]">
           <div className="stagger-item mb-12" style={{ animationDelay: '0.05s' }}>
             <h1 className="font-serif text-[16vw] min-[400px]:text-6xl leading-[0.85] tracking-tight mb-4">
               {t.journalTitle}
@@ -612,7 +613,7 @@ export function BlogPage({
 
       {/* ================= ABOUT VIEW ================= */}
       {view === 'about' && (
-        <div className="absolute inset-0 z-50 bg-[#0A0A0A] text-[#F4F0E8] overflow-y-auto pb-24 pt-6">
+        <div className={`absolute inset-0 z-50 ${cBg} ${cText} overflow-y-auto pb-24 pt-6`}>
            <AboutProject lang={lang} onClose={() => setView('collaboration')} />
         </div>
       )}
@@ -622,20 +623,20 @@ export function BlogPage({
         <div className="min-h-[100dvh] w-full bg-[#0A0A0A] text-[#F4F0E8]">
           
           {/* Article Sticky Header */}
-          <header className="sticky top-0 z-50 px-6 py-4 flex items-center justify-between mix-blend-difference pointer-events-none">
+          <header className="sticky top-0 z-50 px-6 py-4 flex items-center justify-between pointer-events-none">
             <button 
               onClick={() => {
                 haptic('light')
                 if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
                 setView('journal')
               }}
-              className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#F4F0E8] hover:text-white transition-colors"
+              className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-white/80 hover:text-white transition-colors drop-shadow-md"
             >
               <span className="transform transition-transform group-hover:-translate-x-1">←</span>
               <span>Back</span>
             </button>
             <div className="pointer-events-auto flex items-center gap-4">
-               <button onClick={() => handleShareArticle(activeTitle, activeTag)} className="text-[#F4F0E8] hover:text-white active:scale-90 transition-transform">
+               <button onClick={() => handleShareArticle(activeTitle, activeTag)} className="text-white/80 hover:text-white active:scale-90 transition-transform drop-shadow-md">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                     <polyline points="16 6 12 2 8 6" />
@@ -648,22 +649,23 @@ export function BlogPage({
           {/* Article Cover */}
           <div className="relative w-full h-[45vh] -mt-[60px]">
             <img src={activeArticle.cover || '/blog-hero.webp'} alt={activeTitle} className="w-full h-full object-cover grayscale-[20%]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/40 to-transparent" />
+            {/* Жесткий темный градиент для читаемости текста на обложке статьи */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/60 to-black/30" />
           </div>
 
           <div className="px-6 -mt-16 relative z-10 pb-24 max-w-2xl mx-auto">
             {/* Meta */}
             <div className="flex items-center gap-3 mb-6">
-               <span className="text-[9px] font-sans uppercase tracking-[0.3em] text-[#F4F0E8]/60">
+               <span className="text-[9px] font-sans uppercase tracking-[0.3em] text-white/60 drop-shadow-sm">
                  {activeTag}
                </span>
-               <span className="w-4 h-px bg-[#F4F0E8]/20" />
-               <span className="text-[9px] font-sans uppercase tracking-[0.3em] text-[#F4F0E8]/60">
+               <span className="w-4 h-px bg-white/20" />
+               <span className="text-[9px] font-sans uppercase tracking-[0.3em] text-white/60 drop-shadow-sm">
                  {activeReadTime}
                </span>
             </div>
 
-            <h1 className="font-serif text-4xl sm:text-5xl leading-[1.05] tracking-tight mb-8">
+            <h1 className="font-serif text-4xl sm:text-5xl leading-[1.05] tracking-tight mb-8 text-white drop-shadow-md">
               {activeTitle}
             </h1>
 
