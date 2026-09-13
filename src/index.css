@@ -170,6 +170,7 @@ html.perf-fast .glass {
 html.perf-fast * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  transition: none !important; /* Мгновенное переключение состояний */
 }
 
 html.perf-fast .leather-dock {
@@ -270,4 +271,4 @@ html.perf-fast body {
   .calc-page-title {
     font-size: 1.125rem !important;
   }
- }
+}
