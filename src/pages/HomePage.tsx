@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { BottomDock } from '../components/BottomDock'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
-import { CALCULATORS_COUNT } from './CalcMenuPage' // Импортируем счетчик калькуляторов
+import { CALCULATORS_COUNT } from './CalcMenuPage'
 import type { Lang, FavoriteItem } from '../App'
 
 type HomePageProps = {
@@ -18,7 +17,8 @@ type HomePageProps = {
   favorites?: FavoriteItem[]
   onOpenArticle?: (articleId: string) => void
   onOpenFavorites?: () => void
-  onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
+  // onChangeTab оставлен в типах, чтобы не ломать родительский App.tsx, но сам компонент его больше не использует
+  onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void 
 }
 
 function glossaryLabel(count: number, lang: Lang): string {
@@ -32,7 +32,6 @@ function glossaryLabel(count: number, lang: Lang): string {
   if (lang === 'de') {
     return count === 1 ? `${count} Begriff` : `${count} Begriffe`
   }
-  
   const n10 = count % 10
   const n100 = count % 100
   if (n10 === 1 && n100 !== 11) return `${count} термин`
@@ -73,20 +72,29 @@ export function HomePage({
   favorites = [],
   onOpenArticle,
   onOpenFavorites,
-  onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [isDark, setIsDark] = useState(true)
   
   const hasNewBlog = BLOG_ARTICLES?.some((a) => a.isNew) || false
   const articleFavorites = favorites?.filter((f) => f.type === 'article') || []
   const glossaryCount = GLOSSARY_TERMS?.length || 0
 
+  // Тема
+  useEffect(() => {
+    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    checkTheme()
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
+  // Язык
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
     const supportedLangs = ['ru', 'uk', 'de']
-    
-    if (savedLang && supportedLangs.includes(savedLang)) {
-      if (savedLang !== lang) setLang(savedLang)
+    if (savedLang && supportedLangs.includes(savedLang) && savedLang !== lang) {
+      setLang(savedLang)
     }
   }, [lang, setLang])
 
@@ -100,212 +108,102 @@ export function HomePage({
   const t = {
     ru: {
       menu: 'Меню',
-      search: 'Поиск по материалам, конструкциям...',
-      learning: 'Обучение',
-      tools: 'Инструменты',
+      search: 'Поиск (материалы, конструкции...)',
+      learning: 'Исследование',
+      tools: 'Инструментарий',
       materials: 'Материалы',
-      materialsSub: 'Кожа, замша, подошвы и др.',
-      materialsCount: '245 статей',
-      colors: 'Цвета и отделка',
-      colorsSub: 'Психология цвета, патина',
-      colorsCount: '128 статей',
-      styles: 'Фасоны и силуэты',
-      stylesSub: 'Классика, женские, уличные',
-      stylesCount: '186 статей',
-      sizes: 'Размеры, ортопедия',
-      sizesSub: 'Колодки, подъём, стопа',
-      sizesCount: '97 статей',
+      materialsSub: 'Кожа, замша, подошвы',
+      colors: 'Цвета',
+      colorsSub: 'Патина и психология',
+      styles: 'Силуэты',
+      stylesSub: 'Фасоны и классика',
+      sizes: 'Ортопедия',
+      sizesSub: 'Размеры и колодки',
       calc: 'Калькуляторы',
-      calcSub: `${CALCULATORS_COUNT} модулей`,
-      blog: 'Блог',
-      blogSub: hasNewBlog ? 'Новое' : 'Статьи',
+      calcSub: `${CALCULATORS_COUNT} Модулей`,
+      blog: 'Архив',
+      blogSub: hasNewBlog ? 'Новое издание' : 'Статьи',
       glossary: 'Глоссарий',
       glossarySub: glossaryLabel(glossaryCount, 'ru'),
-      prices: 'Цены',
-      pricesSub: 'Клеи, химия',
-      favorites: 'Избранное',
-      favoritesSub:
-        articleFavorites.length > 0
-          ? `Сохранено статей: ${articleFavorites.length}`
-          : 'Нет сохраненных статей',
+      prices: 'Рынок',
+      pricesSub: 'Сводка цен',
+      favorites: 'Сохраненное',
+      favoritesSub: articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
-      searchResults: 'Результаты поиска',
-      noResults: 'Ничего не найдено',
+      searchResults: 'Результаты',
+      noResults: 'Записи не найдены',
       section: 'Раздел',
     },
     uk: {
       menu: 'Меню',
-      search: 'Пошук за матеріалами, конструкціями...',
-      learning: 'Навчання',
-      tools: 'Інструменти',
+      search: 'Пошук (матеріали, конструкції...)',
+      learning: 'Дослідження',
+      tools: 'Інструментарій',
       materials: 'Матеріали',
-      materialsSub: 'Шкіра, замша, підошви тощо',
-      materialsCount: '245 статей',
-      colors: 'Кольори та оздоблення',
-      colorsSub: 'Психологія кольору, патина',
-      colorsCount: '128 статей',
-      styles: 'Фасони та силуети',
-      stylesSub: 'Класика, жіночі, вуличні',
-      stylesCount: '186 статей',
-      sizes: 'Розміри, ортопедія',
-      sizesSub: 'Колодки, підйом, стопа',
-      sizesCount: '97 статей',
-      calc: 'Калькуляторы',
-      calcSub: `${CALCULATORS_COUNT} модулів`,
-      blog: 'Блог',
-      blogSub: hasNewBlog ? 'Нове' : 'Статті',
+      materialsSub: 'Шкіра, замша, підошви',
+      colors: 'Кольори',
+      colorsSub: 'Патина та психологія',
+      styles: 'Силуети',
+      stylesSub: 'Фасони та класика',
+      sizes: 'Ортопедія',
+      sizesSub: 'Розміри та колодки',
+      calc: 'Калькулятори',
+      calcSub: `${CALCULATORS_COUNT} Модулів`,
+      blog: 'Архів',
+      blogSub: hasNewBlog ? 'Нове видання' : 'Статті',
       glossary: 'Глосарій',
       glossarySub: glossaryLabel(glossaryCount, 'uk'),
-      prices: 'Ціни',
-      pricesSub: 'Клеї, хімія',
-      favorites: 'Обране',
-      favoritesSub:
-        articleFavorites.length > 0
-          ? `Збережено статей: ${articleFavorites.length}`
-          : 'Немає збережених статей',
+      prices: 'Ринок',
+      pricesSub: 'Зведення цін',
+      favorites: 'Збережене',
+      favoritesSub: articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
-      searchResults: 'Результати пошуку',
-      noResults: 'Нічого не знайдено',
+      searchResults: 'Результати',
+      noResults: 'Записів не знайдено',
       section: 'Розділ',
     },
     de: {
       menu: 'Menü',
-      search: 'Suche nach Materialien, Konstruktionen...',
-      learning: 'Wissen',
+      search: 'Suchen (Materialien, Formen...)',
+      learning: 'Forschung',
       tools: 'Werkzeuge',
       materials: 'Materialien',
-      materialsSub: 'Leder, Wildleder, Sohlen etc.',
-      materialsCount: '245 Artikel',
-      colors: 'Farben & Finish',
-      colorsSub: 'Farbpsychologie, Patina',
-      colorsCount: '128 Artikel',
-      styles: 'Leisten & Silhouetten',
-      stylesSub: 'Klassik, Damen, Streetwear',
-      stylesCount: '186 Artikel',
-      sizes: 'Größen & Orthopädie',
-      sizesSub: 'Leisten, Rist, Fuß',
-      sizesCount: '97 Artikel',
+      materialsSub: 'Leder, Sohlen',
+      colors: 'Farben',
+      colorsSub: 'Patina & Psychologie',
+      styles: 'Silhouetten',
+      stylesSub: 'Klassik & Formen',
+      sizes: 'Orthopädie',
+      sizesSub: 'Leisten & Maße',
       calc: 'Rechner',
-      calcSub: `${CALCULATORS_COUNT} Tools`,
-      blog: 'Journal',
-      blogSub: hasNewBlog ? 'Neu' : 'Artikel',
+      calcSub: `${CALCULATORS_COUNT} Module`,
+      blog: 'Archiv',
+      blogSub: hasNewBlog ? 'Neue Ausgabe' : 'Artikel',
       glossary: 'Glossar',
       glossarySub: glossaryLabel(glossaryCount, 'de'),
-      prices: 'Preise',
-      pricesSub: 'Materialien',
-      favorites: 'Favoriten',
-      favoritesSub:
-        articleFavorites.length > 0
-          ? `${articleFavorites.length} Artikel gespeichert`
-          : 'Keine Artikel gespeichert',
+      prices: 'Markt',
+      pricesSub: 'Preisübersicht',
+      favorites: 'Gespeichert',
+      favoritesSub: articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
       quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
-      searchResults: 'Suchergebnisse',
-      noResults: 'Nichts gefunden',
+      searchResults: 'Ergebnisse',
+      noResults: 'Keine Einträge',
       section: 'Bereich',
     }
   }[safeLang]
 
   const LEARNING = [
-    {
-      id: 'materials',
-      title: t.materials,
-      subtitle: t.materialsSub,
-      accent: 'var(--color-accent, #B46513)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'colors',
-      title: t.colors,
-      subtitle: t.colorsSub,
-      accent: 'var(--pigment-azurite, #1D4ED8)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="6.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
-          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'styles',
-      title: t.styles,
-      subtitle: t.stylesSub,
-      accent: 'var(--pigment-egyptian-blue, #1E3A8A)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
-          <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
-          <path d="M 14 11.5 L 9 15" />
-        </svg>
-      ),
-    },
-    {
-      id: 'sizes',
-      title: t.sizes,
-      subtitle: t.sizesSub,
-      accent: 'var(--pigment-malachite, #047857)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19.875 6.27L17.73 4.125a2.25 2.25 0 00-3.18 0L3.375 15.3a2.25 2.25 0 000 3.18l2.145 2.145a2.25 2.25 0 003.18 0l11.175-11.175a2.25 2.25 0 000-3.18z" />
-          <path d="M14.5 5.5l4 4M10.5 9.5l4 4M6.5 13.5l4 4" />
-        </svg>
-      ),
-    },
+    { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: undefined },
+    { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
+    { id: 'styles', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
+    { id: 'sizes', title: t.sizes, subtitle: t.sizesSub, action: undefined },
   ]
 
   const TOOLS = [
-    {
-      id: 'calc',
-      title: t.calc,
-      subtitle: t.calcSub,
-      accent: 'var(--color-accent, #B46513)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="4" y="2" width="16" height="20" rx="3" />
-          <path d="M8 6h8M16 14v.01M12 14v.01M8 14v.01M16 18v.01M12 18v.01M8 18v.01M16 10v.01M12 10v.01M8 10v.01" />
-        </svg>
-      ),
-    },
-    {
-      id: 'blog',
-      title: t.blog,
-      subtitle: t.blogSub,
-      accent: 'var(--pigment-lac-dye, #991B1B)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'glossary',
-      title: t.glossary,
-      subtitle: t.glossarySub,
-      accent: 'var(--pigment-azurite, #1D4ED8)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-        </svg>
-      ),
-    },
-    {
-      id: 'prices',
-      title: t.prices,
-      subtitle: t.pricesSub,
-      accent: 'var(--pigment-malachite, #047857)',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
-      ),
-    },
+    { id: 'calc', title: t.calc, subtitle: t.calcSub, action: onOpenCalcMenu },
+    { id: 'blog', title: t.blog, subtitle: t.blogSub, action: onOpenBlog, dot: hasNewBlog },
+    { id: 'glossary', title: t.glossary, subtitle: t.glossarySub, action: () => onOpenGlossary?.() },
+    { id: 'prices', title: t.prices, subtitle: t.pricesSub, action: onOpenPrices },
   ]
 
   const query = searchQuery.trim().toLowerCase()
@@ -317,34 +215,22 @@ export function HomePage({
         searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
       }
     })
-
-    if (BLOG_ARTICLES) {
-      BLOG_ARTICLES.forEach((article) => {
-        if (deepSearch(article, query)) {
-          searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, safeLang), subtitle: t.blog })
-        }
-      })
-    }
-
-    if (GLOSSARY_TERMS) {
-      GLOSSARY_TERMS.forEach((term) => {
-        if (deepSearch(term, query)) {
-          searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, safeLang), subtitle: t.glossary })
-        }
-      })
-    }
+    BLOG_ARTICLES?.forEach((article) => {
+      if (deepSearch(article, query)) {
+        searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, safeLang), subtitle: t.blog })
+      }
+    })
+    GLOSSARY_TERMS?.forEach((term) => {
+      if (deepSearch(term, query)) {
+        searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, safeLang), subtitle: t.glossary })
+      }
+    })
   }
 
   const handleResultClick = (res: any) => {
     if (res.type === 'category') {
-      switch (res.id) {
-        case 'colors': onOpenColors?.(); break
-        case 'styles': onOpenStyles?.(); break
-        case 'calc': onOpenCalcMenu?.(); break
-        case 'blog': onOpenBlog?.(); break
-        case 'glossary': onOpenGlossary?.(); break
-        case 'prices': onOpenPrices?.(); break
-      }
+      const match = [...LEARNING, ...TOOLS].find(i => i.id === res.id)
+      match?.action?.()
     } else if (res.type === 'article') {
       onOpenArticle?.(res.id)
     } else if (res.type === 'glossary') {
@@ -353,259 +239,215 @@ export function HomePage({
     setSearchQuery('')
   }
 
+  // Цветовые токены
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] overflow-hidden">
-      <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <h1 className="text-[34px] font-serif font-bold tracking-wide leading-none text-[var(--color-ink)]">
-          {t.menu}
-        </h1>
+    <div className={`relative flex flex-col h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
+      
+      <style>{`
+        @keyframes fadeUp {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+          opacity: 0;
+          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
 
-        <div className="flex items-center gap-3">
-          <div className="flex rounded-full p-1 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
-            {['ru', 'uk', 'de'].map((l) => (
-              <button
-                key={l}
-                onClick={() => handleLangChange(l as Lang)}
-                className={`px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase rounded-full transition-colors ${
-                  safeLang === l ? 'bg-[var(--color-ink)] text-[var(--color-bg)]' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-                }`}
-                aria-pressed={safeLang === l}
-              >
-                {l === 'uk' ? 'UKR' : l}
-              </button>
-            ))}
-          </div>
-
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink)] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm active:scale-90 transition-transform"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
+      {/* HEADER */}
+      <header className="px-6 pt-8 pb-4 shrink-0 flex items-start justify-between z-20">
         
-        <div className="mb-5 relative">
-          <div className="rounded-[18px] px-4 py-3.5 flex items-center gap-2.5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm transition-all focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_20%,transparent)]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-accent,var(--color-ink))] shrink-0">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
+        {/* Кнопка НАЗАД (если есть) вынесена в левый верхний угол в строгом стиле */}
+        {onBack ? (
+          <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}>
+            <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+            <span>Back</span>
+          </button>
+        ) : (
+          <div className="w-10"></div> // Spacer
+        )}
+
+        {/* Переключатель языка - минималистичный текстовый */}
+        <div className="flex items-center gap-4">
+          {['ru', 'uk', 'de'].map((l) => (
+            <button
+              key={l}
+              onClick={() => handleLangChange(l as Lang)}
+              className={`text-[10px] font-sans uppercase tracking-[0.25em] transition-colors duration-500 ${
+                safeLang === l ? cText : cTextMuted
+              } ${cHover}`}
+            >
+              {l === 'uk' ? 'UKR' : l}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* СКРОЛЛИРУЕМАЯ ОБЛАСТЬ */}
+      <div className="flex-1 px-6 overflow-y-auto pb-24 overscroll-none scrollbar-hide">
+        
+        {/* ЗАГОЛОВОК СТРАНИЦЫ */}
+        <div className="stagger-item mb-12" style={{ animationDelay: '0.1s' }}>
+          <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
+            {t.menu}
+          </h1>
+        </div>
+
+        {/* СТРОГИЙ ПОИСК */}
+        <div className="stagger-item mb-16" style={{ animationDelay: '0.15s' }}>
+          <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
+            <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className="bg-transparent border-none outline-none text-[14px] font-medium text-[var(--color-ink)] w-full placeholder:text-[var(--color-muted)] placeholder:font-medium"
+              className={`w-full bg-transparent outline-none text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="text-[var(--color-muted)] hover:text-[var(--color-ink)] shrink-0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+              <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest ${cTextMuted}`}>
+                Clear
               </button>
             )}
           </div>
         </div>
 
+        {/* РЕЗУЛЬТАТЫ ПОИСКА */}
         {query ? (
-          <div className="search-results pb-6">
-            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
-              {t.searchResults} ({searchResults.length})
+          <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
+            <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+              {t.searchResults} / {searchResults.length}
             </p>
             {searchResults.length > 0 ? (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col">
                 {searchResults.map((res, i) => (
                   <button
                     key={`${res.type}-${res.id}-${i}`}
                     onClick={() => handleResultClick(res)}
-                    className="w-full text-left p-4 rounded-[16px] bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-accent)] shadow-sm transition-colors active:scale-[0.98]"
+                    className={`group flex items-center justify-between py-5 border-b ${cLine} text-left active:opacity-50 transition-opacity`}
                   >
-                    <div className="text-[14px] font-bold text-[var(--color-ink)] line-clamp-1">{res.title}</div>
-                    <div className="text-[12px] font-medium text-[var(--color-muted)] mt-1.5">{res.subtitle}</div>
+                    <div className="font-serif text-[22px] leading-none transition-transform group-active:translate-x-2">
+                      {res.title}
+                    </div>
+                    <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+                      {res.subtitle}
+                    </div>
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="text-[14px] font-medium text-[var(--color-muted)] text-center py-12 bg-[var(--color-surface)] rounded-[18px] border border-[var(--color-border)] shadow-sm">
+              <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
                 {t.noResults}
               </div>
             )}
           </div>
         ) : (
+          /* КАТЕГОРИИ (Журнальное оглавление) */
           <>
-            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
-              {t.learning}
-            </p>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {LEARNING.map((item) => {
-                const isColors = item.id === 'colors'
-                const isStyles = item.id === 'styles'
-                return (
+            <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.learning}
+              </p>
+              <div className="flex flex-col mb-16">
+                {LEARNING.map((item, idx) => (
                   <button
                     key={item.id}
-                    onClick={
-                      isColors ? onOpenColors : 
-                      isStyles ? onOpenStyles : 
-                      undefined
-                    }
-                    className="min-h-[124px] h-auto p-4 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95"
+                    onClick={item.action}
+                    className={`group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all ${item.action ? 'active:opacity-50' : 'opacity-40 cursor-not-allowed'}`}
                   >
-                    <div
-                      className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
-                      style={{
-                        background: `color-mix(in srgb, ${item.accent} 15%, var(--color-surface))`,
-                        color: item.accent
-                      }}
-                    >
-                      {item.icon}
+                    <div className="flex items-start gap-4">
+                      <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+                        0{idx + 1}
+                      </span>
+                      <div>
+                        <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
+                          {item.title}
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0 mt-3">
-                      <div className="text-[13px] font-bold leading-snug text-[var(--color-ink)] truncate">
-                        {item.title}
-                      </div>
-                      <div className="text-[11px] font-medium text-[var(--color-muted)] mt-1 truncate">
-                        {item.subtitle}
-                      </div>
+                    <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+                      {item.subtitle}
                     </div>
                   </button>
-                )
-              })}
+                ))}
+              </div>
             </div>
 
-            <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-[var(--color-ink)] mb-3">
-              {t.tools}
-            </p>
-            <div className="grid grid-cols-4 gap-2.5 md:gap-3 mb-6">
-              {TOOLS.map((item) => {
-                const isBlog = item.id === 'blog'
-                const isCalc = item.id === 'calc'
-                const isGlossary = item.id === 'glossary'
-                const isPrices = item.id === 'prices'
-
-                return (
+            <div className="stagger-item" style={{ animationDelay: '0.3s' }}>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.tools}
+              </p>
+              <div className="flex flex-col mb-16">
+                {TOOLS.map((item, idx) => (
                   <button
                     key={item.id}
-                    onClick={
-                      isCalc
-                        ? onOpenCalcMenu
-                        : isBlog
-                          ? onOpenBlog
-                          : isGlossary
-                            ? () => onOpenGlossary?.()
-                            : isPrices
-                              ? onOpenPrices
-                              : undefined
-                    }
-                    className={`relative min-h-[124px] h-auto p-2.5 md:p-3 rounded-[18px] bg-[var(--color-surface)] border ${
-                      isBlog && hasNewBlog 
-                        ? 'border-[var(--pigment-lac-dye,#991B1B)] shadow-[0_0_12px_color-mix(in_srgb,var(--pigment-lac-dye,#991B1B)_20%,transparent)]' 
-                        : 'border-[var(--color-border)]'
-                    } shadow-sm flex flex-col justify-between text-left transition-transform active:scale-95 overflow-hidden`}
+                    onClick={item.action}
+                    className={`group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all active:opacity-50`}
                   >
-                    <div
-                      className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
-                      style={{
-                        background: `color-mix(in srgb, ${item.accent} 15%, var(--color-surface))`,
-                        color: item.accent
-                      }}
-                    >
-                      {item.icon}
-                    </div>
-                    
-                    <div className="min-w-0 mt-3 w-full">
-                      <div className="text-[11px] md:text-[13px] font-bold leading-snug text-[var(--color-ink)] flex items-center justify-between gap-0.5">
-                        <span className="truncate" lang={safeLang}>
+                    <div className="flex items-start gap-4">
+                      <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+                        {idx + 5 < 10 ? `0${idx + 5}` : idx + 5}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
                           {item.title}
-                        </span>
-                        {isBlog && hasNewBlog && (
-                          <span className="text-[var(--pigment-lac-dye,#991B1B)] text-[16px] leading-none shrink-0" style={{ transform: 'translateY(-1px)' }}>•</span>
+                        </div>
+                        {item.dot && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
                         )}
                       </div>
-                      <div className="text-[9.5px] md:text-[11px] font-medium text-[var(--color-muted)] mt-1 truncate">
-                        {item.subtitle}
-                      </div>
+                    </div>
+                    <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+                      {item.subtitle}
                     </div>
                   </button>
-                )
-              })}
+                ))}
+              </div>
             </div>
 
-            {/* ИЗБРАННОЕ */}
-            <button
-              className="w-full min-h-[80px] px-4 py-3.5 rounded-[18px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm flex items-center gap-4 mb-4 text-left transition-transform active:scale-[0.98]"
-              onClick={() => {
-                if (articleFavorites.length === 0) return
-                if (articleFavorites.length === 1) {
-                  onOpenArticle?.(articleFavorites[0].id)
-                } else {
-                  onOpenFavorites?.()
-                }
-              }}
-            >
-              <div
-                className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0 text-xl font-bold"
-                style={{
-                  background: 'color-mix(in srgb, var(--color-accent, #B46513) 15%, var(--color-surface))',
-                  color: 'var(--color-accent, #B46513)'
+            {/* ИЗБРАННОЕ КАК ОТДЕЛЬНАЯ ЖУРНАЛЬНАЯ ВРЕЗКА */}
+            <div className="stagger-item mb-16" style={{ animationDelay: '0.4s' }}>
+              <button
+                className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--color-ink)]/5`}
+                onClick={() => {
+                  if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
+                  else if (articleFavorites.length > 1) onOpenFavorites?.()
                 }}
               >
-                ★
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[14px] font-bold text-[var(--color-ink)]">{t.favorites}</div>
-                <div className="text-[12px] font-medium text-[var(--color-muted)] mt-0.5">{t.favoritesSub}</div>
-              </div>
-              <div className="flex -space-x-3 shrink-0">
-                {articleFavorites.length === 0 && (
-                  <div className="w-10 h-10 rounded-full bg-[var(--color-bg)] border-2 border-[var(--color-border)] border-dashed flex items-center justify-center text-[var(--color-muted)]">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
-                    </svg>
-                  </div>
-                )}
-                {articleFavorites.slice(0, 3).map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className="w-10 h-10 rounded-full border-[3px] border-[var(--color-surface)] overflow-hidden bg-[var(--color-bg)]"
-                    style={{ zIndex: 10 - idx }}
-                  >
-                    <img src={item.imagePng} alt="" className="w-full h-full object-cover" draggable={false} />
-                  </div>
-                ))}
-                {articleFavorites.length > 3 && (
-                  <div className="w-10 h-10 rounded-full border-[3px] border-[var(--color-surface)] flex items-center justify-center bg-[var(--color-bg)] text-[11px] font-black text-[var(--color-accent,#B46513)]" style={{ zIndex: 1 }}>
-                    +{articleFavorites.length - 3}
-                  </div>
-                )}
-              </div>
-            </button>
+                <div>
+                  <div className="font-serif text-[26px] leading-none mb-2">{t.favorites}</div>
+                  <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
+                </div>
+                <div className="flex -space-x-4">
+                  {articleFavorites.slice(0, 3).map((item, idx) => (
+                    <div key={item.id} className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#0A0A0A]' : 'border-[#F2EFE9]'} overflow-hidden grayscale`} style={{ zIndex: 10 - idx }}>
+                      <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </button>
+            </div>
 
-            {/* QUOTE */}
-            <div className="rounded-[18px] p-5 bg-[var(--color-surface)] border border-[var(--color-border)] shadow-sm">
-              <p className="text-[14px] font-medium leading-relaxed text-[var(--color-ink)] italic">{t.quote}</p>
-              <p className="mt-2.5 text-[12px] font-bold text-[var(--color-accent,#B46513)] font-serif uppercase tracking-widest">Cordwainer</p>
+            {/* ЦИТАТА */}
+            <div className="stagger-item pb-10" style={{ animationDelay: '0.5s' }}>
+              <div className="flex flex-col items-center text-center px-4">
+                <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
+                <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
+                  {t.quote}
+                </p>
+                <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
+                  Cordwainer
+                </p>
+              </div>
             </div>
           </>
         )}
-      </div>
-
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto shadow-[0_-4px_24px_rgba(0,0,0,0.06)]"
-        style={{
-          background: 'var(--color-surface)', 
-          borderTop: '1px solid var(--color-border)'
-        }}
-      >
-        <div className="mx-auto w-full max-w-[var(--app-max-width)]">
-          <BottomDock active="search" lang={safeLang} onChange={onChangeTab} />
-        </div>
       </div>
     </div>
   )
