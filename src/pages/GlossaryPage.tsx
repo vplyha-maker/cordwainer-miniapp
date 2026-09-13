@@ -53,13 +53,21 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   const [query, setQuery] = useState('')
   const [activeLetter, setActiveLetter] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [isDark, setIsDark] = useState(true)
+  
+  // ИСПРАВЛЕНИЕ: Синхронно читаем тему прямо в момент создания компонента
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return true
+  })
+  
   const listRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
-    checkTheme()
+    checkTheme() // Подстраховка
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
@@ -322,7 +330,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
     </div>
   )
 }
-
 
 type FlipCardProps = {
   term: GlossaryTerm
