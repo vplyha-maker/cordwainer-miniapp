@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -161,24 +160,23 @@ const STYLES_DATA: StyleSlide[] = [
 type SlideItemProps = {
   slide: StyleSlide
   lang: Lang
-  isActive: boolean      // Играет ли это видео сейчас
-  isPreloaded: boolean   // Нужно ли держать тег <video> в DOM для быстрой подгрузки
+  index: number
+  isActive: boolean      
+  isPreloaded: boolean   
   isMuted: boolean
 }
 
-function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemProps) {
+function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
   
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState<number>(0)
-  const [isLoading, setIsLoading] = useState(true)
 
   const userId = getDeviceId()
   const tg = (window as any).Telegram?.WebApp
 
   useEffect(() => {
-    // Подгружаем лайки, только если слайд активен или рядом с активным (прелоад)
     if (!isPreloaded) return
     let isMounted = true
     const fetchLikes = async () => {
@@ -189,18 +187,13 @@ function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemPro
           setLikesCount(data.total || 0)
           setIsLiked(data.isLiked || false)
         }
-      } catch (err) {
-        // Игнорируем ошибки при прелоаде
-      } finally {
-        if (isMounted) setIsLoading(false)
-      }
+      } catch (err) {}
     }
     fetchLikes()
     return () => { isMounted = false }
   }, [slide.id, userId, isPreloaded])
 
   useEffect(() => {
-    // Управление воспроизведением: играем только если слайд активен
     if (videoRef.current) {
       if (isActive) {
         videoRef.current.currentTime = 0
@@ -239,6 +232,8 @@ function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemPro
   }
 
   const handleShare = async () => {
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+    
     const shareText = currentLang === 'de' 
       ? `Sieh dir diesen Stil an: ${slide.title.de.replace('\n', ' ')} in der Cordwainer Enzyklopädie!`
       : currentLang === 'ru' 
@@ -256,15 +251,14 @@ function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemPro
         await navigator.share({ title: 'Cordwainer', text: shareText, url: siteUrl });
       } else {
         await navigator.clipboard.writeText(`${shareText}\n${siteUrl}`);
-        alert(currentLang === 'de' ? 'Link in die Zwischenablage kopiert' : currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена' : 'Посилання скопійовано');
       }
     } catch (err) {}
   }
 
   return (
-    <div className="relative h-[100dvh] w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-black">
+    <div className="relative h-[100dvh] w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A]">
+      {/* ВИДЕО ФОН СО SMART LAZY LOADING */}
       <div className="absolute inset-0 w-full h-full z-0 bg-black">
-        {/* Рендерим видео ТОЛЬКО если слайд в зоне видимости (isPreloaded) */}
         {isPreloaded && slide.video ? (
           <video
             ref={videoRef}
@@ -273,7 +267,7 @@ function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemPro
             loop
             playsInline
             webkit-playsinline="true"
-            className={`w-full h-full object-cover transition-opacity duration-700 ${isActive ? 'opacity-100' : 'opacity-0'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
+            className={`w-full h-full object-cover transition-all duration-[2s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.05]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
         ) : isPreloaded && slide.image ? (
           <img
@@ -284,55 +278,69 @@ function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemPro
         ) : null}
       </div>
 
-      <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
+      {/* ЖУРНАЛЬНЫЙ ГРАДИЕНТ ДЛЯ ТЕКСТА */}
+      <div className="absolute bottom-0 left-0 right-0 h-[70%] bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/60 to-transparent z-10 pointer-events-none" />
 
-      {/* Текст и интерфейс рендерятся всегда для плавности, но их анимация зависит от isActive */}
-      <div className={`absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%] transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
-        <h3 className="text-[9px] md:text-[10px] tracking-[0.5em] uppercase text-white/90 font-sans font-light">
-          {slide.subtitle[currentLang]}
-        </h3>
-        <h2 className="text-[44px] md:text-[56px] font-serif font-light leading-[1.05] tracking-wide text-white whitespace-pre-line">
-          {slide.title[currentLang]}
-        </h2>
-      </div>
-
-      <div className={`absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
-        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[70%] drop-shadow-md">
-          {slide.desc[currentLang]}
-        </p>
+      {/* ЖУРНАЛЬНЫЙ КОНТЕНТНЫЙ БЛОК */}
+      <div className={`absolute bottom-8 left-6 right-6 z-20 flex flex-col transition-all duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
         
-        <div className="flex flex-col gap-5 items-center shrink-0">
-          <motion.button 
-            whileTap={{ scale: 0.8 }}
-            onClick={handleLike}
-            className="w-12 flex flex-col items-center justify-center gap-[2px] transition-colors duration-300"
-          >
-            <AnimatePresence mode="wait">
-              {isLiked ? (
-                <motion.svg key="liked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </motion.svg>
-              ) : (
-                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-white/80 drop-shadow-md" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                </motion.svg>
-              )}
-            </AnimatePresence>
-            {!isLoading && likesCount > 0 && (
-              <span className="text-[10px] font-sans font-medium text-white/90 drop-shadow-md mt-1">
-                {likesCount > 999 ? (likesCount / 1000).toFixed(1) + 'k' : likesCount}
-              </span>
-            )}
-          </motion.button>
-
-          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all duration-300 gap-1 drop-shadow-md">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-              <polyline points="16 6 12 2 8 6"></polyline>
-              <line x1="12" y1="2" x2="12" y2="15"></line>
-            </svg>
-          </button>
+        {/* Заголовок и линия */}
+        <div className="flex items-end justify-between border-b border-white/20 pb-6 mb-6">
+          <div>
+            <p className="text-[10px] font-sans uppercase tracking-[0.4em] text-white/60 mb-4">
+              {slide.subtitle[currentLang]}
+            </p>
+            <h2 className="font-serif text-[12.5vw] sm:text-6xl leading-[0.9] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line">
+              {slide.title[currentLang]}
+            </h2>
+          </div>
+          
+          <div className="text-[10px] font-sans tracking-widest text-white/40 mb-2">
+            0{index + 1}
+          </div>
         </div>
+
+        {/* Описание и кнопки */}
+        <div className="flex items-start justify-between gap-6">
+          <p className="text-[11px] font-sans font-light leading-[1.6] text-white/70 max-w-[240px] sm:max-w-[280px]">
+            {slide.desc[currentLang]}
+          </p>
+
+          <div className="flex items-center gap-4 shrink-0">
+            {/* Кнопка ЛАЙК (Монохромная) */}
+            <button 
+              onClick={handleLike} 
+              className="group flex flex-col items-center gap-2 outline-none"
+            >
+              <div className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-500 active:scale-90 ${isLiked ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-white/20 text-white hover:border-white/60'}`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </div>
+              <span className="text-[9px] font-sans tracking-widest uppercase text-white/60">
+                {likesCount || 'LIKE'}
+              </span>
+            </button>
+
+            {/* Кнопка ШЭР */}
+            <button 
+              onClick={handleShare} 
+              className="group flex flex-col items-center gap-2 outline-none"
+            >
+              <div className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white transition-all duration-500 hover:border-white/60 active:scale-90">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </div>
+              <span className="text-[9px] font-sans tracking-widest uppercase text-white/60">
+                SHARE
+              </span>
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   )
@@ -343,7 +351,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Идеальный трекинг активного слайда через scroll events для виртуализации
+  // Трекинг активного слайда для виртуализации памяти
   const handleScroll = () => {
     if (!scrollRef.current) return
     const scrollPosition = scrollRef.current.scrollTop
@@ -356,58 +364,49 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: '100%' }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: '100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 bg-black text-white overflow-hidden"
-    >
+    <div className="fixed inset-0 z-50 bg-[#0A0A0A] text-[#F4F0E8] overflow-hidden">
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Защита от системного мерцания на тач-девайсах */
+        /* Глобальная защита от системного мерцания на мобилках */
         * {
           -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none;
         }
       `}</style>
 
-      <button
-        onClick={onBack}
-        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md outline-none"
-      >
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-      </button>
+      {/* ГЛОБАЛЬНЫЙ МИНИМАЛИСТИЧНЫЙ HEADER (Поверх всех слайдов) */}
+      <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none mix-blend-difference">
+        <button
+          onClick={onBack}
+          className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8]/70 hover:text-white transition-colors outline-none"
+        >
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span>Back</span>
+        </button>
 
-      <button
-        onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md outline-none"
-      >
-        {isMuted ? (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <line x1="23" y1="9" x2="17" y2="15"></line>
-            <line x1="17" y1="9" x2="23" y2="15"></line>
-          </svg>
-        ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-          </svg>
-        )}
-      </button>
+        <button
+          onClick={() => {
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+              window.Telegram.WebApp.HapticFeedback.impactOccurred('light')
+            }
+            setIsMuted(!isMuted)
+          }}
+          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8]/70 hover:text-white transition-colors outline-none"
+        >
+          {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
+        </button>
+      </header>
 
+      {/* ВИРТУАЛИЗИРОВАННЫЙ СКРОЛЛ */}
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
-        className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative"
+        className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]"
       >
         {STYLES_DATA.map((slide, index) => {
-          // Smart Lazy Loading: Держим в DOM только текущий, предыдущий и следующий видео-тег.
+          // Держим в памяти (preload="auto") только активный, предыдущий и следующий видео-тег.
           // Это решает проблему вылета памяти на iPhone (Safari).
           const isPreloaded = Math.abs(activeIndex - index) <= 1
           const isActive = activeIndex === index
@@ -417,6 +416,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
               key={slide.id} 
               slide={slide} 
               lang={lang} 
+              index={index}
               isActive={isActive}
               isPreloaded={isPreloaded}
               isMuted={isMuted} 
@@ -424,6 +424,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           )
         })}
       </div>
-    </motion.div>
+    </div>
   )
 }
