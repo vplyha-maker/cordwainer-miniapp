@@ -9,6 +9,8 @@ type WelcomePageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
+  // ДОБАВЛЕНО: функция переключения вкладок
+  onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
 }
 
 function haptic(kind: 'light' | 'medium' = 'light') {
@@ -36,7 +38,7 @@ function hasVisitedBefore(): boolean {
   }
 }
 
-export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [] }: WelcomePageProps) {
+export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [], onChangeTab }: WelcomePageProps) {
   const blogFavorites = favorites.filter((f) => f.type === 'blog')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
   const [heroReady, setHeroReady] = useState(false)
@@ -186,7 +188,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
 
   return (
     <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[#111] text-[#F5F1EA]">
-      {/* Иллюстрация теперь занимает 100% экрана с мягким затемнением внизу */}
       <div className="absolute inset-0 z-0">
         {!heroReady && (
           <div className="absolute inset-0 animate-pulse bg-[#1A1816]" aria-hidden />
@@ -214,7 +215,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         />
       </div>
 
-      {/* Верхняя панель управления */}
       <div className="relative z-20 flex items-start justify-between p-4">
         <div
           className="flex rounded-full p-1 bg-black/20 backdrop-blur-md border border-white/10"
@@ -248,10 +248,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         </button>
       </div>
 
-      {/* Контентная часть — прижата вниз */}
       <div className="relative z-20 flex-1 flex flex-col justify-end px-5 pb-[110px]">
-        
-        {/* Заголовок */}
         <div className="mb-6">
           <p className="text-[10px] italic font-light opacity-60 mb-1">{greeting}</p>
           <h1 className="font-display text-[2.75rem] sm:text-[3rem] leading-none mb-2 drop-shadow-lg">
@@ -262,14 +259,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           </p>
         </div>
 
-        {/* Разделитель "Журнала" */}
         <div className="flex items-center gap-4 mb-4 opacity-50">
           <span className="h-[1px] flex-1 bg-white/30"></span>
           <span className="text-[8px] uppercase tracking-[0.3em] font-semibold">{t.issue}</span>
           <span className="h-[1px] flex-1 bg-white/30"></span>
         </div>
 
-        {/* Тексты */}
         <p className="text-[13px] font-light leading-relaxed mb-4 max-w-[90%] opacity-90">
           {t.value}
         </p>
@@ -277,7 +272,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           {t.idea}
         </p>
 
-        {/* Блок Избранное (если есть) */}
         {blogFavorites.length > 0 && (
           <button
             type="button"
@@ -301,7 +295,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           </button>
         )}
 
-        {/* Элегантная тонкая кнопка */}
         <button
           type="button"
           onClick={handleStart}
@@ -314,9 +307,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
         </button>
       </div>
 
-      <BottomDock active="search" lang={lang} />
+      {/* ПЕРЕДАЕМ onChangeTab в панель */}
+      <BottomDock active="profile" lang={lang} onChange={onChangeTab} />
 
-      {/* Модальное окно установки */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
