@@ -13,6 +13,7 @@ type SettingsPageProps = {
 }
 
 type FontMode = 'classic' | 'system'
+type FontSize = 'small' | 'medium' | 'large'
 
 function haptic(kind: 'light' | 'medium' = 'light') {
   try {
@@ -31,10 +32,19 @@ function applyFontMode(mode: FontMode) {
   }
 }
 
+function applyFontSize(size: FontSize) {
+  const root = document.documentElement
+  const scale = size === 'small' ? '0.94' : size === 'large' ? '1.07' : '1'
+  root.style.setProperty('--font-scale', scale)
+  // Мягко масштабируем только основной текст, не трогая плотные UI-элементы
+  root.style.fontSize = `calc(16px * ${scale})`
+}
+
 export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPageProps) {
   const [graphics, setGraphics] = useState<'full' | 'fast'>('full')
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [font, setFont] = useState<FontMode>('classic')
+  const [fontSize, setFontSize] = useState<FontSize>('medium')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   useLayoutEffect(() => {
@@ -55,6 +65,14 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       applyFontMode(savedFont)
     } else {
       applyFontMode('classic')
+    }
+
+    const savedSize = localStorage.getItem('cordwainer_font_size') as FontSize | null
+    if (savedSize === 'small' || savedSize === 'medium' || savedSize === 'large') {
+      setFontSize(savedSize)
+      applyFontSize(savedSize)
+    } else {
+      applyFontSize('medium')
     }
   }, [])
 
@@ -86,6 +104,13 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     applyFontMode(mode)
   }
 
+  const handleFontSizeChange = (size: FontSize) => {
+    haptic('light')
+    setFontSize(size)
+    localStorage.setItem('cordwainer_font_size', size)
+    applyFontSize(size)
+  }
+
   const handleAddToHome = async () => {
     haptic('medium')
     const deferredPrompt = (window as any).deferredPrompt
@@ -112,6 +137,10 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       font: 'Шрифт',
       fontClassic: 'Классика',
       fontSystem: 'Системный',
+      fontSize: 'Размер текста',
+      sizeSmall: 'Мелкий',
+      sizeMedium: 'Обычный',
+      sizeLarge: 'Крупный',
       graphics: 'Качество графики',
       graphicsHigh: 'Высокое',
       graphicsLow: 'Производительность',
@@ -131,6 +160,10 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       font: 'Шрифт',
       fontClassic: 'Класика',
       fontSystem: 'Системний',
+      fontSize: 'Розмір тексту',
+      sizeSmall: 'Дрібний',
+      sizeMedium: 'Звичайний',
+      sizeLarge: 'Великий',
       graphics: 'Якість графіки',
       graphicsHigh: 'Висока',
       graphicsLow: 'Продуктивність',
@@ -150,6 +183,10 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       font: 'Schriftart',
       fontClassic: 'Klassisch',
       fontSystem: 'System',
+      fontSize: 'Schriftgröße',
+      sizeSmall: 'Klein',
+      sizeMedium: 'Normal',
+      sizeLarge: 'Groß',
       graphics: 'Grafikqualität',
       graphicsHigh: 'Hoch',
       graphicsLow: 'Leistung',
@@ -183,6 +220,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
 
       <div className="px-5 py-6 space-y-8">
         
+        {/* Язык */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.language}
@@ -207,6 +245,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </div>
         </section>
 
+        {/* Тема */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.theme}
@@ -235,7 +274,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </div>
         </section>
 
-        {/* ===== ПЕРЕКЛЮЧАТЕЛЬ ШРИФТОВ ===== */}
+        {/* Тип шрифта */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.font}
@@ -264,6 +303,46 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </div>
         </section>
 
+        {/* Размер текста — мягкий диапазон */}
+        <section>
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
+            {t.fontSize}
+          </h2>
+          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
+            <button
+              onClick={() => handleFontSizeChange('small')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                fontSize === 'small' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.sizeSmall}
+            </button>
+            <button
+              onClick={() => handleFontSizeChange('medium')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                fontSize === 'medium' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.sizeMedium}
+            </button>
+            <button
+              onClick={() => handleFontSizeChange('large')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                fontSize === 'large' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.sizeLarge}
+            </button>
+          </div>
+        </section>
+
+        {/* Графика */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.graphics}
@@ -295,6 +374,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </p>
         </section>
 
+        {/* Установка */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             Cordwainer App
