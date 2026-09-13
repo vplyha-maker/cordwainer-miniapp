@@ -34,7 +34,6 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
   const [returning] = useState(hasVisitedBefore)
   const [isDark, setIsDark] = useState(true)
 
-  // Отслеживание светлой/темной темы
   useEffect(() => {
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
     checkTheme()
@@ -97,7 +96,6 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
     ? firstName ? `${t.helloBack}, ${firstName}` : t.welcomeBack
     : firstName ? `${t.hello}, ${firstName}` : t.welcome
 
-  // Динамические цветовые токены для "Digital Couture" стиля
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/70' : 'text-[#1C1816]/70'
@@ -105,10 +103,10 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
   const cLine = isDark ? 'bg-[#F4F0E8]/30' : 'bg-[#1C1816]/20'
   const cBtnLine = isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
   
-  // Адаптация картинки и градиентов под тему, чтобы текст всегда читался
-  const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/85' : 'from-[#F2EFE9] via-[#F2EFE9]/85'
-  const cOverlay = isDark ? 'bg-black/20' : 'bg-[#F2EFE9]/40'
-  const imgOpacity = isDark ? '0.75' : '0.5' // В светлой теме картинка должна быть бледнее
+  // Исправленные стили наложения для светлой темы (убрали выцветание)
+  const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/85' : 'from-[#F2EFE9] via-[#F2EFE9]/80'
+  const cOverlay = isDark ? 'bg-black/20' : 'bg-transparent'
+  const imgOpacity = isDark ? '0.75' : '0.95'
 
   return (
     <main className={`relative flex h-[100dvh] w-full flex-col overflow-hidden transition-colors duration-[1.5s] ${cBg}`}>
@@ -141,10 +139,10 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           fetchPriority="high"
           decoding="async"
           style={{ '--img-opacity': imgOpacity } as React.CSSProperties}
-          className={`anim-bg absolute inset-0 h-full w-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-0' : 'grayscale-[20%]'}`}
+          className="anim-bg absolute inset-0 h-full w-full object-cover object-[center_top] transition-opacity duration-1000"
         />
         <div className={`absolute inset-0 z-10 transition-colors duration-1000 ${cOverlay}`} />
-        <div className={`absolute bottom-0 left-0 right-0 h-[65%] z-10 bg-gradient-to-t ${cGrad} to-transparent pointer-events-none transition-colors duration-1000`} />
+        <div className={`absolute bottom-0 left-0 right-0 h-[60%] z-10 bg-gradient-to-t ${cGrad} to-transparent pointer-events-none transition-colors duration-1000`} />
       </div>
 
       {/* 2. МЕТА-ДАННЫЕ */}
@@ -203,4 +201,3 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
     </main>
   )
 }
-
