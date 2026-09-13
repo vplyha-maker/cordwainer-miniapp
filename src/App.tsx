@@ -58,73 +58,45 @@ export interface FavoriteItem {
 }
 
 function getIsDarkTheme(): boolean {
-  // 1. Сначала проверяем, не сохранил ли пользователь свой выбор вручную
   try {
     const savedTheme = localStorage.getItem('cordwainer_theme')
     if (savedTheme === 'dark') return true
     if (savedTheme === 'light') return false
   } catch {}
 
-  // 2. Если ручного выбора нет, смотрим на тему Телеграма
   const tg = window.Telegram?.WebApp
   const isRealTelegram = Boolean(tg?.initData && tg.initData.trim().length > 0)
 
   if (isRealTelegram) {
     return tg?.colorScheme === 'dark'
   }
-  
-  // 3. Значение по умолчанию
   return true
 }
 
-function applyImmediateMutedTheme(isDark: boolean) {
+// НОВАЯ ЧИСТАЯ ЛОГИКА ТЕМЫ (без жестко заданных цветов)
+function applyThemeSettings() {
+  const isDark = getIsDarkTheme()
   const root = document.documentElement
+
+  // Удаляем старые инлайн-стили, которые блокировали переключение
+  root.removeAttribute('style')
 
   if (isDark) {
     root.classList.add('dark')
     root.classList.remove('light')
-    root.style.setProperty('--color-bg', '#1C1816')
-    root.style.setProperty('--color-surface', '#25201C')
-    root.style.setProperty('--color-surface-2', '#2F2924')
-    root.style.setProperty('--color-ink', '#F5F1EA')
-    root.style.setProperty('--color-muted', '#B9ACA0')
-    root.style.setProperty('--color-accent', '#E4D00A')
-    root.style.setProperty('--color-accent-strong', '#E34234')
-    root.style.setProperty('--color-danger', '#8B0000')
-    root.style.setProperty('--color-border', 'rgba(255,255,255,0.12)')
-    root.style.setProperty('--color-info', '#1034A6')
-    root.style.setProperty('--color-success', '#0BDA51')
-    root.style.setProperty('--pigment-lac-dye', '#8B0000')
-    root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
-    root.style.setProperty('--pigment-orpiment', '#E4D00A')
-    root.style.setProperty('--pigment-realgar', '#E34234')
-    root.style.setProperty('--pigment-malachite', '#0BDA51')
-    root.style.setProperty('--pigment-azurite', '#007FFF')
-    root.style.setProperty('--pigment-lead-white', '#F5F1EA')
-    root.style.setProperty('--pigment-bone-black', '#1C1816')
   } else {
     root.classList.add('light')
     root.classList.remove('dark')
-    root.style.setProperty('--color-bg', '#F5F1EA')
-    root.style.setProperty('--color-surface', '#F0EBE3')
-    root.style.setProperty('--color-surface-2', '#E8E2D9')
-    root.style.setProperty('--color-ink', '#1C1816')
-    root.style.setProperty('--color-muted', '#6B5E54')
-    root.style.setProperty('--color-accent', '#A52A2A')
-    root.style.setProperty('--color-accent-strong', '#E34234')
-    root.style.setProperty('--color-danger', '#8B0000')
-    root.style.setProperty('--color-border', 'rgba(0,0,0,0.12)')
-    root.style.setProperty('--color-info', '#1034A6')
-    root.style.setProperty('--color-success', '#0BDA51')
-    root.style.setProperty('--pigment-lac-dye', '#8B0000')
-    root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
-    root.style.setProperty('--pigment-orpiment', '#E4D00A')
-    root.style.setProperty('--pigment-realgar', '#E34234')
-    root.style.setProperty('--pigment-malachite', '#0BDA51')
-    root.style.setProperty('--pigment-azurite', '#007FFF')
-    root.style.setProperty('--pigment-lead-white', '#F5F1EA')
-    root.style.setProperty('--pigment-bone-black', '#1C1816')
   }
+
+  try {
+    const tg = window.Telegram?.WebApp
+    if (tg) {
+      const bg = isDark ? '#151210' : '#F5F1EA'
+      tg.setHeaderColor(bg)
+      tg.setBackgroundColor(bg)
+    }
+  } catch {}
 }
 
 function normalizeFavoriteImage(src: string): string {
@@ -142,7 +114,6 @@ function getInitialScreen(): Screen {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
-  // Состояние, чтобы помнить откуда мы пришли в настройки (Home или Welcome)
   const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
   
   const [lang, setLang] = useState<Lang>(() => {
@@ -222,17 +193,7 @@ export default function App() {
   }
 
   useLayoutEffect(() => {
-    const isDark = getIsDarkTheme()
-    applyImmediateMutedTheme(isDark)
-
-    const tg = window.Telegram?.WebApp
-    try {
-      if (tg) {
-        const bg = isDark ? '#1C1816' : '#F5F1EA'
-        tg.setHeaderColor(bg)
-        tg.setBackgroundColor(bg)
-      }
-    } catch {}
+    applyThemeSettings()
   }, [])
 
   useEffect(() => {
@@ -241,49 +202,28 @@ export default function App() {
 
     tg.ready()
     tg.expand()
-
-    const applyTheme = () => {
-      const isDark = getIsDarkTheme()
-      applyImmediateMutedTheme(isDark)
-      try {
-        const bg = isDark ? '#1C1816' : '#F5F1EA'
-        tg.setHeaderColor(bg)
-        tg.setBackgroundColor(bg)
-      } catch {}
-    }
-
-    applyTheme()
-    tg.onEvent('themeChanged', applyTheme)
+    
+    // Передаем новую функцию
+    tg.onEvent('themeChanged', applyThemeSettings)
 
     return () => {
-      tg.offEvent('themeChanged', applyTheme)
+      tg.offEvent('themeChanged', applyThemeSettings)
     }
   }, [])
 
   useEffect(() => {
     let cancelled = false
-
     const run = async () => {
       const saved = getSavedPerfMode()
-
-      if (saved === 'fast') {
-        applyPerfMode('fast')
-        return
-      }
-      if (saved === 'full') {
-        applyPerfMode('full')
-        return
-      }
-
+      if (saved === 'fast') { applyPerfMode('fast'); return }
+      if (saved === 'full') { applyPerfMode('full'); return }
       if (guessLowPowerDevice()) {
         applyPerfMode('fast')
         if (!cancelled) setShowPerfHint(true)
         return
       }
-
       const needFast = await measureShouldUseFastMode(1100)
       if (cancelled) return
-
       if (needFast) {
         applyPerfMode('fast')
         setShowPerfHint(true)
@@ -291,57 +231,24 @@ export default function App() {
         applyPerfMode('full')
       }
     }
-
     run()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   return (
-    <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
+    <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe transition-colors duration-300">
       {showPerfHint && (
         <div
           className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
-          style={{
-            background: 'rgba(29,24,21,0.96)',
-            border: '1px solid rgba(198,164,122,0.35)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-          }}
+          style={{ background: 'rgba(29,24,21,0.96)', border: '1px solid rgba(198,164,122,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}
         >
           <div className="mb-2 leading-snug text-[#B9ACA0]">
-            {lang === 'de'
-              ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert — Effekte sind vereinfacht.'
-              : lang === 'uk'
-              ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим — ефекти спрощено.'
-              : 'Интерфейс работает неравномерно. Включён быстрый режим — эффекты упрощены.'}
+            {lang === 'de' ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert.' : lang === 'uk' ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим.' : 'Интерфейс работает неравномерно. Включён быстрый режим.'}
           </div>
           <div className="flex gap-2">
-            <button
-              className="flex-1 py-2 rounded-xl text-[11px] font-semibold"
-              style={{ background: '#D8A35C', color: '#151210' }}
-              onClick={() => {
-                savePerfMode('fast')
-                applyPerfMode('fast')
-                setShowPerfHint(false)
-              }}
-            >
-              OK
-            </button>
-            <button
-              className="flex-1 py-2 rounded-xl text-[11px] font-medium text-[#B9ACA0]"
-              style={{ border: '1px solid rgba(185,172,160,0.25)' }}
-              onClick={() => {
-                savePerfMode('full')
-                applyPerfMode('full')
-                setShowPerfHint(false)
-              }}
-            >
-              {lang === 'de' 
-                ? 'Hohe Qualität beibehalten' 
-                : lang === 'uk' 
-                ? 'Залишити красивий' 
-                : 'Оставить красивый'}
+            <button className="flex-1 py-2 rounded-xl text-[11px] font-semibold" style={{ background: '#D8A35C', color: '#151210' }} onClick={() => { savePerfMode('fast'); applyPerfMode('fast'); setShowPerfHint(false) }}>OK</button>
+            <button className="flex-1 py-2 rounded-xl text-[11px] font-medium text-[#B9ACA0]" style={{ border: '1px solid rgba(185,172,160,0.25)' }} onClick={() => { savePerfMode('full'); applyPerfMode('full'); setShowPerfHint(false) }}>
+              {lang === 'de' ? 'Hohe Qualität beibehalten' : lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
             </button>
           </div>
         </div>
@@ -357,10 +264,7 @@ export default function App() {
             setLang={handleSetLang}
             favorites={favorites}
             onChangeTab={(tab) => {
-              if (tab === 'settings') {
-                setPrevMainScreen('welcome') // Запоминаем, откуда ушли
-                setScreen('settings')
-              }
+              if (tab === 'settings') { setPrevMainScreen('welcome'); setScreen('settings') }
               if (tab === 'search') setScreen('home')
             }}
           />
@@ -370,10 +274,7 @@ export default function App() {
           <HomePage
             key="home"
             onChangeTab={(tab) => {
-              if (tab === 'settings') {
-                setPrevMainScreen('home') // Запоминаем, откуда ушли
-                setScreen('settings')
-              }
+              if (tab === 'settings') { setPrevMainScreen('home'); setScreen('settings') }
               if (tab === 'profile') setScreen('welcome') 
             }}
             onBack={() => setScreen('welcome')}
@@ -381,54 +282,25 @@ export default function App() {
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
             onOpenStyles={() => setScreen('styles')}
-            onOpenGlossary={(termId) => {
-              setSelectedGlossaryTermId(termId || null)
-              setScreen('glossary')
-            }}
+            onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
             onOpenPrices={() => setScreen('prices')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
-            onOpenArticle={(articleId) => {
-              setPendingArticleId(articleId)
-              setShowOnlyFavorites(false)
-              setScreen('blog')
-            }}
-            onOpenFavorites={() => {
-              setPendingArticleId(null)
-              setShowOnlyFavorites(true)
-              setScreen('blog')
-            }}
+            onOpenArticle={(articleId) => { setPendingArticleId(articleId); setShowOnlyFavorites(false); setScreen('blog') }}
+            onOpenFavorites={() => { setPendingArticleId(null); setShowOnlyFavorites(true); setScreen('blog') }}
           />
         )}
 
         {screen === 'blog' && (
           <BlogPage
             key="blog"
-            onBack={() => {
-              setPendingArticleId(null)
-              setShowOnlyFavorites(false)
-              setScreen('home')
-            }}
+            onBack={() => { setPendingArticleId(null); setShowOnlyFavorites(false); setScreen('home') }}
             lang={lang}
             isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
-            onToggleFavorite={() =>
-              toggleFavorite({
-                id: 'blog-orvard',
-                type: 'blog',
-                imagePng: '/blog-hero.webp',
-              })
-            }
-            favoriteArticleIds={favorites
-              .filter((f) => f.type === 'article')
-              .map((f) => f.id)}
-            onToggleArticleFavorite={(articleId, cover) =>
-              toggleFavorite({
-                id: articleId,
-                type: 'article',
-                imagePng: cover || `/${articleId}.png`,
-              })
-            }
+            onToggleFavorite={() => toggleFavorite({ id: 'blog-orvard', type: 'blog', imagePng: '/blog-hero.webp' })}
+            favoriteArticleIds={favorites.filter((f) => f.type === 'article').map((f) => f.id)}
+            onToggleArticleFavorite={(articleId, cover) => toggleFavorite({ id: articleId, type: 'article', imagePng: cover || `/${articleId}.png` })}
             initialArticleId={pendingArticleId}
             onArticleOpened={() => setPendingArticleId(null)}
             initialShowFavorites={showOnlyFavorites}
@@ -436,122 +308,31 @@ export default function App() {
         )}
 
         {screen === 'calc-menu' && (
-          <CalcMenuPage
-            key="calc-menu"
-            lang={lang}
-            onBack={() => setScreen('home')}
-            onOpenSizeCalc={() => setScreen('size-calc')}
-            onOpenWidthCalc={() => setScreen('width-calc')}
-            onOpenHeelCalc={() => setScreen('heel-calc')}
-            onOpenColorCalc={() => setScreen('color-calc')}
-            onOpenSalaryCalc={() => setScreen('salary-calc')} 
-          />
+          <CalcMenuPage key="calc-menu" lang={lang} onBack={() => setScreen('home')} onOpenSizeCalc={() => setScreen('size-calc')} onOpenWidthCalc={() => setScreen('width-calc')} onOpenHeelCalc={() => setScreen('heel-calc')} onOpenColorCalc={() => setScreen('color-calc')} onOpenSalaryCalc={() => setScreen('salary-calc')} />
         )}
-
-        {screen === 'salary-calc' && (
-          <SalaryCalcPage
-            key="salary-calc"
-            onBack={() => setScreen('calc-menu')}
-            lang={lang}
-          />
-        )}
-
-        {screen === 'size-calc' && (
-          <SizeCalcPage
-            key="size-calc"
-            lang={lang}
-            onBack={() => setScreen('calc-menu')}
-          />
-        )}
-
-        {screen === 'width-calc' && (
-          <WidthCalcPage
-            key="width-calc"
-            lang={lang}
-            onBack={() => setScreen('calc-menu')}
-          />
-        )}
-
-        {screen === 'heel-calc' && (
-          <HeelCalcPage
-            key="heel-calc"
-            lang={lang}
-            onBack={() => setScreen('calc-menu')}
-          />
-        )}
-
-        {screen === 'color-calc' && (
-          <ColorCalcPage
-            key="color-calc"
-            lang={lang}
-            onBack={() => setScreen('calc-menu')}
-          />
-        )}
-
-        {screen === 'colors' && (
-          <ColorsPage
-            key="colors"
-            onBack={() => setScreen('home')}
-            lang={lang}
-            setLang={handleSetLang}
-          />
-        )}
-
-        {screen === 'styles' && (
-          <StylesPage
-            key="styles"
-            onBack={() => setScreen('home')}
-            lang={lang}
-          />
-        )}
-
-        {screen === 'glossary' && (
-          <GlossaryPage
-            key="glossary"
-            lang={lang}
-            initialTermId={selectedGlossaryTermId}
-            onBack={() => {
-              setSelectedGlossaryTermId(null) 
-              setScreen('home')
-            }}
-          />
-        )}
-
-        {screen === 'prices' && (
-          <PricesPage
-            key="prices"
-            onBack={() => setScreen('home')}
-            lang={lang}
-          />
-        )}
-
-        {screen === 'seo-width' && (
-          <ForwardOrthoSEOPage
-            key="seo-width"
-            lang={lang}
-            setLang={handleSetLang}
-            onBack={() => {
-              try {
-                window.history.replaceState(null, '', '/')
-              } catch {}
-              setScreen('home')
-            }}
-          />
-        )}
+        {screen === 'salary-calc' && <SalaryCalcPage key="salary-calc" onBack={() => setScreen('calc-menu')} lang={lang} />}
+        {screen === 'size-calc' && <SizeCalcPage key="size-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'width-calc' && <WidthCalcPage key="width-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'heel-calc' && <HeelCalcPage key="heel-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'color-calc' && <ColorCalcPage key="color-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'colors' && <ColorsPage key="colors" onBack={() => setScreen('home')} lang={lang} setLang={handleSetLang} />}
+        {screen === 'styles' && <StylesPage key="styles" onBack={() => setScreen('home')} lang={lang} />}
+        {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
+        {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
+        {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
 
         {screen === 'settings' && (
           <SettingsPage
             key="settings"
             lang={lang}
             setLang={handleSetLang}
-            onBack={() => setScreen(prevMainScreen)} // ВОТ ТУТ КНОПКА ВОЗВРАЩАЕТ ТУДА, ОТКУДА ПРИШЛИ
+            onBack={() => setScreen(prevMainScreen)}
             onChangeTab={(tab) => {
               if (tab === 'search') setScreen('home')
               if (tab === 'profile') setScreen('welcome')
             }}
           />
         )}
-
       </AnimatePresence>
     </div>
   )
