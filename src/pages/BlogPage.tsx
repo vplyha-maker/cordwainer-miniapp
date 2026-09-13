@@ -424,19 +424,19 @@ export function BlogPage({
       {view === 'cover' && (
         <div className="relative min-h-[100dvh] flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8]">
           <div className="absolute inset-0 z-0 pointer-events-none">
-            <img src="/blog-hero.webp" alt="Cover" className="w-full h-full object-cover object-[center_top] grayscale-[20%]" />
-            {/* Жесткий темный градиент для обложки, чтобы белый текст всегда читался идеально */}
+            <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-black/30" />
           </div>
 
-          <div className="relative z-10 px-6 pb-24 w-full">
-            <header className="absolute top-8 left-6">
-              <button onClick={onBack} className="group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-white/80 hover:text-white transition-colors drop-shadow-md">
-                <span className="transform transition-transform group-hover:-translate-x-1">←</span>
-                <span>Back</span>
-              </button>
-            </header>
+          {/* HEADER ВЫНЕСЕН НАВЕРХ И ОТВЯЗАН ОТ НИЖНЕГО БЛОКА */}
+          <header className="absolute top-10 left-6 z-20">
+            <button onClick={onBack} className="group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-white/80 hover:text-white transition-colors drop-shadow-md">
+              <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+              <span>Back</span>
+            </button>
+          </header>
 
+          <div className="relative z-10 px-6 pb-24 w-full pt-20">
             <div className="stagger-item mb-16" style={{ animationDelay: '0.1s' }}>
               <p className="text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 text-white/60 drop-shadow-md">
                 {t.subtitle}
