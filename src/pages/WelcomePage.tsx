@@ -56,7 +56,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       localStorage.setItem('app_lang', defaultLang)
       localStorage.setItem('cordwainer_lang', defaultLang)
     }
-  }, [])
+  }, [lang, setLang])
 
   const handleLangChange = (newLang: Lang) => {
     haptic('light')
@@ -80,9 +80,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       favorites: 'Избранное',
       addToHomeShort: 'Установить',
       widgetTitle: 'Установка приложения',
-      widgetText: 'Telegram не позволяет сохранять иконки напрямую. Откройте приложение в вашем браузере (Chrome или Safari), чтобы добавить его на экран.',
-      widgetStep1: '1. Нажмите «Открыть в браузере» ниже',
-      widgetStep2: '2. В меню браузера выберите «Добавить на главный экран»',
+      widgetText: 'Telegram не позволяет сохранять иконки напрямую. Откройте приложение в вашем браузере (Chrome или Safari).',
+      widgetStep1: '1. Нажмите «Открыть в браузере»',
+      widgetStep2: '2. Выберите «На главный экран»',
       widgetStep3: '3. Подтвердите установку',
       widgetAction: 'Открыть в браузере',
     },
@@ -100,9 +100,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       favorites: 'Обране',
       addToHomeShort: 'Встановити',
       widgetTitle: 'Встановлення застосунку',
-      widgetText: 'Telegram не дозволяє зберігати іконки безпосередньо. Відкрийте застосунок у вашому браузері (Chrome або Safari), щоб додати його на екран.',
-      widgetStep1: '1. Натисніть «Відкрити в браузері» нижче',
-      widgetStep2: '2. У меню браузера оберіть «На головний екран»',
+      widgetText: 'Telegram не дозволяє зберігати іконки безпосередньо. Відкрийте застосунок у вашому браузері (Chrome або Safari).',
+      widgetStep1: '1. Натисніть «Відкрити в браузері»',
+      widgetStep2: '2. Оберіть «На головний екран»',
       widgetStep3: '3. Підтвердіть встановлення',
       widgetAction: 'Відкрити в браузері',
     },
@@ -120,10 +120,10 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       favorites: 'Favoriten',
       addToHomeShort: 'Installieren',
       widgetTitle: 'App installieren',
-      widgetText: 'Telegram erlaubt kein direktes Speichern von Icons. Öffnen Sie die App in Ihrem Browser (Chrome oder Safari), um sie zum Startbildschirm hinzuzufügen.',
-      widgetStep1: '1. Tippen Sie unten auf „Im Browser öffnen“',
-      widgetStep2: '2. Wählen Sie im Browsermenü „Zum Startbildschirm hinzufügen“',
-      widgetStep3: '3. Bestätigen Sie die Installation',
+      widgetText: 'Telegram erlaubt kein direktes Speichern von Icons. Öffnen Sie die App in Ihrem Browser.',
+      widgetStep1: '1. Tippen Sie auf „Im Browser öffnen“',
+      widgetStep2: '2. Wählen Sie „Zum Startbildschirm hinzufügen“',
+      widgetStep3: '3. Bestätigen Sie',
       widgetAction: 'Im Browser öffnen',
     },
   }[lang]
@@ -158,7 +158,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     haptic('medium')
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
     const tg = window.Telegram?.WebApp
-
     if (tg && tg.openLink) {
       tg.openLink(appUrl)
     } else {
@@ -186,145 +185,104 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
   }
 
   return (
-    <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[var(--color-bg)] text-[var(--color-ink)]">
-      <div className="relative flex-1 min-h-[220px] overflow-hidden">
+    <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[#111] text-[#F5F1EA]">
+      {/* Иллюстрация теперь занимает 100% экрана с мягким затемнением внизу */}
+      <div className="absolute inset-0 z-0">
         {!heroReady && (
-          <div
-            className="absolute inset-0 animate-pulse"
-            style={{ background: 'var(--color-surface-2, #2F2924)' }}
-            aria-hidden
-          />
+          <div className="absolute inset-0 animate-pulse bg-[#1A1816]" aria-hidden />
         )}
         <img
           src="/hero-cover.webp"
           alt=""
-          width={780}
-          height={1040}
           fetchPriority="high"
           decoding="async"
           onLoad={() => setHeroReady(true)}
-          className="absolute inset-0 w-full h-full object-cover object-[center_28%]"
-          style={{ opacity: heroReady ? 1 : 0, transition: 'opacity 280ms ease' }}
+          className="absolute inset-0 w-full h-full object-cover object-[center_top]"
+          style={{ opacity: heroReady ? 1 : 0, transition: 'opacity 500ms ease' }}
         />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             background: `linear-gradient(
               to bottom,
-              rgba(12, 8, 6, 0.38) 0%,
-              rgba(12, 8, 6, 0.12) 42%,
-              color-mix(in srgb, var(--color-bg) 55%, transparent) 78%,
-              var(--color-bg) 100%
+              rgba(17, 17, 17, 0.1) 0%,
+              rgba(17, 17, 17, 0.4) 40%,
+              rgba(17, 17, 17, 0.85) 75%,
+              rgba(17, 17, 17, 1) 100%
             )`,
           }}
         />
-
-        <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
-          <div className="flex items-start justify-between gap-2">
-            <div
-              className="flex rounded-full p-1"
-              style={{
-                background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)',
-                border: '1px solid var(--color-border)',
-                backdropFilter: 'blur(12px)',
-              }}
-              role="group"
-              aria-label="Language selection"
-            >
-              {(['ru', 'uk', 'de'] as const).map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  onClick={() => handleLangChange(l)}
-                  className={`min-h-9 min-w-9 px-2.5 text-[10px] font-bold tracking-wide uppercase rounded-full transition-colors ${
-                    lang === l
-                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)]'
-                      : 'text-[var(--color-muted)]'
-                  }`}
-                  aria-pressed={lang === l}
-                >
-                  {l === 'uk' ? 'UKR' : l}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAddToHome}
-              className="flex items-center justify-center gap-1.5 min-h-9 px-3 rounded-full active:scale-95 transition-transform"
-              style={{
-                background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)',
-                border: '1px solid var(--color-border)',
-                backdropFilter: 'blur(12px)',
-              }}
-              aria-label={t.addToHomeShort}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <rect x="5" y="2" width="14" height="20" rx="2" />
-                <path d="M12 18h.01" />
-              </svg>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-ink)' }}>
-                {t.addToHomeShort}
-              </span>
-            </button>
-          </div>
-
-          <div className="pb-3">
-            <p
-              className="text-[12px] font-medium tracking-[0.04em] mb-2"
-              style={{ color: '#F5F1EA', textShadow: '0 1px 8px rgba(0,0,0,0.45)' }}
-            >
-              {greeting}
-            </p>
-            <h1
-              className="font-display text-[2.15rem] sm:text-[2.5rem] leading-[0.92]"
-              style={{
-                color: '#F5F1EA',
-                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
-              }}
-            >
-              Cordwainer
-            </h1>
-            <p
-              className={`mt-2 tracking-[0.18em] uppercase font-semibold ${lang === 'de' ? 'text-[8.5px]' : 'text-[10px]'}`}
-              style={{ color: '#F5F1EA', textShadow: '0 1px 8px rgba(0,0,0,0.45)' }}
-            >
-              {t.tagline}
-            </p>
-          </div>
-        </div>
       </div>
 
-      <div className="relative z-30 px-4 pt-1 pb-[118px] shrink-0">
-        <p
-          className="text-[9px] tracking-[0.18em] uppercase mb-2"
-          style={{ color: 'var(--color-muted)' }}
+      {/* Верхняя панель управления */}
+      <div className="relative z-20 flex items-start justify-between p-4">
+        <div
+          className="flex rounded-full p-1 bg-black/20 backdrop-blur-md border border-white/10"
         >
-          Issue 01 · 2026
-        </p>
-        <p
-          className="text-[14px] leading-snug font-medium mb-2 max-w-[34ch]"
-          style={{ color: 'var(--color-ink)' }}
+          {(['ru', 'uk', 'de'] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => handleLangChange(l)}
+              className={`min-h-8 min-w-8 px-2.5 text-[9px] font-bold tracking-widest uppercase rounded-full transition-colors ${
+                lang === l ? 'bg-white/90 text-black' : 'text-white/60 hover:text-white'
+              }`}
+            >
+              {l === 'uk' ? 'UKR' : l}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleAddToHome}
+          className="flex items-center gap-1.5 min-h-8 px-3 rounded-full bg-black/20 backdrop-blur-md border border-white/10 active:scale-95 transition-transform"
         >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" />
+            <path d="M12 18h.01" />
+          </svg>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-white/90">
+            {t.addToHomeShort}
+          </span>
+        </button>
+      </div>
+
+      {/* Контентная часть — прижата вниз */}
+      <div className="relative z-20 flex-1 flex flex-col justify-end px-5 pb-[110px]">
+        
+        {/* Заголовок */}
+        <div className="mb-6">
+          <p className="text-[10px] italic font-light opacity-60 mb-1">{greeting}</p>
+          <h1 className="font-display text-[2.75rem] sm:text-[3rem] leading-none mb-2 drop-shadow-lg">
+            Cordwainer
+          </h1>
+          <p className="text-[8.5px] uppercase tracking-[0.25em] opacity-60">
+            {t.tagline}
+          </p>
+        </div>
+
+        {/* Разделитель "Журнала" */}
+        <div className="flex items-center gap-4 mb-4 opacity-50">
+          <span className="h-[1px] flex-1 bg-white/30"></span>
+          <span className="text-[8px] uppercase tracking-[0.3em] font-semibold">{t.issue}</span>
+          <span className="h-[1px] flex-1 bg-white/30"></span>
+        </div>
+
+        {/* Тексты */}
+        <p className="text-[13px] font-light leading-relaxed mb-4 max-w-[90%] opacity-90">
           {t.value}
         </p>
-        <p
-          className="text-[10px] tracking-[0.06em] leading-relaxed mb-5"
-          style={{ color: 'var(--color-muted)' }}
-        >
+        <p className="text-[9px] uppercase tracking-[0.15em] opacity-40 mb-6 leading-relaxed">
           {t.idea}
         </p>
 
+        {/* Блок Избранное (если есть) */}
         {blogFavorites.length > 0 && (
           <button
             type="button"
             onClick={handleOpenFavorites}
-            className="w-full mb-4 rounded-2xl px-3 py-2.5 flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
-            style={{
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-            }}
-            aria-label={`${t.favorites} ${blogFavorites.length}`}
+            className="w-full mb-3 rounded-xl p-3 flex items-center gap-3 bg-white/5 border border-white/10 backdrop-blur-md active:scale-95 transition-all text-left"
           >
             <div className="flex -space-x-2 shrink-0">
               {blogFavorites.slice(0, 3).map((item) => (
@@ -332,56 +290,33 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                   key={item.id}
                   src={item.imagePng}
                   alt=""
-                  width={28}
-                  height={28}
-                  className="w-7 h-7 rounded-full object-cover"
-                  style={{ border: '2px solid var(--color-surface)' }}
-                  decoding="async"
+                  className="w-6 h-6 rounded-full object-cover border border-[#111]"
                 />
               ))}
             </div>
-            <span className="text-[12px] font-semibold" style={{ color: 'var(--color-ink)' }}>
+            <span className="text-[11px] uppercase tracking-widest font-medium opacity-80">
               {t.favorites} · {blogFavorites.length}
             </span>
-            <span className="ml-auto text-[16px] font-bold" style={{ color: 'var(--color-accent, #C49A5A)' }} aria-hidden>
-              →
-            </span>
+            <span className="ml-auto opacity-50 text-[14px]">→</span>
           </button>
         )}
 
+        {/* Элегантная тонкая кнопка */}
         <button
           type="button"
           onClick={handleStart}
-          className="btn-primary w-full rounded-2xl overflow-hidden active:scale-[0.98] transition-transform"
-          aria-label={ctaLabel}
-          style={{
-            background: 'var(--color-ink)',
-            color: 'var(--color-bg)',
-            minHeight: '64px',
-            height: 'auto',
-          }}
+          className="w-full flex items-center justify-between px-5 py-4 rounded-xl bg-white/90 text-black active:scale-95 transition-transform"
         >
-          <div className="relative flex items-center justify-between px-6 py-4">
-            <div className="flex flex-col text-left">
-              <span
-                className="uppercase text-[10px] tracking-[.30em] font-bold"
-                style={{ color: 'var(--color-bg)', opacity: 0.72 }}
-              >
-                {t.issue}
-              </span>
-              <span className={`${lang === 'de' ? 'text-[17px]' : 'text-[20px]'} font-bold mt-0.5`}>
-                {ctaLabel}
-              </span>
-            </div>
-            <div className="text-[28px] font-bold leading-none" aria-hidden>
-              →
-            </div>
-          </div>
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] mt-0.5">
+            {ctaLabel}
+          </span>
+          <span className="text-[16px] font-bold">→</span>
         </button>
       </div>
 
       <BottomDock active="search" lang={lang} />
 
+      {/* Модальное окно установки */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
@@ -391,76 +326,39 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
             className="fixed inset-0 z-[100] flex items-end justify-center"
             onClick={() => setShowWidgetHint(false)}
           >
-            <div
-              className="absolute inset-0 backdrop-blur-md"
-              style={{ background: 'rgba(0,0,0,0.4)' }}
-            />
-
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
             <motion.div
               initial={{ y: 80, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 60, opacity: 0 }}
               transition={{ type: 'spring', damping: 26, stiffness: 320 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md mx-4 mb-6 rounded-3xl overflow-hidden shadow-2xl"
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-              }}
+              className="relative w-full max-w-md mx-4 mb-6 rounded-2xl bg-[#1A1816] border border-white/10 p-5 shadow-2xl"
             >
-              <div className="p-5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{
-                      background: 'color-mix(in srgb, var(--color-accent, #B46513) 15%, var(--color-surface))',
-                      color: 'var(--color-accent, #B46513)',
-                    }}
-                  >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                      <rect x="5" y="2" width="14" height="20" rx="2" />
-                      <path d="M12 18h.01" />
-                    </svg>
-                  </div>
-                  <div
-                    className="text-[17px] font-bold"
-                    style={{ color: 'var(--color-ink)' }}
-                  >
-                    {t.widgetTitle}
-                  </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 text-white">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="5" y="2" width="14" height="20" rx="2" />
+                    <path d="M12 18h.01" />
+                  </svg>
                 </div>
-
-                <p
-                  className="text-[14px] leading-relaxed mb-5 font-medium"
-                  style={{ color: 'var(--color-muted)' }}
-                >
-                  {t.widgetText}
-                </p>
-
-                <div className="space-y-3 mb-6">
-                  <div className="text-[13px] font-semibold" style={{ color: 'var(--color-ink)' }}>
-                    <span style={{ color: 'var(--color-accent, #B46513)' }}>{t.widgetStep1}</span>
-                  </div>
-                  <div className="text-[13px] font-semibold" style={{ color: 'var(--color-ink)' }}>
-                    <span style={{ color: 'var(--color-accent, #B46513)' }}>{t.widgetStep2}</span>
-                  </div>
-                  <div className="text-[13px] font-semibold" style={{ color: 'var(--color-ink)' }}>
-                    <span style={{ color: 'var(--color-accent, #B46513)' }}>{t.widgetStep3}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleOpenInBrowser}
-                  className="w-full py-4 rounded-2xl text-[14px] font-bold uppercase tracking-wider active:scale-[0.98] transition-transform shadow-md"
-                  style={{
-                    background: 'var(--color-ink)',
-                    color: 'var(--color-bg)',
-                  }}
-                >
-                  {t.widgetAction}
-                </button>
+                <div className="text-[15px] font-medium">{t.widgetTitle}</div>
               </div>
+              <p className="text-[13px] font-light leading-relaxed opacity-70 mb-5">
+                {t.widgetText}
+              </p>
+              <div className="space-y-2.5 mb-6 opacity-80 text-[12px] font-light">
+                <div>{t.widgetStep1}</div>
+                <div>{t.widgetStep2}</div>
+                <div>{t.widgetStep3}</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenInBrowser}
+                className="w-full py-3.5 rounded-xl bg-white/90 text-black text-[11px] font-bold uppercase tracking-widest active:scale-95 transition-transform"
+              >
+                {t.widgetAction}
+              </button>
             </motion.div>
           </motion.div>
         )}
