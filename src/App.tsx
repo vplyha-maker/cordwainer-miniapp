@@ -20,6 +20,9 @@ import { StylesPage } from './pages/StylesPage'
 // Именой импорт адаптированного компонента зарплаты
 import { SalaryCalcPage } from './pages/salary' 
 
+// Импорт новой страницы настроек
+import { SettingsPage } from './pages/SettingsPage'
+
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -49,6 +52,7 @@ export type Screen =
   | 'glossary'
   | 'prices'
   | 'styles'
+  | 'settings'
 
 // Добавляем немецкий язык 'de'
 export type Lang = 'ru' | 'uk' | 'de'
@@ -359,6 +363,10 @@ export default function App() {
         {screen === 'home' && (
           <HomePage
             key="home"
+            onChangeTab={(tab) => {
+              if (tab === 'settings') setScreen('settings')
+              if (tab === 'profile') setScreen('welcome') // Или куда вам нужно
+            }}
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
@@ -523,6 +531,19 @@ export default function App() {
             }}
           />
         )}
+
+        {screen === 'settings' && (
+          <SettingsPage
+            key="settings"
+            lang={lang}
+            setLang={handleSetLang}
+            onChangeTab={(tab) => {
+              if (tab === 'search') setScreen('home')
+              if (tab === 'profile') setScreen('welcome')
+            }}
+          />
+        )}
+
       </AnimatePresence>
     </div>
   )
