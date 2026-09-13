@@ -12,28 +12,49 @@ type SettingsPageProps = {
   onBack?: () => void
 }
 
+type FontMode = 'classic' | 'system'
+
 function haptic(kind: 'light' | 'medium' = 'light') {
   try {
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(kind)
   } catch {}
 }
 
+function applyFontMode(mode: FontMode) {
+  const root = document.documentElement
+  if (mode === 'system') {
+    root.style.setProperty('--font-display', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif')
+    root.style.setProperty('--font-body', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif')
+  } else {
+    root.style.setProperty('--font-display', '"Playfair Display", "Times New Roman", serif')
+    root.style.setProperty('--font-body', '"Inter", system-ui, -apple-system, sans-serif')
+  }
+}
+
 export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPageProps) {
   const [graphics, setGraphics] = useState<'full' | 'fast'>('full')
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [font, setFont] = useState<FontMode>('classic')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   useLayoutEffect(() => {
     const savedGraphics = getSavedPerfMode()
     setGraphics(savedGraphics === 'fast' ? 'fast' : 'full')
 
-    // Правильная инициализация: сначала ищем ручной выбор пользователя
     const savedTheme = localStorage.getItem('cordwainer_theme')
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setTheme(savedTheme)
     } else {
       const isDark = document.documentElement.classList.contains('dark')
       setTheme(isDark ? 'dark' : 'light')
+    }
+
+    const savedFont = localStorage.getItem('cordwainer_font') as FontMode | null
+    if (savedFont === 'classic' || savedFont === 'system') {
+      setFont(savedFont)
+      applyFontMode(savedFont)
+    } else {
+      applyFontMode('classic')
     }
   }, [])
 
@@ -55,10 +76,14 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     haptic('light')
     setTheme(newTheme)
     localStorage.setItem('cordwainer_theme', newTheme)
-
-    // Используем единый источник правды — ту же функцию, что и при старте приложения.
-    // Больше никаких removeAttribute('style') — они убивали --color-border и другие переменные.
     applyImmediateMutedTheme(newTheme === 'dark')
+  }
+
+  const handleFontChange = (mode: FontMode) => {
+    haptic('light')
+    setFont(mode)
+    localStorage.setItem('cordwainer_font', mode)
+    applyFontMode(mode)
   }
 
   const handleAddToHome = async () => {
@@ -84,6 +109,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       theme: 'Оформление',
       themeLight: 'Светлое',
       themeDark: 'Темное',
+      font: 'Шрифт',
+      fontClassic: 'Классика',
+      fontSystem: 'Системный',
       graphics: 'Качество графики',
       graphicsHigh: 'Высокое',
       graphicsLow: 'Производительность',
@@ -100,6 +128,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       theme: 'Оформлення',
       themeLight: 'Світле',
       themeDark: 'Темне',
+      font: 'Шрифт',
+      fontClassic: 'Класика',
+      fontSystem: 'Системний',
       graphics: 'Якість графіки',
       graphicsHigh: 'Висока',
       graphicsLow: 'Продуктивність',
@@ -116,6 +147,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       theme: 'Erscheinungsbild',
       themeLight: 'Hell',
       themeDark: 'Dunkel',
+      font: 'Schriftart',
+      fontClassic: 'Klassisch',
+      fontSystem: 'System',
       graphics: 'Grafikqualität',
       graphicsHigh: 'Hoch',
       graphicsLow: 'Leistung',
@@ -197,6 +231,35 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
               }`}
             >
               {t.themeLight}
+            </button>
+          </div>
+        </section>
+
+        {/* ===== ПЕРЕКЛЮЧАТЕЛЬ ШРИФТОВ ===== */}
+        <section>
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
+            {t.font}
+          </h2>
+          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
+            <button
+              onClick={() => handleFontChange('classic')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                font === 'classic' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.fontClassic}
+            </button>
+            <button
+              onClick={() => handleFontChange('system')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                font === 'system' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.fontSystem}
             </button>
           </div>
         </section>
