@@ -13,14 +13,8 @@ import { ColorsPage } from './pages/ColorsPage'
 import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
 import { PricesPage } from './pages/PricesPage'
-
-// Импортируем нашу новую страницу стилей и фасонов
 import { StylesPage } from './pages/StylesPage'
-
-// Именой импорт адаптированного компонента зарплаты
 import { SalaryCalcPage } from './pages/salary' 
-
-// Импорт новой страницы настроек
 import { SettingsPage } from './pages/SettingsPage'
 
 import {
@@ -54,9 +48,7 @@ export type Screen =
   | 'styles'
   | 'settings'
 
-// Добавляем немецкий язык 'de'
 export type Lang = 'ru' | 'uk' | 'de'
-
 export type FavoriteType = 'blog' | 'article'
 
 export interface FavoriteItem {
@@ -72,7 +64,6 @@ function getIsDarkTheme(): boolean {
   if (isRealTelegram) {
     return tg?.colorScheme === 'dark'
   }
-
   return true
 }
 
@@ -141,14 +132,15 @@ function getInitialScreen(): Screen {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
+  // Состояние, чтобы помнить откуда мы пришли в настройки (Home или Welcome)
+  const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
+  
   const [lang, setLang] = useState<Lang>(() => {
     try {
       const saved = localStorage.getItem('cordwainer_lang') as Lang
       if (saved && ['ru', 'uk', 'de'].includes(saved)) {
         return saved
       }
-      
-      // Автоопределение, если нет сохраненного (синхронно с WelcomePage)
       const sysLang = navigator.language.slice(0, 2)
       if (['ru', 'uk', 'de'].includes(sysLang)) {
         return sysLang as Lang
@@ -185,14 +177,11 @@ export default function App() {
   const [showPerfHint, setShowPerfHint] = useState(false)
   const [pendingArticleId, setPendingArticleId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
-  
-  // Добавляем состояние для хранения ID выбранного термина глоссария
   const [selectedGlossaryTermId, setSelectedGlossaryTermId] = useState<string | null>(null)
 
   const handleSetLang = (next: Lang) => {
     setLang(next)
     try {
-      // Обновляем оба ключа, если где-то используется app_lang (из WelcomePage)
       localStorage.setItem('cordwainer_lang', next)
       localStorage.setItem('app_lang', next)
     } catch {}
@@ -357,6 +346,13 @@ export default function App() {
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
+            onChangeTab={(tab) => {
+              if (tab === 'settings') {
+                setPrevMainScreen('welcome') // Запоминаем, откуда ушли
+                setScreen('settings')
+              }
+              if (tab === 'search') setScreen('home')
+            }}
           />
         )}
 
@@ -364,15 +360,17 @@ export default function App() {
           <HomePage
             key="home"
             onChangeTab={(tab) => {
-              if (tab === 'settings') setScreen('settings')
-              if (tab === 'profile') setScreen('welcome') // Или куда вам нужно
+              if (tab === 'settings') {
+                setPrevMainScreen('home') // Запоминаем, откуда ушли
+                setScreen('settings')
+              }
+              if (tab === 'profile') setScreen('welcome') 
             }}
             onBack={() => setScreen('welcome')}
             onOpenBlog={() => setScreen('blog')}
             onOpenCalcMenu={() => setScreen('calc-menu')}
             onOpenColors={() => setScreen('colors')}
             onOpenStyles={() => setScreen('styles')}
-            // Обновляем onOpenGlossary, чтобы он принимал termId
             onOpenGlossary={(termId) => {
               setSelectedGlossaryTermId(termId || null)
               setScreen('glossary')
@@ -501,10 +499,9 @@ export default function App() {
           <GlossaryPage
             key="glossary"
             lang={lang}
-            // Передаем ID термина в глоссарий
             initialTermId={selectedGlossaryTermId}
             onBack={() => {
-              setSelectedGlossaryTermId(null) // Очищаем стейт при выходе
+              setSelectedGlossaryTermId(null) 
               setScreen('home')
             }}
           />
@@ -537,6 +534,7 @@ export default function App() {
             key="settings"
             lang={lang}
             setLang={handleSetLang}
+            onBack={() => setScreen(prevMainScreen)} // ВОТ ТУТ КНОПКА ВОЗВРАЩАЕТ ТУДА, ОТКУДА ПРИШЛИ
             onChangeTab={(tab) => {
               if (tab === 'search') setScreen('home')
               if (tab === 'profile') setScreen('welcome')
