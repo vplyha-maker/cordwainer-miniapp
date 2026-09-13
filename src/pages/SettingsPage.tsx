@@ -2,6 +2,7 @@ import { useState, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
+import { applyImmediateMutedTheme } from '../App'
 import { getSavedPerfMode, savePerfMode, applyPerfMode } from '../lib/performance'
 
 type SettingsPageProps = {
@@ -55,27 +56,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     setTheme(newTheme)
     localStorage.setItem('cordwainer_theme', newTheme)
 
-    const root = document.documentElement
-    
-    // 🛑 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Удаляем инлайн-стили, которые блокировали смену цвета
-    root.removeAttribute('style')
-
-    if (newTheme === 'dark') {
-      root.classList.add('dark')
-      root.classList.remove('light')
-    } else {
-      root.classList.add('light')
-      root.classList.remove('dark')
-    }
-
-    try {
-      const tg = window.Telegram?.WebApp
-      if (tg) {
-        const bg = newTheme === 'dark' ? '#151210' : '#F5F1EA'
-        tg.setHeaderColor(bg)
-        tg.setBackgroundColor(bg)
-      }
-    } catch {}
+    // Используем единый источник правды — ту же функцию, что и при старте приложения.
+    // Больше никаких removeAttribute('style') — они убивали --color-border и другие переменные.
+    applyImmediateMutedTheme(newTheme === 'dark')
   }
 
   const handleAddToHome = async () => {
