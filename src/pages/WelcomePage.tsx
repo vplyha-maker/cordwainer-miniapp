@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang, FavoriteItem } from '../App'
 
@@ -10,12 +9,6 @@ type WelcomePageProps = {
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
-}
-
-function haptic(kind: 'light' | 'medium' = 'light') {
-  try {
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(kind)
-  } catch {}
 }
 
 function getTelegramFirstName(): string {
@@ -37,11 +30,27 @@ function hasVisitedBefore(): boolean {
   }
 }
 
-export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [], onChangeTab }: WelcomePageProps) {
-  const [showWidgetHint, setShowWidgetHint] = useState(false)
+export function WelcomePage({ onStart, lang, setLang, onChangeTab }: WelcomePageProps) {
   const [heroReady, setHeroReady] = useState(false)
   const [firstName] = useState(getTelegramFirstName)
   const [returning] = useState(hasVisitedBefore)
+  const [isDark, setIsDark] = useState(true)
+
+  useEffect(() => {
+    const checkTheme = () => {
+      const dark = document.documentElement.classList.contains('dark')
+      setIsDark(dark)
+    }
+    checkTheme()
+
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
@@ -56,43 +65,41 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       localStorage.setItem('app_lang', defaultLang)
       localStorage.setItem('cordwainer_lang', defaultLang)
     }
+
+    try {
+      localStorage.setItem('cordwainer_visited', '1')
+    } catch {}
   }, [lang, setLang])
 
   const t = {
     ru: {
-      welcome: 'Добро пожаловать',
       hello: 'Привет',
-      welcomeBack: 'С возвращением',
       helloBack: 'Снова здесь',
+      welcome: 'Добро пожаловать',
+      welcomeBack: 'С возвращением',
       tagline: 'Энциклопедия обувного мастерства',
       value: 'Материалы, цвета, фасоны и калькуляторы — для сапожника, модельера и ортопеда.',
       idea: 'Предмет как идея · Форма как язык · Мастерство как опыт',
-      start: 'Начать обучение',
-      continue: 'Продолжить',
       issue: 'ISSUE 01',
     },
     uk: {
-      welcome: 'Ласкаво просимо',
       hello: 'Привіт',
-      welcomeBack: 'З поверненням',
       helloBack: 'Знову тут',
+      welcome: 'Ласкаво просимо',
+      welcomeBack: 'З поверненням',
       tagline: 'Енциклопедія взуттєвої майстерності',
       value: 'Матеріали, кольори, фасони і калькулятори — для шевця, модельєра та ортопеда.',
       idea: 'Предмет як ідея · Форма як мова · Майстерність як досвід',
-      start: 'Почати навчання',
-      continue: 'Продовжити',
       issue: 'ISSUE 01',
     },
     de: {
-      welcome: 'Willkommen',
       hello: 'Hallo',
-      welcomeBack: 'Willkommen zurück',
       helloBack: 'Wieder da',
+      welcome: 'Willkommen',
+      welcomeBack: 'Willkommen zurück',
       tagline: 'Enzyklopädie der Schuhmacherkunst',
       value: 'Materialien, Farben, Leisten und Rechner — für Schuhmacher, Designer und Orthopäden.',
       idea: 'Objekt als Idee · Form als Sprache · Handwerk als Erfahrung',
-      start: 'Wissen entdecken',
-      continue: 'Weiter',
       issue: 'ISSUE 01',
     },
   }[lang]
@@ -105,21 +112,13 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       ? `${t.hello}, ${firstName}`
       : t.welcome
 
-  const ctaLabel = returning ? t.continue : t.start
-
-  const handleStart = () => {
-    haptic('medium')
-    try {
-      localStorage.setItem('cordwainer_visited', '1')
-    } catch {}
-    onStart?.()
-  }
-
   return (
-    <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[#111] text-[#F5F1EA]">
+    <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[var(--color-bg)] text-[var(--color-ink)] transition-colors duration-500">
+      
+      {/* Фон */}
       <div className="absolute inset-0 z-0">
         {!heroReady && (
-          <div className="absolute inset-0 animate-pulse bg-[#1A1816]" aria-hidden />
+          <div className="absolute inset-0 bg-[var(--color-surface)]" aria-hidden />
         )}
         <img
           src="/hero-cover.webp"
@@ -128,59 +127,79 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           decoding="async"
           onLoad={() => setHeroReady(true)}
           className="absolute inset-0 w-full h-full object-cover object-[center_top]"
-          style={{ opacity: heroReady ? 1 : 0, transition: 'opacity 500ms ease' }}
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
           style={{
-            background: `linear-gradient(
-              to bottom,
-              rgba(17, 17, 17, 0.1) 0%,
-              rgba(17, 17, 17, 0.4) 40%,
-              rgba(17, 17, 17, 0.85) 75%,
-              rgba(17, 17, 17, 1) 100%
-            )`,
+            opacity: heroReady ? (isDark ? 1 : 0.92) : 0,
+            transition: 'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        />
+
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity duration-500"
+          style={{
+            background: isDark
+              ? `linear-gradient(
+                  to bottom,
+                  rgba(12, 10, 9, 0.15) 0%,
+                  rgba(12, 10, 9, 0.35) 35%,
+                  rgba(12, 10, 9, 0.78) 68%,
+                  rgba(12, 10, 9, 0.94) 100%
+                )`
+              : `linear-gradient(
+                  to bottom,
+                  rgba(245, 241, 234, 0.25) 0%,
+                  rgba(245, 241, 234, 0.55) 40%,
+                  rgba(245, 241, 234, 0.88) 72%,
+                  rgba(245, 241, 234, 0.97) 100%
+                )`,
           }}
         />
       </div>
 
-      {/* Пустое место сверху вместо языков и кнопки установки */}
-      <div className="relative z-20 h-14" />
-
-      <div className="relative z-20 flex-1 flex flex-col justify-end px-5 pb-[110px]">
-        <div className="mb-6">
-          <p className="text-[10px] italic font-light opacity-60 mb-1">{greeting}</p>
-          <h1 className="font-display text-[2.75rem] sm:text-[3rem] leading-none mb-2 drop-shadow-lg">
-            Cordwainer
-          </h1>
-          <p className="text-[8.5px] uppercase tracking-[0.25em] opacity-60">
-            {t.tagline}
+      {/* Контент */}
+      <div className="relative z-20 flex-1 flex flex-col justify-end px-6 pb-[120px]">
+        
+        <div className="mb-8">
+          <p className={`text-[9px] tracking-[0.35em] uppercase font-medium ${
+            isDark ? 'text-white/50' : 'text-black/45'
+          }`}>
+            {t.issue}
           </p>
         </div>
 
-        <div className="flex items-center gap-4 mb-4 opacity-50">
-          <span className="h-[1px] flex-1 bg-white/30"></span>
-          <span className="text-[8px] uppercase tracking-[0.3em] font-semibold">{t.issue}</span>
-          <span className="h-[1px] flex-1 bg-white/30"></span>
-        </div>
+        <p className={`text-[11px] tracking-[0.08em] mb-3 font-light ${
+          isDark ? 'text-white/55' : 'text-black/55'
+        }`}>
+          {greeting}
+        </p>
 
-        <p className="text-[13px] font-light leading-relaxed mb-4 max-w-[90%] opacity-90">
+        {/* Название без "r" */}
+        <h1 className={`font-display text-[3.1rem] leading-[0.92] tracking-tight mb-5 ${
+          isDark ? 'text-white' : 'text-[#1C1816]'
+        }`}>
+          Cordwaine
+        </h1>
+
+        <p className={`text-[10px] uppercase tracking-[0.28em] mb-8 font-medium ${
+          isDark ? 'text-white/45' : 'text-black/45'
+        }`}>
+          {t.tagline}
+        </p>
+
+        <div className={`w-10 h-px mb-8 ${
+          isDark ? 'bg-white/25' : 'bg-black/20'
+        }`} />
+
+        <p className={`text-[13.5px] leading-[1.55] font-light max-w-[320px] mb-5 ${
+          isDark ? 'text-white/75' : 'text-black/70'
+        }`}>
           {t.value}
         </p>
-        <p className="text-[9px] uppercase tracking-[0.15em] opacity-40 mb-6 leading-relaxed">
+
+        <p className={`text-[9.5px] tracking-[0.18em] uppercase leading-relaxed ${
+          isDark ? 'text-white/35' : 'text-black/40'
+        }`}>
           {t.idea}
         </p>
-
-        <button
-          type="button"
-          onClick={handleStart}
-          className="w-full flex items-center justify-between px-5 py-4 rounded-xl bg-white/90 text-black active:scale-95 transition-transform"
-        >
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] mt-0.5">
-            {ctaLabel}
-          </span>
-          <span className="text-[16px] font-bold">→</span>
-        </button>
       </div>
 
       <BottomDock active="profile" lang={lang} onChange={onChangeTab} />
