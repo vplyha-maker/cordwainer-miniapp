@@ -1,4 +1,4 @@
-Import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
 import { CALCULATORS_COUNT } from './CalcMenuPage'
@@ -467,4 +467,3 @@ export function HomePage({
     </div>
   )
 }
-
