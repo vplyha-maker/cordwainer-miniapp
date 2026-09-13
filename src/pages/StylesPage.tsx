@@ -1,5 +1,5 @@
-import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -17,20 +17,17 @@ type StyleSlide = {
   hideWatermark?: boolean 
 }
 
-// УМНАЯ ГЕНЕРАЦИЯ ID ДЛЯ ПОЛЬЗОВАТЕЛЕЙ
 const getDeviceId = () => {
-  if (typeof window === 'undefined') return 'unknown';
-  
-  const tg = (window as any).Telegram?.WebApp;
-  const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
-  if (tgUserId) return tgUserId; 
-
-  let deviceId = localStorage.getItem('cordwainer_device_id');
+  if (typeof window === 'undefined') return 'unknown'
+  const tg = (window as any).Telegram?.WebApp
+  const tgUserId = tg?.initDataUnsafe?.user?.id?.toString()
+  if (tgUserId) return tgUserId 
+  let deviceId = localStorage.getItem('cordwainer_device_id')
   if (!deviceId) {
-    deviceId = 'web_' + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('cordwainer_device_id', deviceId);
+    deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
+    localStorage.setItem('cordwainer_device_id', deviceId)
   }
-  return deviceId;
+  return deviceId
 }
 
 const STYLES_DATA: StyleSlide[] = [
@@ -161,15 +158,18 @@ const STYLES_DATA: StyleSlide[] = [
   }
 ]
 
-function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: Lang, index: number, isMuted: boolean }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  // Безопасный фоллбэк: если lang не 'ru', 'uk' или 'de', используем 'ru'
-  const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
+type SlideItemProps = {
+  slide: StyleSlide
+  lang: Lang
+  isActive: boolean      // Играет ли это видео сейчас
+  isPreloaded: boolean   // Нужно ли держать тег <video> в DOM для быстрой подгрузки
+  isMuted: boolean
+}
 
-  const [shouldLoad, setShouldLoad] = useState(index <= 1)
+function SlideItem({ slide, lang, isActive, isPreloaded, isMuted }: SlideItemProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
   
-  // ГЛОБАЛЬНЫЕ ЛАЙКИ ИЗ NEON
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -178,25 +178,44 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
   const tg = (window as any).Telegram?.WebApp
 
   useEffect(() => {
+    // Подгружаем лайки, только если слайд активен или рядом с активным (прелоад)
+    if (!isPreloaded) return
+    let isMounted = true
     const fetchLikes = async () => {
       try {
         const response = await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`)
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const data = await response.json()
           setLikesCount(data.total || 0)
           setIsLiked(data.isLiked || false)
         }
       } catch (err) {
-        console.error("Не удалось загрузить лайки", err)
+        // Игнорируем ошибки при прелоаде
       } finally {
-        setIsLoading(false)
+        if (isMounted) setIsLoading(false)
       }
     }
-    
-    if (shouldLoad) {
-      fetchLikes()
+    fetchLikes()
+    return () => { isMounted = false }
+  }, [slide.id, userId, isPreloaded])
+
+  useEffect(() => {
+    // Управление воспроизведением: играем только если слайд активен
+    if (videoRef.current) {
+      if (isActive) {
+        videoRef.current.currentTime = 0
+        videoRef.current.play().catch(() => {})
+      } else {
+        videoRef.current.pause()
+      }
     }
-  }, [slide.id, userId, shouldLoad])
+  }, [isActive])
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted
+    }
+  }, [isMuted, isPreloaded])
 
   const handleLike = async () => {
     const newIsLiked = !isLiked
@@ -214,7 +233,6 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         body: JSON.stringify({ action: newIsLiked ? 'like' : 'unlike' })
       })
     } catch (err) {
-      console.error("Ошибка при сохранении лайка", err)
       setIsLiked(!newIsLiked)
       setLikesCount(prev => newIsLiked ? prev - 1 : prev + 1)
     }
@@ -240,47 +258,24 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
         await navigator.clipboard.writeText(`${shareText}\n${siteUrl}`);
         alert(currentLang === 'de' ? 'Link in die Zwischenablage kopiert' : currentLang === 'ru' ? 'Ссылка скопирована в буфер обмена' : 'Посилання скопійовано');
       }
-    } catch (err) {
-      console.log('Error sharing:', err);
-    }
+    } catch (err) {}
   }
 
-  useEffect(() => {
-    if (!containerRef.current) return
-    const loadObserver = new IntersectionObserver(
-      (entries) => { entries.forEach((entry) => { if (entry.isIntersecting) setShouldLoad(true) }) },
-      { rootMargin: '100% 0px' } 
-    )
-    const playObserver = new IntersectionObserver(
-      (entries) => { entries.forEach((entry) => {
-          if (entry.isIntersecting) videoRef.current?.play().catch(() => {})
-          else videoRef.current?.pause()
-      }) },
-      { threshold: 0.5 }
-    )
-    loadObserver.observe(containerRef.current)
-    playObserver.observe(containerRef.current)
-    return () => { loadObserver.disconnect(); playObserver.disconnect() }
-  }, [])
-
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.muted = isMuted
-  }, [isMuted])
-
   return (
-    <div ref={containerRef} className="relative h-[100dvh] w-full snap-start snap-always overflow-hidden bg-black">
-      <div className="absolute inset-0 w-full h-full z-0">
-        {shouldLoad && slide.video ? (
+    <div className="relative h-[100dvh] w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-black">
+      <div className="absolute inset-0 w-full h-full z-0 bg-black">
+        {/* Рендерим видео ТОЛЬКО если слайд в зоне видимости (isPreloaded) */}
+        {isPreloaded && slide.video ? (
           <video
             ref={videoRef}
             src={slide.video}
             preload="auto"
             loop
-            muted={isMuted}
             playsInline
-            className={`w-full h-full object-cover transition-transform duration-700 ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
+            webkit-playsinline="true"
+            className={`w-full h-full object-cover transition-opacity duration-700 ${isActive ? 'opacity-100' : 'opacity-0'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
-        ) : shouldLoad && slide.image ? (
+        ) : isPreloaded && slide.image ? (
           <img
             src={slide.image}
             alt={slide.title[currentLang]}
@@ -291,25 +286,22 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
       <div className="absolute inset-0 z-10 bg-black/15 pointer-events-none" />
 
-      {/* Убрано motion.div и whileInView, чтобы текст не мигал при скролле */}
-      <div className="absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%]">
+      {/* Текст и интерфейс рендерятся всегда для плавности, но их анимация зависит от isActive */}
+      <div className={`absolute top-28 md:top-32 left-6 z-20 flex flex-col gap-3 max-w-[80%] transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
         <h3 className="text-[9px] md:text-[10px] tracking-[0.5em] uppercase text-white/90 font-sans font-light">
           {slide.subtitle[currentLang]}
         </h3>
-        
         <h2 className="text-[44px] md:text-[56px] font-serif font-light leading-[1.05] tracking-wide text-white whitespace-pre-line">
           {slide.title[currentLang]}
         </h2>
       </div>
 
-      {/* Убрано motion.div и whileInView, чтобы блок описания не мигал при скролле */}
-      <div className="absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between">
-        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[70%]">
+      <div className={`absolute bottom-8 left-6 right-4 z-20 flex items-center justify-between transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`}>
+        <p className="text-[11px] md:text-[12px] leading-[1.8] text-white/80 font-sans font-light tracking-wide max-w-[70%] drop-shadow-md">
           {slide.desc[currentLang]}
         </p>
         
         <div className="flex flex-col gap-5 items-center shrink-0">
-          
           <motion.button 
             whileTap={{ scale: 0.8 }}
             onClick={handleLike}
@@ -321,7 +313,7 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </motion.svg>
               ) : (
-                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-white/80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <motion.svg key="unliked" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-white/80 drop-shadow-md" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </motion.svg>
               )}
@@ -333,14 +325,13 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
             )}
           </motion.button>
 
-          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all duration-300 gap-1">
+          <button onClick={handleShare} className="w-12 flex flex-col items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all duration-300 gap-1 drop-shadow-md">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
               <polyline points="16 6 12 2 8 6"></polyline>
               <line x1="12" y1="2" x2="12" y2="15"></line>
             </svg>
           </button>
-          
         </div>
       </div>
     </div>
@@ -349,6 +340,20 @@ function SlideItem({ slide, lang, index, isMuted }: { slide: StyleSlide, lang: L
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [isMuted, setIsMuted] = useState(true)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Идеальный трекинг активного слайда через scroll events для виртуализации
+  const handleScroll = () => {
+    if (!scrollRef.current) return
+    const scrollPosition = scrollRef.current.scrollTop
+    const windowHeight = window.innerHeight
+    const newActiveIndex = Math.round(scrollPosition / windowHeight)
+    
+    if (newActiveIndex !== activeIndex && newActiveIndex >= 0 && newActiveIndex < STYLES_DATA.length) {
+      setActiveIndex(newActiveIndex)
+    }
+  }
 
   return (
     <motion.div
@@ -361,11 +366,16 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Защита от системного мерцания на тач-девайсах */
+        * {
+          -webkit-tap-highlight-color: transparent !important;
+        }
       `}</style>
 
       <button
         onClick={onBack}
-        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md"
+        className="absolute top-12 left-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md outline-none"
       >
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <path d="M15 18l-6-6 6-6" />
@@ -374,7 +384,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
       <button
         onClick={() => setIsMuted(!isMuted)}
-        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md"
+        className="absolute top-12 right-4 z-[100] w-12 h-12 flex items-center justify-center text-white/80 active:scale-90 transition-transform drop-shadow-md outline-none"
       >
         {isMuted ? (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -391,16 +401,28 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         )}
       </button>
 
-      <div className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth">
-        {STYLES_DATA.map((slide, index) => (
-          <SlideItem 
-            key={slide.id} 
-            slide={slide} 
-            lang={lang} 
-            index={index} 
-            isMuted={isMuted} 
-          />
-        ))}
+      <div 
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative"
+      >
+        {STYLES_DATA.map((slide, index) => {
+          // Smart Lazy Loading: Держим в DOM только текущий, предыдущий и следующий видео-тег.
+          // Это решает проблему вылета памяти на iPhone (Safari).
+          const isPreloaded = Math.abs(activeIndex - index) <= 1
+          const isActive = activeIndex === index
+
+          return (
+            <SlideItem 
+              key={slide.id} 
+              slide={slide} 
+              lang={lang} 
+              isActive={isActive}
+              isPreloaded={isPreloaded}
+              isMuted={isMuted} 
+            />
+          )
+        })}
       </div>
     </motion.div>
   )
