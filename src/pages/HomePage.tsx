@@ -89,6 +89,9 @@ export function HomePage({
   const glossaryCount = GLOSSARY_TERMS?.length || 0
 
   useEffect(() => {
+    // Принудительно скроллим наверх при открытии страницы
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
     checkTheme()
     const observer = new MutationObserver(checkTheme)
@@ -280,14 +283,14 @@ export function HomePage({
           <button
             key={item.id}
             onClick={item.action}
-            className={`group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all ${item.action ? 'active:opacity-50' : 'opacity-40 cursor-not-allowed'}`}
+            className={`group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent cursor-pointer ${cLine} text-left transition-all ${item.action ? 'active:opacity-50' : 'opacity-40 cursor-not-allowed'}`}
           >
             <div className="flex items-start gap-4">
               <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
                 {numStr}
               </span>
               <div className="flex items-center gap-3">
-                <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
+                <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-hover:translate-x-1 group-active:translate-x-1">
                   {item.title}
                 </div>
                 {item.dot && (
@@ -305,24 +308,19 @@ export function HomePage({
   )
 
   return (
-    // Заменили жесткую высоту на min-h-[100dvh] w-full для нативного скролла
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
-      
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-300 ${cBg} ${cText}`}>
       <style>{`
-        @keyframes fadeUp {
-          0% { opacity: 0; transform: translateY(16px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .stagger-item {
-          opacity: 0;
-          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        /* Отключение вспышек при тапах */
+        * {
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none;
         }
       `}</style>
 
       {/* HEADER */}
       <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
         {onBack ? (
-          <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}>
+          <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer ${cTextMuted} ${cHover}`}>
             <span className="transform transition-transform group-hover:-translate-x-1">←</span>
             <span>Back</span>
           </button>
@@ -335,7 +333,7 @@ export function HomePage({
             <button
               key={l}
               onClick={() => handleLangChange(l as Lang)}
-              className={`text-[10px] font-sans uppercase tracking-[0.25em] transition-colors duration-500 ${
+              className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
                 safeLang === l ? cText : cTextMuted
               } ${cHover}`}
             >
@@ -345,18 +343,18 @@ export function HomePage({
         </div>
       </header>
 
-      {/* КОНТЕНТ БЕЗ ОГРАНИЧЕНИЙ ВЫСОТЫ */}
+      {/* КОНТЕНТ БЕЗ АНИМАЦИИ (без stagger-item) */}
       <div className="px-6 pb-24">
         
         {/* ЗАГОЛОВОК СТРАНИЦЫ */}
-        <div className="stagger-item mb-12" style={{ animationDelay: '0.1s' }}>
+        <div className="mb-12">
           <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
             {t.menu}
           </h1>
         </div>
 
         {/* ПОИСК */}
-        <div className="stagger-item mb-16" style={{ animationDelay: '0.15s' }}>
+        <div className="mb-16">
           <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
             <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
             <input
@@ -364,10 +362,10 @@ export function HomePage({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className={`w-full bg-transparent outline-none text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
+              className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest ${cTextMuted}`}>
+              <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
                 Clear
               </button>
             )}
@@ -376,7 +374,7 @@ export function HomePage({
 
         {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
         {query ? (
-          <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
+          <div>
             <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
               {t.searchResults} / {searchResults.length}
             </p>
@@ -386,9 +384,9 @@ export function HomePage({
                   <button
                     key={`${res.type}-${res.id}-${i}`}
                     onClick={() => handleResultClick(res)}
-                    className={`group flex items-center justify-between py-5 border-b ${cLine} text-left active:opacity-50 transition-opacity`}
+                    className={`w-full group flex items-center justify-between py-5 border-b ${cLine} text-left outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-opacity`}
                   >
-                    <div className="font-serif text-[22px] leading-none transition-transform group-active:translate-x-2">
+                    <div className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1">
                       {res.title}
                     </div>
                     <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
@@ -405,21 +403,21 @@ export function HomePage({
           </div>
         ) : (
           <>
-            <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
+            <div className="mb-4">
               <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
                 {t.learning}
               </p>
               {renderList(LEARNING, 1)}
             </div>
 
-            <div className="stagger-item" style={{ animationDelay: '0.3s' }}>
+            <div className="mb-4">
               <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
                 {t.tools}
               </p>
               {renderList(TOOLS, 5)}
             </div>
 
-            <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
+            <div className="mb-4">
               <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
                 {t.system}
               </p>
@@ -427,9 +425,9 @@ export function HomePage({
             </div>
 
             {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
-            <div className="stagger-item mb-16" style={{ animationDelay: '0.5s' }}>
+            <div className="mb-16">
               <button
-                className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--color-ink)]/5`}
+                className={`w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer ${cLine} transition-colors active:bg-current/5`}
                 onClick={() => {
                   if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
                   else if (articleFavorites.length > 1) onOpenFavorites?.()
@@ -450,7 +448,7 @@ export function HomePage({
             </div>
 
             {/* ЦИТАТА */}
-            <div className="stagger-item pb-10" style={{ animationDelay: '0.6s' }}>
+            <div className="pb-10">
               <div className="flex flex-col items-center text-center px-4">
                 <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
                 <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
