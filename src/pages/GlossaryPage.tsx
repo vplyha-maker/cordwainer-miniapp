@@ -1,6 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
-import { BottomDock } from '../components/BottomDock'
-import { FlipCard } from '../components/FlipCard'
+import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react'
 import {
   GLOSSARY_TERMS,
   searchTerms,
@@ -23,7 +21,7 @@ const CATEGORY_LABELS: Record<
   part: { ru: 'Детали', uk: 'Деталі', de: 'Schuhteile' },
   process: { ru: 'Процессы', uk: 'Процеси', de: 'Verfahren' },
   tool: { ru: 'Инструменты', uk: 'Інструменти', de: 'Werkzeuge' },
-  type: { ru: 'Виды обуви', uk: 'Види взуття', de: 'Schuharten' },
+  type: { ru: 'Виды', uk: 'Види', de: 'Arten' },
   defect: { ru: 'Дефекты', uk: 'Дефекти', de: 'Defekte' },
   other: { ru: 'Прочее', uk: 'Інше', de: 'Sonstiges' },
 }
@@ -34,11 +32,38 @@ const ALPHABETS = {
   de: 'ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ'.split('')
 }
 
+const CATEGORY_ICON: Record<NonNullable<GlossaryTerm['category']>, React.ReactNode> = {
+  material: <path d="M9 3H15L17.5 5.5L21 7.5L19.5 12.5L20.5 17.5L15.5 21H8.5L3.5 17.5L4.5 12.5L3 7.5L6.5 5.5L9 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+  part: <path d="M2.5 17.5C4 17.5 6 17 7.5 15L11.5 9.5C12.5 8.2 13.8 7.5 15.5 7.5H19.5C20.6 7.5 21.5 8.4 21.5 9.5V14.5C21.5 16.2 19.8 17.5 18 17.5H2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+  process: <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+  tool: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+  type: <path d="M4 17.5V14c0-2.5 1.5-4.5 4-5.5l4-1.5L14 3h6v4.5c0 3.5-2.5 6-5 7.5L12 17.5H4.5A.5.5 0 0 1 4 17.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+  defect: <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+  other: <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
+}
+
+function haptic(style: 'light' | 'medium' = 'light') {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+  } catch {}
+}
+
 export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps) {
   const [query, setQuery] = useState('')
   const [activeLetter, setActiveLetter] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [isDark, setIsDark] = useState(true)
   const listRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    checkTheme()
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     setActiveLetter(null)
@@ -46,34 +71,37 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
 
   const t = {
     ru: {
-      title: 'Глоссарий',
-      search: 'Поиск термина...',
+      title: 'Словарь',
+      subtitle: 'Терминология',
+      search: 'Поиск (термин, деталь...)',
       all: 'Все',
-      terms: 'терминов',
+      terms: 'Терминов',
       empty: 'Ничего не найдено',
-      emptyHint: 'Попробуйте другой запрос или сбросьте фильтры',
-      source: 'Краткий словарь терминов обувного дела',
-      flipHint: 'Нажмите на карточку, чтобы увидеть определение',
+      emptyHint: 'Попробуйте изменить запрос',
+      source: 'Энциклопедия обувного дела',
+      flipHint: 'TAP TO READ',
     },
     uk: {
-      title: 'Глосарій',
-      search: 'Пошук терміна...',
+      title: 'Словник',
+      subtitle: 'Термінологія',
+      search: 'Пошук (термін, деталь...)',
       all: 'Усі',
-      terms: 'термінів',
+      terms: 'Термінів',
       empty: 'Нічого не знайдено',
-      emptyHint: 'Спробуйте інший запит або скиньте фільтри',
-      source: 'Короткий словник термінів взуттєвої справи',
-      flipHint: 'Натисніть на картку, щоб побачити визначення',
+      emptyHint: 'Спробуйте змінити запит',
+      source: 'Енциклопедія взуттєвої справи',
+      flipHint: 'TAP TO READ',
     },
     de: {
-      title: 'Glossar',
-      search: 'Begriff suchen...',
+      title: 'Wörterbuch',
+      subtitle: 'Terminologie',
+      search: 'Suchen (Begriff, Teil...)',
       all: 'Alle',
       terms: 'Begriffe',
       empty: 'Nichts gefunden',
-      emptyHint: 'Versuchen Sie eine andere Suchanfrage oder setzen Sie die Filter zurück',
-      source: 'Kurzes Wörterbuch der Schuhmacher-Begriffe',
-      flipHint: 'Klicken Sie auf die Karte, um die Definition zu sehen',
+      emptyHint: 'Versuchen Sie eine andere Anfrage',
+      source: 'Schuhmacher Enzyklopädie',
+      flipHint: 'TAP TO READ',
     },
   }[lang]
 
@@ -128,110 +156,104 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
     return Array.from(set) as NonNullable<GlossaryTerm['category']>[]
   }, [])
 
-  return (
-    <div 
-      className="relative flex flex-col h-[100dvh] overflow-hidden"
-      style={{ background: 'var(--color-bg, #1C1816)', color: 'var(--color-ink, #F5F1EA)' }}
-    >
-      {/* Header */}
-      <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <div className="flex items-center gap-3 min-w-0">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center border active:scale-90 transition-transform shrink-0"
-              style={{ 
-                background: 'var(--color-surface, #25201C)', 
-                color: 'var(--color-ink, #F5F1EA)',
-                borderColor: 'var(--color-border, rgba(255,255,255,0.12))' 
-              }}
-              aria-label={lang === 'de' ? 'Zurück' : (lang === 'uk' ? 'Назад' : 'Назад')}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-          )}
-          <div className="min-w-0">
-            <h1 
-              className="text-[28px] md:text-[34px] font-serif font-normal tracking-wide leading-none truncate"
-              style={{ color: 'var(--color-ink, #F5F1EA)' }}
-            >
-              {t.title}
-            </h1>
-            <p 
-              className="text-[11px] mt-1"
-              style={{ color: 'var(--color-muted, #B9ACA0)' }}
-            >
-              {filtered.length} {t.terms}
-            </p>
-          </div>
-        </div>
-      </div>
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-      {/* Content */}
-      <div ref={listRef} className="flex-1 px-4 md:px-6 overflow-y-auto pb-[110px] overscroll-none">
-        {/* Search */}
-        <div className="mb-4">
-          <div 
-            className="rounded-[18px] px-4 py-3 flex items-center gap-2.5 border"
-            style={{ 
-              background: 'var(--color-surface, #25201C)',
-              borderColor: 'var(--color-border, rgba(255,255,255,0.12))'
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="shrink-0"
-              style={{ color: 'var(--color-muted, #B9ACA0)' }}
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
+  return (
+    <div className={`relative flex flex-col h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText} overflow-hidden`}>
+      <style>{`
+        * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes fadeUp {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+          opacity: 0;
+          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* HEADER */}
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20 shrink-0">
+        <button 
+          onClick={() => { haptic('light'); onBack?.(); }}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
+        >
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span>Back</span>
+        </button>
+      </header>
+
+      {/* CONTENT */}
+      <div ref={listRef} className="flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide">
+        
+        {/* ЗАГОЛОВОК */}
+        <div className="stagger-item mb-12" style={{ animationDelay: '0.05s' }}>
+          <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted}`}>
+            {t.subtitle} / {filtered.length} {t.terms}
+          </p>
+          <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight">
+            {t.title}
+          </h1>
+        </div>
+
+        {/* ПОИСК */}
+        <div className="stagger-item mb-10" style={{ animationDelay: '0.1s' }}>
+          <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
+            <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
             <input
-              type="search"
+              type="text"
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                setActiveLetter(null)
-              }}
+              onChange={(e) => { setQuery(e.target.value); setActiveLetter(null); }}
               placeholder={t.search}
-              className="flex-1 bg-transparent border-0 outline-none text-[13px] min-w-0"
-              style={{ color: 'var(--color-ink, #F5F1EA)' }}
+              className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
             />
             {query && (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                className="p-0.5 active:opacity-70"
-                style={{ color: 'var(--color-muted, #B9ACA0)' }}
-                aria-label="Clear"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
+              <button onClick={() => setQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
+                Clear
               </button>
             )}
           </div>
         </div>
 
-        {/* Alphabet filter */}
-        <div className="mb-3 -mx-1 overflow-x-auto scrollbar-none">
-          <div className="flex gap-1.5 px-1 pb-1 min-w-max">
-            <button
-              type="button"
-              onClick={() => setActiveLetter(null)}
-              className="h-8 px-3 rounded-full text-[12px] font-medium transition-colors shrink-0 border"
-              style={{
-                background: activeLetter === null ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
-                color: activeLetter === null ? '#1C1816' : 'var(--color-muted, #B9ACA0)',
-                borderColor: activeLetter === null ? 'transparent' : 'var(--color-border, rgba(255,255,255,0.12))'
-              }}
+        {/* ФИЛЬТРЫ (КАТЕГОРИИ И АЛФАВИТ) */}
+        <div className="stagger-item mb-12 flex flex-col gap-6" style={{ animationDelay: '0.15s' }}>
+          {/* Categories */}
+          <div className={`flex overflow-x-auto gap-6 pb-4 border-b ${cLine} scrollbar-hide`}>
+            <button 
+              onClick={() => { haptic('light'); setActiveCategory(null); }}
+              className={`text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all outline-none border-none bg-transparent cursor-pointer ${
+                activeCategory === null ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+              }`}
+            >
+              {t.all}
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => { haptic('light'); setActiveCategory(activeCategory === cat ? null : cat); }}
+                className={`text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all outline-none border-none bg-transparent cursor-pointer ${
+                  activeCategory === cat ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                }`}
+              >
+                {CATEGORY_LABELS[cat][lang]}
+              </button>
+            ))}
+          </div>
+
+          {/* Alphabet */}
+          <div className="flex overflow-x-auto gap-6 pb-2 scrollbar-hide">
+             <button 
+              onClick={() => { haptic('light'); setActiveLetter(null); }}
+              className={`text-[12px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer ${
+                activeLetter === null ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40 hover:opacity-100`
+              }`}
             >
               {t.all}
             </button>
@@ -240,15 +262,12 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
               return (
                 <button
                   key={letter}
-                  type="button"
                   disabled={!hasTerms}
-                  onClick={() => setActiveLetter(activeLetter === letter ? null : letter)}
-                  className={`w-8 h-8 rounded-full text-[13px] font-serif font-medium transition-colors shrink-0 flex items-center justify-center border ${!hasTerms ? 'opacity-30 pointer-events-none' : ''}`}
-                  style={{
-                    background: activeLetter === letter ? 'var(--color-accent, #E4D00A)' : 'var(--color-surface, #25201C)',
-                    color: activeLetter === letter ? '#1C1816' : 'var(--color-muted, #B9ACA0)',
-                    borderColor: activeLetter === letter ? 'transparent' : 'var(--color-border, rgba(255,255,255,0.12))'
-                  }}
+                  onClick={() => { haptic('light'); setActiveLetter(activeLetter === letter ? null : letter); }}
+                  className={`text-[14px] font-serif transition-all outline-none border-none bg-transparent ${
+                    !hasTerms ? 'opacity-20 pointer-events-none' : 
+                    activeLetter === letter ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100 cursor-pointer`
+                  }`}
                 >
                   {letter}
                 </button>
@@ -257,99 +276,185 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         </div>
 
-        {/* Category chips */}
-        <div className="mb-4 -mx-1 overflow-x-auto scrollbar-none">
-          <div className="flex gap-1.5 px-1 pb-1 min-w-max">
-            {categories.map((cat) => {
-              const label = CATEGORY_LABELS[cat][lang]
-              const active = activeCategory === cat
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActiveCategory(active ? null : cat)}
-                  className="h-7 px-2.5 rounded-full text-[11px] transition-colors shrink-0 border"
-                  style={{
-                    background: active ? 'var(--color-surface-2, #2F2924)' : 'var(--color-surface, #25201C)',
-                    color: active ? 'var(--color-ink, #F5F1EA)' : 'var(--color-muted, #B9ACA0)',
-                    borderColor: active ? 'color-mix(in srgb, var(--color-accent, #E4D00A) 50%, transparent)' : 'color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 70%, transparent)'
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <p 
-          className="text-[11px] mb-3"
-          style={{ color: 'var(--color-muted, #B9ACA0)' }}
-        >
-          {t.flipHint}
-        </p>
-
-        {/* Cards grid */}
+        {/* СЕТКА КАРТОЧЕК */}
         {filtered.length === 0 ? (
-          <div 
-            className="rounded-[18px] p-8 border text-center"
-            style={{ 
-              background: 'var(--color-surface, #25201C)',
-              borderColor: 'var(--color-border, rgba(255,255,255,0.12))'
-            }}
-          >
-            <p className="text-[14px]" style={{ color: 'var(--color-ink, #F5F1EA)' }}>{t.empty}</p>
-            <p className="text-[12px] mt-1" style={{ color: 'var(--color-muted, #B9ACA0)' }}>{t.emptyHint}</p>
+          <div className="stagger-item py-12 text-center flex flex-col items-center gap-6" style={{ animationDelay: '0.2s' }}>
+            <p className={`font-serif text-2xl italic ${cTextMuted}`}>
+              {t.empty}
+            </p>
+            <p className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+              {t.emptyHint}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-16">
             {filtered.map((term, i) => (
               <div
                 key={term.id}
-                className="animate-glossary-in opacity-0"
-                style={{
-                  animation: `glossaryIn 0.45s ease forwards`,
-                  animationDelay: `${Math.min(i * 35, 350)}ms`,
-                }}
+                className="stagger-item"
+                style={{ animationDelay: `${0.2 + (i % 10) * 0.05}s` }}
               >
-                <FlipCard term={term} lang={lang} index={i} />
+                <FlipCard 
+                  term={term} 
+                  lang={lang} 
+                  isDark={isDark} 
+                  flipHint={t.flipHint}
+                />
               </div>
             ))}
           </div>
         )}
 
-        <p 
-          className="text-[10px] text-center mb-4"
-          style={{ color: 'var(--color-muted, #B9ACA0)' }}
-        >
-          {t.source}
-        </p>
-      </div>
+        {/* FOOTER */}
+        <div className="stagger-item pb-10" style={{ animationDelay: '0.4s' }}>
+          <div className="flex flex-col items-center text-center px-4">
+            <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
+            <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] ${cTextMuted}`}>
+              {t.source}
+            </p>
+            <p className={`mt-4 text-[9px] font-sans font-bold uppercase tracking-[0.4em] ${cText}`}>
+              Cordwainer
+            </p>
+          </div>
+        </div>
 
-      {/* Bottom Dock */}
-      <div className="fixed bottom-[10px] left-0 right-0 z-50 pointer-events-auto">
-        <div className="mx-auto w-full max-w-[var(--app-max-width)]">
-          <BottomDock active="search" lang={lang} />
+      </div>
+    </div>
+  )
+}
+
+
+type FlipCardProps = {
+  term: GlossaryTerm
+  lang: Lang
+  isDark: boolean
+  flipHint: string
+}
+
+function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
+  const [flipped, setFlipped] = useState(false)
+
+  const title = lang === 'de' && (term as any).termDe ? (term as any).termDe 
+              : lang === 'uk' && term.termUk ? term.termUk 
+              : term.term
+              
+  const definition = lang === 'de' && (term as any).definitionDe ? (term as any).definitionDe 
+                   : lang === 'uk' && term.definitionUk ? term.definitionUk 
+                   : term.definition
+                   
+  const example = lang === 'de' && (term as any).exampleDe ? (term as any).exampleDe 
+                : lang === 'uk' && term.exampleUk ? term.exampleUk 
+                : term.example
+
+  const cat = term.category ?? 'other'
+  const icon = CATEGORY_ICON[cat]
+
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cSurface = isDark ? 'bg-[#111111]' : 'bg-[#EAE6DF]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+
+  const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => { haptic('light'); setFlipped((f) => !f) }}
+      aria-expanded={flipped}
+      className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left outline-none cursor-pointer"
+      style={{ perspective: 1200, WebkitPerspective: 1200 }}
+    >
+      <div
+        className="relative w-full h-full"
+        style={{
+          transformStyle: 'preserve-3d',
+          WebkitTransformStyle: 'preserve-3d',
+          transition: 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)',
+          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        }}
+      >
+        {/* FRONT */}
+        <div
+          className={`absolute inset-0 flex flex-col items-center justify-between p-5 border ${cLine} ${cSurface} overflow-hidden backface-hidden shadow-sm`}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            pointerEvents: flipped ? 'none' : 'auto',
+          }}
+        >
+          {/* Top Line */}
+          <div className="w-full flex items-center justify-between z-10">
+            <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+              {CATEGORY_LABELS[cat][lang]}
+            </span>
+            <div className={`w-5 h-5 flex items-center justify-center ${cTextMuted}`}>
+              <svg width="100%" height="100%" viewBox="0 0 24 24">
+                {icon}
+              </svg>
+            </div>
+          </div>
+
+          {/* Center Huge Letter */}
+          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[120px] leading-none opacity-5 pointer-events-none select-none ${cText}`}>
+            {title.charAt(0).toUpperCase()}
+          </div>
+
+          {/* Bottom Term */}
+          <div className="w-full flex flex-col items-center text-center z-10 mt-auto">
+            <h3 className={`font-serif text-[22px] leading-[1.1] mb-4 ${cText}`}>
+              {title}
+            </h3>
+            <div className={`text-[8px] font-sans tracking-[0.3em] uppercase transition-opacity opacity-0 group-hover:opacity-100 ${cTextMuted}`}>
+              {flipHint}
+            </div>
+          </div>
+        </div>
+
+        {/* BACK */}
+        <div
+          className={`absolute inset-0 flex flex-col p-5 border ${cLine} ${cSurface} overflow-hidden shadow-sm`}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)',
+            WebkitTransform: 'rotateY(180deg)',
+            pointerEvents: flipped ? 'auto' : 'none',
+          }}
+        >
+          {/* Header */}
+          <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0`}>
+            <h3 className={`font-serif text-[18px] leading-none truncate ${cText}`}>
+              {title}
+            </h3>
+          </div>
+
+          {/* Scrollable Content */}
+          <div
+            className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2"
+            onClick={stopEvent}
+            onPointerDown={stopEvent}
+            onTouchStart={stopEvent}
+            onWheel={stopEvent}
+          >
+            <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.7] ${cTextMuted}`}>
+              {definition}
+            </p>
+
+            {example && (
+              <div className={`mt-4 pt-4 border-t ${cLine}`}>
+                <span className={`block mb-1 text-[8px] font-sans uppercase tracking-[0.3em] ${cText}`}>
+                  {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
+                </span>
+                <p className={`font-serif text-[13px] italic leading-[1.5] ${cTextMuted}`}>
+                  {example}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes glossaryIn {
-          from { opacity: 0; transform: scale(0.92) translateY(8px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .perspective-\\[1000px\\] { perspective: 1000px; }
-        .preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden {
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-        }
-        .scrollbar-none::-webkit-scrollbar { display: none; }
-        .scrollbar-none {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   )
 }
