@@ -20,6 +20,15 @@ type HomePageProps = {
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void 
 }
 
+// Добавляем строгий тип для элементов меню, где dot опционален
+type MenuItem = {
+  id: string
+  title: string
+  subtitle: string
+  action?: () => void
+  dot?: boolean
+}
+
 function glossaryLabel(count: number, lang: Lang): string {
   if (lang === 'uk') {
     const n10 = count % 10
@@ -205,22 +214,21 @@ export function HomePage({
     }
   }[safeLang]
 
-  const LEARNING = [
+  const LEARNING: MenuItem[] = [
     { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: undefined },
     { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
     { id: 'styles', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
     { id: 'sizes', title: t.sizes, subtitle: t.sizesSub, action: undefined },
   ]
 
-  const TOOLS = [
+  const TOOLS: MenuItem[] = [
     { id: 'calc', title: t.calc, subtitle: t.calcSub, action: onOpenCalcMenu },
     { id: 'blog', title: t.blog, subtitle: t.blogSub, action: onOpenBlog, dot: hasNewBlog },
     { id: 'glossary', title: t.glossary, subtitle: t.glossarySub, action: () => onOpenGlossary?.() },
     { id: 'prices', title: t.prices, subtitle: t.pricesSub, action: onOpenPrices },
   ]
 
-  // Новая секция для замены Док-бара
-  const SYSTEM = [
+  const SYSTEM: MenuItem[] = [
     { id: 'settings', title: t.settings, subtitle: t.settingsSub, action: () => onChangeTab?.('settings') },
     { id: 'profile', title: t.profile, subtitle: t.profileSub, action: () => onChangeTab?.('profile') },
   ]
@@ -258,15 +266,14 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  // Цветовые токены
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // Универсальный рендер списка оглавления
-  const renderList = (items: typeof LEARNING, startIndex: number = 1) => (
+  // Используем интерфейс MenuItem для типизации
+  const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
         const num = startIndex + idx
@@ -413,7 +420,6 @@ export function HomePage({
               {renderList(TOOLS, 5)}
             </div>
 
-            {/* НОВАЯ СЕКЦИЯ ДЛЯ ДОСТУПА В НАСТРОЙКИ (ВМЕСТО ДОК-БАРА) */}
             <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
               <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
                 {t.system}
