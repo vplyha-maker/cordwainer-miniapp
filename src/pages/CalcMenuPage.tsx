@@ -281,7 +281,7 @@ export function CalcMenuPage({
         style={{ background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)' }}
       >
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
-          <BottomDock active="workspace" lang={lang} />
+          <BottomDock active="settings lang={lang} />
         </div>
       </div>
     </motion.div>
