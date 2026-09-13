@@ -18,6 +18,7 @@ type HomePageProps = {
   favorites?: FavoriteItem[]
   onOpenArticle?: (articleId: string) => void
   onOpenFavorites?: () => void
+  onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
 }
 
 function glossaryLabel(count: number, lang: Lang): string {
@@ -72,6 +73,7 @@ export function HomePage({
   favorites = [],
   onOpenArticle,
   onOpenFavorites,
+  onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -148,7 +150,7 @@ export function HomePage({
       sizes: 'Розміри, ортопедія',
       sizesSub: 'Колодки, підйом, стопа',
       sizesCount: '97 статей',
-      calc: 'Калькулятори',
+      calc: 'Калькуляторы',
       calcSub: `${CALCULATORS_COUNT} модулів`,
       blog: 'Блог',
       blogSub: hasNewBlog ? 'Нове' : 'Статті',
@@ -602,7 +604,7 @@ export function HomePage({
         }}
       >
         <div className="mx-auto w-full max-w-[var(--app-max-width)]">
-          <BottomDock active="search" lang={safeLang} />
+          <BottomDock active="search" lang={safeLang} onChange={onChangeTab} />
         </div>
       </div>
     </div>
