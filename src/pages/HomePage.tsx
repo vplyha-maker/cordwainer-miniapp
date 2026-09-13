@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+Import { useEffect, useState } from 'react'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
 import { CALCULATORS_COUNT } from './CalcMenuPage'
@@ -265,12 +265,11 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  // Используем переменные Telegram с фолбеком на ваши цвета
-  const cBg = isDark ? 'bg-[var(--tg-theme-bg-color,#0A0A0A)]' : 'bg-[var(--tg-theme-bg-color,#F2EFE9)]'
-  const cText = isDark ? 'text-[var(--tg-theme-text-color,#F4F0E8)]' : 'text-[var(--tg-theme-text-color,#1C1816)]'
-  const cTextMuted = isDark ? 'text-[var(--tg-theme-hint-color,#F4F0E8)]/50' : 'text-[var(--tg-theme-hint-color,#1C1816)]/50'
-  const cLine = isDark ? 'border-[var(--tg-theme-hint-color,#F4F0E8)]/15' : 'border-[var(--tg-theme-hint-color,#1C1816)]/15'
-  const cHover = isDark ? 'hover:text-[var(--tg-theme-link-color,#ffffff)]' : 'hover:text-[var(--tg-theme-link-color,#000000)]'
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
@@ -306,165 +305,166 @@ export function HomePage({
   )
 
   return (
+    // Заменили жесткую высоту на min-h-[100dvh] w-full для нативного скролла
     <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
       
-      {/* Искусственные снежинки удалены. Фон полностью определяется системными переменными TG. */}
-      <div className="relative z-10">
-        <style>{`
-          @keyframes fadeUp {
-            0% { opacity: 0; transform: translateY(16px); }
-            100% { opacity: 1; transform: translateY(0); }
-          }
-          .stagger-item {
-            opacity: 0;
-            animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-        `}</style>
+      <style>{`
+        @keyframes fadeUp {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+          opacity: 0;
+          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
 
-        {/* HEADER */}
-        <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
-          {onBack ? (
-            <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}>
-              <span className="transform transition-transform group-hover:-translate-x-1">←</span>
-              <span>Back</span>
+      {/* HEADER */}
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
+        {onBack ? (
+          <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}>
+            <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+            <span>Back</span>
+          </button>
+        ) : (
+          <div className="w-10"></div>
+        )}
+
+        <div className="flex items-center gap-4">
+          {['ru', 'uk', 'de'].map((l) => (
+            <button
+              key={l}
+              onClick={() => handleLangChange(l as Lang)}
+              className={`text-[10px] font-sans uppercase tracking-[0.25em] transition-colors duration-500 ${
+                safeLang === l ? cText : cTextMuted
+              } ${cHover}`}
+            >
+              {l === 'uk' ? 'UKR' : l}
             </button>
-          ) : (
-            <div className="w-10"></div>
-          )}
+          ))}
+        </div>
+      </header>
 
-          <div className="flex items-center gap-4">
-            {['ru', 'uk', 'de'].map((l) => (
-              <button
-                key={l}
-                onClick={() => handleLangChange(l as Lang)}
-                className={`text-[10px] font-sans uppercase tracking-[0.25em] transition-colors duration-500 ${
-                  safeLang === l ? cText : cTextMuted
-                } ${cHover}`}
-              >
-                {l === 'uk' ? 'UKR' : l}
+      {/* КОНТЕНТ БЕЗ ОГРАНИЧЕНИЙ ВЫСОТЫ */}
+      <div className="px-6 pb-24">
+        
+        {/* ЗАГОЛОВОК СТРАНИЦЫ */}
+        <div className="stagger-item mb-12" style={{ animationDelay: '0.1s' }}>
+          <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
+            {t.menu}
+          </h1>
+        </div>
+
+        {/* ПОИСК */}
+        <div className="stagger-item mb-16" style={{ animationDelay: '0.15s' }}>
+          <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
+            <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.search}
+              className={`w-full bg-transparent outline-none text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest ${cTextMuted}`}>
+                Clear
               </button>
-            ))}
+            )}
           </div>
-        </header>
+        </div>
 
-        {/* КОНТЕНТ */}
-        <div className="px-6 pb-24">
-          
-          {/* ЗАГОЛОВОК СТРАНИЦЫ */}
-          <div className="stagger-item mb-12" style={{ animationDelay: '0.1s' }}>
-            <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
-              {t.menu}
-            </h1>
+        {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
+        {query ? (
+          <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
+            <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+              {t.searchResults} / {searchResults.length}
+            </p>
+            {searchResults.length > 0 ? (
+              <div className="flex flex-col">
+                {searchResults.map((res, i) => (
+                  <button
+                    key={`${res.type}-${res.id}-${i}`}
+                    onClick={() => handleResultClick(res)}
+                    className={`group flex items-center justify-between py-5 border-b ${cLine} text-left active:opacity-50 transition-opacity`}
+                  >
+                    <div className="font-serif text-[22px] leading-none transition-transform group-active:translate-x-2">
+                      {res.title}
+                    </div>
+                    <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+                      {res.subtitle}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
+                {t.noResults}
+              </div>
+            )}
           </div>
-
-          {/* ПОИСК */}
-          <div className="stagger-item mb-16" style={{ animationDelay: '0.15s' }}>
-            <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
-              <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t.search}
-                className={`w-full bg-transparent outline-none text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[var(--tg-theme-text-color,#F4F0E8)]/30' : 'placeholder:text-[var(--tg-theme-text-color,#1C1816)]/30'}`}
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest ${cTextMuted}`}>
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
-          {query ? (
+        ) : (
+          <>
             <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
-                {t.searchResults} / {searchResults.length}
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.learning}
               </p>
-              {searchResults.length > 0 ? (
-                <div className="flex flex-col">
-                  {searchResults.map((res, i) => (
-                    <button
-                      key={`${res.type}-${res.id}-${i}`}
-                      onClick={() => handleResultClick(res)}
-                      className={`group flex items-center justify-between py-5 border-b ${cLine} text-left active:opacity-50 transition-opacity`}
-                    >
-                      <div className="font-serif text-[22px] leading-none transition-transform group-active:translate-x-2">
-                        {res.title}
-                      </div>
-                      <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
-                        {res.subtitle}
-                      </div>
-                    </button>
+              {renderList(LEARNING, 1)}
+            </div>
+
+            <div className="stagger-item" style={{ animationDelay: '0.3s' }}>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.tools}
+              </p>
+              {renderList(TOOLS, 5)}
+            </div>
+
+            <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.system}
+              </p>
+              {renderList(SYSTEM, 9)}
+            </div>
+
+            {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
+            <div className="stagger-item mb-16" style={{ animationDelay: '0.5s' }}>
+              <button
+                className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--color-ink)]/5`}
+                onClick={() => {
+                  if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
+                  else if (articleFavorites.length > 1) onOpenFavorites?.()
+                }}
+              >
+                <div>
+                  <div className="font-serif text-[26px] leading-none mb-2">{t.favorites}</div>
+                  <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
+                </div>
+                <div className="flex -space-x-4">
+                  {articleFavorites.slice(0, 3).map((item, idx) => (
+                    <div key={item.id} className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#0A0A0A]' : 'border-[#F2EFE9]'} overflow-hidden grayscale`} style={{ zIndex: 10 - idx }}>
+                      <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
+                    </div>
                   ))}
                 </div>
-              ) : (
-                <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
-                  {t.noResults}
-                </div>
-              )}
+              </button>
             </div>
-          ) : (
-            <>
-              <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
-                  {t.learning}
+
+            {/* ЦИТАТА */}
+            <div className="stagger-item pb-10" style={{ animationDelay: '0.6s' }}>
+              <div className="flex flex-col items-center text-center px-4">
+                <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
+                <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
+                  {t.quote}
                 </p>
-                {renderList(LEARNING, 1)}
-              </div>
-
-              <div className="stagger-item" style={{ animationDelay: '0.3s' }}>
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
-                  {t.tools}
+                <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
+                  Cordwainer
                 </p>
-                {renderList(TOOLS, 5)}
               </div>
-
-              <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
-                  {t.system}
-                </p>
-                {renderList(SYSTEM, 9)}
-              </div>
-
-              <div className="stagger-item mb-16" style={{ animationDelay: '0.5s' }}>
-                <button
-                  className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--tg-theme-button-color,var(--color-ink))]/5`}
-                  onClick={() => {
-                    if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
-                    else if (articleFavorites.length > 1) onOpenFavorites?.()
-                  }}
-                >
-                  <div>
-                    <div className="font-serif text-[26px] leading-none mb-2">{t.favorites}</div>
-                    <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
-                  </div>
-                  <div className="flex -space-x-4">
-                    {articleFavorites.slice(0, 3).map((item, idx) => (
-                      <div key={item.id} className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#0A0A0A]' : 'border-[#F2EFE9]'} overflow-hidden grayscale`} style={{ zIndex: 10 - idx }}>
-                        <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </button>
-              </div>
-
-              <div className="stagger-item pb-10" style={{ animationDelay: '0.6s' }}>
-                <div className="flex flex-col items-center text-center px-4">
-                  <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
-                  <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
-                    {t.quote}
-                  </p>
-                  <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
-                    Cordwainer
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
 }
+
