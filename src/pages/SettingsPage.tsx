@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
@@ -8,7 +8,6 @@ type SettingsPageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   onChangeTab: (tab: 'search' | 'settings' | 'profile') => void
-  // ДОБАВЛЕНО: свойство для кнопки "Назад"
   onBack?: () => void
 }
 
@@ -20,15 +19,18 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 
 export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPageProps) {
   const [graphics, setGraphics] = useState<'full' | 'fast'>('full')
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
-  useEffect(() => {
-    const saved = getSavedPerfMode()
-    if (saved === 'fast') {
-      setGraphics('fast')
-    } else {
-      setGraphics('full')
-    }
+  // Инициализация
+  useLayoutEffect(() => {
+    // 1. Графика
+    const savedGraphics = getSavedPerfMode()
+    setGraphics(savedGraphics === 'fast' ? 'fast' : 'full')
+
+    // 2. Тема (проверяем, что сейчас установлено на html)
+    const isDark = document.documentElement.classList.contains('dark')
+    setTheme(isDark ? 'dark' : 'light')
   }, [])
 
   const handleLangChange = (newLang: Lang) => {
@@ -43,6 +45,33 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     setGraphics(mode)
     savePerfMode(mode)
     applyPerfMode(mode)
+  }
+
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    haptic('light')
+    setTheme(newTheme)
+    
+    // Сохраняем выбор пользователя, чтобы App.tsx мог его подхватить при старте
+    localStorage.setItem('cordwainer_theme', newTheme)
+
+    const root = document.documentElement
+    if (newTheme === 'dark') {
+      root.classList.add('dark')
+      root.classList.remove('light')
+    } else {
+      root.classList.add('light')
+      root.classList.remove('dark')
+    }
+
+    // Обновляем шапку Telegram
+    try {
+      const tg = window.Telegram?.WebApp
+      if (tg) {
+        const bg = newTheme === 'dark' ? '#151210' : '#F5F1EA'
+        tg.setHeaderColor(bg)
+        tg.setBackgroundColor(bg)
+      }
+    } catch {}
   }
 
   const handleAddToHome = async () => {
@@ -65,6 +94,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     ru: {
       title: 'Настройки',
       language: 'Язык интерфейса',
+      theme: 'Оформление',
+      themeLight: 'Светлое',
+      themeDark: 'Темное',
       graphics: 'Качество графики',
       graphicsHigh: 'Высокое',
       graphicsLow: 'Производительность',
@@ -78,6 +110,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     uk: {
       title: 'Налаштування',
       language: 'Мова інтерфейсу',
+      theme: 'Оформлення',
+      themeLight: 'Світле',
+      themeDark: 'Темне',
       graphics: 'Якість графіки',
       graphicsHigh: 'Висока',
       graphicsLow: 'Продуктивність',
@@ -91,6 +126,9 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     de: {
       title: 'Einstellungen',
       language: 'Sprache',
+      theme: 'Erscheinungsbild',
+      themeLight: 'Hell',
+      themeDark: 'Dunkel',
       graphics: 'Grafikqualität',
       graphicsHigh: 'Hoch',
       graphicsLow: 'Leistung',
@@ -104,18 +142,18 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   }[lang]
 
   return (
-    <div className="relative min-h-[100dvh] bg-[#111] text-[#F5F1EA] pb-[120px]">
+    <div className="relative min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-[120px] transition-colors duration-300">
       
-      {/* ШАПКА С КНОПКОЙ НАЗАД */}
-      <div className="px-5 pt-12 pb-6 border-b border-white/10 flex items-start justify-between">
+      {/* ШАПКА */}
+      <div className="px-5 pt-12 pb-6 border-b border-[var(--color-border)] flex items-start justify-between">
         <div>
-          <h1 className="font-display text-[2rem] leading-none mb-1">{t.title}</h1>
-          <p className="text-[10px] uppercase tracking-[0.2em] opacity-50">Cordwainer</p>
+          <h1 className="font-display text-[2rem] leading-none mb-1 text-[var(--color-ink)]">{t.title}</h1>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted)]">Cordwainer</p>
         </div>
         
         <button
           onClick={onBack || (() => onChangeTab('search'))}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 active:scale-90 transition-transform"
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-90 transition-transform text-[var(--color-ink)]"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M15 18l-6-6 6-6" />
@@ -123,70 +161,114 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
         </button>
       </div>
 
-      <div className="px-5 py-6 space-y-10">
+      <div className="px-5 py-6 space-y-8">
+        
+        {/* ЯЗЫК */}
         <section>
-          <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.language}
           </h2>
-          <div className="flex bg-white/5 border border-white/10 rounded-xl p-1">
-            {(['ru', 'uk', 'de'] as const).map((l) => (
-              <button
-                key={l}
-                onClick={() => handleLangChange(l)}
-                className={`flex-1 py-3 text-[11px] font-bold tracking-widest uppercase rounded-lg transition-all ${
-                  lang === l ? 'bg-white/90 text-black shadow-md' : 'text-white/60 hover:text-white'
-                }`}
-              >
-                {l === 'uk' ? 'UKR' : l}
-              </button>
-            ))}
+          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
+            {(['ru', 'uk', 'de'] as const).map((l) => {
+              const isActive = lang === l
+              return (
+                <button
+                  key={l}
+                  onClick={() => handleLangChange(l)}
+                  className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                    isActive 
+                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+                  }`}
+                >
+                  {l === 'uk' ? 'UKR' : l}
+                </button>
+              )
+            })}
           </div>
         </section>
 
+        {/* ТЕМА */}
         <section>
-          <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
+            {t.theme}
+          </h2>
+          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
+            <button
+              onClick={() => handleThemeChange('dark')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                theme === 'dark' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.themeDark}
+            </button>
+            <button
+              onClick={() => handleThemeChange('light')}
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                theme === 'light' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {t.themeLight}
+            </button>
+          </div>
+        </section>
+
+        {/* ГРАФИКА */}
+        <section>
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.graphics}
           </h2>
-          <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 mb-3">
+          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm mb-3">
             <button
               onClick={() => handleGraphicsChange('full')}
-              className={`flex-1 py-3 text-[11px] font-bold tracking-widest uppercase rounded-lg transition-all ${
-                graphics === 'full' ? 'bg-[#D8A35C] text-black shadow-[0_0_15px_rgba(216,163,92,0.4)]' : 'text-white/60 hover:text-white'
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                graphics === 'full' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
               }`}
             >
               {t.graphicsHigh}
             </button>
             <button
               onClick={() => handleGraphicsChange('fast')}
-              className={`flex-1 py-3 text-[11px] font-bold tracking-widest uppercase rounded-lg transition-all ${
-                graphics === 'fast' ? 'bg-white/90 text-black shadow-md' : 'text-white/60 hover:text-white'
+              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
+                graphics === 'fast' 
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
               }`}
             >
               {t.graphicsLow}
             </button>
           </div>
-          <p className="text-[11px] font-light opacity-50 leading-relaxed px-1">
+          <p className="text-[11px] font-medium text-[var(--color-muted)] leading-relaxed px-1">
             {t.graphicsDesc}
           </p>
         </section>
 
+        {/* PWA УСТАНОВКА */}
         <section>
-          <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
-            Приложение
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
+            Cordwainer App
           </h2>
           <button
             onClick={handleAddToHome}
-            className="w-full text-left p-4 rounded-xl bg-white/5 border border-white/10 active:scale-95 transition-transform flex items-center justify-between"
+            className="w-full text-left p-5 rounded-[20px] bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-[0.98] transition-transform flex items-center justify-between shadow-sm"
           >
             <div>
-              <div className="text-[14px] font-medium mb-1">{t.install}</div>
-              <div className="text-[11px] font-light opacity-50 leading-relaxed max-w-[240px]">
+              <div className="text-[14px] font-bold text-[var(--color-ink)] mb-1">{t.install}</div>
+              <div className="text-[11px] font-medium text-[var(--color-muted)] leading-relaxed max-w-[240px]">
                 {t.installDesc}
               </div>
             </div>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D8A35C" strokeWidth="1.5" className="opacity-80">
-              <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-color-mix(in srgb, var(--color-accent) 15%, transparent) text-[var(--color-accent)] shrink-0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </div>
           </button>
         </section>
 
@@ -203,19 +285,19 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
             className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-6"
             onClick={() => setShowWidgetHint(false)}
           >
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
             <motion.div
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 20, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md bg-[#1A1816] border border-white/10 p-5 rounded-2xl shadow-2xl"
+              className="relative w-full max-w-md bg-[var(--color-bg)] border border-[var(--color-border)] p-6 rounded-[24px] shadow-2xl"
             >
-              <h3 className="text-[16px] font-medium mb-2 text-[#D8A35C]">{t.hintTitle}</h3>
-              <p className="text-[13px] font-light opacity-70 mb-5 leading-relaxed">{t.hintText}</p>
+              <h3 className="text-[16px] font-bold mb-2 text-[var(--color-ink)]">{t.hintTitle}</h3>
+              <p className="text-[13px] font-medium text-[var(--color-muted)] mb-6 leading-relaxed">{t.hintText}</p>
               <button
                 onClick={() => setShowWidgetHint(false)}
-                className="w-full py-3 rounded-xl bg-white/10 active:bg-white/20 transition-colors text-[11px] font-bold uppercase tracking-widest"
+                className="w-full py-4 rounded-[16px] bg-[var(--color-ink)] text-[var(--color-bg)] active:scale-95 transition-transform text-[11px] font-bold uppercase tracking-widest"
               >
                 {t.close}
               </button>
