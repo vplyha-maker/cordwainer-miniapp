@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
 
+// Импортируем готовые функции из вашего скрипта производительности
+import { getSavedPerfMode, savePerfMode, applyPerfMode } from '../lib/performance'
+
 type SettingsPageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
@@ -16,12 +19,18 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 }
 
 export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) {
-  const [graphics, setGraphics] = useState<'high' | 'low'>('high')
+  // Используем типы 'full' (высокое) и 'fast' (производительность)
+  const [graphics, setGraphics] = useState<'full' | 'fast'>('full')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   useEffect(() => {
-    const savedGraphics = localStorage.getItem('cordwainer_graphics') as 'high' | 'low'
-    if (savedGraphics) setGraphics(savedGraphics)
+    // При загрузке страницы читаем текущий режим из общего хранилища
+    const saved = getSavedPerfMode()
+    if (saved === 'fast') {
+      setGraphics('fast')
+    } else {
+      setGraphics('full')
+    }
   }, [])
 
   const handleLangChange = (newLang: Lang) => {
@@ -31,16 +40,13 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
     setLang(newLang)
   }
 
-  const handleGraphicsChange = (mode: 'high' | 'low') => {
+  const handleGraphicsChange = (mode: 'full' | 'fast') => {
     haptic('light')
     setGraphics(mode)
-    localStorage.setItem('cordwainer_graphics', mode)
-    // Здесь можно глобально отключать блюр или анимации, добавив класс на body
-    if (mode === 'low') {
-      document.documentElement.classList.add('low-graphics')
-    } else {
-      document.documentElement.classList.remove('low-graphics')
-    }
+    
+    // Сохраняем и сразу применяем новый режим через вашу готовую логику
+    savePerfMode(mode)
+    applyPerfMode(mode)
   }
 
   const handleAddToHome = async () => {
@@ -103,7 +109,6 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
 
   return (
     <div className="relative min-h-[100dvh] bg-[#111] text-[#F5F1EA] pb-[120px]">
-      {/* Шапка */}
       <div className="px-5 pt-12 pb-6 border-b border-white/10">
         <h1 className="font-display text-[2rem] leading-none mb-1">{t.title}</h1>
         <p className="text-[10px] uppercase tracking-[0.2em] opacity-50">Cordwainer</p>
@@ -111,7 +116,6 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
 
       <div className="px-5 py-6 space-y-10">
         
-        {/* Язык */}
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
             {t.language}
@@ -131,24 +135,23 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
           </div>
         </section>
 
-        {/* Графика */}
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
             {t.graphics}
           </h2>
           <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 mb-3">
             <button
-              onClick={() => handleGraphicsChange('high')}
+              onClick={() => handleGraphicsChange('full')}
               className={`flex-1 py-3 text-[11px] font-bold tracking-widest uppercase rounded-lg transition-all ${
-                graphics === 'high' ? 'bg-[#D8A35C] text-black shadow-[0_0_15px_rgba(216,163,92,0.4)]' : 'text-white/60 hover:text-white'
+                graphics === 'full' ? 'bg-[#D8A35C] text-black shadow-[0_0_15px_rgba(216,163,92,0.4)]' : 'text-white/60 hover:text-white'
               }`}
             >
               {t.graphicsHigh}
             </button>
             <button
-              onClick={() => handleGraphicsChange('low')}
+              onClick={() => handleGraphicsChange('fast')}
               className={`flex-1 py-3 text-[11px] font-bold tracking-widest uppercase rounded-lg transition-all ${
-                graphics === 'low' ? 'bg-white/90 text-black shadow-md' : 'text-white/60 hover:text-white'
+                graphics === 'fast' ? 'bg-white/90 text-black shadow-md' : 'text-white/60 hover:text-white'
               }`}
             >
               {t.graphicsLow}
@@ -159,7 +162,6 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
           </p>
         </section>
 
-        {/* PWA Установка */}
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
             Приложение
@@ -184,7 +186,6 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
 
       <BottomDock active="settings" lang={lang} onChange={onChangeTab} />
 
-      {/* Модалка инструкции установки */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
@@ -217,4 +218,3 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
     </div>
   )
 }
-
