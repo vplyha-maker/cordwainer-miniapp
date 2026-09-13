@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useState, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
@@ -22,15 +22,18 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
-  // Инициализация
   useLayoutEffect(() => {
-    // 1. Графика
     const savedGraphics = getSavedPerfMode()
     setGraphics(savedGraphics === 'fast' ? 'fast' : 'full')
 
-    // 2. Тема (проверяем, что сейчас установлено на html)
-    const isDark = document.documentElement.classList.contains('dark')
-    setTheme(isDark ? 'dark' : 'light')
+    // Правильная инициализация: сначала ищем ручной выбор пользователя
+    const savedTheme = localStorage.getItem('cordwainer_theme')
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      setTheme(savedTheme)
+    } else {
+      const isDark = document.documentElement.classList.contains('dark')
+      setTheme(isDark ? 'dark' : 'light')
+    }
   }, [])
 
   const handleLangChange = (newLang: Lang) => {
@@ -50,11 +53,13 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     haptic('light')
     setTheme(newTheme)
-    
-    // Сохраняем выбор пользователя, чтобы App.tsx мог его подхватить при старте
     localStorage.setItem('cordwainer_theme', newTheme)
 
     const root = document.documentElement
+    
+    // 🛑 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Удаляем инлайн-стили, которые блокировали смену цвета
+    root.removeAttribute('style')
+
     if (newTheme === 'dark') {
       root.classList.add('dark')
       root.classList.remove('light')
@@ -63,7 +68,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       root.classList.remove('dark')
     }
 
-    // Обновляем шапку Telegram
     try {
       const tg = window.Telegram?.WebApp
       if (tg) {
@@ -144,7 +148,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   return (
     <div className="relative min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-[120px] transition-colors duration-300">
       
-      {/* ШАПКА */}
       <div className="px-5 pt-12 pb-6 border-b border-[var(--color-border)] flex items-start justify-between">
         <div>
           <h1 className="font-display text-[2rem] leading-none mb-1 text-[var(--color-ink)]">{t.title}</h1>
@@ -163,7 +166,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
 
       <div className="px-5 py-6 space-y-8">
         
-        {/* ЯЗЫК */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.language}
@@ -188,7 +190,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </div>
         </section>
 
-        {/* ТЕМА */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.theme}
@@ -217,7 +218,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </div>
         </section>
 
-        {/* ГРАФИКА */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             {t.graphics}
@@ -249,7 +249,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           </p>
         </section>
 
-        {/* PWA УСТАНОВКА */}
         <section>
           <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
             Cordwainer App
@@ -264,7 +263,8 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
                 {t.installDesc}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-color-mix(in srgb, var(--color-accent) 15%, transparent) text-[var(--color-accent)] shrink-0">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-accent)] shrink-0"
+                 style={{ background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
