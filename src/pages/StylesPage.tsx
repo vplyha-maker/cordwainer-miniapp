@@ -278,41 +278,44 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         ) : null}
       </div>
 
-      {/* ЖУРНАЛЬНЫЙ ГРАДИЕНТ ДЛЯ ТЕКСТА (опущен ниже) */}
-      <div className="absolute bottom-0 left-0 right-0 h-[50%] bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/70 to-transparent z-10 pointer-events-none" />
+      {/* ЖУРНАЛЬНЫЙ ГРАДИЕНТ ДЛЯ ТЕКСТА (Разделен на верх и низ для лучшей читаемости) */}
+      <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-[#0A0A0A]/90 via-[#0A0A0A]/60 to-transparent z-10 pointer-events-none" />
 
-      {/* ЖУРНАЛЬНЫЙ КОНТЕНТНЫЙ БЛОК (Смещен максимально вниз) */}
-      <div className={`absolute bottom-4 left-5 right-5 z-20 flex flex-col transition-all duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-        
-        {/* Заголовок и линия (Уменьшены отступы и размер шрифта) */}
-        <div className="flex items-end justify-between border-b border-white/20 pb-4 mb-4">
-          <div>
-            <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/60 mb-2">
-              {slide.subtitle[currentLang]}
-            </p>
-            <h2 className="font-serif text-[10.5vw] min-[390px]:text-[2.75rem] leading-[0.9] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line">
-              {slide.title[currentLang]}
-            </h2>
-          </div>
-          
-          <div className="text-[10px] font-sans tracking-widest text-white/40 mb-1">
-            0{index + 1}
-          </div>
+      {/* ВЕРХНИЙ БЛОК: ЗАГОЛОВОК (Уменьшен и перенесен наверх) */}
+      <div className={`absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between transition-all duration-[1s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <div>
+          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/60 mb-2">
+            {slide.subtitle[currentLang]}
+          </p>
+          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-md">
+            {slide.title[currentLang]}
+          </h2>
         </div>
+        <div className="text-[10px] font-sans tracking-widest text-white/40 mt-1">
+          0{index + 1}
+        </div>
+      </div>
 
-        {/* Описание и кнопки */}
+      {/* НИЖНИЙ БЛОК: ОПИСАНИЕ И КНОПКИ (Прижат к низу) */}
+      <div className={`absolute bottom-6 left-6 right-6 z-20 flex flex-col transition-all duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+        
+        {/* Тонкая линия-разделитель */}
+        <div className="w-full h-px bg-white/20 mb-5" />
+
+        {/* Описание и кнопки в одну линию */}
         <div className="flex items-start justify-between gap-4">
-          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white/70 max-w-[220px] min-[390px]:max-w-[260px]">
+          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white/80 max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-md">
             {slide.desc[currentLang]}
           </p>
 
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center gap-4 shrink-0 mt-1">
             {/* Кнопка ЛАЙК */}
             <button 
               onClick={handleLike} 
               className="group flex flex-col items-center gap-1.5 outline-none"
             >
-              <div className={`w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center transition-all duration-500 active:scale-90 ${isLiked ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-white/20 text-white hover:border-white/60'}`}>
+              <div className={`w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center transition-all duration-500 active:scale-90 ${isLiked ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'border-white/30 text-white hover:border-white/60'}`}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                 </svg>
@@ -327,7 +330,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
               onClick={handleShare} 
               className="group flex flex-col items-center gap-1.5 outline-none"
             >
-              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/20 flex items-center justify-center text-white transition-all duration-500 hover:border-white/60 active:scale-90">
+              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/30 flex items-center justify-center text-white transition-all duration-500 hover:border-white/60 active:scale-90">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                   <polyline points="16 6 12 2 8 6" />
@@ -377,10 +380,10 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       `}</style>
 
       {/* ГЛОБАЛЬНЫЙ МИНИМАЛИСТИЧНЫЙ HEADER */}
-      <header className="absolute top-0 left-0 right-0 z-[100] px-5 pt-10 pb-4 flex justify-between items-start pointer-events-none mix-blend-difference">
+      <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
         <button
           onClick={onBack}
-          className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8]/70 hover:text-white transition-colors outline-none"
+          className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-md"
         >
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
           <span>Back</span>
@@ -393,7 +396,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
             }
             setIsMuted(!isMuted)
           }}
-          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8]/70 hover:text-white transition-colors outline-none"
+          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-md"
         >
           {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
         </button>
