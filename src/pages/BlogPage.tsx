@@ -184,10 +184,6 @@ export function BlogPage({
         readSub: count === 0 ? 'Скоро' : `${count} ${ruPlural}`,
         contact: 'Сотрудничество',
         contactSub: 'Предложить идею',
-        favoriteAdd: 'В закладки',
-        favoriteAddSub: 'Сохранить раздел',
-        favoriteRemove: 'Сохранено',
-        favoriteRemoveSub: 'Убрать раздел',
         backToMenu: 'Назад',
         journalTitle: 'Журнал',
         journalDesc: 'Размышления об индустрии, людях, дизайне и производстве.',
@@ -227,10 +223,6 @@ export function BlogPage({
         readSub: count === 0 ? 'Незабаром' : `${count} ${ukPlural}`,
         contact: 'Співпраця',
         contactSub: 'Запропонувати ідею',
-        favoriteAdd: 'У закладки',
-        favoriteAddSub: 'Зберегти розділ',
-        favoriteRemove: 'Збережено',
-        favoriteRemoveSub: 'Видалити розділ',
         backToMenu: 'Назад',
         journalTitle: 'Журнал',
         journalDesc: 'Роздуми про індустрію, людей, дизайн та виробництво.',
@@ -270,10 +262,6 @@ export function BlogPage({
         readSub: count === 0 ? 'Bald' : `${count} Artikel`,
         contact: 'Kooperation',
         contactSub: 'Idee vorschlagen',
-        favoriteAdd: 'Speichern',
-        favoriteAddSub: 'Kategorie speichern',
-        favoriteRemove: 'Gespeichert',
-        favoriteRemoveSub: 'Kategorie entfernen',
         backToMenu: 'Zurück',
         journalTitle: 'Journal',
         journalDesc: 'Gedanken über die Industrie, Menschen, Design und Produktion.',
@@ -358,7 +346,6 @@ export function BlogPage({
   const MENU_ITEMS = [
     { id: 'journal', title: t.journalTitle, subtitle: t.readSub, action: () => { setView('journal'); setShowOnlyFavorites(false); setActiveFilter('all') } },
     { id: 'collab', title: t.collabTitle, subtitle: t.contactSub, action: () => setView('collaboration') },
-    { id: 'favs', title: isFavorite ? t.favoriteRemove : t.favoriteAdd, subtitle: isFavorite ? t.favoriteRemoveSub : t.favoriteAddSub, action: onToggleFavorite }
   ]
 
   return (
@@ -425,6 +412,7 @@ export function BlogPage({
         <div className="relative min-h-[100dvh] flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8]">
           <div className="absolute inset-0 z-0 pointer-events-none">
             <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
+            {/* Жесткий темный градиент для обложки, чтобы белый текст всегда читался идеально */}
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-black/30" />
           </div>
 
