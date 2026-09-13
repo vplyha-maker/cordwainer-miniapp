@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
-
-// Импортируем готовые функции из вашего скрипта производительности
 import { getSavedPerfMode, savePerfMode, applyPerfMode } from '../lib/performance'
 
 type SettingsPageProps = {
   lang: Lang
   setLang: (lang: Lang) => void
   onChangeTab: (tab: 'search' | 'settings' | 'profile') => void
+  // ДОБАВЛЕНО: свойство для кнопки "Назад"
+  onBack?: () => void
 }
 
 function haptic(kind: 'light' | 'medium' = 'light') {
@@ -18,13 +18,11 @@ function haptic(kind: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) {
-  // Используем типы 'full' (высокое) и 'fast' (производительность)
+export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPageProps) {
   const [graphics, setGraphics] = useState<'full' | 'fast'>('full')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   useEffect(() => {
-    // При загрузке страницы читаем текущий режим из общего хранилища
     const saved = getSavedPerfMode()
     if (saved === 'fast') {
       setGraphics('fast')
@@ -43,8 +41,6 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
   const handleGraphicsChange = (mode: 'full' | 'fast') => {
     haptic('light')
     setGraphics(mode)
-    
-    // Сохраняем и сразу применяем новый режим через вашу готовую логику
     savePerfMode(mode)
     applyPerfMode(mode)
   }
@@ -109,13 +105,25 @@ export function SettingsPage({ lang, setLang, onChangeTab }: SettingsPageProps) 
 
   return (
     <div className="relative min-h-[100dvh] bg-[#111] text-[#F5F1EA] pb-[120px]">
-      <div className="px-5 pt-12 pb-6 border-b border-white/10">
-        <h1 className="font-display text-[2rem] leading-none mb-1">{t.title}</h1>
-        <p className="text-[10px] uppercase tracking-[0.2em] opacity-50">Cordwainer</p>
+      
+      {/* ШАПКА С КНОПКОЙ НАЗАД */}
+      <div className="px-5 pt-12 pb-6 border-b border-white/10 flex items-start justify-between">
+        <div>
+          <h1 className="font-display text-[2rem] leading-none mb-1">{t.title}</h1>
+          <p className="text-[10px] uppercase tracking-[0.2em] opacity-50">Cordwainer</p>
+        </div>
+        
+        <button
+          onClick={onBack || (() => onChangeTab('search'))}
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 border border-white/10 active:scale-90 transition-transform"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
       </div>
 
       <div className="px-5 py-6 space-y-10">
-        
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-widest opacity-60 mb-4">
             {t.language}
