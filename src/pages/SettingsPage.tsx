@@ -1,6 +1,5 @@
 import { useState, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BottomDock } from '../components/BottomDock'
 import type { Lang } from '../App'
 import { applyImmediateMutedTheme } from '../App'
 import { getSavedPerfMode, savePerfMode, applyPerfMode } from '../lib/performance'
@@ -36,13 +35,13 @@ function applyFontSize(size: FontSize) {
   const root = document.documentElement
   const scale = size === 'small' ? '0.94' : size === 'large' ? '1.07' : '1'
   root.style.setProperty('--font-scale', scale)
-  // Мягко масштабируем только основной текст, не трогая плотные UI-элементы
   root.style.fontSize = `calc(16px * ${scale})`
 }
 
 export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPageProps) {
   const [graphics, setGraphics] = useState<'full' | 'fast'>('full')
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [isDark, setIsDark] = useState(true)
   const [font, setFont] = useState<FontMode>('classic')
   const [fontSize, setFontSize] = useState<FontSize>('medium')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
@@ -54,9 +53,11 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     const savedTheme = localStorage.getItem('cordwainer_theme')
     if (savedTheme === 'dark' || savedTheme === 'light') {
       setTheme(savedTheme)
+      setIsDark(savedTheme === 'dark')
     } else {
-      const isDark = document.documentElement.classList.contains('dark')
-      setTheme(isDark ? 'dark' : 'light')
+      const darkQuery = document.documentElement.classList.contains('dark')
+      setTheme(darkQuery ? 'dark' : 'light')
+      setIsDark(darkQuery)
     }
 
     const savedFont = localStorage.getItem('cordwainer_font') as FontMode | null
@@ -93,6 +94,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     haptic('light')
     setTheme(newTheme)
+    setIsDark(newTheme === 'dark')
     localStorage.setItem('cordwainer_theme', newTheme)
     applyImmediateMutedTheme(newTheme === 'dark')
   }
@@ -130,68 +132,68 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const t = {
     ru: {
       title: 'Настройки',
-      language: 'Язык интерфейса',
-      theme: 'Оформление',
-      themeLight: 'Светлое',
-      themeDark: 'Темное',
+      language: 'Язык',
+      theme: 'Тема',
+      themeLight: 'Светлая',
+      themeDark: 'Темная',
       font: 'Шрифт',
-      fontClassic: 'Классика',
-      fontSystem: 'Системный',
-      fontSize: 'Размер текста',
+      fontClassic: 'Изящный',
+      fontSystem: 'Строгий',
+      fontSize: 'Масштаб',
       sizeSmall: 'Мелкий',
-      sizeMedium: 'Обычный',
+      sizeMedium: 'Стандарт',
       sizeLarge: 'Крупный',
-      graphics: 'Качество графики',
-      graphicsHigh: 'Высокое',
-      graphicsLow: 'Производительность',
+      graphics: 'Графика',
+      graphicsHigh: 'Максимум',
+      graphicsLow: 'Энергосбережение',
       graphicsDesc: 'Отключение размытия и сложных анимаций для экономии батареи.',
-      install: 'Установить приложение',
+      install: 'Установить',
       installDesc: 'Добавить на главный экран для быстрого доступа без интернета.',
       hintTitle: 'Установка',
       hintText: 'Откройте приложение в браузере (Safari/Chrome) и выберите «На главный экран».',
       close: 'Закрыть',
     },
     uk: {
-      title: 'Налаштування',
-      language: 'Мова інтерфейсу',
-      theme: 'Оформлення',
-      themeLight: 'Світле',
-      themeDark: 'Темне',
+      title: 'Система',
+      language: 'Мова',
+      theme: 'Тема',
+      themeLight: 'Світла',
+      themeDark: 'Темна',
       font: 'Шрифт',
-      fontClassic: 'Класика',
-      fontSystem: 'Системний',
-      fontSize: 'Розмір тексту',
+      fontClassic: 'Витончений',
+      fontSystem: 'Строгий',
+      fontSize: 'Масштаб',
       sizeSmall: 'Дрібний',
-      sizeMedium: 'Звичайний',
+      sizeMedium: 'Стандарт',
       sizeLarge: 'Великий',
-      graphics: 'Якість графіки',
-      graphicsHigh: 'Висока',
-      graphicsLow: 'Продуктивність',
+      graphics: 'Графіка',
+      graphicsHigh: 'Максимум',
+      graphicsLow: 'Енергозбереження',
       graphicsDesc: 'Вимкнення розмиття та складних анімацій для економії заряду.',
-      install: 'Встановити застосунок',
+      install: 'Встановити',
       installDesc: 'Додати на головний екран для швидкого доступу без інтернету.',
       hintTitle: 'Встановлення',
       hintText: 'Відкрийте застосунок у браузері та оберіть «На головний екран».',
       close: 'Закрити',
     },
     de: {
-      title: 'Einstellungen',
+      title: 'System',
       language: 'Sprache',
-      theme: 'Erscheinungsbild',
+      theme: 'Design',
       themeLight: 'Hell',
       themeDark: 'Dunkel',
       font: 'Schriftart',
-      fontClassic: 'Klassisch',
-      fontSystem: 'System',
-      fontSize: 'Schriftgröße',
+      fontClassic: 'Elegant',
+      fontSystem: 'Streng',
+      fontSize: 'Maßstab',
       sizeSmall: 'Klein',
-      sizeMedium: 'Normal',
+      sizeMedium: 'Standard',
       sizeLarge: 'Groß',
-      graphics: 'Grafikqualität',
-      graphicsHigh: 'Hoch',
-      graphicsLow: 'Leistung',
+      graphics: 'Grafik',
+      graphicsHigh: 'Maximum',
+      graphicsLow: 'Sparmodus',
       graphicsDesc: 'Deaktiviert Unschärfe und komplexe Animationen, um Akku zu sparen.',
-      install: 'App installieren',
+      install: 'Installieren',
       installDesc: 'Zum Startbildschirm hinzufügen für schnellen Offline-Zugriff.',
       hintTitle: 'Installation',
       hintText: 'Öffnen Sie die App im Browser und wählen Sie „Zum Startbildschirm hinzufügen“.',
@@ -199,231 +201,200 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
     },
   }[lang]
 
-  return (
-    <div className="relative min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] pb-[120px] transition-colors duration-300">
-      
-      <div className="px-5 pt-12 pb-6 border-b border-[var(--color-border)] flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-[2rem] leading-none mb-1 text-[var(--color-ink)]">{t.title}</h1>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted)]">Cordwainer</p>
-        </div>
-        
-        <button
-          onClick={onBack || (() => onChangeTab('search'))}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-90 transition-transform text-[var(--color-ink)]"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
+  // Токены Digital Couture
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+
+  // Утилита для рендера журнальных блоков настроек
+  const renderOptionGroup = (
+    title: string, 
+    options: { label: string; value: string }[], 
+    currentValue: string, 
+    onChange: (val: any) => void, 
+    delay: string,
+    desc?: string
+  ) => (
+    <div className={`stagger-item border-b ${cLine} py-8`} style={{ animationDelay: delay }}>
+      <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+        {title}
+      </p>
+      <div className="flex flex-col gap-5">
+        {options.map((opt) => {
+          const isActive = currentValue === opt.value
+          return (
+            <button
+              key={opt.value}
+              onClick={() => onChange(opt.value)}
+              className="group flex items-center gap-6 text-left transition-all active:opacity-50"
+            >
+              <span className={`text-[9px] font-sans tracking-[0.2em] transition-opacity w-6 ${isActive ? 'opacity-100' : 'opacity-20'}`}>
+                {isActive ? '—' : ''}
+              </span>
+              <span 
+                className={`font-serif text-[6.5vw] min-[375px]:text-3xl transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  isActive 
+                    ? 'italic opacity-100 translate-x-2' 
+                    : 'opacity-30 group-hover:opacity-70'
+                }`}
+              >
+                {opt.label}
+              </span>
+            </button>
+          )
+        })}
       </div>
+      {desc && (
+        <p className={`mt-8 text-[10px] font-sans uppercase tracking-[0.15em] leading-[1.6] max-w-[85%] ${cTextMuted}`}>
+          {desc}
+        </p>
+      )}
+    </div>
+  )
 
-      <div className="px-5 py-6 space-y-8">
+  return (
+    <div className={`relative flex flex-col min-h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
+      
+      <style>{`
+        @keyframes fadeUp {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+          opacity: 0;
+          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* МИНИМАЛИСТИЧНЫЙ HEADER */}
+      <header className="px-6 pt-8 pb-4 shrink-0 flex items-start justify-between z-20">
+        <button 
+          onClick={onBack || (() => onChangeTab('search'))} 
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}
+        >
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span>Back</span>
+        </button>
+      </header>
+
+      {/* ОСНОВНОЙ СКРОЛЛ */}
+      <div className="flex-1 px-6 overflow-y-auto pb-24 overscroll-none scrollbar-hide">
         
-        {/* Язык */}
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
-            {t.language}
-          </h2>
-          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
-            {(['ru', 'uk', 'de'] as const).map((l) => {
-              const isActive = lang === l
-              return (
-                <button
-                  key={l}
-                  onClick={() => handleLangChange(l)}
-                  className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                    isActive 
-                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                      : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-                  }`}
-                >
-                  {l === 'uk' ? 'UKR' : l}
-                </button>
-              )
-            })}
-          </div>
-        </section>
+        {/* ЗАГОЛОВОК */}
+        <div className="stagger-item mb-8" style={{ animationDelay: '0.1s' }}>
+          <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
+            {t.title}
+          </h1>
+        </div>
 
-        {/* Тема */}
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
-            {t.theme}
-          </h2>
-          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
-            <button
-              onClick={() => handleThemeChange('dark')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                theme === 'dark' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.themeDark}
-            </button>
-            <button
-              onClick={() => handleThemeChange('light')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                theme === 'light' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.themeLight}
-            </button>
-          </div>
-        </section>
+        {/* НАСТРОЙКИ: ЯЗЫК */}
+        {renderOptionGroup(
+          t.language,
+          [
+            { label: 'Русский', value: 'ru' },
+            { label: 'Українська', value: 'uk' },
+            { label: 'Deutsch', value: 'de' }
+          ],
+          lang,
+          handleLangChange,
+          '0.15s'
+        )}
 
-        {/* Тип шрифта */}
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
-            {t.font}
-          </h2>
-          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
-            <button
-              onClick={() => handleFontChange('classic')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                font === 'classic' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.fontClassic}
-            </button>
-            <button
-              onClick={() => handleFontChange('system')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                font === 'system' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.fontSystem}
-            </button>
-          </div>
-        </section>
+        {/* НАСТРОЙКИ: ТЕМА */}
+        {renderOptionGroup(
+          t.theme,
+          [
+            { label: t.themeLight, value: 'light' },
+            { label: t.themeDark, value: 'dark' }
+          ],
+          theme,
+          handleThemeChange,
+          '0.2s'
+        )}
 
-        {/* Размер текста — мягкий диапазон */}
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
-            {t.fontSize}
-          </h2>
-          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm">
-            <button
-              onClick={() => handleFontSizeChange('small')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                fontSize === 'small' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.sizeSmall}
-            </button>
-            <button
-              onClick={() => handleFontSizeChange('medium')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                fontSize === 'medium' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.sizeMedium}
-            </button>
-            <button
-              onClick={() => handleFontSizeChange('large')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                fontSize === 'large' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.sizeLarge}
-            </button>
-          </div>
-        </section>
+        {/* НАСТРОЙКИ: ШРИФТ */}
+        {renderOptionGroup(
+          t.font,
+          [
+            { label: t.fontClassic, value: 'classic' },
+            { label: t.fontSystem, value: 'system' }
+          ],
+          font,
+          handleFontChange,
+          '0.25s'
+        )}
 
-        {/* Графика */}
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
-            {t.graphics}
-          </h2>
-          <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[20px] p-1.5 shadow-sm mb-3">
-            <button
-              onClick={() => handleGraphicsChange('full')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                graphics === 'full' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.graphicsHigh}
-            </button>
-            <button
-              onClick={() => handleGraphicsChange('fast')}
-              className={`flex-1 py-3.5 text-[11px] font-bold tracking-[0.15em] uppercase rounded-[14px] transition-all ${
-                graphics === 'fast' 
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] shadow-md' 
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {t.graphicsLow}
-            </button>
-          </div>
-          <p className="text-[11px] font-medium text-[var(--color-muted)] leading-relaxed px-1">
-            {t.graphicsDesc}
-          </p>
-        </section>
+        {/* НАСТРОЙКИ: МАСШТАБ */}
+        {renderOptionGroup(
+          t.fontSize,
+          [
+            { label: t.sizeSmall, value: 'small' },
+            { label: t.sizeMedium, value: 'medium' },
+            { label: t.sizeLarge, value: 'large' }
+          ],
+          fontSize,
+          handleFontSizeChange,
+          '0.3s'
+        )}
 
-        {/* Установка */}
-        <section>
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted)] mb-3">
-            Cordwainer App
-          </h2>
-          <button
-            onClick={handleAddToHome}
-            className="w-full text-left p-5 rounded-[20px] bg-[var(--color-surface)] border border-[var(--color-border)] active:scale-[0.98] transition-transform flex items-center justify-between shadow-sm"
+        {/* НАСТРОЙКИ: ГРАФИКА */}
+        {renderOptionGroup(
+          t.graphics,
+          [
+            { label: t.graphicsHigh, value: 'full' },
+            { label: t.graphicsLow, value: 'fast' }
+          ],
+          graphics,
+          handleGraphicsChange,
+          '0.35s',
+          t.graphicsDesc
+        )}
+
+        {/* УСТАНОВКА ПРИЛОЖЕНИЯ */}
+        <div className="stagger-item py-12" style={{ animationDelay: '0.4s' }}>
+          <button 
+            onClick={handleAddToHome} 
+            className={`w-full p-8 border text-left transition-colors active:bg-current/5 ${cLine}`}
           >
-            <div>
-              <div className="text-[14px] font-bold text-[var(--color-ink)] mb-1">{t.install}</div>
-              <div className="text-[11px] font-medium text-[var(--color-muted)] leading-relaxed max-w-[240px]">
-                {t.installDesc}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-accent)] shrink-0"
-                 style={{ background: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
+            <div className="font-serif text-[7vw] min-[375px]:text-3xl mb-4">{t.install}</div>
+            <div className={`text-[10px] font-sans uppercase tracking-[0.2em] leading-relaxed max-w-[85%] ${cTextMuted}`}>
+              {t.installDesc}
             </div>
           </button>
-        </section>
+        </div>
 
       </div>
 
-      <BottomDock active="settings" lang={lang} onChange={onChangeTab} />
-
+      {/* МОДАЛЬНОЕ ОКНО ИНСТРУКЦИИ (Адаптировано под стиль) */}
       <AnimatePresence>
         {showWidgetHint && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-6"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
             onClick={() => setShowWidgetHint(false)}
           >
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
             <motion.div
-              initial={{ y: 50, opacity: 0 }}
+              initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
+              exit={{ y: 10, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md bg-[var(--color-bg)] border border-[var(--color-border)] p-6 rounded-[24px] shadow-2xl"
+              className={`w-full max-w-sm p-8 border shadow-2xl ${isDark ? 'bg-[#0A0A0A] border-white/10' : 'bg-[#F2EFE9] border-black/10'}`}
             >
-              <h3 className="text-[16px] font-bold mb-2 text-[var(--color-ink)]">{t.hintTitle}</h3>
-              <p className="text-[13px] font-medium text-[var(--color-muted)] mb-6 leading-relaxed">{t.hintText}</p>
+              <h3 className="font-serif text-2xl mb-4 text-center">{t.hintTitle}</h3>
+              <p className={`text-[10px] font-sans uppercase tracking-[0.2em] text-center leading-[1.8] mb-8 ${cTextMuted}`}>
+                {t.hintText}
+              </p>
               <button
                 onClick={() => setShowWidgetHint(false)}
-                className="w-full py-4 rounded-[16px] bg-[var(--color-ink)] text-[var(--color-bg)] active:scale-95 transition-transform text-[11px] font-bold uppercase tracking-widest"
+                className={`w-full py-4 border text-[10px] font-sans uppercase tracking-[0.3em] transition-colors ${
+                  isDark 
+                    ? 'border-white/20 hover:bg-white hover:text-black' 
+                    : 'border-black/20 hover:bg-black hover:text-white'
+                }`}
               >
                 {t.close}
               </button>
