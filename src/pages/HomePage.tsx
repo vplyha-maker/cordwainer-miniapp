@@ -17,7 +17,6 @@ type HomePageProps = {
   favorites?: FavoriteItem[]
   onOpenArticle?: (articleId: string) => void
   onOpenFavorites?: () => void
-  // onChangeTab оставлен в типах, чтобы не ломать родительский App.tsx, но сам компонент его больше не использует
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void 
 }
 
@@ -72,6 +71,7 @@ export function HomePage({
   favorites = [],
   onOpenArticle,
   onOpenFavorites,
+  onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isDark, setIsDark] = useState(true)
@@ -80,7 +80,6 @@ export function HomePage({
   const articleFavorites = favorites?.filter((f) => f.type === 'article') || []
   const glossaryCount = GLOSSARY_TERMS?.length || 0
 
-  // Тема
   useEffect(() => {
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
     checkTheme()
@@ -89,7 +88,6 @@ export function HomePage({
     return () => observer.disconnect()
   }, [])
 
-  // Язык
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
     const supportedLangs = ['ru', 'uk', 'de']
@@ -111,6 +109,7 @@ export function HomePage({
       search: 'Поиск (материалы, конструкции...)',
       learning: 'Исследование',
       tools: 'Инструментарий',
+      system: 'Система',
       materials: 'Материалы',
       materialsSub: 'Кожа, замша, подошвы',
       colors: 'Цвета',
@@ -127,6 +126,10 @@ export function HomePage({
       glossarySub: glossaryLabel(glossaryCount, 'ru'),
       prices: 'Рынок',
       pricesSub: 'Сводка цен',
+      settings: 'Настройки',
+      settingsSub: 'Тема, язык, интерфейс',
+      profile: 'Профиль',
+      profileSub: 'Аккаунт и данные',
       favorites: 'Сохраненное',
       favoritesSub: articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
@@ -139,6 +142,7 @@ export function HomePage({
       search: 'Пошук (матеріали, конструкції...)',
       learning: 'Дослідження',
       tools: 'Інструментарій',
+      system: 'Система',
       materials: 'Матеріали',
       materialsSub: 'Шкіра, замша, підошви',
       colors: 'Кольори',
@@ -155,6 +159,10 @@ export function HomePage({
       glossarySub: glossaryLabel(glossaryCount, 'uk'),
       prices: 'Ринок',
       pricesSub: 'Зведення цін',
+      settings: 'Налаштування',
+      settingsSub: 'Тема, мова, інтерфейс',
+      profile: 'Профіль',
+      profileSub: 'Акаунт та дані',
       favorites: 'Збережене',
       favoritesSub: articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
@@ -167,6 +175,7 @@ export function HomePage({
       search: 'Suchen (Materialien, Formen...)',
       learning: 'Forschung',
       tools: 'Werkzeuge',
+      system: 'System',
       materials: 'Materialien',
       materialsSub: 'Leder, Sohlen',
       colors: 'Farben',
@@ -183,6 +192,10 @@ export function HomePage({
       glossarySub: glossaryLabel(glossaryCount, 'de'),
       prices: 'Markt',
       pricesSub: 'Preisübersicht',
+      settings: 'Einstellungen',
+      settingsSub: 'Design, Sprache',
+      profile: 'Profil',
+      profileSub: 'Account & Daten',
       favorites: 'Gespeichert',
       favoritesSub: articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
       quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
@@ -206,11 +219,17 @@ export function HomePage({
     { id: 'prices', title: t.prices, subtitle: t.pricesSub, action: onOpenPrices },
   ]
 
+  // Новая секция для замены Док-бара
+  const SYSTEM = [
+    { id: 'settings', title: t.settings, subtitle: t.settingsSub, action: () => onChangeTab?.('settings') },
+    { id: 'profile', title: t.profile, subtitle: t.profileSub, action: () => onChangeTab?.('profile') },
+  ]
+
   const query = searchQuery.trim().toLowerCase()
   const searchResults: Array<{ id: string; type: string; title: string; subtitle: string }> = []
 
   if (query) {
-    [...LEARNING, ...TOOLS].forEach((item) => {
+    [...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
       if (item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)) {
         searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
       }
@@ -229,7 +248,7 @@ export function HomePage({
 
   const handleResultClick = (res: any) => {
     if (res.type === 'category') {
-      const match = [...LEARNING, ...TOOLS].find(i => i.id === res.id)
+      const match = [...LEARNING, ...TOOLS, ...SYSTEM].find(i => i.id === res.id)
       match?.action?.()
     } else if (res.type === 'article') {
       onOpenArticle?.(res.id)
@@ -245,6 +264,40 @@ export function HomePage({
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+
+  // Универсальный рендер списка оглавления
+  const renderList = (items: typeof LEARNING, startIndex: number = 1) => (
+    <div className="flex flex-col mb-16">
+      {items.map((item, idx) => {
+        const num = startIndex + idx
+        const numStr = num < 10 ? `0${num}` : `${num}`
+        return (
+          <button
+            key={item.id}
+            onClick={item.action}
+            className={`group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all ${item.action ? 'active:opacity-50' : 'opacity-40 cursor-not-allowed'}`}
+          >
+            <div className="flex items-start gap-4">
+              <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+                {numStr}
+              </span>
+              <div className="flex items-center gap-3">
+                <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
+                  {item.title}
+                </div>
+                {item.dot && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
+                )}
+              </div>
+            </div>
+            <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+              {item.subtitle}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className={`relative flex flex-col h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText}`}>
@@ -262,18 +315,15 @@ export function HomePage({
 
       {/* HEADER */}
       <header className="px-6 pt-8 pb-4 shrink-0 flex items-start justify-between z-20">
-        
-        {/* Кнопка НАЗАД (если есть) вынесена в левый верхний угол в строгом стиле */}
         {onBack ? (
           <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}>
             <span className="transform transition-transform group-hover:-translate-x-1">←</span>
             <span>Back</span>
           </button>
         ) : (
-          <div className="w-10"></div> // Spacer
+          <div className="w-10"></div>
         )}
 
-        {/* Переключатель языка - минималистичный текстовый */}
         <div className="flex items-center gap-4">
           {['ru', 'uk', 'de'].map((l) => (
             <button
@@ -299,7 +349,7 @@ export function HomePage({
           </h1>
         </div>
 
-        {/* СТРОГИЙ ПОИСК */}
+        {/* ПОИСК */}
         <div className="stagger-item mb-16" style={{ animationDelay: '0.15s' }}>
           <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
             <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
@@ -318,7 +368,7 @@ export function HomePage({
           </div>
         </div>
 
-        {/* РЕЗУЛЬТАТЫ ПОИСКА */}
+        {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
         {query ? (
           <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
             <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
@@ -348,71 +398,31 @@ export function HomePage({
             )}
           </div>
         ) : (
-          /* КАТЕГОРИИ (Журнальное оглавление) */
           <>
             <div className="stagger-item" style={{ animationDelay: '0.2s' }}>
               <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
                 {t.learning}
               </p>
-              <div className="flex flex-col mb-16">
-                {LEARNING.map((item, idx) => (
-                  <button
-                    key={item.id}
-                    onClick={item.action}
-                    className={`group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all ${item.action ? 'active:opacity-50' : 'opacity-40 cursor-not-allowed'}`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
-                        0{idx + 1}
-                      </span>
-                      <div>
-                        <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
-                          {item.title}
-                        </div>
-                      </div>
-                    </div>
-                    <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
-                      {item.subtitle}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {renderList(LEARNING, 1)}
             </div>
 
             <div className="stagger-item" style={{ animationDelay: '0.3s' }}>
               <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
                 {t.tools}
               </p>
-              <div className="flex flex-col mb-16">
-                {TOOLS.map((item, idx) => (
-                  <button
-                    key={item.id}
-                    onClick={item.action}
-                    className={`group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all active:opacity-50`}
-                  >
-                    <div className="flex items-start gap-4">
-                      <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
-                        {idx + 5 < 10 ? `0${idx + 5}` : idx + 5}
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-active:translate-x-2 group-active:italic">
-                          {item.title}
-                        </div>
-                        {item.dot && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
-                        )}
-                      </div>
-                    </div>
-                    <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
-                      {item.subtitle}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {renderList(TOOLS, 5)}
             </div>
 
-            {/* ИЗБРАННОЕ КАК ОТДЕЛЬНАЯ ЖУРНАЛЬНАЯ ВРЕЗКА */}
-            <div className="stagger-item mb-16" style={{ animationDelay: '0.4s' }}>
+            {/* НОВАЯ СЕКЦИЯ ДЛЯ ДОСТУПА В НАСТРОЙКИ (ВМЕСТО ДОК-БАРА) */}
+            <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.system}
+              </p>
+              {renderList(SYSTEM, 9)}
+            </div>
+
+            {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
+            <div className="stagger-item mb-16" style={{ animationDelay: '0.5s' }}>
               <button
                 className={`w-full flex items-center justify-between p-6 border ${cLine} transition-colors active:bg-[var(--color-ink)]/5`}
                 onClick={() => {
@@ -435,7 +445,7 @@ export function HomePage({
             </div>
 
             {/* ЦИТАТА */}
-            <div className="stagger-item pb-10" style={{ animationDelay: '0.5s' }}>
+            <div className="stagger-item pb-10" style={{ animationDelay: '0.6s' }}>
               <div className="flex flex-col items-center text-center px-4">
                 <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
                 <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
