@@ -170,7 +170,8 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
   return (
-    <div className={`relative flex flex-col h-[100dvh] transition-colors duration-[1.5s] ${cBg} ${cText} overflow-hidden`}>
+    // Жестко блокируем горизонтальный скролл на главном контейнере: w-full, overflow-x-hidden, max-w-[100vw]
+    <div className={`relative flex flex-col h-[100dvh] w-full max-w-[100vw] transition-colors duration-500 ${cBg} ${cText} overflow-hidden overflow-x-hidden`}>
       <style>{`
         * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -182,7 +183,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
         }
         .stagger-item {
           opacity: 0;
-          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
 
@@ -197,21 +198,21 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
         </button>
       </header>
 
-      {/* CONTENT */}
-      <div ref={listRef} className="flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide">
+      {/* CONTENT (Тоже с блокировкой горизонтального скролла) */}
+      <div ref={listRef} className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-24 scrollbar-hide w-full">
         
         {/* ЗАГОЛОВОК */}
-        <div className="stagger-item mb-12" style={{ animationDelay: '0.05s' }}>
+        <div className="stagger-item mb-12 w-full" style={{ animationDelay: '0.05s' }}>
           <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted}`}>
             {t.subtitle} / {filtered.length} {t.terms}
           </p>
-          <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight">
+          <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight break-words pr-2">
             {t.title}
           </h1>
         </div>
 
         {/* ПОИСК */}
-        <div className="stagger-item mb-10" style={{ animationDelay: '0.1s' }}>
+        <div className="stagger-item mb-10 w-full" style={{ animationDelay: '0.1s' }}>
           <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
             <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
             <input
@@ -230,9 +231,9 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
         </div>
 
         {/* ФИЛЬТРЫ (КАТЕГОРИИ И АЛФАВИТ) */}
-        <div className="stagger-item mb-12 flex flex-col gap-6" style={{ animationDelay: '0.15s' }}>
+        <div className="stagger-item mb-12 flex flex-col gap-6 w-full" style={{ animationDelay: '0.15s' }}>
           {/* Categories */}
-          <div className={`flex overflow-x-auto gap-6 pb-4 border-b ${cLine} scrollbar-hide`}>
+          <div className={`flex overflow-x-auto w-full gap-6 pb-4 border-b ${cLine} scrollbar-hide`}>
             <button 
               onClick={() => { haptic('light'); setActiveCategory(null); }}
               className={`text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all outline-none border-none bg-transparent cursor-pointer ${
@@ -255,10 +256,10 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
 
           {/* Alphabet */}
-          <div className="flex overflow-x-auto gap-5 pb-2 scrollbar-hide items-center">
+          <div className="flex overflow-x-auto w-full gap-5 pb-2 scrollbar-hide items-center">
              <button 
               onClick={() => { haptic('light'); setActiveLetter(null); }}
-              className={`text-[12px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer ${
+              className={`text-[12px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer shrink-0 ${
                 activeLetter === null ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
               }`}
             >
@@ -271,7 +272,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
                   key={letter}
                   disabled={!hasTerms}
                   onClick={() => { haptic('light'); setActiveLetter(activeLetter === letter ? null : letter); }}
-                  className={`text-[14px] font-serif transition-all outline-none border-none bg-transparent ${
+                  className={`text-[14px] font-serif transition-all outline-none border-none bg-transparent shrink-0 ${
                     !hasTerms ? 'opacity-[0.08] pointer-events-none' : 
                     activeLetter === letter ? `italic ${cText} opacity-100 scale-125 origin-bottom` : `${cTextMuted} opacity-70 hover:opacity-100 cursor-pointer`
                   }`}
@@ -285,7 +286,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
 
         {/* СЕТКА КАРТОЧЕК */}
         {filtered.length === 0 ? (
-          <div className="stagger-item py-12 text-center flex flex-col items-center gap-6" style={{ animationDelay: '0.2s' }}>
+          <div className="stagger-item py-12 text-center flex flex-col items-center gap-6 w-full" style={{ animationDelay: '0.2s' }}>
             <p className={`font-serif text-2xl italic ${cTextMuted}`}>
               {t.empty}
             </p>
@@ -294,7 +295,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-16 w-full">
             {filtered.map((term, i) => (
               <div
                 key={term.id}
@@ -313,7 +314,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
         )}
 
         {/* FOOTER */}
-        <div className="stagger-item pb-10" style={{ animationDelay: '0.4s' }}>
+        <div className="stagger-item pb-10 w-full" style={{ animationDelay: '0.4s' }}>
           <div className="flex flex-col items-center text-center px-4">
             <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
             <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] ${cTextMuted}`}>
@@ -371,17 +372,12 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
       className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left outline-none cursor-pointer"
       style={{ perspective: '1200px', WebkitPerspective: '1200px' }}
     >
-      {/* 
-        ОБЕРТКА ДЛЯ 3D. 
-        transform-style: preserve-3d — обязательно для iOS, 
-        чтобы карточки крутились как единый 3D-объект.
-      */}
       <div
         className="relative w-full h-full"
         style={{
           transformStyle: 'preserve-3d',
           WebkitTransformStyle: 'preserve-3d',
-          transition: 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)',
+          transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
           transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
           WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
         }}
@@ -390,11 +386,13 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
         <div
           className={`absolute inset-0 flex flex-col items-center justify-between p-5 border ${cLine} ${cSurface} shadow-sm`}
           style={{
+            // Убрали overflow: hidden! Это ломало 3D-движок Safari.
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            /* translateZ(1px) исправляет мерцание z-index на Safari/iOS */
-            transform: 'rotateY(0deg) translateZ(1px)',
-            WebkitTransform: 'rotateY(0deg) translateZ(1px)',
+            transform: 'rotateY(0deg)',
+            WebkitTransform: 'rotateY(0deg)',
+            zIndex: 2,
+            pointerEvents: flipped ? 'none' : 'auto',
           }}
         >
           <div className="w-full flex items-center justify-between z-10">
@@ -428,9 +426,10 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            /* Изначально перевернуто, translateZ(1px) для фикса iOS */
-            transform: 'rotateY(180deg) translateZ(1px)',
-            WebkitTransform: 'rotateY(180deg) translateZ(1px)',
+            transform: 'rotateY(180deg)',
+            WebkitTransform: 'rotateY(180deg)',
+            zIndex: 1,
+            pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
           <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0`}>
