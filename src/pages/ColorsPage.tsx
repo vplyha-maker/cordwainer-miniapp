@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import type { Lang } from '../App'
 
 type ColorsPageProps = {
@@ -16,9 +16,9 @@ type Scheme =
   | 'split-complementary'
   | 'monochromatic'
 
-function SneakerSvg({ colors, isTetrad }: { colors: string[]; isTetrad: boolean }) {
-  const darkNeutral = 'var(--color-surface-2, #2F2924)' 
-  const lightNeutral = 'var(--color-bg, #1C1816)' 
+function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
+  const darkNeutral = isDark ? '#1C1816' : '#EAE6DF'
+  const lightNeutral = isDark ? '#2A2420' : '#F5F1EA'
 
   const mainColor = colors[0]
   const secondaryColor = colors[1]
@@ -29,38 +29,46 @@ function SneakerSvg({ colors, isTetrad }: { colors: string[]; isTetrad: boolean 
       xmlns="http://www.w3.org/2000/svg"
       xmlSpace="preserve"
       viewBox="0 0 512 512"
-      className="w-full h-auto max-h-[260px] md:max-h-[320px] drop-shadow-xl"
+      className="w-full h-auto max-h-[240px] md:max-h-[320px] transition-all duration-700"
+      style={{ filter: isDark ? 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' : 'drop-shadow(0 20px 30px rgba(0,0,0,0.1))' }}
     >
       <path
         d="m387.329 315.859-3.053 68.412 112.711-15.5v-26.256c-11.392-38.217-66.901-26.656-109.658-26.656"
         fill={secondaryColor} 
+        style={{ transition: 'fill 0.5s ease' }}
       />
       <path
         d="M166 95.727c-2.619-6.497-8.875-10.758-15.88-10.758H42.132c-4.691 0-8.463 3.769-8.548 8.459-1.261 69.511-17.023 192.334-17.023 290.845l370.768-8.552V315.86C246.242 272.128 181.92 135.211 166 95.727"
         fill={mainColor}
+        style={{ transition: 'fill 0.5s ease' }}
       />
       <path
         d="M166 95.727c-2.619-6.497-8.875-10.758-15.88-10.758h-33.124c41.934 124.159 136.457 224.064 269.15 276.32l1.182 1.303v-46.733C246.242 272.128 181.92 135.211 166 95.727"
         fill={secondaryColor}
+        style={{ transition: 'fill 0.5s ease' }}
       />
-      <circle cx="110.624" cy="255.999" r="51.309" fill={accentColor} />
-      <circle cx="110.624" cy="255.999" r="25.655" fill={accentColor} fillOpacity={0.7} />
+      <circle cx="110.624" cy="255.999" r="51.309" fill={accentColor} style={{ transition: 'fill 0.5s ease' }} />
+      <circle cx="110.624" cy="255.999" r="25.655" fill={accentColor} fillOpacity={0.7} style={{ transition: 'fill 0.5s ease' }} />
       <path
         d="M206.89 349.046 17.749 333.635c-.728 17.301-1.189 34.318-1.189 50.638l230.891-6.169-19.151-19.151a34.2 34.2 0 0 0-21.41-9.907"
         fill={secondaryColor}
+        style={{ transition: 'fill 0.5s ease' }}
       />
       <path
         d="m503.658 375.863-6.671-33.348c-.831.167-78.747 33.204-143.864 33.204H16.56a8.55 8.55 0 0 0-8.552 8.551v25.655c0 9.445 7.658 17.103 17.103 17.103h328.01c51.716 0 108.891-26.009 136.804-30.977 9.448-1.68 15.615-10.779 13.733-20.188"
         fill={lightNeutral}
+        style={{ transition: 'fill 0.5s ease' }}
       />
       <path
         d="m511.528 374.291-6.671-33.348c-.03-.146-.213-.818-.224-.855-11.124-36.949-54.483-34.879-92.75-33.047-8.17.39-15.899.75-23.327.788a285 285 0 0 1-31.079-11.814 8.015 8.015 0 0 0-3.78-8.832c-3.515-2.031-7.922-1.088-10.338 2.035a297 297 0 0 1-21.538-12.265c2.023-3.416 1.251-7.883-1.961-10.392a8.016 8.016 0 0 0-11.253 1.383l-.128.165a321 321 0 0 1-20.318-15.495c1.855-3.082 1.462-7.137-1.196-9.795a8.02 8.02 0 0 0-10.731-.548 357 357 0 0 1-18.908-18.514c3.294-2.868 3.695-7.857.869-11.209a8.017 8.017 0 0 0-11.297-.963l-.358.301a398 398 0 0 1-15.492-18.954 8.01 8.01 0 0 0 1.123-8.553c-1.836-3.917-6.432-5.643-10.38-3.971a437 437 0 0 1-15.372-23.166 8.018 8.018 0 0 0-8.032-13.786l-.134.061a448 448 0 0 1-13.636-25.783c3.555-1.844 5.253-6.092 3.806-9.933a8.02 8.02 0 0 0-10.328-4.678l-.222.083a355 355 0 0 1-4.426-10.477c-3.864-9.583-13.016-15.776-23.316-15.776H42.139c-8.969 0-16.401 7.325-16.563 16.329-.533 29.386-3.749 67.648-7.153 108.156-4.467 53.142-9.493 113.114-9.838 168.326C3.473 372.586 0 378.029 0 384.271v25.655c0 13.851 11.269 25.12 25.12 25.12h328.01c53.397 0 113.772-22.048 139.553-31.463 13.771-5.029 21.343-16.801 18.845-29.292m-98.879-51.234c37.303-1.784 63.537-1.617 73.689 15.013-37.218 14.314-67.886 21.792-90.984 25.655v-39.972c5.73-.152 11.574-.423 17.295-.696m74.535 65.465c-24.984 9.124-83.493 30.49-134.053 30.49H25.12c-5.01 0-9.086-4.076-9.086-9.086v-25.655c0-.295.239-.534.534-.534H42.22a8.017 8.017 0 0 0 0-16.034H24.63c.458-54.003 5.386-112.772 9.769-164.923 3.427-40.778 6.664-79.295 7.207-109.207.005-.335.234-.587.532-.587h67.1c1.487 4.109 4.224 11.314 8.338 20.808a8.02 8.02 0 0 0 7.361 4.832 8.019 8.019 0 0 0 7.352-11.207 388 388 0 0 1-5.929-14.433h23.767c3.724 0 7.039 2.252 8.445 5.739a370 370 0 0 0 4.273 10.136l-7.467 2.811a8.018 8.018 0 0 0 5.65 15.006l8.553-3.22a464 464 0 0 0 14.047 26.731l-7.324 3.343a8.017 8.017 0 0 0-3.965 10.622 8.02 8.02 0 0 0 7.299 4.691 8 8 0 0 0 3.323-.726l8.865-4.046a456 456 0 0 0 15.238 23.221l-7.532 3.531a8.018 8.018 0 0 0 6.807 14.519l10.354-4.854a418 418 0 0 0 17.621 21.701l-5.975 5.036a8.017 8.017 0 0 0 5.172 14.148 8 8 0 0 0 5.163-1.887l6.41-5.402a375 375 0 0 0 19.786 19.495l-6.403 6.403a8.016 8.016 0 0 0 0 11.337 8 8 0 0 0 5.669 2.348 8 8 0 0 0 5.669-2.348l7.178-7.179a338 338 0 0 0 21.621 16.615l-4.935 6.318a8.017 8.017 0 0 0 1.383 11.253 7.98 7.98 0 0 0 4.929 1.7 8 8 0 0 0 6.324-3.083l5.668-7.256a312 312 0 0 0 23.289 13.397l-4.65 8.053a8.017 8.017 0 1 0 13.885 8.016l5.226-9.052a301 301 0 0 0 29.6 11.604v28.939c-106.002-35.9-173.339-114.976-211.467-175.876a8.018 8.018 0 0 0-13.591 8.509c39.729 63.456 110.169 145.981 221.599 183.117-10.025 1.047-17.667 1.307-22.731 1.307H76.429a8.017 8.017 0 0 0 0 16.034H353.13c50.899 0 108.971-19.31 137.874-30.292l4.8 23.991c1.408 7.04-6.934 10.47-8.62 11.086"
         fill={darkNeutral}
+        style={{ transition: 'fill 0.5s ease' }}
       />
       <path
         d="M137.791 155.109a8.015 8.015 0 0 0 10.877 3.204 8.02 8.02 0 0 0 3.205-10.875 523 523 0 0 1-7.733-14.749 8.017 8.017 0 0 0-14.319 7.215 538 538 0 0 0 7.97 15.205M110.635 315.325c32.713 0 59.326-26.613 59.326-59.326s-26.613-59.326-59.326-59.326-59.326 26.613-59.326 59.326 26.613 59.326 59.326 59.326m0-102.618c23.872 0 43.292 19.42 43.292 43.292s-19.42 43.292-43.292 43.292-43.292-19.422-43.292-43.292 19.421-43.292 43.292-43.292"
         fill={secondaryColor}
         fillOpacity={0.5}
+        style={{ transition: 'fill 0.5s ease' }}
       />
     </svg>
   )
@@ -72,17 +80,20 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [whiteAmount, setWhiteAmount] = useState(0.05)
   const [blackAmount, setBlackAmount] = useState(0.05)
   const [showGuide, setShowGuide] = useState(false)
+  const [isDark, setIsDark] = useState(true)
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
   const rafId = useRef<number | null>(null)
   const pendingValue = useRef<number | null>(null)
 
-  useEffect(() => {
-    const saved = localStorage.getItem('app_lang') as Lang | null
-    if (saved === 'ru' || saved === 'uk' || saved === 'de') {
-      if (saved !== lang) setLang(saved)
-    }
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    checkTheme()
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
   }, [])
 
   const handleLangChange = (newLang: Lang) => {
@@ -92,7 +103,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const t = {
     ru: {
-      title: 'Цвета и отделка',
+      title: 'Цвета',
       complementary: 'Комплементарная',
       analogous: 'Аналогичная',
       triadic: 'Триадная',
@@ -141,7 +152,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Совет: всегда проверяйте сочетание при разном освещении — дневном, тёплом искусственном и холодном. Кожа и замша меняют оттенок сильнее, чем кажется.',
     },
     uk: {
-      title: 'Кольори та оздоблення',
+      title: 'Кольори',
       complementary: 'Комплементарна',
       analogous: 'Аналогічна',
       triadic: 'Тріадна',
@@ -190,7 +201,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильніше, ніж здається.',
     },
     de: {
-      title: 'Farben & Finish',
+      title: 'Farben',
       complementary: 'Komplementär',
       analogous: 'Analog',
       triadic: 'Triadisch',
@@ -385,82 +396,121 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     ? [t.main55, t.secondary20, t.secondary15, t.accent10]
     : [t.main60, t.secondary30, t.accent10]
 
+  const SCHEMES: Scheme[] = [
+    'complementary',
+    'analogous',
+    'triadic',
+    'tetradic',
+    'rectangular',
+    'split-complementary',
+    'monochromatic',
+  ]
+
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+
   return (
-    <div className="relative flex flex-col h-[100dvh] bg-[var(--color-bg,#1C1816)] text-[var(--color-ink,#F5F1EA)] overflow-hidden">
-      {/* Header - теперь с чистой навигацией и отцентрированным заголовком */}
-      <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0 relative z-20">
-        <button
-          onClick={onBack}
-          className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--color-ink,#F5F1EA)] bg-[var(--color-surface,#25201C)] border border-[var(--color-border,rgba(255,255,255,0.12))] active:scale-90 transition-transform"
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
+      
+      <style>{`
+        * {
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Утонченные журнальные слайдеры */
+        input[type=range] {
+          -webkit-appearance: none;
+          background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 1px;
+          background: ${isDark ? 'rgba(244,240,232,0.2)' : 'rgba(28,24,22,0.2)'};
+        }
+        input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 12px;
+          width: 12px;
+          border-radius: 50%;
+          background: ${isDark ? '#F4F0E8' : '#1C1816'};
+          margin-top: -5px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+      `}</style>
+
+      {/* HEADER */}
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
+        <button 
+          onClick={onBack} 
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span>Back</span>
         </button>
 
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[18px] md:text-[22px] font-serif font-light tracking-wide">
-          {t.title}
-        </h1>
-
-        <div className="flex items-center gap-2">
-          <div className="hidden md:flex rounded-full p-0.5 border border-[var(--color-border,rgba(255,255,255,0.12))] bg-[var(--color-surface,#25201C)]">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
             {['ru', 'uk', 'de'].map((l) => (
               <button
                 key={l}
                 onClick={() => handleLangChange(l as Lang)}
-                className={`lang-toggle ${lang === l ? 'active' : 'inactive'} uppercase`}
+                className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
+                  lang === l ? cText : cTextMuted
+                } ${cHover}`}
               >
-                {l}
+                {l === 'uk' ? 'UKR' : l}
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setShowGuide(true)}
-            className="px-4 py-2 rounded-full text-[11px] uppercase tracking-widest font-medium border border-[var(--color-border,rgba(255,255,255,0.18))] bg-transparent active:scale-95 transition-transform"
+          <button 
+            onClick={() => setShowGuide(true)} 
+            className={`text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
           >
             {t.guideBtn}
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col px-4 md:px-6 overflow-hidden calc-page-content mt-2">
-        {/* Schemes - Сдержанные вкладки без кричащего желтого */}
-        <div className="flex overflow-x-auto gap-2 pb-3 mb-4 scrollbar-hide shrink-0">
-          {(
-            [
-              'complementary',
-              'analogous',
-              'triadic',
-              'tetradic',
-              'rectangular',
-              'split-complementary',
-              'monochromatic',
-            ] as Scheme[]
-          ).map((s) => (
-            <button
-              key={s}
-              onClick={() => setScheme(s)}
-              className={`px-4 py-2 rounded-full text-[12px] font-medium whitespace-nowrap shrink-0 transition-colors ${
-                scheme === s
-                  ? 'bg-[var(--color-ink,#F5F1EA)] text-[var(--color-bg,#1C1816)] shadow-sm'
-                  : 'bg-transparent text-[var(--color-muted,#B9ACA0)] border border-[var(--color-border,rgba(255,255,255,0.12))]'
-              }`}
-            >
-              {t[s]}
-            </button>
+      <div className="px-6 pb-24">
+        
+        {/* ЗАГОЛОВОК СТРАНИЦЫ */}
+        <div className="mb-10">
+          <h1 className="font-serif text-[18vw] min-[400px]:text-6xl leading-[0.85] tracking-[-0.04em]">
+            {t.title}
+          </h1>
+        </div>
+
+        {/* НАВИГАЦИЯ СХЕМ (Журнальная горизонтальная лента) */}
+        <div className={`flex overflow-x-auto gap-8 pb-5 mb-10 border-b ${cLine} scrollbar-hide`}>
+          {SCHEMES.map(s => (
+             <button 
+               key={s}
+               onClick={() => setScheme(s)} 
+               className={`text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all duration-300 outline-none border-none bg-transparent cursor-pointer ${
+                 scheme === s ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+               }`}
+             >
+               {t[s]}
+             </button>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-none pb-6 scrollbar-hide">
-          {/* Wheel - Чище и аккуратнее */}
-          <div className="flex flex-col items-center mb-8 mt-2">
+        <div className="flex flex-col md:flex-row gap-12 md:gap-16 items-center md:items-start mb-16">
+          
+          {/* ЦВЕТОВОЙ КРУГ */}
+          <div className="flex flex-col items-center shrink-0">
             <div
               ref={wheelRef}
               className="relative w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
                 background: wheelBackground,
-                boxShadow: '0 0 0 6px var(--color-surface), 0 10px 30px rgba(0,0,0,0.3)',
+                boxShadow: `0 0 0 1px ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}, 0 10px 30px rgba(0,0,0,0.15)`,
               }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -475,111 +525,126 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 }}
               />
               <div
-                className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none origin-[50%_86px] md:origin-[50%_106px]"
+                className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-[1.5px] border-white shadow-md pointer-events-none origin-[50%_86px] md:origin-[50%_106px]"
                 style={{
                   backgroundColor: pointerColor,
                   transform: `translateX(-50%) rotate(${pointerAngle}deg)`,
                 }}
               />
             </div>
-            <p className="mt-4 text-[10px] tracking-[0.2em] uppercase text-[var(--color-muted,#B9ACA0)]">
+            <p className={`mt-6 text-[9px] font-sans tracking-[0.3em] uppercase ${cTextMuted}`}>
               {t.ittenLabel}
             </p>
           </div>
 
-          {/* SNEAKER VISUALIZATION - Убран тяжелый фон, оставлен воздух */}
-          <div className="mb-8 flex justify-center items-center px-4">
-            <SneakerSvg colors={colors} isTetrad={isTetrad} />
-          </div>
-
-          {/* Tints - Тонкие элегантные слайдеры */}
-          <div className="grid grid-cols-2 gap-6 mb-8 px-2">
-            <div>
-              <div className="flex justify-between text-[10px] uppercase tracking-wider mb-2 text-[var(--color-muted,#B9ACA0)]">
-                <span>{t.pure}</span>
-                <span>{t.white}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={whiteAmount}
-                onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
-                className="w-full accent-[var(--color-ink,#F5F1EA)] h-1 bg-[var(--color-surface,#25201C)] rounded-full appearance-none outline-none"
-              />
+          {/* ВИЗУАЛИЗАЦИЯ И СВОТЧИ */}
+          <div className="flex-1 w-full max-w-md">
+            
+            {/* Кроссовок */}
+            <div className="mb-12 flex justify-center items-center px-4">
+              <SneakerSvg colors={colors} isDark={isDark} />
             </div>
-            <div>
-              <div className="flex justify-between text-[10px] uppercase tracking-wider mb-2 text-[var(--color-muted,#B9ACA0)]">
-                <span>{t.pure}</span>
-                <span>{t.black}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={blackAmount}
-                onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
-                className="w-full accent-[var(--color-ink,#F5F1EA)] h-1 bg-[var(--color-surface,#25201C)] rounded-full appearance-none outline-none"
-              />
-            </div>
-          </div>
 
-          {/* Colour blocks - В стиле Pantone свотчей */}
-          <div className={`grid gap-3 md:gap-4 mb-8 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            {colors.map((c, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <div 
-                  className="w-full h-14 md:h-16 rounded-xl mb-2 shadow-sm border border-[var(--color-border,rgba(255,255,255,0.05))]" 
-                  style={{ backgroundColor: c }} 
-                />
-                <div className="text-[10px] tracking-widest text-[var(--color-muted,#B9ACA0)]">
-                  {ratioLabels[i]}
+            {/* Слайдеры Тон/Тень */}
+            <div className="grid grid-cols-2 gap-8 mb-12">
+              <div>
+                <div className={`flex justify-between text-[9px] font-sans uppercase tracking-widest mb-4 ${cTextMuted}`}>
+                  <span>{t.pure}</span>
+                  <span>{t.white}</span>
                 </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={whiteAmount}
+                  onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
+                />
               </div>
-            ))}
-          </div>
+              <div>
+                <div className={`flex justify-between text-[9px] font-sans uppercase tracking-widest mb-4 ${cTextMuted}`}>
+                  <span>{t.pure}</span>
+                  <span>{t.black}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={blackAmount}
+                  onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
+                />
+              </div>
+            </div>
 
-          {/* Quote - Более изящная верстка */}
-          <div className="py-4 text-center border-t border-[var(--color-border,rgba(255,255,255,0.08))]">
-            <p className="text-[13px] font-serif font-light text-[var(--color-ink,#F5F1EA)]/80 italic">
+            {/* Журнальные Pantone-свотчи */}
+            <div className={`grid gap-4 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {colors.map((c, i) => (
+                <div key={i} className="flex flex-col">
+                  <div 
+                    className={`w-full h-24 mb-4 shadow-sm border ${isDark ? 'border-white/10' : 'border-black/5'}`} 
+                    style={{ backgroundColor: c }} 
+                  />
+                  <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+                    {ratioLabels[i]}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
+
+        {/* ЦИТАТА */}
+        <div className="pb-10 pt-4">
+          <div className="flex flex-col items-center text-center px-4">
+            <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
+            <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
               {t.quote}
+            </p>
+            <p className={`mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em] ${cText}`}>
+              Cordwainer
             </p>
           </div>
         </div>
+
       </div>
 
-      {/* DESIGN GUIDE OVERLAY - Элегантное модальное окно */}
+      {/* OVERLAY: ГИД (Журнальный разворот) */}
       {showGuide && (
-        <div className="absolute inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-xl overscroll-none">
-          <div className="px-4 md:px-6 pt-5 pb-3 flex items-center justify-between shrink-0">
-            <h2 className="text-[20px] md:text-[24px] font-serif font-light tracking-wide text-white">{t.guideTitle}</h2>
+        <div className={`fixed inset-0 z-[100] flex flex-col ${cBg} ${cText} overflow-hidden`}>
+          <div className="px-6 pt-10 pb-6 flex items-start justify-between shrink-0">
+            <h2 className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight">
+              {t.guideTitle}
+            </h2>
             <button
               onClick={() => setShowGuide(false)}
-              className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 border border-white/20 text-white active:scale-90 transition-transform"
+              className={`text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors mt-2`}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+              {t.guideClose}
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-8 scrollbar-hide text-white/90">
-            <p className="text-[14px] leading-relaxed font-light">
+          <div className="flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide space-y-12">
+            
+            <p className="text-[14px] min-[400px]:text-[16px] leading-[1.8] font-light max-w-lg">
               {t.guideIntro}
             </p>
 
             <div>
-              <h3 className="text-[11px] tracking-[0.2em] uppercase text-white/50 mb-3">{t.guideBalanceTitle}</h3>
-              <p className="text-[13px] leading-relaxed whitespace-pre-line font-light border-l border-white/20 pl-4">
+              <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+                {t.guideBalanceTitle}
+              </h3>
+              <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg`}>
                 {t.guideBalance}
               </p>
             </div>
 
             <div>
-              <h3 className="text-[11px] tracking-[0.2em] uppercase text-white/50 mb-4">{t.guideSchemesTitle}</h3>
-              <div className="space-y-4">
+              <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-8 ${cTextMuted}`}>
+                {t.guideSchemesTitle}
+              </h3>
+              <div className="space-y-8 max-w-lg">
                 {[
                   { title: t.complementary, text: t.guideComplementary },
                   { title: t.analogous, text: t.guideAnalogous },
@@ -590,8 +655,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   { title: t.monochromatic, text: t.guideMono },
                 ].map((item) => (
                   <div key={item.title}>
-                    <div className="text-[14px] font-medium mb-1 font-serif tracking-wide">{item.title}</div>
-                    <p className="text-[13px] leading-relaxed font-light text-white/70">
+                    <div className="font-serif text-[22px] min-[400px]:text-[26px] leading-[1.2] mb-3">
+                      {item.title}
+                    </div>
+                    <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light ${cTextMuted}`}>
                       {item.text}
                     </p>
                   </div>
@@ -600,18 +667,20 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
 
             <div>
-              <h3 className="text-[11px] tracking-[0.2em] uppercase text-white/50 mb-3">{t.guideFootwearTitle}</h3>
-              <p className="text-[13px] leading-relaxed whitespace-pre-line font-light border-l border-white/20 pl-4">
+              <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+                {t.guideFootwearTitle}
+              </h3>
+              <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg`}>
                 {t.guideFootwear}
               </p>
             </div>
 
-            <div className="pt-4 border-t border-white/10">
-              <p className="text-[13px] leading-relaxed font-light text-white/70 italic">
+            <div className={`pt-8 border-t ${cLine} max-w-lg`}>
+              <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light italic ${cTextMuted}`}>
                 {t.guideTip}
               </p>
             </div>
-            <div className="h-8" />
+            
           </div>
         </div>
       )}
