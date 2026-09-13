@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { BottomDock } from '../components/BottomDock'
 import type { Lang, FavoriteItem } from '../App'
 
 type WelcomePageProps = {
@@ -14,16 +13,11 @@ type WelcomePageProps = {
 function getTelegramFirstName(): string {
   try {
     const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name
-
     if (typeof name === 'string') {
       const trimmed = name.trim()
-
-      if (trimmed.length > 0 && trimmed.length < 32) {
-        return trimmed
-      }
+      if (trimmed.length > 0 && trimmed.length < 32) return trimmed
     }
   } catch {}
-
   return ''
 }
 
@@ -39,7 +33,6 @@ export function WelcomePage({
   onStart,
   lang,
   setLang,
-  onChangeTab,
 }: WelcomePageProps) {
   const [heroReady, setHeroReady] = useState(false)
   const [firstName] = useState(getTelegramFirstName)
@@ -49,518 +42,200 @@ export function WelcomePage({
   /* -------------------------------------------------------
      THEME
   ------------------------------------------------------- */
-
   useEffect(() => {
     const checkTheme = () => {
-      setIsDark(
-        document.documentElement.classList.contains('dark')
-      )
+      setIsDark(document.documentElement.classList.contains('dark'))
     }
-
     checkTheme()
-
     const observer = new MutationObserver(checkTheme)
-
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
     })
-
     return () => observer.disconnect()
   }, [])
 
   /* -------------------------------------------------------
      LANGUAGE
   ------------------------------------------------------- */
-
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
-
     const supportedLangs: Lang[] = ['ru', 'uk', 'de']
 
-    if (
-      savedLang &&
-      supportedLangs.includes(savedLang)
-    ) {
-      if (savedLang !== lang) {
-        setLang(savedLang)
-      }
+    if (savedLang && supportedLangs.includes(savedLang)) {
+      if (savedLang !== lang) setLang(savedLang)
     } else if (!savedLang) {
       const sysLang = navigator.language.slice(0, 2)
-
-      const defaultLang: Lang = supportedLangs.includes(
-        sysLang as Lang
-      )
+      const defaultLang: Lang = supportedLangs.includes(sysLang as Lang)
         ? (sysLang as Lang)
         : 'uk'
-
       setLang(defaultLang)
-
-      localStorage.setItem(
-        'app_lang',
-        defaultLang
-      )
-
-      localStorage.setItem(
-        'cordwainer_lang',
-        defaultLang
-      )
+      localStorage.setItem('app_lang', defaultLang)
+      localStorage.setItem('cordwainer_lang', defaultLang)
     }
 
     try {
-      localStorage.setItem(
-        'cordwainer_visited',
-        '1'
-      )
+      localStorage.setItem('cordwainer_visited', '1')
     } catch {}
   }, [lang, setLang])
 
   /* -------------------------------------------------------
      TRANSLATIONS
   ------------------------------------------------------- */
-
   const t = {
     ru: {
       hello: 'Привет',
       helloBack: 'Снова здесь',
       welcome: 'Добро пожаловать',
       welcomeBack: 'С возвращением',
-
-      tagline:
-        'Энциклопедия обувного мастерства',
-
-      value:
-        'Материалы, цвета, фасоны и калькуляторы — для сапожника, модельера и ортопеда.',
-
-      idea:
-        'Предмет как идея · Форма как язык · Мастерство как опыт',
-
+      tagline: 'Энциклопедия обувного мастерства',
+      value: 'Материалы, цвета, фасоны и калькуляторы — для сапожника, модельера и ортопеда.',
+      idea: 'Предмет как идея · Форма как язык · Мастерство как опыт',
       issue: 'ISSUE 01',
-
-      start: 'ISSUE 01 — НАЧАТЬ',
+      start: 'НАЧАТЬ ИССЛЕДОВАНИЕ',
     },
-
     uk: {
       hello: 'Привіт',
       helloBack: 'Знову тут',
       welcome: 'Ласкаво просимо',
       welcomeBack: 'З поверненням',
-
-      tagline:
-        'Енциклопедія взуттєвої майстерності',
-
-      value:
-        'Матеріали, кольори, фасони і калькулятори — для шевця, модельєра та ортопеда.',
-
-      idea:
-        'Предмет як ідея · Форма як мова · Майстерність як досвід',
-
+      tagline: 'Енциклопедія взуттєвої майстерності',
+      value: 'Матеріали, кольори, фасони і калькулятори — для шевця, модельєра та ортопеда.',
+      idea: 'Предмет як ідея · Форма як мова · Майстерність як досвід',
       issue: 'ISSUE 01',
-
-      start: 'ISSUE 01 — ПОЧАТИ',
+      start: 'ПОЧАТИ ДОСЛІДЖЕННЯ',
     },
-
     de: {
       hello: 'Hallo',
       helloBack: 'Wieder da',
       welcome: 'Willkommen',
       welcomeBack: 'Willkommen zurück',
-
-      tagline:
-        'Enzyklopädie der Schuhmacherkunst',
-
-      value:
-        'Materialien, Farben, Leisten und Rechner — für Schuhmacher, Designer und Orthopäden.',
-
-      idea:
-        'Objekt als Idee · Form als Sprache · Handwerk als Erfahrung',
-
+      tagline: 'Enzyklopädie der Schuhmacherkunst',
+      value: 'Materialien, Farben, Leisten und Rechner — für Schuhmacher, Designer und Orthopäden.',
+      idea: 'Objekt als Idee · Form als Sprache · Handwerk als Erfahrung',
       issue: 'ISSUE 01',
-
-      start: 'ISSUE 01 — STARTEN',
+      start: 'ENTDECKEN',
     },
   }[lang]
 
   const greeting = returning
-    ? firstName
-      ? `${t.helloBack}, ${firstName}`
-      : t.welcomeBack
-    : firstName
-      ? `${t.hello}, ${firstName}`
-      : t.welcome
+    ? firstName ? `${t.helloBack}, ${firstName}` : t.welcomeBack
+    : firstName ? `${t.hello}, ${firstName}` : t.welcome
 
   /* -------------------------------------------------------
      UI
   ------------------------------------------------------- */
-
   return (
     <main
-      className="
-        relative
-        flex
-        h-[100dvh]
-        w-full
-        flex-col
-        overflow-hidden
-        bg-[var(--color-bg)]
-        text-[var(--color-ink)]
-        transition-colors
-        duration-500
-      "
+      className={`
+        relative flex h-[100dvh] w-full flex-col overflow-hidden
+        transition-colors duration-[1.2s] ease-[0.25,1,0.5,1]
+        ${isDark ? 'bg-[#0A0A0A] text-[#F4F0E8]' : 'bg-[#F2EFE9] text-[#121212]'}
+      `}
     >
-
-      {/* =====================================================
-          HERO IMAGE
-      ===================================================== */}
-
-      <div className="absolute inset-0 z-0">
-
-        {!heroReady && (
-          <div
-            className="
-              absolute
-              inset-0
-              bg-[var(--color-surface)]
-            "
-            aria-hidden
-          />
-        )}
-
-        <img
-          src="/hero-cover.webp"
-          alt=""
-          fetchPriority="high"
-          decoding="async"
-          onLoad={() => setHeroReady(true)}
-          className="
-            absolute
-            inset-0
-            h-full
-            w-full
-            object-cover
-            object-[center_top]
-          "
-          style={{
-            opacity: heroReady
-              ? isDark
-                ? 1
-                : 0.92
-              : 0,
-
-            transition:
-              'opacity 700ms cubic-bezier(0.22, 1, 0.36, 1)',
-          }}
-        />
-
-        {/* Editorial photographic treatment */}
-
-        <div
-          className="
-            absolute
-            inset-0
-            pointer-events-none
-          "
-          style={{
-            background: isDark
-              ? `
-                linear-gradient(
-                  to bottom,
-                  rgba(12,10,9,0.08) 0%,
-                  rgba(12,10,9,0.05) 34%,
-                  rgba(12,10,9,0.38) 58%,
-                  rgba(12,10,9,0.78) 76%,
-                  rgba(12,10,9,0.96) 100%
-                )
-              `
-              : `
-                linear-gradient(
-                  to bottom,
-                  rgba(245,241,234,0.04) 0%,
-                  rgba(245,241,234,0.12) 36%,
-                  rgba(245,241,234,0.55) 66%,
-                  rgba(245,241,234,0.94) 100%
-                )
-              `,
-          }}
-        />
-
-        {/* Very subtle side vignette */}
-
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: isDark
-              ? 'linear-gradient(90deg, rgba(10,8,7,0.18), transparent 38%, rgba(10,8,7,0.08))'
-              : 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent 40%)',
-          }}
-        />
-
-      </div>
-
-
-      {/* =====================================================
-          EDITORIAL CONTENT
-      ===================================================== */}
-
-      <section
-        className="
-          relative
-          z-20
-          flex
-          min-h-0
-          flex-1
-          flex-col
-          justify-end
-
-          px-6
-          pb-[116px]
-
-          sm:px-7
-        "
-      >
-
-        <div
-          className="
-            w-full
-            max-w-[390px]
-            mx-auto
-          "
-        >
-
-          {/* ISSUE */}
-
-          <div className="mb-5">
-            <span
-              className={`
-                inline-block
-                text-[10px]
-                font-medium
-                uppercase
-                tracking-[0.30em]
-                ${
-                  isDark
-                    ? 'text-white/55'
-                    : 'text-black/50'
-                }
-              `}
-            >
+      <div className="grid h-full grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 px-6 py-8 lg:p-16">
+        
+        {/* LEFT COLUMN: TYPOGRAPHY & NEGATIVE SPACE */}
+        <section className="relative z-20 flex flex-col justify-between col-span-1 lg:col-span-5 h-full">
+          
+          {/* HEADER / META */}
+          <div className="flex justify-between items-start">
+            <span className="text-[10px] font-sans font-medium uppercase tracking-[0.35em] opacity-60">
               {t.issue}
+            </span>
+            <span className="text-[10px] font-sans font-medium uppercase tracking-[0.2em] opacity-40 lg:hidden">
+              {greeting}
             </span>
           </div>
 
+          {/* OVERSIZED TYPOGRAPHY (Broken grid overlapping) */}
+          <div className="relative mt-auto mb-16 lg:mb-32 lg:w-[150%] z-30 pointer-events-none mix-blend-difference">
+            <h1 className="font-serif text-[4.5rem] leading-[0.8] tracking-[-0.04em] lg:text-[9vw] text-[#F4F0E8]">
+              Cordwainer
+            </h1>
+            <p className="mt-6 text-[10px] font-sans font-medium uppercase leading-[1.6] tracking-[0.25em] opacity-70 lg:max-w-[300px]">
+              {t.tagline}
+            </p>
+          </div>
 
-          {/* GREETING */}
-
-          <p
-            className={`
-              mb-3
-              text-[11px]
-              font-light
-              tracking-[0.08em]
-              ${
-                isDark
-                  ? 'text-white/55'
-                  : 'text-black/55'
-              }
-            `}
-          >
-            {greeting}
-          </p>
-
-
-          {/* BRAND */}
-
-          <h1
-            className={`
-              font-display
-              mb-5
-
-              text-[3.45rem]
-              leading-[0.88]
-              tracking-[-0.045em]
-
-              sm:text-[3.8rem]
-
-              ${
-                isDark
-                  ? 'text-[#F4F0E8]'
-                  : 'text-[#1C1816]'
-              }
-            `}
-          >
-            Cordwainer
-          </h1>
-
-
-          {/* TAGLINE */}
-
-          <p
-            className={`
-              mb-7
-              max-w-[330px]
-
-              text-[10px]
-              font-medium
-              uppercase
-              leading-[1.45]
-              tracking-[0.24em]
-
-              ${
-                isDark
-                  ? 'text-white/48'
-                  : 'text-black/48'
-              }
-            `}
-          >
-            {t.tagline}
-          </p>
-
-
-          {/* EDITORIAL LINE */}
-
-          <div
-            className={`
-              mb-6
-              h-px
-              w-10
-              ${
-                isDark
-                  ? 'bg-white/30'
-                  : 'bg-black/20'
-              }
-            `}
-          />
-
-
-          {/* DESCRIPTION */}
-
-          <p
-            className={`
-              mb-4
-              max-w-[335px]
-
-              text-[15px]
-              font-light
-              leading-[1.48]
-
-              ${
-                isDark
-                  ? 'text-white/80'
-                  : 'text-black/72'
-              }
-            `}
-          >
-            {t.value}
-          </p>
-
-
-          {/* EDITORIAL STATEMENT */}
-
-          <p
-            className={`
-              mb-7
-              max-w-[330px]
-
-              text-[9px]
-              font-medium
-              uppercase
-              leading-[1.75]
-              tracking-[0.19em]
-
-              ${
-                isDark
-                  ? 'text-white/38'
-                  : 'text-black/40'
-              }
-            `}
-          >
-            {t.idea}
-          </p>
-
-
-          {/* CTA */}
-
-          <button
-            type="button"
-            onClick={onStart}
-            className={`
-              group
-              inline-flex
-              h-[48px]
-              items-center
-              justify-center
-
-              rounded-[11px]
-
-              border
-              px-5
-
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.18em]
-
-              transition-all
-              duration-200
-              active:scale-[0.98]
-
-              ${
-                isDark
-                  ? `
-                    border-white/25
-                    bg-[#191512]/55
-                    text-[#F1EDE4]
-                    shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]
-                  `
-                  : `
-                    border-black/20
-                    bg-white/45
-                    text-[#1C1816]
-                  `
-              }
-            `}
-          >
-            <span
+          {/* BOTTOM EDITORIAL TEXT & CTA */}
+          <div className="max-w-[340px] mb-8 lg:mb-0">
+            <div className="h-px w-12 bg-current opacity-20 mb-8" />
+            <p className="text-[14px] font-sans font-light leading-[1.6] opacity-80 mb-10">
+              {t.value}
+            </p>
+            
+            <button
+              type="button"
+              onClick={onStart}
               className="
-                transition-transform
-                duration-200
-                group-active:translate-x-[1px]
+                group relative inline-flex items-center gap-6 overflow-hidden
+                text-[11px] font-sans font-medium uppercase tracking-[0.2em]
               "
             >
-              {t.start}
-            </span>
+              <span className="relative z-10 transition-transform duration-700 ease-[0.25,1,0.5,1] group-hover:translate-x-2">
+                {t.start}
+              </span>
+              <span className="relative z-10 block h-[1px] w-12 bg-current transition-all duration-700 ease-[0.25,1,0.5,1] group-hover:w-20" />
+            </button>
+          </div>
+        </section>
 
-            <span
-              className="
-                ml-3
-                text-[13px]
-                leading-none
-                opacity-60
-                transition-transform
-                duration-200
-                group-active:translate-x-1
-              "
-              aria-hidden
-            >
-              →
-            </span>
-          </button>
+        {/* RIGHT COLUMN: KINETIC MEDIA */}
+        <section className="absolute lg:relative inset-0 lg:inset-auto z-10 lg:col-span-7 h-full w-full pointer-events-none lg:pointer-events-auto">
+          <div className="relative h-full w-full overflow-hidden flex items-center justify-end">
+            
+            {/* MAIN HERO IMAGE */}
+            <div className="w-full h-full lg:h-[85%] lg:w-[90%] relative overflow-hidden bg-[var(--color-surface)]">
+              <img
+                src="/hero-cover.webp"
+                alt=""
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setHeroReady(true)}
+                className={`
+                  absolute inset-0 h-full w-full object-cover object-[center_top]
+                  transition-all duration-[2s] ease-[0.16,1,0.3,1] scale-105 lg:hover:scale-100
+                  ${heroReady ? 'opacity-100' : 'opacity-0'}
+                  ${isDark ? 'brightness-90' : 'brightness-95 contrast-125'}
+                `}
+              />
+              
+              {/* EDITORIAL GRADIENT OVERLAY */}
+              <div 
+                className="absolute inset-0 transition-opacity duration-1000"
+                style={{
+                  background: isDark
+                    ? 'linear-gradient(to top, rgba(10,10,10,0.9) 0%, rgba(10,10,10,0.2) 50%, transparent 100%)'
+                    : 'linear-gradient(to top, rgba(242,239,233,0.85) 0%, rgba(242,239,233,0.1) 60%, transparent 100%)',
+                }}
+              />
+            </div>
 
-        </div>
+            {/* ASYMMETRICAL OFFSET FRAME (Visible on desktop) */}
+            <div className="hidden lg:block absolute left-[-10%] bottom-[15%] w-[35%] aspect-[3/4] overflow-hidden z-20 bg-current">
+              <img
+                src="/hero-cover.webp"
+                alt=""
+                className={`
+                  absolute inset-0 h-full w-full object-cover object-[center_bottom]
+                  transition-transform duration-[1.5s] ease-[0.25,1,0.5,1] hover:scale-110
+                  ${heroReady ? 'opacity-100' : 'opacity-0'}
+                  ${isDark ? 'opacity-70 grayscale mix-blend-screen' : 'opacity-90 mix-blend-multiply'}
+                `}
+              />
+            </div>
+            
+          </div>
+        </section>
+      </div>
 
-      </section>
-
-
-      {/* =====================================================
-          BOTTOM NAVIGATION
-      ===================================================== */}
-
-      <BottomDock
-        active="profile"
-        lang={lang}
-        onChange={onChangeTab}
-      />
-
+      {/* FLOATING IDEA TICKER (Minimalist detail) */}
+      <div className="absolute top-8 right-6 lg:right-16 z-30 hidden lg:block rotate-90 origin-right">
+        <p className="text-[9px] font-sans font-medium uppercase tracking-[0.25em] opacity-30 whitespace-nowrap">
+          {t.idea}
+        </p>
+      </div>
     </main>
   )
 }
