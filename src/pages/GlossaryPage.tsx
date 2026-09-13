@@ -362,10 +362,6 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
 
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
 
-  // ИСПРАВЛЕНИЕ: Индивидуальные анимации трансформаций, чтобы не ломался Safari
-  const frontTransform = flipped ? 'rotateY(-180deg)' : 'rotateY(0deg)'
-  const backTransform = flipped ? 'rotateY(0deg)' : 'rotateY(180deg)'
-
   return (
     <div
       role="button"
@@ -373,86 +369,98 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
       onClick={() => { haptic('light'); setFlipped((f) => !f) }}
       aria-expanded={flipped}
       className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left outline-none cursor-pointer"
-      style={{ perspective: 1200, WebkitPerspective: 1200 }}
+      style={{ perspective: '1200px', WebkitPerspective: '1200px' }}
     >
-      {/* FRONT - Абсолютно спозиционирован, не вращает родителя */}
+      {/* 
+        ОБЕРТКА ДЛЯ 3D. 
+        transform-style: preserve-3d — обязательно для iOS, 
+        чтобы карточки крутились как единый 3D-объект.
+      */}
       <div
-        className={`absolute inset-0 flex flex-col items-center justify-between p-5 border ${cLine} ${cSurface} overflow-hidden shadow-sm`}
+        className="relative w-full h-full"
         style={{
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d',
+          WebkitTransformStyle: 'preserve-3d',
           transition: 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)',
-          transform: frontTransform,
-          WebkitTransform: frontTransform,
-          pointerEvents: flipped ? 'none' : 'auto',
-          zIndex: flipped ? 0 : 1,
+          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
         }}
       >
-        <div className="w-full flex items-center justify-between z-10">
-          <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
-            {CATEGORY_LABELS[cat][lang]}
-          </span>
-          <div className={`w-5 h-5 flex items-center justify-center ${cTextMuted}`}>
-            <svg width="100%" height="100%" viewBox="0 0 24 24">
-              {icon}
-            </svg>
-          </div>
-        </div>
-
-        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[120px] leading-none opacity-5 pointer-events-none select-none ${cText}`}>
-          {title.charAt(0).toUpperCase()}
-        </div>
-
-        <div className="w-full flex flex-col items-center text-center z-10 mt-auto">
-          <h3 className={`font-serif text-[22px] leading-[1.1] mb-4 ${cText}`}>
-            {title}
-          </h3>
-          <div className={`text-[8px] font-sans tracking-[0.3em] uppercase transition-opacity opacity-0 group-hover:opacity-100 ${cTextMuted}`}>
-            {flipHint}
-          </div>
-        </div>
-      </div>
-
-      {/* BACK - Абсолютно спозиционирован, не вращает родителя */}
-      <div
-        className={`absolute inset-0 flex flex-col p-5 border ${cLine} ${cSurface} overflow-hidden shadow-sm`}
-        style={{
-          backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden',
-          transition: 'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1)',
-          transform: backTransform,
-          WebkitTransform: backTransform,
-          pointerEvents: flipped ? 'auto' : 'none',
-          zIndex: flipped ? 1 : 0,
-        }}
-      >
-        <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0`}>
-          <h3 className={`font-serif text-[18px] leading-none truncate ${cText}`}>
-            {title}
-          </h3>
-        </div>
-
+        {/* FRONT */}
         <div
-          className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2"
-          onClick={stopEvent}
-          onPointerDown={stopEvent}
-          onTouchStart={stopEvent}
-          onWheel={stopEvent}
+          className={`absolute inset-0 flex flex-col items-center justify-between p-5 border ${cLine} ${cSurface} shadow-sm`}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            /* translateZ(1px) исправляет мерцание z-index на Safari/iOS */
+            transform: 'rotateY(0deg) translateZ(1px)',
+            WebkitTransform: 'rotateY(0deg) translateZ(1px)',
+          }}
         >
-          <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.7] ${cTextMuted}`}>
-            {definition}
-          </p>
-
-          {example && (
-            <div className={`mt-4 pt-4 border-t ${cLine}`}>
-              <span className={`block mb-1 text-[8px] font-sans uppercase tracking-[0.3em] ${cText}`}>
-                {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
-              </span>
-              <p className={`font-serif text-[13px] italic leading-[1.5] ${cTextMuted}`}>
-                {example}
-              </p>
+          <div className="w-full flex items-center justify-between z-10">
+            <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+              {CATEGORY_LABELS[cat][lang]}
+            </span>
+            <div className={`w-5 h-5 flex items-center justify-center ${cTextMuted}`}>
+              <svg width="100%" height="100%" viewBox="0 0 24 24">
+                {icon}
+              </svg>
             </div>
-          )}
+          </div>
+
+          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[120px] leading-none opacity-5 pointer-events-none select-none ${cText}`}>
+            {title.charAt(0).toUpperCase()}
+          </div>
+
+          <div className="w-full flex flex-col items-center text-center z-10 mt-auto">
+            <h3 className={`font-serif text-[22px] leading-[1.1] mb-4 ${cText}`}>
+              {title}
+            </h3>
+            <div className={`text-[8px] font-sans tracking-[0.3em] uppercase transition-opacity opacity-0 group-hover:opacity-100 ${cTextMuted}`}>
+              {flipHint}
+            </div>
+          </div>
+        </div>
+
+        {/* BACK */}
+        <div
+          className={`absolute inset-0 flex flex-col p-5 border ${cLine} ${cSurface} shadow-sm`}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            /* Изначально перевернуто, translateZ(1px) для фикса iOS */
+            transform: 'rotateY(180deg) translateZ(1px)',
+            WebkitTransform: 'rotateY(180deg) translateZ(1px)',
+          }}
+        >
+          <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0`}>
+            <h3 className={`font-serif text-[18px] leading-none truncate ${cText}`}>
+              {title}
+            </h3>
+          </div>
+
+          <div
+            className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2"
+            onClick={stopEvent}
+            onPointerDown={stopEvent}
+            onTouchStart={stopEvent}
+            onWheel={stopEvent}
+          >
+            <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.7] ${cTextMuted}`}>
+              {definition}
+            </p>
+
+            {example && (
+              <div className={`mt-4 pt-4 border-t ${cLine}`}>
+                <span className={`block mb-1 text-[8px] font-sans uppercase tracking-[0.3em] ${cText}`}>
+                  {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
+                </span>
+                <p className={`font-serif text-[13px] italic leading-[1.5] ${cTextMuted}`}>
+                  {example}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
