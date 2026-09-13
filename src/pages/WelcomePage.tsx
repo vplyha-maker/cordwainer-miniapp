@@ -33,12 +33,15 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
   const [heroReady, setHeroReady] = useState(false)
   const [firstName] = useState(getTelegramFirstName)
   const [returning] = useState(hasVisitedBefore)
-  const [mounted, setMounted] = useState(false) // Стейт для запуска крутых анимаций
+  const [mounted, setMounted] = useState(false)
 
-  // Запускаем анимации после монтирования компонента
+  // Запуск анимаций
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 100)
-    return () => clearTimeout(timer)
+    // Небольшая задержка, чтобы React успел отрендерить начальное состояние (opacity: 0)
+    const timer = requestAnimationFrame(() => {
+      setTimeout(() => setMounted(true), 50)
+    })
+    return () => cancelAnimationFrame(timer)
   }, [])
 
   useEffect(() => {
@@ -94,16 +97,15 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
     ? firstName ? `${t.helloBack}, ${firstName}` : t.welcomeBack
     : firstName ? `${t.hello}, ${firstName}` : t.welcome
 
-  // Утилита для премиальной анимации (берем easing из концепта выше)
-  const revealClass = (delayMs: number) => `
-    transition-all duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)]
-    ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}
-  `
+  // Используем классы Tailwind для задержек (delay-100, delay-200 и т.д.)
+  // Это гарантирует, что стили применятся правильно
+  const baseReveal = "transition-all duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)] transform"
+  const getRevealState = () => mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
 
   return (
-    <main className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0A0A0A]">
+    <main className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#050505]">
       
-      {/* 1. АНИМИРОВАННЫЙ ФОН */}
+      {/* 1. ФОН (Медленный зум + проявление) */}
       <div className="absolute inset-0 z-0">
         <img
           src="/hero-cover.webp"
@@ -113,16 +115,16 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           onLoad={() => setHeroReady(true)}
           className={`
             absolute inset-0 h-full w-full object-cover object-[center_top]
-            transition-all duration-[2000ms] ease-[cubic-bezier(0.16,1,0.3,1)]
-            ${heroReady && mounted ? 'opacity-80 scale-100' : 'opacity-0 scale-105'}
+            transition-all duration-[2.5s] ease-[cubic-bezier(0.16,1,0.3,1)] transform
+            ${heroReady && mounted ? 'opacity-70 scale-100' : 'opacity-0 scale-110'}
           `}
         />
-        <div className="absolute inset-0 bg-black/20 z-10" />
-        <div className="absolute bottom-0 left-0 right-0 h-[65%] z-10 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/85 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-black/30 z-10" />
+        <div className="absolute bottom-0 left-0 right-0 h-[70%] z-10 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/85 to-transparent pointer-events-none" />
       </div>
 
       {/* 2. МЕТА-ДАННЫЕ ВВЕРХУ */}
-      <div className={`absolute top-6 left-6 right-6 z-30 flex items-start justify-between ${revealClass(100)}`} style={{ transitionDelay: '100ms' }}>
+      <div className={`absolute top-6 left-6 right-6 z-30 flex items-start justify-between delay-100 ${baseReveal} ${getRevealState()}`}>
         <span className="text-[10px] font-sans font-medium uppercase tracking-[0.35em] text-[#F4F0E8]/70">
           {t.issue}
         </span>
@@ -131,31 +133,30 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
         </span>
       </div>
 
-      {/* 3. ОСНОВНОЙ КОНТЕНТ СНИЗУ (С каскадной анимацией) */}
+      {/* 3. ОСНОВНОЙ КОНТЕНТ СНИЗУ */}
       <section className="relative z-30 flex h-full w-full flex-col justify-end px-6 pb-12 sm:pb-16">
         <div className="flex w-full flex-col">
           
-          <div className={revealClass(200)} style={{ transitionDelay: '200ms' }}>
+          <div className={`delay-200 ${baseReveal} ${getRevealState()}`}>
             <p className="mb-3 text-[10px] font-sans font-medium uppercase leading-[1.6] tracking-[0.25em] text-[#F4F0E8]/70">
               {t.tagline}
             </p>
           </div>
 
-          <div className={revealClass(350)} style={{ transitionDelay: '350ms' }}>
-            <h1 className="mb-6 font-serif text-4xl min-[375px]:text-5xl sm:text-6xl leading-[0.9] tracking-[-0.02em] text-[#F4F0E8]">
+          <div className={`delay-300 ${baseReveal} ${getRevealState()}`}>
+            <h1 className="mb-6 font-serif text-[12.5vw] min-[375px]:text-5xl sm:text-6xl leading-[0.9] tracking-[-0.02em] text-[#F4F0E8]">
               Cordwainer
             </h1>
           </div>
 
-          <div className={revealClass(500)} style={{ transitionDelay: '500ms' }}>
-            <div className="mb-6 h-px w-10 bg-[#F4F0E8]/30" />
+          <div className={`delay-500 ${baseReveal} ${getRevealState()}`}>
+            <div className="mb-6 h-px w-12 bg-[#F4F0E8]/20" />
             <p className="mb-10 max-w-[320px] text-[14px] font-sans font-light leading-[1.6] text-[#F4F0E8]/80">
               {t.value}
             </p>
           </div>
           
-          {/* Кнопка с анимацией */}
-          <div className={revealClass(650)} style={{ transitionDelay: '650ms' }}>
+          <div className={`delay-700 ${baseReveal} ${getRevealState()}`}>
             <button
               type="button"
               onClick={onStart}
@@ -170,7 +171,6 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           
         </div>
       </section>
-
     </main>
   )
 }
