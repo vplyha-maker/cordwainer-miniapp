@@ -127,14 +127,12 @@ export function CalcMenuPage({
     { id: 'salary', title: t.salaryTitle, subtitle: t.salarySub, action: onOpenSalaryCalc },
   ]
 
-  // Цветовые токены
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // Фоновые градиенты
   const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/90' : 'from-[#F2EFE9] via-[#F2EFE9]/90'
   const imgOpacity = isDark ? '0.35' : '0.6'
 
@@ -147,6 +145,11 @@ export function CalcMenuPage({
       className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}
     >
       <style>{`
+        /* Отключаем системное мерцание при клике на мобильных устройствах */
+        button, a, div {
+          -webkit-tap-highlight-color: transparent;
+        }
+        
         @keyframes fadeUp {
           0% { opacity: 0; transform: translateY(16px); }
           100% { opacity: 1; transform: translateY(0); }
@@ -164,13 +167,17 @@ export function CalcMenuPage({
         }
       `}</style>
 
-      {/* ФОН (Зафиксирован, чтобы контент скроллился поверх него) */}
+      {/* ФОН С ОБРАБОТЧИКОМ ОШИБОК */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img
           src="/CalcMenuPage/size.jpg"
           alt=""
           style={{ '--img-opacity': imgOpacity } as React.CSSProperties}
           className={`anim-bg absolute inset-0 w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[40%]' : 'grayscale-[10%]'}`}
+          onError={(e) => {
+            // Если картинки нет, скрываем ее, чтобы не было сломанного значка
+            e.currentTarget.style.display = 'none'
+          }}
         />
         <div className={`absolute bottom-0 left-0 right-0 h-[85%] bg-gradient-to-t ${cGrad} to-transparent transition-colors duration-1000`} />
       </div>
@@ -179,7 +186,7 @@ export function CalcMenuPage({
       <header className="relative z-20 px-6 pt-8 pb-4 flex items-start justify-between">
         <button 
           onClick={() => { haptic('light'); onBack(); }}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none ${cTextMuted} ${cHover} transition-colors`}
         >
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
           <span>Back</span>
@@ -209,7 +216,7 @@ export function CalcMenuPage({
               <div key={item.id} className="stagger-item" style={{ animationDelay: `${0.15 + idx * 0.05}s` }}>
                 <button
                   onClick={() => { haptic('medium'); item.action?.(); }}
-                  className={`w-full group relative flex items-end justify-between py-6 border-b ${cLine} text-left transition-all active:opacity-50`}
+                  className={`w-full group relative flex items-end justify-between py-6 border-b outline-none ${cLine} text-left transition-all active:opacity-50`}
                 >
                   <div className="flex items-start gap-4">
                     <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
@@ -228,11 +235,11 @@ export function CalcMenuPage({
           })}
         </div>
 
-        {/* ИЗБРАННОЕ (Специальный журнальный блок) */}
+        {/* ИЗБРАННОЕ */}
         <div className="stagger-item" style={{ animationDelay: '0.4s' }}>
           <button
             onClick={() => { haptic(isFavorite ? 'light' : 'medium'); onToggleFavorite?.(); }}
-            className={`w-full flex items-center justify-between p-6 border transition-all duration-500 ${
+            className={`w-full flex items-center justify-between p-6 border outline-none transition-all duration-500 ${
               isFavorite 
                 ? `${isDark ? 'border-white/30 bg-white/5' : 'border-black/30 bg-black/5'}` 
                 : `${cLine} active:bg-current/5`
