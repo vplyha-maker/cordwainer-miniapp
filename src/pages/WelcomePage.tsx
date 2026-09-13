@@ -11,14 +11,42 @@ type WelcomePageProps = {
   favorites?: FavoriteItem[]
 }
 
+function haptic(kind: 'light' | 'medium' = 'light') {
+  try {
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(kind)
+  } catch {}
+}
+
+function getTelegramFirstName(): string {
+  try {
+    const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name
+    if (typeof name === 'string') {
+      const trimmed = name.trim()
+      if (trimmed.length > 0 && trimmed.length < 32) return trimmed
+    }
+  } catch {}
+  return ''
+}
+
+function hasVisitedBefore(): boolean {
+  try {
+    return localStorage.getItem('cordwainer_visited') === '1'
+  } catch {
+    return false
+  }
+}
+
 export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = [] }: WelcomePageProps) {
   const blogFavorites = favorites.filter((f) => f.type === 'blog')
   const [showWidgetHint, setShowWidgetHint] = useState(false)
+  const [heroReady, setHeroReady] = useState(false)
+  const [firstName] = useState(getTelegramFirstName)
+  const [returning] = useState(hasVisitedBefore)
 
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
     const supportedLangs = ['ru', 'uk', 'de']
-    
+
     if (savedLang && supportedLangs.includes(savedLang)) {
       if (savedLang !== lang) setLang(savedLang)
     } else if (!savedLang) {
@@ -26,29 +54,30 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       const defaultLang = supportedLangs.includes(sysLang) ? (sysLang as Lang) : 'uk'
       setLang(defaultLang)
       localStorage.setItem('app_lang', defaultLang)
+      localStorage.setItem('cordwainer_lang', defaultLang)
     }
   }, [])
 
   const handleLangChange = (newLang: Lang) => {
+    haptic('light')
     localStorage.setItem('app_lang', newLang)
+    localStorage.setItem('cordwainer_lang', newLang)
     setLang(newLang)
   }
 
   const t = {
     ru: {
+      welcome: 'Добро пожаловать',
+      hello: 'Привет',
+      welcomeBack: 'С возвращением',
+      helloBack: 'Снова здесь',
       tagline: 'Энциклопедия обувного мастерства',
-      idea1: 'Предмет как идея.',
-      idea2: 'Форма как язык.',
-      idea3: 'Мастерство как опыт.',
-      materials: 'Материалы',
-      materialsSub: 'Кожа · Замша\nПодошвы',
-      colors: 'Цвета',
-      colorsSub: 'Колористика\nПатина',
-      styles: 'Фасоны\nи силуэты',
-      stylesSub: 'Классика\nУличные',
+      value: 'Материалы, цвета, фасоны и калькуляторы — для сапожника, модельера и ортопеда.',
+      idea: 'Предмет как идея · Форма как язык · Мастерство как опыт',
       start: 'Начать обучение',
+      continue: 'Продолжить',
+      issue: 'ISSUE 01',
       favorites: 'Избранное',
-      seeAll: 'Смотреть все',
       addToHomeShort: 'Установить',
       widgetTitle: 'Установка приложения',
       widgetText: 'Telegram не позволяет сохранять иконки напрямую. Откройте приложение в вашем браузере (Chrome или Safari), чтобы добавить его на экран.',
@@ -58,19 +87,17 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       widgetAction: 'Открыть в браузере',
     },
     uk: {
+      welcome: 'Ласкаво просимо',
+      hello: 'Привіт',
+      welcomeBack: 'З поверненням',
+      helloBack: 'Знову тут',
       tagline: 'Енциклопедія взуттєвої майстерності',
-      idea1: 'Предмет як ідея.',
-      idea2: 'Форма як мова.',
-      idea3: 'Майстерність як досвід.',
-      materials: 'Матеріали',
-      materialsSub: 'Шкіра · Замша\nПідошви',
-      colors: 'Кольори',
-      colorsSub: 'Колористика\nПатина',
-      styles: 'Фасони\nта силуети',
-      stylesSub: 'Класика\nВуличні',
+      value: 'Матеріали, кольори, фасони і калькулятори — для шевця, модельєра та ортопеда.',
+      idea: 'Предмет як ідея · Форма як мова · Майстерність як досвід',
       start: 'Почати навчання',
+      continue: 'Продовжити',
+      issue: 'ISSUE 01',
       favorites: 'Обране',
-      seeAll: 'Дивитись усі',
       addToHomeShort: 'Встановити',
       widgetTitle: 'Встановлення застосунку',
       widgetText: 'Telegram не дозволяє зберігати іконки безпосередньо. Відкрийте застосунок у вашому браузері (Chrome або Safari), щоб додати його на екран.',
@@ -80,19 +107,17 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
       widgetAction: 'Відкрити в браузері',
     },
     de: {
+      welcome: 'Willkommen',
+      hello: 'Hallo',
+      welcomeBack: 'Willkommen zurück',
+      helloBack: 'Wieder da',
       tagline: 'Enzyklopädie der Schuhmacherkunst',
-      idea1: 'Objekt als Idee.',
-      idea2: 'Form als Sprache.',
-      idea3: 'Handwerk als Erfahrung.',
-      materials: 'Materialien',
-      materialsSub: 'Leder · Wildleder\nSohlen',
-      colors: 'Farben',
-      colorsSub: 'Farbgebung\nPatina',
-      styles: 'Leisten\n& Silhouetten',
-      stylesSub: 'Klassik\nStreetwear',
+      value: 'Materialien, Farben, Leisten und Rechner — für Schuhmacher, Designer und Orthopäden.',
+      idea: 'Objekt als Idee · Form als Sprache · Handwerk als Erfahrung',
       start: 'Wissen entdecken',
+      continue: 'Weiter',
+      issue: 'ISSUE 01',
       favorites: 'Favoriten',
-      seeAll: 'Alle ansehen',
       addToHomeShort: 'Installieren',
       widgetTitle: 'App installieren',
       widgetText: 'Telegram erlaubt kein direktes Speichern von Icons. Öffnen Sie die App in Ihrem Browser (Chrome oder Safari), um sie zum Startbildschirm hinzuzufügen.',
@@ -103,47 +128,18 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     },
   }[lang]
 
-  // Заданы насыщенные базовые цвета (fallback), совместимые со светлой и темной темами
-  const categories = [
-    {
-      title: t.materials,
-      sub: t.materialsSub,
-      accent: 'var(--color-accent, #B46513)', // Более глубокий золотисто-коричневый
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 8.5 4 C 8.5 4 6 5 5 7.5 C 4 10 4.5 12 4.5 12 C 4.5 12 2.5 14 3.5 17 C 4.5 20 7 19.5 7 19.5 C 7 19.5 9 18 12 18 C 15 18 17 19.5 17 19.5 C 17 19.5 19.5 20 20.5 17 C 21.5 14 19.5 12 19.5 12 C 19.5 12 20 10 19 7.5 C 18 5 15.5 4 15.5 4 C 15.5 4 14 5.5 12 5.5 C 10 5.5 8.5 4 8.5 4 Z" />
-        </svg>
-      ),
-    },
-    {
-      title: t.colors,
-      sub: t.colorsSub,
-      accent: 'var(--color-purple, #6D28D9)', // Насыщенный фиолетовый
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="17.5" cy="10.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="8.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
-          <circle cx="6.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
-          <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-        </svg>
-      ),
-    },
-    {
-      title: t.styles,
-      sub: t.stylesSub,
-      accent: 'var(--color-info, #1D4ED8)', // Глубокий синий
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 19 18 L 3 18 C 3 18 1.5 17.5 1.5 16.5 C 1.5 15 3 14 4 14 L 6.5 13 L 8.5 8.5 C 9 7.5 10 7 11.5 7 L 15 7 C 16 7 16.5 8 16 9 L 14 11.5 L 17 12 C 19 12.5 21 14 21 16 Z" />
-          <path d="M 21 18 L 21 16 L 19 16 L 19 18 Z" />
-          <path d="M 14 11.5 L 9 15" />
-        </svg>
-      ),
-    },
-  ]
+  const greeting = returning
+    ? firstName
+      ? `${t.helloBack}, ${firstName}`
+      : t.welcomeBack
+    : firstName
+      ? `${t.hello}, ${firstName}`
+      : t.welcome
+
+  const ctaLabel = returning ? t.continue : t.start
 
   const handleAddToHome = async () => {
+    haptic('light')
     const deferredPrompt = (window as any).deferredPrompt
     if (deferredPrompt) {
       try {
@@ -153,14 +149,15 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
           ;(window as any).deferredPrompt = null
           return
         }
-      } catch (e) {}
+      } catch {}
     }
     setShowWidgetHint(true)
   }
 
   const handleOpenInBrowser = () => {
+    haptic('medium')
     const appUrl = 'https://cordwainer-miniapp.vercel.app'
-    const tg = (window as any).Telegram?.WebApp
+    const tg = window.Telegram?.WebApp
 
     if (tg && tg.openLink) {
       tg.openLink(appUrl)
@@ -170,261 +167,220 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
     setShowWidgetHint(false)
   }
 
+  const handleStart = () => {
+    haptic('medium')
+    try {
+      localStorage.setItem('cordwainer_visited', '1')
+    } catch {}
+    onStart?.()
+  }
+
+  const handleOpenFavorites = () => {
+    haptic('light')
+    const first = blogFavorites[0]
+    if (first?.id === 'blog-orvard' && onOpenBlog) {
+      onOpenBlog()
+      return
+    }
+    onStart?.()
+  }
+
   return (
-    <div
-      className="relative flex flex-col h-[100dvh] overflow-hidden bg-[var(--color-bg)] text-[var(--color-ink)]"
-    >
-      {/* Hero */}
-      <div className="relative shrink-0 h-[42vh] min-h-[260px] max-h-[360px] md:h-[36vh] md:max-h-[400px] lg:h-[32vh] lg:max-h-[440px] overflow-hidden z-20">
+    <div className="relative flex flex-col h-[100dvh] overflow-hidden bg-[var(--color-bg)] text-[var(--color-ink)]">
+      <div className="relative flex-1 min-h-[220px] overflow-hidden">
+        {!heroReady && (
+          <div
+            className="absolute inset-0 animate-pulse"
+            style={{ background: 'var(--color-surface-2, #2F2924)' }}
+            aria-hidden
+          />
+        )}
         <img
           src="/hero-cover.webp"
-          alt="Cordwainer Background"
+          alt=""
           width={780}
           height={1040}
           fetchPriority="high"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover object-[center_20%]"
+          onLoad={() => setHeroReady(true)}
+          className="absolute inset-0 w-full h-full object-cover object-[center_28%]"
+          style={{ opacity: heroReady ? 1 : 0, transition: 'opacity 280ms ease' }}
         />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             background: `linear-gradient(
               to bottom,
-              rgba(0,0,0,0.1) 0%,
-              color-mix(in srgb, var(--color-bg) 70%, transparent) 70%,
+              rgba(12, 8, 6, 0.38) 0%,
+              rgba(12, 8, 6, 0.12) 42%,
+              color-mix(in srgb, var(--color-bg) 55%, transparent) 78%,
               var(--color-bg) 100%
             )`,
           }}
         />
+
         <div className="absolute inset-0 p-4 flex flex-col justify-between z-20">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0 pr-2">
-              <h1
-                className="font-display text-[2rem] sm:text-[2.5rem] leading-[0.9] truncate"
-                style={{
-                  color: 'var(--color-ink)',
-                  textShadow: '0 2px 12px rgba(0,0,0,0.4)', // Жесткая тень для читаемости на любых фото
-                }}
-              >
-                Cordwainer
-              </h1>
-              <p
-                className={`mt-2 tracking-[0.2em] uppercase font-semibold ${lang === 'de' ? 'text-[8.5px]' : 'text-[10px]'}`}
-                style={{ color: 'var(--color-ink)' }}
-              >
-                {t.tagline}
-              </p>
+          <div className="flex items-start justify-between gap-2">
+            <div
+              className="flex rounded-full p-1"
+              style={{
+                background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)',
+                border: '1px solid var(--color-border)',
+                backdropFilter: 'blur(12px)',
+              }}
+              role="group"
+              aria-label="Language selection"
+            >
+              {(['ru', 'uk', 'de'] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => handleLangChange(l)}
+                  className={`min-h-9 min-w-9 px-2.5 text-[10px] font-bold tracking-wide uppercase rounded-full transition-colors ${
+                    lang === l
+                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)]'
+                      : 'text-[var(--color-muted)]'
+                  }`}
+                  aria-pressed={lang === l}
+                >
+                  {l === 'uk' ? 'UKR' : l}
+                </button>
+              ))}
             </div>
 
-            <div className="flex flex-col items-end gap-2 shrink-0 ml-1 z-50">
-              <div
-                className="flex rounded-full p-1"
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                }}
-                role="group"
-                aria-label="Language selection"
-              >
-                {['ru', 'uk', 'de'].map((l) => (
-                  <button
-                    key={l}
-                    onClick={() => handleLangChange(l as Lang)}
-                    className={`px-3 py-1.5 text-[9px] sm:text-[10px] font-bold tracking-wide uppercase rounded-full transition-colors ${
-                      lang === l ? 'bg-[var(--color-ink)] text-[var(--color-bg)]' : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-                    }`}
-                    aria-pressed={lang === l}
-                    role="button"
-                  >
-                    {l === 'uk' ? 'UKR' : l}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={handleAddToHome}
-                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full active:scale-95 transition-transform cursor-pointer"
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                }}
-                aria-label={t.addToHomeShort}
-                role="button"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="5" y="2" width="14" height="20" rx="2" />
-                  <path d="M12 18h.01" />
-                </svg>
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-ink)' }}>
-                  {t.addToHomeShort}
-                </span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleAddToHome}
+              className="flex items-center justify-center gap-1.5 min-h-9 px-3 rounded-full active:scale-95 transition-transform"
+              style={{
+                background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)',
+                border: '1px solid var(--color-border)',
+                backdropFilter: 'blur(12px)',
+              }}
+              aria-label={t.addToHomeShort}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="5" y="2" width="14" height="20" rx="2" />
+                <path d="M12 18h.01" />
+              </svg>
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-ink)' }}>
+                {t.addToHomeShort}
+              </span>
+            </button>
           </div>
 
-          <div className="pointer-events-none pb-2 font-medium">
+          <div className="pb-3">
             <p
-              className="text-[9px] tracking-[0.2em] uppercase mb-2"
-              style={{ color: 'var(--color-muted)' }}
+              className="text-[12px] font-medium tracking-[0.04em] mb-2"
+              style={{ color: '#F5F1EA', textShadow: '0 1px 8px rgba(0,0,0,0.45)' }}
             >
-              Issue 01 · 2026
+              {greeting}
             </p>
-            <div
-              className="flex flex-col gap-1 text-[9px] tracking-[0.12em] uppercase leading-tight"
-              style={{ color: 'var(--color-ink)' }}
+            <h1
+              className="font-display text-[2.15rem] sm:text-[2.5rem] leading-[0.92]"
+              style={{
+                color: '#F5F1EA',
+                textShadow: '0 2px 16px rgba(0,0,0,0.5)',
+              }}
             >
-              <span>{t.idea1}</span>
-              <span>{t.idea2}</span>
-              <span>{t.idea3}</span>
-            </div>
+              Cordwainer
+            </h1>
+            <p
+              className={`mt-2 tracking-[0.18em] uppercase font-semibold ${lang === 'de' ? 'text-[8.5px]' : 'text-[10px]'}`}
+              style={{ color: '#F5F1EA', textShadow: '0 1px 8px rgba(0,0,0,0.45)' }}
+            >
+              {t.tagline}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 px-4 pt-3 overflow-y-auto pb-[130px] overscroll-none relative z-30 -mt-3">
-        <div className="grid grid-cols-3 gap-2.5 md:gap-3 mb-5 items-stretch max-w-full">
-          {categories.map((item) => (
-            <button
-              key={item.title}
-              className="card-simplified relative rounded-2xl p-2.5 text-left flex flex-col justify-between overflow-hidden cursor-pointer w-full h-full active:scale-[0.96] transition-transform"
-              style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 relative z-10 shrink-0"
-                style={{
-                  background: `color-mix(in srgb, ${item.accent} 15%, var(--color-surface))`,
-                  color: item.accent,
-                }}
-              >
-                {item.icon}
-              </div>
-              <div className="relative z-10 flex-1 flex flex-col justify-end">
-                <div
-                  className="text-[10px] sm:text-[11px] font-bold leading-tight whitespace-pre-line"
-                  style={{ color: 'var(--color-ink)', wordBreak: 'break-word' }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  className="text-[8.5px] sm:text-[9px] mt-1.5 leading-snug whitespace-pre-line font-medium"
-                  style={{ color: 'var(--color-muted)' }}
-                >
-                  {item.sub}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
+      <div className="relative z-30 px-4 pt-1 pb-[118px] shrink-0">
+        <p
+          className="text-[9px] tracking-[0.18em] uppercase mb-2"
+          style={{ color: 'var(--color-muted)' }}
+        >
+          Issue 01 · 2026
+        </p>
+        <p
+          className="text-[14px] leading-snug font-medium mb-2 max-w-[34ch]"
+          style={{ color: 'var(--color-ink)' }}
+        >
+          {t.value}
+        </p>
+        <p
+          className="text-[10px] tracking-[0.06em] leading-relaxed mb-5"
+          style={{ color: 'var(--color-muted)' }}
+        >
+          {t.idea}
+        </p>
+
+        {blogFavorites.length > 0 && (
+          <button
+            type="button"
+            onClick={handleOpenFavorites}
+            className="w-full mb-4 rounded-2xl px-3 py-2.5 flex items-center gap-3 active:scale-[0.98] transition-transform text-left"
+            style={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+            }}
+            aria-label={`${t.favorites} ${blogFavorites.length}`}
+          >
+            <div className="flex -space-x-2 shrink-0">
+              {blogFavorites.slice(0, 3).map((item) => (
+                <img
+                  key={item.id}
+                  src={item.imagePng}
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="w-7 h-7 rounded-full object-cover"
+                  style={{ border: '2px solid var(--color-surface)' }}
+                  decoding="async"
+                />
+              ))}
+            </div>
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--color-ink)' }}>
+              {t.favorites} · {blogFavorites.length}
+            </span>
+            <span className="ml-auto text-[16px] font-bold" style={{ color: 'var(--color-accent, #C49A5A)' }} aria-hidden>
+              →
+            </span>
+          </button>
+        )}
 
         <button
-          onClick={onStart}
-          className="btn-primary mb-6 w-full rounded-2xl overflow-hidden active:scale-[0.98] transition-transform"
-          aria-label={t.start}
-          role="button"
+          type="button"
+          onClick={handleStart}
+          className="btn-primary w-full rounded-2xl overflow-hidden active:scale-[0.98] transition-transform"
+          aria-label={ctaLabel}
           style={{
             background: 'var(--color-ink)',
             color: 'var(--color-bg)',
-            minHeight: '64px'
+            minHeight: '64px',
+            height: 'auto',
           }}
         >
-          <div className="relative h-full flex items-center justify-between px-6 py-4">
+          <div className="relative flex items-center justify-between px-6 py-4">
             <div className="flex flex-col text-left">
               <span
                 className="uppercase text-[10px] tracking-[.30em] font-bold"
-                style={{ color: 'var(--color-bg)', opacity: 0.8 }}
+                style={{ color: 'var(--color-bg)', opacity: 0.72 }}
               >
-                ISSUE 01
+                {t.issue}
               </span>
-              <span
-                className={`${lang === 'de' ? 'text-[17px]' : 'text-[20px]'} font-bold mt-1`}
-              >
-                {t.start}
+              <span className={`${lang === 'de' ? 'text-[17px]' : 'text-[20px]'} font-bold mt-0.5`}>
+                {ctaLabel}
               </span>
             </div>
-            <div className="text-[28px] font-bold">
+            <div className="text-[28px] font-bold leading-none" aria-hidden>
               →
             </div>
           </div>
         </button>
-
-        <div className="mb-2">
-          <div className="flex items-center justify-between mb-3 px-0.5">
-            <span
-              className="text-[11px] font-bold tracking-[0.14em] uppercase"
-              style={{ color: 'var(--color-ink)' }}
-            >
-              {t.favorites}
-            </span>
-            <button
-              className="text-[11px] font-semibold active:opacity-70 cursor-pointer"
-              style={{ color: 'var(--color-accent, #B46513)' }}
-            >
-              {t.seeAll}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 md:gap-3">
-            {[0, 1, 2, 3].map((index) => {
-              const item = blogFavorites[index]
-
-              return (
-                <div
-                  key={index}
-                  onClick={() => {
-                    if (item?.id === 'blog-orvard' && onOpenBlog) {
-                      onOpenBlog()
-                    } else if (!item && onStart) {
-                      onStart()
-                    }
-                  }}
-                  className="card-simplified relative aspect-square rounded-xl flex items-center justify-center overflow-hidden cursor-pointer active:scale-95 transition-transform"
-                  style={{
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                  }}
-                >
-                  {item ? (
-                    <img
-                      src={item.imagePng}
-                      alt={`Favorite ${index}`}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                      draggable={false}
-                    />
-                  ) : (
-                    <span
-                      className="text-[22px] font-medium"
-                      style={{ color: 'var(--color-ink)' }}
-                    >
-                      +
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
       </div>
 
-      {/* Плотная подложка для BottomDock */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-50 pointer-events-auto shadow-[0_-4px_24px_rgba(0,0,0,0.06)]"
-        style={{
-          background: 'var(--color-surface)', 
-          borderTop: '1px solid var(--color-border)'
-        }}
-      >
-        <div className="mx-auto w-full max-w-[var(--app-max-width)]">
-          <BottomDock active="search" lang={lang} />
-        </div>
-      </div>
+      <BottomDock active="search" lang={lang} />
 
       <AnimatePresence>
         {showWidgetHint && (
@@ -461,18 +417,16 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                       color: 'var(--color-accent, #B46513)',
                     }}
                   >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                       <rect x="5" y="2" width="14" height="20" rx="2" />
                       <path d="M12 18h.01" />
                     </svg>
                   </div>
-                  <div>
-                    <div
-                      className="text-[17px] font-bold"
-                      style={{ color: 'var(--color-ink)' }}
-                    >
-                      {t.widgetTitle}
-                    </div>
+                  <div
+                    className="text-[17px] font-bold"
+                    style={{ color: 'var(--color-ink)' }}
+                  >
+                    {t.widgetTitle}
                   </div>
                 </div>
 
@@ -496,8 +450,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang, favorites = []
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleOpenInBrowser}
-                  className="w-full py-4 rounded-2xl text-[14px] font-bold uppercase tracking-wider active:scale-[0.98] transition-transform cursor-pointer shadow-md"
+                  className="w-full py-4 rounded-2xl text-[14px] font-bold uppercase tracking-wider active:scale-[0.98] transition-transform shadow-md"
                   style={{
                     background: 'var(--color-ink)',
                     color: 'var(--color-bg)',
