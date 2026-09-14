@@ -170,7 +170,6 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
   return (
-    // Жестко блокируем горизонтальный скролл на главном контейнере: w-full, overflow-x-hidden, max-w-[100vw]
     <div className={`relative flex flex-col h-[100dvh] w-full max-w-[100vw] transition-colors duration-500 ${cBg} ${cText} overflow-hidden overflow-x-hidden`}>
       <style>{`
         * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
@@ -198,7 +197,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
         </button>
       </header>
 
-      {/* CONTENT (Тоже с блокировкой горизонтального скролла) */}
+      {/* CONTENT */}
       <div ref={listRef} className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-24 scrollbar-hide w-full">
         
         {/* ЗАГОЛОВОК */}
@@ -386,7 +385,6 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
         <div
           className={`absolute inset-0 flex flex-col items-center justify-between p-5 border ${cLine} ${cSurface} shadow-sm`}
           style={{
-            // Убрали overflow: hidden! Это ломало 3D-движок Safari.
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
             transform: 'rotateY(0deg)',
@@ -411,7 +409,7 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
           </div>
 
           <div className="w-full flex flex-col items-center text-center z-10 mt-auto">
-            <h3 className={`font-serif text-[22px] leading-[1.1] mb-4 ${cText}`}>
+            <h3 className={`font-serif text-[22px] leading-[1.1] mb-4 break-words w-full ${cText}`}>
               {title}
             </h3>
             <div className={`text-[8px] font-sans tracking-[0.3em] uppercase transition-opacity opacity-0 group-hover:opacity-100 ${cTextMuted}`}>
@@ -432,8 +430,8 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
             pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
-          <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0`}>
-            <h3 className={`font-serif text-[18px] leading-none truncate ${cText}`}>
+          <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0 w-full`}>
+            <h3 className={`font-serif text-[18px] leading-[1.1] break-words w-full ${cText}`}>
               {title}
             </h3>
           </div>
