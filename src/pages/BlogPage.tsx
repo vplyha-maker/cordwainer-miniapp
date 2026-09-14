@@ -349,8 +349,13 @@ export function BlogPage({
   ]
 
   return (
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${cBg} ${cText}`}>
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${cBg} ${cText} overscroll-none`}>
       <style>{`
+        /* Блокируем оттягивание страницы и белый фон в iOS Safari */
+        html, body {
+          overscroll-behavior-y: none;
+        }
+
         * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -409,7 +414,7 @@ export function BlogPage({
 
       {/* ================= COVER VIEW ================= */}
       {view === 'cover' && (
-        <div className="relative min-h-[100dvh] flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8]">
+        <div className="relative h-[100dvh] overflow-hidden flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8]">
           <div className="absolute inset-0 z-0 pointer-events-none">
             <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-black/30" />
