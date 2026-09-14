@@ -43,7 +43,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       men: 'Мужской', women: 'Женский', kids: 'Детский',
       step1: 'Размер (EU)',
       step2: 'Полнота',
-      cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень широкая' },
+      cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
       gostNum: 'ГОСТ RU (цифра)', gostLet: 'ГОСТ RU (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
@@ -62,7 +62,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       men: 'Чоловічий', women: 'Жіночий', kids: 'Дитячий',
       step1: 'Розмір (EU)',
       step2: 'Повнота',
-      cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже широка' },
+      cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
       gostNum: 'ДСТУ UKR (цифра)', gostLet: 'ДСТУ UKR (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
@@ -88,7 +88,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
       understood: 'Schließen',
       mm: 'mm',
-      in: 'Zoll',
+      in: 'in',
       modal: {
         gostNum: { title: 'Osteuropäische Norm', text: 'Der Standard 3927-88 (GOST/DSTU) nutzt ein Zahlen- und Buchstabensystem zur Definition der Leistenumfänge.' },
         iso: { title: 'ISO Standard', text: 'Internationaler ISO / EU Standard für die Markierung von Schuh- und Leistenparametern.' }
@@ -117,7 +117,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   
   const [showPro, setShowPro] = useState(false)
   const [activeInfo, setActiveInfo] = useState<InfoModalType>(null)
-  const modalRef = useRef<HTMLDivElement>(null)
 
   const limits = SIZE_LIMITS[gender]
   const result = useMemo(() => getWidthData(gender, sizeEu, widthCat), [gender, sizeEu, widthCat])
@@ -128,19 +127,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     localStorage.setItem('wc_width', widthCat)
     localStorage.setItem('wc_unit', unit)
   }, [gender, sizeEu, widthCat, unit])
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && activeInfo) setActiveInfo(null)
-    }
-    if (activeInfo) {
-      document.body.style.overflow = 'hidden'
-      window.addEventListener('keydown', handleKeyDown)
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeInfo])
 
   const handleGender = (g: Gender) => {
     if (gender === g) return
@@ -223,9 +209,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* СЕКЦИЯ: РАЗМЕР И ПОЛНОТА */}
-        <div className="stagger-item mb-12 w-full" style={{ animationDelay: '0.1s' }}>
-          
+        {/* СЕКЦИЯ: ВВОД РАЗМЕРА И ПОЛНОТЫ */}
+        <div className="stagger-item mb-16 w-full" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center justify-between mb-8">
             <div className="flex flex-col">
               <span className={`text-[9px] font-sans uppercase tracking-[0.25em] ${cTextMuted}`}>
@@ -237,7 +222,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
             </div>
           </div>
 
-          {/* Гигантский ввод размера */}
           <div className="flex items-center justify-between w-full mb-12">
             <button
               onClick={() => handleSizeChange(sizeEu - 1)}
@@ -285,13 +269,13 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
 
         {/* СЕКЦИЯ: РЕЗУЛЬТАТ (US / UK) */}
         <div className={`stagger-item border-b ${cLine} pb-12 mb-12 flex justify-between px-4 md:px-12`} style={{ animationDelay: '0.15s' }}>
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 w-1/2">
             <span className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted}`}>US Size</span>
-            <span className={`font-serif text-[60px] leading-none ${cText}`}>{result.us}</span>
+            <span className={`font-serif text-[60px] md:text-[80px] leading-none ${cText}`}>{result.us}</span>
           </div>
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 w-1/2">
             <span className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted}`}>UK Size</span>
-            <span className={`font-serif text-[60px] leading-none ${cText}`}>{result.uk}</span>
+            <span className={`font-serif text-[60px] md:text-[80px] leading-none ${cText}`}>{result.uk}</span>
           </div>
         </div>
 
@@ -299,7 +283,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         <div className="stagger-item w-full" style={{ animationDelay: '0.2s' }}>
           <button
             onClick={() => { haptic('light'); setShowPro(!showPro) }}
-            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none ${showPro ? cLine : 'border-transparent'} ${cTextMuted} hover:text-current`}
+            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none ${cLine} ${cTextMuted} hover:text-current`}
           >
             <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
               {t.proModules}
@@ -317,10 +301,10 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="pt-8 space-y-10 pb-4">
+                <div className="pt-8 space-y-12 pb-4">
                   
-                  {/* Standards */}
-                  <div className="grid grid-cols-3 gap-4">
+                  {/* Standards (ГОСТ / ISO) */}
+                  <div className={`grid grid-cols-3 gap-2 border-b ${cLine} pb-8`}>
                     {[
                       { key: 'gostNum' as const, label: t.gostNum, value: result.gostNum },
                       { key: 'gostNum' as const, label: t.gostLet, value: result.gostLetter },
@@ -329,12 +313,12 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                       <div
                         key={idx}
                         onClick={() => { haptic('light'); setActiveInfo(item.key); }}
-                        className={`flex flex-col items-center gap-3 cursor-pointer group`}
+                        className="flex flex-col items-center justify-between cursor-pointer group"
                       >
-                        <span className={`text-[8px] min-[390px]:text-[9px] font-sans uppercase tracking-widest text-center leading-tight h-8 ${cTextMuted} group-hover:text-current transition-colors`}>
+                        <span className={`text-[8px] font-sans uppercase tracking-widest text-center leading-tight mb-4 ${cTextMuted} group-hover:text-current transition-colors`}>
                           {item.label}
                         </span>
-                        <span className={`font-serif text-2xl md:text-3xl ${cText}`}>
+                        <span className={`font-serif text-3xl md:text-4xl ${cText}`}>
                           {item.value}
                         </span>
                       </div>
@@ -343,11 +327,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
 
                   {/* Dimensions Table */}
                   <div>
-                    <div className="flex justify-between items-center pb-4 mb-4">
+                    <div className="flex justify-between items-center pb-6">
                       <span className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted}`}>
                         {t.mondopointLabel}
                       </span>
-                      <div className="flex gap-4">
+                      <div className="flex gap-5">
                         {(['mm', 'in'] as Unit[]).map(u => (
                           <button 
                             key={u}
@@ -356,29 +340,32 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                               unit === u ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40 hover:opacity-100`
                             }`}
                           >
-                            {u === 'mm' ? t.mm : t.in}
+                            {t[u]}
                           </button>
                         ))}
                       </div>
                     </div>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-0">
                       {[
                         { id: 'length' as const, label: t.tableLength, valMm: result.footLengthMm, valIn: result.footLengthIn },
                         { id: 'ball' as const, label: t.tableBall, valMm: result.girthMm, valIn: result.girthIn },
                         { id: 'instep' as const, label: t.tableInstep, valMm: result.instepMm, valIn: result.instepIn },
                         { id: 'heel' as const, label: t.tableHeel, valMm: result.heelMm, valIn: result.heelIn }
                       ].map((row) => (
-                        <div key={row.id} className={`flex justify-between items-end pb-3 border-b ${cLine}`}>
-                          <div className="flex items-center gap-3">
+                        <div key={row.id} className={`flex justify-between items-end py-5 border-b ${cLine}`}>
+                          <div className="flex items-center gap-4">
                             <StaticIcon type={row.id} className={cTextMuted} />
-                            <span className={`text-[11px] font-sans font-light tracking-wide ${cText}`}>
+                            <span className={`text-[12px] font-sans font-light tracking-wide ${cText}`}>
                               {row.label}
                             </span>
                           </div>
-                          <span className={`font-serif text-xl ${cText}`}>
+                          <span className={`font-serif text-2xl md:text-3xl ${cText}`}>
                             {unit === 'mm' ? row.valMm : row.valIn}
-                            <span className={`font-sans text-[9px] ml-1.5 ${cTextMuted}`}>{unit === 'mm' ? 'mm' : 'in'}</span>
+                            {/* Единицы измерения всегда строчными для эстетики и понятности */}
+                            <span className={`font-sans text-[10px] ml-1.5 ${cTextMuted}`}>
+                              {unit === 'mm' ? 'mm' : 'in'}
+                            </span>
                           </span>
                         </div>
                       ))}
