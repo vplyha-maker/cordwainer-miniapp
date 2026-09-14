@@ -41,6 +41,20 @@ function haptic(style: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
+const StaticIcon = ({ type, className }: { type: 'length' | 'ball' | 'instep' | 'heel', className?: string }) => {
+  const paths = {
+    length: "M3 12h18M5 9v6M19 9v6",
+    ball: "M12 5c-4.4 0-8 3.1-8 7s3.6 7 8 7 8-3.1 8-7",
+    instep: "M4 16c0-6 4-10 8-10s8 4 8 10",
+    heel: "M18 6L6 18M7 7l-2 2 2 2"
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`shrink-0 ${className}`}>
+      <path d={paths[type]} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function HeelCalcPage({ onBack, lang }: Props) {
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') return document.documentElement.classList.contains('dark')
@@ -228,25 +242,21 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         </div>
 
-        {/* Visualizer Canvas */}
-        <div className={`stagger-item w-full h-[260px] md:h-[320px] rounded-[16px] border ${cLine} overflow-hidden mb-10 shadow-sm relative`} style={{ animationDelay: '0.15s' }}>
-          {/* Интегрируем HeelCanvas, оборачивая его в строгий контейнер. Сам компонент HeelCanvas 
-              внутри имеет свои цвета, но они хорошо ложатся на темный или светлый фон. */}
-          <div className="absolute inset-0 grayscale-[20%]">
-            <HeelCanvas
-              geometry={geometry}
-              eng={eng}
-              audit={audit}
-              auditTitle={(t as any)[audit.titleKey]}
-              auditMessage={(t as any)[audit.messageKey]}
-              soleType={soleType}
-              heelType={heelType}
-              heelHeight={heelHeight}
-              toeThickness={toeThickness}
-              labels={t}
-              onFix={handleFix}
-            />
-          </div>
+        {/* Visualizer Canvas - Исправлена высота, теперь контейнер тянется за контентом */}
+        <div className="stagger-item w-full mb-10 relative" style={{ animationDelay: '0.15s' }}>
+          <HeelCanvas
+            geometry={geometry}
+            eng={eng}
+            audit={audit}
+            auditTitle={(t as any)[audit.titleKey]}
+            auditMessage={(t as any)[audit.messageKey]}
+            soleType={soleType}
+            heelType={heelType}
+            heelHeight={heelHeight}
+            toeThickness={toeThickness}
+            labels={t}
+            onFix={handleFix}
+          />
         </div>
 
         {/* Controls Grid (Compact Journal Steppers) */}
@@ -289,7 +299,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 className="overflow-hidden"
               >
                 <div className="pt-8 space-y-2 pb-4">
-                  {/* Упаковываем все спецификации в плотную сетку grid-cols-2 */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-6">
                     <SpecCell label={t.specПерекат} value={`${rockerStartPct}%`} infoKey="перекат" onInfo={() => setActiveInfo('перекат')} isDark={isDark} />
                     <SpecCell label={t.specГеленок} value={`${eng.shankLength}`} unit={t.mm} infoKey="геленок" onInfo={() => setActiveInfo('геленок')} isDark={isDark} />
@@ -353,7 +362,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               className={`w-full max-w-[320px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col`}
             >
               <h3 className={`font-serif text-2xl leading-tight mb-4 ${cText} capitalize`}>
-                 {/* Берем название из метки, убираем спецсимволы */}
                  {activeInfo}
               </h3>
               <p className={`text-[12px] font-sans font-light leading-[1.6] mb-8 ${cTextMuted}`}>
