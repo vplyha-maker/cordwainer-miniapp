@@ -81,10 +81,15 @@ export function BlogPage({
 
   const count = BLOG_ARTICLES.length
 
-  // Сброс скролла и отслеживание темы
+  // Сброс скролла, отслеживание темы и покраска глобального body
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    const checkTheme = () => {
+      const dark = document.documentElement.classList.contains('dark')
+      setIsDark(dark)
+      // Красим body, чтобы отскок iOS показывал правильный цвет, а не белое поле
+      document.body.style.backgroundColor = dark ? '#0A0A0A' : '#F2EFE9'
+    }
     checkTheme()
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
@@ -113,13 +118,29 @@ export function BlogPage({
     }
   }, [initialArticleId, initialShowFavorites])
 
+  // Жесткая блокировка скролла для iOS
   useEffect(() => {
+    const tg = getWebApp()
+    if (tg) {
+      if (!tg.isExpanded) tg.expand() // Раскрываем окно Telegram
+      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes() // Блокируем свайпы
+    }
+
+    // Блокируем touchmove только на статичной обложке
+    const handleTouchMove = (e: TouchEvent) => {
+      if (view === 'cover') {
+        e.preventDefault()
+      }
+    }
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current)
       if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
+      document.removeEventListener('touchmove', handleTouchMove)
     }
-  }, [])
+  }, [view])
 
   const showToastMessage = (message: string) => {
     setToast({ message, visible: true })
@@ -349,11 +370,12 @@ export function BlogPage({
   ]
 
   return (
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${cBg} ${cText} overscroll-none`}>
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${cBg} ${cText}`}>
       <style>{`
-        /* Блокируем оттягивание страницы и белый фон в iOS Safari */
+        /* Блокируем оттягивание страницы на уровне HTML/Body */
         html, body {
           overscroll-behavior-y: none;
+          -webkit-overflow-scrolling: touch;
         }
 
         * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
@@ -414,7 +436,7 @@ export function BlogPage({
 
       {/* ================= COVER VIEW ================= */}
       {view === 'cover' && (
-        <div className="relative h-[100dvh] overflow-hidden flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8]">
+        <div className="fixed inset-0 z-50 overflow-hidden flex flex-col justify-end bg-[#0A0A0A] text-[#F4F0E8] touch-none">
           <div className="absolute inset-0 z-0 pointer-events-none">
             <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-black/30" />
