@@ -13,7 +13,6 @@ type SizeCalcPageProps = {
   lang: Lang
 }
 
-// Флаги сохраняем, но в верстке применим к ним grayscale для журнального вида
 const FlagEU = () => (
   <svg width="14" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
     <rect width="18" height="12" fill="#003399" />
@@ -85,8 +84,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       kids: 'Детский',
       cm: 'см',
       mm: 'мм',
-      cmLabel: 'СМ',
-      mmLabel: 'ММ',
+      cmLabel: 'см',
+      mmLabel: 'мм',
       standardsNote: 'ISO 19407:2023 и ISO 9407 (Mondopoint).',
       isoEu: 'ISO 19407 · Paris Point',
       isoUk: 'ISO 19407 · Barleycorn',
@@ -112,8 +111,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       kids: 'Дитячий',
       cm: 'см',
       mm: 'мм',
-      cmLabel: 'СМ',
-      mmLabel: 'ММ',
+      cmLabel: 'см',
+      mmLabel: 'мм',
       standardsNote: 'ISO 19407:2023 та ISO 9407 (Mondopoint).',
       isoEu: 'ISO 19407 · Paris Point',
       isoUk: 'ISO 19407 · Barleycorn',
@@ -139,8 +138,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       kids: 'Kinder',
       cm: 'cm',
       mm: 'mm',
-      cmLabel: 'CM',
-      mmLabel: 'MM',
+      cmLabel: 'cm',
+      mmLabel: 'mm',
       standardsNote: 'ISO 19407:2023 und ISO 9407 (Mondopoint).',
       isoEu: 'ISO 19407 · Paris Point',
       isoUk: 'ISO 19407 · Barleycorn',
@@ -312,7 +311,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 <button
                   key={u}
                   onClick={() => { haptic('light'); setUnit(u); }}
-                  className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-all outline-none border-none bg-transparent cursor-pointer ${
+                  className={`text-[11px] font-sans transition-all outline-none border-none bg-transparent cursor-pointer ${
                     unit === u ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40`
                   }`}
                 >
@@ -381,7 +380,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                  style={{ left: `calc(${pct}% - 6px)`, backgroundColor: trackColor }}
                />
             </div>
-            <div className={`flex justify-between mt-4 text-[9px] font-sans tracking-[0.2em] uppercase ${cTextMuted}`}>
+            <div className={`flex justify-between mt-4 text-[10px] font-sans ${cTextMuted}`}>
               <span>{unit === 'cm' ? (range.min / 10).toFixed(1) : range.min}</span>
               <span>{unit === 'cm' ? (range.max / 10).toFixed(1) : range.max}</span>
             </div>
@@ -461,7 +460,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center h-4">
-                <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.cmLabel}</span>
+                <span className={`text-[10px] font-sans ${cTextMuted}`}>{t.cmLabel}</span>
               </div>
               <span className={`font-serif text-3xl md:text-4xl ${cText}`}>
                 {result.cm.toFixed(1).replace('.', ',')}
