@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 import {
@@ -13,7 +13,6 @@ import {
   type RockerType,
 } from '../lib/heelCalc'
 import { buildHeelGeometry } from '../lib/heelGeometry'
-import { HeelStepper } from '../components/heel/HeelStepper'
 import { HeelCanvas } from '../components/heel/HeelCanvas'
 
 type Props = { onBack: () => void; lang: Lang }
@@ -34,7 +33,29 @@ type InfoKey =
   | 'apexM5'
   | 'carbonInsert'
 
+function haptic(style: 'light' | 'medium' = 'light') {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+    else if (navigator.vibrate) navigator.vibrate(style === 'light' ? 20 : 40)
+  } catch {}
+}
+
 export function HeelCalcPage({ onBack, lang }: Props) {
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document !== 'undefined') return document.documentElement.classList.contains('dark')
+    return true
+  })
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    checkTheme()
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
   const [shoeSize, setShoeSize] = useState(38)
   const [heelHeight, setHeelHeight] = useState(55)
   const [toeThickness, setToeThickness] = useState(10)
@@ -45,8 +66,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
   const [tipWidthMm, setTipWidthMm] = useState(10)
   const [rockerType, setRockerType] = useState<RockerType>('forefoot')
+  
   const [showSpecs, setShowSpecs] = useState(false)
-  const [openInfo, setOpenInfo] = useState<InfoKey | null>(null)
+  const [activeInfo, setActiveInfo] = useState<InfoKey | null>(null)
 
   useEffect(() => {
     if (toeThickness > heelHeight + 10) setToeThickness(heelHeight + 10)
@@ -56,7 +78,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     if (soleType === 'flat') setTipWidthMm(defaultTipWidth(heelType))
   }, [heelType, soleType])
 
-  // Применение пресета рокера
   useEffect(() => {
     if (soleType === 'rocker') {
       const preset = ROCKER_PRESETS[rockerType]
@@ -65,13 +86,12 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     }
   }, [rockerType, soleType])
 
-  const haptic = (style: 'light' | 'medium' = 'light') => {
-    try {
-      const tg = (window as any).Telegram?.WebApp
-      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
-      else if (navigator.vibrate) navigator.vibrate(style === 'light' ? 20 : 40)
-    } catch {}
-  }
+  // Блокировка скролла при открытой модалке инфо
+  useEffect(() => {
+    if (activeInfo) document.body.style.overflow = 'hidden'
+    else document.body.style.overflow = ''
+    return () => { document.body.style.overflow = '' }
+  }, [activeInfo])
 
   const t = useMemo(() => getLabels(lang), [lang])
   const infos = useMemo(() => getInfoTexts(lang), [lang])
@@ -93,7 +113,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
   const geometry = useMemo(
     () => buildHeelGeometry({ ...input, shankLength: eng.shankLength }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [shoeSize, heelHeight, toeThickness, soleType, heelType, rockerAngle, rockerStartPct, heelTipOffsetMm, tipWidthMm, eng.shankLength]
   )
 
@@ -108,476 +127,246 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   }
 
   const handleRockerType = (type: RockerType) => {
-    haptic()
+    haptic('light')
     setRockerType(type)
   }
 
-  const toggleInfo = (key: InfoKey) => {
-    haptic()
-    setOpenInfo((prev) => (prev === key ? null : key))
-  }
+  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      className="flex flex-col h-[100dvh] overflow-hidden"
-      style={{
-        background: 'var(--color-bg, #1C1816)',
-        color: 'var(--color-ink, #F5F1EA)',
-      }}
-    >
-      {/* Header */}
-      <div
-        className="flex-shrink-0 p-3 md:px-6 md:py-3.5 flex items-center justify-between backdrop-blur-md z-10"
-        style={{
-          background: 'color-mix(in srgb, var(--color-bg, #1C1816) 80%, transparent)',
-          borderBottom: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-        }}
-      >
-        <button
-          onClick={() => { haptic(); onBack() }}
-          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full active:scale-90"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-          }}
+    <div className={`relative flex flex-col min-h-[100dvh] w-full max-w-[100vw] transition-colors duration-500 ${cBg} ${cText} overflow-hidden overflow-x-hidden`}>
+      <style>{`
+        * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeUp {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .stagger-item {
+          opacity: 0;
+          animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* HEADER */}
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20 shrink-0">
+        <button 
+          onClick={() => { haptic('light'); onBack(); }}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span>Back</span>
         </button>
-        <div className="text-right">
-          <h1 className="text-[14px] font-medium leading-none mb-1 calc-page-title">{t.title}</h1>
-          <p className="text-[10px]" style={{ color: 'var(--color-muted, #B9ACA0)' }}>
+      </header>
+
+      {/* CONTENT */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-24 scrollbar-hide w-full">
+        
+        {/* Title */}
+        <div className="stagger-item mb-8 w-full" style={{ animationDelay: '0.05s' }}>
+          <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted}`}>
             {t.desc}
           </p>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-2.5 md:px-6 py-2 space-y-2 pb-6 calc-page-content">
-        <HeelCanvas
-          geometry={geometry}
-          eng={eng}
-          audit={audit}
-          auditTitle={(t as any)[audit.titleKey]}
-          auditMessage={(t as any)[audit.messageKey]}
-          soleType={soleType}
-          heelType={heelType}
-          heelHeight={heelHeight}
-          toeThickness={toeThickness}
-          labels={t}
-          onFix={handleFix}
-        />
-
-        {/* Стандарт / Рокер */}
-        <div
-          className="flex p-1 rounded-xl calc-segment"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-          }}
-        >
-          {(['flat', 'rocker'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => { haptic(); setSoleType(type) }}
-              className="flex-1 py-1.5 text-[11px] font-medium rounded-lg transition-colors"
-              style={
-                soleType === type
-                  ? {
-                      background: 'var(--color-accent, #D8A35C)',
-                      color: 'var(--color-bg, #1C1816)',
-                    }
-                  : { color: 'var(--color-muted, #B9ACA0)' }
-              }
-            >
-              {t[type]}
-            </button>
-          ))}
+          <h1 className="font-serif text-[13vw] min-[400px]:text-5xl leading-[0.9] tracking-tight">
+            {t.title}
+          </h1>
         </div>
 
-        {/* Типы каблука — только Стандарт */}
-        {soleType === 'flat' && (
-          <div
-            className="grid grid-cols-2 gap-1 md:gap-2 p-1 rounded-xl calc-segment"
-            style={{
-              background: 'var(--color-surface, #25201C)',
-              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-            }}
-          >
-            {(['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
+        {/* Toggles (Horizontal Scroll) */}
+        <div className="stagger-item mb-6" style={{ animationDelay: '0.1s' }}>
+          {/* Sole Type */}
+          <div className={`flex gap-6 pb-3 border-b ${cLine} mb-4`}>
+            {(['flat', 'rocker'] as const).map((type) => (
               <button
                 key={type}
-                onClick={() => { haptic(); setHeelType(type) }}
-                className="py-1.5 text-[11px] font-medium rounded-lg transition-colors"
-                style={
-                  heelType === type
-                    ? {
-                        background: 'var(--color-accent, #D8A35C)',
-                        color: 'var(--color-bg, #1C1816)',
-                      }
-                    : { color: 'var(--color-muted, #B9ACA0)' }
-                }
+                onClick={() => { haptic('light'); setSoleType(type) }}
+                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer ${
+                  soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                }`}
               >
                 {t[type]}
               </button>
             ))}
           </div>
-        )}
 
-        {/* Типы рокера — только Рокер */}
-        {soleType === 'rocker' && (
-          <div
-            className="grid grid-cols-3 gap-1 md:gap-2 p-1 rounded-xl calc-segment"
-            style={{
-              background: 'var(--color-surface, #25201C)',
-              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-            }}
-          >
-            {([
-              { type: 'forefoot' as const, labelKey: 'rockerForefoot' as const },
-              { type: 'heelToToe' as const, labelKey: 'rockerHeelToToe' as const },
-              { type: 'negative' as const, labelKey: 'rockerNegative' as const },
-            ]).map(({ type, labelKey }) => (
-              <button
-                key={type}
-                onClick={() => handleRockerType(type)}
-                className="py-1.5 text-[10px] md:text-[11px] font-medium rounded-lg transition-colors leading-tight"
-                style={
-                  rockerType === type
-                    ? {
-                        background: 'var(--color-accent, #D8A35C)',
-                        color: 'var(--color-bg, #1C1816)',
-                      }
-                    : { color: 'var(--color-muted, #B9ACA0)' }
-                }
-              >
-                {t[labelKey]}
-              </button>
-            ))}
+          {/* Heel / Rocker Sub-types */}
+          <div className="flex overflow-x-auto gap-6 pb-2 scrollbar-hide">
+            {soleType === 'flat' ? (
+              (['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => { haptic('light'); setHeelType(type) }}
+                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
+                    heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
+                  }`}
+                >
+                  {t[type]}
+                </button>
+              ))
+            ) : (
+              ([
+                { type: 'forefoot' as const, labelKey: 'rockerForefoot' as const },
+                { type: 'heelToToe' as const, labelKey: 'rockerHeelToToe' as const },
+                { type: 'negative' as const, labelKey: 'rockerNegative' as const },
+              ]).map(({ type, labelKey }) => (
+                <button
+                  key={type}
+                  onClick={() => handleRockerType(type)}
+                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
+                    rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
+                  }`}
+                >
+                  {t[labelKey]}
+                </button>
+              ))
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Степперы */}
-        <div className="grid grid-cols-2 gap-1.5 md:gap-3">
-          <HeelStepper label={t.size} min={33} max={48} value={shoeSize} onChange={setShoeSize} onHaptic={() => haptic()} />
-          <HeelStepper label={t.heel} min={10} max={130} value={heelHeight} onChange={setHeelHeight} unit={t.mm} onHaptic={() => haptic()} />
-          <HeelStepper
-            label={t.toe}
-            min={0}
-            max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)}
-            value={toeThickness}
-            onChange={setToeThickness}
-            unit={t.mm}
-            onHaptic={() => haptic()}
-          />
-          <HeelStepper
-            label={t.start}
-            min={55}
-            max={75}
-            value={rockerStartPct}
-            onChange={setRockerStartPct}
-            unit="%"
-            onHaptic={() => haptic()}
-          />
-
-          {soleType === 'rocker' ? (
-            <HeelStepper
-              label={t.angle}
-              min={5}
-              max={30}
-              value={rockerAngle}
-              onChange={setRockerAngle}
-              unit="°"
-              onHaptic={() => haptic()}
+        {/* Visualizer Canvas */}
+        <div className={`stagger-item w-full h-[260px] md:h-[320px] rounded-[16px] border ${cLine} overflow-hidden mb-10 shadow-sm relative`} style={{ animationDelay: '0.15s' }}>
+          {/* Интегрируем HeelCanvas, оборачивая его в строгий контейнер. Сам компонент HeelCanvas 
+              внутри имеет свои цвета, но они хорошо ложатся на темный или светлый фон. */}
+          <div className="absolute inset-0 grayscale-[20%]">
+            <HeelCanvas
+              geometry={geometry}
+              eng={eng}
+              audit={audit}
+              auditTitle={(t as any)[audit.titleKey]}
+              auditMessage={(t as any)[audit.messageKey]}
+              soleType={soleType}
+              heelType={heelType}
+              heelHeight={heelHeight}
+              toeThickness={toeThickness}
+              labels={t}
+              onFix={handleFix}
             />
+          </div>
+        </div>
+
+        {/* Controls Grid (Compact Journal Steppers) */}
+        <div className="stagger-item grid grid-cols-2 gap-x-6 gap-y-6 mb-12" style={{ animationDelay: '0.2s' }}>
+          <JournalStepper label={t.size} value={shoeSize} min={33} max={48} onChange={setShoeSize} isDark={isDark} />
+          <JournalStepper label={t.heel} value={heelHeight} min={10} max={130} onChange={setHeelHeight} unit={t.mm} isDark={isDark} />
+          <JournalStepper label={t.toe} value={toeThickness} min={0} max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)} onChange={setToeThickness} unit={t.mm} isDark={isDark} />
+          <JournalStepper label={t.start} value={rockerStartPct} min={55} max={75} onChange={setRockerStartPct} unit="%" isDark={isDark} />
+          
+          {soleType === 'rocker' ? (
+            <JournalStepper label={t.angle} value={rockerAngle} min={5} max={30} onChange={setRockerAngle} unit="°" isDark={isDark} />
           ) : (
             <>
-              <HeelStepper
-                label={t.offset}
-                min={-15}
-                max={15}
-                value={heelTipOffsetMm}
-                onChange={setHeelTipOffsetMm}
-                unit={t.mm}
-                onHaptic={() => haptic()}
-              />
-              <HeelStepper
-                label={t.tipW}
-                min={6}
-                max={45}
-                value={tipWidthMm}
-                onChange={setTipWidthMm}
-                unit={t.mm}
-                onHaptic={() => haptic()}
-              />
+              <JournalStepper label={t.offset} value={heelTipOffsetMm} min={-15} max={15} onChange={setHeelTipOffsetMm} unit={t.mm} isDark={isDark} />
+              <JournalStepper label={t.tipW} value={tipWidthMm} min={6} max={45} onChange={setTipWidthMm} unit={t.mm} isDark={isDark} />
             </>
           )}
         </div>
 
-        {/* Спека */}
-        <button
-          onClick={() => { haptic(); setShowSpecs(!showSpecs); setOpenInfo(null) }}
-          className="w-full py-2 px-3 rounded-xl text-[11px] font-medium flex items-center justify-between"
-          style={{
-            background: 'var(--color-surface, #25201C)',
-            border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-          }}
-        >
-          <span>{t.specsBtn}</span>
-          <svg
-            className={`w-3.5 h-3.5 transition-transform ${showSpecs ? 'rotate-180' : ''}`}
-            style={{ color: 'var(--color-muted, #B9ACA0)' }}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <AnimatePresence>
-          {showSpecs && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div
-                className="p-2.5 md:p-4 rounded-xl text-[10px] space-y-1.5 calc-result-card"
-                style={{
-                  background: 'var(--color-surface, #25201C)',
-                  border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-                  color: 'var(--color-muted, #B9ACA0)',
-                }}
-              >
-                <SpecRow
-                  label={t.specПерекат}
-                  value={`${rockerStartPct}%`}
-                  infoKey="перекат"
-                  openInfo={openInfo}
-                  onToggleInfo={toggleInfo}
-                  infoText={infos.перекат}
-                />
-                <SpecRow
-                  label={t.specГеленок}
-                  value={`${eng.shankLength} ${t.mm}`}
-                  infoKey="геленок"
-                  openInfo={openInfo}
-                  onToggleInfo={toggleInfo}
-                  infoText={infos.геленок}
-                />
-                <SpecRow
-                  label={t.specСталь}
-                  value={`${eng.steelThickness.toFixed(1)} ${t.mm}`}
-                  infoKey="сталь"
-                  openInfo={openInfo}
-                  onToggleInfo={toggleInfo}
-                  infoText={infos.сталь}
-                />
-                <SpecRow
-                  label="L_eff"
-                  value={`${eng.lEff.toFixed(1)} ${t.mm}`}
-                  infoKey="lEff"
-                  openInfo={openInfo}
-                  onToggleInfo={toggleInfo}
-                  infoText={infos.lEff}
-                />
-                <SpecRow
-                  label="Heel Center"
-                  value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`}
-                  infoKey="heelCenter"
-                  openInfo={openInfo}
-                  onToggleInfo={toggleInfo}
-                  infoText={infos.heelCenter}
-                />
-
-                {soleType === 'flat' && (
-                  <>
-                    <SpecRow
-                      label={t.specСмещение}
-                      value={`${heelTipOffsetMm} ${t.mm}`}
-                      danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
-                      infoKey="смещение"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.смещение}
-                    />
-                    <SpecRow
-                      label={t.specНабойка}
-                      value={`${tipWidthMm} ${t.mm}`}
-                      infoKey="набойка"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.набойка}
-                    />
-                    <SpecRow
-                      label={t.invertRisk}
-                      value={`${eng.inversionRisk}%`}
-                      danger={eng.inversionRisk >= 55}
-                      infoKey="invertRisk"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.invertRisk}
-                    />
-                    {(heelType === 'kitten' || heelType === 'flared') && (
-                      <SpecRow
-                        label={t.entryAngle}
-                        value={`${eng.entryAngleDeg}°`}
-                        infoKey="entryAngle"
-                        openInfo={openInfo}
-                        onToggleInfo={toggleInfo}
-                        infoText={infos.entryAngle}
-                      />
-                    )}
-                  </>
-                )}
-
-                {/* Клинико-ортопедические параметры */}
-                {eng.requiresMetatarsalPad && eng.metatarsalPadPosMm != null && (
-                  <>
-                    <SpecRow
-                      label={t.padPos}
-                      value={`${eng.metatarsalPadPosMm} ${t.mm}`}
-                      infoKey="padPos"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.padPos}
-                    />
-                    <SpecRow
-                      label={t.padHeight}
-                      value={`${eng.metatarsalPadHeightMm} ${t.mm}`}
-                      infoKey="padHeight"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.padHeight}
-                    />
-                  </>
-                )}
-
-                {eng.apexM1_Mm != null && (
-                  <>
-                    <SpecRow
-                      label={t.apexM1}
-                      value={`${eng.apexM1_Mm} ${t.mm}`}
-                      infoKey="apexM1"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.apexM1}
-                    />
-                    <SpecRow
-                      label={t.apexM5}
-                      value={`${eng.apexM5_Mm} ${t.mm}`}
-                      infoKey="apexM5"
-                      openInfo={openInfo}
-                      onToggleInfo={toggleInfo}
-                      infoText={infos.apexM5}
-                    />
-                  </>
-                )}
-
-                {soleType === 'rocker' && eng.carbonInsertThicknessMm > 0 && (
-                  <SpecRow
-                    label={t.carbonInsert}
-                    value={`${eng.carbonInsertThicknessMm} ${t.mm}`}
-                    infoKey="carbonInsert"
-                    openInfo={openInfo}
-                    onToggleInfo={toggleInfo}
-                    infoText={infos.carbonInsert}
-                  />
-                )}
-
-                <div
-                  className="pt-1.5 mt-1 font-mono text-[9px] p-1.5 rounded-lg text-center"
-                  style={{
-                    borderTop: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 40%, transparent)',
-                    color: 'var(--color-accent, #D8A35C)',
-                    background: 'color-mix(in srgb, var(--color-bg, #1C1816) 40%, transparent)',
-                  }}
-                >
-                  Angle = arcsin((H − T) / L_eff)
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  )
-}
-
-function SpecRow({
-  label,
-  value,
-  danger,
-  infoKey,
-  openInfo,
-  onToggleInfo,
-  infoText,
-}: {
-  label: string
-  value: string
-  danger?: boolean
-  infoKey: InfoKey
-  openInfo: InfoKey | null
-  onToggleInfo: (key: InfoKey) => void
-  infoText: string
-}) {
-  const isOpen = openInfo === infoKey
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between items-center gap-2">
-        <span className="flex items-center gap-1.5 min-w-0">
-          <span className="truncate">{label}</span>
+        {/* Specs Accordion */}
+        <div className="stagger-item w-full" style={{ animationDelay: '0.25s' }}>
           <button
-            type="button"
-            onClick={() => onToggleInfo(infoKey)}
-            className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold leading-none active:scale-90"
-            style={{
-              background: isOpen
-                ? 'var(--color-accent, #D8A35C)'
-                : 'color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 80%, transparent)',
-              color: isOpen
-                ? 'var(--color-bg, #1C1816)'
-                : 'var(--color-muted, #B9ACA0)',
-              border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 50%, transparent)',
-            }}
-            aria-label="info"
+            onClick={() => { haptic('light'); setShowSpecs(!showSpecs); }}
+            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none ${cLine} ${cTextMuted} hover:text-current`}
           >
-            !
+            <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
+              {t.specsBtn}
+            </span>
+            <motion.div animate={{ rotate: showSpecs ? 180 : 0 }} transition={{ duration: 0.3 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
+            </motion.div>
           </button>
-        </span>
-        <strong
-          className="flex-shrink-0"
-          style={{
-            color: danger
-              ? 'var(--color-danger, #f87171)'
-              : 'var(--color-ink, #F5F1EA)',
-          }}
-        >
-          {value}
-        </strong>
+
+          <AnimatePresence>
+            {showSpecs && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }} 
+                animate={{ opacity: 1, height: 'auto' }} 
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-8 space-y-2 pb-4">
+                  {/* Упаковываем все спецификации в плотную сетку grid-cols-2 */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+                    <SpecCell label={t.specПерекат} value={`${rockerStartPct}%`} infoKey="перекат" onInfo={() => setActiveInfo('перекат')} isDark={isDark} />
+                    <SpecCell label={t.specГеленок} value={`${eng.shankLength}`} unit={t.mm} infoKey="геленок" onInfo={() => setActiveInfo('геленок')} isDark={isDark} />
+                    <SpecCell label={t.specСталь} value={`${eng.steelThickness.toFixed(1)}`} unit={t.mm} infoKey="сталь" onInfo={() => setActiveInfo('сталь')} isDark={isDark} />
+                    <SpecCell label="L_eff" value={`${eng.lEff.toFixed(1)}`} unit={t.mm} infoKey="lEff" onInfo={() => setActiveInfo('lEff')} isDark={isDark} />
+                    <SpecCell label="Heel Center" value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`} infoKey="heelCenter" onInfo={() => setActiveInfo('heelCenter')} isDark={isDark} />
+                    
+                    {soleType === 'flat' && (
+                      <>
+                        <SpecCell label={t.specСмещение} value={`${heelTipOffsetMm}`} unit={t.mm} danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward} infoKey="смещение" onInfo={() => setActiveInfo('смещение')} isDark={isDark} />
+                        <SpecCell label={t.specНабойка} value={`${tipWidthMm}`} unit={t.mm} infoKey="набойка" onInfo={() => setActiveInfo('набойка')} isDark={isDark} />
+                        <SpecCell label={t.invertRisk} value={`${eng.inversionRisk}%`} danger={eng.inversionRisk >= 55} infoKey="invertRisk" onInfo={() => setActiveInfo('invertRisk')} isDark={isDark} />
+                        {(heelType === 'kitten' || heelType === 'flared') && (
+                          <SpecCell label={t.entryAngle} value={`${eng.entryAngleDeg}°`} infoKey="entryAngle" onInfo={() => setActiveInfo('entryAngle')} isDark={isDark} />
+                        )}
+                      </>
+                    )}
+
+                    {eng.requiresMetatarsalPad && eng.metatarsalPadPosMm != null && (
+                      <>
+                        <SpecCell label={t.padPos} value={`${eng.metatarsalPadPosMm}`} unit={t.mm} infoKey="padPos" onInfo={() => setActiveInfo('padPos')} isDark={isDark} />
+                        <SpecCell label={t.padHeight} value={`${eng.metatarsalPadHeightMm}`} unit={t.mm} infoKey="padHeight" onInfo={() => setActiveInfo('padHeight')} isDark={isDark} />
+                      </>
+                    )}
+
+                    {eng.apexM1_Mm != null && (
+                      <>
+                        <SpecCell label={t.apexM1} value={`${eng.apexM1_Mm}`} unit={t.mm} infoKey="apexM1" onInfo={() => setActiveInfo('apexM1')} isDark={isDark} />
+                        <SpecCell label={t.apexM5} value={`${eng.apexM5_Mm}`} unit={t.mm} infoKey="apexM5" onInfo={() => setActiveInfo('apexM5')} isDark={isDark} />
+                      </>
+                    )}
+
+                    {soleType === 'rocker' && eng.carbonInsertThicknessMm > 0 && (
+                      <SpecCell label={t.carbonInsert} value={`${eng.carbonInsertThicknessMm}`} unit={t.mm} infoKey="carbonInsert" onInfo={() => setActiveInfo('carbonInsert')} isDark={isDark} />
+                    )}
+                  </div>
+
+                  <div className={`mt-8 pt-4 border-t ${cLine} text-center`}>
+                    <span className={`font-mono text-[9px] uppercase tracking-widest ${cTextMuted}`}>
+                      Angle = arcsin((H − T) / L_eff)
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
+
+      {/* INFO MODAL */}
       <AnimatePresence>
-        {isOpen && (
+        {activeInfo && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+            onClick={() => setActiveInfo(null)}
           >
-            <p
-              className="text-[9px] leading-snug p-2 rounded-lg"
-              style={{
-                background: 'color-mix(in srgb, var(--color-bg, #1C1816) 55%, transparent)',
-                color: 'var(--color-muted, #B9ACA0)',
-                border: '1px solid color-mix(in srgb, var(--color-border, rgba(255,255,255,0.12)) 35%, transparent)',
-              }}
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+              onClick={e => e.stopPropagation()}
+              className={`w-full max-w-[320px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col`}
             >
-              {infoText}
-            </p>
+              <h3 className={`font-serif text-2xl leading-tight mb-4 ${cText} capitalize`}>
+                 {/* Берем название из метки, убираем спецсимволы */}
+                 {activeInfo}
+              </h3>
+              <p className={`text-[12px] font-sans font-light leading-[1.6] mb-8 ${cTextMuted}`}>
+                {infos[activeInfo]}
+              </p>
+              
+              <button
+                onClick={() => setActiveInfo(null)}
+                className={`w-full py-4 border transition-all active:scale-95 text-[9px] font-sans uppercase tracking-[0.3em] ${cText} ${cLine} hover:bg-current/5`}
+              >
+                Close
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -585,11 +374,75 @@ function SpecRow({
   )
 }
 
+// ------------------------------------------------------------------
+// КОМПАКТНЫЕ ЖУРНАЛЬНЫЕ КОМПОНЕНТЫ
+// ------------------------------------------------------------------
+
+function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }: any) {
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+
+  return (
+    <div className={`flex flex-col border-b ${cLine} pb-3 justify-between`}>
+      <span className={`text-[8.5px] uppercase tracking-[0.2em] mb-3 ${cTextMuted} truncate pr-1`}>{label}</span>
+      <div className="flex items-center justify-between">
+        <button 
+          onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
+          className={`text-2xl leading-none px-2 outline-none ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+        >
+          -
+        </button>
+        <span className={`font-serif text-3xl tabular-nums ${cText}`}>
+          {value}<span className={`font-sans text-[10px] ml-1 ${cTextMuted}`}>{unit}</span>
+        </span>
+        <button 
+          onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
+          className={`text-2xl leading-none px-2 outline-none ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: any) {
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cDanger = '#ef4444' // red-500
+
+  return (
+    <div className={`flex flex-col border-b ${cLine} pb-3 relative`}>
+      <div className="flex items-center gap-2 mb-2 pr-4">
+        <span className={`text-[8.5px] uppercase tracking-[0.2em] truncate ${cTextMuted}`}>
+          {label}
+        </span>
+        <button 
+          onClick={onInfo} 
+          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none active:scale-90 ${cTextMuted} hover:${cText}`}
+        >
+          !
+        </button>
+      </div>
+      <span className={`font-serif text-xl md:text-2xl tabular-nums`} style={{ color: danger ? cDanger : cText }}>
+        {value}
+        {unit && <span className={`font-sans text-[9px] ml-1 ${cTextMuted}`}>{unit}</span>}
+      </span>
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------
+// ТЕКСТОВЫЕ ДАННЫЕ
+// ------------------------------------------------------------------
+
 function getLabels(lang: Lang) {
   const C = HEEL_CONST
   const ru = {
-    title: 'Инженерия и Баланс',
-    desc: 'Аудит профиля и каблука',
+    title: 'Инженерия',
+    desc: 'Баланс & Аудит профиля',
     size: 'Размер', heel: 'Каблук', toe: 'Платформа', angle: 'Угол', start: 'Перекат',
     fixBtn: 'Баланс', offset: 'Смещение', tipW: 'Набойка',
     internalSlope: 'Наклон колодки:', loadLbl: 'Нагрузка на плюсну:',
@@ -600,24 +453,24 @@ function getLabels(lang: Lang) {
     errTitle: '⚠️ КРИТИЧЕСКИЙ НАКЛОН',
     errDesc: `Угол колодки > ${C.CRITICAL_ANGLE}°. Требуется утолщение платформы или снижение каблука.`,
     padTitle: '⚠️ КРИТИЧЕСКАЯ НАГРУЗКА НА ПЛЮСНУ',
-    padDesc: 'Требуется обязательная установка встроенного метатарзального пелота (капли Зейца) в стельку для разгрузки нервных окончаний.',
+    padDesc: 'Требуется обязательная установка встроенного метатарзального пелота в стельку.',
     negDropTitle: '⚠️ ОБРАТНЫЙ УКЛОН', negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
     heelBackTitle: '⚠️ КАБЛУК ЗАВАЛЕН НАЗАД',
-    heelBackDesc: 'Ошибка: Каблук завален назад, произойдет перелом супинатора под весом пациента.',
+    heelBackDesc: 'Ошибка: Каблук завален назад, произойдет перелом супинатора.',
     heelFwdTitle: '⚠️ СМЕЩЕНИЕ ВПЕРЁД',
-    heelFwdDesc: `Набойка смещена вперёд больше чем на ${C.MAX_HEEL_OFFSET_MM} мм. Снижена стабильность, риск срыва посадки каблука.`,
+    heelFwdDesc: `Набойка смещена вперёд больше чем на ${C.MAX_HEEL_OFFSET_MM} мм. Снижена стабильность.`,
     invertTitle: '⚠️ РИСК ИНВЕРСИИ',
-    invertDesc: 'Набойка слишком узкая при высоком каблуке — высокий риск подворачивания лодыжки.',
+    invertDesc: 'Набойка слишком узкая при высоком каблуке — высокий риск подворачивания.',
     heelLbl: 'ПЯТКА', toeLbl: 'НОСОК',
     stiletto: 'Шпилька', block: 'Блок', kitten: 'Рюмочка', flared: 'Трапеция',
     flat: 'Стандарт', rocker: 'Рокер',
-    specsBtn: '⚙️ Спецификация и Математика', dropLbl: 'Перепад',
+    specsBtn: 'Спецификация', dropLbl: 'Перепад',
     massTitle: 'Распределение массы',
     forefoot: 'Носок',
     rearfoot: 'Пятка',
     invertRisk: 'Риск инверсии',
     entryAngle: 'Угол въезда',
-    padPos: 'Пелот Зейца (поз.)',
+    padPos: 'Пелот Зейца',
     padHeight: 'Высота пелота',
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
@@ -630,12 +483,12 @@ function getLabels(lang: Lang) {
     specСталь: 'Сталь 65Г',
     specСмещение: 'Смещение',
     specНабойка: 'Набойка',
-    mm: 'мм'
+    mm: 'mm'
   }
   const uk = {
     ...ru,
-    title: 'Інженерія та Баланс',
-    desc: 'Аудит профілю та підбора',
+    title: 'Інженерія',
+    desc: 'Баланс & Аудит профілю',
     size: 'Розмір', heel: 'Підбор', toe: 'Платформа', angle: 'Кут', start: 'Перекат',
     fixBtn: 'Баланс', offset: 'Зміщення', tipW: 'Набійка',
     internalSlope: 'Нахил колодки:', loadLbl: 'Навантаження на плюсну:',
@@ -646,24 +499,24 @@ function getLabels(lang: Lang) {
     errTitle: '⚠️ КРИТИЧНИЙ НАХИЛ',
     errDesc: `Кут колодки > ${C.CRITICAL_ANGLE}°. Потрібне потовщення платформи або зниження підбора.`,
     padTitle: '⚠️ КРИТИЧНЕ НАВАНТАЖЕННЯ НА ПЛЮСНУ',
-    padDesc: 'Потрібна обовʼязкова установка вбудованого метатарзального пелота (краплі Зейца) у устілку для розвантаження нервових закінчень.',
+    padDesc: 'Потрібна обовʼязкова установка вбудованого метатарзального пелота у устілку.',
     negDropTitle: '⚠️ ЗВОРОТНІЙ УХИЛ', negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
     heelBackTitle: '⚠️ ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
-    heelBackDesc: 'Помилка: Підбор завалений назад, відбудеться перелом супінатора під вагою пацієнта.',
+    heelBackDesc: 'Помилка: Підбор завалений назад, відбудеться перелом супінатора.',
     heelFwdTitle: '⚠️ ЗМІЩЕННЯ ВПЕРЕД',
-    heelFwdDesc: `Набійка зміщена вперед більше ніж на ${C.MAX_HEEL_OFFSET_MM} мм. Знижена стабільність, ризик зриву посадки підбора.`,
+    heelFwdDesc: `Набійка зміщена вперед більше ніж на ${C.MAX_HEEL_OFFSET_MM} мм. Знижена стабільність.`,
     invertTitle: '⚠️ РИЗИК ІНВЕРСІЇ',
-    invertDesc: 'Набійка занадто вузька при високому підборі — високий ризик підвертання щиколотки.',
+    invertDesc: 'Набійка занадто вузька при високому підборі — ризик підвертання.',
     heelLbl: "П'ЯТКА", toeLbl: 'НОСОК',
     stiletto: 'Шпилька', block: 'Блок', kitten: 'Чарочка', flared: 'Трапеція',
     flat: 'Стандарт', rocker: 'Рокер',
-    specsBtn: '⚙️ Специфікація та Математика', dropLbl: 'Перепад',
+    specsBtn: 'Специфікація', dropLbl: 'Перепад',
     massTitle: 'Розподіл маси',
     forefoot: 'Носок',
     rearfoot: "П'ятка",
     invertRisk: 'Ризик інверсії',
     entryAngle: 'Кут вʼїзду',
-    padPos: 'Пелот Зейца (поз.)',
+    padPos: 'Пелот Зейца',
     padHeight: 'Висота пелота',
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
@@ -676,11 +529,11 @@ function getLabels(lang: Lang) {
     specСталь: 'Сталь 65Г',
     specСмещение: 'Зміщення',
     specНабойка: 'Набійка',
-    mm: 'мм'
+    mm: 'mm'
   }
   const de = {
-    title: 'Engineering & Balance',
-    desc: 'Leisten- und Absatzprofil Audit',
+    title: 'Engineering',
+    desc: 'Balance & Profil Audit',
     size: 'Größe', heel: 'Absatz', toe: 'Plateau', angle: 'Winkel', start: 'Rolle',
     fixBtn: 'Balance', offset: 'Versatz', tipW: 'Fleck',
     internalSlope: 'Leisten Neigung:', loadLbl: 'Belastung auf Ballen:',
@@ -689,20 +542,20 @@ function getLabels(lang: Lang) {
     warn1Desc: `Winkel über ${C.COMFORT_ANGLE}°. Bitte Plateau erhöhen oder Absatz reduzieren.`,
     warn2Desc: 'Zu starker Rocker bei niedrigem Absatz.',
     errTitle: '⚠️ KRITISCHE NEIGUNG',
-    errDesc: `Leistenwinkel > ${C.CRITICAL_ANGLE}°. Plateaudicke erhöhen oder Absatzhöhe verringern zwingend erforderlich.`,
+    errDesc: `Leistenwinkel > ${C.CRITICAL_ANGLE}°. Plateaudicke erhöhen oder Absatzhöhe verringern.`,
     padTitle: '⚠️ KRITISCHE BALLENBELASTUNG',
-    padDesc: 'Einbau einer retrokapitalen Pelotte (Spreizfußpelotte) in die Brandsohle zur Entlastung zwingend erforderlich.',
-    negDropTitle: '⚠️ NEGATIVE SPRENGUNG', negDropDesc: 'Plateau ist höher als der Absatz. Störung der Biomechanik.',
+    padDesc: 'Einbau einer Pelotte zur Entlastung zwingend erforderlich.',
+    negDropTitle: '⚠️ NEGATIVE SPRENGUNG', negDropDesc: 'Plateau höher als Absatz. Biomechanik gestört.',
     heelBackTitle: '⚠️ ABSATZ NACH HINTEN GENEIGT',
-    heelBackDesc: 'Fehler: Absatz steht zu weit nach hinten. Gefahr des Gelenkfederbruchs unter Belastung.',
+    heelBackDesc: 'Fehler: Absatz zu weit hinten. Gefahr des Gelenkfederbruchs.',
     heelFwdTitle: '⚠️ ABSATZ NACH VORNE VERLAGERT',
-    heelFwdDesc: `Absatzfleck ist mehr als ${C.MAX_HEEL_OFFSET_MM} mm nach vorne verschoben. Reduzierte Stabilität, Gefahr des Absatzbruchs.`,
+    heelFwdDesc: `Absatzfleck > ${C.MAX_HEEL_OFFSET_MM} mm nach vorne. Reduzierte Stabilität.`,
     invertTitle: '⚠️ INVERSIONSRISIKO',
-    invertDesc: 'Absatzfleck zu schmal bei hohem Absatz — hohes Risiko des Umknickens.',
+    invertDesc: 'Absatzfleck zu schmal bei hohem Absatz — Umknickgefahr.',
     heelLbl: 'FERSE', toeLbl: 'SPITZE',
     stiletto: 'Stiletto', block: 'Block', kitten: 'Kitten', flared: 'Ausgestellt',
     flat: 'Standard', rocker: 'Rocker',
-    specsBtn: '⚙️ Spezifikationen & Mathematik', dropLbl: 'Sprengung',
+    specsBtn: 'Spezifikationen', dropLbl: 'Sprengung',
     massTitle: 'Gewichtsverteilung',
     forefoot: 'Vorfuß',
     rearfoot: 'Ferse',
@@ -732,96 +585,54 @@ function getLabels(lang: Lang) {
 function getInfoTexts(lang: Lang): Record<InfoKey, string> {
   if (lang === 'uk') {
     return {
-      перекат:
-        'Точка початку перекату (rocker start) — відсоток довжини колодки, з якого починається підйом/згинання підошви. Типово 55–75%. Впливає на довжину геленка і розвантаження плюсни.',
-      геленок:
-        'Жорстка вставка (супінатор/shank) від центру пʼятки до зони плюсни. Не дає підошві прогинатися під навантаженням і стабілізує каблук.',
-      сталь:
-        'Рекомендована товщина сталевої пластини 65Г за величиною перепаду (net rise). Вища платформа/каблук — товстіша пластина.',
-      lEff:
-        'Ефективна довжина важеля (≈ 73% довжини колодки). У формулі кута: Angle = arcsin((H − T) / L_eff). Від неї залежить внутрішній нахил і навантаження на плюсну.',
-      heelCenter:
-        'Умовний центр опори пʼятки (\~15% довжини колодки від задника). Від цієї точки рахується довжина геленка до зони перекату.',
-      смещение:
-        'Зміщення набійки відносно осі каблука. Занадто назад — ризик поломки супінатора; занадто вперед (>5 мм) — нестабільність посадки.',
-      набойка:
-        'Ширина контактної площадки каблука з підлогою. Вузька набійка при високому каблуці різко підвищує ризик інверсії (підвертання).',
-      invertRisk:
-        'Імовірність підвертання щиколотки. Розраховується з ширини набійки, типу каблука і висоти. ≥55% — критично, потрібна ширша набійка.',
-      entryAngle:
-        'Кут «вʼїзду» каблука (kitten/flared): atan2(перепад, половина ширины набійки). Показує, наскільки агресивно каблук «заходить» у опору.',
-      padPos:
-        'Позиція метатарзального пелота Зейца від пʼятки. Ставиться під головками плюсни (\~60% довжини колодки − 12 мм) для розвантаження нервів при критичному навантаженні.',
-      padHeight:
-        'Висота пелота (4–6 мм) залежить від перепаду: чим вищий підйом, тим вищий пелот для адекватної розгрузки.',
-      apexM1:
-        'Апекс M1 — внутрішня точка суглобової лінії плюсни (I палець). Скос 12–15°: apexM1 ≈ точка перекату − 5 мм. Орієнтир для рокера і пелота.',
-      apexM5:
-        'Апекс M5 — зовнішня точка (V палець). Зсунута проксимально відносно M1 на \~4.5% довжини колодки через діагональний скос суглобової лінії.',
-      carbonInsert:
-        'Мінімальна товщина карбоновой вставки в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках — потрібна жорсткість.',
+      перекат: 'Точка початку перекату (rocker start) — відсоток довжини колодки, з якого починається підйом/згинання підошви. Типово 55–75%.',
+      геленок: 'Жорстка вставка (супінатор/shank) від центру пʼятки до зони плюсни. Не дає підошві прогинатися під навантаженням і стабілізує каблук.',
+      сталь: 'Рекомендована товщина сталевої пластини 65Г за величиною перепаду (net rise). Вища платформа/каблук — товстіша пластина.',
+      lEff: 'Ефективна довжина важеля (≈ 73% довжини колодки). Від неї залежить внутрішній нахил і навантаження на плюсну.',
+      heelCenter: 'Умовний центр опори пʼятки (\~15% довжини колодки від задника). Від цієї точки рахується довжина геленка.',
+      смещение: 'Зміщення набійки відносно осі каблука. Занадто назад — ризик поломки супінатора; занадто вперед — нестабільність посадки.',
+      набойка: 'Ширина контактної площадки каблука з підлогою. Вузька набійка при високому каблуці різко підвищує ризик інверсії (підвертання).',
+      invertRisk: 'Імовірність підвертання щиколотки. Розраховується з ширини набійки, типу каблука і висоти.',
+      entryAngle: 'Кут «вʼїзду» каблука (kitten/flared). Показує, наскільки агресивно каблук «заходить» у опору.',
+      padPos: 'Позиція метатарзального пелота Зейца від пʼятки. Ставиться під головками плюсни для розвантаження нервів при критичному навантаженні.',
+      padHeight: 'Висота пелота (4–6 мм) залежить від перепаду: чим вищий підйом, тим вищий пелот для адекватної розгрузки.',
+      apexM1: 'Апекс M1 — внутрішня точка суглобової лінії плюсни (I палець). Орієнтир для рокера і пелота.',
+      apexM5: 'Апекс M5 — зовнішня точка (V палець). Зсунута проксимально відносно M1 на \~4.5% довжини колодки.',
+      carbonInsert: 'Мінімальна товщина карбоновой вставки в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках.',
     }
   }
   if (lang === 'de') {
     return {
-      перекат:
-        'Ballenrolle (rocker start) — Prozentsatz der Leistenlänge, bei dem die Sohlenbiegung beginnt. Typischerweise 55–75%. Beeinflusst die Gelenklänge und die Entlastung des Vorfußes.',
-      геленок:
-        'Die Gelenkfeder (Shank) von der Fersenmitte bis zur Ballenlinie. Verhindert das Durchbiegen der Sohle unter Belastung und stabilisiert den Absatz.',
-      сталь:
-        'Empfohlene Dicke der Stahlfeder (Federstahl) basierend auf der effektiven Sprengung (net rise). Je höher Plateau/Absatz, desto dicker die Feder.',
-      lEff:
-        'Effektive Hebellänge (≈ 73% der Leistenlänge). In der Winkelformel: Angle = arcsin((H − T) / L_eff). Bestimmt die innere Neigung und die Vorfußbelastung.',
-      heelCenter:
-        'Bedingter Fersenauflagepunkt (\~15% der Leistenlänge von der Ferse entfernt). Von diesem Punkt aus wird die Gelenklänge bis zur Abrollzone gemessen.',
-      смещение:
-        'Versatz des Absatzflecks relativ zur Absatzachse. Zu weit hinten — Gefahr des Gelenkfederbruchs; zu weit vorne (>5 mm) — instabiler Stand.',
-      набойка:
-        'Breite der Kontaktfläche des Absatzes mit dem Boden (Absatzfleck). Ein schmaler Fleck bei hohen Absätzen erhöht das Inversionsrisiko (Umknicken) drastisch.',
-      invertRisk:
-        'Wahrscheinlichkeit des Umknickens des Sprunggelenks. Berechnet aus Fleckbreite, Absatztyp und -höhe. ≥55% — kritisch, breiterer Fleck erforderlich.',
-      entryAngle:
-        'Eintrittswinkel des Absatzes (Kitten/Flared): atan2(Sprengung, halbe Fleckbreite). Zeigt an, wie aggressiv der Absatz auf den Boden trifft.',
-      padPos:
-        'Position der Spreizfußpelotte (retrokapital) von der Ferse aus. Wird hinter den Metatarsalköpfchen (\~60% der Leistenlänge − 12 mm) platziert, um Nerven bei kritischer Belastung zu entlasten.',
-      padHeight:
-        'Pelottenhöhe (4–6 mm) ist abhängig von der Sprengung: je höher die Absatzsprengung, desto höher die Pelotte für adäquate Entlastung.',
-      apexM1:
-        'Apex M1 — innerer Punkt der Gelenklinie (1. Strahl / Großzehe). Schrägung 12–15°: apexM1 ≈ Rollenpunkt − 5 mm. Orientierungspunkt für Rocker und Pelotte.',
-      apexM5:
-        'Apex M5 — äußerer Punkt (5. Strahl / Kleinzehe). Proximal (nach hinten) verschoben relativ zu M1 um \~4.5% der Leistenlänge aufgrund des diagonalen Verlaufs der Gelenklinie.',
-      carbonInsert:
-        'Mindestdicke der Carbonfasereinlage im Ballenbereich. Eine Abrollsohle (Rocker) funktioniert nur, wenn sich die Sohle im Vorfuß nicht biegt — Versteifung ist zwingend erforderlich.',
+      перекат: 'Ballenrolle (rocker start) — Prozentsatz der Leistenlänge, bei dem die Sohlenbiegung beginnt. Typischerweise 55–75%.',
+      геленок: 'Die Gelenkfeder (Shank) von der Fersenmitte bis zur Ballenlinie. Verhindert das Durchbiegen der Sohle unter Belastung.',
+      сталь: 'Empfohlene Dicke der Stahlfeder basierend auf der effektiven Sprengung. Je höher Plateau/Absatz, desto dicker die Feder.',
+      lEff: 'Effektive Hebellänge (≈ 73% der Leistenlänge). Bestimmt die innere Neigung und die Vorfußbelastung.',
+      heelCenter: 'Bedingter Fersenauflagepunkt (\~15% der Leistenlänge von der Ferse entfernt).',
+      смещение: 'Versatz des Absatzflecks relativ zur Absatzachse. Zu weit hinten — Gefahr des Gelenkfederbruchs; zu weit vorne — instabiler Stand.',
+      набойка: 'Breite der Kontaktfläche des Absatzes. Ein schmaler Fleck erhöht das Inversionsrisiko (Umknicken) drastisch.',
+      invertRisk: 'Wahrscheinlichkeit des Umknickens des Sprunggelenks. Berechnet aus Fleckbreite, Absatztyp und -höhe.',
+      entryAngle: 'Eintrittswinkel des Absatzes (Kitten/Flared). Zeigt an, wie aggressiv der Absatz auf den Boden trifft.',
+      padPos: 'Position der Spreizfußpelotte. Wird hinter den Metatarsalköpfchen platziert, um Nerven zu entlasten.',
+      padHeight: 'Pelottenhöhe (4–6 mm) ist abhängig von der Sprengung.',
+      apexM1: 'Apex M1 — innerer Punkt der Gelenklinie (Großzehe). Orientierungspunkt für Rocker und Pelotte.',
+      apexM5: 'Apex M5 — äußerer Punkt (Kleinzehe). Proximal verschoben relativ zu M1 um \~4.5% der Leistenlänge.',
+      carbonInsert: 'Mindestdicke der Carbonfasereinlage im Ballenbereich. Versteifung ist zwingend erforderlich für Abrollsohlen.',
     }
   }
   return {
-    перекат:
-      'Точка начала переката (rocker start) — процент длины колодки, с которого начинается подъём/сгибание подошвы. Обычно 55–75%. Влияет на длину геленка и разгрузку плюсны.',
-    геленок:
-      'Жёсткая вставка (супинатор/shank) от центра пятки до зоны плюсны. Не даёт подошве прогибаться под нагрузкой и стабилизирует каблук.',
-    сталь:
-      'Рекомендуемая толщина стальной пластины 65Г по величине перепада (net rise). Выше платформа/каблук — толще пластина.',
-    lEff:
-      'Эффективная длина рычага (≈ 73% длины колодки). В формуле угла: Angle = arcsin((H − T) / L_eff). От неё зависят внутренний наклон и нагрузка на плюсну.',
-    heelCenter:
-      'Условный центр опоры пятки (\~15% длины колодки от задника). От этой точки считается длина геленка до зоны переката.',
-    смещение:
-      'Смещение набойки относительно оси каблука. Слишком назад — риск поломки супинатора; слишком вперёд (>5 мм) — нестабильность посадки.',
-    набойка:
-      'Ширина контактной площадки каблука с полом. Узкая набойка при высоком каблуке резко повышает риск инверсии (подворачивания).',
-    invertRisk:
-      'Вероятность подворачивания лодыжки. Считается из ширины набойки, типа каблука и высоты. ≥55% — критично, нужна более широкая набойка.',
-    entryAngle:
-      'Угол «въезда» каблука (kitten/flared): atan2(перепад, половина ширины набойки). Показывает, насколько агрессивно каблук «заходит» в опору.',
-    padPos:
-      'Позиция метатарзального пелота Зейца от пятки. Ставится под головками плюсен (\~60% длины колодки − 12 мм) для разгрузки нервов при критической нагрузке.',
-    padHeight:
-      'Высота пелота (4–6 мм) зависит от перепада: чем выше подъём, тем выше пелот для адекватной разгрузки.',
-    apexM1:
-      'Апекс M1 — внутренняя точка суставной линии плюсен (I палец). Скос 12–15°: apexM1 ≈ точка переката − 5 мм. Ориентир для рокера и пелота.',
-    apexM5:
-      'Апекс M5 — наружная точка (V палец). Смещена проксимально относительно M1 на \~4.5% длины колодки из‑за диагонального скоса суставной линии.',
-    carbonInsert:
-      'Минимальная толщина карбоновой вставки в зоне плюсен. Рокер работает только если подошва не гнётся в пучках — нужна жёсткость.',
+    перекат: 'Точка начала переката (rocker start) — процент длины колодки, с которого начинается подъём/сгибание подошвы. Обычно 55–75%.',
+    геленок: 'Жёсткая вставка (супинатор/shank) от центра пятки до зоны плюсни. Не даёт подошве прогибаться под нагрузкой и стабилизирует каблук.',
+    сталь: 'Рекомендуемая толщина стальной пластины 65Г по величине перепада (net rise). Выше платформа/каблук — толще пластина.',
+    lEff: 'Эффективная длина рычага (≈ 73% длины колодки). От неё зависят внутренний наклон и нагрузка на плюсну.',
+    heelCenter: 'Условный центр опоры пятки (\~15% длины колодки от задника). От этой точки считается длина геленка.',
+    смещение: 'Смещение набойки относительно оси каблука. Слишком назад — риск поломки супинатора; слишком вперёд — нестабильность посадки.',
+    набойка: 'Ширина контактной площадки каблука с полом. Узкая набойка при высоком каблуке резко повышает риск инверсии (подворачивания).',
+    invertRisk: 'Вероятность подворачивания лодыжки. Считается из ширины набойки, типа каблука и высоты.',
+    entryAngle: 'Угол «въезда» каблука (kitten/flared). Показывает, насколько агрессивно каблук «заходит» в опору.',
+    padPos: 'Позиция метатарзального пелота Зейца от пятки. Ставится под головками плюсен для разгрузки нервов при критической нагрузке.',
+    padHeight: 'Высота пелота (4–6 мм) зависит от перепада: чем выше подъём, тем выше пелот для адекватной разгрузки.',
+    apexM1: 'Апекс M1 — внутренняя точка суставной линии плюсен (I палец). Ориентир для рокера и пелота.',
+    apexM5: 'Апекс M5 — наружная точка (V палец). Смещена проксимально относительно M1 на \~4.5% длины колодки.',
+    carbonInsert: 'Минимальная толщина карбоновой вставки в зоне плюсен. Рокер работает только если подошва не гнётся в пучках.',
   }
-    }
+}
