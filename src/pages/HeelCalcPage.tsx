@@ -100,12 +100,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     }
   }, [rockerType, soleType])
 
-  // Блокировка скролла при открытой модалке инфо
-  useEffect(() => {
-    if (activeInfo) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-    return () => { document.body.style.overflow = '' }
-  }, [activeInfo])
+  // Удален ломающий iOS Safari useEffect с document.body.style.overflow = 'hidden' 
+  // Модалка имеет position: fixed и сама перекроет касания.
 
   const t = useMemo(() => getLabels(lang), [lang])
   const infos = useMemo(() => getInfoTexts(lang), [lang])
@@ -193,7 +189,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
         {/* Toggles (Horizontal Scroll) */}
         <div className="stagger-item mb-6" style={{ animationDelay: '0.1s' }}>
-          {/* Sole Type */}
           <div className={`flex gap-6 pb-3 border-b ${cLine} mb-4`}>
             {(['flat', 'rocker'] as const).map((type) => (
               <button
@@ -208,7 +203,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
             ))}
           </div>
 
-          {/* Heel / Rocker Sub-types */}
           <div className="flex overflow-x-auto gap-6 pb-2 scrollbar-hide">
             {soleType === 'flat' ? (
               (['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
@@ -242,7 +236,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         </div>
 
-        {/* Visualizer Canvas - Исправлена высота, теперь контейнер тянется за контентом */}
+        {/* Visualizer Canvas */}
         <div className="stagger-item w-full mb-10 relative" style={{ animationDelay: '0.15s' }}>
           <HeelCanvas
             geometry={geometry}
@@ -259,7 +253,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           />
         </div>
 
-        {/* Controls Grid (Compact Journal Steppers) */}
+        {/* Controls Grid */}
         <div className="stagger-item grid grid-cols-2 gap-x-6 gap-y-6 mb-12" style={{ animationDelay: '0.2s' }}>
           <JournalStepper label={t.size} value={shoeSize} min={33} max={48} onChange={setShoeSize} isDark={isDark} />
           <JournalStepper label={t.heel} value={heelHeight} min={10} max={130} onChange={setHeelHeight} unit={t.mm} isDark={isDark} />
@@ -280,7 +274,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         <div className="stagger-item w-full" style={{ animationDelay: '0.25s' }}>
           <button
             onClick={() => { haptic('light'); setShowSpecs(!showSpecs); }}
-            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none ${cLine} ${cTextMuted} hover:text-current`}
+            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
           >
             <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
               {t.specsBtn}
@@ -353,11 +347,12 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         {activeInfo && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
-            onClick={() => setActiveInfo(null)}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+            onPointerDown={() => setActiveInfo(null)} // onPointerDown решает проблему прокликивания на iOS
           >
             <motion.div
               initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+              onPointerDown={e => e.stopPropagation()} 
               onClick={e => e.stopPropagation()}
               className={`w-full max-w-[320px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col`}
             >
@@ -369,8 +364,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               </p>
               
               <button
+                type="button"
                 onClick={() => setActiveInfo(null)}
-                className={`w-full py-4 border transition-all active:scale-95 text-[9px] font-sans uppercase tracking-[0.3em] ${cText} ${cLine} hover:bg-current/5`}
+                className={`w-full py-4 border transition-all active:scale-95 text-[9px] font-sans uppercase tracking-[0.3em] cursor-pointer ${cText} ${cLine} hover:bg-current/5`}
               >
                 Close
               </button>
@@ -396,8 +392,9 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
       <span className={`text-[8.5px] uppercase tracking-[0.2em] mb-3 ${cTextMuted} truncate pr-1`}>{label}</span>
       <div className="flex items-center justify-between">
         <button 
+          type="button"
           onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
         >
           -
         </button>
@@ -405,8 +402,9 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
           {value}<span className={`font-sans text-[10px] ml-1 ${cTextMuted}`}>{unit}</span>
         </span>
         <button 
+          type="button"
           onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
         >
           +
         </button>
@@ -428,8 +426,14 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
           {label}
         </span>
         <button 
-          onClick={onInfo} 
-          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none active:scale-90 ${cTextMuted} hover:${cText}`}
+          type="button"
+          onClick={(e) => {
+            // Прерываем всплытие событий (защита от двойного клика на iOS)
+            e.preventDefault();
+            e.stopPropagation();
+            onInfo(e);
+          }} 
+          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} hover:${cText}`}
         >
           !
         </button>
@@ -529,7 +533,7 @@ function getLabels(lang: Lang) {
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
     carbonInsert: 'Карбон (товщ.)',
-    rockerForefoot: 'Метатарзалгія',
+    rockerForefoot: 'Метатарзалгия',
     rockerHeelToToe: 'Артроз',
     rockerNegative: 'Діабет. стопа',
     specПерекат: 'Перекат',
@@ -637,7 +641,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
     набойка: 'Ширина контактной площадки каблука с полом. Узкая набойка при высоком каблуке резко повышает риск инверсии (подворачивания).',
     invertRisk: 'Вероятность подворачивания лодыжки. Считается из ширины набойки, типа каблука и высоты.',
     entryAngle: 'Угол «въезда» каблука (kitten/flared). Показывает, насколько агрессивно каблук «заходит» в опору.',
-    padPos: 'Позиция метатарзального пелота Зейца от пятки. Ставится под головками плюсен для разгрузки нервов при критической нагрузке.',
+    padPos: 'Позиция метатарзального пелота Зейца от пятки. Ставится под головками плюсен для разгрузки нервов при критической нагруке.',
     padHeight: 'Высота пелота (4–6 мм) зависит от перепада: чем выше подъём, тем выше пелот для адекватной разгрузки.',
     apexM1: 'Апекс M1 — внутренняя точка суставной линии плюсен (I палец). Ориентир для рокера и пелота.',
     apexM5: 'Апекс M5 — наружная точка (V палец). Смещена проксимально относительно M1 на \~4.5% длины колодки.',
