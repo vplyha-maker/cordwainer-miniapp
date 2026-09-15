@@ -1,19 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  /* ===== LIGHT: Premium Minimalism ===== */
+  /* ===== LIGHT: Premium Monochrome + Sapphire ===== */
   --color-bg: #F8FAFC;
   --color-surface: #FFFFFF;
   --color-surface-2: #F1F5F9;
   --color-ink: #0F172A;
   --color-ink-soft: #475569;
   --color-muted: #94A3B8;
-  --color-accent: #0F172A;
-  --color-accent-soft: #CBD5E1;
-  --color-border: #E2E8F0;    /* <-- ИСПРАВЛЕНИЕ: Мягкие, еле заметные рамки */
   
-  --color-danger: #EF4444;    /* <-- ИСПРАВЛЕНИЕ: Красный для дефицита */
-  --color-success: #10B981;   /* <-- ИСПРАВЛЕНИЕ: Зеленый для волатильности */
+  /* Благородный синий для цифр, спреда и бейджей */
+  --color-accent: #2563EB;    
+  --color-accent-soft: #DBEAFE;
+  
+  --color-border: #E2E8F0;
+  --color-danger: #EF4444;
+  --color-success: #10B981;
   
   --color-bronze: #6B7280;
   --color-dock: #FFFFFF;
@@ -31,19 +33,21 @@
 }
 
 .dark {
-  /* ===== DARK: Deep OLED & Platinum ===== */
+  /* ===== DARK: Deep OLED + Sapphire ===== */
   --color-bg: #09090B;
   --color-surface: #141415;
   --color-surface-2: #27272A;
   --color-ink: #FAFAFA;
   --color-ink-soft: #A1A1AA;
   --color-muted: #71717A;
-  --color-accent: #FFFFFF;
-  --color-accent-soft: #3F3F46;
-  --color-border: #27272A;    /* <-- ИСПРАВЛЕНИЕ: Разделители, сливающиеся с фоном */
   
-  --color-danger: #F87171;    /* <-- ИСПРАВЛЕНИЕ: Мягкий красный */
-  --color-success: #34D399;   /* <-- ИСПРАВЛЕНИЕ: Мягкий зеленый */
+  /* Яркий синий для выделения выгодной цены в темной теме */
+  --color-accent: #3B82F6;    
+  --color-accent-soft: #1E3A8A;
+  
+  --color-border: #27272A;
+  --color-danger: #F87171;
+  --color-success: #34D399;
   
   --color-bronze: #71717A;
   --color-dock: #141415;
@@ -131,9 +135,9 @@
 
 .btn-primary {
   @apply relative overflow-hidden w-full h-[72px] rounded-[26px] cursor-pointer transition-transform active:scale-[0.97];
-  background: var(--color-accent);
+  background: var(--color-ink); /* <-- ИСПРАВЛЕНИЕ: Кнопки остаются черными/белыми */
   color: var(--color-bg);
-  border: 1px solid var(--color-accent-soft);
+  border: 1px solid var(--color-border);
   box-shadow: 0 8px 24px var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   will-change: transform;
 }
