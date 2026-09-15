@@ -1,47 +1,48 @@
 @import "tailwindcss";
 
 @theme {
-  /* ===== LIGHT ===== */
-  --color-bg: #F5F1EA;
-  --color-surface: #FBF8F2;
-  --color-surface-2: #F3EEE4;
-  --color-ink: #1A1612;
-  --color-ink-soft: #3D342C;
-  --color-muted: #8A7E72;
-  --color-accent: #C49A5A;
-  --color-accent-soft: #D8A35C;
-  --color-bronze: #8B5E3C;
-  --color-dock: #E8DFD2;
-  --color-dock-border: #C6A47A;
-  --color-glass: rgba(251, 248, 242, 0.78);
-  --color-glass-border: rgba(198, 164, 122, 0.35);
+  /* ===== LIGHT: Pure White & Carbon ===== */
+  --color-bg: #F9FAFB;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F3F4F6;
+  --color-ink: #030712;
+  --color-ink-soft: #374151;
+  --color-muted: #9CA3AF;
+  --color-accent: #111827;
+  --color-accent-soft: #4B5563;
+  --color-bronze: #6B7280;
+  --color-dock: #FFFFFF;
+  --color-dock-border: #E5E7EB;
+  --color-glass: rgba(255, 255, 255, 0.85);
+  --color-glass-border: rgba(0, 0, 0, 0.08);
 
   --font-display: "Playfair Display", "Times New Roman", serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
 
   --radius-card: 1.25rem;
   --radius-dock: 1.5rem;
-  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.08);
-  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.12);
+  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.04);
+  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.08);
 }
 
 .dark {
-  --color-bg: #151210;
-  --color-surface: #27211D;
-  --color-surface-2: #312923;
-  --color-ink: #F5F1EB;
-  --color-ink-soft: #E8DFD2;
-  --color-muted: #B9ACA0;
-  --color-accent: #D8A35C;
-  --color-accent-soft: #F3C27A;
-  --color-bronze: #C6A47A;
-  --color-dock: #3A2418;
-  --color-dock-border: #C6A47A;
-  --color-glass: rgba(39, 33, 29, 0.78);
-  --color-glass-border: rgba(198, 164, 122, 0.25);
+  /* ===== DARK: Obsidian & Platinum ===== */
+  --color-bg: #09090B;
+  --color-surface: #18181B;
+  --color-surface-2: #27272A;
+  --color-ink: #FAFAFA;
+  --color-ink-soft: #E4E4E7;
+  --color-muted: #A1A1AA;
+  --color-accent: #FFFFFF;
+  --color-accent-soft: #D4D4D8;
+  --color-bronze: #71717A;
+  --color-dock: #121214;
+  --color-dock-border: #27272A;
+  --color-glass: rgba(24, 24, 27, 0.85);
+  --color-glass-border: rgba(255, 255, 255, 0.12);
 
-  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.4);
-  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.5);
+  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.5);
+  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.8);
 }
 
 @layer base {
@@ -69,7 +70,6 @@
     border-radius: inherit;
   }
 
-  /* Скрываем системный курсор только на устройствах с точным указателем (мышь/трекпад) */
   @media (pointer: fine) {
     body {
       cursor: none;
@@ -121,9 +121,10 @@
 
 .btn-primary {
   @apply relative overflow-hidden w-full h-[72px] rounded-[26px] cursor-pointer transition-transform active:scale-[0.97];
-  background: linear-gradient(180deg, #F8F3EB 0%, #E2D2BA 100%);
-  border: 1px solid rgba(214, 179, 126, 0.4);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: 1px solid var(--color-accent-soft);
+  box-shadow: 0 8px 24px var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   will-change: transform;
 }
 
@@ -131,39 +132,43 @@
   @apply flex items-center justify-center w-10 h-7 rounded-full text-[10px] font-bold tracking-wide transition-colors cursor-pointer;
   will-change: background-color, color;
 }
+
 .lang-toggle.active {
-  background: rgba(216, 163, 92, 0.25);
-  color: #D8A35C;
-  box-shadow: 0 0 8px rgba(216, 163, 92, 0.2);
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
+
 .lang-toggle.inactive {
   background: transparent;
-  color: #B9ACA0;
+  color: var(--color-muted);
 }
+
 .lang-toggle.inactive:hover {
-  color: #F5F1EB;
+  color: var(--color-ink);
 }
 
 .action-pill {
   @apply flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-medium transition-transform active:scale-95 cursor-pointer;
-  background: rgba(29, 24, 21, 0.8);
-  border: 1px solid rgba(198, 164, 122, 0.25);
-  color: #D8A35C;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-glass-border);
+  color: var(--color-accent);
   will-change: transform;
 }
 
 .card-simplified {
-  background: linear-gradient(180deg, rgba(39, 33, 29, 0.95) 0%, rgba(26, 22, 18, 0.95) 100%);
-  box-shadow: inset 0 1px 0 rgba(198, 164, 122, 0.15), 0 4px 12px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(198, 164, 122, 0.05);
+  background: var(--color-surface);
+  box-shadow: inset 0 1px 0 var(--color-glass-border), 0 4px 12px var(--shadow-soft);
+  border: 1px solid var(--color-glass-border);
 }
 
 .fav-highlight {
   opacity: 0;
   transition: opacity 0.3s ease;
-  background: rgba(244, 114, 182, 0.12);
-  box-shadow: 0 0 16px rgba(244, 114, 182, 0.25) inset;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent) 20%, transparent) inset;
 }
+
 .fav-highlight.is-on {
   opacity: 1;
 }
@@ -181,7 +186,7 @@ html.perf-fast .glass {
 html.perf-fast * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  transition: none !important; /* Мгновенное переключение состояний */
+  transition: none !important;
 }
 
 html.perf-fast .leather-dock {
@@ -198,21 +203,20 @@ html.perf-fast body {
 }
 
 /* =========================================================
-   APP SHELL — телефон / планшет / монитор
+   APP SHELL
    ========================================================= */
 
 :root {
   --app-max-width: 430px;
 }
 
-/* Планшет */
 @media (min-width: 768px) {
   :root {
     --app-max-width: 560px;
   }
 
   body {
-    background: #0c0a09;
+    background: #09090B;
   }
 
   .app-shell {
@@ -222,14 +226,12 @@ html.perf-fast body {
   }
 }
 
-/* Ноутбук / монитор */
 @media (min-width: 1024px) {
   :root {
     --app-max-width: 640px;
   }
 }
 
-/* Большой монитор */
 @media (min-width: 1440px) {
   :root {
     --app-max-width: 720px;
@@ -246,7 +248,6 @@ html.perf-fast body {
   background: var(--color-bg);
 }
 
-/* fixed-элементы внутри колонки */
 .app-shell .fixed-within-shell {
   left: 50%;
   transform: translateX(-50%);
@@ -255,7 +256,7 @@ html.perf-fast body {
 }
 
 /* =========================================================
-   CALC PAGES — планшет / монитор
+   CALC PAGES
    ========================================================= */
 
 @media (min-width: 768px) {
