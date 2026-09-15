@@ -101,9 +101,7 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
   const cTextMuted = isDark ? 'text-[#F4F0E8]/70' : 'text-[#1C1816]/70'
   const cTextFaint = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
   const cLine = isDark ? 'bg-[#F4F0E8]/30' : 'bg-[#1C1816]/20'
-  const cBtnLine = isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
   
-  // Исправленные стили наложения для светлой темы (убрали выцветание)
   const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/85' : 'from-[#F2EFE9] via-[#F2EFE9]/80'
   const cOverlay = isDark ? 'bg-black/20' : 'bg-transparent'
   const imgOpacity = isDark ? '0.75' : '0.95'
@@ -119,6 +117,42 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
         @keyframes coutureFadeUp {
           0% { opacity: 0; transform: translateY(24px); }
           100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Анимация прохождения блика (с паузой) */
+        @keyframes btnGlare {
+          0%, 40% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+
+        /* Темная тема: текст цвета #F4F0E8, блик чисто белый #FFFFFF */
+        .glare-text-dark {
+          background: linear-gradient(110deg, #F4F0E8 35%, #FFFFFF 50%, #F4F0E8 65%);
+          background-size: 300% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: btnGlare 4s linear infinite;
+        }
+        .glare-line-dark {
+          background: linear-gradient(110deg, #F4F0E8 35%, #FFFFFF 50%, #F4F0E8 65%);
+          background-size: 300% 100%;
+          animation: btnGlare 4s linear infinite;
+        }
+
+        /* Светлая тема: текст цвета #1C1816, блик светло-серый #999999 */
+        .glare-text-light {
+          background: linear-gradient(110deg, #1C1816 35%, #999999 50%, #1C1816 65%);
+          background-size: 300% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: btnGlare 4s linear infinite;
+        }
+        .glare-line-light {
+          background: linear-gradient(110deg, #1C1816 35%, #999999 50%, #1C1816 65%);
+          background-size: 300% 100%;
+          animation: btnGlare 4s linear infinite;
         }
         
         .anim-bg {
@@ -181,17 +215,20 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
             </p>
           </div>
           
-          {/* Кнопка */}
+          {/* Кнопка с эффектом блика */}
           <div className="anim-item" style={{ animationDelay: '0.75s' }}>
             <button
               type="button"
               onClick={onStart}
               className={`group relative inline-flex items-center gap-4 self-start text-[11px] font-sans font-medium uppercase tracking-[0.2em] transition-colors duration-1000 active:opacity-60 ${cText}`}
             >
-              <span className="relative z-10 transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">
+              {/* Текст кнопки */}
+              <span className={`relative z-10 transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 ${isDark ? 'glare-text-dark' : 'glare-text-light'}`}>
                 {t.start}
               </span>
-              <span className={`relative z-10 block h-[1px] w-12 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-16 ${cBtnLine}`} />
+              
+              {/* Линия кнопки */}
+              <span className={`relative z-10 block h-[1px] w-12 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-16 ${isDark ? 'glare-line-dark' : 'glare-line-light'}`} />
             </button>
           </div>
           
