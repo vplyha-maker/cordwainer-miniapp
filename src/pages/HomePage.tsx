@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, CSSProperties } from 'react'
 import { motion } from 'framer-motion'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
@@ -38,7 +38,7 @@ function glossaryLabel(count: number, lang: Lang): string {
     return `${count} термінів`
   }
   if (lang === 'de') {
-    return count === 1 ? `\( {count} Begriff` : ` \){count} Begriffe`
+    return count === 1 ? `${count} Begriff` : `${count} Begriffe`
   }
   const n10 = count % 10
   const n100 = count % 100
@@ -159,7 +159,8 @@ export function HomePage({
       profile: 'Профиль',
       profileSub: 'Аккаунт и данные',
       favorites: 'Сохраненное',
-      favoritesSub: articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
+      favoritesSub:
+        articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
       searchResults: 'Результаты',
       noResults: 'Записи не найдены',
@@ -192,7 +193,8 @@ export function HomePage({
       profile: 'Профіль',
       profileSub: 'Акаунт та дані',
       favorites: 'Збережене',
-      favoritesSub: articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
+      favoritesSub:
+        articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
       searchResults: 'Результати',
       noResults: 'Записів не знайдено',
@@ -225,7 +227,8 @@ export function HomePage({
       profile: 'Profil',
       profileSub: 'Account & Daten',
       favorites: 'Gespeichert',
-      favoritesSub: articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
+      favoritesSub:
+        articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
       quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
       searchResults: 'Ergebnisse',
       noResults: 'Keine Einträge',
@@ -256,29 +259,19 @@ export function HomePage({
   const searchResults: Array<{ id: string; type: string; title: string; subtitle: string }> = []
 
   if (query) {
-    ;[...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
+    [...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
       if (item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)) {
         searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
       }
     })
     BLOG_ARTICLES?.forEach((article) => {
       if (deepSearch(article, query)) {
-        searchResults.push({
-          type: 'article',
-          id: article.id,
-          title: getDisplayTitle(article, safeLang),
-          subtitle: t.blog,
-        })
+        searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, safeLang), subtitle: t.blog })
       }
     })
     GLOSSARY_TERMS?.forEach((term) => {
       if (deepSearch(term, query)) {
-        searchResults.push({
-          type: 'glossary',
-          id: term.id,
-          title: getDisplayTitle(term, safeLang),
-          subtitle: t.glossary,
-        })
+        searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, safeLang), subtitle: t.glossary })
       }
     })
   }
@@ -295,7 +288,6 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  // --- ЖУРНАЛЬНЫЕ СТИЛИ ---
   const journalColors = isDark
     ? {
         text: '#F4F0E8',
@@ -326,8 +318,7 @@ export function HomePage({
     <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
         const num = startIndex + idx
-        const numStr = num < 10 ? `0\( {num}` : ` \){num}`
-
+        const numStr = num < 10 ? `0${num}` : `${num}`
         return (
           <motion.button
             variants={itemVariants}
@@ -335,7 +326,9 @@ export function HomePage({
             onClick={item.action}
             disabled={!item.action}
             className={`group relative flex items-end justify-between py-6 border-b outline-none bg-transparent text-left transition-all ${
-              item.action ? 'active:opacity-50 cursor-pointer' : 'opacity-40 cursor-default'
+              item.action
+                ? 'active:opacity-50 cursor-pointer'
+                : 'opacity-40 cursor-default'
             }`}
             style={{ borderColor: journalColors.line }}
           >
@@ -355,7 +348,9 @@ export function HomePage({
                 >
                   {item.title}
                 </div>
-                {item.dot && <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />}
+                {item.dot && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
+                )}
               </div>
             </div>
             <div
@@ -378,7 +373,6 @@ export function HomePage({
         color: journalColors.text,
       }}
     >
-      {/* Слой текстуры */}
       <div
         className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
         style={{
@@ -396,7 +390,6 @@ export function HomePage({
       `}</style>
 
       <div className="relative z-10 flex flex-col min-h-screen">
-        {/* HEADER */}
         <header className="px-6 pt-8 pb-4 flex items-start justify-between">
           {onBack ? (
             <button
@@ -410,7 +403,7 @@ export function HomePage({
               <span>Back</span>
             </button>
           ) : (
-            <div className="w-10" />
+            <div className="w-10"></div>
           )}
 
           <div className="flex items-center gap-4">
@@ -434,14 +427,12 @@ export function HomePage({
           </div>
         </header>
 
-        {/* CONTENT */}
         <motion.div
           className="px-6 pb-24"
           initial="hidden"
           animate="show"
           variants={containerVariants}
         >
-          {/* Title */}
           <motion.div variants={itemVariants} className="mb-12 mt-4">
             <h1
               className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]"
@@ -451,7 +442,6 @@ export function HomePage({
             </h1>
           </motion.div>
 
-          {/* Search */}
           <motion.div variants={itemVariants} className="mb-16">
             <div
               className="relative flex items-end border-b pb-3 transition-colors"
@@ -469,7 +459,12 @@ export function HomePage({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
                 className="w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light"
-                style={{ color: journalColors.text }}
+                style={
+                  {
+                    color: journalColors.text,
+                    '--placeholder-color': journalColors.placeholder,
+                  } as CSSProperties
+                }
               />
               {searchQuery && (
                 <button
@@ -483,7 +478,6 @@ export function HomePage({
             </div>
           </motion.div>
 
-          {/* Results or Categories */}
           {query ? (
             <div>
               <p
@@ -496,7 +490,7 @@ export function HomePage({
                 <div className="flex flex-col">
                   {searchResults.map((res, i) => (
                     <button
-                      key={`\( {res.type}- \){res.id}-${i}`}
+                      key={`${res.type}-${res.id}-${i}`}
                       onClick={() => handleResultClick(res)}
                       className="w-full group flex items-center justify-between py-5 border-b text-left outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
                       style={{ borderColor: journalColors.line }}
@@ -557,7 +551,6 @@ export function HomePage({
                 {renderList(SYSTEM, 9)}
               </motion.div>
 
-              {/* Favorites */}
               <motion.div variants={itemVariants} className="mb-16">
                 <button
                   className="w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
@@ -598,7 +591,6 @@ export function HomePage({
                 </button>
               </motion.div>
 
-              {/* Quote */}
               <motion.div variants={itemVariants} className="pb-10">
                 <div className="flex flex-col items-center text-center px-4">
                   <div
