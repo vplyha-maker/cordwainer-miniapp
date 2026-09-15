@@ -67,18 +67,18 @@ const getDisplayTitle = (item: any, lang: Lang): string => {
   return '...'
 }
 
-// --- АНИМАЦИИ ---
+// Мягкая анимация появления списка
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.1 }
+    transition: { staggerChildren: 0.1 }
   }
 }
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }
 }
 
 export function HomePage({
@@ -105,7 +105,6 @@ export function HomePage({
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
     checkTheme()
     const observer = new MutationObserver(checkTheme)
@@ -129,9 +128,105 @@ export function HomePage({
   const safeLang = (lang && ['ru', 'uk', 'de'].includes(lang)) ? lang : 'uk'
 
   const t = {
-    ru: { menu: 'Меню', search: 'Поиск (материалы, конструкции...)', learning: 'Исследование', tools: 'Инструментарий', system: 'Система', materials: 'Материалы', materialsSub: 'Кожа, замша, подошвы', colors: 'Цвета', colorsSub: 'Патина и психология', styles: 'Силуэты', stylesSub: 'Фасоны и классика', sizes: 'Ортопедия', sizesSub: 'Размеры и колодки', calc: 'Калькуляторы', calcSub: `${CALCULATORS_COUNT} Модулей`, blog: 'Архив', blogSub: hasNewBlog ? 'Новое издание' : 'Статьи', glossary: 'Глоссарий', glossarySub: glossaryLabel(glossaryCount, 'ru'), prices: 'Рынок', pricesSub: 'Сводка цен', settings: 'Настройки', settingsSub: 'Тема, язык, интерфейс', profile: 'Профиль', profileSub: 'Аккаунт и данные', favorites: 'Сохраненное', favoritesSub: articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст', quote: '«Мастерство — в деталях. Знание — в опыте.»', searchResults: 'Результаты', noResults: 'Записи не найдены', section: 'Раздел' },
-    uk: { menu: 'Меню', search: 'Пошук', learning: 'Дослідження', tools: 'Інструментарій', system: 'Система', materials: 'Матеріали', materialsSub: 'Шкіра, замша, підошви', colors: 'Кольори', colorsSub: 'Патина та психологія', styles: 'Силуети', stylesSub: 'Фасони та класика', sizes: 'Ортопедія', sizesSub: 'Розміри та колодки', calc: 'Калькулятори', calcSub: `${CALCULATORS_COUNT} Модулів`, blog: 'Архів', blogSub: hasNewBlog ? 'Нове видання' : 'Статті', glossary: 'Глосарій', glossarySub: glossaryLabel(glossaryCount, 'uk'), prices: 'Ринок', pricesSub: 'Зведення цін', settings: 'Налаштування', settingsSub: 'Тема, мова, інтерфейс', profile: 'Профіль', profileSub: 'Акаунт та дані', favorites: 'Збережене', favoritesSub: articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній', quote: '«Майстерність — в деталях. Знання — в досвіді.»', searchResults: 'Результати', noResults: 'Записів не знайдено', section: 'Розділ' },
-    de: { menu: 'Menü', search: 'Suchen', learning: 'Forschung', tools: 'Werkzeuge', system: 'System', materials: 'Materialien', materialsSub: 'Leder, Sohlen', colors: 'Farben', colorsSub: 'Patina & Psychologie', styles: 'Silhouetten', stylesSub: 'Klassik & Formen', sizes: 'Orthopädie', sizesSub: 'Leisten & Maße', calc: 'Rechner', calcSub: `${CALCULATORS_COUNT} Module`, blog: 'Archiv', blogSub: hasNewBlog ? 'Neue Ausgabe' : 'Artikel', glossary: 'Glossar', glossarySub: glossaryLabel(glossaryCount, 'de'), prices: 'Markt', pricesSub: 'Preisübersicht', settings: 'Einstellungen', settingsSub: 'Design, Sprache', profile: 'Profil', profileSub: 'Account & Daten', favorites: 'Gespeichert', favoritesSub: articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv', quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“', searchResults: 'Ergebnisse', noResults: 'Keine Einträge', section: 'Bereich' }
+    ru: {
+      menu: 'Меню',
+      search: 'Поиск (материалы, конструкции...)',
+      learning: 'Исследование',
+      tools: 'Инструментарий',
+      system: 'Система',
+      materials: 'Материалы',
+      materialsSub: 'Кожа, замша, подошвы',
+      colors: 'Цвета',
+      colorsSub: 'Патина и психология',
+      styles: 'Силуэты',
+      stylesSub: 'Фасоны и классика',
+      sizes: 'Ортопедия',
+      sizesSub: 'Размеры и колодки',
+      calc: 'Калькуляторы',
+      calcSub: `${CALCULATORS_COUNT} Модулей`,
+      blog: 'Архив',
+      blogSub: hasNewBlog ? 'Новое издание' : 'Статьи',
+      glossary: 'Глоссарий',
+      glossarySub: glossaryLabel(glossaryCount, 'ru'),
+      prices: 'Рынок',
+      pricesSub: 'Сводка цен',
+      settings: 'Настройки',
+      settingsSub: 'Тема, язык, интерфейс',
+      profile: 'Профиль',
+      profileSub: 'Аккаунт и данные',
+      favorites: 'Сохраненное',
+      favoritesSub: articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
+      quote: '«Мастерство — в деталях. Знание — в опыте.»',
+      searchResults: 'Результаты',
+      noResults: 'Записи не найдены',
+      section: 'Раздел',
+    },
+    uk: {
+      menu: 'Меню',
+      search: 'Пошук (матеріали, конструкції...)',
+      learning: 'Дослідження',
+      tools: 'Інструментарій',
+      system: 'Система',
+      materials: 'Матеріали',
+      materialsSub: 'Шкіра, замша, підошви',
+      colors: 'Кольори',
+      colorsSub: 'Патина та психологія',
+      styles: 'Силуети',
+      stylesSub: 'Фасони та класика',
+      sizes: 'Ортопедія',
+      sizesSub: 'Розміри та колодки',
+      calc: 'Калькулятори',
+      calcSub: `${CALCULATORS_COUNT} Модулів`,
+      blog: 'Архів',
+      blogSub: hasNewBlog ? 'Нове видання' : 'Статті',
+      glossary: 'Глосарій',
+      glossarySub: glossaryLabel(glossaryCount, 'uk'),
+      prices: 'Ринок',
+      pricesSub: 'Зведення цін',
+      settings: 'Налаштування',
+      settingsSub: 'Тема, мова, інтерфейс',
+      profile: 'Профіль',
+      profileSub: 'Акаунт та дані',
+      favorites: 'Збережене',
+      favoritesSub: articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
+      quote: '«Майстерність — в деталях. Знання — в досвіді.»',
+      searchResults: 'Результати',
+      noResults: 'Записів не знайдено',
+      section: 'Розділ',
+    },
+    de: {
+      menu: 'Menü',
+      search: 'Suchen (Materialien, Formen...)',
+      learning: 'Forschung',
+      tools: 'Werkzeuge',
+      system: 'System',
+      materials: 'Materialien',
+      materialsSub: 'Leder, Sohlen',
+      colors: 'Farben',
+      colorsSub: 'Patina & Psychologie',
+      styles: 'Silhouetten',
+      stylesSub: 'Klassik & Formen',
+      sizes: 'Orthopädie',
+      sizesSub: 'Leisten & Maße',
+      calc: 'Rechner',
+      calcSub: `${CALCULATORS_COUNT} Module`,
+      blog: 'Archiv',
+      blogSub: hasNewBlog ? 'Neue Ausgabe' : 'Artikel',
+      glossary: 'Glossar',
+      glossarySub: glossaryLabel(glossaryCount, 'de'),
+      prices: 'Markt',
+      pricesSub: 'Preisübersicht',
+      settings: 'Einstellungen',
+      settingsSub: 'Design, Sprache',
+      profile: 'Profil',
+      profileSub: 'Account & Daten',
+      favorites: 'Gespeichert',
+      favoritesSub: articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
+      quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
+      searchResults: 'Ergebnisse',
+      noResults: 'Keine Einträge',
+      section: 'Bereich',
+    }
   }[safeLang]
 
   const LEARNING: MenuItem[] = [
@@ -192,46 +287,39 @@ export function HomePage({
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // На мобилках - СТРОГО ml-0 (ровно по левому краю). Асимметрия только на md:
-  const gridClasses = [
-    "self-start text-left ml-0 md:ml-[5%] md:w-[60%]",
-    "self-start text-left ml-0 md:self-end md:text-right md:mr-[5%] md:-mt-8 md:w-[50%]",
-    "self-start text-left ml-0 md:self-center md:text-center md:ml-[10%] md:mt-4 md:w-[70%]",
-    "self-start text-left ml-0 md:ml-[40%] md:-mt-4 md:w-[45%]"
-  ]
-
-  const renderGrid = (items: MenuItem[], startIndex: number = 1) => (
-    <div className="flex flex-col mb-10 md:mb-24 w-full gap-2 md:gap-4">
+  // ВАШ ИСХОДНЫЙ ДИЗАЙН
+  const renderList = (items: MenuItem[], startIndex: number = 1) => (
+    <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
         const num = startIndex + idx
         const numStr = num < 10 ? `0${num}` : `${num}`
-        const alignClass = gridClasses[idx % gridClasses.length]
-        
         return (
           <motion.button
             variants={itemVariants}
             key={item.id}
             onClick={item.action}
-            className={`group relative flex flex-col justify-center py-4 md:py-6 px-0 md:px-4 outline-none border-0 bg-transparent cursor-pointer transition-opacity ${alignClass} ${item.action ? 'active:opacity-50' : 'opacity-40 cursor-not-allowed'}`}
+            disabled={!item.action}
+            className={`group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent text-left transition-all ${
+              item.action 
+                ? 'active:opacity-50 cursor-pointer' 
+                : 'opacity-40 cursor-default' // Неактивные элементы выглядят именно так, как на скриншоте
+            } ${cLine}`}
           >
-            {/* Тонкая линия-разделитель (только на десктопе при наведении) */}
-            <div className={`hidden md:block absolute bottom-0 left-0 right-0 h-[1px] ${cLine} scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left ease-[cubic-bezier(0.16,1,0.3,1)]`} />
-            
-            <div className="flex flex-col w-full h-full justify-center">
-              <span className={`text-[9px] font-sans tracking-[0.2em] mb-1 md:mb-2 ${cTextMuted} transition-colors group-hover:text-current`}>
-                [{numStr}] {item.subtitle}
+            <div className="flex items-start gap-4">
+              <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+                {numStr}
               </span>
-              
-              <div className="flex items-center gap-3 md:gap-4 w-full justify-[inherit]">
-                {/* На мобилках - аккуратный text-4xl. На десктопе - гигантский. */}
-                <span className="font-serif text-4xl min-[375px]:text-5xl md:text-7xl lg:text-8xl leading-[1.1] md:leading-[0.9] tracking-tight transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] md:group-hover:tracking-normal md:group-hover:italic text-left md:text-inherit">
+              <div className="flex items-center gap-3">
+                <div className={`font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform ${item.action ? 'group-hover:translate-x-1 group-active:translate-x-1' : ''}`}>
                   {item.title}
-                </span>
-                
+                </div>
                 {item.dot && (
-                  <span className="w-1.5 h-1.5 md:w-3 md:h-3 rounded-full bg-[#991B1B] shadow-[0_0_10px_rgba(153,27,27,0.5)] block -translate-y-2 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
                 )}
               </div>
+            </div>
+            <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+              {item.subtitle}
             </div>
           </motion.button>
         )
@@ -240,7 +328,7 @@ export function HomePage({
   )
 
   return (
-    <div className={`relative min-h-[100dvh] w-full overflow-hidden transition-colors duration-300 ${cBg} ${cText}`}>
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-300 ${cBg} ${cText}`}>
       <style>{`
         * {
           -webkit-tap-highlight-color: transparent !important;
@@ -249,7 +337,7 @@ export function HomePage({
       `}</style>
 
       {/* HEADER */}
-      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-50 relative">
+      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
         {onBack ? (
           <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer ${cTextMuted} ${cHover}`}>
             <span className="transform transition-transform group-hover:-translate-x-1">←</span>
@@ -259,12 +347,12 @@ export function HomePage({
           <div className="w-10"></div>
         )}
 
-        <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-4">
           {['ru', 'uk', 'de'].map((l) => (
             <button
               key={l}
               onClick={() => handleLangChange(l as Lang)}
-              className={`text-[9px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
+              className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
                 safeLang === l ? cText : cTextMuted
               } ${cHover}`}
             >
@@ -274,147 +362,129 @@ export function HomePage({
         </div>
       </header>
 
-      <div className="px-6 pb-24 pt-4 relative z-10 w-full max-w-[1200px] mx-auto">
-        
+      {/* КОНТЕНТ */}
+      <motion.div 
+        className="px-6 pb-24"
+        initial="hidden"
+        animate="show"
+        variants={containerVariants}
+      >
         {/* ЗАГОЛОВОК СТРАНИЦЫ */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-10 md:mb-32 flex justify-start md:justify-center"
-        >
-          {/* На мобилках: нормальный размер, нормальная прозрачность. На десктопе: огромный фон */}
-          <h1 className="font-serif text-[18vw] md:text-[15rem] leading-[0.85] tracking-[-0.04em] opacity-100 md:opacity-10">
+        <motion.div variants={itemVariants} className="mb-12 mt-4">
+          <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
             {t.menu}
           </h1>
         </motion.div>
 
-        {/* ПОИСК */}
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.1 }}
-          className="mb-12 md:mb-24 px-0 md:px-12"
-        >
-          <div className={`relative flex flex-col md:flex-row md:items-end border-b pb-3 md:pb-6 transition-colors group ${cLine} hover:border-current`}>
-            <span className={`text-[10px] font-sans uppercase tracking-[0.2em] mb-3 md:mb-0 md:mr-8 ${cTextMuted} transition-colors group-hover:text-current`}>
-              Search.
-            </span>
+        {/* ПОИСК В ТОЧНОСТИ КАК БЫЛ */}
+        <motion.div variants={itemVariants} className="mb-16">
+          <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
+            <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className={`w-full bg-transparent outline-none border-0 text-xl md:text-5xl font-serif italic placeholder:not-italic placeholder:font-light transition-colors ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
+              className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className={`absolute right-0 bottom-3 md:bottom-6 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted} hover:text-current`}>
-                [X]
+              <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
+                Clear
               </button>
             )}
           </div>
         </motion.div>
 
         {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
-        <AnimatePresence mode="wait">
-          {query ? (
-            <motion.div key="search-results" initial="hidden" animate="show" exit="hidden" variants={containerVariants}>
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 px-0 md:px-4 ${cTextMuted}`}>
-                {t.searchResults} / {searchResults.length}
+        {query ? (
+          <div>
+            <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+              {t.searchResults} / {searchResults.length}
+            </p>
+            {searchResults.length > 0 ? (
+              <div className="flex flex-col">
+                {searchResults.map((res, i) => (
+                  <button
+                    key={`${res.type}-${res.id}-${i}`}
+                    onClick={() => handleResultClick(res)}
+                    className={`w-full group flex items-center justify-between py-5 border-b ${cLine} text-left outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-opacity`}
+                  >
+                    <div className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1">
+                      {res.title}
+                    </div>
+                    <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+                      {res.subtitle}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
+                {t.noResults}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <motion.div variants={itemVariants} className="mb-4">
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.learning}
               </p>
-              {searchResults.length > 0 ? (
-                <div className="flex flex-col">
-                  {searchResults.map((res, i) => (
-                    <motion.button
-                      variants={itemVariants}
-                      key={`${res.type}-${res.id}-${i}`}
-                      onClick={() => handleResultClick(res)}
-                      className={`w-full group flex items-center justify-between py-5 md:py-8 px-0 md:px-4 border-b ${cLine} text-left outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-colors hover:bg-current/5`}
-                    >
-                      <div className="font-serif text-2xl md:text-5xl leading-none transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:group-hover:translate-x-4">
-                        {res.title}
-                      </div>
-                      <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
-                        {res.subtitle}
-                      </div>
-                    </motion.button>
+              {renderList(LEARNING, 1)}
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="mb-4">
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.tools}
+              </p>
+              {renderList(TOOLS, 5)}
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="mb-4">
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                {t.system}
+              </p>
+              {renderList(SYSTEM, 9)}
+            </motion.div>
+
+            {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
+            <motion.div variants={itemVariants} className="mb-16">
+              <button
+                className={`w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer ${cLine} transition-colors active:bg-current/5`}
+                onClick={() => {
+                  if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
+                  else if (articleFavorites.length > 1) onOpenFavorites?.()
+                }}
+              >
+                <div>
+                  <div className="font-serif text-[26px] leading-none mb-2 text-left">{t.favorites}</div>
+                  <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
+                </div>
+                <div className="flex -space-x-4">
+                  {articleFavorites.slice(0, 3).map((item, idx) => (
+                    <div key={item.id} className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#0A0A0A]' : 'border-[#F2EFE9]'} overflow-hidden grayscale`} style={{ zIndex: 10 - idx }}>
+                      <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
+                    </div>
                   ))}
                 </div>
-              ) : (
-                <motion.div variants={itemVariants} className={`py-12 md:py-20 text-[16px] md:text-2xl font-serif italic text-center ${cTextMuted}`}>
-                  {t.noResults}
-                </motion.div>
-              )}
+              </button>
             </motion.div>
-          ) : (
-            <motion.div key="menu-grid" initial="hidden" animate="show" exit="hidden" variants={containerVariants} className="flex flex-col">
-              
-              {/* СЕКЦИИ МЕНЮ */}
-              <div className="relative w-full">
-                <div className={`hidden md:block absolute top-0 left-0 text-[10px] uppercase tracking-[0.4em] origin-top-left rotate-90 translate-x-4 ${cTextMuted}`}>
-                  {t.learning}
-                </div>
-                <div className={`md:hidden text-[9px] uppercase tracking-[0.2em] mb-2 border-b pb-2 ${cLine} ${cTextMuted}`}>
-                  {t.learning}
-                </div>
-                {renderGrid(LEARNING, 1)}
+
+            {/* ЦИТАТА */}
+            <motion.div variants={itemVariants} className="pb-10">
+              <div className="flex flex-col items-center text-center px-4">
+                <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
+                <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
+                  {t.quote}
+                </p>
+                <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
+                  Cordwainer
+                </p>
               </div>
-
-              <div className="relative w-full md:mt-12">
-                <div className={`hidden md:block absolute top-0 right-0 text-[10px] uppercase tracking-[0.4em] origin-top-right -rotate-90 -translate-x-4 ${cTextMuted}`}>
-                  {t.tools}
-                </div>
-                <div className={`md:hidden text-[9px] uppercase tracking-[0.2em] mt-4 mb-2 border-b pb-2 ${cLine} ${cTextMuted}`}>
-                  {t.tools}
-                </div>
-                {renderGrid(TOOLS, 5)}
-              </div>
-
-              <div className="relative w-full md:mt-12">
-                <div className={`md:hidden text-[9px] uppercase tracking-[0.2em] mt-4 mb-2 border-b pb-2 ${cLine} ${cTextMuted}`}>
-                  {t.system}
-                </div>
-                {renderGrid(SYSTEM, 9)}
-              </div>
-
-              {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
-              <motion.div variants={itemVariants} className="mt-8 md:mt-12 px-0 md:px-12 w-full md:w-[80%] mx-auto">
-                <button
-                  className={`w-full relative group overflow-hidden flex flex-col md:flex-row md:items-center justify-between p-6 md:p-12 border outline-none bg-transparent cursor-pointer ${cLine} transition-colors hover:border-current`}
-                  onClick={() => {
-                    if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
-                    else if (articleFavorites.length > 1) onOpenFavorites?.()
-                  }}
-                >
-                  <div className="absolute inset-0 bg-current/0 md:group-hover:bg-current/5 transition-colors duration-500" />
-                  
-                  <div className="text-left relative z-10 mb-6 md:mb-0">
-                    <div className={`text-[9px] md:text-[10px] font-sans uppercase tracking-[0.2em] mb-2 md:mb-4 ${cTextMuted}`}>{t.favoritesSub}</div>
-                    <div className="font-serif text-3xl md:text-6xl leading-none md:italic md:group-hover:not-italic transition-all duration-500">{t.favorites}</div>
-                  </div>
-                  
-                  <div className="flex -space-x-4 md:-space-x-6 relative z-10">
-                    {articleFavorites.slice(0, 3).map((item, idx) => (
-                      <div key={item.id} className={`w-12 h-12 md:w-24 md:h-24 rounded-full border border-current overflow-hidden grayscale transition-transform duration-500 md:group-hover:scale-110`} style={{ zIndex: 10 - idx }}>
-                        <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </button>
-              </motion.div>
-
-              {/* ЦИТАТА */}
-              <motion.div variants={itemVariants} className="mt-16 md:mt-32 pb-10">
-                <div className="flex flex-col items-center text-center px-4">
-                  <div className={`w-px h-12 md:h-24 mb-6 md:mb-12 ${cLine} border-l`} />
-                  <p className={`font-serif text-[18px] md:text-4xl italic leading-[1.4] max-w-2xl ${cTextMuted}`}>
-                    {t.quote}
-                  </p>
-                  <p className="mt-6 md:mt-8 text-[9px] md:text-[10px] font-sans font-medium uppercase tracking-[0.4em]">
-                    Cordwainer
-                  </p>
-                </div>
-              </motion.div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </>
+        )}
+      </motion.div>
     </div>
   )
 }
