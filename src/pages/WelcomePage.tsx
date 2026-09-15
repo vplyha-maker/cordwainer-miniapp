@@ -119,7 +119,6 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           100% { opacity: 1; transform: translateY(0); }
         }
         
-        /* Блик */
         @keyframes btnGlare {
           0%   { background-position: -200% center; }
           30%  { background-position: -200% center; }
@@ -127,7 +126,7 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           100% { background-position: 200% center; }
         }
 
-        /* ========== ТЁМНАЯ ТЕМА (усиленный блик) ========== */
+        /* ТЁМНАЯ ТЕМА */
         .glare-text-dark {
           background: linear-gradient(
             105deg,
@@ -163,7 +162,7 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           transform: translateZ(0);
         }
 
-        /* ========== СВЕТЛАЯ ТЕМА ========== */
+        /* СВЕТЛАЯ ТЕМА */
         .glare-text-light {
           background: linear-gradient(
             105deg,
@@ -223,16 +222,13 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
         <div className={`absolute bottom-0 left-0 right-0 h-[60%] z-10 bg-gradient-to-t ${cGrad} to-transparent pointer-events-none transition-colors duration-1000`} />
       </div>
 
-      {/* 2. МЕТА-ДАННЫЕ */}
+      {/* 2. МЕТА-ДАННЫЕ (только ISSUE 01 слева) */}
       <div 
-        className="anim-item absolute top-6 left-6 right-6 z-30 flex items-start justify-between"
+        className="anim-item absolute top-6 left-6 right-6 z-30 flex items-start"
         style={{ animationDelay: '0.1s' }}
       >
         <span className={`text-[10px] font-sans font-medium uppercase tracking-[0.35em] transition-colors duration-1000 ${cTextMuted}`}>
           {t.issue}
-        </span>
-        <span className={`max-w-[120px] text-right text-[10px] font-sans font-medium uppercase tracking-[0.2em] transition-colors duration-1000 ${cTextFaint}`}>
-          {greeting}
         </span>
       </div>
 
@@ -259,19 +255,17 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
             </p>
           </div>
           
-          {/* Кнопка с эффектом блика */}
+          {/* Кнопка с бликом */}
           <div className="anim-item" style={{ animationDelay: '0.75s' }}>
             <button
               type="button"
               onClick={onStart}
               className={`group relative inline-flex items-center gap-4 self-start text-[11px] font-sans font-medium uppercase tracking-[0.2em] transition-colors duration-1000 active:opacity-60 ${cText}`}
             >
-              {/* Текст кнопки */}
               <span className={`relative z-10 transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 ${isDark ? 'glare-text-dark' : 'glare-text-light'}`}>
                 {t.start}
               </span>
               
-              {/* Линия кнопки */}
               <span className={`relative z-10 block h-[1px] w-12 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-16 ${isDark ? 'glare-line-dark' : 'glare-line-light'}`} />
             </button>
           </div>
