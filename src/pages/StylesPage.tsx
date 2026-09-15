@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 
@@ -165,9 +165,10 @@ type SlideItemProps = {
   isActive: boolean
   isPreloaded: boolean
   isMuted: boolean
+  isAndroid: boolean
 }
 
-function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
+function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted, isAndroid }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
 
@@ -194,43 +195,65 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     return () => { mounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // Preload только ±1 (как в TikTok/Reels)
+  // === УМНЫЙ ПРЕЛОАД ===
+  // Android: держим src дольше + preload="auto"
+  // iOS: классический жёсткий контроль памяти
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
 
     if (isPreloaded) {
-      if (video.src !== slide.video) {
+      if (!video.src || !video.src.includes(slide.video)) {
         video.src = slide.video
+        video.preload = 'auto'
         video.load()
       }
     } else {
-      if (video.src) {
+      if (isAndroid) {
+        // На Android только паузим, src не снимаем
         video.pause()
-        video.removeAttribute('src')
-        video.load()
+      } else {
+        // На iOS снимаем src (экономия памяти)
+        if (video.src) {
+          video.pause()
+          video.removeAttribute('src')
+          video.load()
+        }
       }
     }
-  }, [isPreloaded, slide.video])
+  }, [isPreloaded, slide.video, isAndroid])
 
-  // Play / Pause
+  // === ВОСПРОИЗВЕДЕНИЕ ===
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     if (isActive) {
-      video.currentTime = 0
-      const p = video.play()
-      if (p) p.catch(() => {})
+      const delay = isAndroid ? 60 : 0
+
+      const timer = setTimeout(() => {
+        video.currentTime = 0
+        const playPromise = video.play()
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Повторная попытка через 150мс (помогает Android)
+            setTimeout(() => {
+              video.play().catch(() => {})
+            }, 150)
+          })
+        }
+      }, delay)
+
+      return () => clearTimeout(timer)
     } else {
       video.pause()
     }
-  }, [isActive])
+  }, [isActive, isAndroid])
 
   const handleLike = async () => {
     const next = !isLiked
     setIsLiked(next)
-    setLikesCount(c => next ? c + 1 : c - 1)
+    setLikesCount(c => (next ? c + 1 : c - 1))
 
     if (tg?.HapticFeedback) {
       tg.HapticFeedback.impactOccurred(next ? 'medium' : 'light')
@@ -244,7 +267,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
       })
     } catch {
       setIsLiked(!next)
-      setLikesCount(c => next ? c - 1 : c + 1)
+      setLikesCount(c => (next ? c - 1 : c + 1))
     }
   }
 
@@ -278,18 +301,17 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
 
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-black">
-      {/* Видео */}
       <div className="absolute inset-0 bg-black">
         {slide.video ? (
           <video
             ref={videoRef}
-            preload="none"
             loop
             playsInline
             muted={isMuted}
+            preload={isPreloaded ? 'auto' : 'none'}
             className={`
               w-full h-full object-cover
-              transition-opacity duration-300 ease-out
+              transition-opacity duration-250 ease-out
               ${isActive ? 'opacity-100' : 'opacity-0'}
               ${slide.hideWatermark ? 'scale-[1.08]' : ''}
             `}
@@ -303,14 +325,13 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         ) : null}
       </div>
 
-      {/* Градиент сверху */}
       <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
 
       {/* Верхний текст */}
       <div
         className={`
           absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between
-          transition-all duration-300 ease-out
+          transition-all duration-250 ease-out
           ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
         `}
       >
@@ -331,7 +352,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
       <div
         className={`
           absolute bottom-6 left-6 right-6 z-20
-          transition-all duration-300 ease-out
+          transition-all duration-250 ease-out
           ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}
         `}
       >
@@ -380,17 +401,26 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
 
 const pageVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.4 } },
-  exit: { opacity: 0, transition: { duration: 0.3 } },
+  animate: { opacity: 1, transition: { duration: 0.35 } },
+  exit: { opacity: 0, transition: { duration: 0.25 } },
 }
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [isAndroid, setIsAndroid] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // IntersectionObserver — как в TikTok/Reels
+  // Определяем Android
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    const platform = (tg?.platform || '').toLowerCase()
+    const ua = navigator.userAgent.toLowerCase()
+    setIsAndroid(platform === 'android' || ua.includes('android'))
+  }, [])
+
+  // IntersectionObserver
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
@@ -398,7 +428,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
             const idx = Number(entry.target.getAttribute('data-index'))
             if (!Number.isNaN(idx)) {
               setActiveIndex(idx)
@@ -408,7 +438,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       },
       {
         root,
-        threshold: [0.6],
+        threshold: [0.55, 0.7],
       }
     )
 
@@ -452,7 +482,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         }
       `}</style>
 
-      {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
         <button
           onClick={onBack}
@@ -473,13 +502,14 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </button>
       </header>
 
-      {/* Feed */}
       <div
         ref={scrollRef}
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
       >
         {STYLES_DATA.map((slide, index) => {
-          const isPreloaded = Math.abs(activeIndex - index) <= 1
+          // Android: ±2, iOS: ±1
+          const preloadDistance = isAndroid ? 2 : 1
+          const isPreloaded = Math.abs(activeIndex - index) <= preloadDistance
           const isActive = activeIndex === index
 
           return (
@@ -496,6 +526,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 isActive={isActive}
                 isPreloaded={isPreloaded}
                 isMuted={isMuted}
+                isAndroid={isAndroid}
               />
             </div>
           )
