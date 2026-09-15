@@ -195,7 +195,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 key={type}
                 onClick={() => { haptic('light'); setSoleType(type) }}
                 className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer ${
-                  soleType === type ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-60 hover:opacity-100`
+                  soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
                 }`}
               >
                 {t[type]}
@@ -210,7 +210,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   key={type}
                   onClick={() => { haptic('light'); setHeelType(type) }}
                   className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
-                    heelType === type ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-50 hover:opacity-100`
+                    heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
                   }`}
                 >
                   {t[type]}
@@ -226,7 +226,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   key={type}
                   onClick={() => handleRockerType(type)}
                   className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
-                    rockerType === type ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-50 hover:opacity-100`
+                    rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
                   }`}
                 >
                   {t[labelKey]}
@@ -348,7 +348,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
-            onPointerDown={() => setActiveInfo(null)} // onPointerDown решает проблему прокликивания на iOS
+            onPointerDown={() => setActiveInfo(null)} 
           >
             <motion.div
               initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
@@ -394,7 +394,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 \( {cTextMuted} hover: \){cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
         >
           -
         </button>
@@ -404,7 +404,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 \( {cTextMuted} hover: \){cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
         >
           +
         </button>
@@ -428,12 +428,11 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
         <button 
           type="button"
           onPointerDown={(e) => {
-            // onPointerDown — мгновенный отклик на iOS (onClick требует 2–3 тапа)
             e.preventDefault()
             e.stopPropagation()
             onInfo()
           }}
-          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 \( {cTextMuted} hover: \){cText}`}
+          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} hover:${cText}`}
         >
           !
         </button>
