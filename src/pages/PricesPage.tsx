@@ -97,17 +97,18 @@ const DICTIONARY = {
     urgentBuy: 'Рекомендация к покупке',
     
     volatilityTitle: 'Средняя волатильность',
-    spreadTitle: 'Спред (Разрыв цен)',
+    spreadTitle: 'Разрыв цен (Spread)',
     gotIt: 'Понятно',
     recommendationLabel: 'Стратегия',
 
     // Динамические тексты
-    spreadLow: (val: string) => `Спред составляет всего ${val}%. Цены на рынке почти идентичны. Рекомендуем выбирать поставщика с наиболее удобной логистикой или лучшим сервисом.`,
-    spreadMid: (val: string) => `Спред составляет ${val}%. Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки устраивают.`,
-    spreadHigh: (val: string) => `Спред достигает ${val}%. На рынке сильный ценовой перекос. Настоятельно рекомендуем закупать объем у поставщика с зеленой отметкой (лучшая цена) для максимизации маржинальности.`,
-    volLow: (val: string) => `Волатильность ${val}%. Рынок стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.`,
-    volMid: (val: string) => `Волатильность ${val}%. Умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях.`,
-    volHigh: (val: string) => `Волатильность ${val}%. Рынок крайне нестабилен. Это лучшее время для оптимизации — тщательно сравнивайте цены, так как разница у разных поставщиков сейчас существенна.`,
+    spreadLow: 'Цены на рынке почти идентичны. Выгоднее выбирать поставщика с наиболее удобной логистикой или лучшим сервисом, так как разница в цене минимальна.',
+    spreadMid: 'Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки вас устраивают.',
+    spreadHigh: 'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у поставщика с зеленой отметкой, чтобы максимизировать вашу маржинальность.',
+    
+    volLow: 'Рынок в данной категории абсолютно стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.',
+    volMid: 'Наблюдаются умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях из списка.',
+    volHigh: 'Рынок крайне нестабилен. Это лучшее время для оптимизации — тщательно сравнивайте цены, так как разница у поставщиков сейчас огромна.',
   },
   uk: {
     title: 'Аналітика цін',
@@ -138,16 +139,17 @@ const DICTIONARY = {
     urgentBuy: 'Рекомендація до покупки',
     
     volatilityTitle: 'Середня волатильність',
-    spreadTitle: 'Спред (Розрив цін)',
+    spreadTitle: 'Розрив цін (Spread)',
     gotIt: 'Зрозуміло',
     recommendationLabel: 'Стратегія',
 
-    spreadLow: (val: string) => `Спред становить лише ${val}%. Ціни на ринку майже ідентичні. Рекомендуємо обирати постачальника з найбільш зручною логістикою.`,
-    spreadMid: (val: string) => `Спред становить ${val}%. Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.`,
-    spreadHigh: (val: string) => `Спред досягає ${val}%. На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у постачальника із зеленою позначкою для максимізації маржинальності.`,
-    volLow: (val: string) => `Волатильність ${val}%. Ринок стабільний, ціни у постачальників тримаються на одному рівні.`,
-    volMid: (val: string) => `Волатильність ${val}%. Помірні коливання цін. Оптимальний час для точкової економії.`,
-    volHigh: (val: string) => `Волатильність ${val}%. Ринок нестабільний. Це найкращий час для оптимізації закупівель — ретельно порівнюйте ціни.`,
+    spreadLow: 'Ціни на ринку майже ідентичні. Вигідніше обирати постачальника з найбільш зручною логістикою.',
+    spreadMid: 'Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.',
+    spreadHigh: 'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у постачальника із зеленою позначкою для максимізації маржинальності.',
+    
+    volLow: 'Ринок стабільний, ціни у постачальників тримаються на одному рівні.',
+    volMid: 'Помірні коливання цін. Оптимальний час для точкової економії.',
+    volHigh: 'Ринок украй нестабільний. Це найкращий час для оптимізації закупівель — ретельно порівнюйте ціни.',
   },
   de: {
     title: 'Preisanalyse',
@@ -182,12 +184,13 @@ const DICTIONARY = {
     gotIt: 'Verstanden',
     recommendationLabel: 'Strategie',
 
-    spreadLow: (val: string) => `Der Spread beträgt nur ${val}%. Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.`,
-    spreadMid: (val: string) => `Der Spread beträgt ${val}%. Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.`,
-    spreadHigh: (val: string) => `Der Spread erreicht ${val}%. Starkes Preisungleichgewicht. Wir empfehlen dringend, beim grün markierten Lieferanten zu kaufen, um die Margen zu maximieren.`,
-    volLow: (val: string) => `Volatilität ${val}%. Der Markt ist stabil, die Preise bleiben auf einem Niveau.`,
-    volMid: (val: string) => `Volatilität ${val}%. Moderate Preisschwankungen. Optimale Zeit für gezielte Einsparungen.`,
-    volHigh: (val: string) => `Volatilität ${val}%. Der Markt ist instabil. Die beste Zeit zur Einkaufsoptimierung – vergleichen Sie die Preise sorgfältig.`,
+    spreadLow: 'Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.',
+    spreadMid: 'Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.',
+    spreadHigh: 'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim grün markierten Lieferanten zu kaufen.',
+    
+    volLow: 'Der Markt ist stabil, die Preise bleiben auf einem Niveau.',
+    volMid: 'Moderate Preisschwankungen. Optimale Zeit für gezielte Einsparungen.',
+    volHigh: 'Der Markt ist instabil. Die beste Zeit zur Einkaufsoptimierung – vergleichen Sie die Preise.',
   },
 }
 
@@ -217,22 +220,12 @@ const formatDate = (dateStr: string | null, lang: Lang) => {
 }
 
 const BRAND_ALIASES: Array<[RegExp, string]> = [
-  [/\bнайр[іи]т\b/gi, 'nairit'],
-  [/\bдесмокол\b/gi, 'desmokol'],
-  [/\bdismakol\b/gi, 'desmokol'],
-  [/\bбон[іи]кол\b/gi, 'bonikol'],
-  [/\bзатверджувач\b/gi, 'hardener'],
-  [/\bотвердитель\b/gi, 'hardener'],
-  [/\bмультиф[іи]кс\b/gi, 'sarmultifix'],
-  [/\bпротрава\b/gi, 'preparatore'],
-  [/\bпротравка\b/gi, 'preparatore'],
-  [/\bпротирання\b/gi, 'preparatore'],
-  [/\bслоник\b/gi, 'solution'],
-  [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'],
-  [/\bрезинов(ый|ой|ая|ое)\b/gi, 'rubber'],
-  [/\bполіуретанов(ий|ої|а|е)\b/gi, 'polyurethane'],
-  [/\bполиуретанов(ый|ой|ая|ое)\b/gi, 'polyurethane'],
-  [/\bполіхлоропренов(ий|ої|а|е)\b/gi, 'polychloroprene'],
+  [/\bнайр[іи]т\b/gi, 'nairit'], [/\bдесмокол\b/gi, 'desmokol'], [/\bdismakol\b/gi, 'desmokol'], 
+  [/\bбон[іи]кол\b/gi, 'bonikol'], [/\bзатверджувач\b/gi, 'hardener'], [/\bотвердитель\b/gi, 'hardener'], 
+  [/\bмультиф[іи]кс\b/gi, 'sarmultifix'], [/\bпротрава\b/gi, 'preparatore'], [/\bпротравка\b/gi, 'preparatore'], 
+  [/\bпротирання\b/gi, 'preparatore'], [/\bслоник\b/gi, 'solution'], [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'], 
+  [/\bрезинов(ый|ой|ая|ое)\b/gi, 'rubber'], [/\bполіуретанов(ий|ої|а|е)\b/gi, 'polyurethane'], 
+  [/\bполиуретанов(ый|ой|ая|ое)\b/gi, 'polyurethane'], [/\bполіхлоропренов(ий|ої|а|е)\b/gi, 'polychloroprene'], 
   [/\bполихлоропренов(ый|ой|ая|ое)\b/gi, 'polychloroprene'],
 ]
 
@@ -318,46 +311,47 @@ const ProductCard = memo(
     const isDeficit = group.totalOffers >= 3 && group.outOfStockCount >= 2
 
     return (
-      <article className="group/card flex flex-col bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 transition-colors hover:border-stone-400 dark:hover:border-stone-600 shadow-sm hover:shadow-md">
-        <div className="p-5 border-b border-stone-100 dark:border-stone-800 flex gap-4 items-start relative">
+      <article className="group/card flex flex-col bg-white dark:bg-[#1A1614] border border-stone-200 dark:border-white/5 transition-colors shadow-sm hover:shadow-md dark:shadow-black/40 relative">
+        <div className="p-5 border-b border-stone-100 dark:border-white/5 flex gap-4 items-start relative">
           
           {group.image_url ? (
             <img
               src={group.image_url}
               alt={group.name}
-              className="w-16 h-16 object-cover bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 grayscale group-hover/card:grayscale-0 transition-all duration-500 shrink-0"
+              className="w-16 h-16 object-cover bg-stone-50 dark:bg-[#25201C] border border-stone-200 dark:border-white/5 grayscale group-hover/card:grayscale-0 transition-all duration-500 shrink-0"
               loading="lazy"
             />
           ) : (
-            <div className="w-16 h-16 flex items-center justify-center bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-400 shrink-0">
+            <div className="w-16 h-16 flex items-center justify-center bg-stone-50 dark:bg-[#25201C] border border-stone-200 dark:border-white/5 text-stone-400 dark:text-white/20 shrink-0">
               <Tag size={20} strokeWidth={1.5} />
             </div>
           )}
           
           <div className="flex-1 min-w-0 pr-8">
-            <h3 className="font-serif text-lg font-medium leading-snug text-stone-900 dark:text-stone-100 line-clamp-2">
+            <h3 className="font-serif text-lg font-medium leading-snug text-stone-900 dark:text-[#F5F1EA] line-clamp-2">
               {group.name}
             </h3>
             
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
               {group.product_code && (
-                <span className="text-[10px] font-mono text-stone-500 dark:text-stone-400 uppercase tracking-widest">
+                <span className="text-[10px] font-mono text-stone-500 dark:text-[#B9ACA0] uppercase tracking-widest">
                   {t.code} {group.product_code}
                 </span>
               )}
               {showSpread && group.unitSpread > 0 && (
                 <button 
                   onClick={() => onOpenSpreadModal(group.unitSpread)}
-                  className="relative inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors focus:outline-none before:absolute before:-inset-3 before:content-['']"
+                  // Расширенная тап-зона через p-2 -m-2 для соответствия HIG
+                  className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-[#E4D00A] hover:text-emerald-800 dark:hover:text-[#F5E11D] transition-colors focus:outline-none rounded-md"
                   aria-label="Что такое спред?"
                 >
                   <TrendingDown size={14} strokeWidth={2.5} />
                   <span>Spread {group.unitSpread.toFixed(0)}%</span>
-                  <Info size={12} strokeWidth={2} className="opacity-50 ml-0.5" />
+                  <Info size={12} strokeWidth={2.5} className="opacity-50 ml-0.5" />
                 </button>
               )}
               {isDeficit && (
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900 px-1.5 py-0.5">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 px-1.5 py-0.5">
                   {t.deficit}
                 </span>
               )}
@@ -366,16 +360,16 @@ const ProductCard = memo(
           
           <button 
             onClick={() => onToggleFavorite(group.key)}
-            className="absolute top-4 right-4 relative text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors before:absolute before:-inset-3 before:content-['']"
+            className="absolute top-4 right-4 p-2 -m-2 text-stone-400 dark:text-white/30 hover:text-stone-900 dark:hover:text-white transition-colors focus:outline-none"
           >
-            <Bookmark size={18} strokeWidth={1.5} className={isFavorite ? "fill-stone-900 dark:fill-stone-100 text-stone-900 dark:text-stone-100" : ""} />
+            <Bookmark size={18} strokeWidth={1.5} className={isFavorite ? "fill-stone-900 dark:fill-[#E4D00A] text-stone-900 dark:text-[#E4D00A]" : ""} />
           </button>
         </div>
 
-        <div className="flex flex-col bg-stone-50/50 dark:bg-stone-900/50">
+        <div className="flex flex-col bg-stone-50/50 dark:bg-[#1A1614]">
           {!showSpread && (
-            <div className="px-5 py-3 text-[11px] uppercase tracking-widest text-stone-500 flex items-center gap-2 border-b border-stone-100 dark:border-stone-800 last:border-0">
-              <Store size={14} strokeWidth={1.5} /> {t.singleOffer}
+            <div className="px-5 py-3 text-[11px] uppercase tracking-widest text-stone-500 dark:text-[#B9ACA0] flex items-center gap-2 border-b border-stone-100 dark:border-white/5 last:border-0">
+              <Store size={14} strokeWidth={1.5} className="opacity-50" /> {t.singleOffer}
             </div>
           )}
 
@@ -396,28 +390,28 @@ const ProductCard = memo(
               <Comp
                 key={`${offer.source}_${offer.id}`}
                 {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-                className={`relative flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-stone-800 last:border-0 transition-colors group/row
-                  ${isBest ? 'bg-emerald-50/40 dark:bg-emerald-900/10' : 'hover:bg-stone-100/50 dark:hover:bg-stone-800/50'}
+                className={`relative flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-white/5 last:border-0 transition-colors group/row
+                  ${isBest ? 'bg-emerald-50/40 dark:bg-[#E4D00A]/10' : 'bg-transparent dark:bg-[#25201C] hover:bg-stone-100/50 dark:hover:bg-white/5'}
                   ${offer.url ? 'cursor-pointer' : ''}
                 `}
               >
                 {isBest && (
-                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-600 dark:bg-emerald-500" />
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-600 dark:bg-[#E4D00A]" />
                 )}
 
                 <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
-                  <span className={`text-sm font-medium truncate ${isBest ? 'text-stone-900 dark:text-stone-100' : 'text-stone-600 dark:text-stone-400'}`}>
+                  <span className={`text-sm font-medium truncate ${isBest ? 'text-stone-900 dark:text-white' : 'text-stone-600 dark:text-[#B9ACA0]'}`}>
                     {formatSourceName(offer.source)}
                   </span>
                   
                   {offer.volumeLabel && (
-                    <span className="text-[11px] text-stone-500 font-mono border border-stone-200 dark:border-stone-700 px-1.5 py-0.5 bg-white dark:bg-stone-800 shrink-0">
+                    <span className="text-[11px] text-stone-500 dark:text-[#B9ACA0] font-mono border border-stone-200 dark:border-white/10 px-1.5 py-0.5 bg-white dark:bg-[#1A1614] shrink-0">
                       {offer.volumeLabel}
                     </span>
                   )}
                   
                   {isArbitrage && (
-                     <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-500 hidden sm:inline-block shrink-0">
+                     <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-[#E4D00A] hidden sm:inline-block shrink-0">
                         {t.urgentBuy}
                      </span>
                   )}
@@ -431,8 +425,8 @@ const ProductCard = memo(
                         const isLast = i === historyData.length - 1
                         const trendDown = historyData[4] < historyData[0]
                         const barColor = isLast 
-                          ? (trendDown ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-rose-600 dark:bg-rose-400') 
-                          : 'bg-stone-300 dark:bg-stone-600'
+                          ? (trendDown ? 'bg-emerald-600 dark:bg-[#32D74B]' : 'bg-rose-600 dark:bg-rose-500') 
+                          : 'bg-stone-300 dark:bg-white/20'
                         return (
                           <div key={i} style={{ height: `${heightPct}%` }} className={`flex-1 ${barColor}`} />
                         )
@@ -441,11 +435,11 @@ const ProductCard = memo(
                   )}
 
                   <div className="flex flex-col items-end leading-tight text-right w-24">
-                    <span className={`text-sm font-medium tabular-nums ${isBest ? 'text-emerald-700 dark:text-emerald-500' : 'text-stone-900 dark:text-stone-100'}`}>
+                    <span className={`text-sm font-medium tabular-nums ${isBest ? 'text-emerald-700 dark:text-[#E4D00A]' : 'text-stone-900 dark:text-white'}`}>
                       {formatPrice(offer.price, lang)}
                     </span>
                     {offer.multiplier !== 1 && offer.unitPrice > 0 && (
-                      <span className="text-[10px] text-stone-500 font-mono tracking-tighter mt-1">
+                      <span className="text-[10px] text-stone-500 dark:text-[#B9ACA0] font-mono tracking-tighter mt-1">
                         ≈ {Math.round(offer.unitPrice)} / {offer.baseUnit}
                       </span>
                     )}
@@ -457,7 +451,7 @@ const ProductCard = memo(
         </div>
         
         {formattedDate && (
-          <div className="px-5 py-2.5 bg-stone-100 dark:bg-stone-950/50 text-[10px] text-stone-500 uppercase tracking-widest flex items-center justify-between border-t border-stone-200 dark:border-stone-800">
+          <div className="px-5 py-2.5 bg-stone-100 dark:bg-[#1A1614] text-[10px] text-stone-500 dark:text-[#B9ACA0] uppercase tracking-widest flex items-center justify-between border-t border-stone-200 dark:border-white/5">
             <span>{t.updatedAt}</span>
             <span className="font-mono">{formattedDate}</span>
           </div>
@@ -662,69 +656,67 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     }
   }, [filteredItems])
 
-  // Генерация динамического текста для модалки
   const getModalText = () => {
-    if (!modalData) return { desc: '', rec: '' }
-    const valStr = modalData.value.toFixed(0)
-    
+    if (!modalData) return { rec: '' }
     if (modalData.type === 'spread') {
-      if (modalData.value < 10) return { desc: t.spreadTitle, rec: t.spreadLow(valStr) }
-      if (modalData.value <= 30) return { desc: t.spreadTitle, rec: t.spreadMid(valStr) }
-      return { desc: t.spreadTitle, rec: t.spreadHigh(valStr) }
+      if (modalData.value < 10) return { rec: t.spreadLow }
+      if (modalData.value <= 30) return { rec: t.spreadMid }
+      return { rec: t.spreadHigh }
     } else {
-      if (modalData.value < 10) return { desc: t.volatilityTitle, rec: t.volLow(valStr) }
-      if (modalData.value <= 30) return { desc: t.volatilityTitle, rec: t.volMid(valStr) }
-      return { desc: t.volatilityTitle, rec: t.volHigh(valStr) }
+      if (modalData.value < 10) return { rec: t.volLow }
+      if (modalData.value <= 30) return { rec: t.volMid }
+      return { rec: t.volHigh }
     }
   }
 
   const currentModalContent = getModalText()
 
   return (
-    <div className={`min-h-screen w-full transition-colors duration-300 ${isDark ? 'dark bg-[#12100E]' : 'bg-stone-50'}`}>
+    // ИСПРАВЛЕНИЕ ТЕМЫ: Убран тернарный оператор для фона, теперь bg-stone-50 и dark:bg-[#12100E] синхронизированы 
+    <div className="min-h-screen w-full bg-stone-50 dark:bg-[#12100E] text-stone-900 dark:text-[#F5F1EA] font-sans transition-colors duration-300">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="flex flex-col h-[100dvh] text-stone-900 dark:text-stone-100 font-sans relative"
+        className="flex flex-col h-[100dvh] relative"
       >
-        <header className="shrink-0 z-20 bg-stone-50 dark:bg-[#1A1614] border-b border-stone-200 dark:border-stone-800 pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
+        <header className="shrink-0 z-20 bg-stone-50 dark:bg-[#1A1614] border-b border-stone-200 dark:border-white/5 pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
             
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex items-center gap-4 min-w-0">
                 <button
                   onClick={onBack}
-                  className="relative w-10 h-10 border border-stone-200 dark:border-stone-800 flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors shrink-0 before:absolute before:-inset-2 before:content-['']"
+                  className="relative p-2 -m-2 border border-stone-200 dark:border-white/10 rounded-lg flex items-center justify-center text-stone-500 dark:text-white/40 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors shrink-0"
                   aria-label="Назад"
                 >
                   <ArrowLeft size={18} strokeWidth={1.5} />
                 </button>
                 <div className="min-w-0">
-                  <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-2.5">
-                    <BookOpen size={22} className="text-stone-400 dark:text-stone-500 shrink-0" strokeWidth={1.5} />
+                  <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-stone-900 dark:text-[#F5F1EA] flex items-center gap-2.5">
+                    <BookOpen size={22} className="text-stone-400 dark:text-white/30 shrink-0" strokeWidth={1.5} />
                     <span className="truncate">{t.title}</span>
                   </h1>
                   
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-stone-500 dark:text-stone-400 mt-1.5 font-mono">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-stone-500 dark:text-[#B9ACA0] mt-1.5 font-mono">
                     <span>{stats.total} {t.statsTotal}</span>
                     {stats.multiCount > 0 && (
                       <>
-                        <span className="text-stone-300 dark:text-stone-700 font-sans">/</span>
+                        <span className="text-stone-300 dark:text-white/20 font-sans">/</span>
                         <button
                           onClick={() => setModalData({ type: 'volatility', value: stats.avgSpreadValue })}
-                          className="relative inline-flex items-center text-emerald-700 dark:text-emerald-400 font-sans font-medium focus:outline-none hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors before:absolute before:-inset-3 before:content-['']"
+                          className="relative inline-flex items-center p-1 -m-1 rounded text-emerald-700 dark:text-[#E4D00A] font-sans font-medium focus:outline-none hover:text-emerald-800 dark:hover:text-[#F5E11D] transition-colors"
                           aria-label="Что такое волатильность?"
                         >
                           {t.statsAvgSpread}: {stats.avgSpreadText}%
-                          <Info size={12} strokeWidth={2} className="opacity-50 ml-1" />
+                          <Info size={12} strokeWidth={2.5} className="opacity-50 ml-1" />
                         </button>
                       </>
                     )}
                     {(usdRate || eurRate) && (
                       <>
-                        <span className="text-stone-300 dark:text-stone-700 font-sans">/</span>
-                        <span className="tabular-nums font-semibold text-stone-800 dark:text-stone-200">
+                        <span className="text-stone-300 dark:text-white/20 font-sans">/</span>
+                        <span className="tabular-nums font-semibold text-stone-800 dark:text-[#F5F1EA]">
                           {usdRate && `$ ${usdRate.toFixed(2)}`}
                           {usdRate && eurRate && ' · '}
                           {eurRate && `€ ${eurRate.toFixed(2)}`}
@@ -737,27 +729,27 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
               <button
                 onClick={() => setIsDark(!isDark)}
-                className="relative p-2.5 border border-stone-200 dark:border-stone-800 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors shrink-0 before:absolute before:-inset-2 before:content-['']"
+                className="relative p-2.5 -m-1 border border-stone-200 dark:border-white/10 rounded-lg text-stone-500 dark:text-white/40 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors shrink-0"
                 aria-label="Сменить тему"
               >
                 {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
               </button>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-3 border-t border-stone-200 dark:border-stone-800 pt-4">
+            <div className="flex flex-col lg:flex-row gap-3 border-t border-stone-200 dark:border-white/5 pt-4">
               <div className="relative flex-1 max-w-md">
-                <Search size={16} strokeWidth={1.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Search size={16} strokeWidth={1.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-white/30" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t.search}
-                  className="w-full h-10 pl-10 pr-9 bg-white dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 focus:border-stone-900 dark:focus:border-stone-400 outline-none text-sm placeholder:text-stone-400 transition-colors"
+                  className="w-full h-10 pl-10 pr-9 bg-white dark:bg-[#25201C] border border-stone-200 dark:border-white/5 focus:border-stone-900 dark:focus:border-white/20 outline-none text-sm placeholder:text-stone-400 dark:placeholder:text-white/30 text-stone-900 dark:text-[#F5F1EA] transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-stone-400 hover:text-stone-900 dark:hover:text-white"
                   >
                     <X size={15} strokeWidth={1.5} />
                   </button>
@@ -768,7 +760,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="h-10 px-3 text-xs uppercase tracking-wider bg-white dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 outline-none cursor-pointer appearance-none shrink-0"
+                  className="h-10 px-3 text-xs uppercase tracking-wider bg-white dark:bg-[#25201C] text-stone-900 dark:text-[#F5F1EA] border border-stone-200 dark:border-white/5 outline-none cursor-pointer appearance-none shrink-0"
                 >
                   <option value="default">{t.sortDefault}</option>
                   <option value="savings">{t.sortSavings}</option>
@@ -776,15 +768,15 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   <option value="name">{t.sortName}</option>
                 </select>
 
-                <div className="h-5 w-px bg-stone-200 dark:border-stone-800 shrink-0" />
+                <div className="h-5 w-px bg-stone-200 dark:bg-white/10 shrink-0" />
 
                 <div className="flex gap-1.5 shrink-0">
                   <button
                     onClick={() => setSelectedSource('all')}
                     className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ${
                       selectedSource === 'all' 
-                        ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900' 
-                        : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
+                        ? 'border-stone-900 bg-stone-900 text-white dark:border-[#E4D00A] dark:bg-[#E4D00A] dark:text-black' 
+                        : 'border-transparent text-stone-500 dark:text-[#B9ACA0] hover:text-stone-900 dark:hover:text-white'
                     }`}
                   >
                     {t.allSources}
@@ -793,8 +785,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     onClick={() => setSelectedSource('favorites')}
                     className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold flex items-center gap-1.5 transition-colors border ${
                       selectedSource === 'favorites' 
-                        ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900' 
-                        : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
+                        ? 'border-stone-900 bg-stone-900 text-white dark:border-[#E4D00A] dark:bg-[#E4D00A] dark:text-black' 
+                        : 'border-transparent text-stone-500 dark:text-[#B9ACA0] hover:text-stone-900 dark:hover:text-white'
                     }`}
                   >
                     <Bookmark size={13} strokeWidth={selectedSource === 'favorites' ? 2 : 1.5} className={selectedSource === 'favorites' ? "fill-current" : ""} />
@@ -806,8 +798,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                       onClick={() => setSelectedSource(src)}
                       className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ${
                         selectedSource === src 
-                          ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900' 
-                          : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
+                          ? 'border-stone-900 bg-stone-900 text-white dark:border-[#E4D00A] dark:bg-[#E4D00A] dark:text-black' 
+                          : 'border-transparent text-stone-500 dark:text-[#B9ACA0] hover:text-stone-900 dark:hover:text-white'
                       }`}
                     >
                       {formatSourceName(src)}
@@ -824,24 +816,24 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-60 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 animate-pulse" />
+                  <div key={i} className="h-60 bg-white dark:bg-[#1A1614] border border-stone-200 dark:border-white/5 animate-pulse" />
                 ))}
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-28 text-center">
-                <p className="font-serif text-xl text-stone-600 dark:text-stone-400 mb-6">{error}</p>
+                <p className="font-serif text-xl text-stone-600 dark:text-[#B9ACA0] mb-6">{error}</p>
                 <button
                   onClick={load}
-                  className="px-8 py-3 border border-stone-900 dark:border-stone-100 text-xs uppercase tracking-widest font-semibold hover:bg-stone-900 hover:text-white dark:hover:bg-stone-100 dark:hover:text-stone-900 transition-colors"
+                  className="px-8 py-3 border border-stone-900 dark:border-[#E4D00A] text-xs uppercase tracking-widest font-semibold hover:bg-stone-900 hover:text-white dark:text-[#E4D00A] dark:hover:bg-[#E4D00A] dark:hover:text-black transition-colors"
                 >
                   {t.retry}
                 </button>
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-28 text-center text-stone-500">
+              <div className="flex flex-col items-center justify-center py-28 text-center text-stone-500 dark:text-white/20">
                 <Tag size={44} strokeWidth={1} className="mb-4 opacity-40" />
-                <p className="font-serif text-2xl text-stone-900 dark:text-stone-100 mb-2">{t.empty}</p>
-                <p className="text-sm tracking-wide">{t.emptyHint}</p>
+                <p className="font-serif text-2xl text-stone-900 dark:text-[#F5F1EA] mb-2">{t.empty}</p>
+                <p className="text-sm tracking-wide text-stone-500 dark:text-[#B9ACA0]">{t.emptyHint}</p>
               </div>
             ) : (
               <div className="pb-14">
@@ -872,7 +864,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   <div className="mt-10 flex justify-center">
                     <button
                       onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
-                      className="px-8 py-3.5 border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs uppercase tracking-widest font-semibold text-stone-900 dark:text-stone-100 hover:border-stone-900 dark:hover:border-stone-100 transition-colors flex items-center gap-2.5"
+                      className="px-8 py-3.5 border border-stone-300 dark:border-white/10 bg-white dark:bg-[#1A1614] text-xs uppercase tracking-widest font-semibold text-stone-900 dark:text-[#F5F1EA] hover:border-stone-900 dark:hover:border-white/30 transition-colors flex items-center gap-2.5"
                     >
                       {t.loadMore} <ChevronDown size={14} strokeWidth={2} />
                     </button>
@@ -891,7 +883,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setModalData(null)}
-                className="absolute inset-0 bg-stone-900/60 dark:bg-black/70 backdrop-blur-sm"
+                className="absolute inset-0 bg-stone-900/60 dark:bg-black/80 backdrop-blur-sm"
               />
               <motion.div
                 initial={{ opacity: 0, y: 100 }}
@@ -900,33 +892,39 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
                 className="relative w-full max-w-md bg-white dark:bg-[#1A1614] border-t sm:border border-stone-200 dark:border-white/10 shadow-2xl p-7 rounded-t-3xl sm:rounded-3xl z-10 overflow-hidden"
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-emerald-500" />
+                <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-[#E4D00A]" />
                 
-                <div className="flex justify-between items-start mb-6">
-                  <h3 className="font-serif text-2xl text-stone-900 dark:text-stone-100 leading-tight">
-                    {currentModalContent.desc}
-                  </h3>
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    {/* ГИГАНТСКИЙ ПРОЦЕНТ ДЛЯ ОЧЕВИДНОСТИ */}
+                    <div className="text-6xl font-serif font-medium text-emerald-700 dark:text-[#E4D00A] tracking-tight mb-2">
+                      {modalData.value.toFixed(0)}%
+                    </div>
+                    <h3 className="text-sm uppercase tracking-widest text-stone-500 dark:text-[#B9ACA0] font-bold mb-6">
+                      {modalData.type === 'spread' ? t.spreadTitle : t.volatilityTitle}
+                    </h3>
+                  </div>
                   <button 
                     onClick={() => setModalData(null)}
-                    className="p-1 text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
+                    className="p-2 -m-2 text-stone-400 dark:text-white/30 hover:text-stone-900 dark:hover:text-white transition-colors"
                   >
                     <X size={20} strokeWidth={1.5} />
                   </button>
                 </div>
 
                 <div className="bg-stone-50 dark:bg-[#25201C] p-5 border border-stone-200 dark:border-white/5 relative">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-600/50 dark:bg-emerald-500/50" />
-                  <p className="text-[11px] font-bold text-stone-800 dark:text-stone-300 uppercase tracking-widest mb-2 font-mono">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-600/50 dark:bg-[#E4D00A]/50" />
+                  <p className="text-[11px] font-bold text-stone-800 dark:text-[#F5F1EA] uppercase tracking-widest mb-2 font-mono">
                     {t.recommendationLabel}
                   </p>
-                  <p className="text-[14px] text-stone-700 dark:text-stone-300 leading-snug">
+                  <p className="text-[14px] text-stone-700 dark:text-[#B9ACA0] leading-relaxed">
                     {currentModalContent.rec}
                   </p>
                 </div>
 
                 <button
                   onClick={() => setModalData(null)}
-                  className="mt-8 w-full py-4 bg-stone-900 dark:bg-white text-white dark:text-stone-900 text-xs uppercase tracking-widest font-bold hover:opacity-90 active:scale-[0.98] transition-all"
+                  className="mt-8 w-full py-4 bg-stone-900 dark:bg-[#E4D00A] text-white dark:text-black text-xs uppercase tracking-widest font-bold hover:opacity-90 active:scale-[0.98] transition-all"
                 >
                   {t.gotIt}
                 </button>
