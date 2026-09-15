@@ -68,6 +68,17 @@
     outline-offset: 2px;
     border-radius: inherit;
   }
+
+  /* Скрываем системный курсор только на устройствах с точным указателем (мышь/трекпад) */
+  @media (pointer: fine) {
+    body {
+      cursor: none;
+    }
+    
+    a, button, [role="button"], input, select, textarea {
+      cursor: none !important;
+    }
+  }
 }
 
 @layer utilities {
