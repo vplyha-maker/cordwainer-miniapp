@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
-import { motion } from 'framer-motion' // Добавили импорт motion
+import { motion, AnimatePresence } from 'framer-motion' // Добавили AnimatePresence
 import type { Lang } from '../App'
 
 type ColorsPageProps = {
@@ -420,7 +420,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // КОРНЕВОЙ ЭЛЕМЕНТ ТЕПЕРЬ MOTION.DIV ДЛЯ ПЛАВНОГО ПЕРЕХОДА СТРАНИЦ
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -624,80 +623,88 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       </div>
 
-      {/* OVERLAY: ГИД (Журнальный разворот) */}
-      {showGuide && (
-        <div className={`fixed inset-0 z-[100] flex flex-col ${cBg} ${cText} overflow-hidden`}>
-          <div className="px-6 pt-10 pb-6 flex items-start justify-between shrink-0">
-            <h2 className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight">
-              {t.guideTitle}
-            </h2>
-            <button
-              onClick={() => setShowGuide(false)}
-              className={`text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors mt-2`}
-            >
-              {t.guideClose}
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide space-y-12">
-            
-            <p className="text-[14px] min-[400px]:text-[16px] leading-[1.8] font-light max-w-lg">
-              {t.guideIntro}
-            </p>
-
-            <div>
-              <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
-                {t.guideBalanceTitle}
-              </h3>
-              <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg`}>
-                {t.guideBalance}
-              </p>
+      {/* OVERLAY: ГИД (Анимированное журнальное окно) */}
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className={`fixed inset-0 z-[100] flex flex-col ${cBg} ${cText} overflow-hidden`}
+          >
+            <div className="px-6 pt-10 pb-6 flex items-start justify-between shrink-0">
+              <h2 className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight">
+                {t.guideTitle}
+              </h2>
+              <button
+                onClick={() => setShowGuide(false)}
+                className={`text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors mt-2`}
+              >
+                {t.guideClose}
+              </button>
             </div>
 
-            <div>
-              <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-8 ${cTextMuted}`}>
-                {t.guideSchemesTitle}
-              </h3>
-              <div className="space-y-8 max-w-lg">
-                {[
-                  { title: t.complementary, text: t.guideComplementary },
-                  { title: t.analogous, text: t.guideAnalogous },
-                  { title: t.triadic, text: t.guideTriadic },
-                  { title: t.tetradic, text: t.guideTetradic },
-                  { title: t.rectangular, text: t.guideRectangular },
-                  { title: t['split-complementary'], text: t.guideSplit },
-                  { title: t.monochromatic, text: t.guideMono },
-                ].map((item) => (
-                  <div key={item.title}>
-                    <div className="font-serif text-[22px] min-[400px]:text-[26px] leading-[1.2] mb-3">
-                      {item.title}
-                    </div>
-                    <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light ${cTextMuted}`}>
-                      {item.text}
-                    </p>
-                  </div>
-                ))}
+            <div className="flex-1 overflow-y-auto px-6 pb-24 scrollbar-hide space-y-12">
+              
+              <p className="text-[14px] min-[400px]:text-[16px] leading-[1.8] font-light max-w-lg">
+                {t.guideIntro}
+              </p>
+
+              <div>
+                <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+                  {t.guideBalanceTitle}
+                </h3>
+                <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg`}>
+                  {t.guideBalance}
+                </p>
               </div>
-            </div>
 
-            <div>
-              <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
-                {t.guideFootwearTitle}
-              </h3>
-              <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg`}>
-                {t.guideFootwear}
-              </p>
-            </div>
+              <div>
+                <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-8 ${cTextMuted}`}>
+                  {t.guideSchemesTitle}
+                </h3>
+                <div className="space-y-8 max-w-lg">
+                  {[
+                    { title: t.complementary, text: t.guideComplementary },
+                    { title: t.analogous, text: t.guideAnalogous },
+                    { title: t.triadic, text: t.guideTriadic },
+                    { title: t.tetradic, text: t.guideTetradic },
+                    { title: t.rectangular, text: t.guideRectangular },
+                    { title: t['split-complementary'], text: t.guideSplit },
+                    { title: t.monochromatic, text: t.guideMono },
+                  ].map((item) => (
+                    <div key={item.title}>
+                      <div className="font-serif text-[22px] min-[400px]:text-[26px] leading-[1.2] mb-3">
+                        {item.title}
+                      </div>
+                      <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light ${cTextMuted}`}>
+                        {item.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <div className={`pt-8 border-t ${cLine} max-w-lg`}>
-              <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light italic ${cTextMuted}`}>
-                {t.guideTip}
-              </p>
+              <div>
+                <h3 className={`text-[9px] font-sans uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+                  {t.guideFootwearTitle}
+                </h3>
+                <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] whitespace-pre-line font-light border-l border-current/20 pl-5 max-w-lg`}>
+                  {t.guideFootwear}
+                </p>
+              </div>
+
+              <div className={`pt-8 border-t ${cLine} max-w-lg`}>
+                <p className={`text-[13px] min-[400px]:text-[14px] leading-[1.8] font-light italic ${cTextMuted}`}>
+                  {t.guideTip}
+                </p>
+              </div>
+              
             </div>
-            
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
