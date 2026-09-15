@@ -1,6 +1,6 @@
 // src/types/salary.ts
 
-export type Lang = 'ru' | 'uk'
+export type Lang = 'ru' | 'uk' | 'de'
 
 export interface SalaryItem {
   id: string
@@ -42,4 +42,4 @@ export function createEmptySalaryData(): SalaryUserData {
     archive: {},
     updatedAt: new Date().toISOString(),
   }
-  }
+}
