@@ -398,7 +398,6 @@ const ProductCard = memo(
               <Comp
                 key={`${offer.source}_${offer.id}`}
                 {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-                // Используем rgba хак для полупрозрачного акцентного фона, чтобы не перебивать цвет текста
                 style={isBest ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)' } : {}}
                 className={`relative flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)] last:border-0 transition-colors group/row
                   ${!isBest ? 'hover:bg-[var(--color-surface-2)]' : ''}
@@ -501,16 +500,24 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     }
   })
 
+  // ИСПРАВЛЕНИЕ 1: Добавлен try/catch для localStorage
   const toggleFavorite = useCallback((key: string) => {
     setFavorites(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      localStorage.setItem('price_favorites', JSON.stringify([...next]))
+      
+      try {
+        localStorage.setItem('price_favorites', JSON.stringify([...next]))
+      } catch (e) {
+        console.warn('Cannot save favorites:', e)
+        // Продолжаем работу, даже если localStorage недоступен
+      }
       return next
     })
   }, [])
 
+  // ИСПРАВЛЕНИЕ 2: Убрана зависимость t.error, добавлена lang. Использование DICTIONARY[lang].error
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -529,12 +536,12 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         if (rates?.eur) setEurRate(Number(rates.eur))
       }
     } catch {
-      setError(t.error)
+      setError(DICTIONARY[lang].error)
       setItems([])
     } finally {
       setLoading(false)
     }
-  }, [t.error])
+  }, [lang])
 
   useEffect(() => { load() }, [load])
 
@@ -898,7 +905,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 </div>
 
                 <div className="bg-[var(--color-surface-2)] p-5 border border-[var(--color-border)] relative">
-                  {/* Имитация прозрачности поверх accent для линии */}
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-accent)] opacity-50" />
                   <p className="text-[11px] font-bold text-[var(--color-ink)] uppercase tracking-widest mb-2 font-mono">
                     {t.recommendationLabel}
