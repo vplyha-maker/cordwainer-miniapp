@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -31,7 +31,6 @@ const getDeviceId = () => {
 }
 
 const STYLES_DATA: StyleSlide[] = [
-  // ... ваш массив данных остается без изменений ...
   {
     id: 'botford',
     video: '/Fason/Botford.mp4',
@@ -159,7 +158,6 @@ const STYLES_DATA: StyleSlide[] = [
   }
 ]
 
-
 type SlideItemProps = {
   slide: StyleSlide
   lang: Lang
@@ -170,7 +168,6 @@ type SlideItemProps = {
   isMuted: boolean
 }
 
-// 1. НАСТРАИВАЕМ КАСТОМНЫЕ КРИВЫЕ БЕЗЬЕ ДЛЯ ТЕКСТА
 const customBezier = [0.16, 1, 0.3, 1];
 
 const topTextVariants = {
@@ -217,6 +214,20 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
     fetchLikes()
     return () => { isMounted = false }
   }, [slide.id, userId, isPreloaded])
+
+  // РЕШЕНИЕ ПРОБЛЕМЫ iOS: Принудительная очистка видеобуфера
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    
+    return () => {
+      if (videoEl) {
+        // Когда видео уходит из зоны видимости, мы жестко вычищаем его из памяти айфона
+        videoEl.pause();
+        videoEl.removeAttribute('src'); 
+        videoEl.load(); 
+      }
+    };
+  }, [isPreloaded]); // Срабатывает в том числе при размонтировании (когда isPreloaded становится false)
 
   useEffect(() => {
     if (videoRef.current) {
@@ -285,13 +296,12 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
 
   return (
     <div className="relative h-[100dvh] w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A]">
-      {/* ВИДЕО ФОН СО SMART LAZY LOADING */}
       <div className="absolute inset-0 w-full h-full z-0 bg-black">
         {isPreloaded && slide.video ? (
           <video
             ref={videoRef}
             src={slide.video}
-            preload={preloadType} // Динамическая подгрузка (auto для соседних, metadata для дальних)
+            preload={preloadType}
             loop
             playsInline
             webkit-playsinline="true"
@@ -308,7 +318,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
 
       <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
 
-      {/* ВЕРХНИЙ БЛОК НА FRAMER MOTION */}
       <motion.div 
         variants={topTextVariants}
         initial="hidden"
@@ -328,7 +337,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
         </div>
       </motion.div>
 
-      {/* НИЖНИЙ БЛОК НА FRAMER MOTION */}
       <motion.div 
         variants={bottomTextVariants}
         initial="hidden"
@@ -373,7 +381,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
   )
 }
 
-// 2. АНИМАЦИЯ ПОЯВЛЕНИЯ САМОЙ СТРАНИЦЫ
 const pageVariants = {
   initial: { opacity: 0, scale: 0.96 },
   animate: { 
@@ -450,15 +457,11 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]"
       >
         {STYLES_DATA.map((slide, index) => {
-          // 3. РЕШЕНИЕ ПРОБЛЕМЫ ПРЕДЗАГРУЗКИ В СЕРЕДИНЕ ЛЕНТЫ
-          // Расширяем окно рендера до 5 элементов (активный + по 2 с каждой стороны)
-          const isPreloaded = Math.abs(activeIndex - index) <= 2
+          // РЕШЕНИЕ ПРОБЛЕМЫ iOS: Уменьшаем лимит удерживаемых в памяти видео до 3 шт (1 активное, 1 до, 1 после)
+          const isPreloaded = Math.abs(activeIndex - index) <= 1
           
-          // Жестко грузим (auto) только текущий и 1 ближайший для экономии сети. 
-          // Те, что за 2 шага, только подтягивают метаданные (metadata).
-          const preloadType = Math.abs(activeIndex - index) <= 1 ? "auto" : "metadata"
-          
-          const isActive = activeIndex === index
+          // Активное грузим полностью, соседние только метаданные
+          const preloadType = isActive ? "auto" : "metadata"
 
           return (
             <SlideItem 
