@@ -54,7 +54,6 @@ function haptic(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light'
   } catch {}
 }
 
-// --- АНИМАЦИИ ПЕРЕХОДОВ ---
 const pageVariants = {
   hidden: { opacity: 0, y: 15 },
   show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
@@ -91,7 +90,6 @@ export function BlogPage({
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   
-  // Инициализируем тему синхронно, чтобы избежать вспышек (FOUC)
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('dark')
@@ -372,7 +370,6 @@ export function BlogPage({
     : ''
   const activeContentHtml = content ? ((content as any)[lang] || content.ru) : ''
 
-  // Динамические цвета для плавного переключения темы
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
@@ -398,7 +395,6 @@ export function BlogPage({
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Editorial Markdown Typography */
         .article-content { max-width: 650px; margin: 0 auto; padding-bottom: 4rem; }
         .article-content p { 
           font-family: var(--font-body); 
@@ -482,7 +478,7 @@ export function BlogPage({
               else if (view === 'collaboration' || view === 'about') setView('cover')
               else onBack?.()
             }}
-            className={`pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer transition-colors ${cTextMuted} ${cHover}`}
+            className={`pointer-events-auto group flex items-center gap-2 px-3.5 py-2 rounded-full text-[10px] font-sans uppercase tracking-[0.2em] outline-none border border-current/20 bg-current/10 backdrop-blur-md cursor-pointer transition-colors ${cText} ${cHover}`}
           >
             <span className="transform transition-transform group-hover:-translate-x-1">←</span>
             <span>{t.backToMenu}</span>
@@ -496,27 +492,33 @@ export function BlogPage({
         {/* ================= COVER VIEW ================= */}
         {view === 'cover' && (
           <motion.div key="cover" variants={pageVariants} initial="hidden" animate="show" exit="exit" className={`fixed inset-0 z-50 overflow-hidden flex flex-col justify-end ${cBg} ${cText} touch-none`}>
+            {/* Фотография на фоне теперь слегка темнее, чтобы текст не сливался */}
             <div className="absolute inset-0 z-0 pointer-events-none">
-              <img src="/blog-hero.webp" alt="Cover" className={`w-full h-full object-cover object-[center_top] transition-opacity duration-1000 ${isDark ? 'grayscale-[30%]' : 'grayscale-[10%]'}`} />
-              <div className={`absolute inset-0 bg-gradient-to-t ${gradStart} ${gradMid} to-transparent`} />
+              <img src="/blog-hero.webp" alt="Cover" className="w-full h-full object-cover object-[center_top] grayscale-[40%] contrast-125 opacity-60" />
+              <div className={`absolute inset-0 bg-gradient-to-t ${gradStart} via-[rgba(10,10,10,0.7)] to-transparent`} />
             </div>
 
-            <header className="absolute top-10 left-6 z-20">
-              <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors drop-shadow-md`}>
+            {/* Контрастная кнопка Назад в шапке обложки */}
+            <header className="absolute top-6 left-6 z-20">
+              <button 
+                onClick={onBack} 
+                className="group flex items-center gap-2 px-3.5 py-2 rounded-full text-[10px] font-sans uppercase tracking-[0.2em] outline-none border border-white/20 bg-black/40 backdrop-blur-md cursor-pointer text-white hover:bg-black/60 transition-all shadow-md"
+              >
                 <span className="transform transition-transform group-hover:-translate-x-1">←</span>
                 <span>Back</span>
               </button>
             </header>
 
-            <div className="relative z-10 px-6 pb-24 w-full pt-20">
-              <motion.div variants={staggerItem} initial="hidden" animate="show" className="mb-16">
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted} drop-shadow-md`}>
+            <div className="relative z-10 px-6 pb-20 w-full pt-24">
+              <motion.div variants={staggerItem} initial="hidden" animate="show" className="mb-10">
+                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-3 ${cTextMuted} drop-shadow-md`}>
                   {t.subtitle}
                 </p>
-                <h1 className="font-serif text-[18vw] min-[400px]:text-7xl leading-[0.85] tracking-tight break-words drop-shadow-lg">
+                {/* Уменьшенный масштаб заголовка, чтобы он гармонично стоял над меню, не перекрывая всю фото-композицию */}
+                <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl leading-[0.95] tracking-tight break-words drop-shadow-lg mb-3">
                   {t.title}
                 </h1>
-                <p className={`mt-6 text-[11px] font-sans font-light leading-[1.8] max-w-[260px] ${cTextMuted} drop-shadow-md`}>
+                <p className={`text-[11px] font-sans font-light leading-[1.6] max-w-[280px] ${cTextMuted} drop-shadow-md`}>
                   {t.tagline}
                 </p>
               </motion.div>
@@ -527,13 +529,13 @@ export function BlogPage({
                     variants={staggerItem}
                     key={item.id}
                     onClick={() => { haptic('medium'); item.action?.(); }}
-                    className={`w-full group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent cursor-pointer ${cLine} text-left transition-all active:opacity-50`}
+                    className={`w-full group relative flex items-end justify-between py-5 border-b outline-none border-0 bg-transparent cursor-pointer ${cLine} text-left transition-all active:opacity-50`}
                   >
                     <div className="flex items-start gap-4 w-[60%]">
                       <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
                         0{idx + 1}
                       </span>
-                      <div className="font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform group-hover:translate-x-1 drop-shadow-md break-words w-full">
+                      <div className="font-serif text-3xl sm:text-4xl leading-[1.1] transition-transform group-hover:translate-x-1 drop-shadow-md break-words w-full">
                         {item.title}
                       </div>
                     </div>
@@ -702,7 +704,7 @@ export function BlogPage({
                   if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
                   setView('journal')
                 }}
-                className={`pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors drop-shadow-md`}
+                className={`pointer-events-auto group flex items-center gap-2 px-3.5 py-2 rounded-full text-[10px] font-sans uppercase tracking-[0.2em] outline-none border border-current/20 bg-current/10 backdrop-blur-md cursor-pointer ${cText} ${cHover} transition-colors drop-shadow-md`}
               >
                 <span className="transform transition-transform group-hover:-translate-x-1">←</span>
                 <span>Back</span>
@@ -718,14 +720,13 @@ export function BlogPage({
               </div>
             </header>
 
-            {/* Article Cover (Dynamic Gradient for Theme) */}
+            {/* Article Cover */}
             <div className="relative w-full h-[45vh] -mt-[60px]">
               <img src={activeArticle.cover || '/blog-hero.webp'} alt={activeTitle} className={`w-full h-full object-cover transition-all duration-700 ${isDark ? 'grayscale-[20%]' : 'grayscale-0'}`} />
               <div className={`absolute inset-0 bg-gradient-to-t ${gradStart} ${gradMid} to-transparent`} />
             </div>
 
             <div className="px-6 -mt-16 relative z-10 pb-24 w-full">
-              {/* Meta */}
               <div className="max-w-2xl mx-auto flex items-center justify-center gap-4 mb-8">
                  <span className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted}`}>
                    {activeTag}
@@ -736,7 +737,6 @@ export function BlogPage({
                  </span>
               </div>
 
-              {/* Title */}
               <h1 className="max-w-3xl mx-auto text-center font-serif text-[11vw] md:text-6xl leading-[0.95] tracking-tight mb-12 break-words">
                 {activeTitle}
               </h1>
@@ -745,12 +745,10 @@ export function BlogPage({
                 <ArticleAudioPlayer text={activeContentHtml} lang={lang} />
               </div>
 
-              {/* Markdown Content (Editorial Styling applied via CSS above) */}
               <div className="article-content">
                 <Markdown>{activeContentHtml}</Markdown>
               </div>
 
-              {/* Bottom Actions */}
               <div className={`max-w-2xl mx-auto mt-16 pt-12 border-t ${cLine} flex flex-col items-center`}>
                 <button 
                   onClick={() => {
