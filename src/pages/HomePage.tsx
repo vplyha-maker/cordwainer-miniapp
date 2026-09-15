@@ -285,16 +285,18 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  // --- ЖУРНАЛЬНЫЕ СТИЛИ ---
-  const cBg = isDark 
-    ? 'bg-gradient-to-br from-[#1A1A1A] to-[#050505]' 
-    : 'bg-gradient-to-br from-[#F9F7F3] to-[#EAE6DD]'
-    
+    // --- ЖУРНАЛЬНЫЕ СТИЛИ (Надежный вариант) ---
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#231F1D]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#231F1D]/50'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#231F1D]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
+  // Градиент передаем напрямую через inline-style
+  const backgroundStyle = isDark
+    ? { background: 'linear-gradient(135deg, #1A1A1A 0%, #050505 100%)' }
+    : { background: 'linear-gradient(135deg, #F9F7F3 0%, #EAE6DD 100%)' }
+
+  // Шум
   const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
 
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
@@ -337,14 +339,18 @@ export function HomePage({
   )
 
   return (
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 overflow-hidden ${cBg} ${cText}`}>
+    // Убрали переменную cBg и добавили style={backgroundStyle}
+    <div 
+      className={`relative min-h-[100dvh] w-full transition-colors duration-500 overflow-hidden ${cText}`}
+      style={backgroundStyle}
+    >
       
       {/* СЛОЙ ЖУРНАЛЬНОЙ ТЕКСТУРЫ */}
       <div 
         className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
         style={{
           backgroundImage: noiseBg,
-          opacity: isDark ? 0.04 : 0.06,
+          opacity: isDark ? 0.04 : 0.07, // Чуть усилил шум для светлой темы
           mixBlendMode: isDark ? 'screen' : 'multiply'
         }}
       />
@@ -515,3 +521,7 @@ export function HomePage({
     </div>
   )
 }
+
+        
+                                    
+                  
