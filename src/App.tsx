@@ -1,8 +1,9 @@
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useLayoutEffect, useState } from 'react'
 
-// Подключаем наш новый провайдер плавного скролла
+// Подключаем наш новый провайдер плавного скролла и кастомный курсор
 import SmoothScroll from './components/SmoothScroll'
+import CustomCursor from './components/CustomCursor'
 
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
@@ -277,106 +278,109 @@ export default function App() {
   }, [])
 
   return (
-    <SmoothScroll>
-      <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe transition-colors duration-300">
-        {showPerfHint && (
-          <div
-            className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
-            style={{ background: 'rgba(29,24,21,0.96)', border: '1px solid rgba(198,164,122,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}
-          >
-            <div className="mb-2 leading-snug text-[#B9ACA0]">
-              {lang === 'de' ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert.' : lang === 'uk' ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим.' : 'Интерфейс работает неравномерно. Включён быстрый режим.'}
+    <>
+      <CustomCursor />
+      <SmoothScroll>
+        <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe transition-colors duration-300">
+          {showPerfHint && (
+            <div
+              className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
+              style={{ background: 'rgba(29,24,21,0.96)', border: '1px solid rgba(198,164,122,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}
+            >
+              <div className="mb-2 leading-snug text-[#B9ACA0]">
+                {lang === 'de' ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert.' : lang === 'uk' ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим.' : 'Интерфейс работает неравномерно. Включён швидкий режим.'}
+              </div>
+              <div className="flex gap-2">
+                <button className="flex-1 py-2 rounded-xl text-[11px] font-semibold" style={{ background: '#D8A35C', color: '#151210' }} onClick={() => { savePerfMode('fast'); applyPerfMode('fast'); setShowPerfHint(false) }}>OK</button>
+                <button className="flex-1 py-2 rounded-xl text-[11px] font-medium text-[#B9ACA0]" style={{ border: '1px solid rgba(185,172,160,0.25)' }} onClick={() => { savePerfMode('full'); applyPerfMode('full'); setShowPerfHint(false) }}>
+                  {lang === 'de' ? 'Hohe Qualität beibehalten' : lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button className="flex-1 py-2 rounded-xl text-[11px] font-semibold" style={{ background: '#D8A35C', color: '#151210' }} onClick={() => { savePerfMode('fast'); applyPerfMode('fast'); setShowPerfHint(false) }}>OK</button>
-              <button className="flex-1 py-2 rounded-xl text-[11px] font-medium text-[#B9ACA0]" style={{ border: '1px solid rgba(185,172,160,0.25)' }} onClick={() => { savePerfMode('full'); applyPerfMode('full'); setShowPerfHint(false) }}>
-                {lang === 'de' ? 'Hohe Qualität beibehalten' : lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <AnimatePresence mode="wait">
-          {screen === 'welcome' && (
-            <WelcomePage
-              key="welcome"
-              onStart={() => setScreen('home')}
-              onOpenBlog={() => setScreen('blog')}
-              lang={lang}
-              setLang={handleSetLang}
-              favorites={favorites}
-              onChangeTab={(tab) => {
-                if (tab === 'settings') { setPrevMainScreen('welcome'); setScreen('settings') }
-                if (tab === 'search') setScreen('home')
-              }}
-            />
           )}
 
-          {screen === 'home' && (
-            <HomePage
-              key="home"
-              onChangeTab={(tab) => {
-                if (tab === 'settings') { setPrevMainScreen('home'); setScreen('settings') }
-                if (tab === 'profile') setScreen('welcome') 
-              }}
-              onBack={() => setScreen('welcome')}
-              onOpenBlog={() => setScreen('blog')}
-              onOpenCalcMenu={() => setScreen('calc-menu')}
-              onOpenColors={() => setScreen('colors')}
-              onOpenStyles={() => setScreen('styles')}
-              onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
-              onOpenPrices={() => setScreen('prices')}
-              lang={lang}
-              setLang={handleSetLang}
-              favorites={favorites}
-              onOpenArticle={(articleId) => { setPendingArticleId(articleId); setShowOnlyFavorites(false); setScreen('blog') }}
-              onOpenFavorites={() => { setPendingArticleId(null); setShowOnlyFavorites(true); setScreen('blog') }}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {screen === 'welcome' && (
+              <WelcomePage
+                key="welcome"
+                onStart={() => setScreen('home')}
+                onOpenBlog={() => setScreen('blog')}
+                lang={lang}
+                setLang={handleSetLang}
+                favorites={favorites}
+                onChangeTab={(tab) => {
+                  if (tab === 'settings') { setPrevMainScreen('welcome'); setScreen('settings') }
+                  if (tab === 'search') setScreen('home')
+                }}
+              />
+            )}
 
-          {screen === 'blog' && (
-            <BlogPage
-              key="blog"
-              onBack={() => { setPendingArticleId(null); setShowOnlyFavorites(false); setScreen('home') }}
-              lang={lang}
-              isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
-              onToggleFavorite={() => toggleFavorite({ id: 'blog-orvard', type: 'blog', imagePng: '/blog-hero.webp' })}
-              favoriteArticleIds={favorites.filter((f) => f.type === 'article').map((f) => f.id)}
-              onToggleArticleFavorite={(articleId, cover) => toggleFavorite({ id: articleId, type: 'article', imagePng: cover || `/${articleId}.png` })}
-              initialArticleId={pendingArticleId}
-              onArticleOpened={() => setPendingArticleId(null)}
-              initialShowFavorites={showOnlyFavorites}
-            />
-          )}
+            {screen === 'home' && (
+              <HomePage
+                key="home"
+                onChangeTab={(tab) => {
+                  if (tab === 'settings') { setPrevMainScreen('home'); setScreen('settings') }
+                  if (tab === 'profile') setScreen('welcome') 
+                }}
+                onBack={() => setScreen('welcome')}
+                onOpenBlog={() => setScreen('blog')}
+                onOpenCalcMenu={() => setScreen('calc-menu')}
+                onOpenColors={() => setScreen('colors')}
+                onOpenStyles={() => setScreen('styles')}
+                onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
+                onOpenPrices={() => setScreen('prices')}
+                lang={lang}
+                setLang={handleSetLang}
+                favorites={favorites}
+                onOpenArticle={(articleId) => { setPendingArticleId(articleId); setShowOnlyFavorites(false); setScreen('blog') }}
+                onOpenFavorites={() => { setPendingArticleId(null); setShowOnlyFavorites(true); setScreen('blog') }}
+              />
+            )}
 
-          {screen === 'calc-menu' && (
-            <CalcMenuPage key="calc-menu" lang={lang} onBack={() => setScreen('home')} onOpenSizeCalc={() => setScreen('size-calc')} onOpenWidthCalc={() => setScreen('width-calc')} onOpenHeelCalc={() => setScreen('heel-calc')} onOpenColorCalc={() => setScreen('color-calc')} onOpenSalaryCalc={() => setScreen('salary-calc')} />
-          )}
-          {screen === 'salary-calc' && <SalaryCalcPage key="salary-calc" onBack={() => setScreen('calc-menu')} lang={lang} />}
-          {screen === 'size-calc' && <SizeCalcPage key="size-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-          {screen === 'width-calc' && <WidthCalcPage key="width-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-          {screen === 'heel-calc' && <HeelCalcPage key="heel-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-          {screen === 'color-calc' && <ColorCalcPage key="color-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-          {screen === 'colors' && <ColorsPage key="colors" onBack={() => setScreen('home')} lang={lang} setLang={handleSetLang} />}
-          {screen === 'styles' && <StylesPage key="styles" onBack={() => setScreen('home')} lang={lang} />}
-          {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
-          {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
-          {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
+            {screen === 'blog' && (
+              <BlogPage
+                key="blog"
+                onBack={() => { setPendingArticleId(null); setShowOnlyFavorites(false); setScreen('home') }}
+                lang={lang}
+                isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
+                onToggleFavorite={() => toggleFavorite({ id: 'blog-orvard', type: 'blog', imagePng: '/blog-hero.webp' })}
+                favoriteArticleIds={favorites.filter((f) => f.type === 'article').map((f) => f.id)}
+                onToggleArticleFavorite={(articleId, cover) => toggleFavorite({ id: articleId, type: 'article', imagePng: cover || `/${articleId}.png` })}
+                initialArticleId={pendingArticleId}
+                onArticleOpened={() => setPendingArticleId(null)}
+                initialShowFavorites={showOnlyFavorites}
+              />
+            )}
 
-          {screen === 'settings' && (
-            <SettingsPage
-              key="settings"
-              lang={lang}
-              setLang={handleSetLang}
-              onBack={() => setScreen(prevMainScreen)}
-              onChangeTab={(tab) => {
-                if (tab === 'search') setScreen('home')
-                if (tab === 'profile') setScreen('welcome')
-              }}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-    </SmoothScroll>
+            {screen === 'calc-menu' && (
+              <CalcMenuPage key="calc-menu" lang={lang} onBack={() => setScreen('home')} onOpenSizeCalc={() => setScreen('size-calc')} onOpenWidthCalc={() => setScreen('width-calc')} onOpenHeelCalc={() => setScreen('heel-calc')} onOpenColorCalc={() => setScreen('color-calc')} onOpenSalaryCalc={() => setScreen('salary-calc')} />
+            )}
+            {screen === 'salary-calc' && <SalaryCalcPage key="salary-calc" onBack={() => setScreen('calc-menu')} lang={lang} />}
+            {screen === 'size-calc' && <SizeCalcPage key="size-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+            {screen === 'width-calc' && <WidthCalcPage key="width-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+            {screen === 'heel-calc' && <HeelCalcPage key="heel-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+            {screen === 'color-calc' && <ColorCalcPage key="color-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+            {screen === 'colors' && <ColorsPage key="colors" onBack={() => setScreen('home')} lang={lang} setLang={handleSetLang} />}
+            {screen === 'styles' && <StylesPage key="styles" onBack={() => setScreen('home')} lang={lang} />}
+            {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
+            {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
+            {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
+
+            {screen === 'settings' && (
+              <SettingsPage
+                key="settings"
+                lang={lang}
+                setLang={handleSetLang}
+                onBack={() => setScreen(prevMainScreen)}
+                onChangeTab={(tab) => {
+                  if (tab === 'search') setScreen('home')
+                  if (tab === 'profile') setScreen('welcome')
+                }}
+              />
+            )}
+          </AnimatePresence>
+        </div>
+      </SmoothScroll>
+    </>
   )
 }
