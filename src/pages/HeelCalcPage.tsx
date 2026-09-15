@@ -142,7 +142,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
-  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
   return (
     <div className={`relative flex flex-col min-h-[100dvh] w-full max-w-[100vw] transition-colors duration-500 ${cBg} ${cText} overflow-hidden overflow-x-hidden`}>
@@ -164,7 +163,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20 shrink-0">
         <button 
           onClick={() => { haptic('light'); onBack(); }}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} transition-colors touch-manipulation`}
         >
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
           <span>Back</span>
@@ -191,8 +190,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               <button
                 key={type}
                 onClick={() => { haptic('light'); setSoleType(type) }}
-                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer ${
-                  soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer touch-manipulation ${
+                  soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60`
                 }`}
               >
                 {t[type]}
@@ -206,8 +205,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 <button
                   key={type}
                   onClick={() => { haptic('light'); setHeelType(type) }}
-                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
-                    heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
+                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap touch-manipulation ${
+                    heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50`
                   }`}
                 >
                   {t[type]}
@@ -222,8 +221,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 <button
                   key={type}
                   onClick={() => handleRockerType(type)}
-                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
-                    rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
+                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap touch-manipulation ${
+                    rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50`
                   }`}
                 >
                   {t[labelKey]}
@@ -271,7 +270,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         <div className="stagger-item w-full" style={{ animationDelay: '0.25s' }}>
           <button
             onClick={() => { haptic('light'); setShowSpecs(!showSpecs); }}
-            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
+            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none cursor-pointer ${cLine} ${cTextMuted} touch-manipulation`}
           >
             <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
               {t.specsBtn}
@@ -284,6 +283,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           <AnimatePresence>
             {showSpecs && (
               <motion.div
+                key="specs-accordion" // ВАЖНО: Добавлен key для iOS
                 initial={{ opacity: 0, height: 0 }} 
                 animate={{ opacity: 1, height: 'auto' }} 
                 exit={{ opacity: 0, height: 0 }}
@@ -343,8 +343,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       <AnimatePresence>
         {activeInfo && (
           <motion.div
+            key="info-modal-backdrop" // ВАЖНО: Добавлен key для iOS
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md cursor-pointer"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md cursor-pointer touch-manipulation"
             onClick={() => setActiveInfo(null)}
           >
             <motion.div
@@ -362,7 +363,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               <button
                 type="button"
                 onClick={() => setActiveInfo(null)}
-                className={`w-full py-4 border transition-all active:scale-95 text-[9px] font-sans uppercase tracking-[0.3em] cursor-pointer ${cText} ${cLine} hover:bg-current/5`}
+                className={`w-full py-4 border transition-all active:scale-95 text-[9px] font-sans uppercase tracking-[0.3em] cursor-pointer ${cText} ${cLine} touch-manipulation`}
               >
                 Close
               </button>
@@ -390,7 +391,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer touch-manipulation ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
         >
           -
         </button>
@@ -400,7 +401,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer touch-manipulation ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
         >
           +
         </button>
@@ -427,7 +428,7 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
             e.stopPropagation();
             onInfo();
           }}
-          className={`relative z-10 w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} hover:${cText}`}
+          className={`relative z-10 w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} touch-manipulation`}
         >
           !
         </button>
