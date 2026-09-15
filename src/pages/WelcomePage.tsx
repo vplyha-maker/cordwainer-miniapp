@@ -119,78 +119,82 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           100% { opacity: 1; transform: translateY(0); }
         }
         
-        /* Надёжный блик для Android + iOS */
+        /* Блик */
         @keyframes btnGlare {
-          0%   { background-position: -180% center; }
-          35%  { background-position: -180% center; } /* пауза */
-          65%  { background-position: 180% center; }
-          100% { background-position: 180% center; } /* пауза */
+          0%   { background-position: -200% center; }
+          30%  { background-position: -200% center; }
+          70%  { background-position: 200% center; }
+          100% { background-position: 200% center; }
         }
 
-        /* Тёмная тема */
+        /* ========== ТЁМНАЯ ТЕМА (усиленный блик) ========== */
         .glare-text-dark {
           background: linear-gradient(
-            110deg,
-            #F4F0E8 25%,
-            #F4F0E8 40%,
-            #FFFFFF 50%,
-            #F4F0E8 60%,
-            #F4F0E8 75%
+            105deg,
+            #F4F0E8 20%,
+            #C8C4BC 38%,
+            #FFFFFF 48%,
+            #FFFFFF 52%,
+            #C8C4BC 62%,
+            #F4F0E8 80%
           );
-          background-size: 250% 100%;
+          background-size: 280% 100%;
           -webkit-background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
           color: transparent;
-          animation: btnGlare 3.8s linear infinite;
+          animation: btnGlare 3.6s linear infinite;
           will-change: background-position;
           transform: translateZ(0);
         }
         .glare-line-dark {
           background: linear-gradient(
-            110deg,
-            #F4F0E8 25%,
-            #F4F0E8 40%,
-            #FFFFFF 50%,
-            #F4F0E8 60%,
-            #F4F0E8 75%
+            105deg,
+            #F4F0E8 20%,
+            #C8C4BC 38%,
+            #FFFFFF 48%,
+            #FFFFFF 52%,
+            #C8C4BC 62%,
+            #F4F0E8 80%
           );
-          background-size: 250% 100%;
-          animation: btnGlare 3.8s linear infinite;
+          background-size: 280% 100%;
+          animation: btnGlare 3.6s linear infinite;
           will-change: background-position;
           transform: translateZ(0);
         }
 
-        /* Светлая тема */
+        /* ========== СВЕТЛАЯ ТЕМА ========== */
         .glare-text-light {
           background: linear-gradient(
-            110deg,
-            #1C1816 25%,
-            #1C1816 40%,
-            #999999 50%,
-            #1C1816 60%,
-            #1C1816 75%
+            105deg,
+            #1C1816 20%,
+            #1C1816 38%,
+            #999999 48%,
+            #999999 52%,
+            #1C1816 62%,
+            #1C1816 80%
           );
-          background-size: 250% 100%;
+          background-size: 280% 100%;
           -webkit-background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
           color: transparent;
-          animation: btnGlare 3.8s linear infinite;
+          animation: btnGlare 3.6s linear infinite;
           will-change: background-position;
           transform: translateZ(0);
         }
         .glare-line-light {
           background: linear-gradient(
-            110deg,
-            #1C1816 25%,
-            #1C1816 40%,
-            #999999 50%,
-            #1C1816 60%,
-            #1C1816 75%
+            105deg,
+            #1C1816 20%,
+            #1C1816 38%,
+            #999999 48%,
+            #999999 52%,
+            #1C1816 62%,
+            #1C1816 80%
           );
-          background-size: 250% 100%;
-          animation: btnGlare 3.8s linear infinite;
+          background-size: 280% 100%;
+          animation: btnGlare 3.6s linear infinite;
           will-change: background-position;
           transform: translateZ(0);
         }
