@@ -30,6 +30,7 @@ const getDeviceId = () => {
   return deviceId
 }
 
+// ... ваш массив STYLES_DATA ...
 const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
@@ -164,7 +165,6 @@ type SlideItemProps = {
   index: number
   isActive: boolean      
   isPreloaded: boolean   
-  preloadType: "auto" | "metadata" | "none"
   isMuted: boolean
 }
 
@@ -188,7 +188,7 @@ const bottomTextVariants = {
   }
 };
 
-function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isMuted }: SlideItemProps) {
+function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
   
@@ -215,48 +215,49 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
     return () => { isMounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // РЕШЕНИЕ ПРОБЛЕМЫ iOS: Принудительная очистка видеобуфера
+  // 1. ЖЕСТКИЙ КОНТРОЛЬ ПАМЯТИ IOS (Ручное добавление и удаление SRC)
+  // Мы больше не удаляем тег <video> из верстки, чтобы не вызывать "тормоза" (reflow).
+  // Вместо этого мы точечно управляем атрибутом src.
   useEffect(() => {
-    const videoEl = videoRef.current;
-    
-    return () => {
-      if (videoEl) {
-        // Когда видео уходит из зоны видимости, мы жестко вычищаем его из памяти айфона
-        videoEl.pause();
-        videoEl.removeAttribute('src'); 
-        videoEl.load(); 
-      }
-    };
-  }, [isPreloaded]); // Срабатывает в том числе при размонтировании (когда isPreloaded становится false)
+    const video = videoRef.current;
+    if (!video || !slide.video) return;
 
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isActive) {
-        videoRef.current.currentTime = 0
-        const playPromise = videoRef.current.play()
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {})
-        }
-      } else {
-        videoRef.current.pause()
+    if (isPreloaded) {
+      if (!video.hasAttribute('src')) {
+        video.setAttribute('src', slide.video);
+        video.load();
+      }
+    } else {
+      if (video.hasAttribute('src')) {
+        video.pause();
+        video.removeAttribute('src'); // Принудительно очищаем буфер в iOS
+        video.load();
       }
     }
-  }, [isActive])
+  }, [isPreloaded, slide.video]);
 
+  // 2. УПРАВЛЕНИЕ ВОСПРОИЗВЕДЕНИЕМ
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = isMuted
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isActive) {
+      video.currentTime = 0;
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    } else {
+      video.pause();
     }
-  }, [isMuted, isPreloaded])
+  }, [isActive]);
 
   const handleLike = async () => {
     const newIsLiked = !isLiked
     setIsLiked(newIsLiked)
     setLikesCount(prev => newIsLiked ? prev + 1 : prev - 1)
 
-    if (tg && tg.HapticFeedback) {
-      tg.HapticFeedback.impactOccurred(newIsLiked ? 'medium' : 'light')
-    }
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(newIsLiked ? 'medium' : 'light')
 
     try {
       await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`, {
@@ -282,8 +283,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
 
     try {
       if (tg && tg.initData) {
-        const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`;
-        tg.openTelegramLink(tgShareUrl);
+        tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`);
         return;
       }
       if (navigator.share) {
@@ -295,84 +295,50 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
   }
 
   return (
-    <div className="relative h-[100dvh] w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A]">
+    // ИЗМЕНЕНИЕ: h-full вместо h-[100dvh], чтобы предотвратить прыжки скролла в Safari
+    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A]">
       <div className="absolute inset-0 w-full h-full z-0 bg-black">
-        {isPreloaded && slide.video ? (
+        {slide.video ? (
           <video
             ref={videoRef}
-            src={slide.video}
-            preload={preloadType}
+            preload="none" // Выключаем автозагрузку, мы контролируем всё вручную
             loop
             playsInline
             webkit-playsinline="true"
+            muted={isMuted} // React безопасно обрабатывает muted напрямую
             className={`w-full h-full object-cover transition-all duration-[1.5s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.03]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
-        ) : isPreloaded && slide.image ? (
-          <img
-            src={slide.image}
-            alt={slide.title[currentLang]}
-            className="w-full h-full object-cover"
-          />
+        ) : slide.image ? (
+          <img src={slide.image} alt={slide.title[currentLang]} className="w-full h-full object-cover" />
         ) : null}
       </div>
 
       <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
 
-      <motion.div 
-        variants={topTextVariants}
-        initial="hidden"
-        animate={isActive ? "visible" : "hidden"}
-        className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between"
-      >
+      <motion.div variants={topTextVariants} initial="hidden" animate={isActive ? "visible" : "hidden"} className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between">
         <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">
-            {slide.subtitle[currentLang]}
-          </p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-            {slide.title[currentLang]}
-          </h2>
+          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">{slide.subtitle[currentLang]}</p>
+          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{slide.title[currentLang]}</h2>
         </div>
-        <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">
-          {String(index + 1).padStart(2, '0')}
-        </div>
+        <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">{String(index + 1).padStart(2, '0')}</div>
       </motion.div>
 
-      <motion.div 
-        variants={bottomTextVariants}
-        initial="hidden"
-        animate={isActive ? "visible" : "hidden"}
-        className="absolute bottom-6 left-6 right-6 z-20 flex flex-col"
-      >
+      <motion.div variants={bottomTextVariants} initial="hidden" animate={isActive ? "visible" : "hidden"} className="absolute bottom-6 left-6 right-6 z-20 flex flex-col">
         <div className="w-full h-px bg-white/30 mb-5 shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
-
         <div className="flex items-start justify-between gap-4">
-          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-            {slide.desc[currentLang]}
-          </p>
-
+          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">{slide.desc[currentLang]}</p>
           <div className="flex items-center gap-4 shrink-0 mt-1">
             <button onClick={handleLike} className="group flex flex-col items-center gap-1.5 outline-none">
               <div className={`w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center transition-all duration-500 active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)] ${isLiked ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'border-white/50 text-white bg-black/20 backdrop-blur-sm hover:border-white'}`}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
               </div>
-              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                {likesCount || 'LIKE'}
-              </span>
+              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{likesCount || 'LIKE'}</span>
             </button>
-
             <button onClick={handleShare} className="group flex flex-col items-center gap-1.5 outline-none">
               <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-500 hover:border-white active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                  <polyline points="16 6 12 2 8 6" />
-                  <line x1="12" y1="2" x2="12" y2="15" />
-                </svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg>
               </div>
-              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                SHARE
-              </span>
+              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">SHARE</span>
             </button>
           </div>
         </div>
@@ -383,16 +349,8 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isM
 
 const pageVariants = {
   initial: { opacity: 0, scale: 0.96 },
-  animate: { 
-    opacity: 1, 
-    scale: 1, 
-    transition: { duration: 0.6, ease: customBezier } 
-  },
-  exit: { 
-    opacity: 0, 
-    scale: 1.02, 
-    transition: { duration: 0.4, ease: customBezier } 
-  }
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: customBezier } },
+  exit: { opacity: 0, scale: 1.02, transition: { duration: 0.4, ease: customBezier } }
 };
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
@@ -403,8 +361,9 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const handleScroll = () => {
     if (!scrollRef.current) return
     const scrollPosition = scrollRef.current.scrollTop
-    const windowHeight = window.innerHeight
-    const newActiveIndex = Math.round(scrollPosition / windowHeight)
+    // ИЗМЕНЕНИЕ: Считаем высоту строго по блоку, а не по window.innerHeight. Это фиксит баг "прыжка на 1-й слайд".
+    const containerHeight = scrollRef.current.clientHeight 
+    const newActiveIndex = Math.round(scrollPosition / containerHeight)
     
     if (newActiveIndex !== activeIndex && newActiveIndex >= 0 && newActiveIndex < STYLES_DATA.length) {
       setActiveIndex(newActiveIndex)
@@ -422,59 +381,26 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        * {
-          -webkit-tap-highlight-color: transparent !important;
-          -webkit-touch-callout: none;
-        }
+        * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
       `}</style>
 
       <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
-        <button
-          onClick={onBack}
-          className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
-        >
-          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
-          <span>Back</span>
+        <button onClick={onBack} className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span><span>Back</span>
         </button>
-
-        <button
-          onClick={() => {
-            if (window.Telegram?.WebApp?.HapticFeedback) {
-              window.Telegram.WebApp.HapticFeedback.impactOccurred('light')
-            }
-            setIsMuted(!isMuted)
-          }}
-          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
-        >
+        <button onClick={() => { if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light'); setIsMuted(!isMuted) }} className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
           {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
         </button>
       </header>
 
-      <div 
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]"
-      >
+      {/* ИЗМЕНЕНИЕ: h-full вместо h-[100dvh] */}
+      <div ref={scrollRef} onScroll={handleScroll} className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]">
         {STYLES_DATA.map((slide, index) => {
-          // РЕШЕНИЕ ПРОБЛЕМЫ iOS: Уменьшаем лимит удерживаемых в памяти видео до 3 шт (1 активное, 1 до, 1 после)
+          // ИЗМЕНЕНИЕ: Возвращаем строгий лимит (максимум 3 активных видео), чтобы iOS не переполнял память
           const isPreloaded = Math.abs(activeIndex - index) <= 1
-          
-          // Активное грузим полностью, соседние только метаданные
-          const preloadType = isActive ? "auto" : "metadata"
+          const isActive = activeIndex === index
 
-          return (
-            <SlideItem 
-              key={slide.id} 
-              slide={slide} 
-              lang={lang} 
-              index={index}
-              isActive={isActive}
-              isPreloaded={isPreloaded}
-              preloadType={preloadType}
-              isMuted={isMuted} 
-            />
-          )
+          return <SlideItem key={slide.id} slide={slide} lang={lang} index={index} isActive={isActive} isPreloaded={isPreloaded} isMuted={isMuted} />
         })}
       </div>
     </motion.div>
