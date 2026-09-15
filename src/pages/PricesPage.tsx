@@ -8,7 +8,6 @@ import {
   Tag,
   BookOpen,
   ChevronDown,
-  Clock,
   Bookmark,
   TrendingDown,
   Sun,
@@ -299,11 +298,11 @@ const ProductCard = memo(
             <img
               src={group.image_url}
               alt={group.name}
-              className="w-16 h-16 object-cover bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 grayscale group-hover/card:grayscale-0 transition-all duration-500"
+              className="w-16 h-16 object-cover bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 grayscale group-hover/card:grayscale-0 transition-all duration-500 shrink-0"
               loading="lazy"
             />
           ) : (
-            <div className="w-16 h-16 flex items-center justify-center bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-400">
+            <div className="w-16 h-16 flex items-center justify-center bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 text-stone-400 shrink-0">
               <Tag size={20} strokeWidth={1.5} />
             </div>
           )}
@@ -382,13 +381,13 @@ const ProductCard = memo(
                   </span>
                   
                   {offer.volumeLabel && (
-                    <span className="text-[11px] text-stone-500 font-mono border border-stone-200 dark:border-stone-700 px-1.5 py-0.5 bg-white dark:bg-stone-800">
+                    <span className="text-[11px] text-stone-500 font-mono border border-stone-200 dark:border-stone-700 px-1.5 py-0.5 bg-white dark:bg-stone-800 shrink-0">
                       {offer.volumeLabel}
                     </span>
                   )}
                   
                   {isArbitrage && (
-                     <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-500 hidden sm:inline-block">
+                     <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-500 hidden sm:inline-block shrink-0">
                         {t.urgentBuy}
                      </span>
                   )}
@@ -463,8 +462,14 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     return false
   })
 
+  // ИСПРАВЛЕНИЕ: Гарантированное переключение темы для Tailwind CSS
   useEffect(() => {
     localStorage.setItem('theme', isDark ? 'dark' : 'light')
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
   }, [isDark])
 
   // Filters & Sorting
@@ -637,78 +642,87 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         exit={{ opacity: 0 }}
         className="flex flex-col h-[100dvh] bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans transition-colors duration-300"
       >
-        {/* Masthead / Header */}
-        <header className="shrink-0 z-20 bg-stone-50 dark:bg-stone-950 border-b border-stone-300 dark:border-stone-800 pt-6 md:pt-10 pb-6 px-6 md:px-12 transition-colors duration-300">
+        {/* ИНТЕГРИРОВАННЫЙ ОБНОВЛЕННЫЙ ХЕДЕР */}
+        <header className="shrink-0 z-20 bg-stone-50 dark:bg-stone-950 border-b border-stone-200 dark:border-stone-800 pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
-            <div className="flex items-start justify-between gap-6 mb-6">
-              <div className="flex items-center gap-5">
+            
+            {/* НОВЫЙ БЛОК ХЕДЕРА С АДАПТИВНОЙ СВОДКОЙ КОТИРОВОК И КНОПКОЙ ТЕМЫ */}
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-4 min-w-0">
                 <button
                   onClick={onBack}
-                  className="w-10 h-10 border border-stone-200 dark:border-stone-700 flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors"
-                  aria-label="Go back"
+                  className="w-10 h-10 border border-stone-200 dark:border-stone-800 flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors shrink-0"
+                  aria-label="Назад"
                 >
                   <ArrowLeft size={18} strokeWidth={1.5} />
                 </button>
-                <div>
-                  <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-3">
-                    <BookOpen size={24} className="text-stone-400 dark:text-stone-500 shrink-0" strokeWidth={1.5} />
-                    <span>{t.title}</span>
+                <div className="min-w-0">
+                  <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-2.5">
+                    <BookOpen size={22} className="text-stone-400 dark:text-stone-500 shrink-0" strokeWidth={1.5} />
+                    <span className="truncate">{t.title}</span>
                   </h1>
+                  
+                  {/* Биржевая сводка: видна и на смартфонах, и на десктопе */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400 mt-1 font-mono">
+                    <span>{stats.total} {t.statsTotal}</span>
+                    {stats.multiCount > 0 && (
+                      <>
+                        <span className="text-stone-300 dark:text-stone-700 font-sans">/</span>
+                        <span className="text-emerald-700 dark:text-emerald-400 font-sans font-medium">
+                          {t.statsAvgSpread}: {stats.avgSpread}%
+                        </span>
+                      </>
+                    )}
+                    {(usdRate || eurRate) && (
+                      <>
+                        <span className="text-stone-300 dark:text-stone-700 font-sans">/</span>
+                        <span className="tabular-nums font-semibold text-stone-800 dark:text-stone-200">
+                          {usdRate && `$ ${usdRate.toFixed(2)}`}
+                          {usdRate && eurRate && ' · '}
+                          {eurRate && `€ ${eurRate.toFixed(2)}`}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
-                {/* Financial Ticker Meta */}
-                <div className="hidden md:flex flex-col text-right text-[11px] uppercase tracking-widest text-stone-500 dark:text-stone-400">
-                  <div className="mb-1">
-                    <span className="text-stone-900 dark:text-stone-200 font-medium">{stats.total}</span> {t.statsTotal}
-                  </div>
-                  {(usdRate || eurRate) && (
-                    <div className="font-mono">
-                      {usdRate && `USD ${usdRate.toFixed(2)}`}
-                      {usdRate && eurRate && ' • '}
-                      {eurRate && `EUR ${eurRate.toFixed(2)}`}
-                    </div>
-                  )}
-                </div>
-                
-                {/* Theme Switcher */}
-                <button
-                  onClick={() => setIsDark(!isDark)}
-                  className="p-2 border border-stone-200 dark:border-stone-700 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors"
-                  aria-label="Toggle theme"
-                >
-                  {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
-                </button>
-              </div>
+              {/* Переключатель темы */}
+              <button
+                onClick={() => setIsDark(!isDark)}
+                className="p-2.5 border border-stone-200 dark:border-stone-800 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors shrink-0"
+                aria-label="Сменить тему"
+              >
+                {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
+              </button>
             </div>
 
             {/* Editorial Filters Toolbar */}
-            <div className="flex flex-col lg:flex-row gap-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+            <div className="flex flex-col lg:flex-row gap-3 border-t border-stone-200 dark:border-stone-800 pt-4">
               <div className="relative flex-1 max-w-md">
-                <Search size={16} strokeWidth={1.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Search size={16} strokeWidth={1.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t.search}
-                  className="w-full h-11 pl-12 pr-10 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 focus:border-stone-900 dark:focus:border-stone-400 outline-none text-sm placeholder:text-stone-400 transition-colors"
+                  className="w-full h-10 pl-10 pr-9 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 focus:border-stone-900 dark:focus:border-stone-400 outline-none text-sm placeholder:text-stone-400 transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
                   >
-                    <X size={16} strokeWidth={1.5} />
+                    <X size={15} strokeWidth={1.5} />
                   </button>
                 )}
               </div>
               
-              <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2 lg:pb-0">
+              <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 lg:pb-0">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="h-11 px-4 text-sm bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 outline-none cursor-pointer appearance-none min-w-[160px]"
+                  className="h-10 px-3 text-xs uppercase tracking-wider bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 outline-none cursor-pointer appearance-none shrink-0"
                 >
                   <option value="default">{t.sortDefault}</option>
                   <option value="savings">{t.sortSavings}</option>
@@ -716,12 +730,12 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   <option value="name">{t.sortName}</option>
                 </select>
 
-                <div className="h-6 w-px bg-stone-300 dark:bg-stone-700 shrink-0 mx-2" />
+                <div className="h-5 w-px bg-stone-200 dark:border-stone-800 shrink-0" />
 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 shrink-0">
                   <button
                     onClick={() => setSelectedSource('all')}
-                    className={`px-4 py-2 text-xs uppercase tracking-wider font-semibold transition-colors border ${
+                    className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ${
                       selectedSource === 'all' 
                         ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900' 
                         : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
@@ -731,20 +745,20 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   </button>
                   <button
                     onClick={() => setSelectedSource('favorites')}
-                    className={`px-4 py-2 text-xs uppercase tracking-wider font-semibold flex items-center gap-2 transition-colors border ${
+                    className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold flex items-center gap-1.5 transition-colors border ${
                       selectedSource === 'favorites' 
                         ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900' 
                         : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
                     }`}
                   >
-                    <Bookmark size={14} strokeWidth={selectedSource === 'favorites' ? 2 : 1.5} className={selectedSource === 'favorites' ? "fill-current" : ""} />
+                    <Bookmark size={13} strokeWidth={selectedSource === 'favorites' ? 2 : 1.5} className={selectedSource === 'favorites' ? "fill-current" : ""} />
                     {t.favorites}
                   </button>
                   {sources.map((src) => (
                     <button
                       key={src}
                       onClick={() => setSelectedSource(src)}
-                      className={`px-4 py-2 text-xs uppercase tracking-wider font-semibold transition-colors border ${
+                      className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ${
                         selectedSource === src 
                           ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900' 
                           : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-200'
@@ -759,34 +773,33 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-y-auto px-6 md:px-12 py-8 no-scrollbar bg-stone-100/50 dark:bg-[#12100E]">
+        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 no-scrollbar bg-stone-100/50 dark:bg-[#12100E]">
           <div className="max-w-7xl mx-auto">
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-64 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 animate-pulse" />
+                  <div key={i} className="h-60 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 animate-pulse" />
                 ))}
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="flex flex-col items-center justify-center py-28 text-center">
                 <p className="font-serif text-xl text-stone-600 dark:text-stone-400 mb-6">{error}</p>
                 <button
                   onClick={load}
-                  className="px-8 py-3 border border-stone-900 dark:border-stone-100 text-sm uppercase tracking-widest font-semibold hover:bg-stone-900 hover:text-white dark:hover:bg-stone-100 dark:hover:text-stone-900 transition-colors"
+                  className="px-8 py-3 border border-stone-900 dark:border-stone-100 text-xs uppercase tracking-widest font-semibold hover:bg-stone-900 hover:text-white dark:hover:bg-stone-100 dark:hover:text-stone-900 transition-colors"
                 >
                   {t.retry}
                 </button>
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-32 text-center text-stone-500">
-                <Tag size={48} strokeWidth={1} className="mb-6 opacity-50" />
+              <div className="flex flex-col items-center justify-center py-28 text-center text-stone-500">
+                <Tag size={44} strokeWidth={1} className="mb-4 opacity-40" />
                 <p className="font-serif text-2xl text-stone-900 dark:text-stone-100 mb-2">{t.empty}</p>
                 <p className="text-sm tracking-wide">{t.emptyHint}</p>
               </div>
             ) : (
-              <div className="pb-16">
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="pb-14">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                   <AnimatePresence>
                     {filteredItems.slice(0, visibleCount).map((g) => (
                       <motion.div
@@ -794,7 +807,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ duration: 0.3 }}
+                        transition={{ duration: 0.2 }}
                       >
                         <ProductCard
                           group={g}
@@ -809,10 +822,10 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 </div>
 
                 {visibleCount < filteredItems.length && (
-                  <div className="mt-12 flex justify-center">
+                  <div className="mt-10 flex justify-center">
                     <button
                       onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
-                      className="px-10 py-4 border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs uppercase tracking-widest font-semibold text-stone-900 dark:text-stone-100 hover:border-stone-900 dark:hover:border-stone-100 transition-colors flex items-center gap-3"
+                      className="px-8 py-3.5 border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs uppercase tracking-widest font-semibold text-stone-900 dark:text-stone-100 hover:border-stone-900 dark:hover:border-stone-100 transition-colors flex items-center gap-2.5"
                     >
                       {t.loadMore} <ChevronDown size={14} strokeWidth={2} />
                     </button>
