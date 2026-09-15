@@ -68,7 +68,8 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     audio.volume = 0.35
     audioRef.current = audio
 
-    const timer = setTimeout(() => setShowClose(true), 4000)
+    // Увеличили таймер до 10.5 секунд, так как текст "пишется" постепенно
+    const timer = setTimeout(() => setShowClose(true), 10500)
 
     return () => {
       audio.pause()
@@ -89,14 +90,13 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   }
 
   return (
-    // Заменили черный фон на бежевый #faf8f5
     <div className="fixed inset-0 z-[150] flex flex-col bg-[#faf8f5] text-[#1a1a1a] overflow-hidden select-none">
       
-      {/* ПОЛНОЭКРАННАЯ РАМКА ИЗ CSS (Адаптируется под любой телефон) */}
+      {/* ПОЛНОЭКРАННАЯ РАМКА ИЗ CSS */}
       <div className="absolute inset-4 border-[1.5px] border-[#c9a86c] pointer-events-none z-0" />
       <div className="absolute inset-[22px] border-[0.5px] border-[#c9a86c] pointer-events-none z-0" />
 
-      {/* ХЕДЕР (Текст сделан темным) */}
+      {/* ХЕДЕР */}
       <header className="absolute top-0 left-0 right-0 z-50 px-8 pt-10 pb-4 flex items-center justify-between pointer-events-none">
         <button onClick={onClose} className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#1a1a1a]/60 hover:text-[#1a1a1a] transition-colors">
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
@@ -110,7 +110,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
       {/* КОНТЕЙНЕР ДЛЯ КОНТЕНТА */}
       <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto scroll-smooth scrollbar-hide flex flex-col items-center justify-center pt-20 pb-20">
         
-        {/* Сам SVG (без заднего фона и рамок, координаты сжаты для компактности) */}
+        {/* SVG */}
         <div className="w-full max-w-[650px] px-6">
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
@@ -153,66 +153,92 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
                   stroke-width: 1.5;
                 }
                 
+                /* Анимация проявления элементов (для линий) */
                 .anim-fade {
                   opacity: 0;
                   animation: fade-in-up 1.5s ease-out forwards;
                 }
-                .delay-1 { animation-delay: 0.2s; }
-                .delay-2 { animation-delay: 1.0s; }
-                .delay-3 { animation-delay: 1.8s; }
-                .delay-4 { animation-delay: 2.6s; }
-                .delay-5 { animation-delay: 3.4s; }
-
                 @keyframes fade-in-up {
                   0% { opacity: 0; transform: translateY(10px); }
                   100% { opacity: 1; transform: translateY(0); }
                 }
+
+                /* Анимация написания текста слева направо */
+                .anim-write {
+                  clip-path: inset(0 100% -20% 0);
+                  -webkit-clip-path: inset(0 100% -20% 0);
+                  animation: wipe-text 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+                }
+                @keyframes wipe-text {
+                  0% { 
+                    clip-path: inset(0 100% -20% 0); 
+                    -webkit-clip-path: inset(0 100% -20% 0);
+                  }
+                  100% { 
+                    clip-path: inset(0 -10% -20% -10%); 
+                    -webkit-clip-path: inset(0 -10% -20% -10%);
+                  }
+                }
+
+                /* Расписание анимации (строка за строкой) */
+                .delay-title-dec { animation-delay: 0.5s; }
+                .delay-title { animation-delay: 0.5s; }
+                
+                .delay-l1 { animation-delay: 1.5s; }
+                .delay-l2 { animation-delay: 2.3s; }
+                
+                .delay-l3 { animation-delay: 3.1s; }
+                .delay-l4 { animation-delay: 3.9s; }
+                .delay-l5 { animation-delay: 4.7s; }
+                .delay-l6 { animation-delay: 5.5s; }
+                
+                .delay-l7 { animation-delay: 6.3s; }
+                .delay-l8 { animation-delay: 7.1s; }
+                
+                .delay-l9 { animation-delay: 8.0s; }
+                
+                .delay-dec2 { animation-delay: 9.2s; }
+                .delay-dedication { animation-delay: 9.2s; }
               `}</style>
             </defs>
             
             {/* Title Section */}
-            <g className="anim-fade delay-1">
+            <g className="anim-fade delay-title-dec">
               <line x1="200" y1="100" x2="600" y2="100" className="svg-line"/>
               <circle cx="400" cy="100" r="3" fill="#c9a86c"/>
-              <text x="400" y="80" textAnchor="middle" className="svg-title">{text.title}</text>
             </g>
+            <text x="400" y="80" textAnchor="middle" className="svg-title anim-write delay-title">{text.title}</text>
             
-            {/* First Block */}
-            <text x="400" y="200" textAnchor="middle" className="svg-body anim-fade delay-2">
-              <tspan x="400" dy="0">{text.p1_1}</tspan>
-              <tspan x="400" dy="36">{text.p1_2}</tspan>
-            </text>
+            {/* First Block (каждая строка вынесена отдельно для правильной анимации) */}
+            <text x="400" y="200" textAnchor="middle" className="svg-body anim-write delay-l1">{text.p1_1}</text>
+            <text x="400" y="236" textAnchor="middle" className="svg-body anim-write delay-l2">{text.p1_2}</text>
             
             {/* Second Block */}
-            <text x="400" y="320" textAnchor="middle" className="svg-body anim-fade delay-3">
-              <tspan x="400" dy="0">{text.p2_1}</tspan>
-              <tspan x="400" dy="36">{text.p2_2}</tspan>
-              <tspan x="400" dy="36">{text.p2_3}</tspan>
-              <tspan x="400" dy="36">{text.p2_4}</tspan>
-            </text>
+            <text x="400" y="320" textAnchor="middle" className="svg-body anim-write delay-l3">{text.p2_1}</text>
+            <text x="400" y="356" textAnchor="middle" className="svg-body anim-write delay-l4">{text.p2_2}</text>
+            <text x="400" y="392" textAnchor="middle" className="svg-body anim-write delay-l5">{text.p2_3}</text>
+            <text x="400" y="428" textAnchor="middle" className="svg-body anim-write delay-l6">{text.p2_4}</text>
             
             {/* Third Block */}
-            <text x="400" y="500" textAnchor="middle" className="svg-body anim-fade delay-4">
-              <tspan x="400" dy="0">{text.p3_1}</tspan>
-              <tspan x="400" dy="36">{text.p3_2}</tspan>
-            </text>
-            <text x="400" y="590" textAnchor="middle" className="svg-emphasis anim-fade delay-4">
-              {text.emphasis}
-            </text>
+            <text x="400" y="500" textAnchor="middle" className="svg-body anim-write delay-l7">{text.p3_1}</text>
+            <text x="400" y="536" textAnchor="middle" className="svg-body anim-write delay-l8">{text.p3_2}</text>
+            
+            {/* Emphasis - Появляется мягким фейдом для красоты */}
+            <text x="400" y="590" textAnchor="middle" className="svg-emphasis anim-fade delay-l9">{text.emphasis}</text>
             
             {/* Dedication Section */}
-            <g className="anim-fade delay-5">
+            <g className="anim-fade delay-dec2">
               <line x1="250" y1="680" x2="550" y2="680" className="svg-line"/>
               <circle cx="400" cy="680" r="3" fill="#c9a86c"/>
-              <text x="400" y="760" textAnchor="middle" className="svg-dedication">{text.dedication}</text>
               <path d="M380 820 Q400 800 420 820" fill="none" stroke="#c9a86c" strokeWidth="1.2"/>
               <circle cx="400" cy="825" r="2" fill="#c9a86c"/>
             </g>
+            <text x="400" y="760" textAnchor="middle" className="svg-dedication anim-write delay-dedication">{text.dedication}</text>
 
           </svg>
         </div>
         
-        {/* Кнопка Закрыть (стилизована под бумагу с золотом) */}
+        {/* Кнопка Закрыть */}
         <div className={`mt-8 w-full px-12 max-w-[400px] transition-opacity duration-1000 ${showClose ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <button
             onClick={onClose}
@@ -224,7 +250,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
 
       </div>
       
-      {/* Мягкое размытие внизу (если экран маленький и нужен скролл) */}
+      {/* Мягкое размытие внизу */}
       <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#faf8f5] to-transparent z-20 pointer-events-none" />
     </div>
   )
