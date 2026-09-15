@@ -67,7 +67,6 @@ const getDisplayTitle = (item: any, lang: Lang): string => {
   return '...'
 }
 
-// Мягкая анимация появления списка
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -98,8 +97,6 @@ export function HomePage({
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   
-  // ИСПРАВЛЕНИЕ ЗДЕСЬ: Читаем тему синхронно при инициализации, 
-  // чтобы избежать вспышки черного цвета (FOUC).
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('dark')
@@ -114,7 +111,6 @@ export function HomePage({
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
-    // Наблюдатель все равно нужен на случай, если тема изменится "на лету" из другого меню
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
@@ -289,11 +285,17 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
-  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
-  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  // --- ЖУРНАЛЬНЫЕ СТИЛИ ---
+  const cBg = isDark 
+    ? 'bg-gradient-to-br from-[#1A1A1A] to-[#050505]' 
+    : 'bg-gradient-to-br from-[#F9F7F3] to-[#EAE6DD]'
+    
+  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#231F1D]'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#231F1D]/50'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#231F1D]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+
+  const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
 
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
@@ -335,7 +337,18 @@ export function HomePage({
   )
 
   return (
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-300 ${cBg} ${cText}`}>
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 overflow-hidden ${cBg} ${cText}`}>
+      
+      {/* СЛОЙ ЖУРНАЛЬНОЙ ТЕКСТУРЫ */}
+      <div 
+        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
+        style={{
+          backgroundImage: noiseBg,
+          opacity: isDark ? 0.04 : 0.06,
+          mixBlendMode: isDark ? 'screen' : 'multiply'
+        }}
+      />
+
       <style>{`
         * {
           -webkit-tap-highlight-color: transparent !important;
@@ -343,155 +356,162 @@ export function HomePage({
         }
       `}</style>
 
-      {/* HEADER */}
-      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
-        {onBack ? (
-          <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer ${cTextMuted} ${cHover}`}>
-            <span className="transform transition-transform group-hover:-translate-x-1">←</span>
-            <span>Back</span>
-          </button>
-        ) : (
-          <div className="w-10"></div>
-        )}
-
-        <div className="flex items-center gap-4">
-          {['ru', 'uk', 'de'].map((l) => (
-            <button
-              key={l}
-              onClick={() => handleLangChange(l as Lang)}
-              className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
-                safeLang === l ? cText : cTextMuted
-              } ${cHover}`}
-            >
-              {l === 'uk' ? 'UKR' : l}
+      {/* ОБОРАЧИВАЕМ КОНТЕНТ В RELATIVE Z-10 ДЛЯ НАЛОЖЕНИЯ ПОВЕРХ ШУМА */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* HEADER */}
+        <header className="px-6 pt-8 pb-4 flex items-start justify-between">
+          {onBack ? (
+            <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer ${cTextMuted} ${cHover}`}>
+              <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+              <span>Back</span>
             </button>
-          ))}
-        </div>
-      </header>
+          ) : (
+            <div className="w-10"></div>
+          )}
 
-      {/* КОНТЕНТ */}
-      <motion.div 
-        className="px-6 pb-24"
-        initial="hidden"
-        animate="show"
-        variants={containerVariants}
-      >
-        {/* ЗАГОЛОВОК СТРАНИЦЫ */}
-        <motion.div variants={itemVariants} className="mb-12 mt-4">
-          <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
-            {t.menu}
-          </h1>
-        </motion.div>
-
-        {/* ПОИСК */}
-        <motion.div variants={itemVariants} className="mb-16">
-          <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
-            <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.search}
-              className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#1C1816]/30'}`}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
-                Clear
-              </button>
-            )}
-          </div>
-        </motion.div>
-
-        {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
-        {query ? (
-          <div>
-            <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
-              {t.searchResults} / {searchResults.length}
-            </p>
-            {searchResults.length > 0 ? (
-              <div className="flex flex-col">
-                {searchResults.map((res, i) => (
-                  <button
-                    key={`${res.type}-${res.id}-${i}`}
-                    onClick={() => handleResultClick(res)}
-                    className={`w-full group flex items-center justify-between py-5 border-b ${cLine} text-left outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-opacity`}
-                  >
-                    <div className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1">
-                      {res.title}
-                    </div>
-                    <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
-                      {res.subtitle}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
-                {t.noResults}
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <motion.div variants={itemVariants} className="mb-4">
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
-                {t.learning}
-              </p>
-              {renderList(LEARNING, 1)}
-            </motion.div>
-
-            <motion.div variants={itemVariants} className="mb-4">
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
-                {t.tools}
-              </p>
-              {renderList(TOOLS, 5)}
-            </motion.div>
-
-            <motion.div variants={itemVariants} className="mb-4">
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
-                {t.system}
-              </p>
-              {renderList(SYSTEM, 9)}
-            </motion.div>
-
-            {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
-            <motion.div variants={itemVariants} className="mb-16">
+          <div className="flex items-center gap-4">
+            {['ru', 'uk', 'de'].map((l) => (
               <button
-                className={`w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer ${cLine} transition-colors active:bg-current/5`}
-                onClick={() => {
-                  if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
-                  else if (articleFavorites.length > 1) onOpenFavorites?.()
-                }}
+                key={l}
+                onClick={() => handleLangChange(l as Lang)}
+                className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
+                  safeLang === l ? cText : cTextMuted
+                } ${cHover}`}
               >
-                <div>
-                  <div className="font-serif text-[26px] leading-none mb-2 text-left">{t.favorites}</div>
-                  <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
-                </div>
-                <div className="flex -space-x-4">
-                  {articleFavorites.slice(0, 3).map((item, idx) => (
-                    <div key={item.id} className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#0A0A0A]' : 'border-[#F2EFE9]'} overflow-hidden grayscale`} style={{ zIndex: 10 - idx }}>
-                      <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
-                    </div>
+                {l === 'uk' ? 'UKR' : l}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        {/* КОНТЕНТ */}
+        <motion.div 
+          className="px-6 pb-24"
+          initial="hidden"
+          animate="show"
+          variants={containerVariants}
+        >
+          {/* ЗАГОЛОВОК СТРАНИЦЫ */}
+          <motion.div variants={itemVariants} className="mb-12 mt-4">
+            <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
+              {t.menu}
+            </h1>
+          </motion.div>
+
+          {/* ПОИСК */}
+          <motion.div variants={itemVariants} className="mb-16">
+            <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
+              <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t.search}
+                className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#231F1D]/30'}`}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </motion.div>
+
+          {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
+          {query ? (
+            <div>
+              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+                {t.searchResults} / {searchResults.length}
+              </p>
+              {searchResults.length > 0 ? (
+                <div className="flex flex-col">
+                  {searchResults.map((res, i) => (
+                    <button
+                      key={`${res.type}-${res.id}-${i}`}
+                      onClick={() => handleResultClick(res)}
+                      className={`w-full group flex items-center justify-between py-5 border-b ${cLine} text-left outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-opacity`}
+                    >
+                      <div className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1">
+                        {res.title}
+                      </div>
+                      <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+                        {res.subtitle}
+                      </div>
+                    </button>
                   ))}
                 </div>
-              </button>
-            </motion.div>
+              ) : (
+                <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
+                  {t.noResults}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <motion.div variants={itemVariants} className="mb-4">
+                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                  {t.learning}
+                </p>
+                {renderList(LEARNING, 1)}
+              </motion.div>
 
-            {/* ЦИТАТА */}
-            <motion.div variants={itemVariants} className="pb-10">
-              <div className="flex flex-col items-center text-center px-4">
-                <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
-                <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
-                  {t.quote}
+              <motion.div variants={itemVariants} className="mb-4">
+                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                  {t.tools}
                 </p>
-                <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
-                  Cordwainer
+                {renderList(TOOLS, 5)}
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="mb-4">
+                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                  {t.system}
                 </p>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </motion.div>
+                {renderList(SYSTEM, 9)}
+              </motion.div>
+
+              {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
+              <motion.div variants={itemVariants} className="mb-16">
+                <button
+                  className={`w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer ${cLine} transition-colors active:bg-current/5`}
+                  onClick={() => {
+                    if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
+                    else if (articleFavorites.length > 1) onOpenFavorites?.()
+                  }}
+                >
+                  <div>
+                    <div className="font-serif text-[26px] leading-none mb-2 text-left">{t.favorites}</div>
+                    <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
+                  </div>
+                  <div className="flex -space-x-4">
+                    {articleFavorites.slice(0, 3).map((item, idx) => (
+                      <div 
+                        key={item.id} 
+                        className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#1A1A1A]' : 'border-[#F9F7F3]'} overflow-hidden grayscale`} 
+                        style={{ zIndex: 10 - idx }}
+                      >
+                        <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              </motion.div>
+
+              {/* ЦИТАТА */}
+              <motion.div variants={itemVariants} className="pb-10">
+                <div className="flex flex-col items-center text-center px-4">
+                  <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
+                  <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
+                    {t.quote}
+                  </p>
+                  <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
+                    Cordwainer
+                  </p>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </motion.div>
+      </div>
     </div>
   )
 }
