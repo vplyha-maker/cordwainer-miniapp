@@ -30,7 +30,6 @@ const getDeviceId = () => {
   return deviceId
 }
 
-// ... ваш массив STYLES_DATA ...
 const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
@@ -168,23 +167,27 @@ type SlideItemProps = {
   isMuted: boolean
 }
 
-const customBezier = [0.16, 1, 0.3, 1];
+// ПРЕМИАЛЬНАЯ АНИМАЦИЯ: Элитарная кривая Безье (ease-out-expo)
+// Уверенный старт и очень долгое, мягкое "затухание" движения в конце
+const customBezier = [0.19, 1, 0.22, 1];
 
 const topTextVariants = {
-  hidden: { opacity: 0, y: -20 },
+  // Единая гравитация: всплывает снизу вверх (y: 15)
+  hidden: { opacity: 0, y: 15 },
   visible: { 
     opacity: 1, 
     y: 0, 
-    transition: { duration: 1, ease: customBezier, delay: 0.1 } 
+    transition: { duration: 1.4, ease: customBezier, delay: 0.1 } 
   }
 };
 
 const bottomTextVariants = {
-  hidden: { opacity: 0, y: 30 },
+  // Легкая задержка (delay: 0.25) создает красивую волну появления после заголовка
+  hidden: { opacity: 0, y: 20 },
   visible: { 
     opacity: 1, 
     y: 0, 
-    transition: { duration: 1.2, ease: customBezier, delay: 0.2 } 
+    transition: { duration: 1.5, ease: customBezier, delay: 0.25 } 
   }
 };
 
@@ -215,9 +218,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     return () => { isMounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // 1. ЖЕСТКИЙ КОНТРОЛЬ ПАМЯТИ IOS (Ручное добавление и удаление SRC)
-  // Мы больше не удаляем тег <video> из верстки, чтобы не вызывать "тормоза" (reflow).
-  // Вместо этого мы точечно управляем атрибутом src.
+  // ЖЕСТКИЙ КОНТРОЛЬ ПАМЯТИ IOS
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !slide.video) return;
@@ -230,13 +231,13 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     } else {
       if (video.hasAttribute('src')) {
         video.pause();
-        video.removeAttribute('src'); // Принудительно очищаем буфер в iOS
+        video.removeAttribute('src'); 
         video.load();
       }
     }
   }, [isPreloaded, slide.video]);
 
-  // 2. УПРАВЛЕНИЕ ВОСПРОИЗВЕДЕНИЕМ
+  // УПРАВЛЕНИЕ ВОСПРОИЗВЕДЕНИЕМ
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -295,17 +296,16 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
   }
 
   return (
-    // ИЗМЕНЕНИЕ: h-full вместо h-[100dvh], чтобы предотвратить прыжки скролла в Safari
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A]">
       <div className="absolute inset-0 w-full h-full z-0 bg-black">
         {slide.video ? (
           <video
             ref={videoRef}
-            preload="none" // Выключаем автозагрузку, мы контролируем всё вручную
+            preload="none" 
             loop
             playsInline
             webkit-playsinline="true"
-            muted={isMuted} // React безопасно обрабатывает muted напрямую
+            muted={isMuted} 
             className={`w-full h-full object-cover transition-all duration-[1.5s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.03]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
         ) : slide.image ? (
@@ -347,10 +347,11 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
   )
 }
 
+// ПРЕМИАЛЬНЫЙ ПЕРЕХОД СТРАНИЦЫ: Чистый, благородный Crossfade без дешевого зума
 const pageVariants = {
-  initial: { opacity: 0, scale: 0.96 },
-  animate: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: customBezier } },
-  exit: { opacity: 0, scale: 1.02, transition: { duration: 0.4, ease: customBezier } }
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.8, ease: customBezier } },
+  exit: { opacity: 0, transition: { duration: 0.6, ease: customBezier } }
 };
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
@@ -361,7 +362,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const handleScroll = () => {
     if (!scrollRef.current) return
     const scrollPosition = scrollRef.current.scrollTop
-    // ИЗМЕНЕНИЕ: Считаем высоту строго по блоку, а не по window.innerHeight. Это фиксит баг "прыжка на 1-й слайд".
     const containerHeight = scrollRef.current.clientHeight 
     const newActiveIndex = Math.round(scrollPosition / containerHeight)
     
@@ -393,10 +393,8 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </button>
       </header>
 
-      {/* ИЗМЕНЕНИЕ: h-full вместо h-[100dvh] */}
       <div ref={scrollRef} onScroll={handleScroll} className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]">
         {STYLES_DATA.map((slide, index) => {
-          // ИЗМЕНЕНИЕ: Возвращаем строгий лимит (максимум 3 активных видео), чтобы iOS не переполнял память
           const isPreloaded = Math.abs(activeIndex - index) <= 1
           const isActive = activeIndex === index
 
