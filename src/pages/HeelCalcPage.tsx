@@ -195,7 +195,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 key={type}
                 onClick={() => { haptic('light'); setSoleType(type) }}
                 className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer ${
-                  soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                  soleType === type ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-60 hover:opacity-100`
                 }`}
               >
                 {t[type]}
@@ -210,7 +210,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   key={type}
                   onClick={() => { haptic('light'); setHeelType(type) }}
                   className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
-                    heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
+                    heelType === type ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-50 hover:opacity-100`
                   }`}
                 >
                   {t[type]}
@@ -226,7 +226,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   key={type}
                   onClick={() => handleRockerType(type)}
                   className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap ${
-                    rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
+                    rockerType === type ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-50 hover:opacity-100`
                   }`}
                 >
                   {t[labelKey]}
@@ -394,7 +394,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 \( {cTextMuted} hover: \){cText}`}`}
         >
           -
         </button>
@@ -404,7 +404,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted} hover:${cText}`}`}
+          className={`text-2xl leading-none px-2 outline-none cursor-pointer ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 \( {cTextMuted} hover: \){cText}`}`}
         >
           +
         </button>
@@ -427,13 +427,13 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
         </span>
         <button 
           type="button"
-          onClick={(e) => {
-            // Прерываем всплытие событий (защита от двойного клика на iOS)
-            e.preventDefault();
-            e.stopPropagation();
-            onInfo(e);
-          }} 
-          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} hover:${cText}`}
+          onPointerDown={(e) => {
+            // onPointerDown — мгновенный отклик на iOS (onClick требует 2–3 тапа)
+            e.preventDefault()
+            e.stopPropagation()
+            onInfo()
+          }}
+          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 \( {cTextMuted} hover: \){cText}`}
         >
           !
         </button>
@@ -601,7 +601,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
       геленок: 'Жорстка вставка (супінатор/shank) від центру пʼятки до зони плюсни. Не дає підошві прогинатися під навантаженням і стабілізує каблук.',
       сталь: 'Рекомендована товщина сталевої пластини 65Г за величиною перепаду (net rise). Вища платформа/каблук — товстіша пластина.',
       lEff: 'Ефективна довжина важеля (≈ 73% довжини колодки). Від неї залежить внутрішній нахил і навантаження на плюсну.',
-      heelCenter: 'Умовний центр опори пʼятки (\~15% довжини колодки від задника). Від цієї точки рахується довжина геленка.',
+      heelCenter: 'Умовний центр опори пʼятки (\\~15% довжини колодки від задника). Від цієї точки рахується довжина геленка.',
       смещение: 'Зміщення набійки відносно осі каблука. Занадто назад — ризик поломки супінатора; занадто вперед — нестабільність посадки.',
       набойка: 'Ширина контактної площадки каблука з підлогою. Вузька набійка при високому каблуці різко підвищує ризик інверсії (підвертання).',
       invertRisk: 'Імовірність підвертання щиколотки. Розраховується з ширини набійки, типу каблука і висоти.',
@@ -609,7 +609,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
       padPos: 'Позиція метатарзального пелота Зейца від пʼятки. Ставиться під головками плюсни для розвантаження нервів при критичному навантаженні.',
       padHeight: 'Висота пелота (4–6 мм) залежить від перепаду: чим вищий підйом, тим вищий пелот для адекватної розгрузки.',
       apexM1: 'Апекс M1 — внутрішня точка суглобової лінії плюсни (I палець). Орієнтир для рокера і пелота.',
-      apexM5: 'Апекс M5 — зовнішня точка (V палець). Зсунута проксимально відносно M1 на \~4.5% довжини колодки.',
+      apexM5: 'Апекс M5 — зовнішня точка (V палець). Зсунута проксимально відносно M1 на \\~4.5% довжини колодки.',
       carbonInsert: 'Мінімальна товщина карбоновой вставки в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках.',
     }
   }
@@ -619,7 +619,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
       геленок: 'Die Gelenkfeder (Shank) von der Fersenmitte bis zur Ballenlinie. Verhindert das Durchbiegen der Sohle unter Belastung.',
       сталь: 'Empfohlene Dicke der Stahlfeder basierend auf der effektiven Sprengung. Je höher Plateau/Absatz, desto dicker die Feder.',
       lEff: 'Effektive Hebellänge (≈ 73% der Leistenlänge). Bestimmt die innere Neigung und die Vorfußbelastung.',
-      heelCenter: 'Bedingter Fersenauflagepunkt (\~15% der Leistenlänge von der Ferse entfernt).',
+      heelCenter: 'Bedingter Fersenauflagepunkt (\\~15% der Leistenlänge von der Ferse entfernt).',
       смещение: 'Versatz des Absatzflecks relativ zur Absatzachse. Zu weit hinten — Gefahr des Gelenkfederbruchs; zu weit vorne — instabiler Stand.',
       набойка: 'Breite der Kontaktfläche des Absatzes. Ein schmaler Fleck erhöht das Inversionsrisiko (Umknicken) drastisch.',
       invertRisk: 'Wahrscheinlichkeit des Umknickens des Sprunggelenks. Berechnet aus Fleckbreite, Absatztyp und -höhe.',
@@ -627,7 +627,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
       padPos: 'Position der Spreizfußpelotte. Wird hinter den Metatarsalköpfchen platziert, um Nerven zu entlasten.',
       padHeight: 'Pelottenhöhe (4–6 mm) ist abhängig von der Sprengung.',
       apexM1: 'Apex M1 — innerer Punkt der Gelenklinie (Großzehe). Orientierungspunkt für Rocker und Pelotte.',
-      apexM5: 'Apex M5 — äußerer Punkt (Kleinzehe). Proximal verschoben relativ zu M1 um \~4.5% der Leistenlänge.',
+      apexM5: 'Apex M5 — äußerer Punkt (Kleinzehe). Proximal verschoben relativ zu M1 um \\~4.5% der Leistenlänge.',
       carbonInsert: 'Mindestdicke der Carbonfasereinlage im Ballenbereich. Versteifung ist zwingend erforderlich für Abrollsohlen.',
     }
   }
@@ -636,7 +636,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
     геленок: 'Жёсткая вставка (супинатор/shank) от центра пятки до зоны плюсни. Не даёт подошве прогибаться под нагрузкой и стабилизирует каблук.',
     сталь: 'Рекомендуемая толщина стальной пластины 65Г по величине перепада (net rise). Выше платформа/каблук — толще пластина.',
     lEff: 'Эффективная длина рычага (≈ 73% длины колодки). От неё зависят внутренний наклон и нагрузка на плюсну.',
-    heelCenter: 'Условный центр опоры пятки (\~15% длины колодки от задника). От этой точки считается длина геленка.',
+    heelCenter: 'Условный центр опоры пятки (\\~15% длины колодки от задника). От этой точки считается длина геленка.',
     смещение: 'Смещение набойки относительно оси каблука. Слишком назад — риск поломки супинатора; слишком вперёд — нестабильность посадки.',
     набойка: 'Ширина контактной площадки каблука с полом. Узкая набойка при высоком каблуке резко повышает риск инверсии (подворачивания).',
     invertRisk: 'Вероятность подворачивания лодыжки. Считается из ширины набойки, типа каблука и высоты.',
@@ -644,7 +644,7 @@ function getInfoTexts(lang: Lang): Record<InfoKey, string> {
     padPos: 'Позиция метатарзального пелота Зейца от пятки. Ставится под головками плюсен для разгрузки нервов при критической нагруке.',
     padHeight: 'Высота пелота (4–6 мм) зависит от перепада: чем выше подъём, тем выше пелот для адекватной разгрузки.',
     apexM1: 'Апекс M1 — внутренняя точка суставной линии плюсен (I палец). Ориентир для рокера и пелота.',
-    apexM5: 'Апекс M5 — наружная точка (V палец). Смещена проксимально относительно M1 на \~4.5% длины колодки.',
+    apexM5: 'Апекс M5 — наружная точка (V палец). Смещена проксимально относительно M1 на \\~4.5% длины колодки.',
     carbonInsert: 'Минимальная толщина карбоновой вставки в зоне плюсен. Рокер работает только если подошва не гнётся в пучках.',
   }
 }
