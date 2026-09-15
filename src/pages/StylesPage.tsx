@@ -14,14 +14,14 @@ type StyleSlide = {
   title: { ru: string; uk: string; de: string }
   subtitle: { ru: string; uk: string; de: string }
   desc: { ru: string; uk: string; de: string }
-  hideWatermark?: boolean 
+  hideWatermark?: boolean
 }
 
 const getDeviceId = () => {
   if (typeof window === 'undefined') return 'unknown'
   const tg = (window as any).Telegram?.WebApp
   const tgUserId = tg?.initDataUnsafe?.user?.id?.toString()
-  if (tgUserId) return tgUserId 
+  if (tgUserId) return tgUserId
   let deviceId = localStorage.getItem('cordwainer_device_id')
   if (!deviceId) {
     deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
@@ -30,7 +30,6 @@ const getDeviceId = () => {
   return deviceId
 }
 
-// ... Ваш массив STYLES_DATA оставляем без изменений ...
 const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
@@ -45,7 +44,7 @@ const STYLES_DATA: StyleSlide[] = [
   },
   {
     id: 'chelsea',
-    video: '/Fason/chelsi.mp4', 
+    video: '/Fason/chelsi.mp4',
     title: { ru: 'Челси', uk: 'Челсі', de: 'Chelsea' },
     subtitle: { ru: 'Вечная классика', uk: 'Вічна класика', de: 'Ewiger Klassiker' },
     desc: {
@@ -79,7 +78,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'sock_boots',
     video: '/Fason/Sock_boots.mp4',
-    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи', de: 'Sock\nBoots' }, 
+    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи', de: 'Sock\nBoots' },
     subtitle: { ru: 'Гибридная эстетика', uk: 'Гібридна естетика', de: 'Hybride Ästhetik' },
     desc: {
       ru: 'Смелый гибрид классической лодочки и эластичного трикотажа. Безупречно облегает щиколотку, добавляя образу утонченной дерзости и абсолютного комфорта.',
@@ -90,7 +89,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'cozaki',
     video: '/Fason/cozaki.mp4',
-    title: { ru: 'Казаки', uk: 'Козаки', de: 'Western\nBoots' }, 
+    title: { ru: 'Казаки', uk: 'Козаки', de: 'Western\nBoots' },
     subtitle: { ru: 'Свобода формы', uk: 'Свобода форми', de: 'Freiheit der Form' },
     desc: {
       ru: 'Знаковый скошенный каблук и характерный мыс. Идеальный баланс между эстетикой дикого запада и ритмом современного мегаполиса.',
@@ -101,7 +100,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'boti',
     video: '/Fason/boti.mp4',
-    title: { ru: 'Ботильоны', uk: 'Ботильйони', de: 'Stiefeletten' }, 
+    title: { ru: 'Ботильоны', uk: 'Ботильйони', de: 'Stiefeletten' },
     subtitle: { ru: 'Идеальные пропорции', uk: 'Ідеальні пропорції', de: 'Perfekte Proportionen' },
     desc: {
       ru: 'Безукоризненная архитектура обуви, мягко обнимающая щиколотку. Универсальный силуэт для создания выверенных, элегантных образов.',
@@ -112,7 +111,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'mary_jane',
     video: '/Fason/Mary_Jane.mp4',
-    title: { ru: 'Мэри Джейн', uk: 'Мері Джейн', de: 'Mary Jane' }, 
+    title: { ru: 'Мэри Джейн', uk: 'Мері Джейн', de: 'Mary Jane' },
     subtitle: { ru: 'Новая романтика', uk: 'Нова романтика', de: 'Neue Romantik' },
     desc: {
       ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
@@ -124,7 +123,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'topsaed',
     video: '/Fason/Topsaed.mp4',
-    title: { ru: 'Топсайдеры', uk: 'Топсайдери', de: 'Bootsschuhe' }, 
+    title: { ru: 'Топсайдеры', uk: 'Топсайдери', de: 'Bootsschuhe' },
     subtitle: { ru: 'Эстетика ривьеры', uk: 'Естетика рів\'єри', de: 'Riviera-Ästhetik' },
     desc: {
       ru: 'Элитарная расслабленность и дух закрытых яхт-клубов. Нескользящая подошва и круговая шнуровка — безупречная база для теплого сезона.',
@@ -136,7 +135,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'slingback',
     video: '/Fason/slingback1.mp4',
-    title: { ru: 'Слингбэки', uk: 'Слінгбеки', de: 'Slingbacks' }, 
+    title: { ru: 'Слингбэки', uk: 'Слінгбеки', de: 'Slingbacks' },
     subtitle: { ru: 'Изящная строгость', uk: 'Витончена строгість', de: 'Zarte Strenge' },
     desc: {
       ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
@@ -148,7 +147,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'espadrilles',
     video: '/Fason/Espadrilles.mp4',
-    title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' }, 
+    title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' },
     subtitle: { ru: 'Средиземноморский шик', uk: 'Середземноморський шик', de: 'Mediterraner Chic' },
     desc: {
       ru: 'Культовая летняя база, сплетенная из натурального джута. Воплощение расслабленного шика и абсолютной свободы, идеально дополняющее легкие льняные образы.',
@@ -156,7 +155,7 @@ const STYLES_DATA: StyleSlide[] = [
       de: 'Die kultige Sommerbasis, geflochten aus natürlicher Jute. Die Verkörperung entspannten Chics und absoluter Freiheit, ideal passend zu leichten Leinen-Looks.',
     },
     hideWatermark: true,
-  }
+  },
 ]
 
 type SlideItemProps = {
@@ -168,9 +167,8 @@ type SlideItemProps = {
   isMuted: boolean
 }
 
-// Премиальные настройки анимации
-const premiumEase = "cubic-bezier(0.19, 1, 0.22, 1)";
-const premiumDuration = "1.2s";
+// Плавная и стабильная кривая без рывков в начале
+const smoothEase = [0.25, 1, 0.5, 1];
 
 function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -199,7 +197,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     return () => { mounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // Preload только ±1 (Логика Grok)
+  // Preload (Логика Grok - не трогаем, она идеальна)
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
@@ -292,11 +290,12 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             loop
             playsInline
             muted={isMuted}
-            style={{
-              transition: `opacity 0.6s ease-out`,
-              opacity: isActive ? 1 : 0
-            }}
-            className={`w-full h-full object-cover ${slide.hideWatermark ? 'scale-[1.08]' : ''}`}
+            className={`
+              w-full h-full object-cover
+              transition-opacity duration-300 ease-out
+              ${isActive ? 'opacity-100' : 'opacity-0'}
+              ${slide.hideWatermark ? 'scale-[1.08]' : ''}
+            `}
           />
         ) : slide.image ? (
           <img
@@ -310,15 +309,12 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
       {/* Градиент сверху */}
       <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
 
-      {/* Верхний текст с премиальной кривой */}
-      <div
+      {/* Верхний текст (Framer Motion - идеальная плавность) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
+        transition={{ duration: 0.8, ease: smoothEase, delay: 0.1 }}
         className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between"
-        style={{
-          transition: `opacity ${premiumDuration} ${premiumEase}, transform ${premiumDuration} ${premiumEase}`,
-          transitionDelay: isActive ? '0.1s' : '0s',
-          opacity: isActive ? 1 : 0,
-          transform: isActive ? 'translateY(0)' : 'translateY(25px)'
-        }}
       >
         <div>
           <p className="text-[9px] font-sans uppercase tracking-[0.35em] text-white/70 mb-2">
@@ -331,17 +327,14 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         <div className="text-[10px] font-sans tracking-widest text-white/50 mt-1">
           {String(index + 1).padStart(2, '0')}
         </div>
-      </div>
+      </motion.div>
 
-      {/* Нижний блок с премиальной кривой */}
-      <div
+      {/* Нижний блок (Framer Motion - идеальная плавность) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
+        transition={{ duration: 0.8, ease: smoothEase, delay: 0.2 }}
         className="absolute bottom-6 left-6 right-6 z-20"
-        style={{
-          transition: `opacity ${premiumDuration} ${premiumEase}, transform ${premiumDuration} ${premiumEase}`,
-          transitionDelay: isActive ? '0.2s' : '0s',
-          opacity: isActive ? 1 : 0,
-          transform: isActive ? 'translateY(0)' : 'translateY(25px)'
-        }}
       >
         <div className="w-full h-px bg-white/20 mb-5" />
         <div className="flex items-start justify-between gap-4">
@@ -381,7 +374,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
@@ -398,7 +391,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // Логика Grok - железобетонно работает в iOS
+  // Логика Grok (IntersectionObserver)
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
