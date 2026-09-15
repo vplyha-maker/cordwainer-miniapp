@@ -490,6 +490,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const [selectedSource, setSelectedSource] = useState<string>('all') 
   const [sortBy, setSortBy] = useState<SortOption>('default')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [retryTrigger, setRetryTrigger] = useState(0) // ТРИГГЕР ДЛЯ ПОВТОРНОЙ ЗАГРУЗКИ
 
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
@@ -500,7 +501,22 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     }
   })
 
-  // ИСПРАВЛЕНИЕ 1: Добавлен try/catch для localStorage
+  // ИСПРАВЛЕНИЕ: Синхронизация localStorage между вкладками (storage event)
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'price_favorites') {
+        try {
+          const newValue = e.newValue ? new Set<string>(JSON.parse(e.newValue)) : new Set<string>()
+          setFavorites(newValue)
+        } catch (err) {
+          console.warn('Error parsing favorites from storage event:', err)
+        }
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
   const toggleFavorite = useCallback((key: string) => {
     setFavorites(prev => {
       const next = new Set(prev)
@@ -511,39 +527,61 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         localStorage.setItem('price_favorites', JSON.stringify([...next]))
       } catch (e) {
         console.warn('Cannot save favorites:', e)
-        // Продолжаем работу, даже если localStorage недоступен
       }
       return next
     })
   }, [])
 
-  // ИСПРАВЛЕНИЕ 2: Убрана зависимость t.error, добавлена lang. Использование DICTIONARY[lang].error
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [apiRes, ratesRes] = await Promise.all([
-        fetch(`/api/prices?_t=${Date.now()}`).catch(() => null),
-        fetch(`/api/rates?_t=${Date.now()}`).catch(() => null),
-      ])
-      if (!apiRes || !apiRes.ok) throw new Error('API error')
-      const data = await apiRes.json()
-      setItems(Array.isArray(data) ? data : [])
-
-      if (ratesRes && ratesRes.ok) {
-        const rates = await ratesRes.json()
-        if (rates?.usd) setUsdRate(Number(rates.usd))
-        if (rates?.eur) setEurRate(Number(rates.eur))
-      }
-    } catch {
-      setError(DICTIONARY[lang].error)
-      setItems([])
-    } finally {
-      setLoading(false)
+  // ИСПРАВЛЕНИЕ: Закрытие модального окна по Escape
+  useEffect(() => {
+    if (!modalData) return
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModalData(null)
     }
-  }, [lang])
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [modalData])
 
-  useEffect(() => { load() }, [load])
+  const handleRetry = useCallback(() => setRetryTrigger((prev) => prev + 1), [])
+
+  // ИСПРАВЛЕНИЕ: Race condition с помощью AbortController
+  useEffect(() => {
+    const abortController = new AbortController()
+    
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [apiRes, ratesRes] = await Promise.all([
+          fetch(`/api/prices?_t=${Date.now()}`, { signal: abortController.signal }),
+          fetch(`/api/rates?_t=${Date.now()}`, { signal: abortController.signal }),
+        ])
+        
+        if (!apiRes?.ok) throw new Error('API error')
+        const data = await apiRes.json()
+        setItems(Array.isArray(data) ? data : [])
+
+        if (ratesRes?.ok) {
+          const rates = await ratesRes.json()
+          if (rates?.usd) setUsdRate(Number(rates.usd))
+          if (rates?.eur) setEurRate(Number(rates.eur))
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return // Запрос отменён, ничего не делаем
+        }
+        setError(DICTIONARY[lang].error)
+        setItems([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadData()
+    return () => abortController.abort()
+  }, [lang, retryTrigger]) // Перезапрашиваем при смене языка или нажатии кнопки "повторить"
 
   const sources = useMemo(() => Array.from(new Set(items.map((i) => i.source).filter(Boolean) as string[])).sort(), [items])
 
@@ -816,7 +854,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               <div className="flex flex-col items-center justify-center py-28 text-center">
                 <p className="font-serif text-xl text-[var(--color-muted)] mb-6">{error}</p>
                 <button
-                  onClick={load}
+                  onClick={handleRetry}
                   className="px-8 py-3 border border-[var(--color-accent)] text-xs uppercase tracking-widest font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-[var(--color-bg)] transition-colors"
                 >
                   {t.retry}
