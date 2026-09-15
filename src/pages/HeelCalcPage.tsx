@@ -100,9 +100,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     }
   }, [rockerType, soleType])
 
-  // Удален ломающий iOS Safari useEffect с document.body.style.overflow = 'hidden' 
-  // Модалка имеет position: fixed и сама перекроет касания.
-
   const t = useMemo(() => getLabels(lang), [lang])
   const infos = useMemo(() => getInfoTexts(lang), [lang])
 
@@ -347,14 +344,13 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         {activeInfo && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
-            onPointerDown={() => setActiveInfo(null)} 
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md cursor-pointer"
+            onClick={() => setActiveInfo(null)}
           >
             <motion.div
               initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
-              onPointerDown={e => e.stopPropagation()} 
-              onClick={e => e.stopPropagation()}
-              className={`w-full max-w-[320px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col`}
+              onClick={e => e.stopPropagation()} 
+              className={`w-full max-w-[320px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col cursor-default relative z-10`}
             >
               <h3 className={`font-serif text-2xl leading-tight mb-4 ${cText} capitalize`}>
                  {activeInfo}
@@ -427,12 +423,11 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
         </span>
         <button 
           type="button"
-          onPointerDown={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onInfo()
+          onClick={(e) => {
+            e.stopPropagation();
+            onInfo();
           }}
-          className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} hover:${cText}`}
+          className={`relative z-10 w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} hover:${cText}`}
         >
           !
         </button>
