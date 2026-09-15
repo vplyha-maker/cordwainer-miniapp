@@ -77,60 +77,40 @@ function getIsDarkTheme(): boolean {
   return true
 }
 
-// ВОЗВРАЩЕН ВЕСЬ ОРИГИНАЛЬНЫЙ ДИЗАЙН СО ВСЕМИ РАМКАМИ И ТЕНЯМИ
 export function applyImmediateMutedTheme(isDark: boolean) {
   const root = document.documentElement
 
+  // Переключаем классы, чтобы стили брались из вашего нового index.css
   if (isDark) {
     root.classList.add('dark')
     root.classList.remove('light')
-    root.style.setProperty('--color-bg', '#1C1816')
-    root.style.setProperty('--color-surface', '#25201C')
-    root.style.setProperty('--color-surface-2', '#2F2924')
-    root.style.setProperty('--color-ink', '#F5F1EA')
-    root.style.setProperty('--color-muted', '#B9ACA0')
-    root.style.setProperty('--color-accent', '#E4D00A')
-    root.style.setProperty('--color-accent-strong', '#E34234')
-    root.style.setProperty('--color-danger', '#8B0000')
-    root.style.setProperty('--color-border', 'rgba(255,255,255,0.12)')
-    root.style.setProperty('--color-info', '#1034A6')
-    root.style.setProperty('--color-success', '#0BDA51')
-    root.style.setProperty('--pigment-lac-dye', '#8B0000')
-    root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
-    root.style.setProperty('--pigment-orpiment', '#E4D00A')
-    root.style.setProperty('--pigment-realgar', '#E34234')
-    root.style.setProperty('--pigment-malachite', '#0BDA51')
-    root.style.setProperty('--pigment-azurite', '#007FFF')
-    root.style.setProperty('--pigment-lead-white', '#F5F1EA')
-    root.style.setProperty('--pigment-bone-black', '#1C1816')
   } else {
     root.classList.add('light')
     root.classList.remove('dark')
-    root.style.setProperty('--color-bg', '#F5F1EA')
-    root.style.setProperty('--color-surface', '#F0EBE3')
-    root.style.setProperty('--color-surface-2', '#E8E2D9')
-    root.style.setProperty('--color-ink', '#1C1816')
-    root.style.setProperty('--color-muted', '#6B5E54')
-    root.style.setProperty('--color-accent', '#A52A2A')
-    root.style.setProperty('--color-accent-strong', '#E34234')
-    root.style.setProperty('--color-danger', '#8B0000')
-    root.style.setProperty('--color-border', 'rgba(0,0,0,0.12)')
-    root.style.setProperty('--color-info', '#1034A6')
-    root.style.setProperty('--color-success', '#0BDA51')
-    root.style.setProperty('--pigment-lac-dye', '#8B0000')
-    root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
-    root.style.setProperty('--pigment-orpiment', '#E4D00A')
-    root.style.setProperty('--pigment-realgar', '#E34234')
-    root.style.setProperty('--pigment-malachite', '#0BDA51')
-    root.style.setProperty('--pigment-azurite', '#007FFF')
-    root.style.setProperty('--pigment-lead-white', '#F5F1EA')
-    root.style.setProperty('--pigment-bone-black', '#1C1816')
   }
 
+  // Очищаем старые инлайн-цвета, чтобы они не перебивали CSS
+  const oldColors = [
+    'bg', 'surface', 'surface-2', 'ink', 'muted', 
+    'accent', 'accent-strong', 'danger', 'border', 'info', 'success'
+  ];
+  oldColors.forEach(c => root.style.removeProperty(`--color-${c}`));
+
+  // Оставляем только пигменты для калькулятора цветов (они не влияют на общий дизайн)
+  root.style.setProperty('--pigment-lac-dye', '#8B0000')
+  root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
+  root.style.setProperty('--pigment-orpiment', '#E4D00A')
+  root.style.setProperty('--pigment-realgar', '#E34234')
+  root.style.setProperty('--pigment-malachite', '#0BDA51')
+  root.style.setProperty('--pigment-azurite', '#007FFF')
+  root.style.setProperty('--pigment-lead-white', '#F5F1EA')
+  root.style.setProperty('--pigment-bone-black', '#1C1816')
+
+  // Синхронизируем цвета фона Telegram с новым монохромом
   try {
     const tg = window.Telegram?.WebApp
     if (tg) {
-      const bg = isDark ? '#1C1816' : '#F5F1EA'
+      const bg = isDark ? '#09090B' : '#F9FAFB'
       tg.setHeaderColor(bg)
       tg.setBackgroundColor(bg)
     }
