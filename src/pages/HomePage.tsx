@@ -38,7 +38,7 @@ function glossaryLabel(count: number, lang: Lang): string {
     return `${count} термінів`
   }
   if (lang === 'de') {
-    return count === 1 ? `${count} Begriff` : `${count} Begriffe`
+    return count === 1 ? `\( {count} Begriff` : ` \){count} Begriffe`
   }
   const n10 = count % 10
   const n100 = count % 100
@@ -285,43 +285,65 @@ export function HomePage({
     setSearchQuery('')
   }
 
-    // --- ЖУРНАЛЬНЫЕ СТИЛИ (Надежный вариант) ---
-  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#231F1D]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#231F1D]/50'
-  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#231F1D]/15'
-  const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
+  // --- ЖУРНАЛЬНЫЕ СТИЛИ (полностью через style) ---
+  const journalColors = isDark
+    ? {
+        text: '#F4F0E8',
+        textMuted: 'rgba(244, 240, 232, 0.5)',
+        line: 'rgba(244, 240, 232, 0.15)',
+        hover: '#FFFFFF',
+        bg: 'linear-gradient(135deg, #1A1A1A 0%, #050505 100%)',
+        noiseOpacity: 0.04,
+        noiseBlend: 'screen' as const,
+        placeholder: 'rgba(244, 240, 232, 0.3)',
+        borderAvatar: '#1A1A1A',
+      }
+    : {
+        text: '#231F1D',
+        textMuted: 'rgba(35, 31, 29, 0.5)',
+        line: 'rgba(35, 31, 29, 0.15)',
+        hover: '#000000',
+        bg: 'linear-gradient(135deg, #F9F7F3 0%, #EAE6DD 100%)',
+        noiseOpacity: 0.07,
+        noiseBlend: 'multiply' as const,
+        placeholder: 'rgba(35, 31, 29, 0.3)',
+        borderAvatar: '#F9F7F3',
+      }
 
-  // Градиент передаем напрямую через inline-style
-  const backgroundStyle = isDark
-    ? { background: 'linear-gradient(135deg, #1A1A1A 0%, #050505 100%)' }
-    : { background: 'linear-gradient(135deg, #F9F7F3 0%, #EAE6DD 100%)' }
-
-  // Шум
   const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
 
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
         const num = startIndex + idx
-        const numStr = num < 10 ? `0${num}` : `${num}`
+        const numStr = num < 10 ? `0\( {num}` : ` \){num}`
         return (
           <motion.button
             variants={itemVariants}
             key={item.id}
             onClick={item.action}
             disabled={!item.action}
-            className={`group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent text-left transition-all ${
+            className={`group relative flex items-end justify-between py-6 border-b outline-none bg-transparent text-left transition-all ${
               item.action 
                 ? 'active:opacity-50 cursor-pointer' 
                 : 'opacity-40 cursor-default'
-            } ${cLine}`}
+            }`}
+            style={{ borderColor: journalColors.line }}
           >
             <div className="flex items-start gap-4">
-              <span className={`text-[9px] font-sans tracking-widest mt-2 ${cTextMuted}`}>
+              <span
+                className="text-[9px] font-sans tracking-widest mt-2"
+                style={{ color: journalColors.textMuted }}
+              >
                 {numStr}
               </span>
               <div className="flex items-center gap-3">
-                <div className={`font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform ${item.action ? 'group-hover:translate-x-1 group-active:translate-x-1' : ''}`}>
+                <div
+                  className={`font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform ${
+                    item.action ? 'group-hover:translate-x-1 group-active:translate-x-1' : ''
+                  }`}
+                  style={{ color: journalColors.text }}
+                >
                   {item.title}
                 </div>
                 {item.dot && (
@@ -329,7 +351,10 @@ export function HomePage({
                 )}
               </div>
             </div>
-            <div className={`text-[10px] font-sans tracking-[0.1em] text-right w-[40%] ${cTextMuted}`}>
+            <div
+              className="text-[10px] font-sans tracking-[0.1em] text-right w-[40%]"
+              style={{ color: journalColors.textMuted }}
+            >
               {item.subtitle}
             </div>
           </motion.button>
@@ -339,19 +364,20 @@ export function HomePage({
   )
 
   return (
-    // Убрали переменную cBg и добавили style={backgroundStyle}
-    <div 
-      className={`relative min-h-[100dvh] w-full transition-colors duration-500 overflow-hidden ${cText}`}
-      style={backgroundStyle}
+    <div
+      className="relative min-h-[100dvh] w-full overflow-hidden transition-colors duration-500"
+      style={{
+        background: journalColors.bg,
+        color: journalColors.text,
+      }}
     >
-      
       {/* СЛОЙ ЖУРНАЛЬНОЙ ТЕКСТУРЫ */}
-      <div 
+      <div
         className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
         style={{
           backgroundImage: noiseBg,
-          opacity: isDark ? 0.04 : 0.07, // Чуть усилил шум для светлой темы
-          mixBlendMode: isDark ? 'screen' : 'multiply'
+          opacity: journalColors.noiseOpacity,
+          mixBlendMode: journalColors.noiseBlend,
         }}
       />
 
@@ -362,12 +388,17 @@ export function HomePage({
         }
       `}</style>
 
-      {/* ОБОРАЧИВАЕМ КОНТЕНТ В RELATIVE Z-10 ДЛЯ НАЛОЖЕНИЯ ПОВЕРХ ШУМА */}
       <div className="relative z-10 flex flex-col min-h-screen">
         {/* HEADER */}
         <header className="px-6 pt-8 pb-4 flex items-start justify-between">
           {onBack ? (
-            <button onClick={onBack} className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer ${cTextMuted} ${cHover}`}>
+            <button
+              onClick={onBack}
+              className="group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-colors"
+              style={{ color: journalColors.textMuted }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = journalColors.hover)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = journalColors.textMuted)}
+            >
               <span className="transform transition-transform group-hover:-translate-x-1">←</span>
               <span>Back</span>
             </button>
@@ -380,9 +411,15 @@ export function HomePage({
               <button
                 key={l}
                 onClick={() => handleLangChange(l as Lang)}
-                className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
-                  safeLang === l ? cText : cTextMuted
-                } ${cHover}`}
+                className="text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300"
+                style={{
+                  color: safeLang === l ? journalColors.text : journalColors.textMuted,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = journalColors.hover)}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color =
+                    safeLang === l ? journalColors.text : journalColors.textMuted)
+                }
               >
                 {l === 'uk' ? 'UKR' : l}
               </button>
@@ -391,7 +428,7 @@ export function HomePage({
         </header>
 
         {/* КОНТЕНТ */}
-        <motion.div 
+        <motion.div
           className="px-6 pb-24"
           initial="hidden"
           animate="show"
@@ -399,24 +436,44 @@ export function HomePage({
         >
           {/* ЗАГОЛОВОК СТРАНИЦЫ */}
           <motion.div variants={itemVariants} className="mb-12 mt-4">
-            <h1 className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]">
+            <h1
+              className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]"
+              style={{ color: journalColors.text }}
+            >
               {t.menu}
             </h1>
           </motion.div>
 
           {/* ПОИСК */}
           <motion.div variants={itemVariants} className="mb-16">
-            <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
-              <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
+            <div
+              className="relative flex items-end border-b pb-3 transition-colors"
+              style={{ borderColor: journalColors.line }}
+            >
+              <span
+                className="text-[12px] font-serif italic mr-4"
+                style={{ color: journalColors.textMuted }}
+              >
+                Find.
+              </span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
-                className={`w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light ${isDark ? 'placeholder:text-[#F4F0E8]/30' : 'placeholder:text-[#231F1D]/30'}`}
+                className="w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light"
+                style={{
+                  color: journalColors.text,
+                  // @ts-ignore
+                  '--placeholder-color': journalColors.placeholder,
+                }}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className={`ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer ${cTextMuted}`}>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer"
+                  style={{ color: journalColors.textMuted }}
+                >
                   Clear
                 </button>
               )}
@@ -426,28 +483,41 @@ export function HomePage({
           {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
           {query ? (
             <div>
-              <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
+              <p
+                className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6"
+                style={{ color: journalColors.textMuted }}
+              >
                 {t.searchResults} / {searchResults.length}
               </p>
               {searchResults.length > 0 ? (
                 <div className="flex flex-col">
                   {searchResults.map((res, i) => (
                     <button
-                      key={`${res.type}-${res.id}-${i}`}
+                      key={`\( {res.type}- \){res.id}-${i}`}
                       onClick={() => handleResultClick(res)}
-                      className={`w-full group flex items-center justify-between py-5 border-b ${cLine} text-left outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-opacity`}
+                      className="w-full group flex items-center justify-between py-5 border-b text-left outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
+                      style={{ borderColor: journalColors.line }}
                     >
-                      <div className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1">
+                      <div
+                        className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1"
+                        style={{ color: journalColors.text }}
+                      >
                         {res.title}
                       </div>
-                      <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+                      <div
+                        className="text-[9px] font-sans uppercase tracking-[0.2em]"
+                        style={{ color: journalColors.textMuted }}
+                      >
                         {res.subtitle}
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className={`py-12 text-[14px] font-serif italic text-center ${cTextMuted}`}>
+                <div
+                  className="py-12 text-[14px] font-serif italic text-center"
+                  style={{ color: journalColors.textMuted }}
+                >
                   {t.noResults}
                 </div>
               )}
@@ -455,45 +525,68 @@ export function HomePage({
           ) : (
             <>
               <motion.div variants={itemVariants} className="mb-4">
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                <p
+                  className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4"
+                  style={{ color: journalColors.textMuted }}
+                >
                   {t.learning}
                 </p>
                 {renderList(LEARNING, 1)}
               </motion.div>
 
               <motion.div variants={itemVariants} className="mb-4">
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                <p
+                  className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4"
+                  style={{ color: journalColors.textMuted }}
+                >
                   {t.tools}
                 </p>
                 {renderList(TOOLS, 5)}
               </motion.div>
 
               <motion.div variants={itemVariants} className="mb-4">
-                <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4 ${cTextMuted}`}>
+                <p
+                  className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4"
+                  style={{ color: journalColors.textMuted }}
+                >
                   {t.system}
                 </p>
                 {renderList(SYSTEM, 9)}
               </motion.div>
 
-              {/* ИЗБРАННОЕ КАК ЖУРНАЛЬНАЯ ВРЕЗКА */}
+              {/* ИЗБРАННОЕ */}
               <motion.div variants={itemVariants} className="mb-16">
                 <button
-                  className={`w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer ${cLine} transition-colors active:bg-current/5`}
+                  className="w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
+                  style={{ borderColor: journalColors.line }}
                   onClick={() => {
                     if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
                     else if (articleFavorites.length > 1) onOpenFavorites?.()
                   }}
                 >
                   <div>
-                    <div className="font-serif text-[26px] leading-none mb-2 text-left">{t.favorites}</div>
-                    <div className={`text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{t.favoritesSub}</div>
+                    <div
+                      className="font-serif text-[26px] leading-none mb-2 text-left"
+                      style={{ color: journalColors.text }}
+                    >
+                      {t.favorites}
+                    </div>
+                    <div
+                      className="text-[10px] font-sans uppercase tracking-[0.2em]"
+                      style={{ color: journalColors.textMuted }}
+                    >
+                      {t.favoritesSub}
+                    </div>
                   </div>
                   <div className="flex -space-x-4">
                     {articleFavorites.slice(0, 3).map((item, idx) => (
-                      <div 
-                        key={item.id} 
-                        className={`w-12 h-12 rounded-full border-2 ${isDark ? 'border-[#1A1A1A]' : 'border-[#F9F7F3]'} overflow-hidden grayscale`} 
-                        style={{ zIndex: 10 - idx }}
+                      <div
+                        key={item.id}
+                        className="w-12 h-12 rounded-full border-2 overflow-hidden grayscale"
+                        style={{
+                          zIndex: 10 - idx,
+                          borderColor: journalColors.borderAvatar,
+                        }}
                       >
                         <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
                       </div>
@@ -505,11 +598,20 @@ export function HomePage({
               {/* ЦИТАТА */}
               <motion.div variants={itemVariants} className="pb-10">
                 <div className="flex flex-col items-center text-center px-4">
-                  <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
-                  <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
+                  <div
+                    className="w-px h-12 mb-8 border-l"
+                    style={{ borderColor: journalColors.line }}
+                  />
+                  <p
+                    className="font-serif text-[18px] sm:text-[20px] italic leading-[1.5]"
+                    style={{ color: journalColors.textMuted }}
+                  >
                     {t.quote}
                   </p>
-                  <p className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]">
+                  <p
+                    className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]"
+                    style={{ color: journalColors.text }}
+                  >
                     Cordwainer
                   </p>
                 </div>
@@ -521,7 +623,3 @@ export function HomePage({
     </div>
   )
 }
-
-        
-                                    
-                  
