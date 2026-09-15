@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -30,6 +31,7 @@ const getDeviceId = () => {
 }
 
 const STYLES_DATA: StyleSlide[] = [
+  // ... ваш массив данных остается без изменений ...
   {
     id: 'botford',
     video: '/Fason/Botford.mp4',
@@ -157,16 +159,39 @@ const STYLES_DATA: StyleSlide[] = [
   }
 ]
 
+
 type SlideItemProps = {
   slide: StyleSlide
   lang: Lang
   index: number
   isActive: boolean      
   isPreloaded: boolean   
+  preloadType: "auto" | "metadata" | "none"
   isMuted: boolean
 }
 
-function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
+// 1. НАСТРАИВАЕМ КАСТОМНЫЕ КРИВЫЕ БЕЗЬЕ ДЛЯ ТЕКСТА
+const customBezier = [0.16, 1, 0.3, 1];
+
+const topTextVariants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { duration: 1, ease: customBezier, delay: 0.1 } 
+  }
+};
+
+const bottomTextVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { duration: 1.2, ease: customBezier, delay: 0.2 } 
+  }
+};
+
+function SlideItem({ slide, lang, index, isActive, isPreloaded, preloadType, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
   
@@ -197,7 +222,10 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     if (videoRef.current) {
       if (isActive) {
         videoRef.current.currentTime = 0
-        videoRef.current.play().catch(() => {})
+        const playPromise = videoRef.current.play()
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {})
+        }
       } else {
         videoRef.current.pause()
       }
@@ -263,11 +291,11 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
           <video
             ref={videoRef}
             src={slide.video}
-            preload="auto"
+            preload={preloadType} // Динамическая подгрузка (auto для соседних, metadata для дальних)
             loop
             playsInline
             webkit-playsinline="true"
-            className={`w-full h-full object-cover transition-all duration-[2s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.05]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
+            className={`w-full h-full object-cover transition-all duration-[1.5s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.03]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
         ) : isPreloaded && slide.image ? (
           <img
@@ -278,11 +306,15 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         ) : null}
       </div>
 
-      {/* ЖУРНАЛЬНЫЙ ГРАДИЕНТ ДЛЯ ТЕКСТА (Оставлен только сверху) */}
       <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
 
-      {/* ВЕРХНИЙ БЛОК: ЗАГОЛОВОК */}
-      <div className={`absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between transition-all duration-[1s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+      {/* ВЕРХНИЙ БЛОК НА FRAMER MOTION */}
+      <motion.div 
+        variants={topTextVariants}
+        initial="hidden"
+        animate={isActive ? "visible" : "hidden"}
+        className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between"
+      >
         <div>
           <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">
             {slide.subtitle[currentLang]}
@@ -292,28 +324,26 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
           </h2>
         </div>
         <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">
-          0{index + 1}
+          {String(index + 1).padStart(2, '0')}
         </div>
-      </div>
+      </motion.div>
 
-      {/* НИЖНИЙ БЛОК: ОПИСАНИЕ И КНОПКИ (Без градиента, с тенями) */}
-      <div className={`absolute bottom-6 left-6 right-6 z-20 flex flex-col transition-all duration-[1.2s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
-        
-        {/* Тонкая линия-разделитель */}
+      {/* НИЖНИЙ БЛОК НА FRAMER MOTION */}
+      <motion.div 
+        variants={bottomTextVariants}
+        initial="hidden"
+        animate={isActive ? "visible" : "hidden"}
+        className="absolute bottom-6 left-6 right-6 z-20 flex flex-col"
+      >
         <div className="w-full h-px bg-white/30 mb-5 shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
 
-        {/* Описание и кнопки в одну линию */}
         <div className="flex items-start justify-between gap-4">
           <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
             {slide.desc[currentLang]}
           </p>
 
           <div className="flex items-center gap-4 shrink-0 mt-1">
-            {/* Кнопка ЛАЙК */}
-            <button 
-              onClick={handleLike} 
-              className="group flex flex-col items-center gap-1.5 outline-none"
-            >
+            <button onClick={handleLike} className="group flex flex-col items-center gap-1.5 outline-none">
               <div className={`w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center transition-all duration-500 active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)] ${isLiked ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'border-white/50 text-white bg-black/20 backdrop-blur-sm hover:border-white'}`}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -324,11 +354,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
               </span>
             </button>
 
-            {/* Кнопка ШЭР */}
-            <button 
-              onClick={handleShare} 
-              className="group flex flex-col items-center gap-1.5 outline-none"
-            >
+            <button onClick={handleShare} className="group flex flex-col items-center gap-1.5 outline-none">
               <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-500 hover:border-white active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -342,18 +368,31 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             </button>
           </div>
         </div>
-
-      </div>
+      </motion.div>
     </div>
   )
 }
+
+// 2. АНИМАЦИЯ ПОЯВЛЕНИЯ САМОЙ СТРАНИЦЫ
+const pageVariants = {
+  initial: { opacity: 0, scale: 0.96 },
+  animate: { 
+    opacity: 1, 
+    scale: 1, 
+    transition: { duration: 0.6, ease: customBezier } 
+  },
+  exit: { 
+    opacity: 0, 
+    scale: 1.02, 
+    transition: { duration: 0.4, ease: customBezier } 
+  }
+};
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Трекинг активного слайда для виртуализации памяти
   const handleScroll = () => {
     if (!scrollRef.current) return
     const scrollPosition = scrollRef.current.scrollTop
@@ -366,19 +405,23 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0A0A0A] text-[#F4F0E8] overflow-hidden">
+    <motion.div 
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      className="fixed inset-0 z-50 bg-[#0A0A0A] text-[#F4F0E8] overflow-hidden"
+    >
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
         .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Глобальная защита от системного мерцания на мобилках */
         * {
           -webkit-tap-highlight-color: transparent !important;
           -webkit-touch-callout: none;
         }
       `}</style>
 
-      {/* ГЛОБАЛЬНЫЙ МИНИМАЛИСТИЧНЫЙ HEADER */}
       <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
         <button
           onClick={onBack}
@@ -401,15 +444,20 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </button>
       </header>
 
-      {/* ВИРТУАЛИЗИРОВАННЫЙ СКРОЛЛ */}
       <div 
         ref={scrollRef}
         onScroll={handleScroll}
         className="snap-container h-[100dvh] w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]"
       >
         {STYLES_DATA.map((slide, index) => {
-          // Держим в памяти только 3 видео-тега вокруг активного
-          const isPreloaded = Math.abs(activeIndex - index) <= 1
+          // 3. РЕШЕНИЕ ПРОБЛЕМЫ ПРЕДЗАГРУЗКИ В СЕРЕДИНЕ ЛЕНТЫ
+          // Расширяем окно рендера до 5 элементов (активный + по 2 с каждой стороны)
+          const isPreloaded = Math.abs(activeIndex - index) <= 2
+          
+          // Жестко грузим (auto) только текущий и 1 ближайший для экономии сети. 
+          // Те, что за 2 шага, только подтягивают метаданные (metadata).
+          const preloadType = Math.abs(activeIndex - index) <= 1 ? "auto" : "metadata"
+          
           const isActive = activeIndex === index
 
           return (
@@ -420,11 +468,12 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
               index={index}
               isActive={isActive}
               isPreloaded={isPreloaded}
+              preloadType={preloadType}
               isMuted={isMuted} 
             />
           )
         })}
       </div>
-    </div>
+    </motion.div>
   )
 }
