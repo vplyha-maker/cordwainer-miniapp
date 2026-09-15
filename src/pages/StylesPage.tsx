@@ -14,14 +14,14 @@ type StyleSlide = {
   title: { ru: string; uk: string; de: string }
   subtitle: { ru: string; uk: string; de: string }
   desc: { ru: string; uk: string; de: string }
-  hideWatermark?: boolean 
+  hideWatermark?: boolean
 }
 
 const getDeviceId = () => {
   if (typeof window === 'undefined') return 'unknown'
   const tg = (window as any).Telegram?.WebApp
   const tgUserId = tg?.initDataUnsafe?.user?.id?.toString()
-  if (tgUserId) return tgUserId 
+  if (tgUserId) return tgUserId
   let deviceId = localStorage.getItem('cordwainer_device_id')
   if (!deviceId) {
     deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
@@ -44,7 +44,7 @@ const STYLES_DATA: StyleSlide[] = [
   },
   {
     id: 'chelsea',
-    video: '/Fason/chelsi.mp4', 
+    video: '/Fason/chelsi.mp4',
     title: { ru: 'Челси', uk: 'Челсі', de: 'Chelsea' },
     subtitle: { ru: 'Вечная классика', uk: 'Вічна класика', de: 'Ewiger Klassiker' },
     desc: {
@@ -78,7 +78,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'sock_boots',
     video: '/Fason/Sock_boots.mp4',
-    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи', de: 'Sock\nBoots' }, 
+    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи', de: 'Sock\nBoots' },
     subtitle: { ru: 'Гибридная эстетика', uk: 'Гібридна естетика', de: 'Hybride Ästhetik' },
     desc: {
       ru: 'Смелый гибрид классической лодочки и эластичного трикотажа. Безупречно облегает щиколотку, добавляя образу утонченной дерзости и абсолютного комфорта.',
@@ -89,7 +89,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'cozaki',
     video: '/Fason/cozaki.mp4',
-    title: { ru: 'Казаки', uk: 'Козаки', de: 'Western\nBoots' }, 
+    title: { ru: 'Казаки', uk: 'Козаки', de: 'Western\nBoots' },
     subtitle: { ru: 'Свобода формы', uk: 'Свобода форми', de: 'Freiheit der Form' },
     desc: {
       ru: 'Знаковый скошенный каблук и характерный мыс. Идеальный баланс между эстетикой дикого запада и ритмом современного мегаполиса.',
@@ -100,7 +100,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'boti',
     video: '/Fason/boti.mp4',
-    title: { ru: 'Ботильоны', uk: 'Ботильйони', de: 'Stiefeletten' }, 
+    title: { ru: 'Ботильоны', uk: 'Ботильйони', de: 'Stiefeletten' },
     subtitle: { ru: 'Идеальные пропорции', uk: 'Ідеальні пропорції', de: 'Perfekte Proportionen' },
     desc: {
       ru: 'Безукоризненная архитектура обуви, мягко обнимающая щиколотку. Универсальный силуэт для создания выверенных, элегантных образов.',
@@ -111,7 +111,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'mary_jane',
     video: '/Fason/Mary_Jane.mp4',
-    title: { ru: 'Мэри Джейн', uk: 'Мері Джейн', de: 'Mary Jane' }, 
+    title: { ru: 'Мэри Джейн', uk: 'Мері Джейн', de: 'Mary Jane' },
     subtitle: { ru: 'Новая романтика', uk: 'Нова романтика', de: 'Neue Romantik' },
     desc: {
       ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
@@ -123,7 +123,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'topsaed',
     video: '/Fason/Topsaed.mp4',
-    title: { ru: 'Топсайдеры', uk: 'Топсайдери', de: 'Bootsschuhe' }, 
+    title: { ru: 'Топсайдеры', uk: 'Топсайдери', de: 'Bootsschuhe' },
     subtitle: { ru: 'Эстетика ривьеры', uk: 'Естетика рів\'єри', de: 'Riviera-Ästhetik' },
     desc: {
       ru: 'Элитарная расслабленность и дух закрытых яхт-клубов. Нескользящая подошва и круговая шнуровка — безупречная база для теплого сезона.',
@@ -135,7 +135,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'slingback',
     video: '/Fason/slingback1.mp4',
-    title: { ru: 'Слингбэки', uk: 'Слінгбеки', de: 'Slingbacks' }, 
+    title: { ru: 'Слингбэки', uk: 'Слінгбеки', de: 'Slingbacks' },
     subtitle: { ru: 'Изящная строгость', uk: 'Витончена строгість', de: 'Zarte Strenge' },
     desc: {
       ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
@@ -147,7 +147,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'espadrilles',
     video: '/Fason/Espadrilles.mp4',
-    title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' }, 
+    title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' },
     subtitle: { ru: 'Средиземноморский шик', uk: 'Середземноморський шик', de: 'Mediterraner Chic' },
     desc: {
       ru: 'Культовая летняя база, сплетенная из натурального джута. Воплощение расслабленного шика и абсолютной свободы, идеально дополняющее легкие льняные образы.',
@@ -155,26 +155,25 @@ const STYLES_DATA: StyleSlide[] = [
       de: 'Die kultige Sommerbasis, geflochten aus natürlicher Jute. Die Verkörperung entspannten Chics und absoluter Freiheit, ideal passend zu leichten Leinen-Looks.',
     },
     hideWatermark: true,
-  }
+  },
 ]
 
 type SlideItemProps = {
   slide: StyleSlide
   lang: Lang
   index: number
-  isActive: boolean      
-  isPreloaded: boolean   
+  isActive: boolean
+  isPreloaded: boolean
   isMuted: boolean
 }
 
-// Глобальные настройки анимации
-const premiumEase = "cubic-bezier(0.19, 1, 0.22, 1)";
-const transitionDuration = "1.4s";
+// Более стабильная кривая для Telegram WebView (Android + iOS)
+const customBezier = [0.25, 0.1, 0.25, 1]
 
 function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const currentLang = (lang === 'uk' || lang === 'ru' || lang === 'de') ? lang : 'ru'
-  
+  const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
+
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState<number>(0)
 
@@ -186,7 +185,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     let isMounted = true
     const fetchLikes = async () => {
       try {
-        const response = await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`)
+        const response = await fetch(`/api/like?style_id=\( {slide.id}&user_id= \){userId}`)
         if (response.ok && isMounted) {
           const data = await response.json()
           setLikesCount(data.total || 0)
@@ -195,160 +194,210 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
       } catch (err) {}
     }
     fetchLikes()
-    return () => { isMounted = false }
+    return () => {
+      isMounted = false
+    }
   }, [slide.id, userId, isPreloaded])
 
-  // ЖЕСТКИЙ КОНТРОЛЬ ПАМЯТИ IOS
+  // Контроль памяти (оставляем только ±1 сосед)
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !slide.video) return;
+    const video = videoRef.current
+    if (!video || !slide.video) return
 
     if (isPreloaded) {
       if (!video.hasAttribute('src')) {
-        video.setAttribute('src', slide.video);
-        video.load();
+        video.setAttribute('src', slide.video)
+        video.load()
       }
     } else {
       if (video.hasAttribute('src')) {
-        video.pause();
-        video.removeAttribute('src'); 
-        video.load();
+        video.pause()
+        video.removeAttribute('src')
+        video.load()
       }
     }
-  }, [isPreloaded, slide.video]);
+  }, [isPreloaded, slide.video])
 
-  // УПРАВЛЕНИЕ ВОСПРОИЗВЕДЕНИЕМ
+  // Управление воспроизведением
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const video = videoRef.current
+    if (!video) return
 
     if (isActive) {
-      video.currentTime = 0;
-      const playPromise = video.play();
+      video.currentTime = 0
+      const playPromise = video.play()
       if (playPromise !== undefined) {
-        playPromise.catch(() => {});
+        playPromise.catch(() => {})
       }
     } else {
-      video.pause();
+      video.pause()
     }
-  }, [isActive]);
+  }, [isActive])
 
   const handleLike = async () => {
     const newIsLiked = !isLiked
     setIsLiked(newIsLiked)
-    setLikesCount(prev => newIsLiked ? prev + 1 : prev - 1)
+    setLikesCount((prev) => (newIsLiked ? prev + 1 : prev - 1))
 
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(newIsLiked ? 'medium' : 'light')
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred(newIsLiked ? 'medium' : 'light')
+    }
 
     try {
-      await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`, {
+      await fetch(`/api/like?style_id=\( {slide.id}&user_id= \){userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: newIsLiked ? 'like' : 'unlike' })
+        body: JSON.stringify({ action: newIsLiked ? 'like' : 'unlike' }),
       })
     } catch (err) {
       setIsLiked(!newIsLiked)
-      setLikesCount(prev => newIsLiked ? prev - 1 : prev + 1)
+      setLikesCount((prev) => (newIsLiked ? prev - 1 : prev + 1))
     }
   }
 
   const handleShare = async () => {
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
-    
-    const shareText = currentLang === 'de' 
-      ? `Sieh dir diesen Stil an: ${slide.title.de.replace('\n', ' ')} in der Cordwainer Enzyklopädie!`
-      : currentLang === 'ru' 
-        ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии Cordwainer!`
-        : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії Cordwainer!`;
-    const siteUrl = "https://www.cordwaine.app"; 
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+
+    const shareText =
+      currentLang === 'de'
+        ? `Sieh dir diesen Stil an: ${slide.title.de.replace('\n', ' ')} in der Cordwainer Enzyklopädie!`
+        : currentLang === 'ru'
+          ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии Cordwainer!`
+          : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії Cordwainer!`
+    const siteUrl = 'https://www.cordwaine.app'
 
     try {
-      if (tg && tg.initData) {
-        tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(siteUrl)}&text=${encodeURIComponent(shareText)}`);
-        return;
+      if (tg?.initData) {
+        tg.openTelegramLink(
+          `https://t.me/share/url?url=\( {encodeURIComponent(siteUrl)}&text= \){encodeURIComponent(shareText)}`
+        )
+        return
       }
       if (navigator.share) {
-        await navigator.share({ title: 'Cordwainer', text: shareText, url: siteUrl });
+        await navigator.share({ title: 'Cordwainer', text: shareText, url: siteUrl })
       } else {
-        await navigator.clipboard.writeText(`${shareText}\n${siteUrl}`);
+        await navigator.clipboard.writeText(`\( {shareText}\n \){siteUrl}`)
       }
     } catch (err) {}
   }
 
   return (
-    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A]">
+    <div
+      className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A] transform-gpu"
+      data-index={index}
+    >
       <div className="absolute inset-0 w-full h-full z-0 bg-black">
         {slide.video ? (
           <video
             ref={videoRef}
-            preload="none" 
+            preload="none"
             loop
             playsInline
             webkit-playsinline="true"
-            muted={isMuted} 
-            className="w-full h-full object-cover"
-            // Аппаратный зум на видео
-            style={{
-              willChange: 'transform, opacity',
-              transition: `opacity ${transitionDuration} ${premiumEase}, transform ${transitionDuration} ${premiumEase}`,
-              opacity: isActive ? 1 : 0,
-              transform: isActive 
-                ? (slide.hideWatermark ? 'scale(1.15) translate3d(0,0,0)' : 'scale(1) translate3d(0,0,0)') 
-                : (slide.hideWatermark ? 'scale(1.18) translate3d(0,0,0)' : 'scale(1.05) translate3d(0,0,0)')
-            }}
+            muted={isMuted}
+            className={`
+              w-full h-full object-cover
+              transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+              will-change-[opacity,transform] transform-gpu
+              ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.02]'}
+              ${slide.hideWatermark ? 'scale-[1.12]' : ''}
+            `}
           />
         ) : slide.image ? (
-          <img src={slide.image} alt={slide.title[currentLang]} className="w-full h-full object-cover" />
+          <img
+            src={slide.image}
+            alt={slide.title[currentLang]}
+            className="w-full h-full object-cover"
+          />
         ) : null}
       </div>
 
       <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
 
-      {/* ВЕРХНИЙ БЛОК: Вычищены классы Tailwind, мешающие стилям */}
-      <div 
-        className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between"
-        style={{
-          willChange: 'transform, opacity',
-          transition: `opacity ${transitionDuration} ${premiumEase}, transform ${transitionDuration} ${premiumEase}`,
-          transitionDelay: isActive ? '0.1s' : '0s',
-          opacity: isActive ? 1 : 0,
-          // translate3d принудительно закидывает анимацию на GPU (железобетонно на iOS)
-          transform: isActive ? 'translate3d(0, 0, 0)' : 'translate3d(0, 40px, 0)'
-        }}
+      {/* Верхний блок */}
+      <div
+        className={`
+          absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between
+          transform transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+          will-change-transform transform-gpu
+          ${isActive ? 'opacity-100 translate-y-0 delay-75' : 'opacity-0 translate-y-3 delay-0'}
+        `}
       >
         <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">{slide.subtitle[currentLang]}</p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{slide.title[currentLang]}</h2>
+          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">
+            {slide.subtitle[currentLang]}
+          </p>
+          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+            {slide.title[currentLang]}
+          </h2>
         </div>
-        <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">{String(index + 1).padStart(2, '0')}</div>
+        <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">
+          {String(index + 1).padStart(2, '0')}
+        </div>
       </div>
 
-      {/* НИЖНИЙ БЛОК: Вычищены классы Tailwind, мешающие стилям */}
-      <div 
-        className="absolute bottom-6 left-6 right-6 z-20 flex flex-col"
-        style={{
-          willChange: 'transform, opacity',
-          transition: `opacity ${transitionDuration} ${premiumEase}, transform ${transitionDuration} ${premiumEase}`,
-          transitionDelay: isActive ? '0.25s' : '0s',
-          opacity: isActive ? 1 : 0,
-          transform: isActive ? 'translate3d(0, 0, 0)' : 'translate3d(0, 40px, 0)'
-        }}
+      {/* Нижний блок */}
+      <div
+        className={`
+          absolute bottom-6 left-6 right-6 z-20 flex flex-col
+          transform transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+          will-change-transform transform-gpu
+          ${isActive ? 'opacity-100 translate-y-0 delay-100' : 'opacity-0 translate-y-4 delay-0'}
+        `}
       >
         <div className="w-full h-px bg-white/30 mb-5 shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
         <div className="flex items-start justify-between gap-4">
-          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">{slide.desc[currentLang]}</p>
+          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+            {slide.desc[currentLang]}
+          </p>
           <div className="flex items-center gap-4 shrink-0 mt-1">
             <button onClick={handleLike} className="group flex flex-col items-center gap-1.5 outline-none">
-              <div className={`w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center transition-all duration-500 active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)] ${isLiked ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'border-white/50 text-white bg-black/20 backdrop-blur-sm hover:border-white'}`}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+              <div
+                className={`
+                  w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center
+                  transition-all duration-300 active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]
+                  ${isLiked
+                    ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]'
+                    : 'border-white/50 text-white bg-black/20 backdrop-blur-sm hover:border-white'}
+                `}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill={isLiked ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
               </div>
-              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{likesCount || 'LIKE'}</span>
+              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                {likesCount || 'LIKE'}
+              </span>
             </button>
             <button onClick={handleShare} className="group flex flex-col items-center gap-1.5 outline-none">
-              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-500 hover:border-white active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg>
+              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-300 hover:border-white active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
               </div>
-              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">SHARE</span>
+              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                SHARE
+              </span>
             </button>
           </div>
         </div>
@@ -357,31 +406,60 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
   )
 }
 
-// ПРЕМИАЛЬНЫЙ ПЕРЕХОД СТРАНИЦЫ
 const pageVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.8, ease: [0.19, 1, 0.22, 1] } },
-  exit: { opacity: 0, transition: { duration: 0.6, ease: [0.19, 1, 0.22, 1] } }
-};
+  animate: { opacity: 1, transition: { duration: 0.6, ease: customBezier } },
+  exit: { opacity: 0, transition: { duration: 0.4, ease: customBezier } },
+}
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  const handleScroll = () => {
-    if (!scrollRef.current) return
-    const scrollPosition = scrollRef.current.scrollTop
-    const containerHeight = scrollRef.current.clientHeight 
-    const newActiveIndex = Math.round(scrollPosition / containerHeight)
-    
-    if (newActiveIndex !== activeIndex && newActiveIndex >= 0 && newActiveIndex < STYLES_DATA.length) {
-      setActiveIndex(newActiveIndex)
+  // Надёжное определение активного слайда через IntersectionObserver
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!root) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
+            const idx = Number(entry.target.getAttribute('data-index'))
+            if (!isNaN(idx) && idx !== activeIndex) {
+              setActiveIndex(idx)
+            }
+          }
+        })
+      },
+      {
+        root,
+        threshold: [0.55, 0.7],
+        rootMargin: '0px',
+      }
+    )
+
+    slideRefs.current.forEach((el) => {
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [activeIndex])
+
+  // Telegram init
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg) {
+      tg.ready()
+      tg.expand?.()
+      tg.disableVerticalSwipes?.()
     }
-  }
+  }, [])
 
   return (
-    <motion.div 
+    <motion.div
       variants={pageVariants}
       initial="initial"
       animate="animate"
@@ -390,25 +468,67 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     >
       <style>{`
         .snap-container::-webkit-scrollbar { display: none; }
-        .snap-container { -ms-overflow-style: none; scrollbar-width: none; }
-        * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
+        .snap-container {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior-y: contain;
+          touch-action: pan-y;
+        }
+        * {
+          -webkit-tap-highlight-color: transparent !important;
+          -webkit-touch-callout: none;
+        }
       `}</style>
 
       <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
-        <button onClick={onBack} className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
-          <span className="transform transition-transform group-hover:-translate-x-1">←</span><span>Back</span>
+        <button
+          onClick={onBack}
+          className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+        >
+          <span>←</span>
+          <span>Back</span>
         </button>
-        <button onClick={() => { if (window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.impactOccurred('light'); setIsMuted(!isMuted) }} className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+        <button
+          onClick={() => {
+            if ((window as any).Telegram?.WebApp?.HapticFeedback) {
+              ;(window as any).Telegram.WebApp.HapticFeedback.impactOccurred('light')
+            }
+            setIsMuted(!isMuted)
+          }}
+          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+        >
           {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
         </button>
       </header>
 
-      <div ref={scrollRef} onScroll={handleScroll} className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth relative bg-[#0A0A0A]">
+      <div
+        ref={scrollRef}
+        className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory relative bg-[#0A0A0A]"
+      >
         {STYLES_DATA.map((slide, index) => {
           const isPreloaded = Math.abs(activeIndex - index) <= 1
           const isActive = activeIndex === index
 
-          return <SlideItem key={slide.id} slide={slide} lang={lang} index={index} isActive={isActive} isPreloaded={isPreloaded} isMuted={isMuted} />
+          return (
+            <div
+              key={slide.id}
+              ref={(el) => {
+                slideRefs.current[index] = el
+              }}
+              data-index={index}
+              className="h-full w-full"
+            >
+              <SlideItem
+                slide={slide}
+                lang={lang}
+                index={index}
+                isActive={isActive}
+                isPreloaded={isPreloaded}
+                isMuted={isMuted}
+              />
+            </div>
+          )
         })}
       </div>
     </motion.div>
