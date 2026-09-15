@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import { motion } from 'framer-motion' // Добавили импорт motion
 import type { Lang } from '../App'
 
 type ColorsPageProps = {
@@ -80,7 +81,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [whiteAmount, setWhiteAmount] = useState(0.05)
   const [blackAmount, setBlackAmount] = useState(0.05)
   const [showGuide, setShowGuide] = useState(false)
-  const [isDark, setIsDark] = useState(true)
+  
+  // Читаем тему синхронно при инициализации, чтобы избежать FOUC (мерцания)
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return true
+  })
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -412,9 +420,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
+  // КОРНЕВОЙ ЭЛЕМЕНТ ТЕПЕРЬ MOTION.DIV ДЛЯ ПЛАВНОГО ПЕРЕХОДА СТРАНИЦ
   return (
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
-      
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}
+    >
       <style>{`
         * {
           -webkit-tap-highlight-color: transparent !important;
@@ -684,6 +698,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
