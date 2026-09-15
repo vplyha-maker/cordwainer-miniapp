@@ -119,40 +119,80 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
           100% { opacity: 1; transform: translateY(0); }
         }
         
-        /* Анимация прохождения блика (с паузой) */
+        /* Надёжный блик для Android + iOS */
         @keyframes btnGlare {
-          0%, 40% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0%   { background-position: -180% center; }
+          35%  { background-position: -180% center; } /* пауза */
+          65%  { background-position: 180% center; }
+          100% { background-position: 180% center; } /* пауза */
         }
 
-        /* Темная тема: текст цвета #F4F0E8, блик чисто белый #FFFFFF */
+        /* Тёмная тема */
         .glare-text-dark {
-          background: linear-gradient(110deg, #F4F0E8 35%, #FFFFFF 50%, #F4F0E8 65%);
-          background-size: 300% 100%;
+          background: linear-gradient(
+            110deg,
+            #F4F0E8 25%,
+            #F4F0E8 40%,
+            #FFFFFF 50%,
+            #F4F0E8 60%,
+            #F4F0E8 75%
+          );
+          background-size: 250% 100%;
           -webkit-background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
-          animation: btnGlare 4s linear infinite;
+          color: transparent;
+          animation: btnGlare 3.8s linear infinite;
+          will-change: background-position;
+          transform: translateZ(0);
         }
         .glare-line-dark {
-          background: linear-gradient(110deg, #F4F0E8 35%, #FFFFFF 50%, #F4F0E8 65%);
-          background-size: 300% 100%;
-          animation: btnGlare 4s linear infinite;
+          background: linear-gradient(
+            110deg,
+            #F4F0E8 25%,
+            #F4F0E8 40%,
+            #FFFFFF 50%,
+            #F4F0E8 60%,
+            #F4F0E8 75%
+          );
+          background-size: 250% 100%;
+          animation: btnGlare 3.8s linear infinite;
+          will-change: background-position;
+          transform: translateZ(0);
         }
 
-        /* Светлая тема: текст цвета #1C1816, блик светло-серый #999999 */
+        /* Светлая тема */
         .glare-text-light {
-          background: linear-gradient(110deg, #1C1816 35%, #999999 50%, #1C1816 65%);
-          background-size: 300% 100%;
+          background: linear-gradient(
+            110deg,
+            #1C1816 25%,
+            #1C1816 40%,
+            #999999 50%,
+            #1C1816 60%,
+            #1C1816 75%
+          );
+          background-size: 250% 100%;
           -webkit-background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
-          animation: btnGlare 4s linear infinite;
+          color: transparent;
+          animation: btnGlare 3.8s linear infinite;
+          will-change: background-position;
+          transform: translateZ(0);
         }
         .glare-line-light {
-          background: linear-gradient(110deg, #1C1816 35%, #999999 50%, #1C1816 65%);
-          background-size: 300% 100%;
-          animation: btnGlare 4s linear infinite;
+          background: linear-gradient(
+            110deg,
+            #1C1816 25%,
+            #1C1816 40%,
+            #999999 50%,
+            #1C1816 60%,
+            #1C1816 75%
+          );
+          background-size: 250% 100%;
+          animation: btnGlare 3.8s linear infinite;
+          will-change: background-position;
+          transform: translateZ(0);
         }
         
         .anim-bg {
