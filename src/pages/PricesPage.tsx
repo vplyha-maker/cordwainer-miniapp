@@ -63,7 +63,7 @@ type PricesPageProps = {
 }
 
 type SortOption = 'default' | 'unit-price-asc' | 'savings' | 'name'
-type ModalType = 'volatility' | 'spread' | null
+type ModalData = { type: 'volatility' | 'spread'; value: number } | null
 
 const PAGE_SIZE = 15
 
@@ -96,15 +96,18 @@ const DICTIONARY = {
     priceRise: 'Ожидается рост цены',
     urgentBuy: 'Рекомендация к покупке',
     
-    // Тексты модальных окон
     volatilityTitle: 'Средняя волатильность',
-    volatilityDesc: 'Этот индекс показывает средний разброс цен (в процентах) по всему рынку среди товаров, которые представлены более чем у одного поставщика.',
-    volatilityRec: 'При высокой волатильности (>20%) рынок нестабилен. Это лучшее время для оптимизации закупок — тщательно сравнивайте цены, так как разница у поставщиков может быть существенной.',
     spreadTitle: 'Спред (Разрыв цен)',
-    spreadDesc: 'Разница между самым дорогим и самым дешевым предложением на этот конкретный товар (в пересчете за эталонную единицу объема, например 1 кг/л).',
-    spreadRec: 'Высокий спред (>30%) указывает на сильный ценовой перекос. Мы рекомендуем закупать объем у поставщика с зеленой отметкой, чтобы максимизировать маржинальность.',
     gotIt: 'Понятно',
     recommendationLabel: 'Стратегия',
+
+    // Динамические тексты
+    spreadLow: (val: string) => `Спред составляет всего ${val}%. Цены на рынке почти идентичны. Рекомендуем выбирать поставщика с наиболее удобной логистикой или лучшим сервисом.`,
+    spreadMid: (val: string) => `Спред составляет ${val}%. Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки устраивают.`,
+    spreadHigh: (val: string) => `Спред достигает ${val}%. На рынке сильный ценовой перекос. Настоятельно рекомендуем закупать объем у поставщика с зеленой отметкой (лучшая цена) для максимизации маржинальности.`,
+    volLow: (val: string) => `Волатильность ${val}%. Рынок стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.`,
+    volMid: (val: string) => `Волатильность ${val}%. Умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях.`,
+    volHigh: (val: string) => `Волатильность ${val}%. Рынок крайне нестабилен. Это лучшее время для оптимизации — тщательно сравнивайте цены, так как разница у разных поставщиков сейчас существенна.`,
   },
   uk: {
     title: 'Аналітика цін',
@@ -135,13 +138,16 @@ const DICTIONARY = {
     urgentBuy: 'Рекомендація до покупки',
     
     volatilityTitle: 'Середня волатильність',
-    volatilityDesc: 'Цей індекс показує середній розкид цін (у відсотках) по всьому ринку серед товарів, які представлені більше ніж в одного постачальника.',
-    volatilityRec: 'При високій волатильності (>20%) ринок нестабільний. Це найкращий час для оптимізації закупівель — ретельно порівнюйте ціни, оскільки різниця може бути суттєвою.',
     spreadTitle: 'Спред (Розрив цін)',
-    spreadDesc: 'Різниця між найдорожчою та найдешевшою пропозицією на цей конкретний товар (у перерахунку за еталонну одиницю об’єму).',
-    spreadRec: 'Високий спред (>30%) вказує на сильний ціновий перекіс. Рекомендуємо закуповувати обсяг у постачальника із зеленою позначкою, щоб максимізувати маржинальність.',
     gotIt: 'Зрозуміло',
     recommendationLabel: 'Стратегія',
+
+    spreadLow: (val: string) => `Спред становить лише ${val}%. Ціни на ринку майже ідентичні. Рекомендуємо обирати постачальника з найбільш зручною логістикою.`,
+    spreadMid: (val: string) => `Спред становить ${val}%. Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.`,
+    spreadHigh: (val: string) => `Спред досягає ${val}%. На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у постачальника із зеленою позначкою для максимізації маржинальності.`,
+    volLow: (val: string) => `Волатильність ${val}%. Ринок стабільний, ціни у постачальників тримаються на одному рівні.`,
+    volMid: (val: string) => `Волатильність ${val}%. Помірні коливання цін. Оптимальний час для точкової економії.`,
+    volHigh: (val: string) => `Волатильність ${val}%. Ринок нестабільний. Це найкращий час для оптимізації закупівель — ретельно порівнюйте ціни.`,
   },
   de: {
     title: 'Preisanalyse',
@@ -172,13 +178,16 @@ const DICTIONARY = {
     urgentBuy: 'Kaufempfehlung',
     
     volatilityTitle: 'Ø Volatilität',
-    volatilityDesc: 'Dieser Index zeigt die durchschnittliche Preisspanne (in Prozent) auf dem gesamten Markt für Produkte, die von mehr als einem Lieferanten angeboten werden.',
-    volatilityRec: 'Bei hoher Volatilität (>20 %) ist der Markt instabil. Dies ist die beste Zeit, um die Beschaffung zu optimieren – vergleichen Sie die Preise sorgfältig.',
     spreadTitle: 'Spread (Preisdifferenz)',
-    spreadDesc: 'Die Differenz zwischen dem teuersten und dem günstigsten Angebot für dieses spezifische Produkt (berechnet pro Standardvolumeneinheit).',
-    spreadRec: 'Ein hoher Spread (>30 %) deutet auf ein starkes Preisungleichgewicht hin. Wir empfehlen, beim Lieferanten mit der grünen Markierung einzukaufen, um die Margen zu maximieren.',
     gotIt: 'Verstanden',
     recommendationLabel: 'Strategie',
+
+    spreadLow: (val: string) => `Der Spread beträgt nur ${val}%. Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.`,
+    spreadMid: (val: string) => `Der Spread beträgt ${val}%. Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.`,
+    spreadHigh: (val: string) => `Der Spread erreicht ${val}%. Starkes Preisungleichgewicht. Wir empfehlen dringend, beim grün markierten Lieferanten zu kaufen, um die Margen zu maximieren.`,
+    volLow: (val: string) => `Volatilität ${val}%. Der Markt ist stabil, die Preise bleiben auf einem Niveau.`,
+    volMid: (val: string) => `Volatilität ${val}%. Moderate Preisschwankungen. Optimale Zeit für gezielte Einsparungen.`,
+    volHigh: (val: string) => `Volatilität ${val}%. Der Markt ist instabil. Die beste Zeit zur Einkaufsoptimierung – vergleichen Sie die Preise sorgfältig.`,
   },
 }
 
@@ -207,10 +216,26 @@ const formatDate = (dateStr: string | null, lang: Lang) => {
   }).format(d)
 }
 
-// ... [тут остальной парсинг, нормализация и алгоритм сходства (BRAND_ALIASES, parsePriceSafely, getVolumeData, normalizeProductName, calculateWordSimilarity, formatPrice) - без изменений] ...
 const BRAND_ALIASES: Array<[RegExp, string]> = [
-  [/\bнайр[іи]т\b/gi, 'nairit'], [/\bдесмокол\b/gi, 'desmokol'], [/\bdismakol\b/gi, 'desmokol'], [/\bбон[іи]кол\b/gi, 'bonikol'], [/\bзатверджувач\b/gi, 'hardener'], [/\bотвердитель\b/gi, 'hardener'], [/\bмультиф[іи]кс\b/gi, 'sarmultifix'], [/\bпротрава\b/gi, 'preparatore'], [/\bпротравка\b/gi, 'preparatore'], [/\bпротирання\b/gi, 'preparatore'], [/\bслоник\b/gi, 'solution'], [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'], [/\bрезинов(ый|ой|ая|ое)\b/gi, 'rubber'], [/\bполіуретанов(ий|ої|а|е)\b/gi, 'polyurethane'], [/\bполиуретанов(ый|ой|ая|ое)\b/gi, 'polyurethane'], [/\bполіхлоропренов(ий|ої|а|е)\b/gi, 'polychloroprene'], [/\bполихлоропренов(ый|ой|ая|ое)\b/gi, 'polychloroprene'],
+  [/\bнайр[іи]т\b/gi, 'nairit'],
+  [/\bдесмокол\b/gi, 'desmokol'],
+  [/\bdismakol\b/gi, 'desmokol'],
+  [/\bбон[іи]кол\b/gi, 'bonikol'],
+  [/\bзатверджувач\b/gi, 'hardener'],
+  [/\bотвердитель\b/gi, 'hardener'],
+  [/\bмультиф[іи]кс\b/gi, 'sarmultifix'],
+  [/\bпротрава\b/gi, 'preparatore'],
+  [/\bпротравка\b/gi, 'preparatore'],
+  [/\bпротирання\b/gi, 'preparatore'],
+  [/\bслоник\b/gi, 'solution'],
+  [/\b(г|ґ)умов(ий|ої|а|е)\b/gi, 'rubber'],
+  [/\bрезинов(ый|ой|ая|ое)\b/gi, 'rubber'],
+  [/\bполіуретанов(ий|ої|а|е)\b/gi, 'polyurethane'],
+  [/\bполиуретанов(ый|ой|ая|ое)\b/gi, 'polyurethane'],
+  [/\bполіхлоропренов(ий|ої|а|е)\b/gi, 'polychloroprene'],
+  [/\bполихлоропренов(ый|ой|ая|ое)\b/gi, 'polychloroprene'],
 ]
+
 function parsePriceSafely(raw: number | string | null | undefined): number {
   if (raw === null || raw === undefined || raw === '') return 0;
   if (typeof raw === 'number') return raw > 0 ? raw : 0;
@@ -218,6 +243,7 @@ function parsePriceSafely(raw: number | string | null | undefined): number {
   const val = parseFloat(cleanStr);
   return !isNaN(val) && val > 0 ? val : 0;
 }
+
 function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; originalLabel: string; multiplier: number } {
   if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
@@ -231,6 +257,7 @@ function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; origina
   if (['кг', 'kg'].includes(u)) return { baseUnit: 'кг', originalLabel: `${num} кг`, multiplier: 1 / num }
   return { baseUnit: 'кг', originalLabel: `${num} г`, multiplier: 1000 / num }
 }
+
 function normalizeProductName(raw: string): string {
   if (!raw) return ''
   let s = raw.toLowerCase().replace(/ё/g, 'е').replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
@@ -240,6 +267,7 @@ function normalizeProductName(raw: string): string {
   const words = s.split(/\s+/).filter(w => w.length > 1 && !stopWords.includes(w))
   return Array.from(new Set(words)).sort().join(' ')
 }
+
 function calculateWordSimilarity(name1: string, name2: string): number {
   const w1 = name1.split(' ').filter(Boolean);
   const w2 = name2.split(' ').filter(Boolean);
@@ -249,6 +277,7 @@ function calculateWordSimilarity(name1: string, name2: string): number {
   const unionSize = new Set([...w1, ...w2]).size;
   return matches / unionSize;
 }
+
 const formatPrice = (val: number, lang: Lang) => {
   if (!val || val <= 0) return DICTIONARY[lang].noPrice
   const locale = lang === 'de' ? 'de-DE' : lang === 'uk' ? 'uk-UA' : 'ru-RU'
@@ -273,7 +302,7 @@ const ProductCard = memo(
     t: typeof DICTIONARY['ru']
     isFavorite: boolean
     onToggleFavorite: (key: string) => void
-    onOpenSpreadModal: () => void
+    onOpenSpreadModal: (val: number) => void
   }) => {
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
@@ -290,7 +319,6 @@ const ProductCard = memo(
 
     return (
       <article className="group/card flex flex-col bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 transition-colors hover:border-stone-400 dark:hover:border-stone-600 shadow-sm hover:shadow-md">
-        
         <div className="p-5 border-b border-stone-100 dark:border-stone-800 flex gap-4 items-start relative">
           
           {group.image_url ? (
@@ -319,8 +347,7 @@ const ProductCard = memo(
               )}
               {showSpread && group.unitSpread > 0 && (
                 <button 
-                  onClick={onOpenSpreadModal}
-                  // Невидимая тап-зона HIG (44x44) за счет псевдоэлемента -inset-3
+                  onClick={() => onOpenSpreadModal(group.unitSpread)}
                   className="relative inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors focus:outline-none before:absolute before:-inset-3 before:content-['']"
                   aria-label="Что такое спред?"
                 >
@@ -339,7 +366,6 @@ const ProductCard = memo(
           
           <button 
             onClick={() => onToggleFavorite(group.key)}
-            // Тоже расширяем тап-зону крестика
             className="absolute top-4 right-4 relative text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors before:absolute before:-inset-3 before:content-['']"
           >
             <Bookmark size={18} strokeWidth={1.5} className={isFavorite ? "fill-stone-900 dark:fill-stone-100 text-stone-900 dark:text-stone-100" : ""} />
@@ -454,8 +480,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const [eurRate, setEurRate] = useState<number | null>(null)
   const [usdRate, setUsdRate] = useState<number | null>(null)
   
-  // Modal State
-  const [activeModal, setActiveModal] = useState<ModalType>(null)
+  const [modalData, setModalData] = useState<ModalData>(null)
   
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -499,10 +524,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     })
   }, [])
 
-  const handleOpenSpreadModal = useCallback(() => {
-    setActiveModal('spread')
-  }, [])
-
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -533,7 +554,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const sources = useMemo(() => Array.from(new Set(items.map((i) => i.source).filter(Boolean) as string[])).sort(), [items])
 
   const baseGroupedItems = useMemo(() => {
-    // ... [Логика группировки без изменений] ...
     const groups: GroupedProduct[] = [];
     items.forEach((item) => {
       let validPrice = parsePriceSafely(item.current_price);
@@ -633,20 +653,40 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
   const stats = useMemo(() => {
     const multi = filteredItems.filter((g) => g.offers.length > 1)
+    const rawAvg = multi.length ? (multi.reduce((acc, g) => acc + g.unitSpread, 0) / multi.length) : 0;
     return {
       total: filteredItems.length,
       multiCount: multi.length,
-      avgSpread: multi.length ? (multi.reduce((acc, g) => acc + g.unitSpread, 0) / multi.length).toFixed(1) : '0.0',
+      avgSpreadValue: rawAvg,
+      avgSpreadText: rawAvg.toFixed(1),
     }
   }, [filteredItems])
 
+  // Генерация динамического текста для модалки
+  const getModalText = () => {
+    if (!modalData) return { desc: '', rec: '' }
+    const valStr = modalData.value.toFixed(0)
+    
+    if (modalData.type === 'spread') {
+      if (modalData.value < 10) return { desc: t.spreadTitle, rec: t.spreadLow(valStr) }
+      if (modalData.value <= 30) return { desc: t.spreadTitle, rec: t.spreadMid(valStr) }
+      return { desc: t.spreadTitle, rec: t.spreadHigh(valStr) }
+    } else {
+      if (modalData.value < 10) return { desc: t.volatilityTitle, rec: t.volLow(valStr) }
+      if (modalData.value <= 30) return { desc: t.volatilityTitle, rec: t.volMid(valStr) }
+      return { desc: t.volatilityTitle, rec: t.volHigh(valStr) }
+    }
+  }
+
+  const currentModalContent = getModalText()
+
   return (
-    <div className={isDark ? 'dark' : ''}>
+    <div className={`min-h-screen w-full transition-colors duration-300 ${isDark ? 'dark bg-[#12100E]' : 'bg-stone-50'}`}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="flex flex-col h-[100dvh] bg-stone-50 dark:bg-[#12100E] text-stone-900 dark:text-stone-100 font-sans transition-colors duration-300 relative"
+        className="flex flex-col h-[100dvh] text-stone-900 dark:text-stone-100 font-sans relative"
       >
         <header className="shrink-0 z-20 bg-stone-50 dark:bg-[#1A1614] border-b border-stone-200 dark:border-stone-800 pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
@@ -655,7 +695,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               <div className="flex items-center gap-4 min-w-0">
                 <button
                   onClick={onBack}
-                  // Расширение тап-зоны для кнопки "Назад"
                   className="relative w-10 h-10 border border-stone-200 dark:border-stone-800 flex items-center justify-center text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors shrink-0 before:absolute before:-inset-2 before:content-['']"
                   aria-label="Назад"
                 >
@@ -667,19 +706,17 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     <span className="truncate">{t.title}</span>
                   </h1>
                   
-                  {/* Строка биржевой сводки */}
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-stone-500 dark:text-stone-400 mt-1.5 font-mono">
                     <span>{stats.total} {t.statsTotal}</span>
                     {stats.multiCount > 0 && (
                       <>
                         <span className="text-stone-300 dark:text-stone-700 font-sans">/</span>
                         <button
-                          onClick={() => setActiveModal('volatility')}
-                          // Интерактивный элемент со скрытой тап-зоной Apple HIG 
+                          onClick={() => setModalData({ type: 'volatility', value: stats.avgSpreadValue })}
                           className="relative inline-flex items-center text-emerald-700 dark:text-emerald-400 font-sans font-medium focus:outline-none hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors before:absolute before:-inset-3 before:content-['']"
                           aria-label="Что такое волатильность?"
                         >
-                          {t.statsAvgSpread}: {stats.avgSpread}%
+                          {t.statsAvgSpread}: {stats.avgSpreadText}%
                           <Info size={12} strokeWidth={2} className="opacity-50 ml-1" />
                         </button>
                       </>
@@ -700,7 +737,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
               <button
                 onClick={() => setIsDark(!isDark)}
-                // Увеличенная тап-зона переключателя темы
                 className="relative p-2.5 border border-stone-200 dark:border-stone-800 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors shrink-0 before:absolute before:-inset-2 before:content-['']"
                 aria-label="Сменить тему"
               >
@@ -783,7 +819,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 no-scrollbar bg-stone-100/40 dark:bg-[#12100E]">
+        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 no-scrollbar">
           <div className="max-w-7xl mx-auto">
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -825,7 +861,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                           t={t}
                           isFavorite={favorites.has(g.key)}
                           onToggleFavorite={toggleFavorite}
-                          onOpenSpreadModal={handleOpenSpreadModal}
+                          onOpenSpreadModal={(val) => setModalData({ type: 'spread', value: val })}
                         />
                       </motion.div>
                     ))}
@@ -847,15 +883,14 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
           </div>
         </main>
 
-        {/* ЖУРНАЛЬНЫЕ ИНФО-МОДАЛКИ */}
         <AnimatePresence>
-          {activeModal && (
+          {modalData && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setActiveModal(null)}
+                onClick={() => setModalData(null)}
                 className="absolute inset-0 bg-stone-900/60 dark:bg-black/70 backdrop-blur-sm"
               />
               <motion.div
@@ -867,21 +902,17 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               >
                 <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-emerald-500" />
                 
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-6">
                   <h3 className="font-serif text-2xl text-stone-900 dark:text-stone-100 leading-tight">
-                    {activeModal === 'volatility' ? t.volatilityTitle : t.spreadTitle}
+                    {currentModalContent.desc}
                   </h3>
                   <button 
-                    onClick={() => setActiveModal(null)}
+                    onClick={() => setModalData(null)}
                     className="p-1 text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors"
                   >
                     <X size={20} strokeWidth={1.5} />
                   </button>
                 </div>
-                
-                <p className="text-[15px] text-stone-600 dark:text-stone-400 leading-relaxed mb-6 font-sans">
-                  {activeModal === 'volatility' ? t.volatilityDesc : t.spreadDesc}
-                </p>
 
                 <div className="bg-stone-50 dark:bg-[#25201C] p-5 border border-stone-200 dark:border-white/5 relative">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-600/50 dark:bg-emerald-500/50" />
@@ -889,12 +920,12 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     {t.recommendationLabel}
                   </p>
                   <p className="text-[14px] text-stone-700 dark:text-stone-300 leading-snug">
-                    {activeModal === 'volatility' ? t.volatilityRec : t.spreadRec}
+                    {currentModalContent.rec}
                   </p>
                 </div>
 
                 <button
-                  onClick={() => setActiveModal(null)}
+                  onClick={() => setModalData(null)}
                   className="mt-8 w-full py-4 bg-stone-900 dark:bg-white text-white dark:text-stone-900 text-xs uppercase tracking-widest font-bold hover:opacity-90 active:scale-[0.98] transition-all"
                 >
                   {t.gotIt}
