@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
 import { CALCULATORS_COUNT } from './CalcMenuPage'
@@ -18,7 +18,7 @@ type HomePageProps = {
   favorites?: FavoriteItem[]
   onOpenArticle?: (articleId: string) => void
   onOpenFavorites?: () => void
-  onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void 
+  onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
 }
 
 type MenuItem = {
@@ -51,7 +51,7 @@ const deepSearch = (obj: any, query: string): boolean => {
   if (!obj) return false
   if (typeof obj === 'string') return obj.toLowerCase().includes(query)
   if (typeof obj === 'object') {
-    return Object.values(obj).some(val => deepSearch(val, query))
+    return Object.values(obj).some((val) => deepSearch(val, query))
   }
   return false
 }
@@ -71,13 +71,13 @@ const containerVariants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+    transition: { staggerChildren: 0.1 },
+  },
 }
 
 const itemVariants = {
   hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
 }
 
 export function HomePage({
@@ -96,14 +96,14 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('dark')
     }
     return true
   })
-  
+
   const hasNewBlog = BLOG_ARTICLES?.some((a) => a.isNew) || false
   const articleFavorites = favorites?.filter((f) => f.type === 'article') || []
   const glossaryCount = GLOSSARY_TERMS?.length || 0
@@ -129,7 +129,7 @@ export function HomePage({
     setLang(newLang)
   }
 
-  const safeLang = (lang && ['ru', 'uk', 'de'].includes(lang)) ? lang : 'uk'
+  const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'uk'
 
   const t = {
     ru: {
@@ -230,7 +230,7 @@ export function HomePage({
       searchResults: 'Ergebnisse',
       noResults: 'Keine Einträge',
       section: 'Bereich',
-    }
+    },
   }[safeLang]
 
   const LEARNING: MenuItem[] = [
@@ -256,26 +256,36 @@ export function HomePage({
   const searchResults: Array<{ id: string; type: string; title: string; subtitle: string }> = []
 
   if (query) {
-    [...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
+    ;[...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
       if (item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)) {
         searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
       }
     })
     BLOG_ARTICLES?.forEach((article) => {
       if (deepSearch(article, query)) {
-        searchResults.push({ type: 'article', id: article.id, title: getDisplayTitle(article, safeLang), subtitle: t.blog })
+        searchResults.push({
+          type: 'article',
+          id: article.id,
+          title: getDisplayTitle(article, safeLang),
+          subtitle: t.blog,
+        })
       }
     })
     GLOSSARY_TERMS?.forEach((term) => {
       if (deepSearch(term, query)) {
-        searchResults.push({ type: 'glossary', id: term.id, title: getDisplayTitle(term, safeLang), subtitle: t.glossary })
+        searchResults.push({
+          type: 'glossary',
+          id: term.id,
+          title: getDisplayTitle(term, safeLang),
+          subtitle: t.glossary,
+        })
       }
     })
   }
 
   const handleResultClick = (res: any) => {
     if (res.type === 'category') {
-      const match = [...LEARNING, ...TOOLS, ...SYSTEM].find(i => i.id === res.id)
+      const match = [...LEARNING, ...TOOLS, ...SYSTEM].find((i) => i.id === res.id)
       match?.action?.()
     } else if (res.type === 'article') {
       onOpenArticle?.(res.id)
@@ -285,7 +295,7 @@ export function HomePage({
     setSearchQuery('')
   }
 
-  // --- ЖУРНАЛЬНЫЕ СТИЛИ (полностью через style) ---
+  // --- ЖУРНАЛЬНЫЕ СТИЛИ ---
   const journalColors = isDark
     ? {
         text: '#F4F0E8',
@@ -317,6 +327,7 @@ export function HomePage({
       {items.map((item, idx) => {
         const num = startIndex + idx
         const numStr = num < 10 ? `0\( {num}` : ` \){num}`
+
         return (
           <motion.button
             variants={itemVariants}
@@ -324,9 +335,7 @@ export function HomePage({
             onClick={item.action}
             disabled={!item.action}
             className={`group relative flex items-end justify-between py-6 border-b outline-none bg-transparent text-left transition-all ${
-              item.action 
-                ? 'active:opacity-50 cursor-pointer' 
-                : 'opacity-40 cursor-default'
+              item.action ? 'active:opacity-50 cursor-pointer' : 'opacity-40 cursor-default'
             }`}
             style={{ borderColor: journalColors.line }}
           >
@@ -346,9 +355,7 @@ export function HomePage({
                 >
                   {item.title}
                 </div>
-                {item.dot && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
-                )}
+                {item.dot && <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />}
               </div>
             </div>
             <div
@@ -371,7 +378,7 @@ export function HomePage({
         color: journalColors.text,
       }}
     >
-      {/* СЛОЙ ЖУРНАЛЬНОЙ ТЕКСТУРЫ */}
+      {/* Слой текстуры */}
       <div
         className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
         style={{
@@ -403,7 +410,7 @@ export function HomePage({
               <span>Back</span>
             </button>
           ) : (
-            <div className="w-10"></div>
+            <div className="w-10" />
           )}
 
           <div className="flex items-center gap-4">
@@ -427,14 +434,14 @@ export function HomePage({
           </div>
         </header>
 
-        {/* КОНТЕНТ */}
+        {/* CONTENT */}
         <motion.div
           className="px-6 pb-24"
           initial="hidden"
           animate="show"
           variants={containerVariants}
         >
-          {/* ЗАГОЛОВОК СТРАНИЦЫ */}
+          {/* Title */}
           <motion.div variants={itemVariants} className="mb-12 mt-4">
             <h1
               className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]"
@@ -444,7 +451,7 @@ export function HomePage({
             </h1>
           </motion.div>
 
-          {/* ПОИСК */}
+          {/* Search */}
           <motion.div variants={itemVariants} className="mb-16">
             <div
               className="relative flex items-end border-b pb-3 transition-colors"
@@ -462,11 +469,7 @@ export function HomePage({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
                 className="w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light"
-                style={{
-                  color: journalColors.text,
-                  // @ts-ignore
-                  '--placeholder-color': journalColors.placeholder,
-                }}
+                style={{ color: journalColors.text }}
               />
               {searchQuery && (
                 <button
@@ -480,7 +483,7 @@ export function HomePage({
             </div>
           </motion.div>
 
-          {/* РЕЗУЛЬТАТЫ / КАТЕГОРИИ */}
+          {/* Results or Categories */}
           {query ? (
             <div>
               <p
@@ -554,7 +557,7 @@ export function HomePage({
                 {renderList(SYSTEM, 9)}
               </motion.div>
 
-              {/* ИЗБРАННОЕ */}
+              {/* Favorites */}
               <motion.div variants={itemVariants} className="mb-16">
                 <button
                   className="w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
@@ -595,7 +598,7 @@ export function HomePage({
                 </button>
               </motion.div>
 
-              {/* ЦИТАТА */}
+              {/* Quote */}
               <motion.div variants={itemVariants} className="pb-10">
                 <div className="flex flex-col items-center text-center px-4">
                   <div
