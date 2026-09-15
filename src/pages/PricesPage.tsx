@@ -99,9 +99,10 @@ const DICTIONARY = {
     gotIt: 'Понятно',
     recommendationLabel: 'Стратегия',
 
+    // Динамические тексты с универсальным обозначением цвета
     spreadLow: 'Цены на рынке почти идентичны. Выгоднее выбирать поставщика с наиболее удобной логистикой или лучшим сервисом, так как разница в цене минимальна.',
     spreadMid: 'Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки вас устраивают.',
-    spreadHigh: 'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у поставщика с желтой отметкой, чтобы максимизировать вашу маржинальность.',
+    spreadHigh: 'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у выделенного цветом поставщика, чтобы максимизировать вашу маржинальность.',
     
     volLow: 'Рынок в данной категории абсолютно стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.',
     volMid: 'Наблюдаются умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях из списка.',
@@ -142,7 +143,7 @@ const DICTIONARY = {
 
     spreadLow: 'Ціни на ринку майже ідентичні. Вигідніше обирати постачальника з найбільш зручною логістикою.',
     spreadMid: 'Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.',
-    spreadHigh: 'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у постачальника із жовтою позначкою для максимізації маржинальності.',
+    spreadHigh: 'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у виділеного кольором постачальника для максимізації маржинальності.',
     
     volLow: 'Ринок стабільний, ціни у постачальників тримаються на одному рівні.',
     volMid: 'Помірні коливання цін. Оптимальний час для точкової економії.',
@@ -183,7 +184,7 @@ const DICTIONARY = {
 
     spreadLow: 'Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.',
     spreadMid: 'Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.',
-    spreadHigh: 'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim gelb markierten Lieferanten zu kaufen.',
+    spreadHigh: 'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim farblich markierten Lieferanten zu kaufen.',
     
     volLow: 'Der Markt ist stabil, die Preise bleiben auf einem Niveau.',
     volMid: 'Moderate Preisschwankungen. Optimale Zeit für gezielte Einsparungen.',
