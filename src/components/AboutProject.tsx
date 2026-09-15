@@ -78,13 +78,12 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     }
   }, [])
 
-  // 2. Динамический расчет таймингов (чтобы не прописывать задержки вручную)
+  // 2. Динамический расчет таймингов
   const { timings, totalTime } = useMemo(() => {
-    let currentDelay = 1.0; // Начальная задержка перед стартом (1 сек)
+    let currentDelay = 1.0; 
     const map: Record<string, number> = {};
-    const LINE_PAUSE = 0.15; // Маленькая пауза перед следующей строкой
+    const LINE_PAUSE = 0.15; 
     
-    // Функция расчета времени для каждой строки
     const processLine = (key: string, str: string, extraPause = 0) => {
       map[key] = currentDelay;
       currentDelay += (str.length * CHAR_SPEED) + LINE_PAUSE + extraPause;
@@ -93,7 +92,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     processLine('title', text.title, 0.4);
     
     processLine('p1_1', text.p1_1);
-    processLine('p1_2', text.p1_2, 0.5); // пауза между абзацами
+    processLine('p1_2', text.p1_2, 0.5); 
     
     processLine('p2_1', text.p2_1);
     processLine('p2_2', text.p2_2);
@@ -104,7 +103,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     processLine('p3_2', text.p3_2, 0.2);
     processLine('emphasis', text.emphasis, 0.5);
     
-    map['decor'] = currentDelay; // Время появления графических элементов внизу
+    map['decor'] = currentDelay; 
     currentDelay += 0.5;
     
     processLine('dedication', text.dedication);
@@ -116,7 +115,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowClose(true);
-    }, (totalTime + 1) * 1000); // Показываем кнопку через 1 сек после завершения последней буквы
+    }, (totalTime + 1) * 1000); 
     
     return () => clearTimeout(timer);
   }, [totalTime]);
@@ -132,7 +131,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     }
   }
 
-  // Функция-помощник для рендера букв по отдельности
   const renderWrittenText = (str: string, y: number, className: string, startDelay: number) => {
     return (
       <text x="400" y={y} textAnchor="middle" className={className}>
@@ -140,10 +138,8 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           <tspan
             key={index}
             className="letter-anim"
-            // Считаем задержку для каждой конкретной буквы
             style={{ animationDelay: `${startDelay + (index * CHAR_SPEED)}s` }}
           >
-            {/* Сохраняем пробелы */}
             {char === ' ' ? '\u00A0' : char}
           </tspan>
         ))}
@@ -211,7 +207,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
                   stroke-width: 1.5;
                 }
                 
-                /* Плавное проявление линий и декораций */
                 .anim-fade {
                   opacity: 0;
                   animation: fade-in-up 1.5s ease-out forwards;
@@ -221,10 +216,8 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
                   100% { opacity: 1; transform: translateY(0); }
                 }
 
-                /* Анимация проявления ОТДЕЛЬНОЙ БУКВЫ */
                 .letter-anim {
                   opacity: 0;
-                  /* Длительность 0.3s создает красивое плавное растекание "чернил" */
                   animation: write-char 0.3s ease-out forwards; 
                 }
                 @keyframes write-char {
@@ -259,7 +252,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
             {renderWrittenText(text.emphasis, 590, "svg-emphasis", timings.emphasis)}
             
             {/* Посвящение (с декорациями) */}
-            <g className="anim-fade" style={{ animationDelay: \`\${timings.decor}s\` }}>
+            <g className="anim-fade" style={{ animationDelay: `${timings.decor}s` }}>
               <line x1="250" y1="680" x2="550" y2="680" className="svg-line"/>
               <circle cx="400" cy="680" r="3" fill="#c9a86c"/>
               <path d="M380 820 Q400 800 420 820" fill="none" stroke="#c9a86c" strokeWidth="1.2"/>
