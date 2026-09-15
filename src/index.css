@@ -1,45 +1,55 @@
 @import "tailwindcss";
 
 @theme {
-  /* ===== LIGHT: Pure White & Carbon ===== */
-  --color-bg: #F9FAFB;
+  /* ===== LIGHT: Premium Minimalism ===== */
+  --color-bg: #F8FAFC;
   --color-surface: #FFFFFF;
-  --color-surface-2: #F3F4F6;
-  --color-ink: #030712;
-  --color-ink-soft: #374151;
-  --color-muted: #9CA3AF;
-  --color-accent: #111827;
-  --color-accent-soft: #4B5563;
+  --color-surface-2: #F1F5F9;
+  --color-ink: #0F172A;
+  --color-ink-soft: #475569;
+  --color-muted: #94A3B8;
+  --color-accent: #0F172A;
+  --color-accent-soft: #CBD5E1;
+  --color-border: #E2E8F0;    /* <-- ИСПРАВЛЕНИЕ: Мягкие, еле заметные рамки */
+  
+  --color-danger: #EF4444;    /* <-- ИСПРАВЛЕНИЕ: Красный для дефицита */
+  --color-success: #10B981;   /* <-- ИСПРАВЛЕНИЕ: Зеленый для волатильности */
+  
   --color-bronze: #6B7280;
   --color-dock: #FFFFFF;
-  --color-dock-border: #E5E7EB;
+  --color-dock-border: #E2E8F0;
   --color-glass: rgba(255, 255, 255, 0.85);
-  --color-glass-border: rgba(0, 0, 0, 0.08);
+  --color-glass-border: rgba(0, 0, 0, 0.06);
 
   --font-display: "Playfair Display", "Times New Roman", serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
 
   --radius-card: 1.25rem;
   --radius-dock: 1.5rem;
-  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.04);
+  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.03);
   --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.08);
 }
 
 .dark {
-  /* ===== DARK: Obsidian & Platinum ===== */
+  /* ===== DARK: Deep OLED & Platinum ===== */
   --color-bg: #09090B;
-  --color-surface: #18181B;
+  --color-surface: #141415;
   --color-surface-2: #27272A;
   --color-ink: #FAFAFA;
-  --color-ink-soft: #E4E4E7;
-  --color-muted: #A1A1AA;
+  --color-ink-soft: #A1A1AA;
+  --color-muted: #71717A;
   --color-accent: #FFFFFF;
-  --color-accent-soft: #D4D4D8;
+  --color-accent-soft: #3F3F46;
+  --color-border: #27272A;    /* <-- ИСПРАВЛЕНИЕ: Разделители, сливающиеся с фоном */
+  
+  --color-danger: #F87171;    /* <-- ИСПРАВЛЕНИЕ: Мягкий красный */
+  --color-success: #34D399;   /* <-- ИСПРАВЛЕНИЕ: Мягкий зеленый */
+  
   --color-bronze: #71717A;
-  --color-dock: #121214;
+  --color-dock: #141415;
   --color-dock-border: #27272A;
-  --color-glass: rgba(24, 24, 27, 0.85);
-  --color-glass-border: rgba(255, 255, 255, 0.12);
+  --color-glass: rgba(20, 20, 21, 0.85);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
 
   --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.5);
   --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.8);
@@ -151,7 +161,7 @@
 .action-pill {
   @apply flex items-center gap-1.5 h-7 px-3 rounded-full text-[10px] font-medium transition-transform active:scale-95 cursor-pointer;
   background: var(--color-surface-2);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   color: var(--color-accent);
   will-change: transform;
 }
@@ -159,7 +169,7 @@
 .card-simplified {
   background: var(--color-surface);
   box-shadow: inset 0 1px 0 var(--color-glass-border), 0 4px 12px var(--shadow-soft);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
 }
 
 .fav-highlight {
