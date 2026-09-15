@@ -97,7 +97,15 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [isDark, setIsDark] = useState(true)
+  
+  // ИСПРАВЛЕНИЕ ЗДЕСЬ: Читаем тему синхронно при инициализации, 
+  // чтобы избежать вспышки черного цвета (FOUC).
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return true
+  })
   
   const hasNewBlog = BLOG_ARTICLES?.some((a) => a.isNew) || false
   const articleFavorites = favorites?.filter((f) => f.type === 'article') || []
@@ -106,7 +114,7 @@ export function HomePage({
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
-    checkTheme()
+    // Наблюдатель все равно нужен на случай, если тема изменится "на лету" из другого меню
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
@@ -287,7 +295,6 @@ export function HomePage({
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
-  // ВАШ ИСХОДНЫЙ ДИЗАЙН
   const renderList = (items: MenuItem[], startIndex: number = 1) => (
     <div className="flex flex-col mb-16">
       {items.map((item, idx) => {
@@ -302,7 +309,7 @@ export function HomePage({
             className={`group relative flex items-end justify-between py-6 border-b outline-none border-0 bg-transparent text-left transition-all ${
               item.action 
                 ? 'active:opacity-50 cursor-pointer' 
-                : 'opacity-40 cursor-default' // Неактивные элементы выглядят именно так, как на скриншоте
+                : 'opacity-40 cursor-default'
             } ${cLine}`}
           >
             <div className="flex items-start gap-4">
@@ -376,7 +383,7 @@ export function HomePage({
           </h1>
         </motion.div>
 
-        {/* ПОИСК В ТОЧНОСТИ КАК БЫЛ */}
+        {/* ПОИСК */}
         <motion.div variants={itemVariants} className="mb-16">
           <div className={`relative flex items-end border-b pb-3 transition-colors ${cLine}`}>
             <span className={`text-[12px] font-serif italic mr-4 ${cTextMuted}`}>Find.</span>
