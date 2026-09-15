@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 
@@ -167,50 +167,45 @@ type SlideItemProps = {
   isMuted: boolean
 }
 
-// Более стабильная кривая для Telegram WebView (Android + iOS)
-const customBezier = [0.25, 0.1, 0.25, 1]
-
 function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
 
   const [isLiked, setIsLiked] = useState(false)
-  const [likesCount, setLikesCount] = useState<number>(0)
+  const [likesCount, setLikesCount] = useState(0)
 
   const userId = getDeviceId()
   const tg = (window as any).Telegram?.WebApp
 
   useEffect(() => {
     if (!isPreloaded) return
-    let isMounted = true
+    let mounted = true
     const fetchLikes = async () => {
       try {
-        const response = await fetch(`/api/like?style_id=\( {slide.id}&user_id= \){userId}`)
-        if (response.ok && isMounted) {
-          const data = await response.json()
+        const res = await fetch(`/api/like?style_id=\( {slide.id}&user_id= \){userId}`)
+        if (res.ok && mounted) {
+          const data = await res.json()
           setLikesCount(data.total || 0)
-          setIsLiked(data.isLiked || false)
+          setIsLiked(!!data.isLiked)
         }
-      } catch (err) {}
+      } catch {}
     }
     fetchLikes()
-    return () => {
-      isMounted = false
-    }
+    return () => { mounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // Контроль памяти (оставляем только ±1 сосед)
+  // Preload только ±1 (как в TikTok/Reels)
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
 
     if (isPreloaded) {
-      if (!video.hasAttribute('src')) {
-        video.setAttribute('src', slide.video)
+      if (video.src !== slide.video) {
+        video.src = slide.video
         video.load()
       }
     } else {
-      if (video.hasAttribute('src')) {
+      if (video.src) {
         video.pause()
         video.removeAttribute('src')
         video.load()
@@ -218,89 +213,85 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     }
   }, [isPreloaded, slide.video])
 
-  // Управление воспроизведением
+  // Play / Pause
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     if (isActive) {
       video.currentTime = 0
-      const playPromise = video.play()
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {})
-      }
+      const p = video.play()
+      if (p) p.catch(() => {})
     } else {
       video.pause()
     }
   }, [isActive])
 
   const handleLike = async () => {
-    const newIsLiked = !isLiked
-    setIsLiked(newIsLiked)
-    setLikesCount((prev) => (newIsLiked ? prev + 1 : prev - 1))
+    const next = !isLiked
+    setIsLiked(next)
+    setLikesCount(c => next ? c + 1 : c - 1)
 
     if (tg?.HapticFeedback) {
-      tg.HapticFeedback.impactOccurred(newIsLiked ? 'medium' : 'light')
+      tg.HapticFeedback.impactOccurred(next ? 'medium' : 'light')
     }
 
     try {
       await fetch(`/api/like?style_id=\( {slide.id}&user_id= \){userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: newIsLiked ? 'like' : 'unlike' }),
+        body: JSON.stringify({ action: next ? 'like' : 'unlike' }),
       })
-    } catch (err) {
-      setIsLiked(!newIsLiked)
-      setLikesCount((prev) => (newIsLiked ? prev - 1 : prev + 1))
+    } catch {
+      setIsLiked(!next)
+      setLikesCount(c => next ? c - 1 : c + 1)
     }
   }
 
   const handleShare = async () => {
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
 
-    const shareText =
+    const title = slide.title[currentLang].replace('\n', ' ')
+    const text =
       currentLang === 'de'
-        ? `Sieh dir diesen Stil an: ${slide.title.de.replace('\n', ' ')} in der Cordwainer Enzyklopädie!`
+        ? `Sieh dir diesen Stil an: ${title} in der Cordwainer Enzyklopädie!`
         : currentLang === 'ru'
-          ? `Смотри, какой фасон: ${slide.title.ru.replace('\n', ' ')} в энциклопедии Cordwainer!`
-          : `Дивись, який фасон: ${slide.title.uk.replace('\n', ' ')} в енциклопедії Cordwainer!`
-    const siteUrl = 'https://www.cordwaine.app'
+          ? `Смотри, какой фасон: ${title} в энциклопедии Cordwainer!`
+          : `Дивись, який фасон: ${title} в енциклопедії Cordwainer!`
+
+    const url = 'https://www.cordwaine.app'
 
     try {
       if (tg?.initData) {
         tg.openTelegramLink(
-          `https://t.me/share/url?url=\( {encodeURIComponent(siteUrl)}&text= \){encodeURIComponent(shareText)}`
+          `https://t.me/share/url?url=\( {encodeURIComponent(url)}&text= \){encodeURIComponent(text)}`
         )
         return
       }
       if (navigator.share) {
-        await navigator.share({ title: 'Cordwainer', text: shareText, url: siteUrl })
+        await navigator.share({ title: 'Cordwainer', text, url })
       } else {
-        await navigator.clipboard.writeText(`\( {shareText}\n \){siteUrl}`)
+        await navigator.clipboard.writeText(`\( {text}\n \){url}`)
       }
-    } catch (err) {}
+    } catch {}
   }
 
   return (
-    <div
-      className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#0A0A0A] transform-gpu"
-      data-index={index}
-    >
-      <div className="absolute inset-0 w-full h-full z-0 bg-black">
+    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-black">
+      {/* Видео */}
+      <div className="absolute inset-0 bg-black">
         {slide.video ? (
           <video
             ref={videoRef}
             preload="none"
             loop
             playsInline
-            webkit-playsinline="true"
             muted={isMuted}
             className={`
               w-full h-full object-cover
-              transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]
-              will-change-[opacity,transform] transform-gpu
-              ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.02]'}
-              ${slide.hideWatermark ? 'scale-[1.12]' : ''}
+              transition-opacity duration-300 ease-out
+              ${isActive ? 'opacity-100' : 'opacity-0'}
+              ${slide.hideWatermark ? 'scale-[1.08]' : ''}
             `}
           />
         ) : slide.image ? (
@@ -312,26 +303,26 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         ) : null}
       </div>
 
-      <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
+      {/* Градиент сверху */}
+      <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
 
-      {/* Верхний блок */}
+      {/* Верхний текст */}
       <div
         className={`
           absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between
-          transform transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]
-          will-change-transform transform-gpu
-          ${isActive ? 'opacity-100 translate-y-0 delay-75' : 'opacity-0 translate-y-3 delay-0'}
+          transition-all duration-300 ease-out
+          ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
         `}
       >
         <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">
+          <p className="text-[9px] font-sans uppercase tracking-[0.35em] text-white/70 mb-2">
             {slide.subtitle[currentLang]}
           </p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-lg">
             {slide.title[currentLang]}
           </h2>
         </div>
-        <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">
+        <div className="text-[10px] font-sans tracking-widest text-white/50 mt-1">
           {String(index + 1).padStart(2, '0')}
         </div>
       </div>
@@ -339,65 +330,46 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
       {/* Нижний блок */}
       <div
         className={`
-          absolute bottom-6 left-6 right-6 z-20 flex flex-col
-          transform transition-all duration-700 ease-[cubic-bezier(0.25,0.1,0.25,1)]
-          will-change-transform transform-gpu
-          ${isActive ? 'opacity-100 translate-y-0 delay-100' : 'opacity-0 translate-y-4 delay-0'}
+          absolute bottom-6 left-6 right-6 z-20
+          transition-all duration-300 ease-out
+          ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}
         `}
       >
-        <div className="w-full h-px bg-white/30 mb-5 shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
+        <div className="w-full h-px bg-white/20 mb-5" />
         <div className="flex items-start justify-between gap-4">
-          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-relaxed text-white/90 max-w-[230px] min-[390px]:max-w-[270px]">
             {slide.desc[currentLang]}
           </p>
-          <div className="flex items-center gap-4 shrink-0 mt-1">
-            <button onClick={handleLike} className="group flex flex-col items-center gap-1.5 outline-none">
+
+          <div className="flex items-center gap-4 shrink-0">
+            <button onClick={handleLike} className="flex flex-col items-center gap-1.5">
               <div
                 className={`
                   w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center
-                  transition-all duration-300 active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]
+                  transition-all duration-200 active:scale-90
                   ${isLiked
-                    ? 'border-white bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]'
-                    : 'border-white/50 text-white bg-black/20 backdrop-blur-sm hover:border-white'}
+                    ? 'border-white bg-white text-black'
+                    : 'border-white/40 text-white bg-black/30 backdrop-blur-sm'}
                 `}
               >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill={isLiked ? 'currentColor' : 'none'}
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                 </svg>
               </div>
-              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <span className="text-[8px] tracking-widest uppercase text-white/80">
                 {likesCount || 'LIKE'}
               </span>
             </button>
-            <button onClick={handleShare} className="group flex flex-col items-center gap-1.5 outline-none">
-              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-300 hover:border-white active:scale-90 shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+
+            <button onClick={handleShare} className="flex flex-col items-center gap-1.5">
+              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/40 bg-black/30 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 active:scale-90">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                   <polyline points="16 6 12 2 8 6" />
                   <line x1="12" y1="2" x2="12" y2="15" />
                 </svg>
               </div>
-              <span className="text-[8.5px] font-sans tracking-widest uppercase text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                SHARE
-              </span>
+              <span className="text-[8px] tracking-widest uppercase text-white/80">SHARE</span>
             </button>
           </div>
         </div>
@@ -408,8 +380,8 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
 
 const pageVariants = {
   initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.6, ease: customBezier } },
-  exit: { opacity: 0, transition: { duration: 0.4, ease: customBezier } },
+  animate: { opacity: 1, transition: { duration: 0.4 } },
+  exit: { opacity: 0, transition: { duration: 0.3 } },
 }
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
@@ -418,26 +390,25 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // Надёжное определение активного слайда через IntersectionObserver
+  // IntersectionObserver — как в TikTok/Reels
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
 
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
             const idx = Number(entry.target.getAttribute('data-index'))
-            if (!isNaN(idx) && idx !== activeIndex) {
+            if (!Number.isNaN(idx)) {
               setActiveIndex(idx)
             }
           }
-        })
+        }
       },
       {
         root,
-        threshold: [0.55, 0.7],
-        rootMargin: '0px',
+        threshold: [0.6],
       }
     )
 
@@ -446,9 +417,9 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     })
 
     return () => observer.disconnect()
-  }, [activeIndex])
+  }, [])
 
-  // Telegram init
+  // Telegram
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     if (tg) {
@@ -464,10 +435,9 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="fixed inset-0 z-50 bg-[#0A0A0A] text-[#F4F0E8] overflow-hidden"
+      className="fixed inset-0 z-50 bg-black text-[#F4F0E8] overflow-hidden"
     >
       <style>{`
-        .snap-container::-webkit-scrollbar { display: none; }
         .snap-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
@@ -475,36 +445,38 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           overscroll-behavior-y: contain;
           touch-action: pan-y;
         }
+        .snap-container::-webkit-scrollbar { display: none; }
         * {
           -webkit-tap-highlight-color: transparent !important;
           -webkit-touch-callout: none;
         }
       `}</style>
 
+      {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
         <button
           onClick={onBack}
-          className="pointer-events-auto flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+          className="pointer-events-auto flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] text-white/90"
         >
-          <span>←</span>
-          <span>Back</span>
+          ← Back
         </button>
         <button
           onClick={() => {
             if ((window as any).Telegram?.WebApp?.HapticFeedback) {
               ;(window as any).Telegram.WebApp.HapticFeedback.impactOccurred('light')
             }
-            setIsMuted(!isMuted)
+            setIsMuted(v => !v)
           }}
-          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] hover:text-white transition-colors outline-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-white/90"
         >
           {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
         </button>
       </header>
 
+      {/* Feed */}
       <div
         ref={scrollRef}
-        className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory relative bg-[#0A0A0A]"
+        className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
       >
         {STYLES_DATA.map((slide, index) => {
           const isPreloaded = Math.abs(activeIndex - index) <= 1
@@ -513,11 +485,9 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           return (
             <div
               key={slide.id}
-              ref={(el) => {
-                slideRefs.current[index] = el
-              }}
+              ref={(el) => { slideRefs.current[index] = el }}
               data-index={index}
-              className="h-full w-full"
+              className="h-full w-full snap-start snap-always"
             >
               <SlideItem
                 slide={slide}
