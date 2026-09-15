@@ -10,8 +10,6 @@ import {
   ChevronDown,
   Bookmark,
   TrendingDown,
-  Sun,
-  Moon,
   Info
 } from 'lucide-react'
 import type { Lang } from '../App'
@@ -101,10 +99,9 @@ const DICTIONARY = {
     gotIt: 'Понятно',
     recommendationLabel: 'Стратегия',
 
-    // Динамические тексты
     spreadLow: 'Цены на рынке почти идентичны. Выгоднее выбирать поставщика с наиболее удобной логистикой или лучшим сервисом, так как разница в цене минимальна.',
     spreadMid: 'Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки вас устраивают.',
-    spreadHigh: 'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у поставщика с зеленой отметкой, чтобы максимизировать вашу маржинальность.',
+    spreadHigh: 'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у поставщика с желтой отметкой, чтобы максимизировать вашу маржинальность.',
     
     volLow: 'Рынок в данной категории абсолютно стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.',
     volMid: 'Наблюдаются умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях из списка.',
@@ -145,7 +142,7 @@ const DICTIONARY = {
 
     spreadLow: 'Ціни на ринку майже ідентичні. Вигідніше обирати постачальника з найбільш зручною логістикою.',
     spreadMid: 'Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.',
-    spreadHigh: 'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у постачальника із зеленою позначкою для максимізації маржинальності.',
+    spreadHigh: 'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у постачальника із жовтою позначкою для максимізації маржинальності.',
     
     volLow: 'Ринок стабільний, ціни у постачальників тримаються на одному рівні.',
     volMid: 'Помірні коливання цін. Оптимальний час для точкової економії.',
@@ -186,7 +183,7 @@ const DICTIONARY = {
 
     spreadLow: 'Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.',
     spreadMid: 'Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.',
-    spreadHigh: 'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim grün markierten Lieferanten zu kaufen.',
+    spreadHigh: 'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim gelb markierten Lieferanten zu kaufen.',
     
     volLow: 'Der Markt ist stabil, die Preise bleiben auf einem Niveau.',
     volMid: 'Moderate Preisschwankungen. Optimale Zeit für gezielte Einsparungen.',
@@ -311,38 +308,37 @@ const ProductCard = memo(
     const isDeficit = group.totalOffers >= 3 && group.outOfStockCount >= 2
 
     return (
-      <article className="group/card flex flex-col bg-white dark:bg-[#1A1614] border border-stone-200 dark:border-white/5 transition-colors shadow-sm hover:shadow-md dark:shadow-black/40 relative">
-        <div className="p-5 border-b border-stone-100 dark:border-white/5 flex gap-4 items-start relative">
+      <article className="group/card flex flex-col bg-[var(--color-surface)] border border-[var(--color-border)] transition-colors shadow-sm hover:shadow-md relative">
+        <div className="p-5 border-b border-[var(--color-border)] flex gap-4 items-start relative">
           
           {group.image_url ? (
             <img
               src={group.image_url}
               alt={group.name}
-              className="w-16 h-16 object-cover bg-stone-50 dark:bg-[#25201C] border border-stone-200 dark:border-white/5 grayscale group-hover/card:grayscale-0 transition-all duration-500 shrink-0"
+              className="w-16 h-16 object-cover bg-[var(--color-surface-2)] border border-[var(--color-border)] grayscale group-hover/card:grayscale-0 transition-all duration-500 shrink-0"
               loading="lazy"
             />
           ) : (
-            <div className="w-16 h-16 flex items-center justify-center bg-stone-50 dark:bg-[#25201C] border border-stone-200 dark:border-white/5 text-stone-400 dark:text-white/20 shrink-0">
+            <div className="w-16 h-16 flex items-center justify-center bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-muted)] shrink-0 opacity-50">
               <Tag size={20} strokeWidth={1.5} />
             </div>
           )}
           
           <div className="flex-1 min-w-0 pr-8">
-            <h3 className="font-serif text-lg font-medium leading-snug text-stone-900 dark:text-[#F5F1EA] line-clamp-2">
+            <h3 className="font-serif text-lg font-medium leading-snug text-[var(--color-ink)] line-clamp-2">
               {group.name}
             </h3>
             
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
               {group.product_code && (
-                <span className="text-[10px] font-mono text-stone-500 dark:text-[#B9ACA0] uppercase tracking-widest">
+                <span className="text-[10px] font-mono text-[var(--color-muted)] uppercase tracking-widest">
                   {t.code} {group.product_code}
                 </span>
               )}
               {showSpread && group.unitSpread > 0 && (
                 <button 
                   onClick={() => onOpenSpreadModal(group.unitSpread)}
-                  // Расширенная тап-зона через p-2 -m-2 для соответствия HIG
-                  className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-[#E4D00A] hover:text-emerald-800 dark:hover:text-[#F5E11D] transition-colors focus:outline-none rounded-md"
+                  className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-[var(--color-accent)] hover:opacity-80 transition-colors focus:outline-none rounded-md"
                   aria-label="Что такое спред?"
                 >
                   <TrendingDown size={14} strokeWidth={2.5} />
@@ -351,7 +347,7 @@ const ProductCard = memo(
                 </button>
               )}
               {isDeficit && (
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 px-1.5 py-0.5">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-danger)] border border-[var(--color-danger)]/50 px-1.5 py-0.5">
                   {t.deficit}
                 </span>
               )}
@@ -360,15 +356,15 @@ const ProductCard = memo(
           
           <button 
             onClick={() => onToggleFavorite(group.key)}
-            className="absolute top-4 right-4 p-2 -m-2 text-stone-400 dark:text-white/30 hover:text-stone-900 dark:hover:text-white transition-colors focus:outline-none"
+            className="absolute top-4 right-4 p-2 -m-2 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors focus:outline-none"
           >
-            <Bookmark size={18} strokeWidth={1.5} className={isFavorite ? "fill-stone-900 dark:fill-[#E4D00A] text-stone-900 dark:text-[#E4D00A]" : ""} />
+            <Bookmark size={18} strokeWidth={1.5} className={isFavorite ? "fill-[var(--color-accent)] text-[var(--color-accent)]" : ""} />
           </button>
         </div>
 
-        <div className="flex flex-col bg-stone-50/50 dark:bg-[#1A1614]">
+        <div className="flex flex-col">
           {!showSpread && (
-            <div className="px-5 py-3 text-[11px] uppercase tracking-widest text-stone-500 dark:text-[#B9ACA0] flex items-center gap-2 border-b border-stone-100 dark:border-white/5 last:border-0">
+            <div className="px-5 py-3 text-[11px] uppercase tracking-widest text-[var(--color-muted)] flex items-center gap-2 border-b border-[var(--color-border)] last:border-0">
               <Store size={14} strokeWidth={1.5} className="opacity-50" /> {t.singleOffer}
             </div>
           )}
@@ -390,28 +386,30 @@ const ProductCard = memo(
               <Comp
                 key={`${offer.source}_${offer.id}`}
                 {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-                className={`relative flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-white/5 last:border-0 transition-colors group/row
-                  ${isBest ? 'bg-emerald-50/40 dark:bg-[#E4D00A]/10' : 'bg-transparent dark:bg-[#25201C] hover:bg-stone-100/50 dark:hover:bg-white/5'}
+                // Используем rgba хак для полупрозрачного акцентного фона, чтобы не перебивать цвет текста
+                style={isBest ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)' } : {}}
+                className={`relative flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)] last:border-0 transition-colors group/row
+                  ${!isBest ? 'hover:bg-[var(--color-surface-2)]' : ''}
                   ${offer.url ? 'cursor-pointer' : ''}
                 `}
               >
                 {isBest && (
-                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-600 dark:bg-[#E4D00A]" />
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--color-accent)]" />
                 )}
 
                 <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
-                  <span className={`text-sm font-medium truncate ${isBest ? 'text-stone-900 dark:text-white' : 'text-stone-600 dark:text-[#B9ACA0]'}`}>
+                  <span className={`text-sm font-medium truncate ${isBest ? 'text-[var(--color-ink)]' : 'text-[var(--color-muted)]'}`}>
                     {formatSourceName(offer.source)}
                   </span>
                   
                   {offer.volumeLabel && (
-                    <span className="text-[11px] text-stone-500 dark:text-[#B9ACA0] font-mono border border-stone-200 dark:border-white/10 px-1.5 py-0.5 bg-white dark:bg-[#1A1614] shrink-0">
+                    <span className="text-[11px] text-[var(--color-muted)] font-mono border border-[var(--color-border)] px-1.5 py-0.5 bg-[var(--color-bg)] shrink-0">
                       {offer.volumeLabel}
                     </span>
                   )}
                   
                   {isArbitrage && (
-                     <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-[#E4D00A] hidden sm:inline-block shrink-0">
+                     <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--color-accent)] hidden sm:inline-block shrink-0">
                         {t.urgentBuy}
                      </span>
                   )}
@@ -425,8 +423,8 @@ const ProductCard = memo(
                         const isLast = i === historyData.length - 1
                         const trendDown = historyData[4] < historyData[0]
                         const barColor = isLast 
-                          ? (trendDown ? 'bg-emerald-600 dark:bg-[#32D74B]' : 'bg-rose-600 dark:bg-rose-500') 
-                          : 'bg-stone-300 dark:bg-white/20'
+                          ? (trendDown ? 'bg-[var(--color-success)]' : 'bg-[var(--color-danger)]') 
+                          : 'bg-[var(--color-muted)] opacity-50'
                         return (
                           <div key={i} style={{ height: `${heightPct}%` }} className={`flex-1 ${barColor}`} />
                         )
@@ -435,11 +433,11 @@ const ProductCard = memo(
                   )}
 
                   <div className="flex flex-col items-end leading-tight text-right w-24">
-                    <span className={`text-sm font-medium tabular-nums ${isBest ? 'text-emerald-700 dark:text-[#E4D00A]' : 'text-stone-900 dark:text-white'}`}>
+                    <span className={`text-sm font-medium tabular-nums ${isBest ? 'text-[var(--color-accent)]' : 'text-[var(--color-ink)]'}`}>
                       {formatPrice(offer.price, lang)}
                     </span>
                     {offer.multiplier !== 1 && offer.unitPrice > 0 && (
-                      <span className="text-[10px] text-stone-500 dark:text-[#B9ACA0] font-mono tracking-tighter mt-1">
+                      <span className="text-[10px] text-[var(--color-muted)] font-mono tracking-tighter mt-1">
                         ≈ {Math.round(offer.unitPrice)} / {offer.baseUnit}
                       </span>
                     )}
@@ -451,7 +449,7 @@ const ProductCard = memo(
         </div>
         
         {formattedDate && (
-          <div className="px-5 py-2.5 bg-stone-100 dark:bg-[#1A1614] text-[10px] text-stone-500 dark:text-[#B9ACA0] uppercase tracking-widest flex items-center justify-between border-t border-stone-200 dark:border-white/5">
+          <div className="px-5 py-2.5 bg-[var(--color-surface)] text-[10px] text-[var(--color-muted)] uppercase tracking-widest flex items-center justify-between border-t border-[var(--color-border)]">
             <span>{t.updatedAt}</span>
             <span className="font-mono">{formattedDate}</span>
           </div>
@@ -475,23 +473,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const [usdRate, setUsdRate] = useState<number | null>(null)
   
   const [modalData, setModalData] = useState<ModalData>(null)
-  
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
-        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    }
-    return false
-  })
-
-  useEffect(() => {
-    localStorage.setItem('theme', isDark ? 'dark' : 'light')
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [isDark])
 
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -672,40 +653,39 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const currentModalContent = getModalText()
 
   return (
-    // ИСПРАВЛЕНИЕ ТЕМЫ: Убран тернарный оператор для фона, теперь bg-stone-50 и dark:bg-[#12100E] синхронизированы 
-    <div className="min-h-screen w-full bg-stone-50 dark:bg-[#12100E] text-stone-900 dark:text-[#F5F1EA] font-sans transition-colors duration-300">
+    <div className="min-h-[100dvh] w-full bg-[var(--color-bg)] text-[var(--color-ink)] font-sans transition-colors duration-300">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="flex flex-col h-[100dvh] relative"
       >
-        <header className="shrink-0 z-20 bg-stone-50 dark:bg-[#1A1614] border-b border-stone-200 dark:border-white/5 pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
+        <header className="shrink-0 z-20 bg-[var(--color-surface)] border-b border-[var(--color-border)] pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
             
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex items-center gap-4 min-w-0">
                 <button
                   onClick={onBack}
-                  className="relative p-2 -m-2 border border-stone-200 dark:border-white/10 rounded-lg flex items-center justify-center text-stone-500 dark:text-white/40 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors shrink-0"
+                  className="relative p-2 -m-2 border border-[var(--color-border)] rounded-lg flex items-center justify-center text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] transition-colors shrink-0"
                   aria-label="Назад"
                 >
                   <ArrowLeft size={18} strokeWidth={1.5} />
                 </button>
                 <div className="min-w-0">
-                  <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-stone-900 dark:text-[#F5F1EA] flex items-center gap-2.5">
-                    <BookOpen size={22} className="text-stone-400 dark:text-white/30 shrink-0" strokeWidth={1.5} />
+                  <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-[var(--color-ink)] flex items-center gap-2.5">
+                    <BookOpen size={22} className="text-[var(--color-muted)] opacity-70 shrink-0" strokeWidth={1.5} />
                     <span className="truncate">{t.title}</span>
                   </h1>
                   
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-stone-500 dark:text-[#B9ACA0] mt-1.5 font-mono">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[var(--color-muted)] mt-1.5 font-mono">
                     <span>{stats.total} {t.statsTotal}</span>
                     {stats.multiCount > 0 && (
                       <>
-                        <span className="text-stone-300 dark:text-white/20 font-sans">/</span>
+                        <span className="text-[var(--color-muted)] opacity-30 font-sans">/</span>
                         <button
                           onClick={() => setModalData({ type: 'volatility', value: stats.avgSpreadValue })}
-                          className="relative inline-flex items-center p-1 -m-1 rounded text-emerald-700 dark:text-[#E4D00A] font-sans font-medium focus:outline-none hover:text-emerald-800 dark:hover:text-[#F5E11D] transition-colors"
+                          className="relative inline-flex items-center p-1 -m-1 rounded text-[var(--color-accent)] font-sans font-medium focus:outline-none hover:opacity-80 transition-colors"
                           aria-label="Что такое волатильность?"
                         >
                           {t.statsAvgSpread}: {stats.avgSpreadText}%
@@ -715,8 +695,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     )}
                     {(usdRate || eurRate) && (
                       <>
-                        <span className="text-stone-300 dark:text-white/20 font-sans">/</span>
-                        <span className="tabular-nums font-semibold text-stone-800 dark:text-[#F5F1EA]">
+                        <span className="text-[var(--color-muted)] opacity-30 font-sans">/</span>
+                        <span className="tabular-nums font-semibold text-[var(--color-ink)]">
                           {usdRate && `$ ${usdRate.toFixed(2)}`}
                           {usdRate && eurRate && ' · '}
                           {eurRate && `€ ${eurRate.toFixed(2)}`}
@@ -726,30 +706,22 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   </div>
                 </div>
               </div>
-
-              <button
-                onClick={() => setIsDark(!isDark)}
-                className="relative p-2.5 -m-1 border border-stone-200 dark:border-white/10 rounded-lg text-stone-500 dark:text-white/40 hover:bg-stone-100 dark:hover:bg-white/5 transition-colors shrink-0"
-                aria-label="Сменить тему"
-              >
-                {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
-              </button>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-3 border-t border-stone-200 dark:border-white/5 pt-4">
+            <div className="flex flex-col lg:flex-row gap-3 border-t border-[var(--color-border)] pt-4">
               <div className="relative flex-1 max-w-md">
-                <Search size={16} strokeWidth={1.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 dark:text-white/30" />
+                <Search size={16} strokeWidth={1.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t.search}
-                  className="w-full h-10 pl-10 pr-9 bg-white dark:bg-[#25201C] border border-stone-200 dark:border-white/5 focus:border-stone-900 dark:focus:border-white/20 outline-none text-sm placeholder:text-stone-400 dark:placeholder:text-white/30 text-stone-900 dark:text-[#F5F1EA] transition-colors"
+                  className="w-full h-10 pl-10 pr-9 bg-[var(--color-surface-2)] border border-[var(--color-border)] focus:border-[var(--color-ink)] outline-none text-sm placeholder:text-[var(--color-muted)] text-[var(--color-ink)] transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-stone-400 hover:text-stone-900 dark:hover:text-white"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-[var(--color-muted)] hover:text-[var(--color-ink)]"
                   >
                     <X size={15} strokeWidth={1.5} />
                   </button>
@@ -760,7 +732,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="h-10 px-3 text-xs uppercase tracking-wider bg-white dark:bg-[#25201C] text-stone-900 dark:text-[#F5F1EA] border border-stone-200 dark:border-white/5 outline-none cursor-pointer appearance-none shrink-0"
+                  className="h-10 px-3 text-xs uppercase tracking-wider bg-[var(--color-surface-2)] text-[var(--color-ink)] border border-[var(--color-border)] outline-none cursor-pointer appearance-none shrink-0"
                 >
                   <option value="default">{t.sortDefault}</option>
                   <option value="savings">{t.sortSavings}</option>
@@ -768,15 +740,15 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   <option value="name">{t.sortName}</option>
                 </select>
 
-                <div className="h-5 w-px bg-stone-200 dark:bg-white/10 shrink-0" />
+                <div className="h-5 w-px bg-[var(--color-border)] shrink-0" />
 
                 <div className="flex gap-1.5 shrink-0">
                   <button
                     onClick={() => setSelectedSource('all')}
                     className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ${
                       selectedSource === 'all' 
-                        ? 'border-stone-900 bg-stone-900 text-white dark:border-[#E4D00A] dark:bg-[#E4D00A] dark:text-black' 
-                        : 'border-transparent text-stone-500 dark:text-[#B9ACA0] hover:text-stone-900 dark:hover:text-white'
+                        ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]' 
+                        : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                     }`}
                   >
                     {t.allSources}
@@ -785,8 +757,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     onClick={() => setSelectedSource('favorites')}
                     className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold flex items-center gap-1.5 transition-colors border ${
                       selectedSource === 'favorites' 
-                        ? 'border-stone-900 bg-stone-900 text-white dark:border-[#E4D00A] dark:bg-[#E4D00A] dark:text-black' 
-                        : 'border-transparent text-stone-500 dark:text-[#B9ACA0] hover:text-stone-900 dark:hover:text-white'
+                        ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]' 
+                        : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                     }`}
                   >
                     <Bookmark size={13} strokeWidth={selectedSource === 'favorites' ? 2 : 1.5} className={selectedSource === 'favorites' ? "fill-current" : ""} />
@@ -798,8 +770,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                       onClick={() => setSelectedSource(src)}
                       className={`px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ${
                         selectedSource === src 
-                          ? 'border-stone-900 bg-stone-900 text-white dark:border-[#E4D00A] dark:bg-[#E4D00A] dark:text-black' 
-                          : 'border-transparent text-stone-500 dark:text-[#B9ACA0] hover:text-stone-900 dark:hover:text-white'
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]' 
+                          : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                       }`}
                     >
                       {formatSourceName(src)}
@@ -816,24 +788,24 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-60 bg-white dark:bg-[#1A1614] border border-stone-200 dark:border-white/5 animate-pulse" />
+                  <div key={i} className="h-60 bg-[var(--color-surface)] border border-[var(--color-border)] animate-pulse" />
                 ))}
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-28 text-center">
-                <p className="font-serif text-xl text-stone-600 dark:text-[#B9ACA0] mb-6">{error}</p>
+                <p className="font-serif text-xl text-[var(--color-muted)] mb-6">{error}</p>
                 <button
                   onClick={load}
-                  className="px-8 py-3 border border-stone-900 dark:border-[#E4D00A] text-xs uppercase tracking-widest font-semibold hover:bg-stone-900 hover:text-white dark:text-[#E4D00A] dark:hover:bg-[#E4D00A] dark:hover:text-black transition-colors"
+                  className="px-8 py-3 border border-[var(--color-accent)] text-xs uppercase tracking-widest font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-[var(--color-bg)] transition-colors"
                 >
                   {t.retry}
                 </button>
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-28 text-center text-stone-500 dark:text-white/20">
+              <div className="flex flex-col items-center justify-center py-28 text-center text-[var(--color-muted)]">
                 <Tag size={44} strokeWidth={1} className="mb-4 opacity-40" />
-                <p className="font-serif text-2xl text-stone-900 dark:text-[#F5F1EA] mb-2">{t.empty}</p>
-                <p className="text-sm tracking-wide text-stone-500 dark:text-[#B9ACA0]">{t.emptyHint}</p>
+                <p className="font-serif text-2xl text-[var(--color-ink)] mb-2">{t.empty}</p>
+                <p className="text-sm tracking-wide text-[var(--color-muted)]">{t.emptyHint}</p>
               </div>
             ) : (
               <div className="pb-14">
@@ -864,7 +836,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   <div className="mt-10 flex justify-center">
                     <button
                       onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
-                      className="px-8 py-3.5 border border-stone-300 dark:border-white/10 bg-white dark:bg-[#1A1614] text-xs uppercase tracking-widest font-semibold text-stone-900 dark:text-[#F5F1EA] hover:border-stone-900 dark:hover:border-white/30 transition-colors flex items-center gap-2.5"
+                      className="px-8 py-3.5 border border-[var(--color-border)] bg-[var(--color-surface)] text-xs uppercase tracking-widest font-semibold text-[var(--color-ink)] hover:border-[var(--color-ink)] transition-colors flex items-center gap-2.5"
                     >
                       {t.loadMore} <ChevronDown size={14} strokeWidth={2} />
                     </button>
@@ -883,48 +855,48 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setModalData(null)}
-                className="absolute inset-0 bg-stone-900/60 dark:bg-black/80 backdrop-blur-sm"
+                className="absolute inset-0 bg-[#000000] opacity-70 backdrop-blur-sm"
               />
               <motion.div
                 initial={{ opacity: 0, y: 100 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 100 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#1A1614] border-t sm:border border-stone-200 dark:border-white/10 shadow-2xl p-7 rounded-t-3xl sm:rounded-3xl z-10 overflow-hidden"
+                className="relative w-full max-w-md bg-[var(--color-surface)] border-t sm:border border-[var(--color-border)] shadow-2xl p-7 rounded-t-3xl sm:rounded-3xl z-10 overflow-hidden"
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 dark:bg-[#E4D00A]" />
+                <div className="absolute top-0 left-0 w-full h-1 bg-[var(--color-accent)]" />
                 
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    {/* ГИГАНТСКИЙ ПРОЦЕНТ ДЛЯ ОЧЕВИДНОСТИ */}
-                    <div className="text-6xl font-serif font-medium text-emerald-700 dark:text-[#E4D00A] tracking-tight mb-2">
+                    <div className="text-6xl font-serif font-medium text-[var(--color-accent)] tracking-tight mb-2">
                       {modalData.value.toFixed(0)}%
                     </div>
-                    <h3 className="text-sm uppercase tracking-widest text-stone-500 dark:text-[#B9ACA0] font-bold mb-6">
+                    <h3 className="text-sm uppercase tracking-widest text-[var(--color-muted)] font-bold mb-6">
                       {modalData.type === 'spread' ? t.spreadTitle : t.volatilityTitle}
                     </h3>
                   </div>
                   <button 
                     onClick={() => setModalData(null)}
-                    className="p-2 -m-2 text-stone-400 dark:text-white/30 hover:text-stone-900 dark:hover:text-white transition-colors"
+                    className="p-2 -m-2 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors"
                   >
                     <X size={20} strokeWidth={1.5} />
                   </button>
                 </div>
 
-                <div className="bg-stone-50 dark:bg-[#25201C] p-5 border border-stone-200 dark:border-white/5 relative">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-600/50 dark:bg-[#E4D00A]/50" />
-                  <p className="text-[11px] font-bold text-stone-800 dark:text-[#F5F1EA] uppercase tracking-widest mb-2 font-mono">
+                <div className="bg-[var(--color-surface-2)] p-5 border border-[var(--color-border)] relative">
+                  {/* Имитация прозрачности поверх accent для линии */}
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-accent)] opacity-50" />
+                  <p className="text-[11px] font-bold text-[var(--color-ink)] uppercase tracking-widest mb-2 font-mono">
                     {t.recommendationLabel}
                   </p>
-                  <p className="text-[14px] text-stone-700 dark:text-[#B9ACA0] leading-relaxed">
+                  <p className="text-[14px] text-[var(--color-muted)] leading-relaxed">
                     {currentModalContent.rec}
                   </p>
                 </div>
 
                 <button
                   onClick={() => setModalData(null)}
-                  className="mt-8 w-full py-4 bg-stone-900 dark:bg-[#E4D00A] text-white dark:text-black text-xs uppercase tracking-widest font-bold hover:opacity-90 active:scale-[0.98] transition-all"
+                  className="mt-8 w-full py-4 bg-[var(--color-accent)] text-[var(--color-bg)] text-xs uppercase tracking-widest font-bold hover:opacity-90 active:scale-[0.98] transition-all"
                 >
                   {t.gotIt}
                 </button>
