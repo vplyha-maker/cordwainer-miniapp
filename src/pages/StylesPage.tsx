@@ -168,28 +168,8 @@ type SlideItemProps = {
 }
 
 // ПРЕМИАЛЬНАЯ АНИМАЦИЯ: Элитарная кривая Безье (ease-out-expo)
-// Уверенный старт и очень долгое, мягкое "затухание" движения в конце
+// Используется для перехода страницы (Framer Motion)
 const customBezier = [0.19, 1, 0.22, 1];
-
-const topTextVariants = {
-  // Единая гравитация: всплывает снизу вверх (y: 15)
-  hidden: { opacity: 0, y: 15 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { duration: 1.4, ease: customBezier, delay: 0.1 } 
-  }
-};
-
-const bottomTextVariants = {
-  // Легкая задержка (delay: 0.25) создает красивую волну появления после заголовка
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { duration: 1.5, ease: customBezier, delay: 0.25 } 
-  }
-};
 
 function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -306,7 +286,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             playsInline
             webkit-playsinline="true"
             muted={isMuted} 
-            className={`w-full h-full object-cover transition-all duration-[1.5s] ease-[cubic-bezier(0.16,1,0.3,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.03]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
+            className={`w-full h-full object-cover transition-all duration-[1500ms] ease-[cubic-bezier(0.19,1,0.22,1)] ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-[1.03]'} ${slide.hideWatermark ? 'scale-[1.15]' : ''}`}
           />
         ) : slide.image ? (
           <img src={slide.image} alt={slide.title[currentLang]} className="w-full h-full object-cover" />
@@ -315,15 +295,17 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
 
       <div className="absolute top-0 left-0 right-0 h-[35%] bg-gradient-to-b from-[#0A0A0A]/90 via-[#0A0A0A]/40 to-transparent z-10 pointer-events-none" />
 
-      <motion.div variants={topTextVariants} initial="hidden" animate={isActive ? "visible" : "hidden"} className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between">
+      {/* ВЕРХНИЙ БЛОК НА ЧИСТОМ CSS С АППАРАТНЫМ УСКОРЕНИЕМ И КРИВОЙ БЕЗЬЕ */}
+      <div className={`absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between transform transition-all duration-[1400ms] ease-[cubic-bezier(0.19,1,0.22,1)] will-change-transform ${isActive ? 'opacity-100 translate-y-0 delay-[100ms]' : 'opacity-0 translate-y-[15px] delay-0'}`}>
         <div>
           <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/80 mb-2 drop-shadow-md">{slide.subtitle[currentLang]}</p>
           <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-[-0.02em] text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{slide.title[currentLang]}</h2>
         </div>
         <div className="text-[10px] font-sans tracking-widest text-white/60 mt-1 drop-shadow-md">{String(index + 1).padStart(2, '0')}</div>
-      </motion.div>
+      </div>
 
-      <motion.div variants={bottomTextVariants} initial="hidden" animate={isActive ? "visible" : "hidden"} className="absolute bottom-6 left-6 right-6 z-20 flex flex-col">
+      {/* НИЖНИЙ БЛОК НА ЧИСТОМ CSS С АППАРАТНЫМ УСКОРЕНИЕМ И КРИВОЙ БЕЗЬЕ */}
+      <div className={`absolute bottom-6 left-6 right-6 z-20 flex flex-col transform transition-all duration-[1500ms] ease-[cubic-bezier(0.19,1,0.22,1)] will-change-transform ${isActive ? 'opacity-100 translate-y-0 delay-[250ms]' : 'opacity-0 translate-y-[20px] delay-0'}`}>
         <div className="w-full h-px bg-white/30 mb-5 shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
         <div className="flex items-start justify-between gap-4">
           <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.6] text-white max-w-[220px] min-[390px]:max-w-[260px] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">{slide.desc[currentLang]}</p>
@@ -342,7 +324,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             </button>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
