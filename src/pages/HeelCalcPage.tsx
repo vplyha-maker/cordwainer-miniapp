@@ -163,9 +163,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20 shrink-0">
         <button 
           onClick={() => { haptic('light'); onBack(); }}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} transition-colors touch-manipulation`}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer p-2 -m-2 ${cTextMuted} transition-colors touch-manipulation`}
         >
-          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span className="transform transition-transform group-active:-translate-x-1">←</span>
           <span>Back</span>
         </button>
       </header>
@@ -190,7 +190,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               <button
                 key={type}
                 onClick={() => { haptic('light'); setSoleType(type) }}
-                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer touch-manipulation ${
+                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent p-2 -m-2 cursor-pointer touch-manipulation ${
                   soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60`
                 }`}
               >
@@ -205,7 +205,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 <button
                   key={type}
                   onClick={() => { haptic('light'); setHeelType(type) }}
-                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap touch-manipulation ${
+                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent p-2 -m-2 cursor-pointer whitespace-nowrap touch-manipulation ${
                     heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50`
                   }`}
                 >
@@ -221,7 +221,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 <button
                   key={type}
                   onClick={() => handleRockerType(type)}
-                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent cursor-pointer whitespace-nowrap touch-manipulation ${
+                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent p-2 -m-2 cursor-pointer whitespace-nowrap touch-manipulation ${
                     rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50`
                   }`}
                 >
@@ -270,7 +270,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         <div className="stagger-item w-full" style={{ animationDelay: '0.25s' }}>
           <button
             onClick={() => { haptic('light'); setShowSpecs(!showSpecs); }}
-            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none cursor-pointer ${cLine} ${cTextMuted} touch-manipulation`}
+            className={`w-full flex items-center justify-between py-4 -my-4 border-b transition-colors outline-none cursor-pointer ${cLine} ${cTextMuted} touch-manipulation`}
           >
             <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
               {t.specsBtn}
@@ -283,7 +283,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           <AnimatePresence>
             {showSpecs && (
               <motion.div
-                key="specs-accordion" // ВАЖНО: Добавлен key для iOS
+                key="specs-accordion" 
                 initial={{ opacity: 0, height: 0 }} 
                 animate={{ opacity: 1, height: 'auto' }} 
                 exit={{ opacity: 0, height: 0 }}
@@ -343,7 +343,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       <AnimatePresence>
         {activeInfo && (
           <motion.div
-            key="info-modal-backdrop" // ВАЖНО: Добавлен key для iOS
+            key="info-modal-backdrop" 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md cursor-pointer touch-manipulation"
             onClick={() => setActiveInfo(null)}
@@ -391,7 +391,8 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer touch-manipulation ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
+          // Увеличена зона клика с помощью p-4 -m-4
+          className={`text-2xl leading-none p-4 -m-4 outline-none cursor-pointer touch-manipulation ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
         >
           -
         </button>
@@ -401,7 +402,8 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
         <button 
           type="button"
           onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
-          className={`text-2xl leading-none px-2 outline-none cursor-pointer touch-manipulation ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
+          // Увеличена зона клика с помощью p-4 -m-4
+          className={`text-2xl leading-none p-4 -m-4 outline-none cursor-pointer touch-manipulation ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
         >
           +
         </button>
@@ -418,21 +420,28 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
 
   return (
     <div className={`flex flex-col border-b ${cLine} pb-3 relative`}>
-      <div className="flex items-center gap-2 mb-2 pr-4">
-        <span className={`text-[8.5px] uppercase tracking-[0.2em] truncate ${cTextMuted}`}>
+      
+      {/* Кликабельным сделана вся строка: и текст, и иконка */}
+      <div 
+        className="flex items-center gap-2 mb-2 pr-4 cursor-pointer touch-manipulation group relative"
+        onClick={(e) => {
+          e.stopPropagation();
+          onInfo();
+        }}
+      >
+        {/* Невидимая расширенная зона по вертикали (+12px сверху и снизу) */}
+        <div className="absolute -inset-y-3 -inset-x-2" />
+        
+        <span className={`relative text-[8.5px] uppercase tracking-[0.2em] truncate ${cTextMuted} transition-opacity group-active:opacity-50`}>
           {label}
         </span>
-        <button 
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onInfo();
-          }}
-          className={`relative z-10 w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7px] font-bold shrink-0 outline-none cursor-pointer active:scale-90 ${cTextMuted} touch-manipulation`}
-        >
+        
+        {/* Визуальная кнопка стала чуть больше (w-4 h-4), но реагирует на клик всей строки */}
+        <div className={`relative z-10 w-4 h-4 rounded-full border ${cLine} flex items-center justify-center text-[9px] font-bold shrink-0 transition-transform group-active:scale-90 ${cTextMuted}`}>
           !
-        </button>
+        </div>
       </div>
+      
       <span className={`font-serif text-xl md:text-2xl tabular-nums`} style={{ color: danger ? cDanger : cText }}>
         {value}
         {unit && <span className={`font-sans text-[9px] ml-1 ${cTextMuted}`}>{unit}</span>}
