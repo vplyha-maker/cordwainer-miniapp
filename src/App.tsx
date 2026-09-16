@@ -134,21 +134,39 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
   
+  // === ИЗМЕНЕНИЕ ЗДЕСЬ: Читаем язык из URL ===
   const [lang, setLang] = useState<Lang>(() => {
     try {
-      const saved = localStorage.getItem('cordwainer_lang') as Lang
+      // 1. Пытаемся поймать параметр ?lang= от Telegram-бота
+      const urlParams = new URLSearchParams(window.location.search);
+      const langFromBot = urlParams.get('lang') as Lang;
+
+      if (langFromBot && ['ru', 'uk', 'de'].includes(langFromBot)) {
+        // Если бот передал язык, сохраняем его в память
+        localStorage.setItem('cordwainer_lang', langFromBot);
+        localStorage.setItem('app_lang', langFromBot);
+        return langFromBot;
+      }
+
+      // 2. Если параметра нет, пытаемся достать из localStorage
+      const saved = localStorage.getItem('cordwainer_lang') as Lang;
       if (saved && ['ru', 'uk', 'de'].includes(saved)) {
-        return saved
+        return saved;
       }
-      const sysLang = navigator.language.slice(0, 2)
+
+      // 3. Если ничего нет, смотрим на язык системы телефона/браузера
+      const sysLang = navigator.language.slice(0, 2);
       if (['ru', 'uk', 'de'].includes(sysLang)) {
-        return sysLang as Lang
+        return sysLang as Lang;
       }
-      return 'ru'
+      
+      // По умолчанию русский
+      return 'ru';
     } catch {
-      return 'ru'
+      return 'ru';
     }
   })
+  // ===========================================
 
   const [favorites, setFavorites] = useState<FavoriteItem[]>(() => {
     try {
