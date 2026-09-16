@@ -156,6 +156,18 @@ const STYLES_DATA: StyleSlide[] = [
     },
     hideWatermark: true,
   },
+  {
+    id: 'muli',
+    video: '/Fason/muli.mp4',
+    title: { ru: 'Мюли', uk: 'Мюлі', de: 'Mules' },
+    subtitle: { ru: 'Непринужденная эстетика', uk: 'Невимушена естетика', de: 'Mühelose Ästhetik' },
+    desc: {
+      ru: 'Открытая пятка и изящный силуэт, создающие эффект абсолютной легкости. Идеальный выбор для тех, кто ценит утонченный шик и комфорт в каждом движении.',
+      uk: 'Відкрита п\'ята та витончений силует, що створюють ефект абсолютної легкості. Ідеальний вибір для тих, хто цінує вишуканий шик та комфорт у кожному русі.',
+      de: 'Offene Ferse und eine anmutige Silhouette, die ein Gefühl von absoluter Leichtigkeit vermitteln. Die ideale Wahl für alle, die raffinierten Chic und Komfort in jeder Bewegung schätzen.',
+    },
+    hideWatermark: true,
+  },
 ]
 
 type SlideItemProps = {
