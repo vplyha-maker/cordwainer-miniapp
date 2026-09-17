@@ -13,13 +13,13 @@ import {
 
 import type { PricesPageProps, SortOption, GroupedProduct } from './types'
 import { DICTIONARY, PAGE_SIZE } from './constants'
+import { formatSourceName } from './utils'
 import { usePrices } from './usePrices'
 
 import { ProductCard } from './components/ProductCard'
 import { CurrencySwitch } from './components/CurrencySwitch'
 import { PriceHistoryModal } from '../../components/PriceHistoryModal'
 
-// ВОТ ЗДЕСЬ ОБЯЗАТЕЛЬНО ДОЛЖНО БЫТЬ export function PricesPage
 export function PricesPage({ onBack, lang }: PricesPageProps) {
   const t = DICTIONARY[lang]
 
