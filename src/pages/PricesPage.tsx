@@ -14,7 +14,7 @@ import {
   LineChart
 } from 'lucide-react'
 import type { Lang } from '../App'
-import { PriceHistoryModal } from '../components/PriceHistoryModal'
+import { PriceHistoryModal, type Currency } from '../components/PriceHistoryModal'
 
 type Product = {
   id: number
@@ -26,7 +26,7 @@ type Product = {
   category: string | null
   updated_at: string | null
   current_price: number | string | null
-  history?: number[]
+  history?: unknown
 }
 
 type Offer = {
@@ -96,6 +96,11 @@ const DICTIONARY = {
     priceRise: 'Ожидается рост цены',
     urgentBuy: 'Рекомендация к покупке',
     priceHistory: 'История цен',
+    historyOldest: 'Старые',
+    historyNewest: 'Новые',
+    historyPoints: 'замеров',
+    historySingleTitle: 'История ещё копится',
+    historySingleHint: 'В базе пока мало замеров по этой позиции. График появится после следующих обновлений парсера.',
     
     volatilityTitle: 'Средняя волатильность',
     spreadTitle: 'Разрыв цен (Spread)',
@@ -138,6 +143,11 @@ const DICTIONARY = {
     priceRise: 'Очікується зростання ціни',
     urgentBuy: 'Рекомендація до покупки',
     priceHistory: 'Історія цін',
+    historyOldest: 'Старі',
+    historyNewest: 'Нові',
+    historyPoints: 'замірів',
+    historySingleTitle: 'Історія ще накопичується',
+    historySingleHint: 'У базі поки мало замірів по цій позиції. Графік зʼявиться після наступних оновлень парсера.',
     
     volatilityTitle: 'Середня волатильність',
     spreadTitle: 'Розрив цін (Spread)',
@@ -180,6 +190,11 @@ const DICTIONARY = {
     priceRise: 'Preisanstieg erwartet',
     urgentBuy: 'Kaufempfehlung',
     priceHistory: 'Preisverlauf',
+    historyOldest: 'Älter',
+    historyNewest: 'Neuer',
+    historyPoints: 'Messungen',
+    historySingleTitle: 'Verlauf wird noch aufgebaut',
+    historySingleHint: 'Noch zu wenige Messpunkte. Der Chart erscheint nach den nächsten Parser-Updates.',
     
     volatilityTitle: 'Ø Volatilität',
     spreadTitle: 'Spread (Preisdifferenz)',
@@ -244,6 +259,45 @@ function parsePriceSafely(raw: number | string | null | undefined): number {
   return !isNaN(val) && val > 0 ? val : 0;
 }
 
+function extractHistory(raw: unknown): number[] {
+  let data: unknown = raw
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+    try {
+      data = JSON.parse(trimmed)
+    } catch {
+      return []
+    }
+  }
+  if (!Array.isArray(data)) return []
+  const out: number[] = []
+  for (const item of data) {
+    if (typeof item === 'number' && item > 0 && Number.isFinite(item)) {
+      out.push(item)
+    } else if (typeof item === 'string') {
+      const n = parsePriceSafely(item)
+      if (n > 0) out.push(n)
+    } else if (item && typeof item === 'object' && 'price' in (item as Record<string, unknown>)) {
+      const n = parsePriceSafely((item as { price: number | string | null }).price)
+      if (n > 0) out.push(n)
+    }
+  }
+  return out
+}
+
+function convertUah(
+  uah: number,
+  currency: Currency,
+  usdRate?: number | null,
+  eurRate?: number | null,
+): number {
+  if (!uah || uah <= 0) return 0
+  if (currency === 'USD' && usdRate && usdRate > 0) return uah / usdRate
+  if (currency === 'EUR' && eurRate && eurRate > 0) return uah / eurRate
+  return uah
+}
+
 function getVolumeData(raw: string): { baseUnit: 'кг' | 'л' | 'шт'; originalLabel: string; multiplier: number } {
   if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
@@ -278,7 +332,7 @@ function calculateWordSimilarity(name1: string, name2: string): number {
   return matches / unionSize;
 }
 
-const formatPrice = (val: number, lang: Lang) => {
+const formatPrice = (val: number, lang: Lang, currency: Currency = 'UAH') => {
   if (!val || val <= 0) return DICTIONARY[lang].noPrice
   const locale = {
     'de': 'de-DE',
@@ -286,12 +340,49 @@ const formatPrice = (val: number, lang: Lang) => {
     'ru': 'ru-RU'
   }[lang] || 'en-US'
   
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 }).format(val)
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: currency === 'UAH' ? 0 : 2,
+    minimumFractionDigits: currency === 'UAH' ? 0 : 2,
+  }).format(val)
 }
 
-// -----------------------------------------------------------------------------
-// UI COMPONENTS
-// -----------------------------------------------------------------------------
+function CurrencySwitch({
+  currency,
+  onChange,
+  usdRate,
+  eurRate,
+}: {
+  currency: Currency
+  onChange: (c: Currency) => void
+  usdRate?: number | null
+  eurRate?: number | null
+}) {
+  return (
+    <div className="flex bg-[var(--color-surface-2)] p-0.5 rounded-md border border-[var(--color-border)]">
+      {(['UAH', 'USD', 'EUR'] as Currency[]).map((cur) => {
+        if (cur === 'USD' && !usdRate) return null
+        if (cur === 'EUR' && !eurRate) return null
+        const isActive = currency === cur
+        return (
+          <button
+            key={cur}
+            type="button"
+            onClick={() => onChange(cur)}
+            className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all ${
+              isActive
+                ? 'bg-[var(--color-surface)] shadow-sm text-[var(--color-ink)]'
+                : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+            }`}
+          >
+            {cur}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 const ProductCard = memo(
   ({
@@ -301,7 +392,10 @@ const ProductCard = memo(
     isFavorite,
     onToggleFavorite,
     onOpenSpreadModal,
-    onOpenHistory
+    onOpenHistory,
+    currency,
+    usdRate,
+    eurRate,
   }: {
     group: GroupedProduct
     lang: Lang
@@ -310,6 +404,9 @@ const ProductCard = memo(
     onToggleFavorite: (key: string) => void
     onOpenSpreadModal: (val: number) => void
     onOpenHistory: (group: GroupedProduct) => void
+    currency: Currency
+    usdRate?: number | null
+    eurRate?: number | null
   }) => {
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
@@ -400,19 +497,22 @@ const ProductCard = memo(
             const isArbitrage = offer.unitPrice > 0 && validOffersCount > 1 && offer.unitPrice < avgUnitPrice * 0.88
 
             const Comp = offer.url ? 'a' : 'div'
-            const historyData = offer.history?.length === 5 && offer.price > 0
-              ? offer.history 
-              : offer.price > 0 
-                ? [offer.price * 1.05, offer.price * 1.02, offer.price * 1.01, offer.price * 0.99, offer.price].map(Math.round)
-                : [1, 1, 1, 1, 1]
+            const historyData = (() => {
+              const real = extractHistory(offer.history)
+              if (real.length >= 2) return real.slice(-5)
+              if (offer.price > 0) return [offer.price]
+              return [] as number[]
+            })()
             
-            const minH = Math.min(...historyData)
-            const maxH = Math.max(...historyData)
+            const minH = historyData.length ? Math.min(...historyData) : 0
+            const maxH = historyData.length ? Math.max(...historyData) : 1
             const range = maxH - minH || 1
+            const displayPrice = convertUah(offer.price, currency, usdRate, eurRate)
+            const displayUnit = convertUah(offer.unitPrice, currency, usdRate, eurRate)
 
             return (
               <Comp
-                key={`${offer.source}_${offer.id}`}
+                key={`\( {offer.source}_ \){offer.id}`}
                 {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
                 className={`relative flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)] last:border-0 transition-colors group/row
                   ${!isBest ? 'hover:bg-[var(--color-surface-2)]' : ''}
@@ -442,15 +542,17 @@ const ProductCard = memo(
                 </div>
 
                 <div className="flex items-center gap-6 shrink-0">
-                  {offer.price > 0 && (
+                  {historyData.length > 0 && (
                     <div className="flex items-end gap-[1px] h-4 w-8 opacity-60 grayscale group-hover/row:grayscale-0 transition-all">
                       {historyData.map((val, i) => {
-                        const heightPct = Math.max(15, ((val - minH) / range) * 100)
+                        const heightPct = historyData.length === 1 ? 70 : Math.max(15, ((val - minH) / range) * 100)
                         const isLast = i === historyData.length - 1
-                        const trendDown = historyData[4] < historyData[0]
-                        const barColor = isLast 
-                          ? (trendDown ? 'bg-[var(--color-success)]' : 'bg-[var(--color-danger)]') 
-                          : 'bg-[var(--color-muted)] opacity-50'
+                        const trendDown = historyData.length >= 2 && historyData[historyData.length - 1] < historyData[0]
+                        const barColor = historyData.length < 2
+                          ? 'bg-[var(--color-muted)]'
+                          : isLast
+                            ? (trendDown ? 'bg-[var(--color-success)]' : 'bg-[var(--color-danger)]')
+                            : 'bg-[var(--color-muted)] opacity-50'
                         return (
                           <div key={i} style={{ height: `${heightPct}%` }} className={`flex-1 ${barColor}`} />
                         )
@@ -460,11 +562,11 @@ const ProductCard = memo(
 
                   <div className="flex flex-col items-end leading-tight text-right w-24">
                     <span className={`text-sm font-medium tabular-nums ${isBest ? 'text-[var(--color-accent)]' : 'text-[var(--color-ink)]'}`}>
-                      {formatPrice(offer.price, lang)}
+                      {formatPrice(displayPrice, lang, currency)}
                     </span>
                     {offer.multiplier !== 1 && offer.unitPrice > 0 && (
                       <span className="text-[10px] text-[var(--color-muted)] font-mono tracking-tighter mt-1">
-                        ≈ {Math.round(offer.unitPrice)} / {offer.baseUnit}
+                        ≈ {currency === 'UAH' ? Math.round(displayUnit) : displayUnit.toFixed(2)} / {offer.baseUnit}
                       </span>
                     )}
                   </div>
@@ -485,13 +587,14 @@ const ProductCard = memo(
   },
   (prev, next) =>
     prev.group.key === next.group.key &&
+    prev.group.latestUpdatedAt === next.group.latestUpdatedAt &&
+    prev.group.offers.length === next.group.offers.length &&
     prev.lang === next.lang &&
-    prev.isFavorite === next.isFavorite
+    prev.isFavorite === next.isFavorite &&
+    prev.currency === next.currency &&
+    prev.usdRate === next.usdRate &&
+    prev.eurRate === next.eurRate
 )
-
-// -----------------------------------------------------------------------------
-// ОСНОВНАЯ СТРАНИЦА
-// -----------------------------------------------------------------------------
 
 export function PricesPage({ onBack, lang }: PricesPageProps) {
   const t = DICTIONARY[lang]
@@ -501,6 +604,15 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [eurRate, setEurRate] = useState<number | null>(null)
   const [usdRate, setUsdRate] = useState<number | null>(null)
+  const [currency, setCurrency] = useState<Currency>(() => {
+    try {
+      const saved = localStorage.getItem('price_currency')
+      if (saved === 'UAH' || saved === 'USD' || saved === 'EUR') return saved
+    } catch {
+      /* ignore */
+    }
+    return 'UAH'
+  })
   
   const [modalData, setModalData] = useState<ModalData>(null)
   const [historyGroup, setHistoryGroup] = useState<GroupedProduct | null>(null)
@@ -520,6 +632,20 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       return new Set()
     }
   })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('price_currency', currency)
+    } catch {
+      /* ignore */
+    }
+  }, [currency])
+
+  useEffect(() => {
+    if (loading) return
+    if (currency === 'USD' && !usdRate) setCurrency('UAH')
+    if (currency === 'EUR' && !eurRate) setCurrency('UAH')
+  }, [loading, currency, usdRate, eurRate])
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -643,7 +769,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         multiplier: volData.multiplier,
         url: item.url,
         updated_at: item.updated_at,
-        history: item.history
+        history: extractHistory(item.history)
       };
 
       if (targetGroup) {
@@ -785,6 +911,15 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                   </div>
                 </div>
               </div>
+
+              <div className="flex flex-col items-end gap-1 shrink-0 pt-1">
+                <CurrencySwitch
+                  currency={currency}
+                  onChange={setCurrency}
+                  usdRate={usdRate}
+                  eurRate={eurRate}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-3 border-t border-[var(--color-border)] pt-4">
@@ -906,6 +1041,9 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                           onToggleFavorite={toggleFavorite}
                           onOpenSpreadModal={(val) => setModalData({ type: 'spread', value: val })}
                           onOpenHistory={(groupData) => setHistoryGroup(groupData)}
+                          currency={currency}
+                          usdRate={usdRate}
+                          eurRate={eurRate}
                         />
                       </motion.div>
                     ))}
@@ -993,6 +1131,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               lang={lang}
               usdRate={usdRate}
               eurRate={eurRate}
+              currency={currency}
+              onCurrencyChange={setCurrency}
             />
           )}
         </AnimatePresence>
