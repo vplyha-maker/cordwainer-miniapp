@@ -17,7 +17,7 @@ export default async function handler(request: Request) {
   const sql = neon(process.env.DATABASE_URL!)
 
   try {
-    // 1. Читаем кэш
+    // 1. Читаем текущий кэш
     const rows = await sql`
       SELECT currency, rate, updated_at
       FROM currency_rates
@@ -31,14 +31,13 @@ export default async function handler(request: Request) {
     const usdAge = usdRow ? now - new Date(usdRow.updated_at).getTime() : Infinity
     const eurAge = eurRow ? now - new Date(eurRow.updated_at).getTime() : Infinity
 
-    // Важно: rate должен быть > 0, иначе считаем кэш невалидным
     const isFresh =
       usdAge < CACHE_TTL_MS &&
       eurAge < CACHE_TTL_MS &&
       Number(usdRow?.rate) > 0 &&
       Number(eurRow?.rate) > 0
 
-    // 2. Если кэш свежий и валидный — отдаём
+    // 2. Если кэш свежий — отдаём его (историю не трогаем)
     if (isFresh) {
       return new Response(
         JSON.stringify({
@@ -64,7 +63,7 @@ export default async function handler(request: Request) {
     )
 
     if (!nbuRes.ok) {
-      // Fallback: если в базе есть хоть какие-то ненулевые курсы — отдаём их
+      // Fallback на старый кэш
       if (Number(usdRow?.rate) > 0 && Number(eurRow?.rate) > 0) {
         return new Response(
           JSON.stringify({
@@ -93,7 +92,15 @@ export default async function handler(request: Request) {
     const usdRate = Number(usd.rate)
     const eurRate = Number(eur.rate)
 
-    // 4. Обновляем кэш по одному (надёжнее для Neon Edge)
+    // 4. Пишем в ИСТОРИЮ (новые строки)
+    await sql`
+      INSERT INTO currency_rate_history (currency, rate, scraped_at)
+      VALUES 
+        ('USD', ${usdRate}, NOW()),
+        ('EUR', ${eurRate}, NOW())
+    `
+
+    // 5. Обновляем текущий кэш
     await sql`
       INSERT INTO currency_rates (currency, rate, updated_at)
       VALUES ('USD', ${usdRate}, NOW())
@@ -143,4 +150,3 @@ export default async function handler(request: Request) {
     )
   }
 }
-
