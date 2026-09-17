@@ -1,7 +1,8 @@
 import { DICTIONARY, BRAND_ALIASES } from './constants'
-import type { Offer, GroupedProduct, Signal } from './types'
-import type { Lang } from '../../App' // Проверьте правильность пути
-import type { Currency } from '../../components/PriceHistoryModal' // Проверьте правильность пути
+// ДОБАВИЛ MacroIndicator
+import type { Offer, GroupedProduct, Signal, MacroIndicator } from './types'
+import type { Lang } from '../../App' 
+import type { Currency } from '../../components/PriceHistoryModal' 
 
 export const formatSourceName = (sourceId: string) => {
   if (!sourceId) return 'Unknown'
@@ -184,8 +185,13 @@ export function computeOfferSignals(
   return signals
 }
 
-export function computeGroupSignals(group: GroupedProduct): Signal[] {
+// ДОБАВЛЕН ПРИЕМ macroIndicators И УМНАЯ КЛАССИФИКАЦИЯ ОБУВНОЙ ХИМИИ
+export function computeGroupSignals(
+  group: GroupedProduct, 
+  macroIndicators: MacroIndicator[] = []
+): Signal[] {
   const signals: Signal[] = []
+  
   if (group.totalOffers >= 3 && group.outOfStockCount >= 2) {
     signals.push({ kind: 'deficit', label: 'Риск дефицита', tone: 'bad' })
   }
@@ -196,6 +202,57 @@ export function computeGroupSignals(group: GroupedProduct): Signal[] {
       tone: 'warn',
     })
   }
+
+  // МАКРО-ЛОГИКА
+  if (macroIndicators.length > 0) {
+    const name = group.name.toLowerCase()
+    
+    // Классификаторы химии
+    const isPU = name.includes('десмокол') || name.includes('desmokol') || name.includes('полиуретан') || name.includes('sar 30') || name.includes('sar30') || name.includes('sar-30')
+    const isRubber = name.includes('наирит') || name.includes('nairit') || name.includes('резинов') || name.includes('sar 20') || name.includes('sar20') || name.includes('каучук')
+    const isLatex = name.includes('латекс')
+    const isPrimer = name.includes('протрав') || name.includes('галоген')
+    
+    // 1. Полиуретан (Десмокол / SAR 306) -> Изоцианат
+    if (isPU) {
+      const isocyanate = macroIndicators.find(m => m.type === 'isocyanate')
+      if (isocyanate && isocyanate.trend > 10) {
+        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост ПУ-сырья)', tone: 'bad' })
+      } else if (isocyanate && isocyanate.trend < -10) {
+        signals.push({ kind: 'macro_down', label: 'Сырье ПУ дешевеет', tone: 'good' })
+      }
+    }
+
+    // 2. Наирит / Резиновый клей (SAR 206) -> Хлоропрен или Каучук
+    if (isRubber) {
+      const rubberRaw = macroIndicators.find(m => m.type === 'chloroprene' || m.type === 'rubber')
+      if (rubberRaw && rubberRaw.trend > 10) {
+        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост каучука)', tone: 'bad' })
+      }
+    }
+
+    // 3. Латексный клей -> Латекс (Latex)
+    if (isLatex) {
+      const latexRaw = macroIndicators.find(m => m.type === 'latex')
+      if (latexRaw && latexRaw.trend > 10) {
+        signals.push({ kind: 'urgent_buy', label: 'Внимание: рост цен на латекс', tone: 'warn' })
+      }
+    }
+
+    // 4. Протрава / Галоген -> Базовая химия / Растворители
+    if (isPrimer) {
+      const solvent = macroIndicators.find(m => m.type === 'solvent')
+      if (solvent && solvent.trend > 10) {
+        signals.push({ kind: 'supply_alert', label: 'Риск дефицита (растворители)', tone: 'warn' })
+      }
+    }
+
+    // 5. Логистика / Фрахт (Бьет по всему импорту)
+    const freight = macroIndicators.find(m => m.type === 'freight_cn_eu')
+    if (freight && freight.trend > 15) {
+      signals.push({ kind: 'supply_alert', label: 'Ожидается удорожание импорта', tone: 'warn' })
+    }
+  }
+
   return signals
 }
-
