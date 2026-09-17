@@ -11,19 +11,18 @@ import {
   Info,
 } from 'lucide-react'
 
-import type { PricesPageProps, SortOption } from './types'
+import type { PricesPageProps, SortOption, GroupedProduct } from './types'
 import { DICTIONARY, PAGE_SIZE } from './constants'
 import { formatSourceName } from './utils'
 import { usePrices } from './usePrices'
 
 import { ProductCard } from './components/ProductCard'
 import { CurrencySwitch } from './components/CurrencySwitch'
-import { PriceHistoryModal } from '../../components/PriceHistoryModal' // Проверьте правильность пути!
+import { PriceHistoryModal } from '../../components/PriceHistoryModal'
 
 export function PricesPage({ onBack, lang }: PricesPageProps) {
   const t = DICTIONARY[lang]
 
-  // Достаем всю логику и состояния из нашего кастомного хука
   const {
     loading,
     error,
@@ -51,7 +50,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     stats,
   } = usePrices()
 
-  // Логика текста для модального окна с рекомендациями (зависит от словаря)
   const currentModalContent = useMemo(() => {
     if (!modalData) return { rec: '' }
     if (modalData.type === 'spread') {
@@ -202,7 +200,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                     />
                     {t.favorites}
                   </button>
-                  {sources.map((src) => (
+                  {sources.map((src: string) => (
                     <button
                       key={src}
                       onClick={() => setSelectedSource(src)}
@@ -253,7 +251,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               <div className="pb-14">
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                   <AnimatePresence>
-                    {filteredItems.slice(0, visibleCount).map((g) => (
+                    {filteredItems.slice(0, visibleCount).map((g: GroupedProduct) => (
                       <motion.div
                         key={g.key}
                         initial={{ opacity: 0, y: 10 }}
@@ -283,7 +281,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                 {visibleCount < filteredItems.length && (
                   <div className="mt-10 flex justify-center">
                     <button
-                      onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+                      onClick={() => setVisibleCount((v: number) => v + PAGE_SIZE)}
                       className="px-8 py-3.5 border border-[var(--color-border)] bg-[var(--color-surface)] text-xs uppercase tracking-widest font-semibold text-[var(--color-ink)] hover:border-[var(--color-ink)] transition-colors flex items-center gap-2.5"
                     >
                       {t.loadMore} <ChevronDown size={14} strokeWidth={2} />
@@ -367,4 +365,3 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     </div>
   )
 }
-
