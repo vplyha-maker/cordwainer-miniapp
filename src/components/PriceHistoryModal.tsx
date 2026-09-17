@@ -110,7 +110,14 @@ function Sparkline({
   height?: number
 }) {
   if (points.length < 2) {
-    return <div style={{ width, height }} className="flex items-center justify-center text-[10px] text-[var(--color-muted)]">—</div>
+    return (
+      <div
+        style={{ width, height }}
+        className="flex items-center justify-center text-[10px] text-[var(--color-muted)]"
+      >
+        —
+      </div>
+    )
   }
 
   const min = Math.min(...points)
@@ -120,10 +127,10 @@ function Sparkline({
   const coords = points.map((p, i) => {
     const x = (i / (points.length - 1)) * width
     const y = height - ((p - min) / span) * (height - 6) - 3
-    return `\( {x}, \){y}`
+    return x + ',' + y
   })
 
-  const path = `M ${coords.join(' L ')}`
+  const path = 'M ' + coords.join(' L ')
   const lastY = height - ((points[points.length - 1] - min) / span) * (height - 6) - 3
 
   return (
@@ -168,8 +175,11 @@ export function PriceHistoryModal({
 
         const first = history[0] ?? convertedPrice
         const last = history[history.length - 1] ?? convertedPrice
-        const changePct =
-          history.length >= 2 && first > 0 ? ((last - first) / first) * 100 : null
+
+        let changePct: number | null = null
+        if (history.length >= 2 && first > 0) {
+          changePct = ((last - first) / first) * 100
+        }
 
         return {
           ...offer,
@@ -272,33 +282,36 @@ export function PriceHistoryModal({
                 const isDown = changePct !== null && changePct < -0.4
                 const isUp = changePct !== null && changePct > 0.4
 
+                // Простой и надёжный способ сформировать текст процента
                 let changeText = '—'
-                let changeColor = 'text-[var(--color-muted)]'
-
                 if (changePct !== null) {
-                  const sign = changePct > 0 ? '+' : ''
-                  changeText = `\( {sign} \){changePct.toFixed(1)}%`
-                  changeColor = isDown
-                    ? 'text-emerald-600'
-                    : isUp
-                      ? 'text-red-500'
-                      : 'text-[var(--color-muted)]'
+                  const rounded = changePct.toFixed(1)
+                  if (changePct > 0) {
+                    changeText = '+' + rounded + '%'
+                  } else {
+                    changeText = rounded + '%'
+                  }
                 }
+
+                const changeColor = isDown
+                  ? 'text-emerald-600'
+                  : isUp
+                    ? 'text-red-500'
+                    : 'text-[var(--color-muted)]'
 
                 return (
                   <motion.div
-                    key={`\( {row.source}_ \){row.id}`}
+                    key={row.source + '_' + row.id}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
                     className="px-5 py-4 flex items-center gap-3"
                   >
-                    {/* Color + Source */}
+                    {/* Цвет + Название поставщика */}
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <div
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: row.color }}
-                        title={formatSourceName(row.source)}
                       />
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium text-[var(--color-ink)] truncate">
@@ -312,12 +325,12 @@ export function PriceHistoryModal({
                       </div>
                     </div>
 
-                    {/* Sparkline (desktop) */}
+                    {/* Sparkline */}
                     <div className="hidden sm:block shrink-0 opacity-90">
                       <Sparkline points={row.history} color={row.color} />
                     </div>
 
-                    {/* Price + Change */}
+                    {/* Цена + изменение */}
                     <div className="text-right shrink-0">
                       <div className="text-[15px] font-semibold tabular-nums text-[var(--color-ink)]">
                         {formatPrice(row.convertedPrice, currency)}
@@ -326,7 +339,7 @@ export function PriceHistoryModal({
                         </span>
                       </div>
 
-                      <div className={`flex items-center justify-end gap-1 mt-0.5 ${changeColor}`}>
+                      <div className={'flex items-center justify-end gap-1 mt-0.5 ' + changeColor}>
                         {isDown && <TrendingDown size={11} strokeWidth={2.5} />}
                         {isUp && <TrendingUp size={11} strokeWidth={2.5} />}
                         {!isDown && !isUp && changePct !== null && (
@@ -347,11 +360,11 @@ export function PriceHistoryModal({
           )}
         </div>
 
-        {/* Footer */}
+        {/* Подсказка внизу */}
         {hasAnyHistory && (
           <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/50 shrink-0">
-            <p className="text-[10px] text-[var(--color-muted)] text-center">
-              Цвет точки = поставщик · % = изменение цены за период · число = кол-во замеров
+            <p className="text-[10px] text-[var(--color-muted)] text-center leading-relaxed">
+              Цвет точки = поставщик · % = изменение цены · число = количество замеров
             </p>
           </div>
         )}
