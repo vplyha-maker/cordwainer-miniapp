@@ -213,21 +213,17 @@ function buildDealLabel(
   changePct: number | null,
   rank: 'best' | 'worst' | 'mid' | 'single'
 ): { text: string; tone: DealTone } {
-  // Несколько поставщиков — главный критерий сравнение между ними
   if (rank === 'best') return { text: 'Лучшая цена', tone: 'best' }
   if (rank === 'worst') return { text: 'Самая высокая', tone: 'worst' }
 
-  // Один поставщик или средняя позиция — смотрим тренд / свою историю
   const spreadPct = minH > 0 ? ((maxH - minH) / minH) * 100 : 0
 
   if (spreadPct < 4) {
-    // Почти не менялась
     if (changePct !== null && changePct <= -1.5) return { text: 'Упала', tone: 'good' }
     if (changePct !== null && changePct >= 1.5) return { text: 'Выросла', tone: 'bad' }
     return { text: 'Стабильно', tone: 'neutral' }
   }
 
-  // Есть заметный разброс — где мы сейчас
   const pos = (displayPrice - minH) / (maxH - minH || 1)
   if (pos <= 0.2) return { text: 'У минимума', tone: 'good' }
   if (pos >= 0.8) return { text: 'У максимума', tone: 'bad' }
@@ -258,16 +254,18 @@ export function PriceHistoryModal({
         const historyRaw = extractHistory(offer.history, offer.price)
         const multiplier = offer.multiplier && offer.multiplier > 0 ? offer.multiplier : 1
 
-        // Абсолютные цены → в выбранной валюте
         const historyAbs = historyRaw.map((p) => p / currentRate)
-        // При наличии объёма — в unit-price
         const historyUnit = historyAbs.map((p) => p * multiplier)
         const useUnit = multiplier !== 1 && historyUnit.length > 0
-        let history = useUnit ? historyUnit : historyAbs
 
-        // LTTB: сжимаем до TARGET_POINTS, если точек больше
-        if (history.length > TARGET_POINTS) {
-          history = lttb(history, TARGET_POINTS)
+        // Полная история — для min/max, % и счётчика
+        const fullHistory = useUnit ? historyUnit : historyAbs
+        const pointsCount = fullHistory.length
+
+        // Для sparkline — сжимаем, если точек много
+        let sparkHistory = fullHistory
+        if (sparkHistory.length > TARGET_POINTS) {
+          sparkHistory = lttb(sparkHistory, TARGET_POINTS)
         }
 
         const convertedPrice = offer.price / currentRate
@@ -277,20 +275,21 @@ export function PriceHistoryModal({
             : convertedPrice * multiplier
 
         const displayPrice = useUnit ? convertedUnit : convertedPrice
-        const first = history[0] ?? displayPrice
-        const last = history[history.length - 1] ?? displayPrice
+        const first = fullHistory[0] ?? displayPrice
+        const last = fullHistory[fullHistory.length - 1] ?? displayPrice
 
         let changePct: number | null = null
-        if (history.length >= 2 && first > 0) {
+        if (fullHistory.length >= 2 && first > 0) {
           changePct = ((last - first) / first) * 100
         }
 
-        const minH = history.length ? Math.min(...history) : displayPrice
-        const maxH = history.length ? Math.max(...history) : displayPrice
+        const minH = fullHistory.length ? Math.min(...fullHistory) : displayPrice
+        const maxH = fullHistory.length ? Math.max(...fullHistory) : displayPrice
 
         return {
           ...offer,
-          history,
+          history: sparkHistory,
+          pointsCount,
           displayPrice,
           changePct,
           minH,
@@ -301,7 +300,6 @@ export function PriceHistoryModal({
       })
       .sort((a, b) => a.displayPrice - b.displayPrice)
 
-    // Ранги между поставщиками
     const multi = prepared.length >= 2
     const bestPrice = multi ? prepared[0].displayPrice : null
     const worstPrice = multi ? prepared[prepared.length - 1].displayPrice : null
@@ -320,7 +318,7 @@ export function PriceHistoryModal({
     })
   }, [group, currentRate])
 
-  const hasAnyHistory = rows.some((r) => r.history.length >= 2)
+  const hasAnyHistory = rows.some((r) => r.pointsCount >= 2)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6 font-sans">
@@ -496,7 +494,7 @@ export function PriceHistoryModal({
                             {changeText}
                           </span>
                           <span className="text-[10px] text-[var(--color-muted)] opacity-60">
-                            · {row.history.length}
+                            · {row.pointsCount}
                           </span>
                         </div>
                       </div>
