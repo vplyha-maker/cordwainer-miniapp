@@ -10,9 +10,11 @@ import {
   ChevronDown,
   Bookmark,
   TrendingDown,
-  Info
+  Info,
+  LineChart
 } from 'lucide-react'
 import type { Lang } from '../App'
+import { PriceHistoryModal } from './PriceHistoryModal'
 
 type Product = {
   id: number
@@ -93,6 +95,7 @@ const DICTIONARY = {
     deficit: 'Риск дефицита',
     priceRise: 'Ожидается рост цены',
     urgentBuy: 'Рекомендация к покупке',
+    priceHistory: 'История цен',
     
     volatilityTitle: 'Средняя волатильность',
     spreadTitle: 'Разрыв цен (Spread)',
@@ -134,6 +137,7 @@ const DICTIONARY = {
     deficit: 'Ризик дефіциту',
     priceRise: 'Очікується зростання ціни',
     urgentBuy: 'Рекомендація до покупки',
+    priceHistory: 'Історія цін',
     
     volatilityTitle: 'Середня волатильність',
     spreadTitle: 'Розрив цін (Spread)',
@@ -175,6 +179,7 @@ const DICTIONARY = {
     deficit: 'Engpassrisiko',
     priceRise: 'Preisanstieg erwartet',
     urgentBuy: 'Kaufempfehlung',
+    priceHistory: 'Preisverlauf',
     
     volatilityTitle: 'Ø Volatilität',
     spreadTitle: 'Spread (Preisdifferenz)',
@@ -295,7 +300,8 @@ const ProductCard = memo(
     t,
     isFavorite,
     onToggleFavorite,
-    onOpenSpreadModal
+    onOpenSpreadModal,
+    onOpenHistory
   }: {
     group: GroupedProduct
     lang: Lang
@@ -303,6 +309,7 @@ const ProductCard = memo(
     isFavorite: boolean
     onToggleFavorite: (key: string) => void
     onOpenSpreadModal: (val: number) => void
+    onOpenHistory: (group: GroupedProduct) => void
   }) => {
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
@@ -345,6 +352,15 @@ const ProductCard = memo(
                   {t.code} {group.product_code}
                 </span>
               )}
+              
+              <button 
+                onClick={() => onOpenHistory(group)}
+                className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-[var(--color-ink)] opacity-70 hover:opacity-100 transition-opacity focus:outline-none rounded-md"
+              >
+                <LineChart size={14} strokeWidth={2.5} />
+                <span>{t.priceHistory}</span>
+              </button>
+
               {showSpread && group.unitSpread > 0 && (
                 <button 
                   onClick={() => onOpenSpreadModal(group.unitSpread)}
@@ -474,6 +490,10 @@ const ProductCard = memo(
     prev.isFavorite === next.isFavorite
 )
 
+// -----------------------------------------------------------------------------
+// ОСНОВНАЯ СТРАНИЦА
+// -----------------------------------------------------------------------------
+
 export function PricesPage({ onBack, lang }: PricesPageProps) {
   const t = DICTIONARY[lang]
   
@@ -484,13 +504,14 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
   const [usdRate, setUsdRate] = useState<number | null>(null)
   
   const [modalData, setModalData] = useState<ModalData>(null)
+  const [historyGroup, setHistoryGroup] = useState<GroupedProduct | null>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [selectedSource, setSelectedSource] = useState<string>('all') 
   const [sortBy, setSortBy] = useState<SortOption>('default')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const [retryTrigger, setRetryTrigger] = useState(0) // ТРИГГЕР ДЛЯ ПОВТОРНОЙ ЗАГРУЗКИ
+  const [retryTrigger, setRetryTrigger] = useState(0)
 
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try {
@@ -501,7 +522,6 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     }
   })
 
-  // ИСПРАВЛЕНИЕ: Синхронизация localStorage между вкладками (storage event)
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'price_favorites') {
@@ -532,21 +552,22 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     })
   }, [])
 
-  // ИСПРАВЛЕНИЕ: Закрытие модального окна по Escape
   useEffect(() => {
-    if (!modalData) return
+    if (!modalData && !historyGroup) return
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setModalData(null)
+      if (e.key === 'Escape') {
+        setModalData(null)
+        setHistoryGroup(null)
+      }
     }
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalData])
+  }, [modalData, historyGroup])
 
   const handleRetry = useCallback(() => setRetryTrigger((prev) => prev + 1), [])
 
-  // ИСПРАВЛЕНИЕ: Race condition с помощью AbortController
   useEffect(() => {
     const abortController = new AbortController()
     
@@ -570,7 +591,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-          return // Запрос отменён, ничего не делаем
+          return
         }
         setError(DICTIONARY[lang].error)
         setItems([])
@@ -581,7 +602,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     
     loadData()
     return () => abortController.abort()
-  }, [lang, retryTrigger]) // Перезапрашиваем при смене языка или нажатии кнопки "повторить"
+  }, [lang, retryTrigger])
 
   const sources = useMemo(() => Array.from(new Set(items.map((i) => i.source).filter(Boolean) as string[])).sort(), [items])
 
@@ -885,6 +906,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                           isFavorite={favorites.has(g.key)}
                           onToggleFavorite={toggleFavorite}
                           onOpenSpreadModal={(val) => setModalData({ type: 'spread', value: val })}
+                          onOpenHistory={(groupData) => setHistoryGroup(groupData)}
                         />
                       </motion.div>
                     ))}
@@ -962,6 +984,17 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
             </div>
           )}
         </AnimatePresence>
+
+        <AnimatePresence>
+          {historyGroup && (
+            <PriceHistoryModal 
+              group={historyGroup} 
+              onClose={() => setHistoryGroup(null)} 
+              t={t} 
+            />
+          )}
+        </AnimatePresence>
+
       </motion.div>
     </div>
   )
