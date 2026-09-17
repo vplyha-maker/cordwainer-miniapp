@@ -11,7 +11,7 @@ import {
   Bookmark,
   TrendingDown,
   Info,
-  LineChart
+  LineChart,
 } from 'lucide-react'
 import type { Lang } from '../App'
 import { PriceHistoryModal, type Currency } from '../components/PriceHistoryModal'
@@ -107,17 +107,24 @@ const DICTIONARY = {
     historyNewest: 'Новые',
     historyPoints: 'замеров',
     historySingleTitle: 'История ещё копится',
-    historySingleHint: 'В базе пока мало замеров по этой позиции. График появится после следующих обновлений парсера.',
+    historySingleHint:
+      'В базе пока мало замеров по этой позиции. График появится после следующих обновлений парсера.',
     volatilityTitle: 'Средняя волатильность',
     spreadTitle: 'Разрыв цен (Spread)',
     gotIt: 'Понятно',
     recommendationLabel: 'Стратегия',
-    spreadLow: 'Цены на рынке почти идентичны. Выгоднее выбирать поставщика с наиболее удобной логистикой или лучшим сервисом, так как разница в цене минимальна.',
-    spreadMid: 'Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки вас устраивают.',
-    spreadHigh: 'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у выделенного цветом поставщика, чтобы максимизировать вашу маржинальность.',
-    volLow: 'Рынок в данной категории абсолютно стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.',
-    volMid: 'Наблюдаются умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях из списка.',
-    volHigh: 'Рынок крайне нестабилен. Это лучшее время для оптимизации — тщательно сравнивайте цены, так как разница у поставщиков сейчас огромна.',
+    spreadLow:
+      'Цены на рынке почти идентичны. Выгоднее выбирать поставщика с наиболее удобной логистикой или лучшим сервисом, так как разница в цене минимальна.',
+    spreadMid:
+      'Заметная разница в цене. Это хорошая возможность сэкономить, выбрав более выгодное предложение, если сроки доставки вас устраивают.',
+    spreadHigh:
+      'На рынке сильный ценовой перекос по данной позиции. Настоятельно рекомендуем закупать объем у выделенного цветом поставщика, чтобы максимизировать вашу маржинальность.',
+    volLow:
+      'Рынок в данной категории абсолютно стабилен, цены у поставщиков держатся на одном уровне. Срочности в оптимизации закупок нет.',
+    volMid:
+      'Наблюдаются умеренные колебания цен. Оптимальное время для точечной экономии на конкретных позициях из списка.',
+    volHigh:
+      'Рынок крайне нестабилен. Это лучшее время для оптимизации — тщательно сравнивайте цены, так как разница у поставщиков сейчас огромна.',
   },
   uk: {
     title: 'Аналітика цін',
@@ -151,17 +158,22 @@ const DICTIONARY = {
     historyNewest: 'Нові',
     historyPoints: 'замірів',
     historySingleTitle: 'Історія ще накопичується',
-    historySingleHint: 'У базі поки мало замірів по цій позиції. Графік зʼявиться після наступних оновлень парсера.',
+    historySingleHint:
+      'У базі поки мало замірів по цій позиції. Графік зʼявиться після наступних оновлень парсера.',
     volatilityTitle: 'Середня волатильність',
     spreadTitle: 'Розрив цін (Spread)',
     gotIt: 'Зрозуміло',
     recommendationLabel: 'Стратегія',
-    spreadLow: 'Ціни на ринку майже ідентичні. Вигідніше обирати постачальника з найбільш зручною логістикою.',
-    spreadMid: 'Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.',
-    spreadHigh: 'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у виділеного кольором постачальника для максимізації маржинальності.',
+    spreadLow:
+      'Ціни на ринку майже ідентичні. Вигідніше обирати постачальника з найбільш зручною логістикою.',
+    spreadMid:
+      'Помітна різниця в ціні. Це гарна можливість заощадити, обравши вигіднішу пропозицію.',
+    spreadHigh:
+      'На ринку сильний ціновий перекіс. Настійно рекомендуємо закуповувати обсяг у виділеного кольором постачальника для максимізації маржинальності.',
     volLow: 'Ринок стабільний, ціни у постачальників тримаються на одному рівні.',
     volMid: 'Помірні коливання цін. Оптимальний час для точкової економії.',
-    volHigh: 'Ринок украй нестабільний. Це найкращий час для оптимізації закупівель — ретельно порівнюйте ціни.',
+    volHigh:
+      'Ринок украй нестабільний. Це найкращий час для оптимізації закупівель — ретельно порівнюйте ціни.',
   },
   de: {
     title: 'Preisanalyse',
@@ -195,17 +207,22 @@ const DICTIONARY = {
     historyNewest: 'Neuer',
     historyPoints: 'Messungen',
     historySingleTitle: 'Verlauf wird noch aufgebaut',
-    historySingleHint: 'Noch zu wenige Messpunkte. Der Chart erscheint nach den nächsten Parser-Updates.',
+    historySingleHint:
+      'Noch zu wenige Messpunkte. Der Chart erscheint nach den nächsten Parser-Updates.',
     volatilityTitle: 'Ø Volatilität',
     spreadTitle: 'Spread (Preisdifferenz)',
     gotIt: 'Verstanden',
     recommendationLabel: 'Strategie',
-    spreadLow: 'Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.',
-    spreadMid: 'Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.',
-    spreadHigh: 'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim farblich markierten Lieferanten zu kaufen.',
+    spreadLow:
+      'Die Preise sind nahezu identisch. Wählen Sie den Lieferanten mit der bequemsten Logistik.',
+    spreadMid:
+      'Spürbarer Preisunterschied. Eine gute Gelegenheit, durch die günstigere Option Geld zu sparen.',
+    spreadHigh:
+      'Starkes Preisungleichgewicht. Wir empfehlen dringend, beim farblich markierten Lieferanten zu kaufen.',
     volLow: 'Der Markt ist stabil, die Preise bleiben auf einem Niveau.',
     volMid: 'Moderate Preisschwankungen. Optimale Zeit für gezielte Einsparungen.',
-    volHigh: 'Der Markt ist instabil. Die beste Zeit zur Einkaufsoptimierung – vergleichen Sie die Preise.',
+    volHigh:
+      'Der Markt ist instabil. Die beste Zeit zur Einkaufsoptimierung – vergleichen Sie die Preise.',
   },
 }
 
@@ -314,9 +331,12 @@ function getVolumeData(raw: string): {
   const num = parseFloat(m[1])
   if (num === 0 || isNaN(num)) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
   const u = m[2].toLowerCase()
-  if (u.startsWith('л') || u === 'l') return { baseUnit: 'л', originalLabel: num + ' л', multiplier: 1 / num }
-  if (u.startsWith('м') || u === 'ml') return { baseUnit: 'л', originalLabel: num + ' мл', multiplier: 1000 / num }
-  if (['кг', 'kg'].includes(u)) return { baseUnit: 'кг', originalLabel: num + ' кг', multiplier: 1 / num }
+  if (u.startsWith('л') || u === 'l')
+    return { baseUnit: 'л', originalLabel: num + ' л', multiplier: 1 / num }
+  if (u.startsWith('м') || u === 'ml')
+    return { baseUnit: 'л', originalLabel: num + ' мл', multiplier: 1000 / num }
+  if (['кг', 'kg'].includes(u))
+    return { baseUnit: 'кг', originalLabel: num + ' кг', multiplier: 1 / num }
   return { baseUnit: 'кг', originalLabel: num + ' г', multiplier: 1000 / num }
 }
 
@@ -327,7 +347,10 @@ function normalizeProductName(raw: string): string {
     .replace(/ё/g, 'е')
     .replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
   for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ' ' + rep + ' ')
-  s = s.replace(/\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)(?:[\s.,;)]|$)/gi, ' ')
+  s = s.replace(
+    /\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)(?:[\s.,;)]|$)/gi,
+    ' ',
+  )
   const stopWords = [
     'клей', 'взуттєвий', 'обувной', 'обувної', 'банка', 'італія', 'италия', 'чорний', 'черный',
     'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 'ремонту',
@@ -363,10 +386,8 @@ const formatPrice = (val: number, lang: Lang, currency: Currency = 'UAH') => {
 }
 
 function signalClass(tone: Signal['tone']) {
-  if (tone === 'good')
-    return 'text-emerald-700 border-emerald-500/40 bg-emerald-500/10'
-  if (tone === 'bad')
-    return 'text-red-600 border-red-500/40 bg-red-500/10'
+  if (tone === 'good') return 'text-emerald-700 border-emerald-500/40 bg-emerald-500/10'
+  if (tone === 'bad') return 'text-red-600 border-red-500/40 bg-red-500/10'
   if (tone === 'warn')
     return 'text-[var(--color-accent)] border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10'
   return 'text-[var(--color-muted)] border-[var(--color-border)] bg-[var(--color-surface-2)]'
@@ -592,12 +613,13 @@ const ProductCard = memo(
             const range = maxH - minH || 1
             const displayPrice = convertUah(offer.price, currency, usdRate, eurRate)
             const displayUnit = convertUah(offer.unitPrice, currency, usdRate, eurRate)
+
             const offerSignals = computeOfferSignals(
               offer,
               group,
               avgUnitPrice,
               validOffersCount,
-            ).filter((s) => !(s.kind === 'best' && isBest))
+            )
 
             return (
               <Comp
@@ -615,7 +637,7 @@ const ProductCard = memo(
                   <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--color-accent)]" />
                 )}
 
-                <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
+                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 pr-3">
                   <span
                     className={
                       'text-sm font-medium truncate ' +
@@ -635,7 +657,7 @@ const ProductCard = memo(
                     <span
                       key={s.kind}
                       className={
-                        'text-[10px] uppercase tracking-wider font-semibold border px-1.5 py-0.5 hidden sm:inline-block shrink-0 ' +
+                        'text-[10px] uppercase tracking-wider font-semibold border px-1.5 py-0.5 shrink-0 ' +
                         signalClass(s.tone)
                       }
                     >
@@ -644,7 +666,7 @@ const ProductCard = memo(
                   ))}
                 </div>
 
-                <div className="flex items-center gap-5 shrink-0">
+                <div className="flex items-center gap-4 shrink-0">
                   {historyData.length > 0 && (
                     <div className="flex items-end gap-[1px] h-4 w-8 opacity-60 grayscale group-hover/row:grayscale-0 transition-all">
                       {historyData.map((val, i) => {
@@ -867,8 +889,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
       let targetGroup: GroupedProduct | null = null
       if (normalizedCode && normalizedCode.length >= 2) {
         targetGroup =
-          groups.find((g) => g.product_code?.trim()?.toLowerCase() === normalizedCode) ||
-          null
+          groups.find((g) => g.product_code?.trim()?.toLowerCase() === normalizedCode) || null
       }
 
       if (!targetGroup && cleanName.length >= 2 && groups.length > 0) {
@@ -936,12 +957,8 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
 
     return groups.map((group) => {
       const priced = group.offers.filter((o) => o.unitPrice > 0)
-      group.minUnitPrice = priced.length
-        ? Math.min(...priced.map((o) => o.unitPrice))
-        : 0
-      group.maxUnitPrice = priced.length
-        ? Math.max(...priced.map((o) => o.unitPrice))
-        : 0
+      group.minUnitPrice = priced.length ? Math.min(...priced.map((o) => o.unitPrice)) : 0
+      group.maxUnitPrice = priced.length ? Math.max(...priced.map((o) => o.unitPrice)) : 0
       group.unitSpread =
         group.minUnitPrice > 0
           ? ((group.maxUnitPrice - group.minUnitPrice) / group.minUnitPrice) * 100
