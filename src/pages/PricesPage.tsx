@@ -414,7 +414,6 @@ const ProductCard = memo(
               <Comp
                 key={`${offer.source}_${offer.id}`}
                 {...(offer.url ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-                style={isBest ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)' } : {}}
                 className={`relative flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)] last:border-0 transition-colors group/row
                   ${!isBest ? 'hover:bg-[var(--color-surface-2)]' : ''}
                   ${offer.url ? 'cursor-pointer' : ''}
@@ -991,7 +990,9 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               group={historyGroup} 
               onClose={() => setHistoryGroup(null)} 
               t={t} 
-              lang={lang} 
+              lang={lang}
+              usdRate={usdRate}
+              eurRate={eurRate}
             />
           )}
         </AnimatePresence>
