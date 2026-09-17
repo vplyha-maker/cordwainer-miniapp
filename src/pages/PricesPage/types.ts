@@ -50,10 +50,23 @@ export type PricesPageProps = {
 export type SortOption = 'default' | 'unit-price-asc' | 'savings' | 'name'
 export type ModalData = { type: 'volatility' | 'spread'; value: number } | null
 
-export type SignalKind = 'best' | 'expensive' | 'spike' | 'spread' | 'deficit' | 'arbitrage'
+// ДОБАВЛЕНЫ НОВЫЕ МАКРО-СИГНАЛЫ (macro_up, macro_down, supply_alert, urgent_buy)
+export type SignalKind = 
+  | 'best' | 'expensive' | 'spike' | 'spread' | 'deficit' | 'arbitrage'
+  | 'macro_up' | 'macro_down' | 'supply_alert' | 'urgent_buy'
+
 export type Signal = {
   kind: SignalKind
   label: string
   tone: 'good' | 'bad' | 'warn' | 'neutral'
 }
 
+// НОВЫЙ ТИП: Структура данных из вашей новой таблицы macro_indicators
+export type MacroIndicator = {
+  id: number
+  type: string // 'polyol', 'isocyanate', 'freight_cn_eu', 'news_alert'
+  value: number
+  trend: number
+  description: string
+  updated_at: string
+}
