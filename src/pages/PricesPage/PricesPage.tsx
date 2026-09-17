@@ -1,256 +1,369 @@
-import { DICTIONARY, BRAND_ALIASES } from './constants'
-import type { Offer, GroupedProduct, Signal, MacroIndicator } from './types'
-import type { Lang } from '../../App' 
-import type { Currency } from '../../components/PriceHistoryModal' 
+import { useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ArrowLeft,
+  Search,
+  X,
+  Tag,
+  BookOpen,
+  ChevronDown,
+  Bookmark,
+  Info,
+} from 'lucide-react'
 
-export const formatSourceName = (sourceId: string) => {
-  if (!sourceId) return 'Unknown'
-  const customNames: Record<string, string> = {
-    zotti: 'Zotti',
-    aligo: 'Aligo Group',
-    bahtarma: 'Bahtarma',
-    bashmachnik: 'Башмачник',
-    masterok: 'Masterok',
-  }
-  return customNames[sourceId.toLowerCase()] || sourceId.charAt(0).toUpperCase() + sourceId.slice(1)
-}
+import type { PricesPageProps, SortOption, GroupedProduct } from './types'
+import { DICTIONARY, PAGE_SIZE } from './constants'
+import { formatSourceName } from './utils'
+import { usePrices } from './usePrices'
 
-export const formatDate = (dateStr: string | null, lang: Lang) => {
-  if (!dateStr) return null
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return null
-  const locale = { de: 'de-DE', uk: 'uk-UA', ru: 'ru-RU' }[lang] || 'en-US'
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(d)
-}
+import { ProductCard } from './components/ProductCard'
+import { CurrencySwitch } from './components/CurrencySwitch'
+import { PriceHistoryModal } from '../../components/PriceHistoryModal'
 
-export function parsePriceSafely(raw: number | string | null | undefined): number {
-  if (raw === null || raw === undefined || raw === '') return 0
-  if (typeof raw === 'number') return raw > 0 ? raw : 0
-  const cleanStr = String(raw).replace(',', '.').replace(/[^0-9.]/g, '')
-  const val = parseFloat(cleanStr)
-  return !isNaN(val) && val > 0 ? val : 0
-}
+export function PricesPage({ onBack, lang }: PricesPageProps) {
+  const t = DICTIONARY[lang]
 
-export function extractHistory(raw: unknown): number[] {
-  let data: unknown = raw
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim()
-    if (!trimmed) return []
-    try {
-      data = JSON.parse(trimmed)
-    } catch {
-      return []
-    }
-  }
-  if (!Array.isArray(data)) return []
-  const out: number[] = []
-  for (const item of data) {
-    if (typeof item === 'number' && item > 0 && Number.isFinite(item)) {
-      out.push(item)
-    } else if (typeof item === 'string') {
-      const n = parsePriceSafely(item)
-      if (n > 0) out.push(n)
-    } else if (item && typeof item === 'object' && 'price' in (item as Record<string, unknown>)) {
-      const n = parsePriceSafely((item as { price: number | string | null }).price)
-      if (n > 0) out.push(n)
-    }
-  }
-  return out
-}
-
-export function convertUah(
-  uah: number,
-  currency: Currency,
-  usdRate?: number | null,
-  eurRate?: number | null,
-): number {
-  if (!uah || uah <= 0) return 0
-  if (currency === 'USD' && usdRate && usdRate > 0) return uah / usdRate
-  if (currency === 'EUR' && eurRate && eurRate > 0) return uah / eurRate
-  return uah
-}
-
-export function getVolumeData(raw: string): {
-  baseUnit: 'кг' | 'л' | 'шт'
-  originalLabel: string
-  multiplier: number
-} {
-  if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
-  const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
-  const m = s.match(
-    /(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[а-я]*|литр[а-я]*|мл|ml)(?:[\s.,;)]|$)/i,
-  )
-  if (!m) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
-  const num = parseFloat(m[1])
-  if (num === 0 || isNaN(num)) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
-  const u = m[2].toLowerCase()
-  if (u.startsWith('л') || u === 'l')
-    return { baseUnit: 'л', originalLabel: num + ' л', multiplier: 1 / num }
-  if (u.startsWith('м') || u === 'ml')
-    return { baseUnit: 'л', originalLabel: num + ' мл', multiplier: 1000 / num }
-  if (['кг', 'kg'].includes(u))
-    return { baseUnit: 'кг', originalLabel: num + ' кг', multiplier: 1 / num }
-  return { baseUnit: 'кг', originalLabel: num + ' г', multiplier: 1000 / num }
-}
-
-export function normalizeProductName(raw: string): string {
-  if (!raw) return ''
-  let s = raw
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
-  for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ' ' + rep + ' ')
-  s = s.replace(
-    /\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)(?:[\s.,;)]|$)/gi,
-    ' ',
-  )
-  const stopWords = [
-    'клей', 'взуттєвий', 'обувной', 'обувної', 'банка', 'італія', 'италия', 'чорний', 'черный',
-    'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 'ремонту',
-    'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр',
-    'шт', 'розлив', 'на', 'original', 'strong', 'shoe', 'glue', 'в', 'от', '06w', '06wn',
-    '006w', 'm', 'і', 'и', 'та', 'або', 'или',
-  ]
-  const words = s.split(/\s+/).filter((w) => w.length > 1 && !stopWords.includes(w))
-  return Array.from(new Set(words)).sort().join(' ')
-}
-
-export function calculateWordSimilarity(name1: string, name2: string): number {
-  const w1 = name1.split(' ').filter(Boolean)
-  const w2 = name2.split(' ').filter(Boolean)
-  if (w1.length === 0 || w2.length === 0) return 0
-  let matches = 0
-  for (const w of w1) {
-    if (w2.includes(w)) matches++
-  }
-  const unionSize = new Set([...w1, ...w2]).size
-  return matches / unionSize
-}
-
-export const formatPrice = (val: number, lang: Lang, currency: Currency = 'UAH') => {
-  if (!val || val <= 0) return DICTIONARY[lang].noPrice
-  const locale = { de: 'de-DE', uk: 'uk-UA', ru: 'ru-RU' }[lang] || 'en-US'
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
+  const {
+    loading,
+    error,
+    eurRate,
+    usdRate,
     currency,
-    maximumFractionDigits: currency === 'UAH' ? 0 : 2,
-    minimumFractionDigits: currency === 'UAH' ? 0 : 2,
-  }).format(val)
-}
+    setCurrency,
+    modalData,
+    setModalData,
+    historyGroup,
+    setHistoryGroup,
+    searchQuery,
+    setSearchQuery,
+    selectedSource,
+    setSelectedSource,
+    sortBy,
+    setSortBy,
+    visibleCount,
+    setVisibleCount,
+    favorites,
+    toggleFavorite,
+    handleRetry,
+    sources,
+    filteredItems,
+    stats,
+    macroIndicators, 
+  } = usePrices()
 
-export function signalClass(tone: Signal['tone']) {
-  if (tone === 'good') return 'text-emerald-700 border-emerald-500/40 bg-emerald-500/10'
-  if (tone === 'bad') return 'text-red-600 border-red-500/40 bg-red-500/10'
-  if (tone === 'warn')
-    return 'text-[var(--color-accent)] border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10'
-  return 'text-[var(--color-muted)] border-[var(--color-border)] bg-[var(--color-surface-2)]'
-}
-
-export function computeOfferSignals(
-  offer: Offer,
-  group: GroupedProduct,
-  avgUnitPrice: number,
-  validOffersCount: number,
-): Signal[] {
-  const signals: Signal[] = []
-  if (offer.unitPrice <= 0) return signals
-
-  const history = offer.history && offer.history.length >= 2 ? offer.history : []
-  const first = history[0]
-  const last = history[history.length - 1]
-  const changePct =
-    history.length >= 2 && first > 0 ? ((last - first) / first) * 100 : null
-
-  if (validOffersCount > 1 && offer.unitPrice === group.minUnitPrice && group.minUnitPrice > 0) {
-    signals.push({ kind: 'best', label: 'Лучшая цена', tone: 'good' })
-  }
-  if (validOffersCount > 1 && avgUnitPrice > 0 && offer.unitPrice < avgUnitPrice * 0.88) {
-    signals.push({ kind: 'arbitrage', label: 'Ниже рынка', tone: 'good' })
-  }
-  if (validOffersCount > 1 && avgUnitPrice > 0 && offer.unitPrice > avgUnitPrice * 1.15) {
-    signals.push({ kind: 'expensive', label: 'Дороже рынка', tone: 'bad' })
-  }
-  if (changePct !== null && changePct >= 10) {
-    signals.push({
-      kind: 'spike',
-      label: 'Рост +' + changePct.toFixed(0) + '%',
-      tone: 'warn',
-    })
-  }
-  return signals
-}
-
-export function computeGroupSignals(
-  group: GroupedProduct, 
-  macroIndicators: MacroIndicator[] = []
-): Signal[] {
-  const signals: Signal[] = []
-  
-  if (group.totalOffers >= 3 && group.outOfStockCount >= 2) {
-    signals.push({ kind: 'deficit', label: 'Риск дефицита', tone: 'bad' })
-  }
-  if (group.unitSpread >= 35) {
-    signals.push({
-      kind: 'spread',
-      label: 'Спред ' + group.unitSpread.toFixed(0) + '%',
-      tone: 'warn',
-    })
-  }
-
-  // МАКРО-ЛОГИКА (Умный анализ сырья из базы)
-  if (macroIndicators.length > 0) {
-    const searchString = (group.name + ' ' + group.key).toLowerCase()
-    
-    // Группируем виды клеев
-    const isPU = searchString.includes('десмокол') || searchString.includes('desmokol') || searchString.includes('полиуретан') || searchString.includes('поліуретан') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
-    const isRubber = searchString.includes('наирит') || searchString.includes('найріт') || searchString.includes('nairit') || searchString.includes('резинов') || searchString.includes('гумов') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('каучук')
-    const isLatex = searchString.includes('латекс') || searchString.includes('latex')
-    const isPrimer = searchString.includes('протрав') || searchString.includes('протирання') || searchString.includes('галоген') || searchString.includes('halog') || searchString.includes('preparatore')
-    
-    // 1. Полиуретан -> зависит от Изоцианата
-    if (isPU) {
-      const isocyanate = macroIndicators.find(m => m.type === 'isocyanate')
-      if (isocyanate && isocyanate.trend > 10) {
-        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост ПУ-сырья)', tone: 'bad' })
-      } else if (isocyanate && isocyanate.trend < -10) {
-        signals.push({ kind: 'macro_down', label: 'Сырье ПУ дешевеет', tone: 'good' })
-      }
+  const currentModalContent = useMemo(() => {
+    if (!modalData) return { rec: '' }
+    if (modalData.type === 'spread') {
+      if (modalData.value < 10) return { rec: t.spreadLow }
+      if (modalData.value <= 30) return { rec: t.spreadMid }
+      return { rec: t.spreadHigh }
+    } else {
+      if (modalData.value < 10) return { rec: t.volLow }
+      if (modalData.value <= 30) return { rec: t.volMid }
+      return { rec: t.volHigh }
     }
+  }, [modalData, t])
 
-    // 2. Наирит / Резиновый клей -> зависит от хлоропрена или каучука
-    if (isRubber) {
-      const rubberRaw = macroIndicators.find(m => m.type === 'chloroprene' || m.type === 'rubber')
-      if (rubberRaw && rubberRaw.trend > 10) {
-        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост каучука)', tone: 'bad' })
-      }
-    }
+  return (
+    <div className="min-h-[100dvh] w-full bg-[var(--color-bg)] text-[var(--color-ink)] font-sans transition-colors duration-300">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="flex flex-col h-[100dvh] relative"
+      >
+        <header className="shrink-0 z-20 bg-[var(--color-surface)] border-b border-[var(--color-border)] pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <button
+                  onClick={onBack}
+                  className="relative p-2 -m-2 border border-[var(--color-border)] rounded-lg flex items-center justify-center text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] transition-colors shrink-0"
+                  aria-label="Назад"
+                >
+                  <ArrowLeft size={18} strokeWidth={1.5} />
+                </button>
+                <div className="min-w-0">
+                  <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-[var(--color-ink)] flex items-center gap-2.5">
+                    <BookOpen
+                      size={22}
+                      className="text-[var(--color-muted)] opacity-70 shrink-0"
+                      strokeWidth={1.5}
+                    />
+                    <span className="truncate">{t.title}</span>
+                  </h1>
 
-    // 3. Латексный клей -> зависит от латекса
-    if (isLatex) {
-      const latexRaw = macroIndicators.find(m => m.type === 'latex')
-      if (latexRaw && latexRaw.trend > 10) {
-        signals.push({ kind: 'urgent_buy', label: 'Внимание: рост цен на латекс', tone: 'warn' })
-      }
-    }
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[var(--color-muted)] mt-1.5 font-mono">
+                    <span>
+                      {stats.total} {t.statsTotal}
+                    </span>
+                    {stats.multiCount > 0 && (
+                      <>
+                        <span className="text-[var(--color-muted)] opacity-30 font-sans">/</span>
+                        <button
+                          onClick={() =>
+                            setModalData({ type: 'volatility', value: stats.avgSpreadValue })
+                          }
+                          className="relative inline-flex items-center p-1 -m-1 rounded text-[var(--color-accent)] font-sans font-medium focus:outline-none hover:opacity-80 transition-colors"
+                        >
+                          {t.statsAvgSpread}: {stats.avgSpreadText}%
+                          <Info size={12} strokeWidth={2.5} className="opacity-50 ml-1" />
+                        </button>
+                      </>
+                    )}
+                    {(usdRate || eurRate) && (
+                      <>
+                        <span className="text-[var(--color-muted)] opacity-30 font-sans">/</span>
+                        <span className="tabular-nums font-semibold text-[var(--color-ink)]">
+                          {usdRate && '$ ' + usdRate.toFixed(2)}
+                          {usdRate && eurRate && ' · '}
+                          {eurRate && '€ ' + eurRate.toFixed(2)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-    // 4. Протрава / Галоген -> зависит от растворителей (solvent)
-    if (isPrimer) {
-      const solvent = macroIndicators.find(m => m.type === 'solvent')
-      if (solvent && solvent.trend > 10) {
-        signals.push({ kind: 'supply_alert', label: 'Риск дефицита (растворители)', tone: 'warn' })
-      }
-    }
+              <div className="flex flex-col items-end gap-1 shrink-0 pt-1">
+                <CurrencySwitch
+                  currency={currency}
+                  onChange={setCurrency}
+                  usdRate={usdRate}
+                  eurRate={eurRate}
+                />
+              </div>
+            </div>
 
-    // 5. Логистика / Фрахт (Бьет по всему импорту)
-    const freight = macroIndicators.find(m => m.type === 'freight_cn_eu')
-    if (freight && freight.trend > 15) {
-      signals.push({ kind: 'supply_alert', label: 'Ожидается удорожание импорта', tone: 'warn' })
-    }
-  }
+            <div className="flex flex-col lg:flex-row gap-3 border-t border-[var(--color-border)] pt-4">
+              <div className="relative flex-1 max-w-md">
+                <Search
+                  size={16}
+                  strokeWidth={1.5}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-muted)]"
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t.search}
+                  className="w-full h-10 pl-10 pr-9 bg-[var(--color-surface-2)] border border-[var(--color-border)] focus:border-[var(--color-ink)] outline-none text-sm placeholder:text-[var(--color-muted)] text-[var(--color-ink)] transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                  >
+                    <X size={15} strokeWidth={1.5} />
+                  </button>
+                )}
+              </div>
 
-  return signals
+              <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="h-10 px-3 text-xs uppercase tracking-wider bg-[var(--color-surface-2)] text-[var(--color-ink)] border border-[var(--color-border)] outline-none cursor-pointer appearance-none shrink-0"
+                >
+                  <option value="default">{t.sortDefault}</option>
+                  <option value="savings">{t.sortSavings}</option>
+                  <option value="unit-price-asc">{t.sortUnitPriceAsc}</option>
+                  <option value="name">{t.sortName}</option>
+                </select>
+
+                <div className="h-5 w-px bg-[var(--color-border)] shrink-0" />
+
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setSelectedSource('all')}
+                    className={
+                      'px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ' +
+                      (selectedSource === 'all'
+                        ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]'
+                        : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]')
+                    }
+                  >
+                    {t.allSources}
+                  </button>
+                  <button
+                    onClick={() => setSelectedSource('favorites')}
+                    className={
+                      'px-3 py-1.5 text-xs uppercase tracking-wider font-semibold flex items-center gap-1.5 transition-colors border ' +
+                      (selectedSource === 'favorites'
+                        ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]'
+                        : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]')
+                    }
+                  >
+                    <Bookmark
+                      size={13}
+                      strokeWidth={selectedSource === 'favorites' ? 2 : 1.5}
+                      className={selectedSource === 'favorites' ? 'fill-current' : ''}
+                    />
+                    {t.favorites}
+                  </button>
+                  {sources.map((src: string) => (
+                    <button
+                      key={src}
+                      onClick={() => setSelectedSource(src)}
+                      className={
+                        'px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ' +
+                        (selectedSource === src
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]'
+                          : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]')
+                      }
+                    >
+                      {formatSourceName(src)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 no-scrollbar">
+          <div className="max-w-7xl mx-auto">
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-60 bg-[var(--color-surface)] border border-[var(--color-border)] animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-28 text-center">
+                <p className="font-serif text-xl text-[var(--color-muted)] mb-6">{error}</p>
+                <button
+                  onClick={handleRetry}
+                  className="px-8 py-3 border border-[var(--color-accent)] text-xs uppercase tracking-widest font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-[var(--color-bg)] transition-colors"
+                >
+                  {t.retry}
+                </button>
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-28 text-center text-[var(--color-muted)]">
+                <Tag size={44} strokeWidth={1} className="mb-4 opacity-40" />
+                <p className="font-serif text-2xl text-[var(--color-ink)] mb-2">{t.empty}</p>
+                <p className="text-sm tracking-wide text-[var(--color-muted)]">{t.emptyHint}</p>
+              </div>
+            ) : (
+              <div className="pb-14">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+                  <AnimatePresence>
+                    {filteredItems.slice(0, visibleCount).map((g: GroupedProduct) => (
+                      <motion.div
+                        key={g.key}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <ProductCard
+                          group={g}
+                          lang={lang}
+                          t={t}
+                          isFavorite={favorites.has(g.key)}
+                          onToggleFavorite={toggleFavorite}
+                          onOpenSpreadModal={(val) =>
+                            setModalData({ type: 'spread', value: val })
+                          }
+                          onOpenHistory={(groupData) => setHistoryGroup(groupData)}
+                          currency={currency}
+                          usdRate={usdRate}
+                          eurRate={eurRate}
+                          macroIndicators={macroIndicators} 
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+
+                {visibleCount < filteredItems.length && (
+                  <div className="mt-10 flex justify-center">
+                    <button
+                      onClick={() => setVisibleCount((v: number) => v + PAGE_SIZE)}
+                      className="px-8 py-3.5 border border-[var(--color-border)] bg-[var(--color-surface)] text-xs uppercase tracking-widest font-semibold text-[var(--color-ink)] hover:border-[var(--color-ink)] transition-colors flex items-center gap-2.5"
+                    >
+                      {t.loadMore} <ChevronDown size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+
+        <AnimatePresence>
+          {modalData && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setModalData(null)}
+                className="absolute inset-0 bg-[#000000] opacity-70 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 100 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 100 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative w-full max-w-md bg-[var(--color-surface)] border-t sm:border border-[var(--color-border)] shadow-2xl p-7 rounded-t-3xl sm:rounded-3xl z-10 overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-full h-1 bg-[var(--color-accent)]" />
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <div className="text-6xl font-serif font-medium text-[var(--color-accent)] tracking-tight mb-2">
+                      {modalData.value.toFixed(0)}%
+                    </div>
+                    <h3 className="text-sm uppercase tracking-widest text-[var(--color-muted)] font-bold mb-6">
+                      {modalData.type === 'spread' ? t.spreadTitle : t.volatilityTitle}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setModalData(null)}
+                    className="p-2 -m-2 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors"
+                  >
+                    <X size={20} strokeWidth={1.5} />
+                  </button>
+                </div>
+                <div className="bg-[var(--color-surface-2)] p-5 border border-[var(--color-border)] relative">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--color-accent)] opacity-50" />
+                  <p className="text-[11px] font-bold text-[var(--color-ink)] uppercase tracking-widest mb-2 font-mono">
+                    {t.recommendationLabel}
+                  </p>
+                  <p className="text-[14px] text-[var(--color-muted)] leading-relaxed">
+                    {currentModalContent.rec}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setModalData(null)}
+                  className="mt-8 w-full py-4 bg-[var(--color-accent)] text-[var(--color-bg)] text-xs uppercase tracking-widest font-bold hover:opacity-90 active:scale-[0.98] transition-all"
+                >
+                  {t.gotIt}
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {historyGroup && (
+            <PriceHistoryModal
+              group={historyGroup}
+              onClose={() => setHistoryGroup(null)}
+              t={t}
+              lang={lang}
+              usdRate={usdRate}
+              eurRate={eurRate}
+              currency={currency}
+              onCurrencyChange={setCurrency}
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  )
 }
