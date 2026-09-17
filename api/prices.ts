@@ -15,7 +15,7 @@ export default async function handler(request: Request) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Забираем все товары + актуальную цену + историю (последние 15 точек)
+    // Все товары + актуальная цена + история за 90 дней (до 120 точек)
     const rows = await sql`
       SELECT 
         p.id,
@@ -36,8 +36,9 @@ export default async function handler(request: Request) {
             SELECT price, scraped_at, id
             FROM price_history
             WHERE product_id = p.id
+              AND scraped_at >= NOW() - INTERVAL '90 days'
             ORDER BY scraped_at DESC NULLS LAST, id DESC
-            LIMIT 15
+            LIMIT 120
           ) h
         ) AS history
       FROM products p
