@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -49,6 +48,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     sources,
     filteredItems,
     stats,
+    macroIndicators, // ДОСТАЛИ ИЗ ХУКА
   } = usePrices()
 
   const currentModalContent = useMemo(() => {
@@ -273,6 +273,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
                           currency={currency}
                           usdRate={usdRate}
                           eurRate={eurRate}
+                          macroIndicators={macroIndicators} // ПЕРЕДАЕМ В КАРТОЧКУ
                         />
                       </motion.div>
                     ))}
