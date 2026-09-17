@@ -34,24 +34,24 @@ type PriceHistoryModalProps = {
 }
 
 const COLORS = [
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#10b981', // green
-  '#f59e0b', // amber
-  '#8b5cf6', // violet
-  '#ec4899', // pink
+  '#3b82f6',
+  '#10b981',
+  '#ef4444',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ec4899',
 ]
 
 const formatSourceName = (sourceId: string) => {
   if (!sourceId) return 'Unknown'
-  const customNames: Record<string, string> = {
+  const map: Record<string, string> = {
     zotti: 'Zotti',
     aligo: 'Aligo Group',
     bahtarma: 'Bahtarma',
     bashmachnik: 'Башмачник',
     masterok: 'Masterok',
   }
-  return customNames[sourceId.toLowerCase()] || sourceId.charAt(0).toUpperCase() + sourceId.slice(1)
+  return map[sourceId.toLowerCase()] || sourceId.charAt(0).toUpperCase() + sourceId.slice(1)
 }
 
 function parseHistoryPoint(item: unknown): number {
@@ -101,8 +101,8 @@ function formatPrice(val: number, currency: Currency) {
 function Sparkline({
   points,
   color,
-  width = 120,
-  height = 32,
+  width = 110,
+  height = 28,
 }: {
   points: number[]
   color: string
@@ -110,14 +110,7 @@ function Sparkline({
   height?: number
 }) {
   if (points.length < 2) {
-    return (
-      <div
-        className="flex items-center justify-center text-[10px] text-[var(--color-muted)]"
-        style={{ width, height }}
-      >
-        —
-      </div>
-    )
+    return <div style={{ width, height }} className="flex items-center justify-center text-[10px] text-[var(--color-muted)]">—</div>
   }
 
   const min = Math.min(...points)
@@ -126,14 +119,12 @@ function Sparkline({
 
   const coords = points.map((p, i) => {
     const x = (i / (points.length - 1)) * width
-    const y = height - ((p - min) / span) * (height - 4) - 2
+    const y = height - ((p - min) / span) * (height - 6) - 3
     return `\( {x}, \){y}`
   })
 
   const path = `M ${coords.join(' L ')}`
-  const last = points[points.length - 1]
-  const first = points[0]
-  const isDown = last < first
+  const lastY = height - ((points[points.length - 1] - min) / span) * (height - 6) - 3
 
   return (
     <svg width={width} height={height} className="overflow-visible">
@@ -141,25 +132,17 @@ function Sparkline({
         d={path}
         fill="none"
         stroke={color}
-        strokeWidth="1.75"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity={0.9}
       />
-      {/* last point */}
-      <circle
-        cx={width}
-        cy={height - ((last - min) / span) * (height - 4) - 2}
-        r="2.5"
-        fill={color}
-      />
+      <circle cx={width} cy={lastY} r="2.8" fill={color} />
     </svg>
   )
 }
 
 export function PriceHistoryModal({
   group,
-  lang: _lang,
   onClose,
   t,
   usdRate,
@@ -186,7 +169,7 @@ export function PriceHistoryModal({
         const first = history[0] ?? convertedPrice
         const last = history[history.length - 1] ?? convertedPrice
         const changePct =
-          history.length >= 2 && first > 0 ? ((last - first) / first) * 100 : 0
+          history.length >= 2 && first > 0 ? ((last - first) / first) * 100 : null
 
         return {
           ...offer,
@@ -222,7 +205,7 @@ export function PriceHistoryModal({
         <div className="px-5 pt-5 pb-4 border-b border-[var(--color-border)] shrink-0">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-2 min-w-0">
-              <TrendingUp size={16} className="text-[var(--color-muted)] shrink-0" />
+              <TrendingUp size={15} className="text-[var(--color-muted)] shrink-0" />
               <h3 className="text-[11px] uppercase tracking-widest text-[var(--color-muted)] font-bold">
                 {t.priceHistory}
               </h3>
@@ -285,47 +268,57 @@ export function PriceHistoryModal({
           ) : (
             <div className="divide-y divide-[var(--color-border)]">
               {rows.map((row, idx) => {
-                const isDown = row.changePct < -0.5
-                const isUp = row.changePct > 0.5
-                const changeColor = isDown
-                  ? 'text-[var(--color-success)]'
-                  : isUp
-                    ? 'text-[var(--color-danger)]'
-                    : 'text-[var(--color-muted)]'
+                const changePct = row.changePct
+                const isDown = changePct !== null && changePct < -0.4
+                const isUp = changePct !== null && changePct > 0.4
+
+                let changeText = '—'
+                let changeColor = 'text-[var(--color-muted)]'
+
+                if (changePct !== null) {
+                  const sign = changePct > 0 ? '+' : ''
+                  changeText = `\( {sign} \){changePct.toFixed(1)}%`
+                  changeColor = isDown
+                    ? 'text-emerald-600'
+                    : isUp
+                      ? 'text-red-500'
+                      : 'text-[var(--color-muted)]'
+                }
 
                 return (
                   <motion.div
                     key={`\( {row.source}_ \){row.id}`}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.04 }}
-                    className="px-5 py-4 flex items-center gap-4 hover:bg-[var(--color-surface-2)]/50 transition-colors"
+                    transition={{ delay: idx * 0.03 }}
+                    className="px-5 py-4 flex items-center gap-3"
                   >
-                    {/* Left: source + volume */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <div
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: row.color }}
-                        />
-                        <span className="text-[13px] font-medium text-[var(--color-ink)] truncate">
+                    {/* Color + Source */}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: row.color }}
+                        title={formatSourceName(row.source)}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-medium text-[var(--color-ink)] truncate">
                           {formatSourceName(row.source)}
-                        </span>
+                        </div>
+                        {row.volumeLabel && (
+                          <div className="text-[11px] text-[var(--color-muted)] font-mono">
+                            {row.volumeLabel}
+                          </div>
+                        )}
                       </div>
-                      {row.volumeLabel && (
-                        <p className="text-[11px] text-[var(--color-muted)] font-mono pl-4">
-                          {row.volumeLabel}
-                        </p>
-                      )}
                     </div>
 
-                    {/* Center: sparkline */}
-                    <div className="hidden sm:block shrink-0">
+                    {/* Sparkline (desktop) */}
+                    <div className="hidden sm:block shrink-0 opacity-90">
                       <Sparkline points={row.history} color={row.color} />
                     </div>
 
-                    {/* Right: price + change */}
-                    <div className="text-right shrink-0 min-w-[90px]">
+                    {/* Price + Change */}
+                    <div className="text-right shrink-0">
                       <div className="text-[15px] font-semibold tabular-nums text-[var(--color-ink)]">
                         {formatPrice(row.convertedPrice, currency)}
                         <span className="text-[12px] font-normal text-[var(--color-muted)] ml-0.5">
@@ -334,19 +327,15 @@ export function PriceHistoryModal({
                       </div>
 
                       <div className={`flex items-center justify-end gap-1 mt-0.5 ${changeColor}`}>
-                        {isDown ? (
-                          <TrendingDown size={12} strokeWidth={2.5} />
-                        ) : isUp ? (
-                          <TrendingUp size={12} strokeWidth={2.5} />
-                        ) : (
-                          <Minus size={12} strokeWidth={2.5} />
+                        {isDown && <TrendingDown size={11} strokeWidth={2.5} />}
+                        {isUp && <TrendingUp size={11} strokeWidth={2.5} />}
+                        {!isDown && !isUp && changePct !== null && (
+                          <Minus size={11} strokeWidth={2.5} />
                         )}
                         <span className="text-[11px] font-medium tabular-nums">
-                          {row.history.length >= 2
-                            ? `\( {row.changePct > 0 ? '+' : ''} \){row.changePct.toFixed(1)}%`
-                            : '—'}
+                          {changeText}
                         </span>
-                        <span className="text-[10px] text-[var(--color-muted)] opacity-70 ml-0.5">
+                        <span className="text-[10px] text-[var(--color-muted)] opacity-60">
                           · {row.history.length}
                         </span>
                       </div>
@@ -358,11 +347,11 @@ export function PriceHistoryModal({
           )}
         </div>
 
-        {/* Footer note */}
+        {/* Footer */}
         {hasAnyHistory && (
-          <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/40 shrink-0">
-            <p className="text-[10px] text-[var(--color-muted)] text-center tracking-wide">
-              {t.historyOldest} → {t.historyNewest} · до 15 последних замеров
+          <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/50 shrink-0">
+            <p className="text-[10px] text-[var(--color-muted)] text-center">
+              Цвет точки = поставщик · % = изменение цены за период · число = кол-во замеров
             </p>
           </div>
         )}
