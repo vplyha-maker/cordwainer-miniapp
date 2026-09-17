@@ -1,5 +1,4 @@
 import { DICTIONARY, BRAND_ALIASES } from './constants'
-// ДОБАВИЛ MacroIndicator
 import type { Offer, GroupedProduct, Signal, MacroIndicator } from './types'
 import type { Lang } from '../../App' 
 import type { Currency } from '../../components/PriceHistoryModal' 
@@ -185,7 +184,6 @@ export function computeOfferSignals(
   return signals
 }
 
-// ДОБАВЛЕН ПРИЕМ macroIndicators И УМНАЯ КЛАССИФИКАЦИЯ ОБУВНОЙ ХИМИИ
 export function computeGroupSignals(
   group: GroupedProduct, 
   macroIndicators: MacroIndicator[] = []
@@ -203,55 +201,23 @@ export function computeGroupSignals(
     })
   }
 
-  // МАКРО-ЛОГИКА
-  if (macroIndicators.length > 0) {
-    const name = group.name.toLowerCase()
-    
-    // Классификаторы химии
-    const isPU = name.includes('десмокол') || name.includes('desmokol') || name.includes('полиуретан') || name.includes('sar 30') || name.includes('sar30') || name.includes('sar-30')
-    const isRubber = name.includes('наирит') || name.includes('nairit') || name.includes('резинов') || name.includes('sar 20') || name.includes('sar20') || name.includes('каучук')
-    const isLatex = name.includes('латекс')
-    const isPrimer = name.includes('протрав') || name.includes('галоген')
-    
-    // 1. Полиуретан (Десмокол / SAR 306) -> Изоцианат
-    if (isPU) {
-      const isocyanate = macroIndicators.find(m => m.type === 'isocyanate')
-      if (isocyanate && isocyanate.trend > 10) {
-        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост ПУ-сырья)', tone: 'bad' })
-      } else if (isocyanate && isocyanate.trend < -10) {
-        signals.push({ kind: 'macro_down', label: 'Сырье ПУ дешевеет', tone: 'good' })
-      }
-    }
+  // ОБЪЕДИНЯЕМ ИМЯ И НОРМАЛИЗОВАННЫЙ КЛЮЧ, ЧТОБЫ ИСКАТЬ ВЕЗДЕ
+  const searchString = (group.name + ' ' + group.key).toLowerCase()
+  
+  // Ищем и на русском, и на украинском, и на английском
+  const isPU = searchString.includes('десмокол') || searchString.includes('desmokol') || searchString.includes('полиуретан') || searchString.includes('поліуретан') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
+  const isRubber = searchString.includes('наирит') || searchString.includes('найріт') || searchString.includes('nairit') || searchString.includes('резинов') || searchString.includes('гумов') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('каучук')
+  const isPrimer = searchString.includes('протрав') || searchString.includes('протирання') || searchString.includes('галоген') || searchString.includes('halog') || searchString.includes('preparatore')
 
-    // 2. Наирит / Резиновый клей (SAR 206) -> Хлоропрен или Каучук
-    if (isRubber) {
-      const rubberRaw = macroIndicators.find(m => m.type === 'chloroprene' || m.type === 'rubber')
-      if (rubberRaw && rubberRaw.trend > 10) {
-        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост каучука)', tone: 'bad' })
-      }
-    }
-
-    // 3. Латексный клей -> Латекс (Latex)
-    if (isLatex) {
-      const latexRaw = macroIndicators.find(m => m.type === 'latex')
-      if (latexRaw && latexRaw.trend > 10) {
-        signals.push({ kind: 'urgent_buy', label: 'Внимание: рост цен на латекс', tone: 'warn' })
-      }
-    }
-
-    // 4. Протрава / Галоген -> Базовая химия / Растворители
-    if (isPrimer) {
-      const solvent = macroIndicators.find(m => m.type === 'solvent')
-      if (solvent && solvent.trend > 10) {
-        signals.push({ kind: 'supply_alert', label: 'Риск дефицита (растворители)', tone: 'warn' })
-      }
-    }
-
-    // 5. Логистика / Фрахт (Бьет по всему импорту)
-    const freight = macroIndicators.find(m => m.type === 'freight_cn_eu')
-    if (freight && freight.trend > 15) {
-      signals.push({ kind: 'supply_alert', label: 'Ожидается удорожание импорта', tone: 'warn' })
-    }
+  // ФОРСИРОВАННЫЙ ТЕСТ: Выводим бейджи 100%
+  if (isPU) {
+    signals.push({ kind: 'urgent_buy', label: '🚨 СРОЧНО (ПУ-СЫРЬЕ)', tone: 'bad' })
+  }
+  if (isRubber) {
+    signals.push({ kind: 'urgent_buy', label: '🚨 СРОЧНО (КАУЧУК)', tone: 'bad' })
+  }
+  if (isPrimer) {
+    signals.push({ kind: 'supply_alert', label: '🚨 РИСК ДЕФИЦИТА', tone: 'warn' })
   }
 
   return signals
