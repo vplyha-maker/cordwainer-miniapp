@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { X, TrendingUp } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import type { Lang } from '../App'
 
 export type Currency = 'UAH' | 'USD' | 'EUR'
@@ -10,6 +10,9 @@ type Offer = {
   source: string
   price: number
   history?: number[]
+  unitPrice?: number
+  baseUnit?: string
+  volumeLabel?: string
 }
 
 type GroupedProduct = {
@@ -31,11 +34,12 @@ type PriceHistoryModalProps = {
 }
 
 const COLORS = [
-  '#3b82f6',
-  '#ef4444',
-  '#10b981',
-  '#f59e0b',
-  '#8b5cf6',
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // violet
+  '#ec4899', // pink
 ]
 
 const formatSourceName = (sourceId: string) => {
@@ -88,6 +92,71 @@ function extractHistory(raw: unknown, fallbackPrice: number): number[] {
   return fallbackPrice > 0 ? [fallbackPrice] : []
 }
 
+function formatPrice(val: number, currency: Currency) {
+  if (!val || val <= 0) return '—'
+  if (currency === 'UAH') return Math.round(val).toLocaleString('uk-UA')
+  return val.toFixed(2)
+}
+
+function Sparkline({
+  points,
+  color,
+  width = 120,
+  height = 32,
+}: {
+  points: number[]
+  color: string
+  width?: number
+  height?: number
+}) {
+  if (points.length < 2) {
+    return (
+      <div
+        className="flex items-center justify-center text-[10px] text-[var(--color-muted)]"
+        style={{ width, height }}
+      >
+        —
+      </div>
+    )
+  }
+
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const span = max - min || 1
+
+  const coords = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * width
+    const y = height - ((p - min) / span) * (height - 4) - 2
+    return `\( {x}, \){y}`
+  })
+
+  const path = `M ${coords.join(' L ')}`
+  const last = points[points.length - 1]
+  const first = points[0]
+  const isDown = last < first
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.9}
+      />
+      {/* last point */}
+      <circle
+        cx={width}
+        cy={height - ((last - min) / span) * (height - 4) - 2}
+        r="2.5"
+        fill={color}
+      />
+    </svg>
+  )
+}
+
 export function PriceHistoryModal({
   group,
   lang: _lang,
@@ -106,60 +175,31 @@ export function PriceHistoryModal({
 
   const currencySymbol = currency === 'UAH' ? '₴' : currency === 'USD' ? '$' : '€'
 
-  const chartData = useMemo(() => {
-    return group.offers.filter(o => o.price > 0).map((offer, index) => {
-      const historyRaw = extractHistory(offer.history, offer.price)
-      const history = historyRaw.map(p => p / currentRate)
-      const convertedPrice = offer.price / currentRate
+  const rows = useMemo(() => {
+    return group.offers
+      .filter((o) => o.price > 0)
+      .map((offer, index) => {
+        const historyRaw = extractHistory(offer.history, offer.price)
+        const history = historyRaw.map((p) => p / currentRate)
+        const convertedPrice = offer.price / currentRate
 
-      return {
-        ...offer,
-        history,
-        convertedPrice,
-        color: COLORS[index % COLORS.length],
-      }
-    })
+        const first = history[0] ?? convertedPrice
+        const last = history[history.length - 1] ?? convertedPrice
+        const changePct =
+          history.length >= 2 && first > 0 ? ((last - first) / first) * 100 : 0
+
+        return {
+          ...offer,
+          history,
+          convertedPrice,
+          changePct,
+          color: COLORS[index % COLORS.length],
+        }
+      })
+      .sort((a, b) => a.convertedPrice - b.convertedPrice)
   }, [group, currentRate])
 
-  const maxPoints = chartData.reduce((m, o) => Math.max(m, o.history.length), 0)
-  const hasEnoughHistory = chartData.some(o => o.history.length >= 2)
-
-  const { minPrice, maxPrice } = useMemo(() => {
-    let min = Infinity
-    let max = -Infinity
-    chartData.forEach(offer => {
-      offer.history.forEach(price => {
-        if (price < min) min = price
-        if (price > max) max = price
-      })
-    })
-
-    if (min === Infinity) return { minPrice: 0, maxPrice: 100 }
-
-    const padding = (max - min) * 0.1 || max * 0.1 || 1
-    return {
-      minPrice: Math.max(0, min - padding),
-      maxPrice: max + padding,
-    }
-  }, [chartData])
-
-  const width = 100
-  const height = 100
-
-  const getCoordinates = (index: number, price: number, totalPoints: number) => {
-    const x = totalPoints <= 1 ? width / 2 : (index / (totalPoints - 1)) * width
-    const span = maxPrice - minPrice
-    const y = span === 0 ? height / 2 : height - ((price - minPrice) / span) * height
-    return { x, y: isNaN(y) ? height / 2 : y }
-  }
-
-  const formatAxisY = (val: number) => {
-    return currency === 'UAH' ? val.toFixed(0) : val.toFixed(1)
-  }
-
-  const formatLegendPrice = (val: number) => {
-    return currency === 'UAH' ? val.toFixed(0) : val.toFixed(2)
-  }
+  const hasAnyHistory = rows.some((r) => r.history.length >= 2)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6 font-sans">
@@ -168,23 +208,27 @@ export function PriceHistoryModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-[#000000] opacity-70 backdrop-blur-sm cursor-pointer"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-pointer"
       />
+
       <motion.div
-        initial={{ opacity: 0, y: 100 }}
+        initial={{ opacity: 0, y: 80 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 100 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="relative w-full max-w-lg bg-[var(--color-surface)] border-t sm:border border-[var(--color-border)] shadow-2xl p-6 sm:p-8 rounded-t-3xl sm:rounded-3xl z-10 overflow-hidden flex flex-col max-h-[90vh]"
+        exit={{ opacity: 0, y: 80 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        className="relative w-full max-w-lg bg-[var(--color-surface)] border-t sm:border border-[var(--color-border)] shadow-2xl rounded-t-3xl sm:rounded-3xl z-10 overflow-hidden flex flex-col max-h-[92vh]"
       >
-        <div className="flex justify-between items-start mb-6 shrink-0 gap-4">
-          <div className="flex-1 min-w-0 pr-2">
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h3 className="text-sm uppercase tracking-widest text-[var(--color-muted)] font-bold flex items-center gap-2">
-                <TrendingUp size={16} />
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 border-b border-[var(--color-border)] shrink-0">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <TrendingUp size={16} className="text-[var(--color-muted)] shrink-0" />
+              <h3 className="text-[11px] uppercase tracking-widest text-[var(--color-muted)] font-bold">
                 {t.priceHistory}
               </h3>
+            </div>
 
+            <div className="flex items-center gap-2">
               <div className="flex bg-[var(--color-surface-2)] p-0.5 rounded-md border border-[var(--color-border)]">
                 {(['UAH', 'USD', 'EUR'] as Currency[]).map((cur) => {
                   if (cur === 'USD' && !usdRate) return null
@@ -195,7 +239,7 @@ export function PriceHistoryModal({
                       key={cur}
                       type="button"
                       onClick={() => onCurrencyChange(cur)}
-                      className={`px-2.5 py-0.5 text-[10px] font-bold rounded transition-all ${
+                      className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all ${
                         isActive
                           ? 'bg-[var(--color-surface)] shadow-sm text-[var(--color-ink)]'
                           : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
@@ -206,115 +250,122 @@ export function PriceHistoryModal({
                   )
                 })}
               </div>
-            </div>
 
-            <h2 className="text-lg font-serif font-medium text-[var(--color-ink)] leading-tight line-clamp-2">
-              {group.name}
-            </h2>
-            {group.product_code && (
-              <p className="text-[11px] font-mono text-[var(--color-muted)] mt-1">
-                {t.code} {group.product_code}
-              </p>
-            )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors bg-[var(--color-surface-2)] rounded-full"
+              >
+                <X size={18} strokeWidth={1.5} />
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 -m-2 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors bg-[var(--color-surface-2)] rounded-full shrink-0"
-          >
-            <X size={20} strokeWidth={1.5} />
-          </button>
+          <h2 className="text-[17px] font-serif font-medium text-[var(--color-ink)] leading-snug line-clamp-2">
+            {group.name}
+          </h2>
+          {group.product_code && (
+            <p className="text-[11px] font-mono text-[var(--color-muted)] mt-1">
+              {t.code} {group.product_code}
+            </p>
+          )}
         </div>
 
-        {hasEnoughHistory ? (
-          <>
-            <div className="relative w-full aspect-[2/1] mt-2 mb-2 shrink-0">
-              <div className="absolute inset-0 flex flex-col justify-between text-[10px] text-[var(--color-muted)] font-mono">
-                <div className="w-full flex items-center gap-2">
-                  <span className="w-10 text-right shrink-0">
-                    {currencySymbol}{formatAxisY(maxPrice)}
-                  </span>
-                  <div className="flex-1 h-px bg-[var(--color-border)] opacity-50"></div>
-                </div>
-                <div className="w-full flex items-center gap-2">
-                  <span className="w-10 text-right shrink-0">
-                    {currencySymbol}{formatAxisY((maxPrice + minPrice) / 2)}
-                  </span>
-                  <div className="flex-1 h-px bg-[var(--color-border)] opacity-50"></div>
-                </div>
-                <div className="w-full flex items-center gap-2">
-                  <span className="w-10 text-right shrink-0">
-                    {currencySymbol}{formatAxisY(minPrice)}
-                  </span>
-                  <div className="flex-1 h-px bg-[var(--color-border)] opacity-50"></div>
-                </div>
-              </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {!hasAnyHistory ? (
+            <div className="m-5 py-10 px-5 text-center bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-2xl">
+              <p className="text-sm text-[var(--color-ink)] font-medium mb-1.5">
+                {t.historySingleTitle}
+              </p>
+              <p className="text-[13px] text-[var(--color-muted)] leading-relaxed">
+                {t.historySingleHint}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--color-border)]">
+              {rows.map((row, idx) => {
+                const isDown = row.changePct < -0.5
+                const isUp = row.changePct > 0.5
+                const changeColor = isDown
+                  ? 'text-[var(--color-success)]'
+                  : isUp
+                    ? 'text-[var(--color-danger)]'
+                    : 'text-[var(--color-muted)]'
 
-              <div className="absolute inset-0 ml-12 py-1">
-                <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
-                  {chartData.map((offer, idx) => {
-                    const points = offer.history.map((price, i) => {
-                      const { x, y } = getCoordinates(i, price, offer.history.length)
-                      return `\( {x}, \){y}`
-                    }).join(' L ')
+                return (
+                  <motion.div
+                    key={`\( {row.source}_ \){row.id}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                    className="px-5 py-4 flex items-center gap-4 hover:bg-[var(--color-surface-2)]/50 transition-colors"
+                  >
+                    {/* Left: source + volume */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: row.color }}
+                        />
+                        <span className="text-[13px] font-medium text-[var(--color-ink)] truncate">
+                          {formatSourceName(row.source)}
+                        </span>
+                      </div>
+                      {row.volumeLabel && (
+                        <p className="text-[11px] text-[var(--color-muted)] font-mono pl-4">
+                          {row.volumeLabel}
+                        </p>
+                      )}
+                    </div>
 
-                    return (
-                      <motion.g key={offer.source} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, delay: idx * 0.08 }}>
-                        {offer.history.length >= 2 && (
-                          <path
-                            d={`M ${points}`}
-                            fill="none"
-                            stroke={offer.color}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            vectorEffect="non-scaling-stroke"
-                            className="drop-shadow-sm"
-                          />
+                    {/* Center: sparkline */}
+                    <div className="hidden sm:block shrink-0">
+                      <Sparkline points={row.history} color={row.color} />
+                    </div>
+
+                    {/* Right: price + change */}
+                    <div className="text-right shrink-0 min-w-[90px]">
+                      <div className="text-[15px] font-semibold tabular-nums text-[var(--color-ink)]">
+                        {formatPrice(row.convertedPrice, currency)}
+                        <span className="text-[12px] font-normal text-[var(--color-muted)] ml-0.5">
+                          {currencySymbol}
+                        </span>
+                      </div>
+
+                      <div className={`flex items-center justify-end gap-1 mt-0.5 ${changeColor}`}>
+                        {isDown ? (
+                          <TrendingDown size={12} strokeWidth={2.5} />
+                        ) : isUp ? (
+                          <TrendingUp size={12} strokeWidth={2.5} />
+                        ) : (
+                          <Minus size={12} strokeWidth={2.5} />
                         )}
-                        {offer.history.map((price, i) => {
-                          const { x, y } = getCoordinates(i, price, offer.history.length)
-                          return (
-                            <circle key={i} cx={x} cy={y} r="2.5" fill={offer.color} stroke="var(--color-surface)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                          )
-                        })}
-                      </motion.g>
-                    )
-                  })}
-                </svg>
-              </div>
+                        <span className="text-[11px] font-medium tabular-nums">
+                          {row.history.length >= 2
+                            ? `\( {row.changePct > 0 ? '+' : ''} \){row.changePct.toFixed(1)}%`
+                            : '—'}
+                        </span>
+                        <span className="text-[10px] text-[var(--color-muted)] opacity-70 ml-0.5">
+                          · {row.history.length}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
             </div>
-            <div className="flex justify-between text-[10px] font-mono text-[var(--color-muted)] mb-3 px-12">
-              <span>{t.historyOldest}</span>
-              <span>{t.historyNewest} · {maxPoints} {t.historyPoints}</span>
-            </div>
-          </>
-        ) : (
-          <div className="py-8 px-4 mb-2 text-center bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl">
-            <p className="text-sm text-[var(--color-ink)] font-medium mb-1">{t.historySingleTitle}</p>
-            <p className="text-[13px] text-[var(--color-muted)] leading-relaxed">{t.historySingleHint}</p>
+          )}
+        </div>
+
+        {/* Footer note */}
+        {hasAnyHistory && (
+          <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/40 shrink-0">
+            <p className="text-[10px] text-[var(--color-muted)] text-center tracking-wide">
+              {t.historyOldest} → {t.historyNewest} · до 15 последних замеров
+            </p>
           </div>
         )}
-
-        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 pt-4 border-t border-[var(--color-border)] overflow-y-auto min-h-0">
-          {chartData.map(offer => (
-            <div key={offer.source} className="flex items-center gap-1.5 bg-[var(--color-surface-2)] px-2 py-1 rounded-md border border-[var(--color-border)]">
-              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: offer.color }} />
-              <span className="text-[11px] font-medium text-[var(--color-ink)] truncate max-w-[100px]">
-                {formatSourceName(offer.source)}
-              </span>
-              <span className="text-[10px] font-mono text-[var(--color-muted)] whitespace-nowrap">
-                {formatLegendPrice(offer.convertedPrice)} {currencySymbol}
-              </span>
-              {offer.history.length > 1 && (
-                <span className="text-[9px] font-mono text-[var(--color-muted)] opacity-70">
-                  · {offer.history.length}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
       </motion.div>
     </div>
   )
