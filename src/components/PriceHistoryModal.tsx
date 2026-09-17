@@ -1,10 +1,8 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { X, TrendingUp } from 'lucide-react'
-import type { Lang } from '../App' // Укажите правильный путь к типам
+import type { Lang } from '../App'
 
-// Вы можете вынести эти типы в отдельный файл (например, types.ts), 
-// если они нужны в нескольких местах, или импортировать их из PricesPage
 type Offer = {
   id: number
   source: string
@@ -23,7 +21,7 @@ type PriceHistoryModalProps = {
   group: GroupedProduct
   lang: Lang
   onClose: () => void
-  t: any // Словарь из PricesPage
+  t: any
 }
 
 const COLORS = [
@@ -47,10 +45,8 @@ const formatSourceName = (sourceId: string) => {
 }
 
 export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModalProps) {
-  // Подготавливаем данные для графика
   const chartData = useMemo(() => {
     return group.offers.filter(o => o.price > 0).map((offer, index) => {
-      // Если истории нет, создаем заглушку из текущей цены (как в спарклайне)
       const history = offer.history?.length === 5 
         ? offer.history 
         : [offer.price, offer.price, offer.price, offer.price, offer.price]
@@ -63,7 +59,6 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
     })
   }, [group])
 
-  // Вычисляем минимальное и максимальное значение для шкалы Y
   const { minPrice, maxPrice } = useMemo(() => {
     let min = Infinity
     let max = -Infinity
@@ -76,7 +71,6 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
     
     if (min === Infinity) return { minPrice: 0, maxPrice: 100 }
     
-    // Добавляем отступы сверху и снизу на графике (10%)
     const padding = (max - min) * 0.1 || max * 0.1
     return {
       minPrice: Math.max(0, min - padding),
@@ -84,11 +78,9 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
     }
   }, [chartData])
 
-  // Размеры SVG графика
   const width = 100
   const height = 100
 
-  // Функция масштабирования координат
   const getCoordinates = (index: number, price: number, totalPoints: number) => {
     const x = (index / (totalPoints - 1)) * width
     const y = height - ((price - minPrice) / (maxPrice - minPrice)) * height
@@ -134,9 +126,7 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
           </button>
         </div>
 
-        {/* Область графика */}
         <div className="relative w-full aspect-[2/1] mt-4 mb-6">
-          {/* Сетка и подписи оси Y */}
           <div className="absolute inset-0 flex flex-col justify-between text-[10px] text-[var(--color-muted)] font-mono">
             <div className="w-full flex items-center gap-2">
               <span className="w-10 text-right shrink-0">{maxPrice.toFixed(0)}</span>
@@ -152,7 +142,6 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
             </div>
           </div>
 
-          {/* SVG График */}
           <div className="absolute inset-0 ml-12">
             <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
               {chartData.map((offer, idx) => {
@@ -172,7 +161,6 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
                       strokeLinejoin="round"
                       className="drop-shadow-sm"
                     />
-                    {/* Точки на узлах */}
                     {offer.history.map((price, i) => {
                       const { x, y } = getCoordinates(i, price, offer.history.length)
                       return (
@@ -186,7 +174,6 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
           </div>
         </div>
 
-        {/* Легенда */}
         <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-[var(--color-border)]">
           {chartData.map(offer => (
             <div key={offer.source} className="flex items-center gap-2">
@@ -204,4 +191,3 @@ export function PriceHistoryModal({ group, lang, onClose, t }: PriceHistoryModal
     </div>
   )
 }
-
