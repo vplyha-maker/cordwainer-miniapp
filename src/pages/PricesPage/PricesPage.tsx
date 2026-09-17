@@ -1,340 +1,225 @@
-import { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react'
-import { PAGE_SIZE } from './constants'
-import type { Product, GroupedProduct, Offer, SortOption, ModalData, MacroIndicator } from './types'
-import type { Currency } from '../../components/PriceHistoryModal'
-import {
-  parsePriceSafely,
-  getVolumeData,
-  normalizeProductName,
-  calculateWordSimilarity,
-  extractHistory,
-} from './utils'
 
-export function usePrices() {
-  const [items, setItems] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [eurRate, setEurRate] = useState<number | null>(null)
-  const [usdRate, setUsdRate] = useState<number | null>(null)
-  
-  // ВРЕМЕННЫЕ ТЕСТОВЫЕ ДАННЫЕ ДЛЯ ПРОВЕРКИ ВИЗУАЛА (Потом заменим на реальные из базы)
-  const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>([
-    {
-      id: 1,
-      type: 'solvent', // Для протравы/галогена
-      value: 100,
-      trend: 15, // Имитируем рост на 15%
-      description: 'Тест',
-      updated_at: new Date().toISOString()
-    },
-    {
-      id: 2,
-      type: 'isocyanate', // Для десмокола
-      value: 100,
-      trend: 12, // Имитируем рост на 12%
-      description: 'Тест',
-      updated_at: new Date().toISOString()
-    }
-  ])
-  
-  const [currency, setCurrency] = useState<Currency>(() => {
-    try {
-      const saved = localStorage.getItem('price_currency')
-      if (saved === 'UAH' || saved === 'USD' || saved === 'EUR') return saved as Currency
-    } catch {
-      /* ignore */
-    }
-    return 'UAH'
-  })
+import { DICTIONARY, BRAND_ALIASES } from './constants'
+import type { Offer, GroupedProduct, Signal, MacroIndicator } from './types'
+import type { Lang } from '../../App' 
+import type { Currency } from '../../components/PriceHistoryModal' 
 
-  const [modalData, setModalData] = useState<ModalData>(null)
-  const [historyGroup, setHistoryGroup] = useState<GroupedProduct | null>(null)
-
-  const [searchQuery, setSearchQuery] = useState('')
-  const deferredSearchQuery = useDeferredValue(searchQuery)
-  const [selectedSource, setSelectedSource] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<SortOption>('default')
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const [retryTrigger, setRetryTrigger] = useState(0)
-
-  const [favorites, setFavorites] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem('price_favorites')
-      return saved ? new Set(JSON.parse(saved)) : new Set()
-    } catch {
-      return new Set()
-    }
-  })
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('price_currency', currency)
-    } catch {
-      /* ignore */
-    }
-  }, [currency])
-
-  useEffect(() => {
-    if (loading) return
-    if (currency === 'USD' && !usdRate) setCurrency('UAH')
-    if (currency === 'EUR' && !eurRate) setCurrency('UAH')
-  }, [loading, currency, usdRate, eurRate])
-
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'price_favorites') {
-        try {
-          const newValue = e.newValue
-            ? new Set<string>(JSON.parse(e.newValue))
-            : new Set<string>()
-          setFavorites(newValue)
-        } catch (err) {
-          console.warn('Error parsing favorites from storage event:', err)
-        }
-      }
-    }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [])
-
-  const toggleFavorite = useCallback((key: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      try {
-        localStorage.setItem('price_favorites', JSON.stringify([...next]))
-      } catch (e) {
-        console.warn('Cannot save favorites:', e)
-      }
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!modalData && !historyGroup) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setModalData(null)
-        setHistoryGroup(null)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [modalData, historyGroup])
-
-  const handleRetry = useCallback(() => setRetryTrigger((prev) => prev + 1), [])
-
-  useEffect(() => {
-    const abortController = new AbortController()
-    const loadData = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const [apiRes, ratesRes, macroRes] = await Promise.all([
-          fetch('/api/prices?_t=' + Date.now(), { signal: abortController.signal }),
-          fetch('/api/rates?_t=' + Date.now(), { signal: abortController.signal }),
-          fetch('/api/macro?_t=' + Date.now(), { signal: abortController.signal }).catch(() => null)
-        ])
-
-        if (!apiRes?.ok) throw new Error('API error')
-        const data = await apiRes.json()
-        setItems(Array.isArray(data) ? data : [])
-
-        if (ratesRes?.ok) {
-          const rates = await ratesRes.json()
-          if (rates?.usd) setUsdRate(Number(rates.usd))
-          if (rates?.eur) setEurRate(Number(rates.eur))
-        }
-
-        if (macroRes?.ok) {
-          try {
-            const macroData = await macroRes.json()
-            // На время теста закомментировали загрузку пустых данных, чтобы видеть тестовые
-            // setMacroIndicators(Array.isArray(macroData) ? macroData : [])
-          } catch (e) {
-            console.warn('Failed to parse macro indicators')
-          }
-        }
-
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        setError('Error loading data')
-        setItems([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadData()
-    return () => abortController.abort()
-  }, [retryTrigger])
-
-  const sources = useMemo(
-    () =>
-      Array.from(new Set(items.map((i) => i.source).filter(Boolean) as string[])).sort(),
-    [items],
-  )
-
-  const baseGroupedItems = useMemo(() => {
-    const groups: GroupedProduct[] = []
-    items.forEach((item) => {
-      let validPrice = parsePriceSafely(item.current_price)
-      if (validPrice > 50000) validPrice = 0
-      const volData = getVolumeData(item.name)
-      const unitPrice = validPrice * volData.multiplier
-      const cleanName = normalizeProductName(item.name)
-      const normalizedCode = item.product_code?.trim()?.toLowerCase() || ''
-
-      let targetGroup: GroupedProduct | null = null
-      if (normalizedCode && normalizedCode.length >= 2) {
-        targetGroup =
-          groups.find((g) => g.product_code?.trim()?.toLowerCase() === normalizedCode) || null
-      }
-
-      if (!targetGroup && cleanName.length >= 2 && groups.length > 0) {
-        let bestMatchScore = 0
-        let bestMatchIndex = -1
-        for (let i = 0; i < groups.length; i++) {
-          const score = calculateWordSimilarity(cleanName, groups[i].key)
-          if (score > bestMatchScore) {
-            bestMatchScore = score
-            bestMatchIndex = i
-          }
-        }
-        if (bestMatchScore >= 0.65) targetGroup = groups[bestMatchIndex]
-      }
-
-      const offer: Offer = {
-        id: item.id,
-        source: item.source || 'unknown',
-        price: validPrice,
-        unitPrice,
-        baseUnit: volData.baseUnit,
-        volumeLabel: volData.originalLabel,
-        multiplier: volData.multiplier,
-        url: item.url,
-        updated_at: item.updated_at,
-        history: extractHistory(item.history),
-      }
-
-      if (targetGroup) {
-        if (
-          !targetGroup.offers.some(
-            (o: Offer) => o.id === item.id || (o.url && o.url === item.url),
-          )
-        ) {
-          targetGroup.offers.push(offer)
-        }
-        if (item.name.length > targetGroup.name.length) targetGroup.name = item.name
-        if (!targetGroup.image_url && item.image_url) targetGroup.image_url = item.image_url
-        if (!targetGroup.product_code && item.product_code)
-          targetGroup.product_code = item.product_code
-        if (
-          item.updated_at &&
-          (!targetGroup.latestUpdatedAt ||
-            new Date(item.updated_at) > new Date(targetGroup.latestUpdatedAt))
-        ) {
-          targetGroup.latestUpdatedAt = item.updated_at
-        }
-      } else {
-        groups.push({
-          key: cleanName || 'raw_' + item.id,
-          name: item.name,
-          product_code: item.product_code,
-          image_url: item.image_url,
-          category: item.category,
-          offers: [offer],
-          minUnitPrice: Infinity,
-          maxUnitPrice: -Infinity,
-          unitSpread: 0,
-          latestUpdatedAt: item.updated_at,
-          outOfStockCount: 0,
-          totalOffers: 0,
-        })
-      }
-    })
-
-    return groups.map((group) => {
-      const priced = group.offers.filter((o: Offer) => o.unitPrice > 0)
-      group.minUnitPrice = priced.length ? Math.min(...priced.map((o: Offer) => o.unitPrice)) : 0
-      group.maxUnitPrice = priced.length ? Math.max(...priced.map((o: Offer) => o.unitPrice)) : 0
-      group.unitSpread =
-        group.minUnitPrice > 0
-          ? ((group.maxUnitPrice - group.minUnitPrice) / group.minUnitPrice) * 100
-          : 0
-      group.totalOffers = group.offers.length
-      group.outOfStockCount = group.offers.filter((o: Offer) => o.unitPrice <= 0).length
-      return group
-    })
-  }, [items])
-
-  const filteredItems = useMemo(() => {
-    let result = baseGroupedItems
-    if (selectedSource === 'favorites') result = result.filter((g) => favorites.has(g.key))
-    else if (selectedSource !== 'all')
-      result = result.filter((g: GroupedProduct) =>
-        g.offers.some((o: Offer) => o.source.toLowerCase() === selectedSource.toLowerCase()),
-      )
-
-    if (deferredSearchQuery.trim()) {
-      const q = deferredSearchQuery.toLowerCase().trim()
-      result = result.filter(
-        (g) =>
-          g.name.toLowerCase().includes(q) ||
-          (g.product_code && g.product_code.toLowerCase().includes(q)),
-      )
-    }
-
-    return result.sort((a, b) => {
-      if (sortBy === 'unit-price-asc') return a.minUnitPrice - b.minUnitPrice
-      if (sortBy === 'savings') return b.unitSpread - a.unitSpread
-      if (sortBy === 'name') return a.name.localeCompare(b.name)
-      return b.offers.length - a.offers.length || b.unitSpread - a.unitSpread
-    })
-  }, [baseGroupedItems, deferredSearchQuery, selectedSource, sortBy, favorites])
-
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE)
-  }, [deferredSearchQuery, selectedSource, sortBy])
-
-  const stats = useMemo(() => {
-    const multi = filteredItems.filter((g) => g.offers.length > 1)
-    const rawAvg = multi.length
-      ? multi.reduce((acc, g) => acc + g.unitSpread, 0) / multi.length
-      : 0
-    return {
-      total: filteredItems.length,
-      multiCount: multi.length,
-      avgSpreadValue: rawAvg,
-      avgSpreadText: rawAvg.toFixed(1),
-    }
-  }, [filteredItems])
-
-  return {
-    loading,
-    error,
-    eurRate,
-    usdRate,
-    currency,
-    setCurrency,
-    modalData,
-    setModalData,
-    historyGroup,
-    setHistoryGroup,
-    searchQuery,
-    setSearchQuery,
-    selectedSource,
-    setSelectedSource,
-    sortBy,
-    setSortBy,
-    visibleCount,
-    setVisibleCount,
-    favorites,
-    toggleFavorite,
-    handleRetry,
-    sources,
-    filteredItems,
-    stats,
-    macroIndicators, 
+export const formatSourceName = (sourceId: string) => {
+  if (!sourceId) return 'Unknown'
+  const customNames: Record<string, string> = {
+    zotti: 'Zotti',
+    aligo: 'Aligo Group',
+    bahtarma: 'Bahtarma',
+    bashmachnik: 'Башмачник',
+    masterok: 'Masterok',
   }
+  return customNames[sourceId.toLowerCase()] || sourceId.charAt(0).toUpperCase() + sourceId.slice(1)
+}
+
+export const formatDate = (dateStr: string | null, lang: Lang) => {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return null
+  const locale = { de: 'de-DE', uk: 'uk-UA', ru: 'ru-RU' }[lang] || 'en-US'
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(d)
+}
+
+export function parsePriceSafely(raw: number | string | null | undefined): number {
+  if (raw === null || raw === undefined || raw === '') return 0
+  if (typeof raw === 'number') return raw > 0 ? raw : 0
+  const cleanStr = String(raw).replace(',', '.').replace(/[^0-9.]/g, '')
+  const val = parseFloat(cleanStr)
+  return !isNaN(val) && val > 0 ? val : 0
+}
+
+export function extractHistory(raw: unknown): number[] {
+  let data: unknown = raw
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+    try {
+      data = JSON.parse(trimmed)
+    } catch {
+      return []
+    }
+  }
+  if (!Array.isArray(data)) return []
+  const out: number[] = []
+  for (const item of data) {
+    if (typeof item === 'number' && item > 0 && Number.isFinite(item)) {
+      out.push(item)
+    } else if (typeof item === 'string') {
+      const n = parsePriceSafely(item)
+      if (n > 0) out.push(n)
+    } else if (item && typeof item === 'object' && 'price' in (item as Record<string, unknown>)) {
+      const n = parsePriceSafely((item as { price: number | string | null }).price)
+      if (n > 0) out.push(n)
+    }
+  }
+  return out
+}
+
+export function convertUah(
+  uah: number,
+  currency: Currency,
+  usdRate?: number | null,
+  eurRate?: number | null,
+): number {
+  if (!uah || uah <= 0) return 0
+  if (currency === 'USD' && usdRate && usdRate > 0) return uah / usdRate
+  if (currency === 'EUR' && eurRate && eurRate > 0) return uah / eurRate
+  return uah
+}
+
+export function getVolumeData(raw: string): {
+  baseUnit: 'кг' | 'л' | 'шт'
+  originalLabel: string
+  multiplier: number
+} {
+  if (!raw) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
+  const s = raw.toLowerCase().replace(/,/g, '.').replace(/\u00a0/g, ' ')
+  const m = s.match(
+    /(\d+(?:\.\d+)?)\s*(кг|kg|г|гр|g|л|l|літр[а-я]*|литр[а-я]*|мл|ml)(?:[\s.,;)]|$)/i,
+  )
+  if (!m) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
+  const num = parseFloat(m[1])
+  if (num === 0 || isNaN(num)) return { baseUnit: 'шт', originalLabel: '', multiplier: 1 }
+  const u = m[2].toLowerCase()
+  if (u.startsWith('л') || u === 'l')
+    return { baseUnit: 'л', originalLabel: num + ' л', multiplier: 1 / num }
+  if (u.startsWith('м') || u === 'ml')
+    return { baseUnit: 'л', originalLabel: num + ' мл', multiplier: 1000 / num }
+  if (['кг', 'kg'].includes(u))
+    return { baseUnit: 'кг', originalLabel: num + ' кг', multiplier: 1 / num }
+  return { baseUnit: 'кг', originalLabel: num + ' г', multiplier: 1000 / num }
+}
+
+export function normalizeProductName(raw: string): string {
+  if (!raw) return ''
+  let s = raw
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/['"`«»„“()[\]{}_/\\|–—−\-]/g, ' ')
+  for (const [re, rep] of BRAND_ALIASES) s = s.replace(re, ' ' + rep + ' ')
+  s = s.replace(
+    /\b\d+([.,]\d+)?\s*(кг|kg|г|гр|g|л|l|літр\w*|литр\w*|мл|ml)(?:[\s.,;)]|$)/gi,
+    ' ',
+  )
+  const stopWords = [
+    'клей', 'взуттєвий', 'обувной', 'обувної', 'банка', 'італія', 'италия', 'чорний', 'черный',
+    'світлий', 'светлый', 'білий', 'белый', 'універсальний', 'универсальный', 'для', 'ремонту',
+    'шкіряного', 'взуття', 'пінополіуретану', 'тканини', 'кг', 'л', 'мл', 'г', 'гр', 'литр',
+    'шт', 'розлив', 'на', 'original', 'strong', 'shoe', 'glue', 'в', 'от', '06w', '06wn',
+    '006w', 'm', 'і', 'и', 'та', 'або', 'или',
+  ]
+  const words = s.split(/\s+/).filter((w) => w.length > 1 && !stopWords.includes(w))
+  return Array.from(new Set(words)).sort().join(' ')
+}
+
+export function calculateWordSimilarity(name1: string, name2: string): number {
+  const w1 = name1.split(' ').filter(Boolean)
+  const w2 = name2.split(' ').filter(Boolean)
+  if (w1.length === 0 || w2.length === 0) return 0
+  let matches = 0
+  for (const w of w1) {
+    if (w2.includes(w)) matches++
+  }
+  const unionSize = new Set([...w1, ...w2]).size
+  return matches / unionSize
+}
+
+export const formatPrice = (val: number, lang: Lang, currency: Currency = 'UAH') => {
+  if (!val || val <= 0) return DICTIONARY[lang].noPrice
+  const locale = { de: 'de-DE', uk: 'uk-UA', ru: 'ru-RU' }[lang] || 'en-US'
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: currency === 'UAH' ? 0 : 2,
+    minimumFractionDigits: currency === 'UAH' ? 0 : 2,
+  }).format(val)
+}
+
+export function signalClass(tone: Signal['tone']) {
+  if (tone === 'good') return 'text-emerald-700 border-emerald-500/40 bg-emerald-500/10'
+  if (tone === 'bad') return 'text-red-600 border-red-500/40 bg-red-500/10'
+  if (tone === 'warn')
+    return 'text-[var(--color-accent)] border-[var(--color-accent)]/40 bg-[var(--color-accent)]/10'
+  return 'text-[var(--color-muted)] border-[var(--color-border)] bg-[var(--color-surface-2)]'
+}
+
+export function computeOfferSignals(
+  offer: Offer,
+  group: GroupedProduct,
+  avgUnitPrice: number,
+  validOffersCount: number,
+): Signal[] {
+  const signals: Signal[] = []
+  if (offer.unitPrice <= 0) return signals
+
+  const history = offer.history && offer.history.length >= 2 ? offer.history : []
+  const first = history[0]
+  const last = history[history.length - 1]
+  const changePct =
+    history.length >= 2 && first > 0 ? ((last - first) / first) * 100 : null
+
+  if (validOffersCount > 1 && offer.unitPrice === group.minUnitPrice && group.minUnitPrice > 0) {
+    signals.push({ kind: 'best', label: 'Лучшая цена', tone: 'good' })
+  }
+  if (validOffersCount > 1 && avgUnitPrice > 0 && offer.unitPrice < avgUnitPrice * 0.88) {
+    signals.push({ kind: 'arbitrage', label: 'Ниже рынка', tone: 'good' })
+  }
+  if (validOffersCount > 1 && avgUnitPrice > 0 && offer.unitPrice > avgUnitPrice * 1.15) {
+    signals.push({ kind: 'expensive', label: 'Дороже рынка', tone: 'bad' })
+  }
+  if (changePct !== null && changePct >= 10) {
+    signals.push({
+      kind: 'spike',
+      label: 'Рост +' + changePct.toFixed(0) + '%',
+      tone: 'warn',
+    })
+  }
+  return signals
+}
+
+export function computeGroupSignals(
+  group: GroupedProduct, 
+  macroIndicators: MacroIndicator[] = []
+): Signal[] {
+  const signals: Signal[] = []
+  
+  if (group.totalOffers >= 3 && group.outOfStockCount >= 2) {
+    signals.push({ kind: 'deficit', label: 'Риск дефицита', tone: 'bad' })
+  }
+  if (group.unitSpread >= 35) {
+    signals.push({
+      kind: 'spread',
+      label: 'Спред ' + group.unitSpread.toFixed(0) + '%',
+      tone: 'warn',
+    })
+  }
+
+  const name = group.name.toLowerCase()
+  
+  // ЖЕЛЕЗОБЕТОННЫЙ ТЕСТ: Жестко ищем ключевые слова независимо от входящих данных
+  const isPU = name.includes('десмокол') || name.includes('desmokol') || name.includes('полиуретан') || name.includes('sar 30') || name.includes('sar30') || name.includes('sar-30')
+  const isRubber = name.includes('наирит') || name.includes('nairit') || name.includes('резинов') || name.includes('sar 20') || name.includes('sar20') || name.includes('каучук')
+  const isLatex = name.includes('латекс')
+  const isPrimer = name.includes('протрав') || name.includes('галоген')
+
+  // Форсируем вывод бейджей для нужных карточек
+  if (isPU) {
+    signals.push({ kind: 'urgent_buy', label: '🚨 ЗАКУПАТЬ СРОЧНО (ПУ-СЫРЬЕ)', tone: 'bad' })
+  }
+  if (isRubber) {
+    signals.push({ kind: 'urgent_buy', label: '🚨 ЗАКУПАТЬ СРОЧНО (КАУЧУК)', tone: 'bad' })
+  }
+  if (isPrimer) {
+    signals.push({ kind: 'supply_alert', label: '🚨 РИСК ДЕФИЦИТА (РАСТВОРИТЕЛИ)', tone: 'warn' })
+  }
+
+  return signals
 }
