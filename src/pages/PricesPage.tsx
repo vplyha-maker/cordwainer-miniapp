@@ -14,7 +14,7 @@ import {
   LineChart
 } from 'lucide-react'
 import type { Lang } from '../App'
-import { PriceHistoryModal } from './PriceHistoryModal'
+import { PriceHistoryModal } from '../components/PriceHistoryModal'
 
 type Product = {
   id: number
