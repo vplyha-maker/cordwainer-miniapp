@@ -1,8 +1,9 @@
 import { memo } from 'react'
 import { Tag, LineChart, TrendingDown, Info, Bookmark, Store } from 'lucide-react'
-import type { Lang } from '../../../App' // Проверьте путь!
-import type { Currency } from '../../../components/PriceHistoryModal' // Проверьте путь!
-import type { GroupedProduct } from '../types'
+import type { Lang } from '../../../App' 
+import type { Currency } from '../../../components/PriceHistoryModal' 
+// ДОБАВИЛ MacroIndicator
+import type { GroupedProduct, MacroIndicator } from '../types'
 import { DICTIONARY } from '../constants'
 import {
   formatDate,
@@ -27,6 +28,7 @@ export const ProductCard = memo(
     currency,
     usdRate,
     eurRate,
+    macroIndicators = [], // Принимаем макро-индикаторы
   }: {
     group: GroupedProduct
     lang: Lang
@@ -38,6 +40,7 @@ export const ProductCard = memo(
     currency: Currency
     usdRate?: number | null
     eurRate?: number | null
+    macroIndicators?: MacroIndicator[] // Типизируем
   }) => {
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
@@ -52,7 +55,9 @@ export const ProductCard = memo(
     const validOffersCount = validPrices.length
     const showSpread = validOffersCount > 1
     const formattedDate = formatDate(group.latestUpdatedAt, lang)
-    const groupSignals = computeGroupSignals(group)
+    
+    // ПЕРЕДАЕМ МАКРО-ИНДИКАТОРЫ ДЛЯ РАСЧЕТА СИГНАЛОВ
+    const groupSignals = computeGroupSignals(group, macroIndicators)
 
     return (
       <article className="group/card flex flex-col bg-[var(--color-surface)] border border-[var(--color-border)] transition-colors shadow-sm hover:shadow-md relative">
@@ -275,6 +280,6 @@ export const ProductCard = memo(
     prev.isFavorite === next.isFavorite &&
     prev.currency === next.currency &&
     prev.usdRate === next.usdRate &&
-    prev.eurRate === next.eurRate,
+    prev.eurRate === next.eurRate &&
+    prev.macroIndicators === next.macroIndicators // Добавили проверку
 )
-
