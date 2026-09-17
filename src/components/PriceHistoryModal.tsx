@@ -13,6 +13,7 @@ type Offer = {
   unitPrice?: number
   baseUnit?: string
   volumeLabel?: string
+  multiplier?: number
 }
 
 type GroupedProduct = {
@@ -101,8 +102,8 @@ function formatPrice(val: number, currency: Currency) {
 function Sparkline({
   points,
   color,
-  width = 110,
-  height = 28,
+  width = 100,
+  height = 26,
 }: {
   points: number[]
   color: string
@@ -139,13 +140,23 @@ function Sparkline({
         d={path}
         fill="none"
         stroke={color}
-        strokeWidth="1.8"
+        strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx={width} cy={lastY} r="2.8" fill={color} />
+      <circle cx={width} cy={lastY} r="2.6" fill={color} />
     </svg>
   )
+}
+
+function getDealLabel(current: number, min: number, max: number) {
+  if (max <= min) return { text: '—', tone: 'neutral' as const }
+  const range = max - min
+  const pos = (current - min) / range
+
+  if (pos <= 0.25) return { text: 'Выгодно', tone: 'good' as const }
+  if (pos >= 0.75) return { text: 'Дорого', tone: 'bad' as const }
+  return { text: 'Средне', tone: 'neutral' as const }
 }
 
 export function PriceHistoryModal({
@@ -170,26 +181,47 @@ export function PriceHistoryModal({
       .filter((o) => o.price > 0)
       .map((offer, index) => {
         const historyRaw = extractHistory(offer.history, offer.price)
-        const history = historyRaw.map((p) => p / currentRate)
-        const convertedPrice = offer.price / currentRate
 
-        const first = history[0] ?? convertedPrice
-        const last = history[history.length - 1] ?? convertedPrice
+        // Если есть multiplier — переводим историю в цену за единицу
+        const multiplier = offer.multiplier && offer.multiplier > 0 ? offer.multiplier : 1
+        const historyAbs = historyRaw.map((p) => p / currentRate)
+        const historyUnit = historyAbs.map((p) => p * multiplier)
+
+        const useUnit = multiplier !== 1 && historyUnit.length > 0
+        const history = useUnit ? historyUnit : historyAbs
+
+        const convertedPrice = offer.price / currentRate
+        const convertedUnit =
+          offer.unitPrice && offer.unitPrice > 0
+            ? offer.unitPrice / currentRate
+            : convertedPrice * multiplier
+
+        const displayPrice = useUnit ? convertedUnit : convertedPrice
+        const first = history[0] ?? displayPrice
+        const last = history[history.length - 1] ?? displayPrice
 
         let changePct: number | null = null
         if (history.length >= 2 && first > 0) {
           changePct = ((last - first) / first) * 100
         }
 
+        const minH = history.length ? Math.min(...history) : displayPrice
+        const maxH = history.length ? Math.max(...history) : displayPrice
+        const deal = getDealLabel(displayPrice, minH, maxH)
+
         return {
           ...offer,
           history,
-          convertedPrice,
+          displayPrice,
           changePct,
+          minH,
+          maxH,
+          deal,
+          useUnit,
           color: COLORS[index % COLORS.length],
         }
       })
-      .sort((a, b) => a.convertedPrice - b.convertedPrice)
+      .sort((a, b) => a.displayPrice - b.displayPrice)
   }, [group, currentRate])
 
   const hasAnyHistory = rows.some((r) => r.history.length >= 2)
@@ -282,15 +314,10 @@ export function PriceHistoryModal({
                 const isDown = changePct !== null && changePct < -0.4
                 const isUp = changePct !== null && changePct > 0.4
 
-                // Простой и надёжный способ сформировать текст процента
                 let changeText = '—'
                 if (changePct !== null) {
                   const rounded = changePct.toFixed(1)
-                  if (changePct > 0) {
-                    changeText = '+' + rounded + '%'
-                  } else {
-                    changeText = rounded + '%'
-                  }
+                  changeText = changePct > 0 ? '+' + rounded + '%' : rounded + '%'
                 }
 
                 const changeColor = isDown
@@ -299,58 +326,85 @@ export function PriceHistoryModal({
                     ? 'text-red-500'
                     : 'text-[var(--color-muted)]'
 
+                const dealColor =
+                  row.deal.tone === 'good'
+                    ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
+                    : row.deal.tone === 'bad'
+                      ? 'bg-red-500/10 text-red-600 border-red-500/25'
+                      : 'bg-[var(--color-surface-2)] text-[var(--color-muted)] border-[var(--color-border)]'
+
                 return (
                   <motion.div
                     key={row.source + '_' + row.id}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    className="px-5 py-4 flex items-center gap-3"
+                    className="px-5 py-4"
                   >
-                    {/* Цвет + Название поставщика */}
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: row.color }}
-                      />
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium text-[var(--color-ink)] truncate">
+                    {/* Верхняя строка: поставщик + метка */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: row.color }}
+                        />
+                        <span className="text-[13px] font-medium text-[var(--color-ink)] truncate">
                           {formatSourceName(row.source)}
-                        </div>
+                        </span>
                         {row.volumeLabel && (
-                          <div className="text-[11px] text-[var(--color-muted)] font-mono">
+                          <span className="text-[11px] text-[var(--color-muted)] font-mono">
                             {row.volumeLabel}
-                          </div>
+                          </span>
                         )}
                       </div>
+
+                      <span
+                        className={
+                          'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ' +
+                          dealColor
+                        }
+                      >
+                        {row.deal.text}
+                      </span>
                     </div>
 
-                    {/* Sparkline */}
-                    <div className="hidden sm:block shrink-0 opacity-90">
-                      <Sparkline points={row.history} color={row.color} />
-                    </div>
-
-                    {/* Цена + изменение */}
-                    <div className="text-right shrink-0">
-                      <div className="text-[15px] font-semibold tabular-nums text-[var(--color-ink)]">
-                        {formatPrice(row.convertedPrice, currency)}
-                        <span className="text-[12px] font-normal text-[var(--color-muted)] ml-0.5">
-                          {currencySymbol}
-                        </span>
+                    {/* Нижняя строка: sparkline + цены */}
+                    <div className="flex items-center gap-3">
+                      <div className="hidden sm:block shrink-0 opacity-90">
+                        <Sparkline points={row.history} color={row.color} />
                       </div>
 
-                      <div className={'flex items-center justify-end gap-1 mt-0.5 ' + changeColor}>
-                        {isDown && <TrendingDown size={11} strokeWidth={2.5} />}
-                        {isUp && <TrendingUp size={11} strokeWidth={2.5} />}
-                        {!isDown && !isUp && changePct !== null && (
-                          <Minus size={11} strokeWidth={2.5} />
-                        )}
-                        <span className="text-[11px] font-medium tabular-nums">
-                          {changeText}
-                        </span>
-                        <span className="text-[10px] text-[var(--color-muted)] opacity-60">
-                          · {row.history.length}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] text-[var(--color-muted)] font-mono">
+                          min {formatPrice(row.minH, currency)}
+                          {' · '}
+                          max {formatPrice(row.maxH, currency)}
+                          {row.useUnit && row.baseUnit ? ' / ' + row.baseUnit : ''}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="text-[15px] font-semibold tabular-nums text-[var(--color-ink)]">
+                          {formatPrice(row.displayPrice, currency)}
+                          <span className="text-[12px] font-normal text-[var(--color-muted)] ml-0.5">
+                            {currencySymbol}
+                            {row.useUnit && row.baseUnit ? '/' + row.baseUnit : ''}
+                          </span>
+                        </div>
+
+                        <div className={'flex items-center justify-end gap-1 mt-0.5 ' + changeColor}>
+                          {isDown && <TrendingDown size={11} strokeWidth={2.5} />}
+                          {isUp && <TrendingUp size={11} strokeWidth={2.5} />}
+                          {!isDown && !isUp && changePct !== null && (
+                            <Minus size={11} strokeWidth={2.5} />
+                          )}
+                          <span className="text-[11px] font-medium tabular-nums">
+                            {changeText}
+                          </span>
+                          <span className="text-[10px] text-[var(--color-muted)] opacity-60">
+                            · {row.history.length}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -360,11 +414,11 @@ export function PriceHistoryModal({
           )}
         </div>
 
-        {/* Подсказка внизу */}
+        {/* Footer */}
         {hasAnyHistory && (
           <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/50 shrink-0">
             <p className="text-[10px] text-[var(--color-muted)] text-center leading-relaxed">
-              Цвет точки = поставщик · % = изменение цены · число = количество замеров
+              Выгодно = цена у минимума · Дорого = у максимума · % = изменение за период
             </p>
           </div>
         )}
