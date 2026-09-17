@@ -1,10 +1,7 @@
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useLayoutEffect, useState } from 'react'
-
-// Подключаем наш новый провайдер плавного скролла и кастомный курсор
 import SmoothScroll from './components/SmoothScroll'
 import CustomCursor from './components/CustomCursor'
-
 import { WelcomePage } from './pages/WelcomePage'
 import { HomePage } from './pages/HomePage'
 import { BlogPage } from './pages/BlogPage'
@@ -16,7 +13,7 @@ import { ColorCalcPage } from './pages/ColorCalcPage'
 import { ColorsPage } from './pages/ColorsPage'
 import { ForwardOrthoSEOPage } from './pages/ForwardOrthoSEOPage'
 import { GlossaryPage } from './pages/GlossaryPage'
-import { PricesPage } from './pages/PricesPage'
+import { PricesPage } from './pages/PricesPage/PricesPage'
 import { StylesPage } from './pages/StylesPage'
 import { SalaryCalcPage } from './pages/salary' 
 import { SettingsPage } from './pages/SettingsPage'
