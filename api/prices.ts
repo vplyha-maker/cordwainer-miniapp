@@ -15,7 +15,7 @@ export default async function handler(request: Request) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Забираем ВСЕ товары со всех трех площадок и притягиваем актуальную цену
+    // Забираем все товары + актуальную цену + историю (последние 15 точек)
     const rows = await sql`
       SELECT 
         p.id,
@@ -26,7 +26,20 @@ export default async function handler(request: Request) {
         p.image_url,
         p.category,
         p.updated_at,
-        ph.price AS current_price
+        ph.price AS current_price,
+        (
+          SELECT COALESCE(
+            json_agg(h.price ORDER BY h.scraped_at ASC, h.id ASC),
+            '[]'::json
+          )
+          FROM (
+            SELECT price, scraped_at, id
+            FROM price_history
+            WHERE product_id = p.id
+            ORDER BY scraped_at DESC NULLS LAST, id DESC
+            LIMIT 15
+          ) h
+        ) AS history
       FROM products p
       LEFT JOIN LATERAL (
         SELECT price 
