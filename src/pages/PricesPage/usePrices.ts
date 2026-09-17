@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react'
 import { PAGE_SIZE } from './constants'
-import type { Product, GroupedProduct, Offer, SortOption, ModalData } from './types'
+// ДОБАВЛЕН MacroIndicator в импорт
+import type { Product, GroupedProduct, Offer, SortOption, ModalData, MacroIndicator } from './types'
 import type { Currency } from '../../components/PriceHistoryModal'
 import {
   parsePriceSafely,
@@ -16,6 +17,9 @@ export function usePrices() {
   const [error, setError] = useState<string | null>(null)
   const [eurRate, setEurRate] = useState<number | null>(null)
   const [usdRate, setUsdRate] = useState<number | null>(null)
+  
+  // НОВОЕ СОСТОЯНИЕ ДЛЯ МАКРО-ИНДИКАТОРОВ
+  const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>([])
   
   const [currency, setCurrency] = useState<Currency>(() => {
     try {
@@ -111,9 +115,11 @@ export function usePrices() {
       setLoading(true)
       setError(null)
       try {
-        const [apiRes, ratesRes] = await Promise.all([
+        // ДОБАВЛЕН ЗАПРОС К /api/macro (с безопасным catch, чтобы не ломать всё остальное)
+        const [apiRes, ratesRes, macroRes] = await Promise.all([
           fetch('/api/prices?_t=' + Date.now(), { signal: abortController.signal }),
           fetch('/api/rates?_t=' + Date.now(), { signal: abortController.signal }),
+          fetch('/api/macro?_t=' + Date.now(), { signal: abortController.signal }).catch(() => null)
         ])
 
         if (!apiRes?.ok) throw new Error('API error')
@@ -125,6 +131,17 @@ export function usePrices() {
           if (rates?.usd) setUsdRate(Number(rates.usd))
           if (rates?.eur) setEurRate(Number(rates.eur))
         }
+
+        // Обработка макро-данных, если запрос успешен
+        if (macroRes?.ok) {
+          try {
+            const macroData = await macroRes.json()
+            setMacroIndicators(Array.isArray(macroData) ? macroData : [])
+          } catch (e) {
+            console.warn('Failed to parse macro indicators')
+          }
+        }
+
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         setError('Error loading data')
@@ -303,6 +320,7 @@ export function usePrices() {
     sources,
     filteredItems,
     stats,
+    // ДОБАВЛЕНО ВОЗВРАЩЕНИЕ МАКРО ИНДИКАТОРОВ
+    macroIndicators, 
   }
 }
-
