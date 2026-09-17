@@ -991,6 +991,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
               group={historyGroup} 
               onClose={() => setHistoryGroup(null)} 
               t={t} 
+              lang={lang} 
             />
           )}
         </AnimatePresence>
