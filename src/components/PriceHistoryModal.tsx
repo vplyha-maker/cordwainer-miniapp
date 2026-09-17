@@ -43,6 +43,8 @@ const COLORS = [
   '#ec4899',
 ]
 
+const TARGET_POINTS = 15
+
 const formatSourceName = (sourceId: string) => {
   if (!sourceId) return 'Unknown'
   const map: Record<string, string> = {
@@ -91,6 +93,59 @@ function extractHistory(raw: unknown, fallbackPrice: number): number[] {
 
   if (fromApi.length > 0) return fromApi
   return fallbackPrice > 0 ? [fallbackPrice] : []
+}
+
+/** Largest Triangle Three Buckets — сохраняет пики и форму */
+function lttb(data: number[], threshold: number): number[] {
+  if (data.length <= threshold || threshold < 3) return data
+
+  const result: number[] = []
+  const bucketSize = (data.length - 2) / (threshold - 2)
+
+  let a = 0
+  result.push(data[a])
+
+  for (let i = 0; i < threshold - 2; i++) {
+    const rangeStart = Math.floor((i + 0) * bucketSize) + 1
+    const rangeEnd = Math.floor((i + 1) * bucketSize) + 1
+    const rangeEndClamped = Math.min(rangeEnd, data.length - 1)
+
+    const avgRangeStart = Math.floor((i + 1) * bucketSize) + 1
+    const avgRangeEnd = Math.floor((i + 2) * bucketSize) + 1
+    const avgRangeEndClamped = Math.min(avgRangeEnd, data.length)
+
+    let avgX = 0
+    let avgY = 0
+    const avgRangeLength = avgRangeEndClamped - avgRangeStart
+    for (let j = avgRangeStart; j < avgRangeEndClamped; j++) {
+      avgX += j
+      avgY += data[j]
+    }
+    if (avgRangeLength > 0) {
+      avgX /= avgRangeLength
+      avgY /= avgRangeLength
+    }
+
+    let maxArea = -1
+    let nextA = rangeStart
+
+    for (let j = rangeStart; j < rangeEndClamped; j++) {
+      const area =
+        Math.abs(
+          (a - avgX) * (data[j] - data[a]) - (a - j) * (avgY - data[a])
+        ) * 0.5
+      if (area > maxArea) {
+        maxArea = area
+        nextA = j
+      }
+    }
+
+    result.push(data[nextA])
+    a = nextA
+  }
+
+  result.push(data[data.length - 1])
+  return result
 }
 
 function formatPrice(val: number, currency: Currency) {
@@ -149,14 +204,34 @@ function Sparkline({
   )
 }
 
-function getDealLabel(current: number, min: number, max: number) {
-  if (max <= min) return { text: '—', tone: 'neutral' as const }
-  const range = max - min
-  const pos = (current - min) / range
+type DealTone = 'good' | 'bad' | 'neutral' | 'best' | 'worst'
 
-  if (pos <= 0.25) return { text: 'Выгодно', tone: 'good' as const }
-  if (pos >= 0.75) return { text: 'Дорого', tone: 'bad' as const }
-  return { text: 'Средне', tone: 'neutral' as const }
+function buildDealLabel(
+  displayPrice: number,
+  minH: number,
+  maxH: number,
+  changePct: number | null,
+  rank: 'best' | 'worst' | 'mid' | 'single'
+): { text: string; tone: DealTone } {
+  // Несколько поставщиков — главный критерий сравнение между ними
+  if (rank === 'best') return { text: 'Лучшая цена', tone: 'best' }
+  if (rank === 'worst') return { text: 'Самая высокая', tone: 'worst' }
+
+  // Один поставщик или средняя позиция — смотрим тренд / свою историю
+  const spreadPct = minH > 0 ? ((maxH - minH) / minH) * 100 : 0
+
+  if (spreadPct < 4) {
+    // Почти не менялась
+    if (changePct !== null && changePct <= -1.5) return { text: 'Упала', tone: 'good' }
+    if (changePct !== null && changePct >= 1.5) return { text: 'Выросла', tone: 'bad' }
+    return { text: 'Стабильно', tone: 'neutral' }
+  }
+
+  // Есть заметный разброс — где мы сейчас
+  const pos = (displayPrice - minH) / (maxH - minH || 1)
+  if (pos <= 0.2) return { text: 'У минимума', tone: 'good' }
+  if (pos >= 0.8) return { text: 'У максимума', tone: 'bad' }
+  return { text: 'В диапазоне', tone: 'neutral' }
 }
 
 export function PriceHistoryModal({
@@ -177,18 +252,23 @@ export function PriceHistoryModal({
   const currencySymbol = currency === 'UAH' ? '₴' : currency === 'USD' ? '$' : '€'
 
   const rows = useMemo(() => {
-    return group.offers
+    const prepared = group.offers
       .filter((o) => o.price > 0)
       .map((offer, index) => {
         const historyRaw = extractHistory(offer.history, offer.price)
-
-        // Если есть multiplier — переводим историю в цену за единицу
         const multiplier = offer.multiplier && offer.multiplier > 0 ? offer.multiplier : 1
-        const historyAbs = historyRaw.map((p) => p / currentRate)
-        const historyUnit = historyAbs.map((p) => p * multiplier)
 
+        // Абсолютные цены → в выбранной валюте
+        const historyAbs = historyRaw.map((p) => p / currentRate)
+        // При наличии объёма — в unit-price
+        const historyUnit = historyAbs.map((p) => p * multiplier)
         const useUnit = multiplier !== 1 && historyUnit.length > 0
-        const history = useUnit ? historyUnit : historyAbs
+        let history = useUnit ? historyUnit : historyAbs
+
+        // LTTB: сжимаем до TARGET_POINTS, если точек больше
+        if (history.length > TARGET_POINTS) {
+          history = lttb(history, TARGET_POINTS)
+        }
 
         const convertedPrice = offer.price / currentRate
         const convertedUnit =
@@ -207,7 +287,6 @@ export function PriceHistoryModal({
 
         const minH = history.length ? Math.min(...history) : displayPrice
         const maxH = history.length ? Math.max(...history) : displayPrice
-        const deal = getDealLabel(displayPrice, minH, maxH)
 
         return {
           ...offer,
@@ -216,12 +295,29 @@ export function PriceHistoryModal({
           changePct,
           minH,
           maxH,
-          deal,
           useUnit,
           color: COLORS[index % COLORS.length],
         }
       })
       .sort((a, b) => a.displayPrice - b.displayPrice)
+
+    // Ранги между поставщиками
+    const multi = prepared.length >= 2
+    const bestPrice = multi ? prepared[0].displayPrice : null
+    const worstPrice = multi ? prepared[prepared.length - 1].displayPrice : null
+
+    return prepared.map((row) => {
+      let rank: 'best' | 'worst' | 'mid' | 'single' = 'single'
+      if (multi && bestPrice !== null && worstPrice !== null) {
+        if (row.displayPrice === bestPrice) rank = 'best'
+        else if (row.displayPrice === worstPrice) rank = 'worst'
+        else rank = 'mid'
+      }
+
+      const deal = buildDealLabel(row.displayPrice, row.minH, row.maxH, row.changePct, rank)
+
+      return { ...row, deal }
+    })
   }, [group, currentRate])
 
   const hasAnyHistory = rows.some((r) => r.history.length >= 2)
@@ -327,9 +423,9 @@ export function PriceHistoryModal({
                     : 'text-[var(--color-muted)]'
 
                 const dealColor =
-                  row.deal.tone === 'good'
+                  row.deal.tone === 'best' || row.deal.tone === 'good'
                     ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
-                    : row.deal.tone === 'bad'
+                    : row.deal.tone === 'worst' || row.deal.tone === 'bad'
                       ? 'bg-red-500/10 text-red-600 border-red-500/25'
                       : 'bg-[var(--color-surface-2)] text-[var(--color-muted)] border-[var(--color-border)]'
 
@@ -341,7 +437,6 @@ export function PriceHistoryModal({
                     transition={{ delay: idx * 0.03 }}
                     className="px-5 py-4"
                   >
-                    {/* Верхняя строка: поставщик + метка */}
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <div
@@ -360,7 +455,7 @@ export function PriceHistoryModal({
 
                       <span
                         className={
-                          'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ' +
+                          'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ' +
                           dealColor
                         }
                       >
@@ -368,7 +463,6 @@ export function PriceHistoryModal({
                       </span>
                     </div>
 
-                    {/* Нижняя строка: sparkline + цены */}
                     <div className="flex items-center gap-3">
                       <div className="hidden sm:block shrink-0 opacity-90">
                         <Sparkline points={row.history} color={row.color} />
@@ -414,11 +508,10 @@ export function PriceHistoryModal({
           )}
         </div>
 
-        {/* Footer */}
         {hasAnyHistory && (
           <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/50 shrink-0">
             <p className="text-[10px] text-[var(--color-muted)] text-center leading-relaxed">
-              Выгодно = цена у минимума · Дорого = у максимума · % = изменение за период
+              Лучшая / Самая высокая — сравнение поставщиков · % — изменение за период
             </p>
           </div>
         )}
