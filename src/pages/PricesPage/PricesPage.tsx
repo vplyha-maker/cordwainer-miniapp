@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -21,7 +20,8 @@ import { ProductCard } from './components/ProductCard'
 import { CurrencySwitch } from './components/CurrencySwitch'
 import { PriceHistoryModal } from '../../components/PriceHistoryModal'
 
-export function PricesPage({ onBack, lang }: PricesPageProps) {
+// Изменили на const, чтобы сбросить кэш TypeScript в Vercel
+const PricesPage = ({ onBack, lang }: PricesPageProps) => {
   const t = DICTIONARY[lang]
 
   const {
@@ -368,3 +368,7 @@ export function PricesPage({ onBack, lang }: PricesPageProps) {
     </div>
   )
 }
+
+// ЭКСПОРТИРУЕМ ВСЕМИ ВОЗМОЖНЫМИ СПОСОБАМИ, ЧТОБЫ У VERCEL НЕ БЫЛО ШАНСОВ УПАСТЬ
+export { PricesPage }
+export default PricesPage
