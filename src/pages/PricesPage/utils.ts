@@ -201,23 +201,56 @@ export function computeGroupSignals(
     })
   }
 
-  // ОБЪЕДИНЯЕМ ИМЯ И НОРМАЛИЗОВАННЫЙ КЛЮЧ, ЧТОБЫ ИСКАТЬ ВЕЗДЕ
-  const searchString = (group.name + ' ' + group.key).toLowerCase()
-  
-  // Ищем и на русском, и на украинском, и на английском
-  const isPU = searchString.includes('десмокол') || searchString.includes('desmokol') || searchString.includes('полиуретан') || searchString.includes('поліуретан') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
-  const isRubber = searchString.includes('наирит') || searchString.includes('найріт') || searchString.includes('nairit') || searchString.includes('резинов') || searchString.includes('гумов') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('каучук')
-  const isPrimer = searchString.includes('протрав') || searchString.includes('протирання') || searchString.includes('галоген') || searchString.includes('halog') || searchString.includes('preparatore')
+  // МАКРО-ЛОГИКА (Умный анализ сырья из базы)
+  if (macroIndicators.length > 0) {
+    // Объединяем название и нормализованный ключ, переводим в нижний регистр
+    const searchString = (group.name + ' ' + group.key).toLowerCase()
+    
+    // БРОНЕБОЙНЫЙ ПОИСК (Украинский + Русский + Латиница + Опечатки)
+    const isPU = searchString.includes('поліуретан') || searchString.includes('полиуретан') || searchString.includes('десмокол') || searchString.includes('дисмакол') || searchString.includes('desmokol') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
+    const isRubber = searchString.includes('найріт') || searchString.includes('наїріт') || searchString.includes('наирит') || searchString.includes('nairit') || searchString.includes('гумов') || searchString.includes('резинов') || searchString.includes('каучук') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('sar-20')
+    const isLatex = searchString.includes('латекс') || searchString.includes('latex')
+    const isPrimer = searchString.includes('протирання') || searchString.includes('протрав') || searchString.includes('праймер') || searchString.includes('primer') || searchString.includes('галоген') || searchString.includes('halog') || searchString.includes('preparatore')
+    
+    // 1. Полиуретан -> Изоцианат
+    if (isPU) {
+      const isocyanate = macroIndicators.find(m => m.type === 'isocyanate')
+      if (isocyanate && isocyanate.trend > 10) {
+        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост ПУ-сырья)', tone: 'bad' })
+      } else if (isocyanate && isocyanate.trend < -10) {
+        signals.push({ kind: 'macro_down', label: 'Сырье ПУ дешевеет', tone: 'good' })
+      }
+    }
 
-  // ФОРСИРОВАННЫЙ ТЕСТ: Выводим бейджи 100%
-  if (isPU) {
-    signals.push({ kind: 'urgent_buy', label: '🚨 СРОЧНО (ПУ-СЫРЬЕ)', tone: 'bad' })
-  }
-  if (isRubber) {
-    signals.push({ kind: 'urgent_buy', label: '🚨 СРОЧНО (КАУЧУК)', tone: 'bad' })
-  }
-  if (isPrimer) {
-    signals.push({ kind: 'supply_alert', label: '🚨 РИСК ДЕФИЦИТА', tone: 'warn' })
+    // 2. Наирит / Каучук -> Хлоропрен или каучук
+    if (isRubber) {
+      const rubberRaw = macroIndicators.find(m => m.type === 'chloroprene' || m.type === 'rubber')
+      if (rubberRaw && rubberRaw.trend > 10) {
+        signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост каучука)', tone: 'bad' })
+      }
+    }
+
+    // 3. Латексный клей -> Латекс
+    if (isLatex) {
+      const latexRaw = macroIndicators.find(m => m.type === 'latex')
+      if (latexRaw && latexRaw.trend > 10) {
+        signals.push({ kind: 'urgent_buy', label: 'Внимание: рост цен на латекс', tone: 'warn' })
+      }
+    }
+
+    // 4. Протрава / Праймер / Галоген -> Растворители
+    if (isPrimer) {
+      const solvent = macroIndicators.find(m => m.type === 'solvent')
+      if (solvent && solvent.trend > 10) {
+        signals.push({ kind: 'supply_alert', label: 'Риск дефицита (растворители)', tone: 'warn' })
+      }
+    }
+
+    // 5. Логистика / Фрахт (Для импорта)
+    const freight = macroIndicators.find(m => m.type === 'freight_cn_eu')
+    if (freight && freight.trend > 15) {
+      signals.push({ kind: 'supply_alert', label: 'Ожидается удорожание импорта', tone: 'warn' })
+    }
   }
 
   return signals
