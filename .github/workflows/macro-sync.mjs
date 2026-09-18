@@ -2,9 +2,8 @@ name: Macro Indicators Sync
 
 on:
   schedule:
-    # Запуск каждый день в 05:00 UTC
     - cron: '0 5 * * *'
-  workflow_dispatch: # Позволяет запускать скрипт вручную кнопкой "Run workflow"
+  workflow_dispatch:
 
 jobs:
   scrape-macro:
@@ -23,7 +22,6 @@ jobs:
 
       - name: Run macro scraper
         env:
-          # Секрет базы данных берется из настроек репозитория (Settings -> Secrets)
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node src/pages/PricesPage/scripts/macro-sync.mjs
 
