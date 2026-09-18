@@ -3,7 +3,6 @@ import * as cheerio from 'cheerio';
 import Parser from 'rss-parser';
 import 'dotenv/config';
 
-// Подключение к Neon БД
 const sql = neon(process.env.DATABASE_URL);
 const rssParser = new Parser();
 
@@ -42,100 +41,84 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// Помощник для обхода блокировок GitHub (Использует бесплатный публичный прокси AllOrigins)
-async function fetchViaProxy(targetUrl) {
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) throw new Error(`Proxy статус: ${res.status}`);
-  const data = await res.json();
-  return cheerio.load(data.contents);
-}
-
-// 2. ПАРСИНГ СЫРЬЯ (100% БЕСПЛАТНЫЕ МАКРО-ИНДЕКСЫ)
+// 2. ПАРСИНГ СЫРЬЯ (БАЗОВЫЙ ScraperAPI: 1 запрос = 1 кредит)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью (Бесплатные открытые API и прокси)...');
+  console.log('Сбор данных по сырью (Базовый ScraperAPI)...');
   const results = [];
+  const apiKey = process.env.SCRAPER_API_KEY;
 
-  // --- КАУЧУК (Yahoo Finance API) ---
-  try {
-    console.log('Запрашиваем Каучук (Yahoo JSON API)...');
-    // Прямой запрос к API Yahoo. Возвращает JSON, работает без блокировок.
-    const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/RUBW.SI');
-    if (!res.ok) throw new Error(`Yahoo API статус: ${res.status}`);
-    const data = await res.json();
-    
-    const newValue = data.chart.result[0].meta.regularMarketPrice;
+  if (!apiKey) {
+    console.error('❌ Ошибка: Не задана переменная SCRAPER_API_KEY');
+    return [];
+  }
 
-    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'rubber'`;
-    let trend = 0;
-    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
-      const oldValue = parseFloat(lastRecord[0].value);
-      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+  const sources = [
+    { type: 'rubber', url: 'https://finance.yahoo.com/quote/RUBW.SI/', name: 'Каучук (Yahoo Finance)' },
+    { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', name: 'Изоцианат (SunSirs Китай)' },
+    { type: 'latex', url: 'https://www.indexmundi.com/commodities/?commodity=rubber', name: 'Латекс (IndexMundi)' }
+  ];
+
+  for (const src of sources) {
+    try {
+      console.log(`Запрашиваем ${src.name}...`);
+      
+      // ВАЖНО: Никаких premium=true или render=true. Это самый дешевый запрос.
+      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${encodeURIComponent(src.url)}`;
+      
+      let html = '';
+      let success = false;
+      
+      // Страховка: если сервер моргнет, скрипт попробует еще раз
+      for (let i = 0; i < 3; i++) {
+        const res = await fetch(scraperUrl);
+        if (res.ok) {
+          html = await res.text();
+          success = true;
+          break;
+        }
+        console.log(`⚠️ ScraperAPI статус ${res.status}. Попытка ${i + 1} из 3...`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+
+      if (!success) throw new Error('Не удалось загрузить страницу');
+
+      const $ = cheerio.load(html);
+      let newValue = NaN;
+
+      // Индивидуальные парсеры под каждый сайт
+      if (src.type === 'rubber') {
+        const text = $('fin-streamer[data-symbol="RUBW.SI"][data-field="regularMarketPrice"]').first().text();
+        newValue = parseFloat(text.replace(/[^\d.-]/g, ''));
+      } else if (src.type === 'isocyanate') {
+        let text = $('.detail_top_txt').text();
+        if (!text) text = $('body').text();
+        const match = text.match(/\d{4,}/); // MDI в Китае измеряется тысячами юаней за тонну
+        if (match) newValue = parseFloat(match[0]);
+      } else if (src.type === 'latex') {
+        const text = $('#tdPrice').text();
+        newValue = parseFloat(text.replace(/[^\d.-]/g, ''));
+      }
+
+      if (isNaN(newValue)) throw new Error('Цена не найдена в разметке');
+
+      // Расчет тренда
+      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
+      let trend = 0;
+      if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+        const oldValue = parseFloat(lastRecord[0].value);
+        trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+      }
+
+      results.push({
+        type: src.type,
+        value: Number(newValue),
+        trend: Number(trend),
+        description: `Макро-индекс. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+      });
+    } catch (e) {
+      console.error(`❌ Ошибка ${src.name}:`, e.message);
     }
-
-    results.push({
-      type: 'rubber',
-      value: Number(newValue),
-      trend: Number(trend),
-      description: `Сингапур TSR20 ($/kg). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
-    });
-  } catch (e) { console.error('❌ Ошибка Каучук:', e.message); }
-
-  // --- ИЗОЦИАНАТ (SunSirs - Китай) ---
-  try {
-    console.log('Запрашиваем Изоцианат (SunSirs)...');
-    const $ = await fetchViaProxy('http://www.sunsirs.com/uk/prodetail-447.html');
-    
-    let text = $('.detail_top_txt').text();
-    if (!text) text = $('body').text();
-    
-    // Ищем цену MDI (обычно это число от 10000 до 25000 юаней за тонну)
-    const match = text.match(/\d{4,}/);
-    if (!match) throw new Error(`Не найдено число на странице. Текст: ${text.substring(0, 30)}`);
-    
-    const newValue = parseFloat(match[0]);
-
-    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'isocyanate'`;
-    let trend = 0;
-    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
-      const oldValue = parseFloat(lastRecord[0].value);
-      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
-    }
-
-    results.push({
-      type: 'isocyanate',
-      value: Number(newValue),
-      trend: Number(trend),
-      description: `SunSirs (RMB/ton). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
-    });
-  } catch (e) { console.error('❌ Ошибка Изоцианат:', e.message); }
-
-  // --- ЛАТЕКС (IndexMundi) ---
-  try {
-    console.log('Запрашиваем Латекс (IndexMundi)...');
-    const $ = await fetchViaProxy('https://www.indexmundi.com/commodities/?commodity=rubber');
-    
-    const priceText = $('#tdPrice').text();
-    const match = priceText.match(/[\d.]+/);
-    if (!match) throw new Error('Элемент #tdPrice не найден или пуст.');
-    
-    const newValue = parseFloat(match[0]);
-
-    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'latex'`;
-    let trend = 0;
-    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
-      const oldValue = parseFloat(lastRecord[0].value);
-      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
-    }
-
-    results.push({
-      type: 'latex',
-      value: Number(newValue),
-      trend: Number(trend),
-      description: `IndexMundi ($/kg). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
-    });
-  } catch (e) { console.error('❌ Ошибка Латекс:', e.message); }
-
+  }
   return results;
 }
 
