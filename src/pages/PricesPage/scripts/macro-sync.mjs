@@ -84,8 +84,8 @@ async function fetchCommodities(sql) {
       console.log(`Запрашиваем ${src.name}...`);
       
       const targetUrl = encodeURIComponent(src.url);
-      // Добавлен параметр country_code=US для более стабильной выдачи
-      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true&country_code=US`;
+      // Добавлен параметр premium=true для использования резидентных прокси и обхода капчи
+      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true&premium=true&country_code=US`;
 
       const res = await fetch(scraperUrl);
       if (!res.ok) throw new Error(`ScraperAPI вернул статус: ${res.status}`);
