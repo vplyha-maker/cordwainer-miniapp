@@ -45,19 +45,22 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (БРОНЕБОЙНЫЙ ФИЛЬТР SUNSIRS)
+
+// 2. ПАРСИНГ СЫРЬЯ (SunSirs)
 async function fetchCommodities(sql) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
   const results = [];
 
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9',
   };
 
   const sources = [
-    { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', name: 'Изоцианат (MDI)' },
-    { type: 'rubber', url: 'http://www.sunsirs.com/uk/prodetail-180.html', name: 'Каучук натуральный' },
-    { type: 'latex', url: 'http://www.sunsirs.com/uk/prodetail-180.html', name: 'Латекс (по индексу каучука)' }
+    { type: 'isocyanate', url: 'https://www.sunsirs.com/uk/prodetail-975.html', name: 'Изоцианат (MDI)' },
+    { type: 'rubber',     url: 'https://www.sunsirs.com/uk/prodetail-586.html', name: 'Каучук натуральный' },
+    // latex — дублируем каучук (отдельной страницы нет)
+    { type: 'latex',      url: 'https://www.sunsirs.com/uk/prodetail-586.html', name: 'Латекс (по индексу каучука)' },
   ];
 
   for (const src of sources) {
@@ -69,44 +72,50 @@ async function fetchCommodities(sql) {
       const $ = cheerio.load(html);
 
       let newValue = NaN;
-      // Сканируем весь текст страницы целиком
-      const bodyText = $('body').text();
 
-      // Шаг 1: Ищем точную финансовую цену с копейками (например, 14500.00)
-      const exactMatches = bodyText.match(/(?:\D|^)(\d{4,5}\.\d{2})(?:\D|$)/g);
-      
-      if (exactMatches) {
-        const cleanMatch = exactMatches[0].replace(/[^\d.]/g, '');
-        newValue = parseFloat(cleanMatch);
-      } else {
-        // Шаг 2: Если копеек нет, ищем целые числа от 4 до 5 знаков
-        const allNumbers = bodyText.match(/(?:\D|^)(\d{4,5})(?:\D|$)/g);
-        if (allNumbers) {
-          const numbers = allNumbers.map(n => Number(n.replace(/\D/g, '')));
-          // Отсекаем годы (2024) и номера телефонов. Оставляем только коридор реальных цен сырья.
-          const realisticPrices = numbers.filter(n => n >= 5000 && n <= 40000);
-          if (realisticPrices.length > 0) {
-            newValue = realisticPrices[0];
-          }
+      // 1. Ищем в таблице цен (самый надёжный способ)
+      // Формат: | Commodity | Sectors | Price | Date |
+      //          | MDI       | Chemical| 18366.67 | 2026-09-18 |
+      const priceCell = $('table td').filter((_, el) => {
+        const t = $(el).text().trim();
+        return /^\d{4,5}(?:\.\d{1,2})?$/.test(t);
+      }).first();
+
+      if (priceCell.length) {
+        newValue = parseFloat(priceCell.text().trim());
+      }
+
+      // 2. Fallback — ищем по всему тексту числа вида 18366.67 или 18366
+      if (isNaN(newValue)) {
+        const bodyText = $('body').text();
+        const match = bodyText.match(/(?:\D|^)(\d{4,5}\.\d{1,2})(?:\D|$)/);
+        if (match) {
+          newValue = parseFloat(match[1]);
+        } else {
+          const allNumbers = bodyText.match(/(?:\D|^)(\d{4,5})(?:\D|$)/g) || [];
+          const realistic = allNumbers
+            .map(n => Number(n.replace(/\D/g, '')))
+            .filter(n => n >= 8000 && n <= 30000); // актуальный коридор цен
+          if (realistic.length > 0) newValue = realistic[0];
         }
       }
 
       if (isNaN(newValue)) {
-          throw new Error(`Адекватная цена не найдена в тексте.`);
+        throw new Error(`Адекватная цена не найдена в тексте.`);
       }
 
       const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
       let trend = 0;
       if (lastRecord.length > 0 && lastRecord[0].value > 0) {
         const oldValue = parseFloat(lastRecord[0].value);
-        trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+        trend = Number((((newValue - oldValue) / oldValue) * 100).toFixed(1));
       }
 
       results.push({
         type: src.type,
         value: Number(newValue),
         trend: Number(trend),
-        description: `SunSirs Китай (RMB/ton). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+        description: `SunSirs Китай (RMB/ton). Изменение: \( {trend > 0 ? '+' : ''} \){trend}%`
       });
     } catch (e) {
       console.error(`❌ Ошибка ${src.name}:`, e.message);
@@ -114,7 +123,7 @@ async function fetchCommodities(sql) {
   }
 
   return results;
-}
+ }
 
 // 3. ПАРСИНГ ФРАХТА (Реальный мировой индекс Drewry WCI)
 async function fetchFreightRates(sql) {
