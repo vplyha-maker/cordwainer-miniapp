@@ -6,6 +6,20 @@ import 'dotenv/config';
 const sql = neon(process.env.DATABASE_URL);
 const rssParser = new Parser();
 
+// Вспомогательная функция с жестким таймаутом, чтобы скрипт никогда не висел
+async function fetchWithTimeout(url, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw new Error(err.name === 'AbortError' ? 'Таймаут запроса (сервер не ответил за 20 сек)' : err.message);
+  }
+}
+
 // 1. ПАРСИНГ НОВОСТЕЙ
 async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
@@ -41,9 +55,9 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (БАЗОВЫЙ ScraperAPI: 1 запрос = 1 кредит)
+// 2. ПАРСИНГ СЫРЬЯ (С ЗАЩИТОЙ ОТ ЗАВИСАНИЙ)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью (Базовый ScraperAPI)...');
+  console.log('Сбор данных по сырью (ScraperAPI + Таймауты)...');
   const results = [];
   const apiKey = process.env.SCRAPER_API_KEY;
 
@@ -52,47 +66,53 @@ async function fetchCommodities(sql) {
     return [];
   }
 
+  // render: true только для Yahoo, остальные парсятся дешевым базовым запросом
   const sources = [
-    { type: 'rubber', url: 'https://finance.yahoo.com/quote/RUBW.SI/', name: 'Каучук (Yahoo Finance)' },
-    { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', name: 'Изоцианат (SunSirs Китай)' },
-    { type: 'latex', url: 'https://www.indexmundi.com/commodities/?commodity=rubber', name: 'Латекс (IndexMundi)' }
+    { type: 'rubber', url: 'https://finance.yahoo.com/quote/RUBW.SI/', render: true, name: 'Каучук (Yahoo)' },
+    { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', render: false, name: 'Изоцианат (SunSirs)' },
+    { type: 'latex', url: 'https://www.indexmundi.com/commodities/?commodity=rubber', render: false, name: 'Латекс (IndexMundi)' }
   ];
 
   for (const src of sources) {
     try {
       console.log(`Запрашиваем ${src.name}...`);
       
-      // ВАЖНО: Никаких premium=true или render=true. Это самый дешевый запрос.
-      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${encodeURIComponent(src.url)}`;
+      let scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${encodeURIComponent(src.url)}`;
+      if (src.render) scraperUrl += '&render=true'; // Добавляем рендер JS только там, где он нужен
       
       let html = '';
       let success = false;
       
-      // Страховка: если сервер моргнет, скрипт попробует еще раз
-      for (let i = 0; i < 3; i++) {
-        const res = await fetch(scraperUrl);
-        if (res.ok) {
-          html = await res.text();
-          success = true;
-          break;
+      // Максимум 2 попытки, чтобы не растягивать время выполнения
+      for (let i = 0; i < 2; i++) {
+        try {
+          const res = await fetchWithTimeout(scraperUrl, 20000); // Обрыв связи, если ждем дольше 20 секунд
+          if (res.ok) {
+            html = await res.text();
+            success = true;
+            break;
+          }
+          console.log(`⚠️ Статус ${res.status}. Попытка ${i + 1} из 2...`);
+        } catch (err) {
+          console.log(`⚠️ ${err.message}. Попытка ${i + 1} из 2...`);
         }
-        console.log(`⚠️ ScraperAPI статус ${res.status}. Попытка ${i + 1} из 3...`);
-        await new Promise(r => setTimeout(r, 3000));
       }
 
-      if (!success) throw new Error('Не удалось загрузить страницу');
+      if (!success) throw new Error('Не удалось загрузить страницу после 2 попыток');
 
       const $ = cheerio.load(html);
       let newValue = NaN;
 
-      // Индивидуальные парсеры под каждый сайт
       if (src.type === 'rubber') {
         const text = $('fin-streamer[data-symbol="RUBW.SI"][data-field="regularMarketPrice"]').first().text();
         newValue = parseFloat(text.replace(/[^\d.-]/g, ''));
+        if (isNaN(newValue)) {
+            console.log(`[Отладка] Title Yahoo:`, $('title').text());
+        }
       } else if (src.type === 'isocyanate') {
         let text = $('.detail_top_txt').text();
         if (!text) text = $('body').text();
-        const match = text.match(/\d{4,}/); // MDI в Китае измеряется тысячами юаней за тонну
+        const match = text.match(/\d{4,}/); 
         if (match) newValue = parseFloat(match[0]);
       } else if (src.type === 'latex') {
         const text = $('#tdPrice').text();
@@ -101,7 +121,6 @@ async function fetchCommodities(sql) {
 
       if (isNaN(newValue)) throw new Error('Цена не найдена в разметке');
 
-      // Расчет тренда
       const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
       let trend = 0;
       if (lastRecord.length > 0 && lastRecord[0].value > 0) {
