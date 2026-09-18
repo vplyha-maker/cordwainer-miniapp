@@ -1,24 +1,12 @@
 import { neon } from '@neondatabase/serverless';
 import * as cheerio from 'cheerio';
 import Parser from 'rss-parser';
+import yahooFinance from 'yahoo-finance2';
 import 'dotenv/config';
 
+// Подключение к Neon БД
 const sql = neon(process.env.DATABASE_URL);
 const rssParser = new Parser();
-
-// Вспомогательная функция с жестким таймаутом, чтобы скрипт никогда не висел
-async function fetchWithTimeout(url, timeoutMs = 20000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(id);
-    return response;
-  } catch (err) {
-    clearTimeout(id);
-    throw new Error(err.name === 'AbortError' ? 'Таймаут запроса (сервер не ответил за 20 сек)' : err.message);
-  }
-}
 
 // 1. ПАРСИНГ НОВОСТЕЙ
 async function fetchNewsAlerts() {
@@ -55,89 +43,81 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (С ЗАЩИТОЙ ОТ ЗАВИСАНИЙ)
+// 2. ПАРСИНГ СЫРЬЯ (БЕЗ ПРОКСИ, НАДЕЖНЫЕ ПАКЕТЫ)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью (ScraperAPI + Таймауты)...');
+  console.log('Сбор данных по сырью (yahoo-finance2 + прямой fetch)...');
   const results = [];
-  const apiKey = process.env.SCRAPER_API_KEY;
 
-  if (!apiKey) {
-    console.error('❌ Ошибка: Не задана переменная SCRAPER_API_KEY');
-    return [];
-  }
+  // --- КАУЧУК И ЛАТЕКС (Yahoo Finance API) ---
+  try {
+    console.log('Запрашиваем Каучук/Латекс (Yahoo Finance)...');
+    // Встроенный пакет сам обходит защиту, получает токены и делает запрос
+    const quote = await yahooFinance.quote('RUBW.SI');
+    const newValue = quote.regularMarketPrice;
 
-  // render: true только для Yahoo, остальные парсятся дешевым базовым запросом
-  const sources = [
-    { type: 'rubber', url: 'https://finance.yahoo.com/quote/RUBW.SI/', render: true, name: 'Каучук (Yahoo)' },
-    { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', render: false, name: 'Изоцианат (SunSirs)' },
-    { type: 'latex', url: 'https://www.indexmundi.com/commodities/?commodity=rubber', render: false, name: 'Латекс (IndexMundi)' }
-  ];
+    if (!newValue) throw new Error('Yahoo не вернул цену');
 
-  for (const src of sources) {
-    try {
-      console.log(`Запрашиваем ${src.name}...`);
-      
-      let scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${encodeURIComponent(src.url)}`;
-      if (src.render) scraperUrl += '&render=true'; // Добавляем рендер JS только там, где он нужен
-      
-      let html = '';
-      let success = false;
-      
-      // Максимум 2 попытки, чтобы не растягивать время выполнения
-      for (let i = 0; i < 2; i++) {
-        try {
-          const res = await fetchWithTimeout(scraperUrl, 20000); // Обрыв связи, если ждем дольше 20 секунд
-          if (res.ok) {
-            html = await res.text();
-            success = true;
-            break;
-          }
-          console.log(`⚠️ Статус ${res.status}. Попытка ${i + 1} из 2...`);
-        } catch (err) {
-          console.log(`⚠️ ${err.message}. Попытка ${i + 1} из 2...`);
-        }
-      }
+    // Привязываем оба материала к одному макро-индексу
+    const types = [
+      { id: 'rubber', name: 'Каучук (Сингапур TSR20)' },
+      { id: 'latex', name: 'Латекс (Биржевой тренд)' }
+    ];
 
-      if (!success) throw new Error('Не удалось загрузить страницу после 2 попыток');
-
-      const $ = cheerio.load(html);
-      let newValue = NaN;
-
-      if (src.type === 'rubber') {
-        const text = $('fin-streamer[data-symbol="RUBW.SI"][data-field="regularMarketPrice"]').first().text();
-        newValue = parseFloat(text.replace(/[^\d.-]/g, ''));
-        if (isNaN(newValue)) {
-            console.log(`[Отладка] Title Yahoo:`, $('title').text());
-        }
-      } else if (src.type === 'isocyanate') {
-        let text = $('.detail_top_txt').text();
-        if (!text) text = $('body').text();
-        const match = text.match(/\d{4,}/); 
-        if (match) newValue = parseFloat(match[0]);
-      } else if (src.type === 'latex') {
-        const text = $('#tdPrice').text();
-        newValue = parseFloat(text.replace(/[^\d.-]/g, ''));
-      }
-
-      if (isNaN(newValue)) throw new Error('Цена не найдена в разметке');
-
-      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
+    for (const item of types) {
+      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${item.id}`;
       let trend = 0;
       if (lastRecord.length > 0 && lastRecord[0].value > 0) {
         const oldValue = parseFloat(lastRecord[0].value);
         trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
       }
-
       results.push({
-        type: src.type,
+        type: item.id,
         value: Number(newValue),
         trend: Number(trend),
-        description: `Макро-индекс. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+        description: `${item.name}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
       });
-    } catch (e) {
-      console.error(`❌ Ошибка ${src.name}:`, e.message);
     }
+  } catch (e) {
+    console.error('❌ Ошибка Каучук/Латекс:', e.message);
   }
+
+  // --- ИЗОЦИАНАТ (SunSirs Китай) ---
+  try {
+    console.log('Запрашиваем Изоцианат (SunSirs)...');
+    // Прямой запрос. Сайт работает на старом протоколе HTTP без Cloudflare.
+    const res = await fetch('http://www.sunsirs.com/uk/prodetail-447.html', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+
+    if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    let text = $('.detail_top_txt').text();
+    if (!text) text = $('body').text();
+
+    const match = text.match(/\d{4,}/); // MDI в Китае измеряется тысячами
+    if (!match) throw new Error('Цена не найдена на странице');
+
+    const newValue = parseFloat(match[0]);
+
+    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'isocyanate'`;
+    let trend = 0;
+    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+      const oldValue = parseFloat(lastRecord[0].value);
+      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+    }
+
+    results.push({
+      type: 'isocyanate',
+      value: Number(newValue),
+      trend: Number(trend),
+      description: `SunSirs (MDI Китай). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+    });
+  } catch (e) {
+    console.error('❌ Ошибка Изоцианат:', e.message);
+  }
+
   return results;
 }
 
