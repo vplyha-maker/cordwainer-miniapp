@@ -203,11 +203,12 @@ export function computeGroupSignals(
 
   // МАКРО-ЛОГИКА (Умный анализ сырья из базы)
   if (macroIndicators.length > 0) {
-    const searchString = (group.name + ' ' + group.key).toLowerCase()
+    // Выравниваем кодировку (NFC) для правильного чтения 'й' и 'і' и переводим в нижний регистр
+    const searchString = (group.name + ' ' + group.key).normalize('NFC').toLowerCase()
     
-    // БРОНЕБОЙНЫЙ ПОИСК (Украинский + Русский + Латиница + Опечатки)
-    const isPU = searchString.includes('поліуретан') || searchString.includes('полиуретан') || searchString.includes('десмокол') || searchString.includes('дисмакол') || searchString.includes('desmokol') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
-    const isRubber = searchString.includes('найрит') || searchString.includes('найріт') || searchString.includes('наїріт') || searchString.includes('наирит') || searchString.includes('nairit') || searchString.includes('гумов') || searchString.includes('резинов') || searchString.includes('каучук') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('sar-20')
+    // БРОНЕБОЙНЫЙ ПОИСК ПО КОРОТКИМ КОРНЯМ (игнорирует окончания и опечатки)
+    const isPU = searchString.includes('уретан') || searchString.includes('десмокол') || searchString.includes('дисмакол') || searchString.includes('desmokol') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
+    const isRubber = searchString.includes('найр') || searchString.includes('наир') || searchString.includes('nairit') || searchString.includes('гумов') || searchString.includes('резинов') || searchString.includes('каучук') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('sar-20')
     const isLatex = searchString.includes('латекс') || searchString.includes('latex')
     const isPrimer = searchString.includes('протирання') || searchString.includes('протрав') || searchString.includes('праймер') || searchString.includes('primer') || searchString.includes('галоген') || searchString.includes('halog') || searchString.includes('preparatore')
     
