@@ -57,25 +57,24 @@ async function fetchCommodities(sql) {
     return [];
   }
 
-  // Ссылки ведут на страницы поиска Alibaba. 
-  // Селекторы нужно будет подогнать под актуальную верстку карточек товаров.
+  // Расширенные селекторы для поиска цен
   const sources = [
     { 
       type: 'isocyanate', 
       url: 'https://www.alibaba.com/trade/search?SearchText=mdi+isocyanate+polyurethane', 
-      selector: '.elements-title-price, .search-card-e-price-main', 
+      selector: '.search-card-e-price-main, .elements-title-price, .moq-price, span[class*="price"], div[class*="price-main"]', 
       name: 'Изоцианат MDI (Alibaba)' 
     },
     { 
       type: 'rubber', 
       url: 'https://www.alibaba.com/trade/search?SearchText=neoprene+chloroprene+rubber', 
-      selector: '.elements-title-price, .search-card-e-price-main', 
+      selector: '.search-card-e-price-main, .elements-title-price, .moq-price, span[class*="price"], div[class*="price-main"]', 
       name: 'Каучук Наирит (Alibaba)' 
     },
     { 
       type: 'latex', 
       url: 'https://www.alibaba.com/trade/search?SearchText=liquid+natural+latex', 
-      selector: '.elements-title-price, .search-card-e-price-main', 
+      selector: '.search-card-e-price-main, .elements-title-price, .moq-price, span[class*="price"], div[class*="price-main"]', 
       name: 'Латекс жидкий (Alibaba)' 
     }
   ];
@@ -84,9 +83,9 @@ async function fetchCommodities(sql) {
     try {
       console.log(`Запрашиваем ${src.name}...`);
       
-      // Формируем URL для API. render=true загружает динамический контент.
       const targetUrl = encodeURIComponent(src.url);
-      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true`;
+      // Добавлен параметр country_code=US для более стабильной выдачи
+      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true&country_code=US`;
 
       const res = await fetch(scraperUrl);
       if (!res.ok) throw new Error(`ScraperAPI вернул статус: ${res.status}`);
@@ -94,15 +93,17 @@ async function fetchCommodities(sql) {
       const html = await res.text();
       const $ = cheerio.load(html);
       
-      // Ищем первую попавшуюся цену в поисковой выдаче
-      const rawText = $(src.selector).first().text();
+      // Пытаемся найти текст по нашим расширенным селекторам
+      const rawText = $(src.selector).first().text().trim();
       
-      // Очищаем: берем только первую группу цифр (например, из "$1.50 - $2.00" возьмет "1.50")
+      // Ищем первое совпадение с цифрами (цена)
       const match = rawText.match(/[\d.]+/);
       const newValue = match ? parseFloat(match[0]) : NaN;
       
       if (isNaN(newValue)) {
-        throw new Error(`Не удалось найти цену по селектору. Текст: "${rawText.substring(0, 50)}"`);
+        // Если цена не найдена, выводим кусок HTML (title страницы), чтобы понять, не капча ли это
+        const pageTitle = $('title').text();
+        throw new Error(`Цена не найдена. Title страницы: "${pageTitle}". Найденный текст: "${rawText.substring(0, 30)}"`);
       }
 
       // Запрашиваем предыдущую цену из БД для расчета тренда
@@ -127,7 +128,6 @@ async function fetchCommodities(sql) {
   }
   return results;
 }
-
 
 // 3. ПАРСИНГ ФРАХТА (Логистика Китай -> Европа)
 async function fetchFreightRates() {
