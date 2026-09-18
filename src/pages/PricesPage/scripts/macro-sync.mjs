@@ -3,17 +3,14 @@ import * as cheerio from 'cheerio';
 import Parser from 'rss-parser';
 import 'dotenv/config';
 
-// Подключение к Neon БД (URL берется из переменных окружения)
+// Подключение к Neon БД
 const sql = neon(process.env.DATABASE_URL);
 const rssParser = new Parser();
 
-// 1. ПАРСИНГ НОВОСТЕЙ (Лента RSS по логистике)
+// 1. ПАРСИНГ НОВОСТЕЙ
 async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
-  const feeds = [
-    'https://www.supplychaindive.com/feeds/news/'
-  ];
-
+  const feeds = ['https://www.supplychaindive.com/feeds/news/'];
   const keywords = ['strike', 'shortage', 'delay', 'disruption', 'tariff', 'забастовка', 'дефицит'];
   let alertCount = 0;
   let latestAlertTitle = '';
@@ -26,29 +23,28 @@ async function fetchNewsAlerts() {
         const pubDate = new Date(item.pubDate).getTime();
         if (pubDate > oneWeekAgo) {
           const text = (item.title + ' ' + (item.contentSnippet || '')).toLowerCase();
-          const hasAlert = keywords.some(kw => text.includes(kw));
-          if (hasAlert) {
+          if (keywords.some(kw => text.includes(kw))) {
             alertCount++;
             if (!latestAlertTitle) latestAlertTitle = item.title;
           }
         }
       }
     } catch (e) {
-      console.error(`Ошибка чтения RSS (${feedUrl}):`, e.message);
+      console.error(`Ошибка чтения RSS:`, e.message);
     }
   }
 
   const trend = Math.min(alertCount * 10, 100);
   const description = alertCount > 0 
-    ? `Тревожных новостей о логистике: ${alertCount}. Последняя: "${latestAlertTitle}"`
-    : 'Новостной фон спокойный, сбоев поставок не замечено.';
+    ? `Тревожных новостей: ${alertCount}. Последняя: "${latestAlertTitle}"`
+    : 'Новостной фон спокойный.';
 
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (ALIBABA через ScraperAPI)
+// 2. ПАРСИНГ СЫРЬЯ (ALIBABA) С АВТО-ПОВТОРАМИ
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью с Alibaba (через API-обходчик)...');
+  console.log('Сбор данных по сырью с Alibaba (premium API)...');
   const results = [];
   
   const apiKey = process.env.SCRAPER_API_KEY;
@@ -57,7 +53,6 @@ async function fetchCommodities(sql) {
     return [];
   }
 
-  // Расширенные селекторы для поиска цен
   const sources = [
     { 
       type: 'isocyanate', 
@@ -82,31 +77,55 @@ async function fetchCommodities(sql) {
   for (const src of sources) {
     try {
       console.log(`Запрашиваем ${src.name}...`);
-      
       const targetUrl = encodeURIComponent(src.url);
-      // Добавлен параметр premium=true для использования резидентных прокси и обхода капчи
-      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true&premium=true&country_code=US`;
+      
+      // Добавлен device_type=desktop для стабильной верстки
+      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true&premium=true&country_code=US&device_type=desktop`;
 
-      const res = await fetch(scraperUrl);
-      if (!res.ok) throw new Error(`ScraperAPI вернул статус: ${res.status}`);
+      let html = '';
+      let success = false;
+      const maxRetries = 3;
 
-      const html = await res.text();
-      const $ = cheerio.load(html);
-      
-      // Пытаемся найти текст по нашим расширенным селекторам
-      const rawText = $(src.selector).first().text().trim();
-      
-      // Ищем первое совпадение с цифрами (цена)
-      const match = rawText.match(/[\d.]+/);
-      const newValue = match ? parseFloat(match[0]) : NaN;
-      
-      if (isNaN(newValue)) {
-        // Если цена не найдена, выводим кусок HTML (title страницы), чтобы понять, не капча ли это
-        const pageTitle = $('title').text();
-        throw new Error(`Цена не найдена. Title страницы: "${pageTitle}". Найденный текст: "${rawText.substring(0, 30)}"`);
+      // Блок авто-повтора (3 попытки, если ScraperAPI падает с 500 ошибкой)
+      for (let i = 0; i < maxRetries; i++) {
+        const res = await fetch(scraperUrl);
+        if (res.ok) {
+          html = await res.text();
+          success = true;
+          break; // Успешно - выходим из цикла попыток
+        }
+        console.log(`⚠️ ScraperAPI статус ${res.status}. Попытка ${i + 1} из ${maxRetries}. Ждем 5 сек...`);
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Пауза 5 секунд
       }
 
-      // Запрашиваем предыдущую цену из БД для расчета тренда
+      if (!success) {
+        throw new Error(`ScraperAPI не смог загрузить страницу после ${maxRetries} попыток.`);
+      }
+
+      const $ = cheerio.load(html);
+      const rawText = $(src.selector).first().text().trim();
+      
+      // Ищем цены, игнорируя мелкие цифры вроде "1" (часто это минимальный заказ)
+      // Ищем числа с плавающей точкой (например, 1.50 или 200)
+      const matches = rawText.match(/\d+[.,]\d+/g);
+      let newValue = NaN;
+
+      if (matches && matches.length > 0) {
+        newValue = parseFloat(matches[0].replace(',', '.'));
+      } else {
+        // Если дробного нет, берем первое целое число больше 1
+        const allNumbers = rawText.match(/\d+/g);
+        if (allNumbers) {
+          const validNumbers = allNumbers.map(Number).filter(n => n > 1);
+          if (validNumbers.length > 0) newValue = validNumbers[0];
+        }
+      }
+      
+      if (isNaN(newValue)) {
+        const pageTitle = $('title').text();
+        throw new Error(`Цена не найдена. Title: "${pageTitle}". Текст: "${rawText.substring(0, 30)}"`);
+      }
+
       const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
       let trend = 0;
 
@@ -123,17 +142,16 @@ async function fetchCommodities(sql) {
       });
 
     } catch (e) {
-      console.error(`Ошибка сбора сырья (${src.type}):`, e.message);
+      console.error(`❌ Ошибка сбора сырья (${src.type}):`, e.message);
     }
   }
   return results;
 }
 
-// 3. ПАРСИНГ ФРАХТА (Логистика Китай -> Европа)
+// 3. ПАРСИНГ ФРАХТА
 async function fetchFreightRates() {
   console.log('Сбор данных по фрахту...');
   try {
-    // Пока оставляем имитацию. Позже можно подключить API Freightos или аналогичный парсер.
     const value = 4200 + Math.floor(Math.random() * 800); 
     const trend = (Math.random() * 10 - 3).toFixed(1);
 
@@ -149,7 +167,7 @@ async function fetchFreightRates() {
   }
 }
 
-// ОСНОВНАЯ ФУНКЦИЯ СИНХРОНИЗАЦИИ
+// ОСНОВНАЯ ФУНКЦИЯ
 async function run() {
   if (!process.env.DATABASE_URL) {
     console.error('❌ Ошибка: Не задана переменная DATABASE_URL');
@@ -158,14 +176,9 @@ async function run() {
 
   try {
     const indicators = [];
+    indicators.push(await fetchNewsAlerts());
+    indicators.push(...await fetchCommodities(sql));
     
-    const news = await fetchNewsAlerts();
-    indicators.push(news);
-
-    // Передаем объект sql в функцию для расчета тренда
-    const commodities = await fetchCommodities(sql);
-    indicators.push(...commodities);
-
     const freight = await fetchFreightRates();
     if (freight) indicators.push(freight);
 
