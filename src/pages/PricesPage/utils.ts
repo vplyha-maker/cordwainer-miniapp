@@ -203,21 +203,20 @@ export function computeGroupSignals(
 
   // МАКРО-ЛОГИКА (Умный анализ сырья из базы)
   if (macroIndicators.length > 0) {
-    // Объединяем название и нормализованный ключ, переводим в нижний регистр
     const searchString = (group.name + ' ' + group.key).toLowerCase()
     
     // БРОНЕБОЙНЫЙ ПОИСК (Украинский + Русский + Латиница + Опечатки)
     const isPU = searchString.includes('поліуретан') || searchString.includes('полиуретан') || searchString.includes('десмокол') || searchString.includes('дисмакол') || searchString.includes('desmokol') || searchString.includes('sar 30') || searchString.includes('sar30') || searchString.includes('sar-30')
-    const isRubber = searchString.includes('найріт') || searchString.includes('наїріт') || searchString.includes('наирит') || searchString.includes('nairit') || searchString.includes('гумов') || searchString.includes('резинов') || searchString.includes('каучук') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('sar-20')
+    const isRubber = searchString.includes('найрит') || searchString.includes('найріт') || searchString.includes('наїріт') || searchString.includes('наирит') || searchString.includes('nairit') || searchString.includes('гумов') || searchString.includes('резинов') || searchString.includes('каучук') || searchString.includes('sar 20') || searchString.includes('sar20') || searchString.includes('sar-20')
     const isLatex = searchString.includes('латекс') || searchString.includes('latex')
     const isPrimer = searchString.includes('протирання') || searchString.includes('протрав') || searchString.includes('праймер') || searchString.includes('primer') || searchString.includes('галоген') || searchString.includes('halog') || searchString.includes('preparatore')
     
     // 1. Полиуретан -> Изоцианат
     if (isPU) {
       const isocyanate = macroIndicators.find(m => m.type === 'isocyanate')
-      if (isocyanate && isocyanate.trend > 10) {
+      if (isocyanate && Number(isocyanate.trend) > 10) {
         signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост ПУ-сырья)', tone: 'bad' })
-      } else if (isocyanate && isocyanate.trend < -10) {
+      } else if (isocyanate && Number(isocyanate.trend) < -10) {
         signals.push({ kind: 'macro_down', label: 'Сырье ПУ дешевеет', tone: 'good' })
       }
     }
@@ -225,7 +224,7 @@ export function computeGroupSignals(
     // 2. Наирит / Каучук -> Хлоропрен или каучук
     if (isRubber) {
       const rubberRaw = macroIndicators.find(m => m.type === 'chloroprene' || m.type === 'rubber')
-      if (rubberRaw && rubberRaw.trend > 10) {
+      if (rubberRaw && Number(rubberRaw.trend) > 10) {
         signals.push({ kind: 'urgent_buy', label: 'Закупать срочно (рост каучука)', tone: 'bad' })
       }
     }
@@ -233,7 +232,7 @@ export function computeGroupSignals(
     // 3. Латексный клей -> Латекс
     if (isLatex) {
       const latexRaw = macroIndicators.find(m => m.type === 'latex')
-      if (latexRaw && latexRaw.trend > 10) {
+      if (latexRaw && Number(latexRaw.trend) > 10) {
         signals.push({ kind: 'urgent_buy', label: 'Внимание: рост цен на латекс', tone: 'warn' })
       }
     }
@@ -241,14 +240,14 @@ export function computeGroupSignals(
     // 4. Протрава / Праймер / Галоген -> Растворители
     if (isPrimer) {
       const solvent = macroIndicators.find(m => m.type === 'solvent')
-      if (solvent && solvent.trend > 10) {
+      if (solvent && Number(solvent.trend) > 10) {
         signals.push({ kind: 'supply_alert', label: 'Риск дефицита (растворители)', tone: 'warn' })
       }
     }
 
     // 5. Логистика / Фрахт (Для импорта)
     const freight = macroIndicators.find(m => m.type === 'freight_cn_eu')
-    if (freight && freight.trend > 15) {
+    if (freight && Number(freight.trend) > 15) {
       signals.push({ kind: 'supply_alert', label: 'Ожидается удорожание импорта', tone: 'warn' })
     }
   }
