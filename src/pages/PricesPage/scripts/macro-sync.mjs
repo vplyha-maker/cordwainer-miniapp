@@ -22,7 +22,6 @@ async function fetchNewsAlerts() {
       for (const item of feed.items) {
         const pubDate = new Date(item.pubDate).getTime();
         if (pubDate > oneWeekAgo) {
-          // Исключаем баги копирования
           let snippet = item.contentSnippet;
           if (!snippet) snippet = '';
           const text = (item.title + ' ' + snippet).toLowerCase();
@@ -46,96 +45,66 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ
+// 2. ПАРСИНГ СЫРЬЯ (ТОЛЬКО SUNSIRS - НЕ БЛОКИРУЕТ GITHUB)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью (Прямые запросы)...');
+  console.log('Сбор данных по сырью (SunSirs Китай)...');
   const results = [];
 
-  const standardHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5'
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
   };
 
-  // --- ИЗОЦИАНАТ ---
-  try {
-    console.log('Запрашиваем Изоцианат (SunSirs)...');
-    const res = await fetch('http://www.sunsirs.com/uk/prodetail-447.html', { headers: standardHeaders });
-    const html = await res.text();
-    const $ = cheerio.load(html);
+  // Переводим все материалы на китайский B2B портал, который разрешает парсинг
+  const sources = [
+    { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', name: 'Изоцианат (MDI)' },
+    { type: 'rubber', url: 'http://www.sunsirs.com/uk/prodetail-180.html', name: 'Каучук натуральный' },
+    { type: 'latex', url: 'http://www.sunsirs.com/uk/prodetail-180.html', name: 'Латекс (по индексу каучука)' }
+  ];
 
-    // Заменено на железобетонный if вместо ||
-    let text = $('.detail_top_txt').text();
-    if (!text) {
-      text = $('body').text();
-    }
-
-    const match = text.match(/\d{4,}/);
-    if (!match) throw new Error('Цена не найдена');
-
-    const newValue = parseFloat(match[0]);
-    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'isocyanate'`;
-    let trend = 0;
-    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
-      const oldValue = parseFloat(lastRecord[0].value);
-      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
-    }
-
-    results.push({
-      type: 'isocyanate',
-      value: Number(newValue),
-      trend: Number(trend),
-      description: `SunSirs (MDI Китай). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
-    });
-  } catch (e) {
-    console.error('❌ Ошибка Изоцианат:', e.message);
-  }
-
-  // --- КАУЧУК И ЛАТЕКС ---
-  try {
-    console.log('Запрашиваем Каучук/Латекс (Открытые источники)...');
-    let newValue = NaN;
-
+  for (const src of sources) {
     try {
-      const res = await fetch('https://markets.businessinsider.com/commodities/rubber-price', { headers: standardHeaders });
+      console.log(`Запрашиваем ${src.name}...`);
+      const res = await fetch(src.url, { headers });
+      if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
       const html = await res.text();
       const $ = cheerio.load(html);
-      const priceText = $('.price-section__current-value').first().text();
-      newValue = parseFloat(priceText.replace(/[^\d.-]/g, ''));
-    } catch (err) {}
 
-    if (isNaN(newValue)) {
-      console.log('Пробуем резервный источник (IndexMundi)...');
-      const res = await fetch('https://www.indexmundi.com/commodities/?commodity=rubber', { headers: standardHeaders });
-      const html = await res.text();
-      const $ = cheerio.load(html);
-      const priceText = $('#tdPrice').text();
-      newValue = parseFloat(priceText.replace(/[^\d.-]/g, ''));
-    }
+      let newValue = NaN;
+      const bodyText = $('body').text();
 
-    if (isNaN(newValue)) throw new Error('Не удалось получить цену ни с одного источника');
+      // Жесткий фильтр: ищем только биржевой формат (например: 14500.00)
+      const exactMatch = bodyText.match(/(\d{4,}\.\d{2})/);
+      if (exactMatch) {
+        newValue = parseFloat(exactMatch[1]);
+      } else {
+        // Фолбэк на случай, если цена без копеек
+        const fallbackMatch = bodyText.match(/\d{4,}/);
+        if (fallbackMatch) {
+            newValue = parseFloat(fallbackMatch[0]);
+        }
+      }
 
-    const types = [
-      { id: 'rubber', name: 'Каучук (Мировой индекс)' },
-      { id: 'latex', name: 'Латекс (Мировой индекс)' }
-    ];
+      // Защита от парсинга мусора (цена сырья в юанях не может быть меньше 1000)
+      if (isNaN(newValue) || newValue < 1000) {
+          throw new Error(`Адекватная цена не найдена.`);
+      }
 
-    for (const item of types) {
-      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${item.id}`;
+      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
       let trend = 0;
       if (lastRecord.length > 0 && lastRecord[0].value > 0) {
         const oldValue = parseFloat(lastRecord[0].value);
         trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
       }
+
       results.push({
-        type: item.id,
+        type: src.type,
         value: Number(newValue),
         trend: Number(trend),
-        description: `${item.name}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+        description: `SunSirs Китай (RMB/ton). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
       });
+    } catch (e) {
+      console.error(`❌ Ошибка ${src.name}:`, e.message);
     }
-  } catch (e) {
-    console.error('❌ Ошибка Каучук/Латекс:', e.message);
   }
 
   return results;
