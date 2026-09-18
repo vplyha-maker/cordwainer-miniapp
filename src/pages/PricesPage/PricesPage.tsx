@@ -20,7 +20,6 @@ import { ProductCard } from './components/ProductCard'
 import { CurrencySwitch } from './components/CurrencySwitch'
 import { PriceHistoryModal } from '../../components/PriceHistoryModal'
 
-// Изменили на const, чтобы сбросить кэш TypeScript в Vercel
 const PricesPage = ({ onBack, lang }: PricesPageProps) => {
   const t = DICTIONARY[lang]
 
@@ -49,7 +48,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
     sources,
     filteredItems,
     stats,
-    macroIndicators, 
+    macroIndicators,
   } = usePrices()
 
   const currentModalContent = useMemo(() => {
@@ -65,6 +64,14 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
     }
   }, [modalData, t])
 
+  // Макро-индикаторы
+  const newsAlert = macroIndicators?.find((m: any) => m.type === 'news_alert')
+  const freight = macroIndicators?.find((m: any) => m.type === 'freight_cn_eu')
+
+  const freightTrend = Number(freight?.trend) || 0
+  const isFreightUp = freightTrend > 0
+  const isFreightDown = freightTrend < 0
+
   return (
     <div className="min-h-[100dvh] w-full bg-[var(--color-bg)] text-[var(--color-ink)] font-sans transition-colors duration-300">
       <motion.div
@@ -73,6 +80,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
         exit={{ opacity: 0 }}
         className="flex flex-col h-[100dvh] relative"
       >
+        {/* ===== HEADER ===== */}
         <header className="shrink-0 z-20 bg-[var(--color-surface)] border-b border-[var(--color-border)] pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-start justify-between gap-4 mb-4">
@@ -222,8 +230,116 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
           </div>
         </header>
 
+        {/* ===== MAIN ===== */}
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 no-scrollbar">
           <div className="max-w-7xl mx-auto">
+
+            {/* ===== МАКРО: БЕГУЩАЯ СТРОКА + ФРАХТ ===== */}
+            {!loading && !error && (newsAlert || freight) && (
+              <div className="mb-8 space-y-4">
+
+                {/* Бегущая строка новостей */}
+                {newsAlert?.description && (
+                  <div className="relative overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl">
+                    <div className="flex items-center gap-3 px-4 py-2.5">
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-2 py-0.5 rounded">
+                        RSS
+                      </span>
+                      <div className="relative flex-1 overflow-hidden">
+                        <div className="animate-marquee whitespace-nowrap text-sm text-[var(--color-muted)]">
+                          <span className="inline-block pr-16">
+                            {newsAlert.description}
+                            {newsAlert.value > 0 && (
+                              <span className="ml-3 text-[var(--color-accent)] font-medium">
+                                · алертов: {newsAlert.value}
+                              </span>
+                            )}
+                          </span>
+                          <span className="inline-block pr-16">
+                            {newsAlert.description}
+                            {newsAlert.value > 0 && (
+                              <span className="ml-3 text-[var(--color-accent)] font-medium">
+                                · алертов: {newsAlert.value}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Карточка фрахта Drewry WCI */}
+                {freight && (
+                  <div className="border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl p-5 md:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
+                            Макро · Фрахт
+                          </span>
+                          <span className="text-[10px] text-[var(--color-muted)] opacity-50">·</span>
+                          <span className="text-[10px] text-[var(--color-muted)]">
+                            Drewry World Container Index
+                          </span>
+                        </div>
+
+                        <h3 className="font-serif text-lg md:text-xl text-[var(--color-ink)] mb-2">
+                          Китай → Европа
+                        </h3>
+
+                        <p className="text-sm text-[var(--color-muted)] leading-relaxed max-w-xl">
+                          Индекс спотовых ставок на контейнер 40ft по основным маршрутам
+                          Восток–Запад. Обновляется еженедельно. Рост индекса = дороже
+                          логистика из Китая, падение = снижение давления на себестоимость.
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <div className="text-3xl md:text-4xl font-serif font-medium text-[var(--color-ink)] tabular-nums tracking-tight">
+                          ${Number(freight.value).toLocaleString('en-US')}
+                        </div>
+                        <div className="text-xs text-[var(--color-muted)] mt-1 mb-2">
+                          за 40ft контейнер
+                        </div>
+
+                        <div
+                          className={
+                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ' +
+                            (isFreightUp
+                              ? 'bg-red-500/10 text-red-500'
+                              : isFreightDown
+                              ? 'bg-emerald-500/10 text-emerald-500'
+                              : 'bg-[var(--color-surface-2)] text-[var(--color-muted)]')
+                          }
+                        >
+                          {isFreightUp && '↑'}
+                          {isFreightDown && '↓'}
+                          {!isFreightUp && !isFreightDown && '→'}
+                          <span>
+                            {freightTrend > 0 ? '+' : ''}
+                            {freightTrend}%
+                          </span>
+                          <span className="opacity-60 font-normal">к прошлому</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-muted)]">
+                      <span>Источник: OilPriceAPI → Drewry</span>
+                      {freight.description && (
+                        <>
+                          <span className="opacity-30">·</span>
+                          <span className="truncate max-w-md">{freight.description}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ===== КОНТЕНТ ===== */}
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -274,7 +390,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                           currency={currency}
                           usdRate={usdRate}
                           eurRate={eurRate}
-                          macroIndicators={macroIndicators} 
+                          macroIndicators={macroIndicators}
                         />
                       </motion.div>
                     ))}
@@ -296,6 +412,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
           </div>
         </main>
 
+        {/* ===== MODALS ===== */}
         <AnimatePresence>
           {modalData && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6">
@@ -365,10 +482,24 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
           )}
         </AnimatePresence>
       </motion.div>
+
+      {/* CSS для бегущей строки */}
+      <style>{`
+        @keyframes marquee {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+          display: inline-block;
+          animation: marquee 28s linear infinite;
+        }
+        .animate-marquee:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
     </div>
   )
 }
 
-// ЭКСПОРТИРУЕМ ВСЕМИ ВОЗМОЖНЫМИ СПОСОБАМИ, ЧТОБЫ У VERCEL НЕ БЫЛО ШАНСОВ УПАСТЬ
 export { PricesPage }
 export default PricesPage
