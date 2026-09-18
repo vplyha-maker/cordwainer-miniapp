@@ -125,51 +125,62 @@ async function fetchCommodities(sql) {
   return results;
  }
 
-// 3. ПАРСИНГ ФРАХТА (Реальный мировой индекс Drewry WCI)
+// 3. ФРАХТ через OilPriceAPI (Drewry WCI)
 async function fetchFreightRates(sql) {
-  console.log('Сбор данных по фрахту (Drewry World Container Index)...');
-  
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-  };
+  console.log('Сбор данных по фрахту (OilPriceAPI → Drewry WCI)...');
+
+  const apiKey = process.env.OILPRICE_API_KEY;
+  if (!apiKey) {
+    console.error('❌ Не задана переменная OILPRICE_API_KEY');
+    return null;
+  }
 
   try {
-    const res = await fetch('https://www.drewry.co.uk/trackers-and-indices/latest-trackers-and-indices/world-container-index-assessed-by-drewry', { headers });
-    if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
-    const html = await res.text();
-    const $ = cheerio.load(html);
-    
-    const text = $('body').text();
-    const match = text.match(/\$(\d{1,3}(?:,\d{3})*)\s*per\s*40ft/i);
-    
-    let newValue = NaN;
-    if (match) {
-      newValue = parseFloat(match[1].replace(/,/g, ''));
+    const res = await fetch(
+      'https://api.oilpriceapi.com/v1/prices/latest?by_code=DREWRY_WCI_USD',
+      {
+        headers: {
+          'Authorization': `Token ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
     }
 
-    if (isNaN(newValue)) {
-      throw new Error('Не удалось найти актуальную цену фрахта на странице Drewry.');
+    const json = await res.json();
+    
+    // Структура ответа: { status: "success", data: { price: 4500, ... } }
+    const newValue = Number(json?.data?.price ?? json?.price);
+    
+    if (isNaN(newValue) || newValue <= 0) {
+      throw new Error(`Некорректная цена из API: ${JSON.stringify(json)}`);
     }
 
-    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'freight_cn_eu'`;
+    const lastRecord = await sql`
+      SELECT value FROM macro_indicators WHERE type = 'freight_cn_eu'
+    `;
+    
     let trend = 0;
-    
     if (lastRecord.length > 0 && lastRecord[0].value > 0) {
       const oldValue = parseFloat(lastRecord[0].value);
-      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+      trend = Number((((newValue - oldValue) / oldValue) * 100).toFixed(1));
     }
 
     return {
       type: 'freight_cn_eu',
-      value: Number(newValue),
-      trend: Number(trend),
-      description: `Drewry WCI (Китай -> Европа). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+      value: newValue,
+      trend,
+      description: `Drewry WCI (OilPriceAPI). Изменение: \( {trend > 0 ? '+' : ''} \){trend}%`
     };
   } catch (e) {
-    console.error('❌ Ошибка сбора фрахта:', e.message);
+    console.error('❌ Ошибка сбора фрахта (API):', e.message);
     return null;
   }
-}
+  }
 
 // ОСНОВНАЯ ФУНКЦИЯ
 async function run() {
