@@ -1,9 +1,9 @@
 name: scrape-macro
 
 on:
-  workflow_dispatch: # Кнопка для ручного запуска
+  workflow_dispatch: # Кнопка для ручного запуска в любое время
   schedule:
-    - cron: '0 3 * * *' # Автоматический запуск каждый день в 3 часа ночи (по желанию)
+    - cron: '0 3 * * 0' # Автоматический запуск каждое воскресенье в 3 часа ночи
 
 jobs:
   scrape-macro:
@@ -25,4 +25,3 @@ jobs:
         run: node src/pages/PricesPage/scripts/macro-sync.mjs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
