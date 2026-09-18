@@ -169,7 +169,6 @@ async function fetchFreightRates(sql) {
   }
 }
 
-
 // ОСНОВНАЯ ФУНКЦИЯ
 async function run() {
   if (!process.env.DATABASE_URL) {
@@ -182,7 +181,8 @@ async function run() {
     indicators.push(await fetchNewsAlerts());
     indicators.push(...await fetchCommodities(sql));
     
-    const freight = await fetchFreightRates();
+    // Исправлено: добавлена передача sql
+    const freight = await fetchFreightRates(sql);
     if (freight) indicators.push(freight);
 
     console.log(`Собрано индикаторов: ${indicators.length}. Сохраняем в БД...`);
