@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "scrape": "node scripts/scrape-prices.mjs"
+    "scrape": "node scripts/scrape-prices.mjs",
+    "scrape:macro": "node scripts/macro-sync.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -26,7 +27,8 @@
     "react-datepicker": "^6.9.0",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.41.0",
