@@ -45,7 +45,7 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (ЖЕСТКИЙ ФИЛЬТР ЦЕН SUNSIRS)
+// 2. ПАРСИНГ СЫРЬЯ (БРОНЕБОЙНЫЙ ФИЛЬТР SUNSIRS)
 async function fetchCommodities(sql) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
   const results = [];
@@ -69,19 +69,25 @@ async function fetchCommodities(sql) {
       const $ = cheerio.load(html);
 
       let newValue = NaN;
-      
-      // Сужаем зону поиска: берем только блоки с данными и таблицы
-      const targetText = $('.detail_top_txt').text() + ' ' + $('.prodetail_font').text() + ' ' +$('table').text();
+      // Сканируем весь текст страницы целиком
+      const bodyText = $('body').text();
 
-      // Ищем все возможные числа
-      const allNumbers = targetText.match(/\d{4,}(\.\d+)?/g);
+      // Шаг 1: Ищем точную финансовую цену с копейками (например, 14500.00)
+      const exactMatches = bodyText.match(/(?:\D|^)(\d{4,5}\.\d{2})(?:\D|$)/g);
       
-      if (allNumbers) {
-        // Фильтруем: оставляем только адекватные рыночные цены (от 3,000 до 60,000 юаней за тонну)
-        const realisticPrices = allNumbers.map(Number).filter(n => n > 3000 && n < 60000);
-        
-        if (realisticPrices.length > 0) {
-          newValue = realisticPrices[0];
+      if (exactMatches) {
+        const cleanMatch = exactMatches[0].replace(/[^\d.]/g, '');
+        newValue = parseFloat(cleanMatch);
+      } else {
+        // Шаг 2: Если копеек нет, ищем целые числа от 4 до 5 знаков
+        const allNumbers = bodyText.match(/(?:\D|^)(\d{4,5})(?:\D|$)/g);
+        if (allNumbers) {
+          const numbers = allNumbers.map(n => Number(n.replace(/\D/g, '')));
+          // Отсекаем годы (2024) и номера телефонов. Оставляем только коридор реальных цен сырья.
+          const realisticPrices = numbers.filter(n => n >= 5000 && n <= 40000);
+          if (realisticPrices.length > 0) {
+            newValue = realisticPrices[0];
+          }
         }
       }
 
@@ -119,19 +125,16 @@ async function fetchFreightRates(sql) {
   };
 
   try {
-    // Парсим официальный открытый еженедельный отчет Drewry
     const res = await fetch('https://www.drewry.co.uk/trackers-and-indices/latest-trackers-and-indices/world-container-index-assessed-by-drewry', { headers });
     if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
     const html = await res.text();
     const $ = cheerio.load(html);
     
-    // Ищем в тексте официальную сводку, например: "$4,476 per 40ft container"
     const text = $('body').text();
     const match = text.match(/\$(\d{1,3}(?:,\d{3})*)\s*per\s*40ft/i);
     
     let newValue = NaN;
     if (match) {
-      // Убираем запятую из тысяч, если она есть (4,476 -> 4476)
       newValue = parseFloat(match[1].replace(/,/g, ''));
     }
 
