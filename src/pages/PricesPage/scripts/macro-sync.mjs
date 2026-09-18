@@ -10,7 +10,6 @@ const rssParser = new Parser();
 // 1. ПАРСИНГ НОВОСТЕЙ (Лента RSS по логистике)
 async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
-  // Надежные источники по логистике и цепочкам поставок
   const feeds = [
     'https://www.supplychaindive.com/feeds/news/'
   ];
@@ -18,7 +17,7 @@ async function fetchNewsAlerts() {
   const keywords = ['strike', 'shortage', 'delay', 'disruption', 'tariff', 'забастовка', 'дефицит'];
   let alertCount = 0;
   let latestAlertTitle = '';
-  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000; // за последние 7 дней
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
   for (const feedUrl of feeds) {
     try {
@@ -47,37 +46,72 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (Полиуретан, Изоцианат, Каучук)
-async function fetchCommodities() {
-  console.log('Сбор данных по сырью...');
+// 2. ПАРСИНГ СЫРЬЯ (Глобальные макро-индексы)
+// Передаем sql внутрь, чтобы брать предыдущую цену для расчета тренда
+async function fetchCommodities(sql) {
+  console.log('Сбор данных по сырью (биржи и агрегаторы)...');
   const results = [];
   
-  // В будущем замените url и selector на реальные сайты доноров
   const sources = [
-    { type: 'isocyanate', url: 'https://example.com/iso', selector: '.price', name: 'Изоцианат' },
-    { type: 'rubber', url: 'https://example.com/rubber', selector: '.price', name: 'Каучук' },
-    { type: 'latex', url: 'https://example.com/latex', selector: '.price', name: 'Латекс' }
+    { 
+      type: 'rubber', 
+      url: 'https://finance.yahoo.com/quote/RUBW.SI/', 
+      selector: 'fin-streamer[data-symbol="RUBW.SI"][data-field="regularMarketPrice"]', 
+      name: 'Каучук (Сингапур TSR20)' 
+    },
+    { 
+      type: 'isocyanate', 
+      url: 'http://www.sunsirs.com/uk/prodetail-447.html', 
+      selector: 'div.detail_top_txt span:nth-child(1)', 
+      name: 'Изоцианат (MDI Китай)' 
+    },
+    { 
+      type: 'latex', 
+      url: 'https://www.indexmundi.com/commodities/?commodity=rubber', 
+      selector: '#tdPrice', 
+      name: 'Латекс (Глобальный индекс)' 
+    }
   ];
 
   for (const src of sources) {
     try {
-      // Здесь будет логика cheerio для реальных сайтов
-      // const res = await fetch(src.url);
-      // const html = await res.text();
-      // const $ = cheerio.load(html);
-      // const value = parseFloat($(src.selector).text().replace(/[^\d.]/g, '')) || 0;
+      // Имитируем реальный браузер для обхода базовой защиты от ботов
+      const res = await fetch(src.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
       
-      // Временная имитация данных, чтобы интерфейс начал работать:
-      const value = 100 + Math.floor(Math.random() * 20); 
-      // Имитируем тренд от -15% до +20%
-      const trend = (Math.random() * 35 - 15).toFixed(1); 
+      if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
+
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      
+      // Находим элемент и очищаем его от лишних символов (оставляем цифры и точку)
+      const rawText = $(src.selector).first().text();
+      const newValue = parseFloat(rawText.replace(/[^\d.-]/g, ''));
+      
+      if (isNaN(newValue)) {
+        throw new Error(`Не удалось извлечь число. Полученный текст: "${rawText}"`);
+      }
+
+      // Расчет тренда по отношению к предыдущему значению из БД
+      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
+      let trend = 0;
+
+      if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+        const oldValue = parseFloat(lastRecord[0].value);
+        trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+      }
 
       results.push({
         type: src.type,
-        value: Number(value),
+        value: Number(newValue),
         trend: Number(trend),
-        description: `Индекс: ${src.name}. Изменение: ${trend}%`
+        description: `Индекс: ${src.name}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
       });
+
     } catch (e) {
       console.error(`Ошибка сбора сырья (${src.type}):`, e.message);
     }
@@ -89,7 +123,7 @@ async function fetchCommodities() {
 async function fetchFreightRates() {
   console.log('Сбор данных по фрахту...');
   try {
-    // Временная имитация цены за контейнер
+    // Пока оставляем имитацию. Позже можно подключить API Freightos или аналогичный парсер.
     const value = 4200 + Math.floor(Math.random() * 800); 
     const trend = (Math.random() * 10 - 3).toFixed(1);
 
@@ -97,7 +131,7 @@ async function fetchFreightRates() {
       type: 'freight_cn_eu',
       value: Number(value),
       trend: Number(trend),
-      description: `Ставка фрахта (CN->EU): $${value}. Изменение: ${trend}%`
+      description: `Ставка фрахта (CN->EU): $${value}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
     };
   } catch (e) {
     console.error('Ошибка сбора фрахта:', e.message);
@@ -118,7 +152,8 @@ async function run() {
     const news = await fetchNewsAlerts();
     indicators.push(news);
 
-    const commodities = await fetchCommodities();
+    // Передаем объект sql в функцию для расчета тренда
+    const commodities = await fetchCommodities(sql);
     indicators.push(...commodities);
 
     const freight = await fetchFreightRates();
@@ -136,7 +171,7 @@ async function run() {
           description = EXCLUDED.description,
           updated_at = NOW();
       `;
-      console.log(`✅ Обновлен: ${item.type} | Тренд: ${item.trend}%`);
+      console.log(`✅ Обновлен: ${item.type} | Цена: ${item.value} | Тренд: ${item.trend}%`);
     }
 
     console.log('🎉 Все макро-данные успешно обновлены!');
@@ -148,4 +183,3 @@ async function run() {
 }
 
 run();
-
