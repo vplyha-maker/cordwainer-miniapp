@@ -1,7 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import * as cheerio from 'cheerio';
 import Parser from 'rss-parser';
-import yahooFinance from 'yahoo-finance2';
 import 'dotenv/config';
 
 // Подключение к Neon БД
@@ -43,24 +42,76 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (БЕЗ ПРОКСИ, НАДЕЖНЫЕ ПАКЕТЫ)
+// 2. ПАРСИНГ СЫРЬЯ (Прямые HTTP-запросы с имитацией браузера)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью (yahoo-finance2 + прямой fetch)...');
+  console.log('Сбор данных по сырью (Прямые запросы)...');
   const results = [];
 
-  // --- КАУЧУК И ЛАТЕКС (Yahoo Finance API) ---
+  // Заголовки, чтобы сайты думали, что заходит обычный человек с Windows
+  const standardHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5'
+  };
+
+  // --- ИЗОЦИАНАТ (SunSirs - успешно протестирован) ---
   try {
-    console.log('Запрашиваем Каучук/Латекс (Yahoo Finance)...');
-    // Встроенный пакет сам обходит защиту, получает токены и делает запрос
-    const quote = await yahooFinance.quote('RUBW.SI');
-    const newValue = quote.regularMarketPrice;
+    console.log('Запрашиваем Изоцианат (SunSirs)...');
+    const res = await fetch('http://www.sunsirs.com/uk/prodetail-447.html', { headers: standardHeaders });
+    const html = await res.text();
+    const $ = cheerio.load(html);
 
-    if (!newValue) throw new Error('Yahoo не вернул цену');
+    let text = $('.detail_top_txt').text() \vert{}\vert{}$('body').text();
+    const match = text.match(/\d{4,}/);
+    if (!match) throw new Error('Цена не найдена');
 
-    // Привязываем оба материала к одному макро-индексу
+    const newValue = parseFloat(match[0]);
+    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'isocyanate'`;
+    let trend = 0;
+    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+      const oldValue = parseFloat(lastRecord[0].value);
+      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+    }
+
+    results.push({
+      type: 'isocyanate',
+      value: Number(newValue),
+      trend: Number(trend),
+      description: `SunSirs (MDI Китай). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+    });
+  } catch (e) {
+    console.error('❌ Ошибка Изоцианат:', e.message);
+  }
+
+  // --- КАУЧУК И ЛАТЕКС (Двойной механизм: Business Insider -> IndexMundi) ---
+  try {
+    console.log('Запрашиваем Каучук/Латекс (Открытые источники)...');
+    let newValue = NaN;
+
+    // Попытка 1: Сбор с Business Insider
+    try {
+      const res = await fetch('https://markets.businessinsider.com/commodities/rubber-price', { headers: standardHeaders });
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      const priceText = $('.price-section__current-value').first().text();
+      newValue = parseFloat(priceText.replace(/[^\d.-]/g, ''));
+    } catch (err) {}
+
+    // Попытка 2: Если первый сайт не ответил, забираем с IndexMundi
+    if (isNaN(newValue)) {
+      console.log('Пробуем резервный источник (IndexMundi)...');
+      const res = await fetch('https://www.indexmundi.com/commodities/?commodity=rubber', { headers: standardHeaders });
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      const priceText = $('#tdPrice').text();
+      newValue = parseFloat(priceText.replace(/[^\d.-]/g, ''));
+    }
+
+    if (isNaN(newValue)) throw new Error('Не удалось получить цену ни с одного источника');
+
     const types = [
-      { id: 'rubber', name: 'Каучук (Сингапур TSR20)' },
-      { id: 'latex', name: 'Латекс (Биржевой тренд)' }
+      { id: 'rubber', name: 'Каучук (Мировой индекс)' },
+      { id: 'latex', name: 'Латекс (Мировой индекс)' }
     ];
 
     for (const item of types) {
@@ -79,43 +130,6 @@ async function fetchCommodities(sql) {
     }
   } catch (e) {
     console.error('❌ Ошибка Каучук/Латекс:', e.message);
-  }
-
-  // --- ИЗОЦИАНАТ (SunSirs Китай) ---
-  try {
-    console.log('Запрашиваем Изоцианат (SunSirs)...');
-    // Прямой запрос. Сайт работает на старом протоколе HTTP без Cloudflare.
-    const res = await fetch('http://www.sunsirs.com/uk/prodetail-447.html', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-    });
-
-    if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    let text = $('.detail_top_txt').text();
-    if (!text) text = $('body').text();
-
-    const match = text.match(/\d{4,}/); // MDI в Китае измеряется тысячами
-    if (!match) throw new Error('Цена не найдена на странице');
-
-    const newValue = parseFloat(match[0]);
-
-    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'isocyanate'`;
-    let trend = 0;
-    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
-      const oldValue = parseFloat(lastRecord[0].value);
-      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
-    }
-
-    results.push({
-      type: 'isocyanate',
-      value: Number(newValue),
-      trend: Number(trend),
-      description: `SunSirs (MDI Китай). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
-    });
-  } catch (e) {
-    console.error('❌ Ошибка Изоцианат:', e.message);
   }
 
   return results;
