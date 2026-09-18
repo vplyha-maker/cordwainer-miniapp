@@ -42,109 +42,100 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (ALIBABA) С АВТО-ПОВТОРАМИ
+// Помощник для обхода блокировок GitHub (Использует бесплатный публичный прокси AllOrigins)
+async function fetchViaProxy(targetUrl) {
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+  const res = await fetch(proxyUrl);
+  if (!res.ok) throw new Error(`Proxy статус: ${res.status}`);
+  const data = await res.json();
+  return cheerio.load(data.contents);
+}
+
+// 2. ПАРСИНГ СЫРЬЯ (100% БЕСПЛАТНЫЕ МАКРО-ИНДЕКСЫ)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью с Alibaba (premium API)...');
+  console.log('Сбор данных по сырью (Бесплатные открытые API и прокси)...');
   const results = [];
-  
-  const apiKey = process.env.SCRAPER_API_KEY;
-  if (!apiKey) {
-    console.error('❌ Ошибка: Не задана переменная SCRAPER_API_KEY');
-    return [];
-  }
 
-  const sources = [
-    { 
-      type: 'isocyanate', 
-      url: 'https://www.alibaba.com/trade/search?SearchText=mdi+isocyanate+polyurethane', 
-      selector: '.search-card-e-price-main, .elements-title-price, .moq-price, span[class*="price"], div[class*="price-main"]', 
-      name: 'Изоцианат MDI (Alibaba)' 
-    },
-    { 
-      type: 'rubber', 
-      url: 'https://www.alibaba.com/trade/search?SearchText=neoprene+chloroprene+rubber', 
-      selector: '.search-card-e-price-main, .elements-title-price, .moq-price, span[class*="price"], div[class*="price-main"]', 
-      name: 'Каучук Наирит (Alibaba)' 
-    },
-    { 
-      type: 'latex', 
-      url: 'https://www.alibaba.com/trade/search?SearchText=liquid+natural+latex', 
-      selector: '.search-card-e-price-main, .elements-title-price, .moq-price, span[class*="price"], div[class*="price-main"]', 
-      name: 'Латекс жидкий (Alibaba)' 
+  // --- КАУЧУК (Yahoo Finance API) ---
+  try {
+    console.log('Запрашиваем Каучук (Yahoo JSON API)...');
+    // Прямой запрос к API Yahoo. Возвращает JSON, работает без блокировок.
+    const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/RUBW.SI');
+    if (!res.ok) throw new Error(`Yahoo API статус: ${res.status}`);
+    const data = await res.json();
+    
+    const newValue = data.chart.result[0].meta.regularMarketPrice;
+
+    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'rubber'`;
+    let trend = 0;
+    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+      const oldValue = parseFloat(lastRecord[0].value);
+      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
     }
-  ];
 
-  for (const src of sources) {
-    try {
-      console.log(`Запрашиваем ${src.name}...`);
-      const targetUrl = encodeURIComponent(src.url);
-      
-      // Добавлен device_type=desktop для стабильной верстки
-      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true&premium=true&country_code=US&device_type=desktop`;
+    results.push({
+      type: 'rubber',
+      value: Number(newValue),
+      trend: Number(trend),
+      description: `Сингапур TSR20 ($/kg). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+    });
+  } catch (e) { console.error('❌ Ошибка Каучук:', e.message); }
 
-      let html = '';
-      let success = false;
-      const maxRetries = 3;
+  // --- ИЗОЦИАНАТ (SunSirs - Китай) ---
+  try {
+    console.log('Запрашиваем Изоцианат (SunSirs)...');
+    const $ = await fetchViaProxy('http://www.sunsirs.com/uk/prodetail-447.html');
+    
+    let text = $('.detail_top_txt').text();
+    if (!text) text = $('body').text();
+    
+    // Ищем цену MDI (обычно это число от 10000 до 25000 юаней за тонну)
+    const match = text.match(/\d{4,}/);
+    if (!match) throw new Error(`Не найдено число на странице. Текст: ${text.substring(0, 30)}`);
+    
+    const newValue = parseFloat(match[0]);
 
-      // Блок авто-повтора (3 попытки, если ScraperAPI падает с 500 ошибкой)
-      for (let i = 0; i < maxRetries; i++) {
-        const res = await fetch(scraperUrl);
-        if (res.ok) {
-          html = await res.text();
-          success = true;
-          break; // Успешно - выходим из цикла попыток
-        }
-        console.log(`⚠️ ScraperAPI статус ${res.status}. Попытка ${i + 1} из ${maxRetries}. Ждем 5 сек...`);
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Пауза 5 секунд
-      }
-
-      if (!success) {
-        throw new Error(`ScraperAPI не смог загрузить страницу после ${maxRetries} попыток.`);
-      }
-
-      const $ = cheerio.load(html);
-      const rawText = $(src.selector).first().text().trim();
-      
-      // Ищем цены, игнорируя мелкие цифры вроде "1" (часто это минимальный заказ)
-      // Ищем числа с плавающей точкой (например, 1.50 или 200)
-      const matches = rawText.match(/\d+[.,]\d+/g);
-      let newValue = NaN;
-
-      if (matches && matches.length > 0) {
-        newValue = parseFloat(matches[0].replace(',', '.'));
-      } else {
-        // Если дробного нет, берем первое целое число больше 1
-        const allNumbers = rawText.match(/\d+/g);
-        if (allNumbers) {
-          const validNumbers = allNumbers.map(Number).filter(n => n > 1);
-          if (validNumbers.length > 0) newValue = validNumbers[0];
-        }
-      }
-      
-      if (isNaN(newValue)) {
-        const pageTitle = $('title').text();
-        throw new Error(`Цена не найдена. Title: "${pageTitle}". Текст: "${rawText.substring(0, 30)}"`);
-      }
-
-      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
-      let trend = 0;
-
-      if (lastRecord.length > 0 && lastRecord[0].value > 0) {
-        const oldValue = parseFloat(lastRecord[0].value);
-        trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
-      }
-
-      results.push({
-        type: src.type,
-        value: Number(newValue),
-        trend: Number(trend),
-        description: `Опт: ${src.name}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
-      });
-
-    } catch (e) {
-      console.error(`❌ Ошибка сбора сырья (${src.type}):`, e.message);
+    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'isocyanate'`;
+    let trend = 0;
+    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+      const oldValue = parseFloat(lastRecord[0].value);
+      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
     }
-  }
+
+    results.push({
+      type: 'isocyanate',
+      value: Number(newValue),
+      trend: Number(trend),
+      description: `SunSirs (RMB/ton). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+    });
+  } catch (e) { console.error('❌ Ошибка Изоцианат:', e.message); }
+
+  // --- ЛАТЕКС (IndexMundi) ---
+  try {
+    console.log('Запрашиваем Латекс (IndexMundi)...');
+    const $ = await fetchViaProxy('https://www.indexmundi.com/commodities/?commodity=rubber');
+    
+    const priceText = $('#tdPrice').text();
+    const match = priceText.match(/[\d.]+/);
+    if (!match) throw new Error('Элемент #tdPrice не найден или пуст.');
+    
+    const newValue = parseFloat(match[0]);
+
+    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'latex'`;
+    let trend = 0;
+    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+      const oldValue = parseFloat(lastRecord[0].value);
+      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+    }
+
+    results.push({
+      type: 'latex',
+      value: Number(newValue),
+      trend: Number(trend),
+      description: `IndexMundi ($/kg). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+    });
+  } catch (e) { console.error('❌ Ошибка Латекс:', e.message); }
+
   return results;
 }
 
