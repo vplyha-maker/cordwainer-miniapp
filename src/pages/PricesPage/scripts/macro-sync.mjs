@@ -110,24 +110,65 @@ async function fetchCommodities(sql) {
   return results;
 }
 
-// 3. ПАРСИНГ ФРАХТА
-async function fetchFreightRates() {
-  console.log('Сбор данных по фрахту...');
+// 3. ПАРСИНГ ФРАХТА (Реальный индекс FBX11)
+async function fetchFreightRates(sql) {
+  console.log('Сбор данных по фрахту (TradingView FBX11)...');
+  
+  const standardHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.5'
+  };
+
+  let newValue = NaN;
+  let sourceName = 'FBX11 (Китай -> Сев. Европа)';
+
   try {
-    const value = 4200 + Math.floor(Math.random() * 800); 
-    const trend = (Math.random() * 10 - 3).toFixed(1);
+    // Парсим официальные фьючерсы индекса FBX11 на TradingView
+    const res = await fetch('https://www.tradingview.com/symbols/NYMEX-CS41!/', { headers: standardHeaders });
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    
+    // TradingView выводит актуальную цену прямо в meta-описании страницы
+    const desc = $('meta[name="description"]').attr('content') || '';
+    
+    // Ищем фразу вроде "is 4,248 USD"
+    const match = desc.match(/(?:is|price is)\s*([\d,.]+)\s*USD/);
+    if (match) {
+      // Убираем запятые из тысяч (4,248 -> 4248)
+      newValue = parseFloat(match[1].replace(/,/g, ''));
+    }
+  } catch (err) {
+    console.error('❌ Ошибка сети при парсинге фрахта:', err.message);
+  }
+
+  // Если спарсить не удалось, прерываем функцию
+  if (isNaN(newValue)) {
+    console.error('❌ Не удалось найти цену фрахта на странице.');
+    return null;
+  }
+
+  try {
+    // Считаем тренд по отношению к прошлой записи
+    const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'freight_cn_eu'`;
+    let trend = 0;
+    
+    if (lastRecord.length > 0 && lastRecord[0].value > 0) {
+      const oldValue = parseFloat(lastRecord[0].value);
+      trend = (((newValue - oldValue) / oldValue) * 100).toFixed(1);
+    }
 
     return {
       type: 'freight_cn_eu',
-      value: Number(value),
+      value: Number(newValue),
       trend: Number(trend),
-      description: `Ставка фрахта (CN->EU): $${value}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+      description: `${sourceName}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
     };
   } catch (e) {
-    console.error('Ошибка сбора фрахта:', e.message);
+    console.error('❌ Ошибка работы с БД при сохранении фрахта:', e.message);
     return null;
   }
 }
+
 
 // ОСНОВНАЯ ФУНКЦИЯ
 async function run() {
