@@ -45,16 +45,15 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (ТОЛЬКО SUNSIRS - НЕ БЛОКИРУЕТ GITHUB)
+// 2. ПАРСИНГ СЫРЬЯ (ЖЕСТКИЙ ФИЛЬТР ЦЕН SUNSIRS)
 async function fetchCommodities(sql) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
   const results = [];
 
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   };
 
-  // Переводим все материалы на китайский B2B портал, который разрешает парсинг
   const sources = [
     { type: 'isocyanate', url: 'http://www.sunsirs.com/uk/prodetail-447.html', name: 'Изоцианат (MDI)' },
     { type: 'rubber', url: 'http://www.sunsirs.com/uk/prodetail-180.html', name: 'Каучук натуральный' },
@@ -70,23 +69,24 @@ async function fetchCommodities(sql) {
       const $ = cheerio.load(html);
 
       let newValue = NaN;
-      const bodyText = $('body').text();
+      
+      // Сужаем зону поиска: берем только блоки с данными и таблицы
+      const targetText = $('.detail_top_txt').text() + ' ' + $('.prodetail_font').text() + ' ' +$('table').text();
 
-      // Жесткий фильтр: ищем только биржевой формат (например: 14500.00)
-      const exactMatch = bodyText.match(/(\d{4,}\.\d{2})/);
-      if (exactMatch) {
-        newValue = parseFloat(exactMatch[1]);
-      } else {
-        // Фолбэк на случай, если цена без копеек
-        const fallbackMatch = bodyText.match(/\d{4,}/);
-        if (fallbackMatch) {
-            newValue = parseFloat(fallbackMatch[0]);
+      // Ищем все возможные числа
+      const allNumbers = targetText.match(/\d{4,}(\.\d+)?/g);
+      
+      if (allNumbers) {
+        // Фильтруем: оставляем только адекватные рыночные цены (от 3,000 до 60,000 юаней за тонну)
+        const realisticPrices = allNumbers.map(Number).filter(n => n > 3000 && n < 60000);
+        
+        if (realisticPrices.length > 0) {
+          newValue = realisticPrices[0];
         }
       }
 
-      // Защита от парсинга мусора (цена сырья в юанях не может быть меньше 1000)
-      if (isNaN(newValue) || newValue < 1000) {
-          throw new Error(`Адекватная цена не найдена.`);
+      if (isNaN(newValue)) {
+          throw new Error(`Адекватная цена не найдена в тексте.`);
       }
 
       const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
@@ -110,45 +110,35 @@ async function fetchCommodities(sql) {
   return results;
 }
 
-// 3. ПАРСИНГ ФРАХТА (Реальный индекс FBX11)
+// 3. ПАРСИНГ ФРАХТА (Реальный мировой индекс Drewry WCI)
 async function fetchFreightRates(sql) {
-  console.log('Сбор данных по фрахту (TradingView FBX11)...');
+  console.log('Сбор данных по фрахту (Drewry World Container Index)...');
   
-  const standardHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept-Language': 'en-US,en;q=0.5'
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
   };
 
-  let newValue = NaN;
-  let sourceName = 'FBX11 (Китай -> Сев. Европа)';
-
   try {
-    // Парсим официальные фьючерсы индекса FBX11 на TradingView
-    const res = await fetch('https://www.tradingview.com/symbols/NYMEX-CS41!/', { headers: standardHeaders });
+    // Парсим официальный открытый еженедельный отчет Drewry
+    const res = await fetch('https://www.drewry.co.uk/trackers-and-indices/latest-trackers-and-indices/world-container-index-assessed-by-drewry', { headers });
+    if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
     const html = await res.text();
     const $ = cheerio.load(html);
     
-    // TradingView выводит актуальную цену прямо в meta-описании страницы
-    const desc = $('meta[name="description"]').attr('content') || '';
+    // Ищем в тексте официальную сводку, например: "$4,476 per 40ft container"
+    const text = $('body').text();
+    const match = text.match(/\$(\d{1,3}(?:,\d{3})*)\s*per\s*40ft/i);
     
-    // Ищем фразу вроде "is 4,248 USD"
-    const match = desc.match(/(?:is|price is)\s*([\d,.]+)\s*USD/);
+    let newValue = NaN;
     if (match) {
-      // Убираем запятые из тысяч (4,248 -> 4248)
+      // Убираем запятую из тысяч, если она есть (4,476 -> 4476)
       newValue = parseFloat(match[1].replace(/,/g, ''));
     }
-  } catch (err) {
-    console.error('❌ Ошибка сети при парсинге фрахта:', err.message);
-  }
 
-  // Если спарсить не удалось, прерываем функцию
-  if (isNaN(newValue)) {
-    console.error('❌ Не удалось найти цену фрахта на странице.');
-    return null;
-  }
+    if (isNaN(newValue)) {
+      throw new Error('Не удалось найти актуальную цену фрахта на странице Drewry.');
+    }
 
-  try {
-    // Считаем тренд по отношению к прошлой записи
     const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = 'freight_cn_eu'`;
     let trend = 0;
     
@@ -161,10 +151,10 @@ async function fetchFreightRates(sql) {
       type: 'freight_cn_eu',
       value: Number(newValue),
       trend: Number(trend),
-      description: `${sourceName}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+      description: `Drewry WCI (Китай -> Европа). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
     };
   } catch (e) {
-    console.error('❌ Ошибка работы с БД при сохранении фрахта:', e.message);
+    console.error('❌ Ошибка сбора фрахта:', e.message);
     return null;
   }
 }
@@ -181,7 +171,6 @@ async function run() {
     indicators.push(await fetchNewsAlerts());
     indicators.push(...await fetchCommodities(sql));
     
-    // Исправлено: добавлена передача sql
     const freight = await fetchFreightRates(sql);
     if (freight) indicators.push(freight);
 
