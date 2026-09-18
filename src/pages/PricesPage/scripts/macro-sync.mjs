@@ -22,7 +22,11 @@ async function fetchNewsAlerts() {
       for (const item of feed.items) {
         const pubDate = new Date(item.pubDate).getTime();
         if (pubDate > oneWeekAgo) {
-          const text = (item.title + ' ' + (item.contentSnippet || '')).toLowerCase();
+          // Исключаем баги копирования
+          let snippet = item.contentSnippet;
+          if (!snippet) snippet = '';
+          const text = (item.title + ' ' + snippet).toLowerCase();
+          
           if (keywords.some(kw => text.includes(kw))) {
             alertCount++;
             if (!latestAlertTitle) latestAlertTitle = item.title;
@@ -42,26 +46,30 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (Прямые HTTP-запросы с имитацией браузера)
+// 2. ПАРСИНГ СЫРЬЯ
 async function fetchCommodities(sql) {
   console.log('Сбор данных по сырью (Прямые запросы)...');
   const results = [];
 
-  // Заголовки, чтобы сайты думали, что заходит обычный человек с Windows
   const standardHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.5'
   };
 
-  // --- ИЗОЦИАНАТ (SunSirs - успешно протестирован) ---
+  // --- ИЗОЦИАНАТ ---
   try {
     console.log('Запрашиваем Изоцианат (SunSirs)...');
     const res = await fetch('http://www.sunsirs.com/uk/prodetail-447.html', { headers: standardHeaders });
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    let text = $('.detail_top_txt').text() \vert{}\vert{}$('body').text();
+    // Заменено на железобетонный if вместо ||
+    let text = $('.detail_top_txt').text();
+    if (!text) {
+      text = $('body').text();
+    }
+
     const match = text.match(/\d{4,}/);
     if (!match) throw new Error('Цена не найдена');
 
@@ -83,12 +91,11 @@ async function fetchCommodities(sql) {
     console.error('❌ Ошибка Изоцианат:', e.message);
   }
 
-  // --- КАУЧУК И ЛАТЕКС (Двойной механизм: Business Insider -> IndexMundi) ---
+  // --- КАУЧУК И ЛАТЕКС ---
   try {
     console.log('Запрашиваем Каучук/Латекс (Открытые источники)...');
     let newValue = NaN;
 
-    // Попытка 1: Сбор с Business Insider
     try {
       const res = await fetch('https://markets.businessinsider.com/commodities/rubber-price', { headers: standardHeaders });
       const html = await res.text();
@@ -97,7 +104,6 @@ async function fetchCommodities(sql) {
       newValue = parseFloat(priceText.replace(/[^\d.-]/g, ''));
     } catch (err) {}
 
-    // Попытка 2: Если первый сайт не ответил, забираем с IndexMundi
     if (isNaN(newValue)) {
       console.log('Пробуем резервный источник (IndexMundi)...');
       const res = await fetch('https://www.indexmundi.com/commodities/?commodity=rubber', { headers: standardHeaders });
