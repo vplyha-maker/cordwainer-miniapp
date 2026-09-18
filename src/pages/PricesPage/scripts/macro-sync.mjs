@@ -46,57 +46,66 @@ async function fetchNewsAlerts() {
   return { type: 'news_alert', value: alertCount, trend, description };
 }
 
-// 2. ПАРСИНГ СЫРЬЯ (Глобальные макро-индексы)
-// Передаем sql внутрь, чтобы брать предыдущую цену для расчета тренда
+// 2. ПАРСИНГ СЫРЬЯ (ALIBABA через ScraperAPI)
 async function fetchCommodities(sql) {
-  console.log('Сбор данных по сырью (биржи и агрегаторы)...');
+  console.log('Сбор данных по сырью с Alibaba (через API-обходчик)...');
   const results = [];
   
+  const apiKey = process.env.SCRAPER_API_KEY;
+  if (!apiKey) {
+    console.error('❌ Ошибка: Не задана переменная SCRAPER_API_KEY');
+    return [];
+  }
+
+  // Ссылки ведут на страницы поиска Alibaba. 
+  // Селекторы нужно будет подогнать под актуальную верстку карточек товаров.
   const sources = [
     { 
-      type: 'rubber', 
-      url: 'https://finance.yahoo.com/quote/RUBW.SI/', 
-      selector: 'fin-streamer[data-symbol="RUBW.SI"][data-field="regularMarketPrice"]', 
-      name: 'Каучук (Сингапур TSR20)' 
+      type: 'isocyanate', 
+      url: 'https://www.alibaba.com/trade/search?SearchText=mdi+isocyanate+polyurethane', 
+      selector: '.elements-title-price, .search-card-e-price-main', 
+      name: 'Изоцианат MDI (Alibaba)' 
     },
     { 
-      type: 'isocyanate', 
-      url: 'http://www.sunsirs.com/uk/prodetail-447.html', 
-      selector: 'div.detail_top_txt span:nth-child(1)', 
-      name: 'Изоцианат (MDI Китай)' 
+      type: 'rubber', 
+      url: 'https://www.alibaba.com/trade/search?SearchText=neoprene+chloroprene+rubber', 
+      selector: '.elements-title-price, .search-card-e-price-main', 
+      name: 'Каучук Наирит (Alibaba)' 
     },
     { 
       type: 'latex', 
-      url: 'https://www.indexmundi.com/commodities/?commodity=rubber', 
-      selector: '#tdPrice', 
-      name: 'Латекс (Глобальный индекс)' 
+      url: 'https://www.alibaba.com/trade/search?SearchText=liquid+natural+latex', 
+      selector: '.elements-title-price, .search-card-e-price-main', 
+      name: 'Латекс жидкий (Alibaba)' 
     }
   ];
 
   for (const src of sources) {
     try {
-      // Имитируем реальный браузер для обхода базовой защиты от ботов
-      const res = await fetch(src.url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9'
-        }
-      });
+      console.log(`Запрашиваем ${src.name}...`);
       
-      if (!res.ok) throw new Error(`HTTP статус: ${res.status}`);
+      // Формируем URL для API. render=true загружает динамический контент.
+      const targetUrl = encodeURIComponent(src.url);
+      const scraperUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${targetUrl}&render=true`;
+
+      const res = await fetch(scraperUrl);
+      if (!res.ok) throw new Error(`ScraperAPI вернул статус: ${res.status}`);
 
       const html = await res.text();
       const $ = cheerio.load(html);
       
-      // Находим элемент и очищаем его от лишних символов (оставляем цифры и точку)
+      // Ищем первую попавшуюся цену в поисковой выдаче
       const rawText = $(src.selector).first().text();
-      const newValue = parseFloat(rawText.replace(/[^\d.-]/g, ''));
+      
+      // Очищаем: берем только первую группу цифр (например, из "$1.50 - $2.00" возьмет "1.50")
+      const match = rawText.match(/[\d.]+/);
+      const newValue = match ? parseFloat(match[0]) : NaN;
       
       if (isNaN(newValue)) {
-        throw new Error(`Не удалось извлечь число. Полученный текст: "${rawText}"`);
+        throw new Error(`Не удалось найти цену по селектору. Текст: "${rawText.substring(0, 50)}"`);
       }
 
-      // Расчет тренда по отношению к предыдущему значению из БД
+      // Запрашиваем предыдущую цену из БД для расчета тренда
       const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
       let trend = 0;
 
@@ -109,7 +118,7 @@ async function fetchCommodities(sql) {
         type: src.type,
         value: Number(newValue),
         trend: Number(trend),
-        description: `Индекс: ${src.name}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+        description: `Опт: ${src.name}. Изменение: ${trend > 0 ? '+' : ''}${trend}%`
       });
 
     } catch (e) {
@@ -118,6 +127,7 @@ async function fetchCommodities(sql) {
   }
   return results;
 }
+
 
 // 3. ПАРСИНГ ФРАХТА (Логистика Китай -> Европа)
 async function fetchFreightRates() {
