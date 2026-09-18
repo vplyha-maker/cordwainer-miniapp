@@ -191,9 +191,14 @@ async function run() {
 
   try {
     const indicators = [];
+
+    // 1. Новости
     indicators.push(await fetchNewsAlerts());
-    indicators.push(...await fetchCommodities(sql));
-    
+
+    // 2. Сырьё (MDI / каучук / латекс) — ОТКЛЮЧЕНО
+    // indicators.push(...await fetchCommodities(sql));
+
+    // 3. Фрахт через API
     const freight = await fetchFreightRates(sql);
     if (freight) indicators.push(freight);
 
