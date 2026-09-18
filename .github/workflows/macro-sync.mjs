@@ -24,4 +24,3 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node src/pages/PricesPage/scripts/macro-sync.mjs
-
