@@ -204,32 +204,6 @@ function Sparkline({
   )
 }
 
-type DealTone = 'good' | 'bad' | 'neutral' | 'best' | 'worst'
-
-function buildDealLabel(
-  displayPrice: number,
-  minH: number,
-  maxH: number,
-  changePct: number | null,
-  rank: 'best' | 'worst' | 'mid' | 'single'
-): { text: string; tone: DealTone } {
-  if (rank === 'best') return { text: 'Лучшая цена', tone: 'best' }
-  if (rank === 'worst') return { text: 'Самая высокая', tone: 'worst' }
-
-  const spreadPct = minH > 0 ? ((maxH - minH) / minH) * 100 : 0
-
-  if (spreadPct < 4) {
-    if (changePct !== null && changePct <= -1.5) return { text: 'Упала', tone: 'good' }
-    if (changePct !== null && changePct >= 1.5) return { text: 'Выросла', tone: 'bad' }
-    return { text: 'Стабильно', tone: 'neutral' }
-  }
-
-  const pos = (displayPrice - minH) / (maxH - minH || 1)
-  if (pos <= 0.2) return { text: 'У минимума', tone: 'good' }
-  if (pos >= 0.8) return { text: 'У максимума', tone: 'bad' }
-  return { text: 'В диапазоне', tone: 'neutral' }
-}
-
 export function PriceHistoryModal({
   group,
   onClose,
@@ -248,7 +222,7 @@ export function PriceHistoryModal({
   const currencySymbol = currency === 'UAH' ? '₴' : currency === 'USD' ? '$' : '€'
 
   const rows = useMemo(() => {
-    const prepared = group.offers
+    return group.offers
       .filter((o) => o.price > 0)
       .map((offer, index) => {
         const historyRaw = extractHistory(offer.history, offer.price)
@@ -299,23 +273,6 @@ export function PriceHistoryModal({
         }
       })
       .sort((a, b) => a.displayPrice - b.displayPrice)
-
-    const multi = prepared.length >= 2
-    const bestPrice = multi ? prepared[0].displayPrice : null
-    const worstPrice = multi ? prepared[prepared.length - 1].displayPrice : null
-
-    return prepared.map((row) => {
-      let rank: 'best' | 'worst' | 'mid' | 'single' = 'single'
-      if (multi && bestPrice !== null && worstPrice !== null) {
-        if (row.displayPrice === bestPrice) rank = 'best'
-        else if (row.displayPrice === worstPrice) rank = 'worst'
-        else rank = 'mid'
-      }
-
-      const deal = buildDealLabel(row.displayPrice, row.minH, row.maxH, row.changePct, rank)
-
-      return { ...row, deal }
-    })
   }, [group, currentRate])
 
   const hasAnyHistory = rows.some((r) => r.pointsCount >= 2)
@@ -420,13 +377,6 @@ export function PriceHistoryModal({
                     ? 'text-red-500'
                     : 'text-[var(--color-muted)]'
 
-                const dealColor =
-                  row.deal.tone === 'best' || row.deal.tone === 'good'
-                    ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
-                    : row.deal.tone === 'worst' || row.deal.tone === 'bad'
-                      ? 'bg-red-500/10 text-red-600 border-red-500/25'
-                      : 'bg-[var(--color-surface-2)] text-[var(--color-muted)] border-[var(--color-border)]'
-
                 return (
                   <motion.div
                     key={row.source + '_' + row.id}
@@ -435,30 +385,19 @@ export function PriceHistoryModal({
                     transition={{ delay: idx * 0.03 }}
                     className="px-5 py-4"
                   >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: row.color }}
-                        />
-                        <span className="text-[13px] font-medium text-[var(--color-ink)] truncate">
-                          {formatSourceName(row.source)}
-                        </span>
-                        {row.volumeLabel && (
-                          <span className="text-[11px] text-[var(--color-muted)] font-mono">
-                            {row.volumeLabel}
-                          </span>
-                        )}
-                      </div>
-
-                      <span
-                        className={
-                          'text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ' +
-                          dealColor
-                        }
-                      >
-                        {row.deal.text}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: row.color }}
+                      />
+                      <span className="text-[13px] font-medium text-[var(--color-ink)] truncate">
+                        {formatSourceName(row.source)}
                       </span>
+                      {row.volumeLabel && (
+                        <span className="text-[11px] text-[var(--color-muted)] font-mono ml-auto">
+                          {row.volumeLabel}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -509,7 +448,7 @@ export function PriceHistoryModal({
         {hasAnyHistory && (
           <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-surface-2)]/50 shrink-0">
             <p className="text-[10px] text-[var(--color-muted)] text-center leading-relaxed">
-              Лучшая / Самая высокая — сравнение поставщиков · % — изменение за период
+              min / max — за весь период · % — изменение цены
             </p>
           </div>
         )}
