@@ -10,7 +10,6 @@ import {
   computeGroupSignals,
   extractHistory,
   convertUah,
-  computeOfferSignals,
   formatSourceName,
   signalClass,
   formatPrice,
@@ -49,9 +48,6 @@ export const ProductCard = memo(
     })
 
     const validPrices = sortedOffers.filter((o) => o.unitPrice > 0).map((o) => o.unitPrice)
-    const avgUnitPrice = validPrices.length
-      ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length
-      : 0
     const validOffersCount = validPrices.length
     const showSpread = validOffersCount > 1
     const formattedDate = formatDate(group.latestUpdatedAt, lang)
@@ -87,12 +83,14 @@ export const ProductCard = memo(
                 </span>
               )}
 
+              {/* ПУНКТ 4: ИСТОРИЯ ЦЕН В БЛАГОРОДНОМ ЗЕЛЕНОМ ЦВЕТЕ С ИКОНКОЙ INFO */}
               <button
                 onClick={() => onOpenHistory(group)}
-                className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-[var(--color-ink)] opacity-70 hover:opacity-100 transition-opacity focus:outline-none rounded-md"
+                className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-[#15803d] hover:text-[#166534] transition-colors focus:outline-none rounded-md"
               >
                 <LineChart size={14} strokeWidth={2.5} />
                 <span>{t.priceHistory}</span>
+                <Info size={12} strokeWidth={2.5} className="opacity-70 ml-0.5" />
               </button>
 
               {showSpread && group.unitSpread > 0 && (
@@ -155,13 +153,6 @@ export const ProductCard = memo(
             const displayPrice = convertUah(offer.price, currency, usdRate, eurRate)
             const displayUnit = convertUah(offer.unitPrice, currency, usdRate, eurRate)
 
-            const offerSignals = computeOfferSignals(
-              offer,
-              group,
-              avgUnitPrice,
-              validOffersCount,
-            )
-
             return (
               <Comp
                 key={offer.source + '_' + offer.id}
@@ -194,17 +185,7 @@ export const ProductCard = memo(
                     </span>
                   )}
 
-                  {offerSignals.slice(0, 2).map((s) => (
-                    <span
-                      key={s.kind}
-                      className={
-                        'text-[10px] uppercase tracking-wider font-semibold border px-1.5 py-0.5 shrink-0 ' +
-                        signalClass(s.tone)
-                      }
-                    >
-                      {s.label}
-                    </span>
-                  ))}
+                  {/* ПУНКТ 3 ВЫПОЛНЕН ЗДЕСЬ: УДАЛЕН КОД С offerSignals (БЕЙДЖИ "ЛУЧШАЯ ЦЕНА", "НИЖЕ РЫНКА") */}
                 </div>
 
                 <div className="flex items-center gap-4 shrink-0">
@@ -281,5 +262,5 @@ export const ProductCard = memo(
     prev.currency === next.currency &&
     prev.usdRate === next.usdRate &&
     prev.eurRate === next.eurRate &&
-    prev.macroIndicators === next.macroIndicators // Добавили проверку
+    prev.macroIndicators === next.macroIndicators
 )
