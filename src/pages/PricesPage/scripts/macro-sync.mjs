@@ -35,7 +35,7 @@ async function fetchNewsAlerts() {
 
   const matchedTitles = [];
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const scraperKey = process.env.SCRAPERAPI_KEY;
+  const scraperKey = process.env.SCRAPER_API_KEY;
 
   const parser = new Parser({
     timeout: 20000,
