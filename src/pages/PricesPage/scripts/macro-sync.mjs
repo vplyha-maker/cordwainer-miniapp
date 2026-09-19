@@ -11,12 +11,10 @@ async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
 
   const feeds = [
-    // Українські (більш стабільні)
-    'https://www.pravda.com.ua/rss/',                    // Українська правда
-    'https://nv.ua/rss/all.xml',                         // NV
-    'https://rss.unian.net/site/news_ukr.rss',           // УНІАН UA
-    'https://www.ukrinform.ua/rss/block-lastnews',       // Укрінформ
-    // Англійський запасний
+    'https://www.pravda.com.ua/rss/',
+    'https://nv.ua/rss/all.xml',
+    'https://rss.unian.net/site/news_ukr.rss',
+    'https://www.ukrinform.ua/rss/block-lastnews',
     'https://www.supplychaindive.com/feeds/news/',
   ];
 
@@ -25,17 +23,15 @@ async function fetchNewsAlerts() {
     'страйк', 'забастовка', 'дефіцит', 'затримка', 'зрив', 'тариф',
     'логістика', 'контейнер', 'фрахт', 'порт', 'експорт', 'імпорт',
     'постачання', 'блокада', 'митниця', 'перевізник', 'склад',
-    'удар', 'атака', 'пошкоджен', 'залізниц', 'укрзаліз', 'порт',
+    'удар', 'атака', 'пошкоджен', 'залізниц', 'укрзаліз',
     // EN
     'strike', 'shortage', 'delay', 'disruption', 'tariff',
     'logistics', 'container', 'freight', 'port', 'export',
   ];
 
-  let alertCount = 0;
-  let latestAlertTitle = '';
+  const matchedTitles = [];
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-  // Важливо: User-Agent, інакше багато сайтів віддають 403
   const parser = new Parser({
     headers: {
       'User-Agent':
@@ -53,14 +49,16 @@ async function fetchNewsAlerts() {
         const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
         if (pubDate && pubDate < oneWeekAgo) continue;
 
-        const title = item.title || '';
+        const title = (item.title || '').trim();
+        if (!title) continue;
+
         const snippet = item.contentSnippet || item.content || '';
         const text = (title + ' ' + snippet).toLowerCase();
 
         if (keywords.some((kw) => text.includes(kw.toLowerCase()))) {
-          alertCount++;
-          if (!latestAlertTitle) {
-            latestAlertTitle = title;
+          // уникаємо дублікатів
+          if (!matchedTitles.includes(title)) {
+            matchedTitles.push(title);
           }
         }
       }
@@ -69,10 +67,19 @@ async function fetchNewsAlerts() {
     }
   }
 
+  const alertCount = matchedTitles.length;
   const trend = Math.min(alertCount * 10, 100);
-  const description = alertCount > 0
-    ? `Тривожних новин: ${alertCount}. Остання: «${latestAlertTitle}»`
-    : 'Новинний фон спокійний.';
+
+  // Беремо перші 10 новин для стрічки (можна змінити на matchedTitles без slice, якщо хочеш усі)
+  const topTitles = matchedTitles.slice(0, 10);
+  const titlesText = topTitles.length
+    ? topTitles.join('  ·  ')
+    : 'Новинний фон спокійний';
+
+  const description =
+    alertCount > 0
+      ? `Тривожних новин: ${alertCount}  ·  ${titlesText}`
+      : 'Новинний фон спокійний.';
 
   return {
     type: 'news_alert',
@@ -81,8 +88,8 @@ async function fetchNewsAlerts() {
     description,
   };
 }
-        
-// 2. ПАРСИНГ СЫРЬЯ (SunSirs)
+
+// 2. ПАРСИНГ СЫРЬЯ (SunSirs) — ОТКЛЮЧЕНО, але функція залишається
 async function fetchCommodities(db) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
   const results = [];
@@ -95,7 +102,6 @@ async function fetchCommodities(db) {
   const sources = [
     { type: 'isocyanate', url: 'https://www.sunsirs.com/uk/prodetail-975.html', name: 'Изоцианат (MDI)' },
     { type: 'rubber',     url: 'https://www.sunsirs.com/uk/prodetail-586.html', name: 'Каучук натуральный' },
-    // latex — дублируем каучук (отдельной страницы нет)
     { type: 'latex',      url: 'https://www.sunsirs.com/uk/prodetail-586.html', name: 'Латекс (по индексу каучука)' },
   ];
 
@@ -109,7 +115,6 @@ async function fetchCommodities(db) {
 
       let newValue = NaN;
 
-      // 1. Ищем в таблице цен (самый надёжный способ)
       const priceCell = $('table td').filter((_, el) => {
         const t = $(el).text().trim();
         return /^\d{4,5}(?:\.\d{1,2})?$/.test(t);
@@ -119,7 +124,6 @@ async function fetchCommodities(db) {
         newValue = parseFloat(priceCell.text().trim());
       }
 
-      // 2. Fallback — ищем по всему тексту
       if (isNaN(newValue)) {
         const bodyText = $('body').text();
         const match = bodyText.match(/(?:\D|^)(\d{4,5}\.\d{1,2})(?:\D|$)/);
@@ -129,7 +133,7 @@ async function fetchCommodities(db) {
           const allNumbers = bodyText.match(/(?:\D|^)(\d{4,5})(?:\D|$)/g) || [];
           const realistic = allNumbers
             .map(n => Number(n.replace(/\D/g, '')))
-            .filter(n => n >= 8000 && n <= 30000); // актуальный коридор цен
+            .filter(n => n >= 8000 && n <= 30000);
           if (realistic.length > 0) newValue = realistic[0];
         }
       }
@@ -149,7 +153,7 @@ async function fetchCommodities(db) {
         type: src.type,
         value: Number(newValue),
         trend: Number(trend),
-        description: `SunSirs Китай (RMB/ton). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+        description: `SunSirs Китай (RMB/ton). Изменение: \( {trend > 0 ? '+' : ''} \){trend}%`
       });
     } catch (e) {
       console.error(`❌ Ошибка ${src.name}:`, e.message);
@@ -186,10 +190,8 @@ async function fetchFreightRates(db) {
     }
 
     const json = await res.json();
-    
-    // Структура ответа: { status: "success", data: { price: 4500, ... } }
     const newValue = Number(json?.data?.price ?? json?.price);
-    
+
     if (isNaN(newValue) || newValue <= 0) {
       throw new Error(`Некорректная цена из API: ${JSON.stringify(json)}`);
     }
@@ -197,7 +199,7 @@ async function fetchFreightRates(db) {
     const lastRecord = await db`
       SELECT value FROM macro_indicators WHERE type = 'freight_cn_eu'
     `;
-    
+
     let trend = 0;
     if (lastRecord.length > 0 && lastRecord[0].value > 0) {
       const oldValue = parseFloat(lastRecord[0].value);
@@ -208,7 +210,7 @@ async function fetchFreightRates(db) {
       type: 'freight_cn_eu',
       value: newValue,
       trend,
-      description: `Drewry WCI (OilPriceAPI). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
+      description: `Drewry WCI (OilPriceAPI). Изменение: \( {trend > 0 ? '+' : ''} \){trend}%`
     };
   } catch (e) {
     console.error('❌ Ошибка сбора фрахта (API):', e.message);
@@ -229,10 +231,10 @@ async function run() {
     // 1. Новости
     indicators.push(await fetchNewsAlerts());
 
-    // 2. Сырьё (MDI / каучук / латекс) — ОТКЛЮЧЕНО
+    // 2. Сырьё — ОТКЛЮЧЕНО
     // indicators.push(...await fetchCommodities(sql));
 
-    // 3. Фрахт через API
+    // 3. Фрахт
     const freight = await fetchFreightRates(sql);
     if (freight) indicators.push(freight);
 
