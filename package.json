@@ -47,5 +47,10 @@
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "overrides": {
+    "vite-plugin-pwa": {
+      "vite": "^6.0.0"
+    }
   }
 }
