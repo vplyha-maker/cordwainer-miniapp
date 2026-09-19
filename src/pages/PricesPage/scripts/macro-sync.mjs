@@ -7,11 +7,34 @@ import 'dotenv/config';
 const sql = neon(process.env.DATABASE_URL);
 const rssParser = new Parser();
 
-// 1. ПАРСИНГ НОВОСТЕЙ
+// 1. ПАРСИНГ НОВОСТЕЙ (UA + EN)
 async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
-  const feeds = ['https://www.supplychaindive.com/feeds/news/'];
-  const keywords = ['strike', 'shortage', 'delay', 'disruption', 'tariff', 'забастовка', 'дефицит'];
+
+  const feeds = [
+    // Українські
+    'https://www.epravda.com.ua/rss/',
+    'https://interfax.com.ua/news/rss.xml',
+    'https://www.liga.net/news/rss.xml',
+    'https://rss.unian.net/site/news_ukr.rss',
+
+    // Англійський (залишаємо як запасний)
+    'https://www.supplychaindive.com/feeds/news/',
+  ];
+
+  // Ключові слова українською + англійською
+  const keywords = [
+    // UA
+    'страйк', 'забастовка', 'дефіцит', 'затримка', 'зрив', 'тариф',
+    'логістика', 'контейнер', 'фрахт', 'порт', 'експорт', 'імпорт',
+    'постачання', 'блокада', 'митниця', 'перевізник', 'склад',
+    'удар', 'атака', 'пошкоджен', 'залізниц', 'укрзаліз',
+
+    // EN
+    'strike', 'shortage', 'delay', 'disruption', 'tariff',
+    'logistics', 'container', 'freight', 'port', 'export',
+  ];
+
   let alertCount = 0;
   let latestAlertTitle = '';
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -19,31 +42,41 @@ async function fetchNewsAlerts() {
   for (const feedUrl of feeds) {
     try {
       const feed = await rssParser.parseURL(feedUrl);
+
       for (const item of feed.items) {
-        const pubDate = new Date(item.pubDate).getTime();
-        if (pubDate > oneWeekAgo) {
-          let snippet = item.contentSnippet;
-          if (!snippet) snippet = '';
-          const text = (item.title + ' ' + snippet).toLowerCase();
-          
-          if (keywords.some(kw => text.includes(kw))) {
-            alertCount++;
-            if (!latestAlertTitle) latestAlertTitle = item.title;
+        const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
+        if (pubDate && pubDate < oneWeekAgo) continue;
+
+        const title = item.title || '';
+        const snippet = item.contentSnippet || item.content || '';
+        const text = (title + ' ' + snippet).toLowerCase();
+
+        if (keywords.some((kw) => text.includes(kw.toLowerCase()))) {
+          alertCount++;
+          if (!latestAlertTitle) {
+            latestAlertTitle = title;
           }
         }
       }
     } catch (e) {
-      console.error(`Ошибка чтения RSS:`, e.message);
+      console.error(`Ошибка чтения RSS (${feedUrl}):`, e.message);
     }
   }
 
   const trend = Math.min(alertCount * 10, 100);
-  const description = alertCount > 0 
-    ? `Тревожных новостей: ${alertCount}. Последняя: "${latestAlertTitle}"`
-    : 'Новостной фон спокойный.';
+  const description =
+    alertCount > 0
+      ? `Тривожних новин: \( {alertCount}. Остання: « \){latestAlertTitle}»`
+      : 'Новинний фон спокійний.';
 
-  return { type: 'news_alert', value: alertCount, trend, description };
-}
+  return {
+    type: 'news_alert',
+    value: alertCount,
+    trend,
+    description,
+  };
+  }
+
 
 
 // 2. ПАРСИНГ СЫРЬЯ (SunSirs)
