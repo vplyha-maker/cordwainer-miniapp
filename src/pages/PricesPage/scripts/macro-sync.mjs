@@ -12,23 +12,22 @@ async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
 
   const feeds = [
-    // Українські
-    'https://www.epravda.com.ua/rss/',
-    'https://interfax.com.ua/news/rss.xml',
-    'https://www.liga.net/news/rss.xml',
-    'https://rss.unian.net/site/news_ukr.rss',
+    // Українські (більш стабільні)
+    'https://www.pravda.com.ua/rss/',                    // Українська правда
+    'https://nv.ua/rss/all.xml',                         // NV
+    'https://rss.unian.net/site/news_ukr.rss',            // УНІАН UA
+    'https://www.ukrinform.ua/rss/block-lastnews',       // Укрінформ
 
-    // Англійський (залишаємо як запасний)
+    // Англійський запасний
     'https://www.supplychaindive.com/feeds/news/',
   ];
 
-  // Ключові слова українською + англійською
   const keywords = [
     // UA
     'страйк', 'забастовка', 'дефіцит', 'затримка', 'зрив', 'тариф',
     'логістика', 'контейнер', 'фрахт', 'порт', 'експорт', 'імпорт',
     'постачання', 'блокада', 'митниця', 'перевізник', 'склад',
-    'удар', 'атака', 'пошкоджен', 'залізниц', 'укрзаліз',
+    'удар', 'атака', 'пошкоджен', 'залізниц', 'укрзаліз', 'порт',
 
     // EN
     'strike', 'shortage', 'delay', 'disruption', 'tariff',
@@ -39,9 +38,19 @@ async function fetchNewsAlerts() {
   let latestAlertTitle = '';
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
+  // Важливо: User-Agent, інакше багато сайтів віддають 403
+  const parser = new Parser({
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'application/rss+xml, application/xml, text/xml, */*',
+    },
+    timeout: 15000,
+  });
+
   for (const feedUrl of feeds) {
     try {
-      const feed = await rssParser.parseURL(feedUrl);
+      const feed = await parser.parseURL(feedUrl);
 
       for (const item of feed.items) {
         const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
@@ -75,10 +84,9 @@ async function fetchNewsAlerts() {
     trend,
     description,
   };
-  }
-
-
-
+}
+        
+        
 // 2. ПАРСИНГ СЫРЬЯ (SunSirs)
 async function fetchCommodities(sql) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
