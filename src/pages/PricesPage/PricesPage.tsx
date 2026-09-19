@@ -246,7 +246,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                         RSS
                       </span>
                       <div className="relative flex-1 overflow-hidden">
-                        <div className="animate-marquee whitespace-nowrap text-sm font-medium text-[#1a365d]">
+                        <div className="animate-marquee whitespace-nowrap text-sm font-medium text-[#1e40af]">
                           <span className="inline-block pr-16">
                             {newsAlert.description}
                             {newsAlert.value > 0 && (
@@ -269,43 +269,32 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                   </div>
                 )}
 
-                {/* Карточка фрахта Drewry WCI */}
+                {/* Карточка фрахта Drewry WCI (Компактная) */}
                 {freight && (
-                  <div className="border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl p-5 md:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
+                  <div className="border border-[var(--color-border)] bg-[var(--color-surface)] rounded-xl p-3 md:p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-muted)]">
                             Макро · Фрахт
                           </span>
-                          <span className="text-[10px] text-[var(--color-muted)] opacity-50">·</span>
-                          <span className="text-[10px] text-[var(--color-muted)]">
-                            Drewry World Container Index
+                          <span className="text-[9px] text-[var(--color-muted)] opacity-50">·</span>
+                          <span className="text-[9px] text-[var(--color-muted)] truncate">
+                            Drewry WCI
                           </span>
                         </div>
-
-                        <h3 className="font-serif text-lg md:text-xl text-[var(--color-ink)] mb-2">
+                        <h3 className="font-serif text-base md:text-lg text-[var(--color-ink)] leading-none">
                           Китай → Европа
                         </h3>
-
-                        <p className="text-sm text-[var(--color-muted)] leading-relaxed max-w-xl">
-                          Индекс спотовых ставок на контейнер 40ft по основным маршрутам
-                          Восток–Запад. Обновляется еженедельно. Рост индекса = дороже
-                          логистика из Китая, падение = снижение давления на себестоимость.
-                        </p>
                       </div>
 
-                      <div className="shrink-0 text-right">
-                        <div className="text-3xl md:text-4xl font-serif font-medium text-[var(--color-ink)] tabular-nums tracking-tight">
+                      <div className="shrink-0 text-right flex flex-col items-end">
+                        <div className="text-xl md:text-2xl font-serif font-medium text-[var(--color-ink)] tabular-nums tracking-tight leading-none mb-1.5">
                           ${Number(freight.value).toLocaleString('en-US')}
                         </div>
-                        <div className="text-xs text-[var(--color-muted)] mt-1 mb-2">
-                          за 40ft контейнер
-                        </div>
-
                         <div
                           className={
-                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ' +
+                            'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ' +
                             (isFreightUp
                               ? 'bg-red-500/10 text-red-500'
                               : isFreightDown
@@ -320,19 +309,8 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                             {freightTrend > 0 ? '+' : ''}
                             {freightTrend}%
                           </span>
-                          <span className="opacity-60 font-normal">к прошлому</span>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--color-muted)]">
-                      <span>Источник: OilPriceAPI → Drewry</span>
-                      {freight.description && (
-                        <>
-                          <span className="opacity-30">·</span>
-                          <span className="truncate max-w-md">{freight.description}</span>
-                        </>
-                      )}
                     </div>
                   </div>
                 )}
