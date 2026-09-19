@@ -11,39 +11,39 @@ async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
 
   const feeds = [
-    'https://www.pravda.com.ua/rss/',
-    'https://nv.ua/rss/all.xml',
-    'https://rss.unian.net/site/news_ukr.rss',
-    'https://www.ukrinform.ua/rss/block-lastnews',
-    'https://www.supplychaindive.com/feeds/news/',
-  ];
+  // Бізнес UA
+  'https://www.epravda.com.ua/rss/',              // Економічна правда
+  'https://biz.nv.ua/rss/all.html',               // NV Бізнес
+  'https://www.liga.net/biz/articles/rss.xml',    // LIGA.Бізнес
+
+  // Фінанси / економіка
+  'https://minfin.com.ua/data/rss/analytics.xml', // Мінфін аналітика
+
+  // Міжнародна логістика (англійською)
+  'https://www.supplychaindive.com/feeds/news/',
+];
 
   const keywords = [
-  // Логістика / транспорт
-  'логістик', 'логистик',
-  'контейнер', 'фрахт', 'перевезен', 'перевізник',
-  'порт', 'термінал', 'митниц', 'митн',
-  'залізниц', 'укрзаліз', 'вагон', 'локомотив',
-  'автотранспорт', 'фура', 'вантажівк',
+  // Логістика
+  'логістик', 'логистик', 'контейнер', 'фрахт',
+  'перевезен', 'перевізник', 'порт', 'термінал',
+  'митниц', 'залізниц', 'укрзаліз', 'вагон',
+  'вантаж', 'склад', 'транзит', 'інтермодальн',
 
-  // Постачання / ланцюги
-  'постачан', 'supply', 'ланцюг поставок', 'supply chain',
-  'експорт', 'імпорт', 'транзит',
-  'склад', 'дефіцит', 'нестача', 'зрив поставок',
+  // Постачання / торгівля
+  'постачан', 'експорт', 'імпорт', 'supply chain',
+  'дефіцит', 'нестача', 'зрив поставок',
+  'тариф', 'ставка', 'вартість доставки',
 
-  // Затримки / блокування
-  'затримк', 'затримка', 'блокада', 'перекрит',
-  'черга на кордоні', 'кордон', 'простій',
+  // Бізнес
+  'бізнес', 'компані', 'ринок', 'виробництв',
+  'агро', 'зерн', 'металург', 'енергет',
 
-  // Тарифи / ціни перевезень
-  'тариф', 'ставка фрахту', 'вартість доставки',
-  'подорожчан', 'здешевлен',
-
-  // Англійські (Supply Chain Dive тощо)
+  // EN
   'logistics', 'freight', 'container', 'shipping',
   'port', 'terminal', 'customs', 'tariff',
-  'shortage', 'delay', 'disruption', 'supply chain',
-  'rail', 'truck', 'cargo', 'export', 'import',
+  'shortage', 'delay', 'disruption', 'cargo',
+  'rail', 'export', 'import', 'supply chain',
 ];
 
   const matchedTitles = [];
