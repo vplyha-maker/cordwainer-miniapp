@@ -246,7 +246,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                         RSS
                       </span>
                       <div className="relative flex-1 overflow-hidden">
-                        <div className="animate-marquee whitespace-nowrap text-sm text-[var(--color-muted)]">
+                        <div className="animate-marquee whitespace-nowrap text-sm font-medium text-[#1a365d]">
                           <span className="inline-block pr-16">
                             {newsAlert.description}
                             {newsAlert.value > 0 && (
@@ -483,7 +483,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
         </AnimatePresence>
       </motion.div>
 
-      {/* CSS для бегущей строки */}
+      {/* CSS для бегущей строки — медленнее + благородный синий */}
       <style>{`
         @keyframes marquee {
           0%   { transform: translateX(0); }
@@ -491,7 +491,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
         }
         .animate-marquee {
           display: inline-block;
-          animation: marquee 28s linear infinite;
+          animation: marquee 55s linear infinite;
         }
         .animate-marquee:hover {
           animation-play-state: paused;
