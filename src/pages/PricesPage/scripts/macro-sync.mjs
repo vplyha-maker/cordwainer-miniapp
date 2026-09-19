@@ -11,7 +11,6 @@ async function fetchNewsAlerts() {
 
   const feeds = [
     'https://www.epravda.com.ua/rss/',
-    'https://biz.nv.ua/rss/all.html',
     'https://www.liga.net/biz/articles/rss.xml',
     'https://minfin.com.ua/data/rss/analytics.xml',
     'https://www.supplychaindive.com/feeds/news/',
