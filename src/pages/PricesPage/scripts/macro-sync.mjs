@@ -5,7 +5,6 @@ import 'dotenv/config';
 
 // Подключение к Neon БД
 const sql = neon(process.env.DATABASE_URL);
-const rssParser = new Parser();
 
 // 1. ПАРСИНГ НОВОСТЕЙ (UA + EN)
 async function fetchNewsAlerts() {
@@ -15,9 +14,8 @@ async function fetchNewsAlerts() {
     // Українські (більш стабільні)
     'https://www.pravda.com.ua/rss/',                    // Українська правда
     'https://nv.ua/rss/all.xml',                         // NV
-    'https://rss.unian.net/site/news_ukr.rss',            // УНІАН UA
+    'https://rss.unian.net/site/news_ukr.rss',           // УНІАН UA
     'https://www.ukrinform.ua/rss/block-lastnews',       // Укрінформ
-
     // Англійський запасний
     'https://www.supplychaindive.com/feeds/news/',
   ];
@@ -28,7 +26,6 @@ async function fetchNewsAlerts() {
     'логістика', 'контейнер', 'фрахт', 'порт', 'експорт', 'імпорт',
     'постачання', 'блокада', 'митниця', 'перевізник', 'склад',
     'удар', 'атака', 'пошкоджен', 'залізниц', 'укрзаліз', 'порт',
-
     // EN
     'strike', 'shortage', 'delay', 'disruption', 'tariff',
     'logistics', 'container', 'freight', 'port', 'export',
@@ -73,10 +70,9 @@ async function fetchNewsAlerts() {
   }
 
   const trend = Math.min(alertCount * 10, 100);
-  const description =
-    alertCount > 0
-      ? `Тривожних новин: \( {alertCount}. Остання: « \){latestAlertTitle}»`
-      : 'Новинний фон спокійний.';
+  const description = alertCount > 0
+    ? `Тривожних новин: ${alertCount}. Остання: «${latestAlertTitle}»`
+    : 'Новинний фон спокійний.';
 
   return {
     type: 'news_alert',
@@ -86,9 +82,8 @@ async function fetchNewsAlerts() {
   };
 }
         
-        
 // 2. ПАРСИНГ СЫРЬЯ (SunSirs)
-async function fetchCommodities(sql) {
+async function fetchCommodities(db) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
   const results = [];
 
@@ -115,8 +110,6 @@ async function fetchCommodities(sql) {
       let newValue = NaN;
 
       // 1. Ищем в таблице цен (самый надёжный способ)
-      // Формат: | Commodity | Sectors | Price | Date |
-      //          | MDI       | Chemical| 18366.67 | 2026-09-18 |
       const priceCell = $('table td').filter((_, el) => {
         const t = $(el).text().trim();
         return /^\d{4,5}(?:\.\d{1,2})?$/.test(t);
@@ -126,7 +119,7 @@ async function fetchCommodities(sql) {
         newValue = parseFloat(priceCell.text().trim());
       }
 
-      // 2. Fallback — ищем по всему тексту числа вида 18366.67 или 18366
+      // 2. Fallback — ищем по всему тексту
       if (isNaN(newValue)) {
         const bodyText = $('body').text();
         const match = bodyText.match(/(?:\D|^)(\d{4,5}\.\d{1,2})(?:\D|$)/);
@@ -145,7 +138,7 @@ async function fetchCommodities(sql) {
         throw new Error(`Адекватная цена не найдена в тексте.`);
       }
 
-      const lastRecord = await sql`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
+      const lastRecord = await db`SELECT value FROM macro_indicators WHERE type = ${src.type}`;
       let trend = 0;
       if (lastRecord.length > 0 && lastRecord[0].value > 0) {
         const oldValue = parseFloat(lastRecord[0].value);
@@ -156,7 +149,7 @@ async function fetchCommodities(sql) {
         type: src.type,
         value: Number(newValue),
         trend: Number(trend),
-        description: `SunSirs Китай (RMB/ton). Изменение: \( {trend > 0 ? '+' : ''} \){trend}%`
+        description: `SunSirs Китай (RMB/ton). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
       });
     } catch (e) {
       console.error(`❌ Ошибка ${src.name}:`, e.message);
@@ -164,10 +157,10 @@ async function fetchCommodities(sql) {
   }
 
   return results;
- }
+}
 
 // 3. ФРАХТ через OilPriceAPI (Drewry WCI)
-async function fetchFreightRates(sql) {
+async function fetchFreightRates(db) {
   console.log('Сбор данных по фрахту (OilPriceAPI → Drewry WCI)...');
 
   const apiKey = process.env.OILPRICE_API_KEY;
@@ -201,7 +194,7 @@ async function fetchFreightRates(sql) {
       throw new Error(`Некорректная цена из API: ${JSON.stringify(json)}`);
     }
 
-    const lastRecord = await sql`
+    const lastRecord = await db`
       SELECT value FROM macro_indicators WHERE type = 'freight_cn_eu'
     `;
     
@@ -215,13 +208,13 @@ async function fetchFreightRates(sql) {
       type: 'freight_cn_eu',
       value: newValue,
       trend,
-      description: `Drewry WCI (OilPriceAPI). Изменение: \( {trend > 0 ? '+' : ''} \){trend}%`
+      description: `Drewry WCI (OilPriceAPI). Изменение: ${trend > 0 ? '+' : ''}${trend}%`
     };
   } catch (e) {
     console.error('❌ Ошибка сбора фрахта (API):', e.message);
     return null;
   }
-  }
+}
 
 // ОСНОВНАЯ ФУНКЦИЯ
 async function run() {
@@ -255,7 +248,7 @@ async function run() {
           description = EXCLUDED.description,
           updated_at = NOW();
       `;
-      console.log(`✅ Обновлен: ${item.type} | Цена: ${item.value} | Тренд: ${item.trend}%`);
+      console.log(`✅ Обновлен: ${item.type} | Значение: ${item.value} | Тренд: ${item.trend}%`);
     }
 
     console.log('🎉 Все макро-данные успешно обновлены!');
