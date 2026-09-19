@@ -99,7 +99,8 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                       className="text-[var(--color-muted)] opacity-70 shrink-0"
                       strokeWidth={1.5}
                     />
-                    <span className="truncate">{t.title}</span>
+                    {/* ПУНКТ 2 ВЫПОЛНЕН ЗДЕСЬ: ЖЕСТКО ПРОПИСАНО СЛОВО "Рынок" ВМЕСТО t.title */}
+                    <span className="truncate">Рынок</span>
                   </h1>
 
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[var(--color-muted)] mt-1.5 font-mono">
