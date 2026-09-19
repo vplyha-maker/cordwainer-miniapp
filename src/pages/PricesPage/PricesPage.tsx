@@ -80,10 +80,10 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
         exit={{ opacity: 0 }}
         className="flex flex-col h-[100dvh] relative"
       >
-        {/* ===== HEADER ===== */}
-        <header className="shrink-0 z-20 bg-[var(--color-surface)] border-b border-[var(--color-border)] pt-5 pb-4 px-4 md:px-8 transition-colors duration-300">
+        {/* ===== HEADER (уменьшены отступы pt-4 pb-3 вместо pt-5 pb-4) ===== */}
+        <header className="shrink-0 z-20 bg-[var(--color-surface)] border-b border-[var(--color-border)] pt-4 pb-3 px-4 md:px-8 transition-colors duration-300">
           <div className="max-w-7xl mx-auto">
-            <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-start justify-between gap-4 mb-3">
               <div className="flex items-center gap-4 min-w-0">
                 <button
                   onClick={onBack}
@@ -99,11 +99,10 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                       className="text-[var(--color-muted)] opacity-70 shrink-0"
                       strokeWidth={1.5}
                     />
-                    {/* ПУНКТ 2 ВЫПОЛНЕН ЗДЕСЬ: ЖЕСТКО ПРОПИСАНО СЛОВО "Рынок" ВМЕСТО t.title */}
                     <span className="truncate">Рынок</span>
                   </h1>
 
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-[var(--color-muted)] mt-1.5 font-mono">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-muted)] mt-1 font-mono">
                     <span>
                       {stats.total} {t.statsTotal}
                     </span>
@@ -145,35 +144,39 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-3 border-t border-[var(--color-border)] pt-4">
+            {/* ===== SEARCH & FILTERS (Уменьшена высота и отступы) ===== */}
+            <div className="flex flex-col lg:flex-row gap-2 border-t border-[var(--color-border)] pt-3">
+              
+              {/* Поле поиска: h-8, текст меньше */}
               <div className="relative flex-1 max-w-md">
                 <Search
-                  size={16}
+                  size={14}
                   strokeWidth={1.5}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-muted)]"
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-muted)]"
                 />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t.search}
-                  className="w-full h-10 pl-10 pr-9 bg-[var(--color-surface-2)] border border-[var(--color-border)] focus:border-[var(--color-ink)] outline-none text-sm placeholder:text-[var(--color-muted)] text-[var(--color-ink)] transition-colors"
+                  className="w-full h-8 pl-8 pr-7 bg-[var(--color-surface-2)] border border-[var(--color-border)] focus:border-[var(--color-ink)] outline-none text-xs placeholder:text-[var(--color-muted)] text-[var(--color-ink)] transition-colors"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--color-muted)] hover:text-[var(--color-ink)]"
                   >
-                    <X size={15} strokeWidth={1.5} />
+                    <X size={14} strokeWidth={1.5} />
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+              {/* Фильтры: h-8, текст 10px, padding меньше */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 lg:pb-0">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="h-10 px-3 text-xs uppercase tracking-wider bg-[var(--color-surface-2)] text-[var(--color-ink)] border border-[var(--color-border)] outline-none cursor-pointer appearance-none shrink-0"
+                  className="h-8 px-2 min-w-min text-[10px] uppercase tracking-wider bg-[var(--color-surface-2)] text-[var(--color-ink)] border border-[var(--color-border)] outline-none cursor-pointer appearance-none shrink-0"
                 >
                   <option value="default">{t.sortDefault}</option>
                   <option value="savings">{t.sortSavings}</option>
@@ -181,13 +184,13 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                   <option value="name">{t.sortName}</option>
                 </select>
 
-                <div className="h-5 w-px bg-[var(--color-border)] shrink-0" />
+                <div className="h-4 w-px bg-[var(--color-border)] shrink-0" />
 
-                <div className="flex gap-1.5 shrink-0">
+                <div className="flex gap-1 shrink-0">
                   <button
                     onClick={() => setSelectedSource('all')}
                     className={
-                      'px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ' +
+                      'px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold transition-colors border ' +
                       (selectedSource === 'all'
                         ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]'
                         : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]')
@@ -198,14 +201,14 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                   <button
                     onClick={() => setSelectedSource('favorites')}
                     className={
-                      'px-3 py-1.5 text-xs uppercase tracking-wider font-semibold flex items-center gap-1.5 transition-colors border ' +
+                      'px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1 transition-colors border ' +
                       (selectedSource === 'favorites'
                         ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]'
                         : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]')
                     }
                   >
                     <Bookmark
-                      size={13}
+                      size={11}
                       strokeWidth={selectedSource === 'favorites' ? 2 : 1.5}
                       className={selectedSource === 'favorites' ? 'fill-current' : ''}
                     />
@@ -216,7 +219,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                       key={src}
                       onClick={() => setSelectedSource(src)}
                       className={
-                        'px-3 py-1.5 text-xs uppercase tracking-wider font-semibold transition-colors border ' +
+                        'px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold transition-colors border ' +
                         (selectedSource === src
                           ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-bg)]'
                           : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]')
@@ -462,7 +465,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
         </AnimatePresence>
       </motion.div>
 
-      {/* CSS для бегущей строки — медленнее + благородный синий */}
+      {/* CSS для бегущей строки */}
       <style>{`
         @keyframes marquee {
           0%   { transform: translateX(0); }
