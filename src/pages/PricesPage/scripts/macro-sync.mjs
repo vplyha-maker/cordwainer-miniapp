@@ -6,61 +6,68 @@ import 'dotenv/config';
 // Подключение к Neon БД
 const sql = neon(process.env.DATABASE_URL);
 
-// 1. ПАРСИНГ НОВОСТЕЙ (UA + EN)
 async function fetchNewsAlerts() {
   console.log('Сбор новостей из RSS...');
 
   const feeds = [
-  // Бізнес UA
-  'https://www.epravda.com.ua/rss/',              // Економічна правда
-  'https://biz.nv.ua/rss/all.html',               // NV Бізнес
-  'https://www.liga.net/biz/articles/rss.xml',    // LIGA.Бізнес
-
-  // Фінанси / економіка
-  'https://minfin.com.ua/data/rss/analytics.xml', // Мінфін аналітика
-
-  // Міжнародна логістика (англійською)
-  'https://www.supplychaindive.com/feeds/news/',
-];
+    'https://www.epravda.com.ua/rss/',
+    'https://biz.nv.ua/rss/all.html',
+    'https://www.liga.net/biz/articles/rss.xml',
+    'https://minfin.com.ua/data/rss/analytics.xml',
+    'https://www.supplychaindive.com/feeds/news/',
+  ];
 
   const keywords = [
-  // Логістика
-  'логістик', 'логистик', 'контейнер', 'фрахт',
-  'перевезен', 'перевізник', 'порт', 'термінал',
-  'митниц', 'залізниц', 'укрзаліз', 'вагон',
-  'вантаж', 'склад', 'транзит', 'інтермодальн',
-
-  // Постачання / торгівля
-  'постачан', 'експорт', 'імпорт', 'supply chain',
-  'дефіцит', 'нестача', 'зрив поставок',
-  'тариф', 'ставка', 'вартість доставки',
-
-  // Бізнес
-  'бізнес', 'компані', 'ринок', 'виробництв',
-  'агро', 'зерн', 'металург', 'енергет',
-
-  // EN
-  'logistics', 'freight', 'container', 'shipping',
-  'port', 'terminal', 'customs', 'tariff',
-  'shortage', 'delay', 'disruption', 'cargo',
-  'rail', 'export', 'import', 'supply chain',
-];
+    'логістик', 'логистик', 'контейнер', 'фрахт',
+    'перевезен', 'перевізник', 'порт', 'термінал',
+    'митниц', 'залізниц', 'укрзаліз', 'вагон',
+    'вантаж', 'склад', 'транзит', 'інтермодальн',
+    'постачан', 'експорт', 'імпорт', 'supply chain',
+    'дефіцит', 'нестача', 'зрив поставок',
+    'тариф', 'ставка', 'вартість доставки',
+    'бізнес', 'компані', 'ринок', 'виробництв',
+    'агро', 'зерн', 'металург',
+    'logistics', 'freight', 'container', 'shipping',
+    'port', 'terminal', 'customs', 'tariff',
+    'shortage', 'delay', 'disruption', 'cargo',
+    'rail', 'export', 'import',
+  ];
 
   const matchedTitles = [];
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const scraperKey = process.env.SCRAPERAPI_KEY;
 
   const parser = new Parser({
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'application/rss+xml, application/xml, text/xml, */*',
-    },
-    timeout: 15000,
+    timeout: 20000,
   });
 
   for (const feedUrl of feeds) {
     try {
-      const feed = await parser.parseURL(feedUrl);
+      let xml;
+
+      if (scraperKey) {
+        // Через ScraperAPI (обходить 403)
+        const proxyUrl =
+          `http://api.scraperapi.com?api_key=${scraperKey}` +
+          `&url=${encodeURIComponent(feedUrl)}`;
+
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error(`ScraperAPI HTTP ${res.status}`);
+        xml = await res.text();
+      } else {
+        // Прямий запит (може давати 403)
+        const res = await fetch(feedUrl, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'application/rss+xml, application/xml, text/xml, */*',
+          },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        xml = await res.text();
+      }
+
+      const feed = await parser.parseString(xml);
 
       for (const item of feed.items) {
         const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
@@ -73,7 +80,6 @@ async function fetchNewsAlerts() {
         const text = (title + ' ' + snippet).toLowerCase();
 
         if (keywords.some((kw) => text.includes(kw.toLowerCase()))) {
-          // уникаємо дублікатів
           if (!matchedTitles.includes(title)) {
             matchedTitles.push(title);
           }
@@ -87,7 +93,6 @@ async function fetchNewsAlerts() {
   const alertCount = matchedTitles.length;
   const trend = Math.min(alertCount * 10, 100);
 
-  // Беремо перші 10 новин для стрічки (можна змінити на matchedTitles без slice, якщо хочеш усі)
   const topTitles = matchedTitles.slice(0, 10);
   const titlesText = topTitles.length
     ? topTitles.join('  ·  ')
@@ -105,7 +110,7 @@ async function fetchNewsAlerts() {
     description,
   };
 }
-
+  
 // 2. ПАРСИНГ СЫРЬЯ (SunSirs) — ОТКЛЮЧЕНО, але функція залишається
 async function fetchCommodities(db) {
   console.log('Сбор данных по сырью (SunSirs Китай)...');
