@@ -144,6 +144,23 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     localStorage.setItem('wc_unit', unit)
   }, [gender, sizeEu, widthCat, unit])
 
+  // Автоматическая проверка покупки в Neon при загрузке страницы
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    const userId = tg?.initDataUnsafe?.user?.id
+
+    if (!userId) return
+
+    fetch(`/api/check-purchase?userId=${userId}&productId=pro_width_calc`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.purchased) {
+          setIsProPurchased(true)
+        }
+      })
+      .catch(err => console.error("Ошибка проверки покупки:", err))
+  }, [])
+
   const handleGender = (g: Gender) => {
     if (gender === g) return
     haptic('medium')
@@ -271,7 +288,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 key={g}
                 onClick={() => handleGender(g)}
                 className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer ${
-                  gender === g ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-60 hover:opacity-100`
+                  gender === g ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
                 }`}
               >
                 {t[g]}
@@ -328,7 +345,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                   key={cat} 
                   onClick={() => { haptic('light'); setWidthCat(cat); }}
                   className={`text-[10px] min-[390px]:text-[11px] font-sans uppercase tracking-[0.2em] whitespace-nowrap transition-all outline-none border-none bg-transparent cursor-pointer ${
-                    widthCat === cat ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-40 hover:opacity-100`
+                    widthCat === cat ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40 hover:opacity-100`
                   }`}
                 >
                   {t.cats[cat]}
@@ -421,7 +438,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                             key={u}
                             onClick={() => { haptic('light'); setUnit(u) }}
                             className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors outline-none border-none bg-transparent cursor-pointer ${
-                              unit === u ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-40 hover:opacity-100`
+                              unit === u ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40 hover:opacity-100`
                             }`}
                           >
                             {t[u]}
