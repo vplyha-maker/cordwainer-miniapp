@@ -38,7 +38,8 @@ export default async function handler(request: Request) {
       Number(eurRow?.rate) > 0
 
     // 2. Если кэш свежий — отдаём его (историю не трогаем)
-    if (isFresh) {
+    // ДОБАВЛЕНО: явная проверка usdRow и eurRow для TypeScript
+    if (isFresh && usdRow && eurRow) {
       return new Response(
         JSON.stringify({
           usd: Number(usdRow.rate),
@@ -64,7 +65,8 @@ export default async function handler(request: Request) {
 
     if (!nbuRes.ok) {
       // Fallback на старый кэш
-      if (Number(usdRow?.rate) > 0 && Number(eurRow?.rate) > 0) {
+      // ДОБАВЛЕНО: явная проверка usdRow и eurRow для TypeScript
+      if (usdRow && eurRow && Number(usdRow.rate) > 0 && Number(eurRow.rate) > 0) {
         return new Response(
           JSON.stringify({
             usd: Number(usdRow.rate),
