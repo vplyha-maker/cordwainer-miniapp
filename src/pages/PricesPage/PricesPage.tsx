@@ -59,6 +59,13 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
     macroIndicators,
   } = usePrices()
 
+  // Принудительно ставим UAH по умолчанию при первой загрузке
+  useEffect(() => {
+    if (!currency || currency === 'USD' || currency === 'EUR') {
+      setCurrency('UAH' as any)
+    }
+  }, [])
+
   // === СВЕТЛАЯ / ТЕМНАЯ ТЕМА ===
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
@@ -88,7 +95,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [showProModal, setShowProModal] = useState(false)
 
-  // Проверка покупки
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
@@ -102,7 +108,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
       .catch(err => console.error("Ошибка проверки покупки:", err))
   }, [])
 
-  // Покупка PRO
   const handleProClick = async () => {
     const tg = (window as any).Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id;
@@ -142,9 +147,9 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
     }
   };
 
-  // Перехват смены валюты (Исправлена ошибка TS с типами)
+  // Перехват смены валюты
   const handleCurrencyChange = (newCurrency: string) => {
-    if (newCurrency !== 'rub' && newCurrency !== 'RUB' && !isProPurchased) {
+    if (newCurrency !== 'UAH' && !isProPurchased) {
       haptic('medium')
       setShowProModal(true)
       return
@@ -152,22 +157,32 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
     setCurrency(newCurrency as any)
   }
 
+  // Перехват добавления в Избранное
+  const handleToggleFavorite = (key: string) => {
+    if (!isProPurchased) {
+      haptic('medium')
+      setShowProModal(true)
+      return
+    }
+    toggleFavorite(key)
+  }
+
   const paywallText = {
     ru: {
       title: 'PRO: Рынок',
-      desc: 'Мультивалютный пересчет (USD / EUR) и прямые ссылки на поставщиков доступны только в PRO.',
+      desc: 'В PRO-версии вам доступны: пересчет цен в USD и EUR, сохранение в «Отслеживаемые» (Избранное) и прямые ссылки на поставщиков.',
       btn: 'ОТКРЫТЬ ДОСТУП • 1 ⭐️',
       loading: 'ОБРАБОТКА...'
     },
     uk: {
       title: 'PRO: Ринок',
-      desc: 'Мультивалютний перерахунок (USD / EUR) та прямі посилання на постачальників доступні в PRO.',
+      desc: 'У PRO-версії вам доступні: перерахунок цін в USD та EUR, збереження у «Відстежувані» (Обране) та прямі посилання на постачальників.',
       btn: 'ВІДКРИТИ ДОСТУП • 1 ⭐️',
       loading: 'ОБРОБКА...'
     },
     de: {
       title: 'PRO: Markt',
-      desc: 'Währungsumrechnung (USD / EUR) und direkte Lieferantenlinks sind nur in PRO verfügbar.',
+      desc: 'In der PRO-Version erhalten Sie: Preisumrechnung in USD und EUR, Speichern in Favoriten und direkte Links zu Lieferanten.',
       btn: 'FREISCHALTEN • 1 ⭐️',
       loading: 'LÄDT...'
     }
@@ -200,7 +215,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
         exit={{ opacity: 0 }}
         className="flex flex-col h-[100dvh] relative"
       >
-        {/* ===== HEADER ===== */}
         <header className={`shrink-0 z-20 ${cSurface} border-b ${cLine} pt-4 pb-3 px-4 md:px-8 transition-colors duration-300`}>
           <div className="max-w-7xl mx-auto">
             <div className="flex items-start justify-between gap-4 mb-3">
@@ -250,7 +264,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
               </div>
             </div>
 
-            {/* ===== SEARCH & FILTERS ===== */}
             <div className={`flex flex-col lg:flex-row gap-2 border-t ${cLine} pt-3`}>
               <div className="relative flex-1 max-w-md">
                 <Search size={14} strokeWidth={1.5} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${cTextMuted}`} />
@@ -282,7 +295,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
 
                 <div className={`h-4 w-px shrink-0 ${isDark ? 'bg-[#F4F0E8]/15' : 'bg-[#1C1816]/15'}`} />
 
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1 shrink-0 relative">
                   <button
                     onClick={() => setSelectedSource('all')}
                     className={`px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold transition-colors border ${selectedSource === 'all' ? `border-[#FFB020] bg-[#FFB020] ${isDark ? 'text-[#0A0A0A]' : 'text-[#F2EFE9]'}` : `border-transparent ${cTextMuted} hover:text-current`}`}
@@ -290,9 +303,21 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                     {t.allSources}
                   </button>
                   <button
-                    onClick={() => setSelectedSource('favorites')}
-                    className={`px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1 transition-colors border ${selectedSource === 'favorites' ? `border-[#FFB020] bg-[#FFB020] ${isDark ? 'text-[#0A0A0A]' : 'text-[#F2EFE9]'}` : `border-transparent ${cTextMuted} hover:text-current`}`}
+                    onClick={() => {
+                      if (!isProPurchased) {
+                        haptic('medium');
+                        setShowProModal(true);
+                      } else {
+                        setSelectedSource('favorites');
+                      }
+                    }}
+                    className={`relative px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1 transition-colors border ${selectedSource === 'favorites' ? `border-[#FFB020] bg-[#FFB020] ${isDark ? 'text-[#0A0A0A]' : 'text-[#F2EFE9]'}` : `border-transparent ${cTextMuted} hover:text-current`}`}
                   >
+                    {!isProPurchased && (
+                      <div className="absolute -top-1.5 -right-1.5 text-[#FFB020]">
+                        <Lock size={8} strokeWidth={3} />
+                      </div>
+                    )}
                     <Bookmark size={11} strokeWidth={selectedSource === 'favorites' ? 2 : 1.5} className={selectedSource === 'favorites' ? 'fill-current' : ''} />
                     {t.favorites}
                   </button>
@@ -311,10 +336,8 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
           </div>
         </header>
 
-        {/* ===== MAIN ===== */}
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 no-scrollbar relative">
           <div className="max-w-7xl mx-auto">
-            {/* Макро индикаторы */}
             {!loading && !error && (newsAlert || freight) && (
               <div className="mb-8 space-y-4">
                 {newsAlert?.description && (
@@ -356,7 +379,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
               </div>
             )}
 
-            {/* Список товаров */}
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.from({ length: 6 }).map((_, i) => <div key={i} className={`h-60 ${cSurface} border ${cLine} animate-pulse`} />)}
@@ -379,19 +401,18 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                   <AnimatePresence>
                     {filteredItems.slice(0, visibleCount).map((g: GroupedProduct) => (
                       <motion.div key={g.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }}>
-                        {/* @ts-ignore - игнорируем ошибку TS, пока не обновим ProductCard */}
                         <ProductCard
                           group={g}
                           lang={lang}
-                          t={t}
+                          t={t as any}
                           isFavorite={favorites.has(g.key)}
-                          onToggleFavorite={toggleFavorite}
+                          onToggleFavorite={handleToggleFavorite}
                           onOpenSpreadModal={(val) => setModalData({ type: 'spread', value: val })}
                           onOpenHistory={(groupData) => setHistoryGroup(groupData)}
-                          currency={currency}
+                          currency={currency as any}
                           usdRate={usdRate}
                           eurRate={eurRate}
-                          macroIndicators={macroIndicators}
+                          macroIndicators={macroIndicators as any}
                           isProPurchased={isProPurchased}
                           onRequirePro={() => setShowProModal(true)}
                         />
@@ -411,7 +432,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
           </div>
         </main>
 
-        {/* ===== МОДАЛКА PRO ДОСТУПА ===== */}
         <AnimatePresence>
           {showProModal && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#000000]/70 backdrop-blur-sm">
@@ -421,7 +441,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 className={`relative w-full max-w-[340px] p-8 border ${cLine} ${cSurface} shadow-2xl flex flex-col overflow-hidden`}
               >
-                {/* Журнальные декоративные уголки */}
                 <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${cLine}`} />
                 <div className={`absolute top-0 right-0 w-2 h-2 border-t border-r ${cLine}`} />
                 <div className={`absolute bottom-0 left-0 w-2 h-2 border-b border-l ${cLine}`} />
@@ -466,7 +485,6 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
           )}
         </AnimatePresence>
 
-        {/* Модалки инфо и графиков */}
         <AnimatePresence>
           {modalData && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6">
