@@ -53,6 +53,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
       buyPro: 'КУПИТЬ 1 ⭐️',
+      loading: 'ОБРАБОТКА...',
       gostNum: 'ГОСТ RU (цифра)', gostLet: 'ГОСТ RU (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
@@ -73,6 +74,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
       buyPro: 'КУПИТИ 1 ⭐️',
+      loading: 'ОБРОБКА...',
       gostNum: 'ДСТУ UKR (цифра)', gostLet: 'ДСТУ UKR (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
@@ -93,6 +95,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
       buyPro: 'KAUFEN 1 ⭐️',
+      loading: 'LÄDT...',
       gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
@@ -127,6 +130,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   
   const [showPro, setShowPro] = useState(false)
   const [isProPurchased, setIsProPurchased] = useState(false) 
+  const [isPurchasing, setIsPurchasing] = useState(false)
   
   const [activeInfo, setActiveInfo] = useState<InfoModalType>(null)
 
@@ -160,8 +164,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
   }
 
-  // === НОВАЯ ЛОГИКА: ОБЩЕНИЕ С БОТОМ НАПРЯМУЮ ===
-  const handleProClick = () => {
+  // === НОВАЯ ЛОГИКА: VERCEL SERVERLESS API ===
+  const handleProClick = async () => {
     if (isProPurchased) {
       haptic('light');
       setShowPro(!showPro);
@@ -169,20 +173,46 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
 
     const tg = (window as any).Telegram?.WebApp;
-    
-    if (!tg) {
-      alert("Откройте приложение через Telegram.");
+    const userId = tg?.initDataUnsafe?.user?.id;
+
+    if (!userId) {
+      alert("Ошибка: Откройте приложение через Telegram.");
       return;
     }
 
-    haptic('heavy');
-    
-    // Передаем боту строку, по которой он поймет, какой счет нужно выставить
-    tg.sendData("buy_pro_width_calc");
-    
-    // Опционально: можно не закрывать приложение, а показать уведомление, 
-    // но Telegram рекомендует закрывать WebApp при переходе к оплате в чате.
-    tg.close();
+    setIsPurchasing(true);
+    haptic('light');
+
+    try {
+      // Обращаемся к нашему внутреннему API на Vercel (ошибок CORS не будет)
+      const response = await fetch("/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userId, productId: "pro_width_calc" })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.invoiceLink) {
+        throw new Error(data.error || "Ошибка генерации счета");
+      }
+
+      // Открываем красивую шторку оплаты внутри Telegram
+      tg.openInvoice(data.invoiceLink, (status: string) => {
+        if (status === 'paid') {
+          haptic('heavy');
+          setIsProPurchased(true);
+          setShowPro(true);
+        } else if (status === 'failed') {
+          alert("Оплата была отменена или произошла ошибка.");
+        }
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(`Сбой сервера: ${error.message}`);
+    } finally {
+      setIsPurchasing(false);
+    }
   };
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
@@ -320,6 +350,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         <div className="stagger-item w-full" style={{ animationDelay: '0.2s' }}>
           <button
             onClick={handleProClick}
+            disabled={isPurchasing}
             className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none bg-transparent cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
           >
             <div className="flex items-center gap-3">
@@ -333,9 +364,13 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               )}
             </div>
             
-            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
-            </motion.div>
+            {isPurchasing ? (
+              <span className="text-[8px] font-sans uppercase animate-pulse">{t.loading}</span>
+            ) : (
+              <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
+              </motion.div>
+            )}
           </button>
 
           <AnimatePresence>
