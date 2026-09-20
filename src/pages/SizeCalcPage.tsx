@@ -60,11 +60,12 @@ const LockIcon = () => (
   </svg>
 )
 
-function haptic(style: 'light' | 'medium' = 'light') {
+// ИСПРАВЛЕНО: добавлено разрешение на параметр 'heavy'
+function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   try {
     const tg = (window as any).Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
-    else if (navigator.vibrate) navigator.vibrate(style === 'light' ? 15 : 30)
+    else if (navigator.vibrate) navigator.vibrate(style === 'light' ? 15 : (style === 'heavy' ? 40 : 25))
   } catch {}
 }
 
@@ -191,7 +192,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [showStandards, setShowStandards] = useState(false)
   const [showMeasureGuide, setShowMeasureGuide] = useState(false)
   
-  // Добавляем состояния для Paywall (Neon DB)
+  // Состояния для Paywall (Neon DB)
   const [isProPurchased, setIsProPurchased] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
 
