@@ -10,12 +10,17 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'Токен бота не настроен на Vercel' });
   }
 
+  if (!userId || !productId) {
+    return res.status(400).json({ error: 'Не указаны userId или productId' });
+  }
+
   const url = `https://api.telegram.org/bot${token}/createInvoiceLink`;
+
+  // Для Telegram Stars (XTR) provider_token НЕ передаём вообще
   const payload = {
     title: "PRO: Конструктивные данные",
     description: "Разовый доступ к расширенным функциям",
-    payload: `${userId}_buy_${productId}`,
-    provider_token: "", // Пусто для Telegram Stars
+    payload: `\( {userId}_buy_ \){productId}`,
     currency: "XTR",
     prices: [{ label: "Цена", amount: 1 }] // 1 звезда
   };
@@ -26,15 +31,19 @@ export default async function handler(req: any, res: any) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
     const data = await response.json();
-    
+
     if (data.ok) {
-      res.status(200).json({ invoiceLink: data.result });
+      return res.status(200).json({ invoiceLink: data.result });
     } else {
-      res.status(500).json({ error: data.description });
+      console.error('Telegram API error:', data);
+      return res.status(500).json({ 
+        error: data.description || 'Ошибка создания инвойса' 
+      });
     }
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    console.error('Fetch error:', e);
+    return res.status(500).json({ error: e.message || 'Внутренняя ошибка сервера' });
   }
 }
-
