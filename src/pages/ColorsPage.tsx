@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion' // Добавили AnimatePresence
+import { motion, AnimatePresence } from 'framer-motion' 
 import type { Lang } from '../App'
 
 type ColorsPageProps = {
@@ -16,6 +16,20 @@ type Scheme =
   | 'rectangular'
   | 'split-complementary'
   | 'monochromatic'
+
+const LockIcon = ({ size = 10 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-[1px]">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+  </svg>
+)
+
+function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+  } catch {}
+}
 
 function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
   const darkNeutral = isDark ? '#1C1816' : '#EAE6DF'
@@ -82,7 +96,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [blackAmount, setBlackAmount] = useState(0.05)
   const [showGuide, setShowGuide] = useState(false)
   
-  // Читаем тему синхронно при инициализации, чтобы избежать FOUC (мерцания)
+  // === PAYWALL СОСТОЯНИЯ ===
+  const [isProPurchased, setIsProPurchased] = useState(false)
+  const [isPurchasing, setIsPurchasing] = useState(false)
+  const [showProModal, setShowProModal] = useState(false)
+
+  // Читаем тему синхронно при инициализации
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('dark')
@@ -104,9 +123,74 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return () => observer.disconnect()
   }, [])
 
+  // Автоматическая проверка покупки при загрузке
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    const userId = tg?.initDataUnsafe?.user?.id
+    if (!userId) return
+
+    fetch(`/api/check-purchase?userId=${userId}&productId=pro_colors`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.purchased) setIsProPurchased(true)
+      })
+      .catch(err => console.error("Ошибка проверки покупки:", err))
+  }, [])
+
+  // Оплата
+  const handleProClick = async () => {
+    const tg = (window as any).Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id;
+
+    if (!userId) {
+      alert("Ошибка: Откройте приложение через Telegram.");
+      return;
+    }
+
+    setIsPurchasing(true);
+    haptic('light');
+
+    try {
+      const response = await fetch("/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, productId: "pro_colors" }) 
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.invoiceLink) throw new Error(data.error);
+
+      tg.openInvoice(data.invoiceLink, (status: string) => {
+        if (status === 'paid') {
+          haptic('heavy');
+          setIsProPurchased(true); 
+          setShowProModal(false);
+        } else if (status === 'failed') {
+          alert("Оплата была отменена или произошла ошибка.");
+        }
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(`Сбой сервера: ${error.message}`);
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
   const handleLangChange = (newLang: Lang) => {
     localStorage.setItem('app_lang', newLang)
     setLang(newLang)
+  }
+
+  const handleSchemeClick = (s: Scheme) => {
+    const isFree = s === 'complementary' || s === 'analogous'
+    if (!isFree && !isProPurchased) {
+      haptic('medium')
+      setShowProModal(true)
+      return
+    }
+    haptic('light')
+    setScheme(s)
   }
 
   const t = {
@@ -133,6 +217,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideBtn: 'Гид',
       guideTitle: 'Цвет в дизайне',
       guideClose: 'Закрыть',
+      paywallTitle: 'PRO: Палитры',
+      paywallDesc: 'Откройте доступ ко всем профессиональным цветовым схемам: триады, тетрады и благородный монохром.',
+      paywallBtn: 'ОТКРЫТЬ ДОСТУП • 1 ⭐️',
+      loading: 'ОБРАБОТКА...',
       guideIntro:
         'Круг Иттена — классический инструмент гармонизации цвета. В обуви он особенно важен: основная палитра почти всегда строится вокруг нейтралей (чёрный, белый, бежевый, серый), а цвет появляется точечно — в коже верха, подкладке, строчке, подошве или фурнитуре.',
       guideBalanceTitle: 'Правило баланса',
@@ -182,6 +270,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideBtn: 'Гід',
       guideTitle: 'Колір у дизайні',
       guideClose: 'Закрити',
+      paywallTitle: 'PRO: Палітри',
+      paywallDesc: 'Відкрийте доступ до всіх професійних колірних схем: тріади, тетради та шляхетний монохром.',
+      paywallBtn: 'ВІДКРИТИ ДОСТУП • 1 ⭐️',
+      loading: 'ОБРОБКА...',
       guideIntro:
         'Коло Іттена — класичний інструмент гармонізації кольору. У взутті він особливо важливий: основна палітра майже завжди будується навколо нейтралей (чорний, білий, бежевий, сірий), а колір з’являється точково — у шкірі верху, підкладці, рядку, підошві чи фурнітурі.',
       guideBalanceTitle: 'Правило балансу',
@@ -231,6 +323,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideBtn: 'Guide',
       guideTitle: 'Farbe im Design',
       guideClose: 'Schließen',
+      paywallTitle: 'PRO: Paletten',
+      paywallDesc: 'Schalten Sie alle professionellen Farbschemata frei: Triaden, Tetraden und edles Monochrom.',
+      paywallBtn: 'FREISCHALTEN FÜR 1 ⭐️',
+      loading: 'LÄDT...',
       guideIntro:
         'Der Itten-Farbkreis ist ein klassisches Werkzeug zur Farbharmonisierung. Bei Schuhen ist er besonders wichtig: Die Grundpalette ist fast immer um neutrale Farben (Schwarz, Weiß, Beige, Grau) herum aufgebaut, und Farbe taucht punktuell auf — im Oberleder, im Futter, in den Nähten, der Sohle oder den Beschlägen.',
       guideBalanceTitle: 'Die Balance-Regel',
@@ -501,17 +597,23 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
         {/* НАВИГАЦИЯ СХЕМ (Журнальная горизонтальная лента) */}
         <div className={`flex overflow-x-auto gap-8 pb-5 mb-10 border-b ${cLine} scrollbar-hide`}>
-          {SCHEMES.map(s => (
-             <button 
-               key={s}
-               onClick={() => setScheme(s)} 
-               className={`text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all duration-300 outline-none border-none bg-transparent cursor-pointer ${
-                 scheme === s ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
-               }`}
-             >
-               {t[s]}
-             </button>
-          ))}
+          {SCHEMES.map(s => {
+             const isFree = s === 'complementary' || s === 'analogous'
+             const isLocked = !isFree && !isProPurchased
+             
+             return (
+               <button 
+                 key={s}
+                 onClick={() => handleSchemeClick(s)} 
+                 className={`flex items-center gap-1.5 text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all duration-300 outline-none border-none bg-transparent cursor-pointer ${
+                   scheme === s ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                 }`}
+               >
+                 {isLocked && <span className="text-[#FFB020]"><LockIcon size={8} /></span>}
+                 {t[s]}
+               </button>
+             )
+          })}
         </div>
 
         <div className="flex flex-col md:flex-row gap-12 md:gap-16 items-center md:items-start mb-16">
@@ -623,6 +725,60 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       </div>
 
+      {/* ===== МОДАЛКА PRO ДОСТУПА ===== */}
+      <AnimatePresence>
+        {showProModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#000000]/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className={`relative w-full max-w-[340px] p-8 border ${cLine} ${isDark ? 'bg-[#111111]' : 'bg-[#EAE6DF]'} shadow-2xl flex flex-col overflow-hidden`}
+            >
+              <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${cLine}`} />
+              <div className={`absolute top-0 right-0 w-2 h-2 border-t border-r ${cLine}`} />
+              <div className={`absolute bottom-0 left-0 w-2 h-2 border-b border-l ${cLine}`} />
+              <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${cLine}`} />
+
+              <button onClick={() => setShowProModal(false)} className={`absolute top-4 right-4 ${cTextMuted} hover:text-current`}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+
+              <div className={`flex justify-center mb-5 ${cTextMuted} opacity-50`}>
+                <LockIcon size={32} />
+              </div>
+
+              <h3 className={`font-serif text-2xl tracking-tight mb-4 text-center ${cText}`}>
+                {t.paywallTitle}
+              </h3>
+              
+              <p className={`text-[12px] font-sans font-light leading-relaxed mb-8 text-center ${cTextMuted}`}>
+                {t.paywallDesc}
+              </p>
+
+              <button
+                onClick={handleProClick}
+                disabled={isPurchasing}
+                className={`group flex items-center justify-center gap-3 w-full py-4 border ${cLine} ${cText} hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent`}
+              >
+                {isPurchasing ? (
+                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
+                    {t.loading}
+                  </span>
+                ) : (
+                  <>
+                    <LockIcon size={14} />
+                    <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
+                      {t.paywallBtn}
+                    </span>
+                  </>
+                )}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* OVERLAY: ГИД (Анимированное журнальное окно) */}
       <AnimatePresence>
         {showGuide && (
@@ -631,7 +787,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className={`fixed inset-0 z-[100] flex flex-col ${cBg} ${cText} overflow-hidden`}
+            className={`fixed inset-0 z-[90] flex flex-col ${cBg} ${cText} overflow-hidden`}
           >
             <div className="px-6 pt-10 pb-6 flex items-start justify-between shrink-0">
               <h2 className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight">
