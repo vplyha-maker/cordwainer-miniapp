@@ -19,11 +19,10 @@ export default async function handler(req: any, res: any) {
   const apiKey = process.env.KICKSDB_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key is not configured' });
+    return res.status(500).json({ error: 'API key is not configured in Vercel' });
   }
 
   try {
-    // Используем доступный роут v3/stockx/products с поиском по слову "nike"
     const response = await fetch('https://api.kicks.dev/v3/stockx/products?query=nike', {
       method: 'GET',
       headers: {
@@ -33,14 +32,19 @@ export default async function handler(req: any, res: any) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || errorData.message || 'Failed to fetch data');
+      // Читаем ответ как текст, чтобы увидеть реальную причину отказа от KicksDB
+      const errorText = await response.text();
+      return res.status(response.status).json({ 
+        error: 'KicksDB API Error', 
+        status: response.status, 
+        details: errorText 
+      });
     }
 
     const data = await response.json();
     return res.status(200).json(data);
 
   } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Internal Server Error' });
+    return res.status(500).json({ error: 'Crash: ' + error.message });
   }
 }
