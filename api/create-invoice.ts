@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
     description: "Разовый доступ к расширенным функциям",
     payload: `${userId}_buy_${productId}`,
     currency: "XTR",
-    prices: [{ label: "Цена", amount: 0 }] 
+    prices: [{ label: "Цена", amount: 1 }] 
   };
 
   try {
