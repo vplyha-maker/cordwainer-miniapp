@@ -2,7 +2,6 @@ import { memo } from 'react'
 import { Tag, LineChart, TrendingDown, Info, Bookmark, Store } from 'lucide-react'
 import type { Lang } from '../../../App' 
 import type { Currency } from '../../../components/PriceHistoryModal' 
-// ДОБАВИЛ MacroIndicator
 import type { GroupedProduct, MacroIndicator } from '../types'
 import { DICTIONARY } from '../constants'
 import {
@@ -27,7 +26,9 @@ export const ProductCard = memo(
     currency,
     usdRate,
     eurRate,
-    macroIndicators = [], // Принимаем макро-индикаторы
+    macroIndicators = [],
+    isProPurchased = false, // Новое поле
+    onRequirePro,         // Новое поле
   }: {
     group: GroupedProduct
     lang: Lang
@@ -39,7 +40,9 @@ export const ProductCard = memo(
     currency: Currency
     usdRate?: number | null
     eurRate?: number | null
-    macroIndicators?: MacroIndicator[] // Типизируем
+    macroIndicators?: MacroIndicator[]
+    isProPurchased?: boolean
+    onRequirePro?: () => void
   }) => {
     const sortedOffers = [...group.offers].sort((a, b) => {
       if (a.unitPrice <= 0) return 1
@@ -52,7 +55,6 @@ export const ProductCard = memo(
     const showSpread = validOffersCount > 1
     const formattedDate = formatDate(group.latestUpdatedAt, lang)
     
-    // ПЕРЕДАЕМ МАКРО-ИНДИКАТОРЫ ДЛЯ РАСЧЕТА СИГНАЛОВ
     const groupSignals = computeGroupSignals(group, macroIndicators)
 
     return (
@@ -83,7 +85,6 @@ export const ProductCard = memo(
                 </span>
               )}
 
-              {/* ПУНКТ 4: ИСТОРИЯ ЦЕН В БЛАГОРОДНОМ ЗЕЛЕНОМ ЦВЕТЕ С ИКОНКОЙ INFO */}
               <button
                 onClick={() => onOpenHistory(group)}
                 className="relative inline-flex items-center gap-1.5 p-2 -m-2 text-[10px] uppercase tracking-wider font-semibold text-[#15803d] hover:text-[#166534] transition-colors focus:outline-none rounded-md"
@@ -153,11 +154,19 @@ export const ProductCard = memo(
             const displayPrice = convertUah(offer.price, currency, usdRate, eurRate)
             const displayUnit = convertUah(offer.unitPrice, currency, usdRate, eurRate)
 
+            // === ОБРАБОТЧИК КЛИКА (ПЕРЕХВАТ ДЛЯ PRO) ===
+            const handleClick = (e: React.MouseEvent) => {
+              if (offer.url && !isProPurchased) {
+                e.preventDefault() // Останавливаем переход на сайт
+                if (onRequirePro) onRequirePro() // Открываем модалку
+              }
+            }
+
             return (
               <Comp
                 key={offer.source + '_' + offer.id}
                 {...(offer.url
-                  ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer' }
+                  ? { href: offer.url, target: '_blank', rel: 'noopener noreferrer', onClick: handleClick }
                   : {})}
                 className={
                   'relative flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)] last:border-0 transition-colors group/row ' +
@@ -184,8 +193,6 @@ export const ProductCard = memo(
                       {offer.volumeLabel}
                     </span>
                   )}
-
-                  {/* ПУНКТ 3 ВЫПОЛНЕН ЗДЕСЬ: УДАЛЕН КОД С offerSignals (БЕЙДЖИ "ЛУЧШАЯ ЦЕНА", "НИЖЕ РЫНКА") */}
                 </div>
 
                 <div className="flex items-center gap-4 shrink-0">
@@ -262,5 +269,6 @@ export const ProductCard = memo(
     prev.currency === next.currency &&
     prev.usdRate === next.usdRate &&
     prev.eurRate === next.eurRate &&
-    prev.macroIndicators === next.macroIndicators
+    prev.macroIndicators === next.macroIndicators &&
+    prev.isProPurchased === next.isProPurchased
 )
