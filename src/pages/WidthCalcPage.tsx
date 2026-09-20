@@ -33,7 +33,6 @@ const StaticIcon = ({ type, className }: { type: 'length' | 'ball' | 'instep' | 
   )
 }
 
-// Новая иконка замка для PRO режима
 const LockIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-[2px]">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -129,9 +128,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   const [widthCat, setWidthCat] = useState<WidthCategory>(() => (localStorage.getItem('wc_width') as WidthCategory) || 'standard')
   const [unit, setUnit] = useState<Unit>(() => (localStorage.getItem('wc_unit') as Unit) || 'mm')
   
-  // === СТЕЙТЫ ДЛЯ ПОКУПКИ PRO ===
   const [showPro, setShowPro] = useState(false)
-  const [isProPurchased, setIsProPurchased] = useState(false) // Пока храним локально
+  const [isProPurchased, setIsProPurchased] = useState(false) 
   const [isPurchasing, setIsPurchasing] = useState(false)
   
   const [activeInfo, setActiveInfo] = useState<InfoModalType>(null)
@@ -166,21 +164,19 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
   }
 
-  // === ЛОГИКА ПОКУПКИ ===
+  // === ОБНОВЛЕННАЯ ЛОГИКА ПОКУПКИ С ДЕТАЛЬНЫМ ВЫВОДОМ ОШИБКИ ===
   const handleProClick = async () => {
-    // Если уже куплено — просто открываем/закрываем
     if (isProPurchased) {
       haptic('light');
       setShowPro(!showPro);
       return;
     }
 
-    // Получаем ID юзера
     const tg = (window as any).Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id;
 
     if (!userId) {
-      alert("Пожалуйста, откройте приложение внутри Telegram для покупки.");
+      alert("Ошибка: Не удалось получить ID пользователя. Откройте приложение через Telegram.");
       return;
     }
 
@@ -188,33 +184,44 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     haptic('light');
 
     try {
-      // Запрос к нашему боту на Render
       const response = await fetch("https://shoemaker-bot.onrender.com/api/create-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: userId, productId: "pro_width_calc" })
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.invoiceLink) {
-        throw new Error(data.error || "Ошибка генерации счета");
+      // 1. Проверяем, вернул ли Render HTML-страницу (например, ошибку 502 Bad Gateway) вместо JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        throw new Error(`Render вернул не JSON. Статус: ${response.status}. Текст: ${textResponse.substring(0, 100)}...`);
       }
 
-      // Открываем окно оплаты
+      const data = await response.json();
+
+      // 2. Проверяем наличие ошибки в самом JSON
+      if (!response.ok) {
+        throw new Error(`Ошибка от Python-сервера (${response.status}): ${data.error || 'Нет описания'}`);
+      }
+
+      // 3. Проверяем наличие ссылки
+      if (!data.invoiceLink) {
+        throw new Error("Сервер не прислал invoiceLink. Ответ: " + JSON.stringify(data));
+      }
+
       tg.openInvoice(data.invoiceLink, (status: string) => {
         if (status === 'paid') {
-          // Успех! Открываем секцию
           haptic('heavy');
           setIsProPurchased(true);
           setShowPro(true);
         } else if (status === 'failed') {
-          alert("Произошла ошибка при оплате.");
+          alert("Телеграм отклонил платеж (ошибка на стороне мессенджера).");
         }
       });
-    } catch (error) {
-      console.error(error);
-      alert("Ошибка сети. Попробуйте позже.");
+    } catch (error: any) {
+      console.error("Детали сбоя:", error);
+      // Теперь на экране появится точная техническая причина
+      alert(`ДЕТАЛИ ОШИБКИ:\n${error.message}`);
     } finally {
       setIsPurchasing(false);
     }
@@ -362,7 +369,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
                 {t.proModules}
               </span>
-              {/* Показываем замок и цену, если не куплено */}
               {!isProPurchased && (
                 <span className={`flex items-center gap-1 text-[8px] font-sans uppercase tracking-[0.1em] px-2 py-0.5 rounded-sm border ${cLine} text-[#FFB020] border-[#FFB020]/30 bg-[#FFB020]/10`}>
                   <LockIcon /> {t.buyPro}
@@ -370,7 +376,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               )}
             </div>
             
-            {/* Анимация шеврона или текст загрузки */}
             {isPurchasing ? (
               <span className="text-[8px] font-sans uppercase animate-pulse">{t.loading}</span>
             ) : (
