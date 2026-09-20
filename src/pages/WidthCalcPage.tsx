@@ -164,7 +164,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
   }
 
-  // === НОВАЯ ЛОГИКА: VERCEL SERVERLESS API ===
+  // === ОПЛАТА TELEGRAM STARS ===
   const handleProClick = async () => {
     if (isProPurchased) {
       haptic('light');
@@ -184,7 +184,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     haptic('light');
 
     try {
-      // Обращаемся к нашему внутреннему API на Vercel (ошибок CORS не будет)
       const response = await fetch("/api/create-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -197,14 +196,19 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         throw new Error(data.error || "Ошибка генерации счета");
       }
 
-      // Открываем красивую шторку оплаты внутри Telegram
       tg.openInvoice(data.invoiceLink, (status: string) => {
+        console.log("=== Invoice status:", status, "===");
+
         if (status === 'paid') {
           haptic('heavy');
           setIsProPurchased(true);
           setShowPro(true);
         } else if (status === 'failed') {
-          alert("Оплата была отменена или произошла ошибка.");
+          alert("Оплата была отменена или произошла ошибка. (status: failed)");
+        } else if (status === 'cancelled') {
+          console.log("Пользователь отменил оплату");
+        } else {
+          console.log("Неизвестный статус оплаты:", status);
         }
       });
     } catch (error: any) {
@@ -267,7 +271,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                 key={g}
                 onClick={() => handleGender(g)}
                 className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent cursor-pointer ${
-                  gender === g ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                  gender === g ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-60 hover:opacity-100`
                 }`}
               >
                 {t[g]}
@@ -324,7 +328,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                   key={cat} 
                   onClick={() => { haptic('light'); setWidthCat(cat); }}
                   className={`text-[10px] min-[390px]:text-[11px] font-sans uppercase tracking-[0.2em] whitespace-nowrap transition-all outline-none border-none bg-transparent cursor-pointer ${
-                    widthCat === cat ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40 hover:opacity-100`
+                    widthCat === cat ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-40 hover:opacity-100`
                   }`}
                 >
                   {t.cats[cat]}
@@ -417,7 +421,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                             key={u}
                             onClick={() => { haptic('light'); setUnit(u) }}
                             className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors outline-none border-none bg-transparent cursor-pointer ${
-                              unit === u ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-40 hover:opacity-100`
+                              unit === u ? `italic \( {cText} opacity-100` : ` \){cTextMuted} opacity-40 hover:opacity-100`
                             }`}
                           >
                             {t[u]}
