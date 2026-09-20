@@ -34,7 +34,7 @@ const StaticIcon = ({ type, className }: { type: 'length' | 'ball' | 'instep' | 
 }
 
 const LockIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-[2px]">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
     <path d="M7 11V7a5 5 0 0110 0v4"></path>
   </svg>
@@ -52,7 +52,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
-      buyPro: 'КУПИТЬ 1 ⭐️',
+      proDesc: 'Полный доступ к профессиональным таблицам обхватов (пучки, взъем, пятка), стандартам ГОСТ/ISO и Mondopoint. Незаменимо для точного подбора и конструирования колодки.',
+      unlockBtn: 'РАЗБЛОКИРОВАТЬ ЗА 1 ⭐️',
       loading: 'ОБРАБОТКА...',
       gostNum: 'ГОСТ RU (цифра)', gostLet: 'ГОСТ RU (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
@@ -73,7 +74,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
-      buyPro: 'КУПИТИ 1 ⭐️',
+      proDesc: 'Повний доступ до професійних таблиць обхватів (пучки, підйом, п\'ятка), стандартів ДСТУ/ISO та Mondopoint. Незамінно для точного підбору та конструювання колодки.',
+      unlockBtn: 'РОЗБЛОКУВАТИ ЗА 1 ⭐️',
       loading: 'ОБРОБКА...',
       gostNum: 'ДСТУ UKR (цифра)', gostLet: 'ДСТУ UKR (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
@@ -94,7 +96,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step2: 'Weite',
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
-      buyPro: 'KAUFEN 1 ⭐️',
+      proDesc: 'Voller Zugriff auf professionelle Umfangstabellen (Ballen, Rist, Ferse), GOST/ISO-Standards und Mondopoint. Unerlässlich für die präzise Leistenanpassung und Konstruktion.',
+      unlockBtn: 'FREISCHALTEN FÜR 1 ⭐️',
       loading: 'LÄDT...',
       gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
@@ -156,6 +159,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       .then(data => {
         if (data.purchased) {
           setIsProPurchased(true)
+          setShowPro(true) // Автоматически раскрываем PRO-секцию, если она куплена
         }
       })
       .catch(err => console.error("Ошибка проверки покупки:", err))
@@ -181,14 +185,7 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
   }
 
-  // === ОПЛАТА TELEGRAM STARS ===
   const handleProClick = async () => {
-    if (isProPurchased) {
-      haptic('light');
-      setShowPro(!showPro);
-      return;
-    }
-
     const tg = (window as any).Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id;
 
@@ -214,18 +211,12 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       }
 
       tg.openInvoice(data.invoiceLink, (status: string) => {
-        console.log("=== Invoice status:", status, "===");
-
         if (status === 'paid') {
           haptic('heavy');
           setIsProPurchased(true);
           setShowPro(true);
         } else if (status === 'failed') {
-          alert("Оплата была отменена или произошла ошибка. (status: failed)");
-        } else if (status === 'cancelled') {
-          console.log("Пользователь отменил оплату");
-        } else {
-          console.log("Неизвестный статус оплаты:", status);
+          alert("Оплата была отменена или произошла ошибка.");
         }
       });
     } catch (error: any) {
@@ -367,32 +358,61 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* PRO DATA - БЛОК С ОПЛАТОЙ */}
+        {/* PRO DATA - ЖУРНАЛЬНАЯ ВРЕЗКА */}
         <div className="stagger-item w-full" style={{ animationDelay: '0.2s' }}>
-          <button
-            onClick={handleProClick}
-            disabled={isPurchasing}
-            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none bg-transparent cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
-          >
-            <div className="flex items-center gap-3">
+          
+          {!isProPurchased ? (
+            // Состояние: НЕ КУПЛЕНО (Элегантная карточка-приглашение)
+            <div className={`mt-8 mb-4 p-8 border ${cLine} flex flex-col items-center text-center relative overflow-hidden`}>
+              {/* Декоративные уголки (эстетика журнала) */}
+              <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${cLine}`}></div>
+              <div className={`absolute top-0 right-0 w-2 h-2 border-t border-r ${cLine}`}></div>
+              <div className={`absolute bottom-0 left-0 w-2 h-2 border-b border-l ${cLine}`}></div>
+              <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${cLine}`}></div>
+
+              <h3 className={`font-serif text-2xl tracking-tight mb-3 ${cText}`}>
+                {t.proModules}
+              </h3>
+              
+              <p className={`text-[10px] min-[390px]:text-[11px] font-sans font-light leading-relaxed mb-8 max-w-[280px] ${cTextMuted}`}>
+                {t.proDesc}
+              </p>
+
+              <button
+                onClick={handleProClick}
+                disabled={isPurchasing}
+                className={`group flex items-center justify-center gap-3 w-full py-4 border ${cLine} ${cText} hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer`}
+              >
+                {isPurchasing ? (
+                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
+                    {t.loading}
+                  </span>
+                ) : (
+                  <>
+                    <LockIcon />
+                    <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
+                      {t.unlockBtn}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            // Состояние: КУПЛЕНО (Стандартный аккордеон без замка)
+            <button
+              onClick={() => { haptic('light'); setShowPro(!showPro); }}
+              className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none bg-transparent cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
+            >
               <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
                 {t.proModules}
               </span>
-              {!isProPurchased && (
-                <span className={`flex items-center gap-1 text-[8px] font-sans uppercase tracking-[0.1em] px-2 py-0.5 rounded-sm border ${cLine} text-[#FFB020] border-[#FFB020]/30 bg-[#FFB020]/10`}>
-                  <LockIcon /> {t.buyPro}
-                </span>
-              )}
-            </div>
-            
-            {isPurchasing ? (
-              <span className="text-[8px] font-sans uppercase animate-pulse">{t.loading}</span>
-            ) : (
               <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M19 9l-7 7-7-7" />
+                </svg>
               </motion.div>
-            )}
-          </button>
+            </button>
+          )}
 
           <AnimatePresence>
             {showPro && isProPurchased && (
