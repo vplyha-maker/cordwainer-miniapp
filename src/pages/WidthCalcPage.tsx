@@ -53,7 +53,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
       buyPro: 'КУПИТЬ 1 ⭐️',
-      loading: 'ОБРАБОТКА...',
       gostNum: 'ГОСТ RU (цифра)', gostLet: 'ГОСТ RU (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
@@ -74,7 +73,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
       buyPro: 'КУПИТИ 1 ⭐️',
-      loading: 'ОБРОБКА...',
       gostNum: 'ДСТУ UKR (цифра)', gostLet: 'ДСТУ UKR (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
@@ -95,7 +93,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
       buyPro: 'KAUFEN 1 ⭐️',
-      loading: 'LÄDT...',
       gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
@@ -130,7 +127,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   
   const [showPro, setShowPro] = useState(false)
   const [isProPurchased, setIsProPurchased] = useState(false) 
-  const [isPurchasing, setIsPurchasing] = useState(false)
   
   const [activeInfo, setActiveInfo] = useState<InfoModalType>(null)
 
@@ -164,8 +160,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
   }
 
-  // === ОБНОВЛЕННАЯ ЛОГИКА ПОКУПКИ С ДЕТАЛЬНЫМ ВЫВОДОМ ОШИБКИ ===
-  const handleProClick = async () => {
+  // === НОВАЯ ЛОГИКА: ОБЩЕНИЕ С БОТОМ НАПРЯМУЮ ===
+  const handleProClick = () => {
     if (isProPurchased) {
       haptic('light');
       setShowPro(!showPro);
@@ -173,58 +169,20 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
     }
 
     const tg = (window as any).Telegram?.WebApp;
-    const userId = tg?.initDataUnsafe?.user?.id;
-
-    if (!userId) {
-      alert("Ошибка: Не удалось получить ID пользователя. Откройте приложение через Telegram.");
+    
+    if (!tg) {
+      alert("Откройте приложение через Telegram.");
       return;
     }
 
-    setIsPurchasing(true);
-    haptic('light');
-
-    try {
-      const response = await fetch("https://shoemaker-bot.onrender.com/api/create-invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: userId, productId: "pro_width_calc" })
-      });
-
-      // 1. Проверяем, вернул ли Render HTML-страницу (например, ошибку 502 Bad Gateway) вместо JSON
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const textResponse = await response.text();
-        throw new Error(`Render вернул не JSON. Статус: ${response.status}. Текст: ${textResponse.substring(0, 100)}...`);
-      }
-
-      const data = await response.json();
-
-      // 2. Проверяем наличие ошибки в самом JSON
-      if (!response.ok) {
-        throw new Error(`Ошибка от Python-сервера (${response.status}): ${data.error || 'Нет описания'}`);
-      }
-
-      // 3. Проверяем наличие ссылки
-      if (!data.invoiceLink) {
-        throw new Error("Сервер не прислал invoiceLink. Ответ: " + JSON.stringify(data));
-      }
-
-      tg.openInvoice(data.invoiceLink, (status: string) => {
-        if (status === 'paid') {
-          haptic('heavy');
-          setIsProPurchased(true);
-          setShowPro(true);
-        } else if (status === 'failed') {
-          alert("Телеграм отклонил платеж (ошибка на стороне мессенджера).");
-        }
-      });
-    } catch (error: any) {
-      console.error("Детали сбоя:", error);
-      // Теперь на экране появится точная техническая причина
-      alert(`ДЕТАЛИ ОШИБКИ:\n${error.message}`);
-    } finally {
-      setIsPurchasing(false);
-    }
+    haptic('heavy');
+    
+    // Передаем боту строку, по которой он поймет, какой счет нужно выставить
+    tg.sendData("buy_pro_width_calc");
+    
+    // Опционально: можно не закрывать приложение, а показать уведомление, 
+    // но Telegram рекомендует закрывать WebApp при переходе к оплате в чате.
+    tg.close();
   };
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
@@ -362,7 +320,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
         <div className="stagger-item w-full" style={{ animationDelay: '0.2s' }}>
           <button
             onClick={handleProClick}
-            disabled={isPurchasing}
             className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none bg-transparent cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
           >
             <div className="flex items-center gap-3">
@@ -376,13 +333,9 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
               )}
             </div>
             
-            {isPurchasing ? (
-              <span className="text-[8px] font-sans uppercase animate-pulse">{t.loading}</span>
-            ) : (
-              <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
-              </motion.div>
-            )}
+            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
+            </motion.div>
           </button>
 
           <AnimatePresence>
