@@ -16,11 +16,11 @@ export default async function handler(req: any, res: any) {
 
   const url = `https://api.telegram.org/bot${token}/createInvoiceLink`;
 
-  // Для Telegram Stars (XTR) provider_token НЕ передаём вообще
+  // Исправлен шаблонный литерал для payload
   const payload = {
     title: "PRO: Конструктивные данные",
     description: "Разовый доступ к расширенным функциям",
-    payload: `\( {userId}_buy_ \){productId}`,
+    payload: `${userId}_buy_${productId}`,
     currency: "XTR",
     prices: [{ label: "Цена", amount: 1 }] // 1 звезда
   };
