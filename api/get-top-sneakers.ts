@@ -12,30 +12,25 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  const apiKey = process.env.KICKSDB_API_KEY;
+  const apiKey = process.env.RAPIDAPI_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key is not configured in Vercel' });
+    return res.status(500).json({ error: 'RAPIDAPI_KEY is not configured in Vercel' });
   }
 
   try {
-    const response = await fetch('https://api.kicks.dev/v3/stockx/products?query=nike', {
+    const response = await fetch('https://sneaker-database-stockx.p.rapidapi.com/productprice?styleId=HQ6448', {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'x-rapidapi-host': 'sneaker-database-stockx.p.rapidapi.com',
+        'x-rapidapi-key': apiKey
       },
     });
 
     if (!response.ok) {
-      // Читаем ответ как текст, чтобы увидеть реальную причину отказа от KicksDB
       const errorText = await response.text();
       return res.status(response.status).json({ 
-        error: 'KicksDB API Error', 
+        error: 'RapidAPI Error', 
         status: response.status, 
         details: errorText 
       });
