@@ -442,16 +442,16 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
 
   const paywallText = {
     ru: {
-      desc: 'Разблокируйте доступ ко всем терминам навсегда.',
-      btn: 'ВЕСЬ СЛОВАРЬ • 1 ⭐️'
+      desc: 'Словарь доступен в PRO',
+      btn: 'ОТКРЫТЬ • 1 ⭐️'
     },
     uk: {
-      desc: 'Розблокуйте доступ до всіх термінів назавжди.',
-      btn: 'ВЕСЬ СЛОВНИК • 1 ⭐️'
+      desc: 'Словник доступний у PRO',
+      btn: 'ВІДКРИТИ • 1 ⭐️'
     },
     de: {
-      desc: 'Schalten Sie den Zugang zu allen Begriffen frei.',
-      btn: 'ALLES FÜR 1 ⭐️'
+      desc: 'Wörterbuch im PRO',
+      btn: 'ÖFFNEN • 1 ⭐️'
     }
   }[lang]
 
@@ -514,7 +514,7 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
 
         {/* BACK */}
         <div
-          className={`absolute inset-0 flex flex-col p-4 md:p-5 border ${cLine} ${cSurface} shadow-sm`}
+          className={`absolute inset-0 flex flex-col p-3 md:p-4 border ${cLine} ${cSurface} shadow-sm`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
@@ -524,40 +524,41 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
             pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
-          <div className={`flex items-center justify-between pb-3 mb-3 border-b ${cLine} shrink-0`}>
-            <h3 className={`font-serif text-[15px] md:text-[17px] leading-tight break-words pr-2 ${cText}`}>
-              {title}
-            </h3>
-          </div>
-
-          {/* КОНТЕЙНЕР (без скролла для заблокированного состояния) */}
-          <div
-            className={`flex-1 flex flex-col ${!isLocked ? 'overflow-y-auto scrollbar-hide overscroll-contain pb-2' : ''}`}
-            onClick={stopEvent}
-            onPointerDown={stopEvent}
-            onTouchStart={stopEvent}
-            onWheel={stopEvent}
-          >
-            {isLocked ? (
-              // ЗАБЛОКИРОВАННОЕ СОСТОЯНИЕ (PAYWALL) - СЖАТАЯ ВЕРСИЯ
-              <div className="flex flex-col h-full items-center justify-between text-center pb-1">
-                <div className="flex flex-col items-center justify-center flex-1 w-full gap-1.5 px-1">
-                  <div className={`opacity-60 ${cTextMuted}`}><LockIcon /></div>
-                  <p className={`text-[8.5px] md:text-[9.5px] font-sans font-light leading-[1.4] ${cTextMuted} max-w-[140px]`}>
-                    {paywallText.desc}
-                  </p>
-                </div>
-                <button
-                  onClick={onUnlock}
-                  disabled={isPurchasing}
-                  className={`w-full py-2.5 border ${cLine} ${cText} text-[8px] md:text-[8.5px] font-sans uppercase tracking-[0.15em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent shrink-0 mt-2 flex justify-center items-center`}
-                >
-                  {isPurchasing ? '...' : paywallText.btn}
-                </button>
+          {isLocked ? (
+            // ЗАБЛОКИРОВАННОЕ СОСТОЯНИЕ (ОЧЕНЬ КОМПАКТНОЕ)
+            <div className="flex flex-col h-full w-full justify-between items-center text-center">
+              <div className="flex flex-col items-center justify-center flex-1 w-full gap-2">
+                <div className={`opacity-50 ${cTextMuted}`}><LockIcon /></div>
+                <h3 className={`font-serif text-[16px] leading-tight px-1 break-words line-clamp-2 ${cText}`}>
+                  {title}
+                </h3>
+                <p className={`text-[8px] font-sans uppercase tracking-[0.15em] ${cTextMuted}`}>
+                  {paywallText.desc}
+                </p>
               </div>
-            ) : (
-              // РАЗБЛОКИРОВАННОЕ СОСТОЯНИЕ (ТЕКСТ)
-              <>
+              <button
+                onClick={onUnlock}
+                disabled={isPurchasing}
+                className={`w-full py-2 border ${cLine} ${cText} text-[8.5px] font-sans uppercase tracking-[0.1em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent shrink-0 mt-2`}
+              >
+                {isPurchasing ? '...' : paywallText.btn}
+              </button>
+            </div>
+          ) : (
+            // РАЗБЛОКИРОВАННОЕ СОСТОЯНИЕ (ОБЫЧНЫЙ ТЕКСТ)
+            <>
+              <div className={`flex items-center justify-between pb-3 mb-3 border-b ${cLine} shrink-0`}>
+                <h3 className={`font-serif text-[15px] md:text-[17px] leading-tight break-words pr-2 ${cText}`}>
+                  {title}
+                </h3>
+              </div>
+              <div
+                className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2 flex flex-col"
+                onClick={stopEvent}
+                onPointerDown={stopEvent}
+                onTouchStart={stopEvent}
+                onWheel={stopEvent}
+              >
                 <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.6] ${cTextMuted}`}>
                   {definition}
                 </p>
@@ -572,9 +573,9 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
                     </p>
                   </div>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
