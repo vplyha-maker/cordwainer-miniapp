@@ -32,7 +32,7 @@ export const ProductCard = memo(
   }: {
     group: GroupedProduct
     lang: Lang
-    t: typeof DICTIONARY['ru']
+    t: any
     isFavorite: boolean
     onToggleFavorite: (key: string) => void
     onOpenSpreadModal: (val: number) => void
