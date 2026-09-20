@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Tag, LineChart, TrendingDown, Info, Bookmark, Store } from 'lucide-react'
+import { Tag, LineChart, TrendingDown, Info, Bookmark, Store, Lock } from 'lucide-react'
 import type { Lang } from '../../../App' 
 import type { Currency } from '../../../components/PriceHistoryModal' 
 import type { GroupedProduct, MacroIndicator } from '../types'
@@ -26,9 +26,9 @@ export const ProductCard = memo(
     currency,
     usdRate,
     eurRate,
-    macroIndicators = [],
-    isProPurchased = false, // Новое поле
-    onRequirePro,         // Новое поле
+    macroIndicators = [], 
+    isProPurchased = false, 
+    onRequirePro,         
   }: {
     group: GroupedProduct
     lang: Lang
@@ -121,8 +121,13 @@ export const ProductCard = memo(
 
           <button
             onClick={() => onToggleFavorite(group.key)}
-            className="absolute top-4 right-4 p-2 -m-2 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors focus:outline-none"
+            className="absolute top-4 right-4 p-2 -m-2 text-[var(--color-muted)] hover:text-[var(--color-ink)] transition-colors focus:outline-none relative"
           >
+            {!isProPurchased && (
+              <div className="absolute -top-1 -right-1 text-[#FFB020]">
+                <Lock size={10} strokeWidth={2.5} />
+              </div>
+            )}
             <Bookmark
               size={18}
               strokeWidth={1.5}
@@ -154,11 +159,11 @@ export const ProductCard = memo(
             const displayPrice = convertUah(offer.price, currency, usdRate, eurRate)
             const displayUnit = convertUah(offer.unitPrice, currency, usdRate, eurRate)
 
-            // === ОБРАБОТЧИК КЛИКА (ПЕРЕХВАТ ДЛЯ PRO) ===
+            // Перехват клика по ссылке на магазин
             const handleClick = (e: React.MouseEvent) => {
               if (offer.url && !isProPurchased) {
-                e.preventDefault() // Останавливаем переход на сайт
-                if (onRequirePro) onRequirePro() // Открываем модалку
+                e.preventDefault() 
+                if (onRequirePro) onRequirePro() 
               }
             }
 
@@ -178,7 +183,7 @@ export const ProductCard = memo(
                   <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--color-accent)]" />
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 pr-3">
+                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0 pr-3 relative">
                   <span
                     className={
                       'text-sm font-medium truncate ' +
@@ -187,6 +192,11 @@ export const ProductCard = memo(
                   >
                     {formatSourceName(offer.source)}
                   </span>
+                  
+                  {/* Замочек рядом с названием магазина, если это ссылка */}
+                  {offer.url && !isProPurchased && (
+                    <Lock size={12} className="text-[#FFB020] opacity-80" strokeWidth={2} />
+                  )}
 
                   {offer.volumeLabel && (
                     <span className="text-[11px] text-[var(--color-muted)] font-mono border border-[var(--color-border)] px-1.5 py-0.5 bg-[var(--color-bg)] shrink-0">
