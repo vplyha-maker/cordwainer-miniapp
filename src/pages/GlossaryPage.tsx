@@ -440,6 +440,24 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
 
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
 
+  const paywallText = {
+    ru: {
+      title: 'PRO: Словарь',
+      desc: 'Разблокируйте доступ сразу ко всем терминам и определениям навсегда.',
+      btn: 'ВЕСЬ СЛОВАРЬ • 1 ⭐️'
+    },
+    uk: {
+      title: 'PRO: Словник',
+      desc: 'Розблокуйте доступ одразу до всіх термінів та визначень назавжди.',
+      btn: 'ВЕСЬ СЛОВНИК • 1 ⭐️'
+    },
+    de: {
+      title: 'PRO: Wörterbuch',
+      desc: 'Schalten Sie den Zugang zu allen Begriffen und Definitionen dauerhaft frei.',
+      btn: 'ALLES FÜR 1 ⭐️'
+    }
+  }[lang]
+
   return (
     <div
       role="button"
@@ -525,16 +543,19 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
             {isLocked ? (
               // ЗАБЛОКИРОВАННОЕ СОСТОЯНИЕ (PAYWALL)
               <div className="flex flex-col items-center justify-center h-full text-center px-1">
-                <div className={`mb-3 ${cTextMuted}`}><LockIcon /></div>
-                <p className={`text-[10px] md:text-[11px] font-sans font-light leading-[1.5] mb-5 ${cTextMuted}`}>
-                  {lang === 'de' ? 'Definition ist im PRO-Modus verfügbar' : lang === 'uk' ? 'Визначення доступне в PRO' : 'Определение доступно в PRO'}
+                <div className={`mb-2 ${cTextMuted}`}><LockIcon /></div>
+                <h4 className={`font-serif text-[16px] md:text-[18px] mb-2 leading-tight ${cText}`}>
+                  {paywallText.title}
+                </h4>
+                <p className={`text-[9.5px] md:text-[10px] font-sans font-light leading-[1.4] mb-4 ${cTextMuted} max-w-[180px]`}>
+                  {paywallText.desc}
                 </p>
                 <button
                   onClick={onUnlock}
                   disabled={isPurchasing}
-                  className={`w-full py-3 border ${cLine} ${cText} text-[8px] md:text-[9px] font-sans uppercase tracking-[0.2em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent flex justify-center items-center`}
+                  className={`w-full py-3 border ${cLine} ${cText} text-[8px] md:text-[9px] font-sans uppercase tracking-[0.1em] md:tracking-[0.2em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent flex justify-center items-center`}
                 >
-                  {isPurchasing ? '...' : '1 ⭐️'}
+                  {isPurchasing ? '...' : paywallText.btn}
                 </button>
               </div>
             ) : (
