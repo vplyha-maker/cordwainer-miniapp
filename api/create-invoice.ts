@@ -16,13 +16,13 @@ export default async function handler(req: any, res: any) {
 
   const url = `https://api.telegram.org/bot${token}/createInvoiceLink`;
 
-  // Исправлен шаблонный литерал для payload
+  // Установили amount: 0 для тестирования с аккаунта разработчика
   const payload = {
     title: "PRO: Конструктивные данные",
     description: "Разовый доступ к расширенным функциям",
     payload: `${userId}_buy_${productId}`,
     currency: "XTR",
-    prices: [{ label: "Цена", amount: 1 }] // 1 звезда
+    prices: [{ label: "Цена", amount: 0 }] 
   };
 
   try {
