@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   GLOSSARY_TERMS,
   searchTerms,
@@ -42,7 +43,14 @@ const CATEGORY_ICON: Record<NonNullable<GlossaryTerm['category']>, React.ReactNo
   other: <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
 }
 
-function haptic(style: 'light' | 'medium' = 'light') {
+const LockIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+  </svg>
+)
+
+function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   try {
     const tg = (window as any).Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
@@ -53,6 +61,10 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   const [query, setQuery] = useState('')
   const [activeLetter, setActiveLetter] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  
+  // Состояния для Paywall (Neon DB)
+  const [isProPurchased, setIsProPurchased] = useState(false)
+  const [isPurchasing, setIsPurchasing] = useState(false)
   
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
@@ -75,6 +87,59 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   useEffect(() => {
     setActiveLetter(null)
   }, [lang])
+
+  // Автоматическая проверка покупки словаря при загрузке
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    const userId = tg?.initDataUnsafe?.user?.id
+    if (!userId) return
+
+    fetch(`/api/check-purchase?userId=${userId}&productId=pro_glossary`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.purchased) setIsProPurchased(true)
+      })
+      .catch(err => console.error("Ошибка проверки покупки:", err))
+  }, [])
+
+  const handleProClick = async (e: React.MouseEvent) => {
+    e.stopPropagation() // Чтобы карточка не переворачивалась при клике на кнопку
+    const tg = (window as any).Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id;
+
+    if (!userId) {
+      alert("Ошибка: Откройте приложение через Telegram.");
+      return;
+    }
+
+    setIsPurchasing(true);
+    haptic('light');
+
+    try {
+      const response = await fetch("/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, productId: "pro_glossary" }) 
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.invoiceLink) throw new Error(data.error);
+
+      tg.openInvoice(data.invoiceLink, (status: string) => {
+        if (status === 'paid') {
+          haptic('heavy');
+          setIsProPurchased(true); 
+        } else if (status === 'failed') {
+          alert("Оплата была отменена или произошла ошибка.");
+        }
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(`Сбой сервера: ${error.message}`);
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   const t = {
     ru: {
@@ -295,20 +360,30 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-16 w-full">
-            {filtered.map((term, i) => (
-              <div
-                key={term.id}
-                className="stagger-item"
-                style={{ animationDelay: `${0.2 + (i % 10) * 0.05}s` }}
-              >
-                <FlipCard 
-                  term={term} 
-                  lang={lang} 
-                  isDark={isDark} 
-                  flipHint={t.flipHint}
-                />
-              </div>
-            ))}
+            {filtered.map((term, i) => {
+              // Вычисляем абсолютный индекс термина в общем словаре
+              const globalIndex = GLOSSARY_TERMS.findIndex(t => t.id === term.id);
+              // Первые 3 карточки словаря всегда бесплатны
+              const isFree = globalIndex < 3;
+              
+              return (
+                <div
+                  key={term.id}
+                  className="stagger-item"
+                  style={{ animationDelay: `${0.2 + (i % 10) * 0.05}s` }}
+                >
+                  <FlipCard 
+                    term={term} 
+                    lang={lang} 
+                    isDark={isDark} 
+                    flipHint={t.flipHint}
+                    isLocked={!isProPurchased && !isFree}
+                    onUnlock={handleProClick}
+                    isPurchasing={isPurchasing}
+                  />
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -333,11 +408,14 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
 type FlipCardProps = {
   term: GlossaryTerm
   lang: Lang
-  isDark: boolean
-  flipHint: string
+  isDark?: boolean
+  flipHint?: string
+  isLocked?: boolean
+  onUnlock?: (e: React.MouseEvent) => void
+  isPurchasing?: boolean
 }
 
-function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
+function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocked = false, onUnlock, isPurchasing = false }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
 
   const title = lang === 'de' && (term as any).termDe ? (term as any).termDe 
@@ -383,7 +461,7 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
       >
         {/* FRONT */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-between p-5 border ${cLine} ${cSurface} shadow-sm`}
+          className={`absolute inset-0 flex flex-col items-center justify-between p-4 md:p-5 border ${cLine} ${cSurface} shadow-sm`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
@@ -394,33 +472,34 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
           }}
         >
           <div className="w-full flex items-center justify-between z-10">
-            <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
+            <span className={`text-[8.5px] md:text-[9px] font-sans uppercase tracking-[0.15em] truncate pr-2 ${cTextMuted}`}>
               {CATEGORY_LABELS[cat][lang]}
             </span>
-            <div className={`w-5 h-5 flex items-center justify-center ${cTextMuted}`}>
+            <div className={`w-4 h-4 md:w-5 md:h-5 flex items-center justify-center shrink-0 ${cTextMuted}`}>
               <svg width="100%" height="100%" viewBox="0 0 24 24">
                 {icon}
               </svg>
             </div>
           </div>
 
-          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[120px] leading-none opacity-5 pointer-events-none select-none ${cText}`}>
+          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[100px] md:text-[120px] leading-none opacity-5 pointer-events-none select-none ${cText}`}>
             {title.charAt(0).toUpperCase()}
           </div>
 
-          <div className="w-full flex flex-col items-center text-center z-10 mt-auto">
-            <h3 className={`font-serif text-[22px] leading-[1.1] mb-4 break-words w-full ${cText}`}>
+          <div className="w-full flex flex-col items-center text-center z-10 mt-auto px-1">
+            <h3 className={`font-serif text-[17px] md:text-[20px] leading-[1.15] mb-3 break-words hyphens-auto w-full ${cText}`}>
               {title}
             </h3>
-            <div className={`text-[8px] font-sans tracking-[0.3em] uppercase transition-opacity opacity-0 group-hover:opacity-100 ${cTextMuted}`}>
-              {flipHint}
+            <div className={`text-[8px] font-sans tracking-[0.25em] uppercase transition-opacity opacity-0 group-hover:opacity-100 flex flex-col items-center gap-1 ${cTextMuted}`}>
+              {isLocked ? <LockIcon /> : null}
+              <span>{flipHint}</span>
             </div>
           </div>
         </div>
 
         {/* BACK */}
         <div
-          className={`absolute inset-0 flex flex-col p-5 border ${cLine} ${cSurface} shadow-sm`}
+          className={`absolute inset-0 flex flex-col p-4 md:p-5 border ${cLine} ${cSurface} shadow-sm`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
@@ -430,32 +509,52 @@ function FlipCard({ term, lang, isDark, flipHint }: FlipCardProps) {
             pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
-          <div className={`flex items-center justify-between pb-3 mb-4 border-b ${cLine} shrink-0 w-full`}>
-            <h3 className={`font-serif text-[18px] leading-[1.1] break-words w-full ${cText}`}>
+          <div className={`flex items-center justify-between pb-3 mb-3 border-b ${cLine} shrink-0`}>
+            <h3 className={`font-serif text-[15px] md:text-[17px] leading-tight break-words pr-2 ${cText}`}>
               {title}
             </h3>
           </div>
 
           <div
-            className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2"
+            className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2 flex flex-col"
             onClick={stopEvent}
             onPointerDown={stopEvent}
             onTouchStart={stopEvent}
             onWheel={stopEvent}
           >
-            <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.7] ${cTextMuted}`}>
-              {definition}
-            </p>
-
-            {example && (
-              <div className={`mt-4 pt-4 border-t ${cLine}`}>
-                <span className={`block mb-1 text-[8px] font-sans uppercase tracking-[0.3em] ${cText}`}>
-                  {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
-                </span>
-                <p className={`font-serif text-[13px] italic leading-[1.5] ${cTextMuted}`}>
-                  {example}
+            {isLocked ? (
+              // ЗАБЛОКИРОВАННОЕ СОСТОЯНИЕ (PAYWALL)
+              <div className="flex flex-col items-center justify-center h-full text-center px-1">
+                <div className={`mb-3 ${cTextMuted}`}><LockIcon /></div>
+                <p className={`text-[10px] md:text-[11px] font-sans font-light leading-[1.5] mb-5 ${cTextMuted}`}>
+                  {lang === 'de' ? 'Definition ist im PRO-Modus verfügbar' : lang === 'uk' ? 'Визначення доступне в PRO' : 'Определение доступно в PRO'}
                 </p>
+                <button
+                  onClick={onUnlock}
+                  disabled={isPurchasing}
+                  className={`w-full py-3 border ${cLine} ${cText} text-[8px] md:text-[9px] font-sans uppercase tracking-[0.2em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent flex justify-center items-center`}
+                >
+                  {isPurchasing ? '...' : '1 ⭐️'}
+                </button>
               </div>
+            ) : (
+              // РАЗБЛОКИРОВАННОЕ СОСТОЯНИЕ (ТЕКСТ)
+              <>
+                <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.6] ${cTextMuted}`}>
+                  {definition}
+                </p>
+
+                {example && (
+                  <div className={`mt-3 pt-3 border-t ${cLine} mt-auto`}>
+                    <span className={`block mb-1 text-[7.5px] font-sans uppercase tracking-[0.25em] ${cText}`}>
+                      {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
+                    </span>
+                    <p className={`font-serif text-[12px] md:text-[13px] italic leading-[1.4] ${cTextMuted}`}>
+                      {example}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
