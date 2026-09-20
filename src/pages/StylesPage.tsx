@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -29,6 +29,13 @@ const getDeviceId = () => {
   }
   return deviceId
 }
+
+const LockIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+  </svg>
+)
 
 const STYLES_DATA: StyleSlide[] = [
   {
@@ -179,7 +186,6 @@ type SlideItemProps = {
   isMuted: boolean
 }
 
-// Плавная и стабильная кривая без рывков в начале
 const smoothEase = [0.25, 1, 0.5, 1];
 
 function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
@@ -209,7 +215,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     return () => { mounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // Preload (Логика Grok - не трогаем, она идеальна)
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
@@ -228,7 +233,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     }
   }, [isPreloaded, slide.video])
 
-  // Play / Pause (Логика Grok)
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -293,7 +297,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
 
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-black">
-      {/* Видео */}
       <div className="absolute inset-0 bg-black">
         {slide.video ? (
           <video
@@ -318,10 +321,8 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         ) : null}
       </div>
 
-      {/* Градиент сверху */}
       <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
 
-      {/* Верхний текст (Framer Motion - идеальная плавность) */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
@@ -341,7 +342,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         </div>
       </motion.div>
 
-      {/* Нижний блок (Framer Motion - идеальная плавность) */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
@@ -398,12 +398,56 @@ const pageVariants = {
 }
 
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
+  const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
+  
+  const paywallText = {
+    ru: {
+      title: 'PRO: Энциклопедия',
+      desc: 'Откройте полный доступ ко всем видео-разборам фасонов, истории обуви и эксклюзивному контенту.',
+      btn: 'РАЗБЛОКИРОВАТЬ ЗА 1 ⭐️',
+      loading: 'ОБРАБОТКА...'
+    },
+    uk: {
+      title: 'PRO: Енциклопедія',
+      desc: 'Відкрийте повний доступ до всіх відео-розборів фасонів, історії взуття та ексклюзивного контенту.',
+      btn: 'РОЗБЛОКУВАТИ ЗА 1 ⭐️',
+      loading: 'ОБРОБКА...'
+    },
+    de: {
+      title: 'PRO: Enzyklopädie',
+      desc: 'Schalten Sie den vollen Zugriff auf alle Videoanalysen von Stilen, Schuhgeschichte und exklusiven Inhalten frei.',
+      btn: 'FREISCHALTEN FÜR 1 ⭐️',
+      loading: 'LÄDT...'
+    }
+  }[currentLang]
+
   const [isMuted, setIsMuted] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // Логика Grok (IntersectionObserver)
+  const [isProPurchased, setIsProPurchased] = useState(false)
+  const [isPurchasing, setIsPurchasing] = useState(false)
+
+  // Проверка покупки при запуске страницы
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    const userId = tg?.initDataUnsafe?.user?.id
+    if (!userId) return
+
+    fetch(`/api/check-purchase?userId=${userId}&productId=pro_videos`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.purchased) setIsProPurchased(true)
+      })
+      .catch(err => console.error("Ошибка проверки:", err))
+  }, [])
+
+  // Показываем только 3 видео, если не куплено
+  const visibleStyles = isProPurchased ? STYLES_DATA : STYLES_DATA.slice(0, 3)
+  const showPaywallSlide = !isProPurchased
+
+  // Перепривязываем Observer при изменении количества слайдов
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
@@ -419,18 +463,14 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           }
         }
       },
-      {
-        root,
-        threshold: [0.6],
-      }
+      { root, threshold: [0.6] }
     )
 
-    slideRefs.current.forEach((el) => {
-      if (el) observer.observe(el)
-    })
+    const currentRefs = slideRefs.current.filter(Boolean)
+    currentRefs.forEach(el => observer.observe(el!))
 
     return () => observer.disconnect()
-  }, [])
+  }, [isProPurchased])
 
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
@@ -440,6 +480,45 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       tg.disableVerticalSwipes?.()
     }
   }, [])
+
+  const handleProClick = async () => {
+    const tg = (window as any).Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id;
+
+    if (!userId) {
+      alert("Ошибка: Откройте приложение через Telegram.");
+      return;
+    }
+
+    setIsPurchasing(true);
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+    try {
+      const response = await fetch("/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Используем новый ID товара для видео
+        body: JSON.stringify({ userId, productId: "pro_videos" }) 
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.invoiceLink) throw new Error(data.error);
+
+      tg.openInvoice(data.invoiceLink, (status: string) => {
+        if (status === 'paid') {
+          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
+          setIsProPurchased(true); // Автоматически открываем оставшиеся видео
+        } else if (status === 'failed') {
+          alert("Оплата была отменена или произошла ошибка.");
+        }
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(`Сбой сервера: ${error.message}`);
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   return (
     <motion.div
@@ -490,7 +569,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         ref={scrollRef}
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
       >
-        {STYLES_DATA.map((slide, index) => {
+        {visibleStyles.map((slide, index) => {
           const isPreloaded = Math.abs(activeIndex - index) <= 1
           const isActive = activeIndex === index
 
@@ -512,6 +591,50 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
             </div>
           )
         })}
+
+        {/* PAYWALL SLIDE */}
+        {showPaywallSlide && (
+          <div
+            ref={(el) => { slideRefs.current[visibleStyles.length] = el }}
+            data-index={visibleStyles.length}
+            className="h-full w-full snap-start snap-always relative bg-[#0A0A0A] flex flex-col items-center justify-center px-6"
+          >
+            <div className="relative w-full max-w-[320px] p-8 border border-white/15 flex flex-col items-center text-center overflow-hidden bg-black/40 backdrop-blur-md">
+              {/* Декоративные уголки */}
+              <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/30" />
+              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/30" />
+              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/30" />
+              <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/30" />
+
+              <h3 className="font-serif text-2xl tracking-tight text-white mb-3">
+                {paywallText.title}
+              </h3>
+              
+              <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-relaxed mb-8 text-white/50 max-w-[250px]">
+                {paywallText.desc}
+              </p>
+
+              <button
+                onClick={handleProClick}
+                disabled={isPurchasing}
+                className="group flex items-center justify-center gap-3 w-full py-4 border border-white/20 text-white hover:bg-white/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer"
+              >
+                {isPurchasing ? (
+                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
+                    {paywallText.loading}
+                  </span>
+                ) : (
+                  <>
+                    <LockIcon />
+                    <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
+                      {paywallText.btn}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   )
