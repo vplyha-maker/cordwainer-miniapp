@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 import { getWidthData, SIZE_LIMITS, type Gender, type WidthCategory } from '../lib/shoeWidths'
@@ -33,6 +33,14 @@ const StaticIcon = ({ type, className }: { type: 'length' | 'ball' | 'instep' | 
   )
 }
 
+// Новая иконка замка для PRO режима
+const LockIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-[2px]">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+  </svg>
+)
+
 export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   const safeLang = (lang && ['ru', 'uk', 'de'].includes(lang)) ? lang : 'uk'
 
@@ -45,6 +53,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step2: 'Полнота',
       cats: { narrow: 'Узкая', standard: 'Средняя', wide: 'Широкая', xwide: 'Очень шир.' },
       proModules: 'PRO: Конструктивные данные',
+      buyPro: 'КУПИТЬ 1 ⭐️',
+      loading: 'ОБРАБОТКА...',
       gostNum: 'ГОСТ RU (цифра)', gostLet: 'ГОСТ RU (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Длина стопы', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямой взъем', tableHeel: 'Косой обхват',
@@ -64,6 +74,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step2: 'Повнота',
       cats: { narrow: 'Вузька', standard: 'Середня', wide: 'Широка', xwide: 'Дуже шир.' },
       proModules: 'PRO: Конструктивні дані',
+      buyPro: 'КУПИТИ 1 ⭐️',
+      loading: 'ОБРОБКА...',
       gostNum: 'ДСТУ UKR (цифра)', gostLet: 'ДСТУ UKR (буква)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Довжина стопи', tableBall: 'Пучки (Обхват)', tableInstep: 'Прямий підйом', tableHeel: 'Косий обхват',
@@ -83,6 +95,8 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       step2: 'Weite',
       cats: { narrow: 'Schmal', standard: 'Standard', wide: 'Weit', xwide: 'Sehr weit' },
       proModules: 'PRO: Konstruktionsdaten',
+      buyPro: 'KAUFEN 1 ⭐️',
+      loading: 'LÄDT...',
       gostNum: 'RU-Norm (Zahl)', gostLet: 'RU-Norm (Buchst.)', iso: 'EU / ISO',
       mondopointLabel: 'Mondopoint',
       tableLength: 'Fußlänge', tableBall: 'Ballenumfang', tableInstep: 'Ristumfang', tableHeel: 'Fersenumfang',
@@ -115,7 +129,11 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
   const [widthCat, setWidthCat] = useState<WidthCategory>(() => (localStorage.getItem('wc_width') as WidthCategory) || 'standard')
   const [unit, setUnit] = useState<Unit>(() => (localStorage.getItem('wc_unit') as Unit) || 'mm')
   
+  // === СТЕЙТЫ ДЛЯ ПОКУПКИ PRO ===
   const [showPro, setShowPro] = useState(false)
+  const [isProPurchased, setIsProPurchased] = useState(false) // Пока храним локально
+  const [isPurchasing, setIsPurchasing] = useState(false)
+  
   const [activeInfo, setActiveInfo] = useState<InfoModalType>(null)
 
   const limits = SIZE_LIMITS[gender]
@@ -147,6 +165,60 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
       haptic('heavy')
     }
   }
+
+  // === ЛОГИКА ПОКУПКИ ===
+  const handleProClick = async () => {
+    // Если уже куплено — просто открываем/закрываем
+    if (isProPurchased) {
+      haptic('light');
+      setShowPro(!showPro);
+      return;
+    }
+
+    // Получаем ID юзера
+    const tg = (window as any).Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id;
+
+    if (!userId) {
+      alert("Пожалуйста, откройте приложение внутри Telegram для покупки.");
+      return;
+    }
+
+    setIsPurchasing(true);
+    haptic('light');
+
+    try {
+      // Запрос к нашему боту на Render
+      const response = await fetch("https://shoemaker-bot.onrender.com/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userId, productId: "pro_width_calc" })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.invoiceLink) {
+        throw new Error(data.error || "Ошибка генерации счета");
+      }
+
+      // Открываем окно оплаты
+      tg.openInvoice(data.invoiceLink, (status: string) => {
+        if (status === 'paid') {
+          // Успех! Открываем секцию
+          haptic('heavy');
+          setIsProPurchased(true);
+          setShowPro(true);
+        } else if (status === 'failed') {
+          alert("Произошла ошибка при оплате.");
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Ошибка сети. Попробуйте позже.");
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
@@ -279,22 +351,37 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
           </div>
         </div>
 
-        {/* PRO DATA */}
+        {/* PRO DATA - БЛОК С ОПЛАТОЙ */}
         <div className="stagger-item w-full" style={{ animationDelay: '0.2s' }}>
           <button
-            onClick={() => { haptic('light'); setShowPro(!showPro) }}
-            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none ${cLine} ${cTextMuted} hover:text-current`}
+            onClick={handleProClick}
+            disabled={isPurchasing}
+            className={`w-full flex items-center justify-between pb-4 border-b transition-colors outline-none bg-transparent cursor-pointer ${cLine} ${cTextMuted} hover:text-current`}
           >
-            <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
-              {t.proModules}
-            </span>
-            <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
-            </motion.div>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
+                {t.proModules}
+              </span>
+              {/* Показываем замок и цену, если не куплено */}
+              {!isProPurchased && (
+                <span className={`flex items-center gap-1 text-[8px] font-sans uppercase tracking-[0.1em] px-2 py-0.5 rounded-sm border ${cLine} text-[#FFB020] border-[#FFB020]/30 bg-[#FFB020]/10`}>
+                  <LockIcon /> {t.buyPro}
+                </span>
+              )}
+            </div>
+            
+            {/* Анимация шеврона или текст загрузки */}
+            {isPurchasing ? (
+              <span className="text-[8px] font-sans uppercase animate-pulse">{t.loading}</span>
+            ) : (
+              <motion.div animate={{ rotate: showPro ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
+              </motion.div>
+            )}
           </button>
 
           <AnimatePresence>
-            {showPro && (
+            {showPro && isProPurchased && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }} 
                 animate={{ opacity: 1, height: 'auto' }} 
@@ -362,7 +449,6 @@ export function WidthCalcPage({ onBack, lang }: WidthCalcPageProps) {
                           </div>
                           <span className={`font-serif text-2xl md:text-3xl ${cText}`}>
                             {unit === 'mm' ? row.valMm : row.valIn}
-                            {/* Единицы измерения всегда строчными для эстетики и понятности */}
                             <span className={`font-sans text-[10px] ml-1.5 ${cTextMuted}`}>
                               {unit === 'mm' ? 'mm' : 'in'}
                             </span>
