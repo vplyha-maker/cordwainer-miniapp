@@ -103,7 +103,7 @@ export function GlossaryPage({ onBack, lang, initialTermId }: GlossaryPageProps)
   }, [])
 
   const handleProClick = async (e: React.MouseEvent) => {
-    e.stopPropagation() // Чтобы карточка не переворачивалась при клике на кнопку
+    e.stopPropagation() 
     const tg = (window as any).Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id;
 
@@ -442,18 +442,15 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
 
   const paywallText = {
     ru: {
-      title: 'PRO: Словарь',
-      desc: 'Разблокируйте доступ сразу ко всем терминам и определениям навсегда.',
+      desc: 'Разблокируйте доступ ко всем терминам навсегда.',
       btn: 'ВЕСЬ СЛОВАРЬ • 1 ⭐️'
     },
     uk: {
-      title: 'PRO: Словник',
-      desc: 'Розблокуйте доступ одразу до всіх термінів та визначень назавжди.',
+      desc: 'Розблокуйте доступ до всіх термінів назавжди.',
       btn: 'ВЕСЬ СЛОВНИК • 1 ⭐️'
     },
     de: {
-      title: 'PRO: Wörterbuch',
-      desc: 'Schalten Sie den Zugang zu allen Begriffen und Definitionen dauerhaft frei.',
+      desc: 'Schalten Sie den Zugang zu allen Begriffen frei.',
       btn: 'ALLES FÜR 1 ⭐️'
     }
   }[lang]
@@ -533,27 +530,27 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
             </h3>
           </div>
 
+          {/* КОНТЕЙНЕР (без скролла для заблокированного состояния) */}
           <div
-            className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2 flex flex-col"
+            className={`flex-1 flex flex-col ${!isLocked ? 'overflow-y-auto scrollbar-hide overscroll-contain pb-2' : ''}`}
             onClick={stopEvent}
             onPointerDown={stopEvent}
             onTouchStart={stopEvent}
             onWheel={stopEvent}
           >
             {isLocked ? (
-              // ЗАБЛОКИРОВАННОЕ СОСТОЯНИЕ (PAYWALL)
-              <div className="flex flex-col items-center justify-center h-full text-center px-1">
-                <div className={`mb-2 ${cTextMuted}`}><LockIcon /></div>
-                <h4 className={`font-serif text-[16px] md:text-[18px] mb-2 leading-tight ${cText}`}>
-                  {paywallText.title}
-                </h4>
-                <p className={`text-[9.5px] md:text-[10px] font-sans font-light leading-[1.4] mb-4 ${cTextMuted} max-w-[180px]`}>
-                  {paywallText.desc}
-                </p>
+              // ЗАБЛОКИРОВАННОЕ СОСТОЯНИЕ (PAYWALL) - СЖАТАЯ ВЕРСИЯ
+              <div className="flex flex-col h-full items-center justify-between text-center pb-1">
+                <div className="flex flex-col items-center justify-center flex-1 w-full gap-1.5 px-1">
+                  <div className={`opacity-60 ${cTextMuted}`}><LockIcon /></div>
+                  <p className={`text-[8.5px] md:text-[9.5px] font-sans font-light leading-[1.4] ${cTextMuted} max-w-[140px]`}>
+                    {paywallText.desc}
+                  </p>
+                </div>
                 <button
                   onClick={onUnlock}
                   disabled={isPurchasing}
-                  className={`w-full py-3 border ${cLine} ${cText} text-[8px] md:text-[9px] font-sans uppercase tracking-[0.1em] md:tracking-[0.2em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent flex justify-center items-center`}
+                  className={`w-full py-2.5 border ${cLine} ${cText} text-[8px] md:text-[8.5px] font-sans uppercase tracking-[0.15em] hover:bg-current/10 active:scale-95 transition-all outline-none bg-transparent shrink-0 mt-2 flex justify-center items-center`}
                 >
                   {isPurchasing ? '...' : paywallText.btn}
                 </button>
@@ -566,7 +563,7 @@ function FlipCard({ term, lang, isDark = true, flipHint = 'TAP TO READ', isLocke
                 </p>
 
                 {example && (
-                  <div className={`mt-3 pt-3 border-t ${cLine} mt-auto`}>
+                  <div className={`mt-3 pt-3 border-t ${cLine} mt-auto shrink-0`}>
                     <span className={`block mb-1 text-[7.5px] font-sans uppercase tracking-[0.25em] ${cText}`}>
                       {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
                     </span>
