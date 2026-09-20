@@ -400,22 +400,26 @@ const pageVariants = {
 export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
   
+  // Новые, правильные тексты в стиле Fashion Editorial
   const paywallText = {
     ru: {
-      title: 'PRO: Энциклопедия',
-      desc: 'Откройте полный доступ ко всем видео-разборам фасонов, истории обуви и эксклюзивному контенту.',
-      btn: 'РАЗБЛОКИРОВАТЬ ЗА 1 ⭐️',
+      tag: 'ОГРАНИЧЕНИЕ ПРОСМОТРА',
+      title: 'Полный\nЛукбук',
+      desc: 'Вы посмотрели бесплатную часть ленты. Разблокируйте доступ, чтобы продолжить свайпать и увидеть видео-разборы всех премиальных фасонов обуви.',
+      btn: 'ОТКРЫТЬ ДОСТУП • 1 ⭐️',
       loading: 'ОБРАБОТКА...'
     },
     uk: {
-      title: 'PRO: Енциклопедія',
-      desc: 'Відкрийте повний доступ до всіх відео-розборів фасонів, історії взуття та ексклюзивного контенту.',
-      btn: 'РОЗБЛОКУВАТИ ЗА 1 ⭐️',
+      tag: 'ОБМЕЖЕННЯ ПЕРЕГЛЯДУ',
+      title: 'Повний\nЛукбук',
+      desc: 'Ви переглянули безкоштовну частину стрічки. Розблокуйте доступ, щоб продовжити свайпати та побачити відео-розбори всіх преміальних фасонів взуття.',
+      btn: 'ВІДКРИТИ ДОСТУП • 1 ⭐️',
       loading: 'ОБРОБКА...'
     },
     de: {
-      title: 'PRO: Enzyklopädie',
-      desc: 'Schalten Sie den vollen Zugriff auf alle Videoanalysen von Stilen, Schuhgeschichte und exklusiven Inhalten frei.',
+      tag: 'ANSICHTSLIMIT',
+      title: 'Volles\nLookbook',
+      desc: 'Sie haben den kostenlosen Teil gesehen. Schalten Sie den Zugang frei, um weiter zu wischen und Videoanalysen aller Premium-Stile zu sehen.',
       btn: 'FREISCHALTEN FÜR 1 ⭐️',
       loading: 'LÄDT...'
     }
@@ -497,7 +501,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       const response = await fetch("/api/create-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Используем новый ID товара для видео
         body: JSON.stringify({ userId, productId: "pro_videos" }) 
       });
 
@@ -507,7 +510,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       tg.openInvoice(data.invoiceLink, (status: string) => {
         if (status === 'paid') {
           if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
-          setIsProPurchased(true); // Автоматически открываем оставшиеся видео
+          setIsProPurchased(true); 
         } else if (status === 'failed') {
           alert("Оплата была отменена или произошла ошибка.");
         }
@@ -526,7 +529,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="fixed inset-0 z-50 bg-black text-[#F4F0E8] overflow-hidden"
+      className="fixed inset-0 z-50 bg-[#050505] text-[#F4F0E8] overflow-hidden"
     >
       <style>{`
         .snap-container {
@@ -592,43 +595,51 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           )
         })}
 
-        {/* PAYWALL SLIDE */}
+        {/* НОВЫЙ ЭДИТОРИАЛ PAYWALL SLIDE */}
         {showPaywallSlide && (
           <div
             ref={(el) => { slideRefs.current[visibleStyles.length] = el }}
             data-index={visibleStyles.length}
-            className="h-full w-full snap-start snap-always relative bg-[#0A0A0A] flex flex-col items-center justify-center px-6"
+            className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6 pb-12"
           >
-            <div className="relative w-full max-w-[320px] p-8 border border-white/15 flex flex-col items-center text-center overflow-hidden bg-black/40 backdrop-blur-md">
-              {/* Декоративные уголки */}
-              <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/30" />
-              <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/30" />
-              <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/30" />
-              <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/30" />
+            {/* Огромная фоновая типографика в стиле Vogue */}
+            <div className="absolute top-20 left-4 pointer-events-none select-none">
+              <h2 className="font-serif text-[22vw] leading-[0.8] text-white/5 tracking-tighter">
+                FULL<br/>VIDEO<br/>LOOKBOOK
+              </h2>
+            </div>
 
-              <h3 className="font-serif text-2xl tracking-tight text-white mb-3">
+            {/* Контент прижат к низу, как описание в самих видео */}
+            <div className="relative z-10 w-full mb-4">
+              <div className="w-full h-px bg-white/20 mb-6" />
+              
+              <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/50 mb-4">
+                {paywallText.tag}
+              </p>
+              
+              <h3 className="font-serif text-4xl min-[390px]:text-5xl tracking-tight text-[#F4F0E8] whitespace-pre-line mb-6">
                 {paywallText.title}
               </h3>
               
-              <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-relaxed mb-8 text-white/50 max-w-[250px]">
+              <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.8] text-white/70 max-w-[300px] mb-10">
                 {paywallText.desc}
               </p>
 
               <button
                 onClick={handleProClick}
                 disabled={isPurchasing}
-                className="group flex items-center justify-center gap-3 w-full py-4 border border-white/20 text-white hover:bg-white/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer"
+                className="group relative flex items-center justify-between w-full h-[56px] px-6 border border-white/20 text-[#F4F0E8] hover:bg-white/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer"
               >
                 {isPurchasing ? (
-                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
+                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse mx-auto">
                     {paywallText.loading}
                   </span>
                 ) : (
                   <>
-                    <LockIcon />
                     <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
                       {paywallText.btn}
                     </span>
+                    <LockIcon />
                   </>
                 )}
               </button>
