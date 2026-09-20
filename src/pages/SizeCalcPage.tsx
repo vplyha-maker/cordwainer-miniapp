@@ -53,6 +53,13 @@ const FlagUS = () => (
   </svg>
 )
 
+const LockIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+    <path d="M7 11V7a5 5 0 0110 0v4"></path>
+  </svg>
+)
+
 function haptic(style: 'light' | 'medium' = 'light') {
   try {
     const tg = (window as any).Telegram?.WebApp
@@ -91,6 +98,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       isoUk: 'ISO 19407 · Barleycorn',
       isoUs: 'ISO 19407 · UK + сдвиг',
       isoMondo: 'ISO 9407 · мм стопы',
+      proTitle: 'Global Sizing',
+      proDesc: 'Откройте точную конвертацию в международные стандарты США (US) и Великобритании (UK).',
+      proBtn: 'РАЗБЛОКИРОВАТЬ ЗА 1 ⭐️',
+      loading: 'ОБРАБОТКА...'
     },
     uk: {
       title: 'Розмір взуття',
@@ -118,6 +129,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       isoUk: 'ISO 19407 · Barleycorn',
       isoUs: 'ISO 19407 · UK + зсув',
       isoMondo: 'ISO 9407 · мм стопи',
+      proTitle: 'Global Sizing',
+      proDesc: 'Відкрийте точну конвертацію в міжнародні стандарти США (US) та Великобританії (UK).',
+      proBtn: 'РОЗБЛОКУВАТИ ЗА 1 ⭐️',
+      loading: 'ОБРОБКА...'
     },
     de: {
       title: 'Schuhgröße',
@@ -145,6 +160,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       isoUk: 'ISO 19407 · Barleycorn',
       isoUs: 'ISO 19407 · UK + Offset',
       isoMondo: 'ISO 9407 · Fuß in mm',
+      proTitle: 'Global Sizing',
+      proDesc: 'Schalten Sie die genaue Umrechnung in US- und UK-Standards frei.',
+      proBtn: 'FREISCHALTEN FÜR 1 ⭐️',
+      loading: 'LÄDT...'
     },
   }[safeLang]
 
@@ -172,6 +191,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [showStandards, setShowStandards] = useState(false)
   const [showMeasureGuide, setShowMeasureGuide] = useState(false)
   
+  // Добавляем состояния для Paywall (Neon DB)
+  const [isProPurchased, setIsProPurchased] = useState(false)
+  const [isPurchasing, setIsPurchasing] = useState(false)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const range = RANGES[gender]
 
@@ -182,9 +205,60 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   }, [])
 
   const result = useMemo(() => convertShoeSize(footMm, gender), [footMm, gender])
-
   const displayValue = unit === 'cm' ? (footMm / 10).toFixed(1).replace('.', ',') : String(Math.round(footMm))
   const pct = ((footMm - range.min) / (range.max - range.min)) * 100
+
+  // Автоматическая проверка покупки при загрузке
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    const userId = tg?.initDataUnsafe?.user?.id
+    if (!userId) return
+
+    fetch(`/api/check-purchase?userId=${userId}&productId=pro_sizes`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.purchased) setIsProPurchased(true)
+      })
+      .catch(err => console.error("Ошибка проверки покупки:", err))
+  }, [])
+
+  const handleProClick = async () => {
+    const tg = (window as any).Telegram?.WebApp;
+    const userId = tg?.initDataUnsafe?.user?.id;
+
+    if (!userId) {
+      alert("Ошибка: Откройте приложение через Telegram.");
+      return;
+    }
+
+    setIsPurchasing(true);
+    haptic('light');
+
+    try {
+      const response = await fetch("/api/create-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, productId: "pro_sizes" }) 
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.invoiceLink) throw new Error(data.error);
+
+      tg.openInvoice(data.invoiceLink, (status: string) => {
+        if (status === 'paid') {
+          haptic('heavy');
+          setIsProPurchased(true); 
+        } else if (status === 'failed') {
+          alert("Оплата была отменена или произошла ошибка.");
+        }
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(`Сбой сервера: ${error.message}`);
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   const startEdit = () => {
     setEditValue(unit === 'cm' ? (footMm / 10).toFixed(1) : String(Math.round(footMm)))
@@ -421,8 +495,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </AnimatePresence>
         </div>
 
-        {/* СЕКЦИЯ: РЕЗУЛЬТАТ (ОГРОМНЫЕ ЦИФРЫ) */}
+        {/* СЕКЦИЯ: РЕЗУЛЬТАТ (ОГРОМНЫЕ ЦИФРЫ И PAYWALL) */}
         <div className={`stagger-item border-t border-b ${cLine} py-12 flex flex-col items-center justify-center mb-12`} style={{ animationDelay: '0.15s' }}>
+          
+          {/* Главный EU размер (Бесплатно) */}
           <div className="flex items-center gap-3 mb-6 grayscale opacity-80">
             <FlagEU />
             <span className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted}`}>EU / UKR</span>
@@ -432,40 +508,81 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           <div className={`font-serif text-[28vw] md:text-[180px] leading-none tracking-tighter mb-4 ${cText}`}>
             {formatSize(result.eu)}
           </div>
-          <div className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted} mb-10`}>
-            {t.recommended}
+          
+          <div className="flex flex-col items-center mb-10">
+            <div className={`text-[9px] font-sans uppercase tracking-[0.3em] ${cTextMuted} mb-2`}>
+              {t.recommended}
+            </div>
+            <div className={`text-[11px] font-sans ${cTextMuted}`}>
+              {result.cm.toFixed(1).replace('.', ',')} {t.cmLabel}
+            </div>
           </div>
 
-          {/* Таблица остальных размеров */}
-          <div className="w-full flex justify-between px-2 md:px-10">
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center gap-2 grayscale opacity-80 h-4">
-                <FlagUK />
-                <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>UK</span>
-              </div>
-              <span className={`font-serif text-3xl md:text-4xl ${cText}`}>
-                {formatSize(result.uk)}
-              </span>
-            </div>
+          {/* PRO DATA - ЖУРНАЛЬНАЯ ВРЕЗКА (Скрывает UK и US до оплаты) */}
+          <div className="w-full mt-2">
+            {!isProPurchased ? (
+              // Состояние: НЕ КУПЛЕНО (Элегантная карточка)
+              <div className={`p-8 border ${cLine} flex flex-col items-center text-center relative overflow-hidden`}>
+                <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${cLine}`} />
+                <div className={`absolute top-0 right-0 w-2 h-2 border-t border-r ${cLine}`} />
+                <div className={`absolute bottom-0 left-0 w-2 h-2 border-b border-l ${cLine}`} />
+                <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${cLine}`} />
 
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center gap-2 grayscale opacity-80 h-4">
-                <FlagUS />
-                <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{usLabel}</span>
-              </div>
-              <span className={`font-serif text-3xl md:text-4xl ${cText}`}>
-                {formatSize(result.us)}
-              </span>
-            </div>
+                <h3 className={`font-serif text-2xl tracking-tight mb-3 ${cText}`}>
+                  {t.proTitle}
+                </h3>
+                
+                <p className={`text-[10px] min-[390px]:text-[11px] font-sans font-light leading-relaxed mb-8 max-w-[280px] ${cTextMuted}`}>
+                  {t.proDesc}
+                </p>
 
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center h-4">
-                <span className={`text-[10px] font-sans ${cTextMuted}`}>{t.cmLabel}</span>
+                <button
+                  onClick={handleProClick}
+                  disabled={isPurchasing}
+                  className={`group flex items-center justify-center gap-3 w-full py-4 border ${cLine} ${cText} hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer`}
+                >
+                  {isPurchasing ? (
+                    <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
+                      {t.loading}
+                    </span>
+                  ) : (
+                    <>
+                      <LockIcon />
+                      <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
+                        {t.proBtn}
+                      </span>
+                    </>
+                  )}
+                </button>
               </div>
-              <span className={`font-serif text-3xl md:text-4xl ${cText}`}>
-                {result.cm.toFixed(1).replace('.', ',')}
-              </span>
-            </div>
+            ) : (
+              // Состояние: КУПЛЕНО (Раскрытые размеры)
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full flex justify-center gap-16 md:gap-24 px-2 md:px-10"
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 grayscale opacity-80 h-4">
+                    <FlagUK />
+                    <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>UK</span>
+                  </div>
+                  <span className={`font-serif text-4xl md:text-5xl ${cText}`}>
+                    {formatSize(result.uk)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 grayscale opacity-80 h-4">
+                    <FlagUS />
+                    <span className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>{usLabel}</span>
+                  </div>
+                  <span className={`font-serif text-4xl md:text-5xl ${cText}`}>
+                    {formatSize(result.us)}
+                  </span>
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
 
