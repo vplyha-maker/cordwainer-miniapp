@@ -19,8 +19,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Подставили новую ссылку и параметры поиска
-    const response = await fetch('https://sneakers-database3.p.rapidapi.com/8356/sneakers%2Bby%2Brelease%2Bdate?releaseDate=2024-10-10&limit=20000000', {
+    const response = await fetch('https://sneakers-database3.p.rapidapi.com/8356/sneakers%2Bby%2Brelease%2Bdate?releaseDate=2024-10-10&limit=10', {
       method: 'GET',
       headers: {
         'x-rapidapi-host': 'sneakers-database3.p.rapidapi.com',
