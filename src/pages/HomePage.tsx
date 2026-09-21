@@ -14,6 +14,7 @@ type HomePageProps = {
   onOpenGlossary?: (termId?: string) => void
   onOpenPrices?: () => void
   onOpenSneakers?: () => void
+  onOpenMaterials?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -90,6 +91,7 @@ export function HomePage({
   onOpenGlossary,
   onOpenPrices,
   onOpenSneakers,
+  onOpenMaterials,
   lang,
   setLang,
   favorites = [],
@@ -245,7 +247,7 @@ export function HomePage({
   }[safeLang]
 
   const LEARNING: MenuItem[] = [
-    { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: undefined },
+    { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: onOpenMaterials },
     { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
     { id: 'styles', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
     { id: 'sneakers', title: t.sneakers, subtitle: t.sneakersSub, action: onOpenSneakers },
