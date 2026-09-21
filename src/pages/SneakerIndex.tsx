@@ -131,7 +131,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     fetchSneakers(activeQuery, nextPage, true)
   }
 
-  // Функция клика по карточке: открывает поиск модели в украинских магазинах через Google
   const handleCardClick = (sneaker: Sneaker) => {
     const searchQuery = `${sneaker.brand} ${sneaker.name} купити в Україні`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
@@ -249,7 +248,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         </div>
       )}
 
-      {/* Карточки с возможностью клика */}
+      {/* Карточки с оптимизацией производительности (content-visibility) */}
       {!loading && (
         <div className="flex flex-col gap-10 pb-10">
           {filteredSneakers.map((sneaker) => (
@@ -257,7 +256,11 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
               key={sneaker.id}
               onClick={() => handleCardClick(sneaker)}
               className="border-b pb-10 cursor-pointer group transition-opacity duration-200 hover:opacity-80"
-              style={{ borderColor: 'rgba(244, 240, 232, 0.12)' }}
+              style={{
+                borderColor: 'rgba(244, 240, 232, 0.12)',
+                contentVisibility: 'auto', // Разгружает процессор телефона
+                containIntrinsicSize: 'auto 400px', // Ускоряет прорисовку длинных списков
+              }}
             >
               {sneaker.image?.original && (
                 <div className="w-full rounded-2xl overflow-hidden mb-5 bg-[#141414]">
