@@ -18,6 +18,7 @@ import { StylesPage } from './pages/StylesPage'
 import { SalaryCalcPage } from './pages/salary' 
 import { SettingsPage } from './pages/SettingsPage'
 import SneakerIndex from './pages/SneakerIndex'
+import Materials from './pages/Materials' // Импорт новой страницы
 
 import {
   getSavedPerfMode,
@@ -50,6 +51,7 @@ export type Screen =
   | 'styles'
   | 'settings'
   | 'sneakers'
+  | 'materials' // Добавлен новый экран
 
 export type Lang = 'ru' | 'uk' | 'de'
 export type FavoriteType = 'blog' | 'article'
@@ -314,6 +316,7 @@ export default function App() {
                 onOpenColors={() => setScreen('colors')}
                 onOpenStyles={() => setScreen('styles')}
                 onOpenSneakers={() => setScreen('sneakers')}
+                onOpenMaterials={() => setScreen('materials')} 
                 onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
                 onOpenPrices={() => setScreen('prices')}
                 lang={lang}
@@ -354,6 +357,10 @@ export default function App() {
             {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
             
             {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
+            
+            {screen === 'materials' && (
+              <Materials key="materials" onBack={() => setScreen('home')} />
+            )}
 
             {screen === 'settings' && (
               <SettingsPage
