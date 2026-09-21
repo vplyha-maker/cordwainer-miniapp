@@ -139,24 +139,23 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
 
     let animationFrameId: number;
     let startTimeout: ReturnType<typeof setTimeout>;
-    let exactScrollTop = 0; // Точный трекинг позиции (чтобы учитывать доли пикселей)
+    let exactScrollTop = 0; 
 
     const smoothScroll = () => {
       if (!scrollRef.current || !isAutoScrolling) return;
 
-      // Инициализируем стартовую позицию при первом кадре
       if (exactScrollTop === 0) {
         exactScrollTop = scrollRef.current.scrollTop;
       }
 
-      // Скорость скролла (0.3 - очень медленно и премиально). Можно менять от 0.1 до 1.0
-      exactScrollTop += 0.3; 
+      // Скорость стала чуть больше (было 0.3, стало 0.5)
+      exactScrollTop += 0.5; 
       scrollRef.current.scrollTop = exactScrollTop;
 
       const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
       
-      // Проверка на достижение конца контейнера (с небольшой погрешностью)
-      if (scrollTop + clientHeight >= scrollHeight - 2) {
+      // Проверяем, достигли ли мы абсолютного низа (с запасом 5px на погрешность экранов)
+      if (Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5) {
         setIsAutoScrolling(false);
         return;
       }
@@ -166,7 +165,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
 
     startTimeout = setTimeout(() => {
       animationFrameId = requestAnimationFrame(smoothScroll);
-    }, 3500); // Ждем 3.5 секунды, пока появится заголовок
+    }, 3500); 
 
     return () => {
       clearTimeout(startTimeout);
@@ -177,9 +176,8 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowClose(true);
-      // Автоскролл сам остановится, когда дойдет до конца, 
-      // но если пользователь досмотрел текст до кнопки, отключаем принудительно
-      setIsAutoScrolling(false); 
+      // Убрана принудительная остановка скролла по таймеру!
+      // Теперь скролл остановится сам, только когда доедет до самого низа контейнера.
     }, (totalTime + 1) * 1000); 
     
     return () => clearTimeout(timer);
@@ -214,7 +212,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         </button>
       </motion.header>
 
-      {/* Контейнер скролла. Добавлен onMouseDown на случай, если на десктопе потянут за ползунок */}
+      {/* Контейнер скролла */}
       <div 
         ref={scrollRef} 
         onTouchStart={() => setIsAutoScrolling(false)}
