@@ -51,7 +51,6 @@ const CONTENT = {
 
 const CHAR_SPEED = 0.04 
 
-// Компонент разбивает текст на слова, чтобы они не переносились по буквам на мобильных экранах
 const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: number, className?: string }) => {
   const words = text.split(' ')
   let globalCharIndex = 0
@@ -105,7 +104,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   }, [])
 
   const { timings, totalTime } = useMemo(() => {
-    let currentDelay = 0.5; // Начинаем чуть быстрее
+    let currentDelay = 0.5;
     const map: Record<string, number> = {};
     const LINE_PAUSE = 0.15; 
     
@@ -134,35 +133,53 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     return { timings: map, totalTime: currentDelay };
   }, [text]);
 
-  // Плавный и аккуратный автоскролл
+  // Непрерывный кинематографичный автоскролл
   useEffect(() => {
     if (!isAutoScrolling) return;
 
-    let intervalId: ReturnType<typeof setInterval>;
+    let animationFrameId: number;
+    let startTimeout: ReturnType<typeof setTimeout>;
+    let exactScrollTop = 0; // Точный трекинг позиции (чтобы учитывать доли пикселей)
 
-    // Ждем 3.5 секунды (пока напечатается заголовок и первый абзац), затем начинаем плавно скроллить
-    const startTimeout = setTimeout(() => {
-      intervalId = setInterval(() => {
-        if (scrollRef.current && isAutoScrolling) {
-          scrollRef.current.scrollBy({
-            top: 20, // Ползем вниз мелкими шажками
-            behavior: 'smooth'
-          })
-        }
-      }, 500); // Каждые полсекунды
-    }, 3500);
+    const smoothScroll = () => {
+      if (!scrollRef.current || !isAutoScrolling) return;
+
+      // Инициализируем стартовую позицию при первом кадре
+      if (exactScrollTop === 0) {
+        exactScrollTop = scrollRef.current.scrollTop;
+      }
+
+      // Скорость скролла (0.3 - очень медленно и премиально). Можно менять от 0.1 до 1.0
+      exactScrollTop += 0.3; 
+      scrollRef.current.scrollTop = exactScrollTop;
+
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      
+      // Проверка на достижение конца контейнера (с небольшой погрешностью)
+      if (scrollTop + clientHeight >= scrollHeight - 2) {
+        setIsAutoScrolling(false);
+        return;
+      }
+
+      animationFrameId = requestAnimationFrame(smoothScroll);
+    };
+
+    startTimeout = setTimeout(() => {
+      animationFrameId = requestAnimationFrame(smoothScroll);
+    }, 3500); // Ждем 3.5 секунды, пока появится заголовок
 
     return () => {
       clearTimeout(startTimeout);
-      if (intervalId) clearInterval(intervalId);
-    }
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
   }, [isAutoScrolling]);
 
-  // Появление кнопки закрытия
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowClose(true);
-      setIsAutoScrolling(false); // Отключаем скролл, когда анимация закончилась
+      // Автоскролл сам остановится, когда дойдет до конца, 
+      // но если пользователь досмотрел текст до кнопки, отключаем принудительно
+      setIsAutoScrolling(false); 
     }, (totalTime + 1) * 1000); 
     
     return () => clearTimeout(timer);
@@ -176,7 +193,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         .font-cormorant { font-family: 'Cormorant Garamond', Georgia, serif; }
       `}</style>
 
-      {/* Анимированные двойные рамки */}
       <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 2 }}
         className="absolute inset-4 border-[1px] border-[#c9a86c]/30 pointer-events-none z-0" 
@@ -186,10 +202,8 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         className="absolute inset-[22px] border-[0.5px] border-[#c9a86c]/20 pointer-events-none z-0" 
       />
 
-      {/* Уменьшенный градиент сверху, чтобы не перекрывал заголовок */}
       <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#faf8f5] to-transparent z-40 pointer-events-none" />
 
-      {/* Header */}
       <motion.header 
         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5 }}
         className="absolute top-0 left-0 right-0 z-50 px-10 pt-12 pb-4 flex items-center justify-between pointer-events-none"
@@ -200,12 +214,13 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         </button>
       </motion.header>
 
-      {/* Скролл-контейнер (отключает автоскролл при ручном касании) */}
+      {/* Контейнер скролла. Добавлен onMouseDown на случай, если на десктопе потянут за ползунок */}
       <div 
         ref={scrollRef} 
         onTouchStart={() => setIsAutoScrolling(false)}
         onWheel={() => setIsAutoScrolling(false)}
-        className="relative z-10 flex-1 overflow-y-auto scroll-smooth scrollbar-hide flex flex-col items-center justify-start pt-32 pb-32 px-6"
+        onMouseDown={() => setIsAutoScrolling(false)}
+        className="relative z-10 flex-1 overflow-y-auto scrollbar-hide flex flex-col items-center justify-start pt-32 pb-32 px-6"
       >
         <div className="w-full max-w-[650px] flex flex-col items-center text-center">
           
