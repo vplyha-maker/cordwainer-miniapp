@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Pool } from '@neondatabase/serverless'
 
 type MaterialsProps = {
   onBack?: () => void
@@ -16,42 +17,28 @@ function cleanText(text: any): string {
 export default function Materials({ onBack }: MaterialsProps) {
   const [materials, setMaterials] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-
-  const fetchMaterials = async (pageNum: number, isAppend = false) => {
-    if (isAppend) setLoadingMore(true)
-    else setLoading(true)
-
-    try {
-      const res = await fetch(`/api/get-materials?page=${pageNum}`)
-      if (!res.ok) throw new Error('Ошибка при загрузке данных с сервера')
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-
-      if (data.length < 50) setHasMore(false)
-
-      setMaterials((prev) => isAppend ? [...prev, ...data] : data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
+  const [displayCount, setDisplayCount] = useState(30) // Показываем порциями для скорости
 
   useEffect(() => {
-    fetchMaterials(1, false)
+    // Загружаем данные через публичный API или напрямую, если настроено.
+    // Попробуем сначала стандартный эндпоинт без параметров, чтобы он точно сработал.
+    fetch('/api/get-materials')
+      .then((res) => {
+        if (!res.ok) throw new Error('Ошибка сервера')
+        return res.json()
+      })
+      .then((data) => {
+        if (data.error) throw new Error(data.error)
+        setMaterials(Array.isArray(data) ? data : [])
+      })
+      .catch((err) => {
+        setError(err.message)
+      })
+      .finally(() => setLoading(false))
   }, [])
 
-  const loadMore = () => {
-    if (loadingMore || !hasMore) return
-    const nextPage = page + 1
-    setPage(nextPage)
-    fetchMaterials(nextPage, true)
-  }
+  const visibleItems = materials.slice(0, displayCount)
 
   return (
     <div className="min-h-screen p-6 transition-colors duration-500" style={{ background: '#09090B', color: '#F4F0E8' }}>
@@ -71,26 +58,24 @@ export default function Materials({ onBack }: MaterialsProps) {
         Каталог обуви & Картинки
       </h1>
 
-      {loading && <p className="text-sm opacity-50 animate-pulse">Загрузка каталога...</p>}
+      {loading && <p className="text-sm opacity-50 animate-pulse">Загрузка каталога из Neon...</p>}
       
       {error && (
         <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl text-red-400 text-sm">
-          {error}
+          Ошибка: {error}. Проверьте соединение с API.
         </div>
       )}
 
       {!loading && !error && (
         <div className="flex flex-col gap-4 pb-10">
-          {materials.map((item, index) => {
+          {visibleItems.map((item, index) => {
             const brand = cleanText(item.footwear_brand)
             const category = cleanText(item.footwear_category)
             const material = cleanText(item.material)
-            const color = cleanText(item.color)
-            const stock = cleanText(item.stock_status)
             const size = cleanText(item.shoe_size)
             const price = cleanText(item.price)
             const discount = cleanText(item.discount_percent)
-            const imageUrl = item.image_url // картинка из базы
+            const imageUrl = item.image_url
 
             return (
               <div 
@@ -98,7 +83,7 @@ export default function Materials({ onBack }: MaterialsProps) {
                 className="p-4 rounded-2xl border flex gap-4 items-center transition-all"
                 style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
               >
-                {/* Выводим картинку, если она есть */}
+                {/* Картинка из базы */}
                 {imageUrl && imageUrl.startsWith('data:image') ? (
                   <img 
                     src={imageUrl} 
@@ -107,7 +92,7 @@ export default function Materials({ onBack }: MaterialsProps) {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center text-[10px] opacity-40 uppercase flex-shrink-0 font-sans">
+                  <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center text-[10px] opacity-40 uppercase flex-shrink-0 font-sans text-center px-1">
                     Нет фото
                   </div>
                 )}
@@ -147,14 +132,13 @@ export default function Materials({ onBack }: MaterialsProps) {
             )
           })}
 
-          {hasMore && (
+          {displayCount < materials.length && (
             <button
-              onClick={loadMore}
-              disabled={loadingMore}
+              onClick={() => setDisplayCount((prev) => prev + 30)}
               className="w-full py-3.5 rounded-xl border text-xs font-sans uppercase tracking-widest mt-2 transition-all active:scale-95"
               style={{ borderColor: 'rgba(244, 240, 232, 0.2)', background: 'transparent', color: '#F4F0E8' }}
             >
-              {loadingMore ? 'Загрузка...' : 'Загрузить еще 50 товаров ↓'}
+              Загрузить еще 30 товаров ↓
             </button>
           )}
         </div>
