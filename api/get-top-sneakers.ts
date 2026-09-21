@@ -37,6 +37,10 @@ export default async function handler(req: any, res: any) {
     }
 
     const data = await response.json();
+    
+    // Кэшируем ответ на серверах Vercel на 24 часа (86400 секунд)
+    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+    
     return res.status(200).json(data);
 
   } catch (error: any) {
