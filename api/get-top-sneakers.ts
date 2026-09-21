@@ -19,10 +19,11 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const response = await fetch('https://sneaker-database-stockx.p.rapidapi.com/productprice?styleId=HQ6448', {
+    // Подставили новую ссылку и параметры поиска
+    const response = await fetch('https://sneakers-database3.p.rapidapi.com/8356/sneakers%2Bby%2Brelease%2Bdate?releaseDate=2024-10-10&limit=20000000', {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'sneaker-database-stockx.p.rapidapi.com',
+        'x-rapidapi-host': 'sneakers-database3.p.rapidapi.com',
         'x-rapidapi-key': apiKey
       },
     });
