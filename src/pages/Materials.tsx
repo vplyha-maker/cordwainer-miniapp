@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-export interface MaterialsProps {
-  onBack?: () => void;
+type MaterialsProps = {
+  onBack?: () => void
 }
 
 export default function Materials({ onBack }: MaterialsProps) {
@@ -23,6 +23,9 @@ export default function Materials({ onBack }: MaterialsProps) {
       .finally(() => setLoading(false))
   }, [])
 
+  // Берем первую запись, чтобы посмотреть ее ключи (названия колонок)
+  const firstItem = materials.length > 0 ? materials[0] : null;
+
   return (
     <div className="min-h-screen p-6 transition-colors duration-500" style={{ background: '#09090B', color: '#F4F0E8' }}>
       
@@ -37,11 +40,11 @@ export default function Materials({ onBack }: MaterialsProps) {
         </button>
       </header>
 
-      <h1 className="font-serif text-4xl leading-none mb-6 tracking-tight">
-        Материалы & Детали
+      <h1 className="font-serif text-3xl leading-none mb-4 tracking-tight">
+        Проверка структуры базы
       </h1>
 
-      {loading && <p className="text-sm opacity-50 animate-pulse">Подключение к Neon...</p>}
+      {loading && <p className="text-sm opacity-50 animate-pulse">Загрузка из Neon...</p>}
       
       {error && (
         <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl text-red-400 text-sm">
@@ -49,37 +52,23 @@ export default function Materials({ onBack }: MaterialsProps) {
         </div>
       )}
 
-      {!loading && !error && (
-        <div className="flex flex-col gap-5 pb-10">
-          {materials.map((item) => (
-            <div 
-              key={item.id} 
-              className="p-5 rounded-2xl border transition-all"
-              style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
-            >
-              <h2 className="font-serif text-2xl mb-1">{item.brand}</h2>
-              <p className="text-sm opacity-70 mb-4">{item.model_name}</p>
-              
-              <div className="flex flex-col gap-2 text-xs font-sans tracking-wide">
-                <div className="flex justify-between border-b border-white/5 pb-1">
-                  <span className="opacity-40 uppercase">Верх</span>
-                  <span className="text-right ml-4 max-w-[60%] text-right">{item.material_upper}</span>
-                </div>
-                <div className="flex justify-between border-b border-white/5 pb-1">
-                  <span className="opacity-40 uppercase">Подошва</span>
-                  <span className="text-right ml-4 max-w-[60%] text-right">{item.material_sole}</span>
-                </div>
-                <div className="flex justify-between border-b border-white/5 pb-1">
-                  <span className="opacity-40 uppercase">Цвет</span>
-                  <span className="text-right ml-4">{item.color}</span>
-                </div>
-                <div className="flex justify-between mt-2">
-                  <span className="opacity-40 uppercase">Цена</span>
-                  <span className="font-bold text-[#F4F0E8]">${item.price}</span>
-                </div>
-              </div>
+      {!loading && !error && firstItem && (
+        <div className="flex flex-col gap-4 pb-10">
+          <div className="p-4 rounded-xl border bg-[#141414]" style={{ borderColor: 'rgba(244, 240, 232, 0.2)' }}>
+            <p className="text-xs uppercase opacity-50 mb-2 font-sans">Доступные названия колонок в базе:</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(firstItem).map((key) => (
+                <span key={key} className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-mono text-[#D8A35C]">
+                  {key}
+                </span>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <p className="text-xs opacity-50 mt-2 font-sans">Пример первой записи:</p>
+          <div className="p-4 rounded-xl border bg-[#141414] font-mono text-xs overflow-x-auto" style={{ borderColor: 'rgba(244, 240, 232, 0.12)' }}>
+            <pre>{JSON.stringify(firstItem, null, 2)}</pre>
+          </div>
         </div>
       )}
     </div>
