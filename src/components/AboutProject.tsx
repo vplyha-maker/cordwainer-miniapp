@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 
 type AboutProjectProps = {
@@ -51,15 +51,35 @@ const CONTENT = {
 
 const CHAR_SPEED = 0.04 
 
-// Компонент для Awwwards-анимации текста по буквам
+// Компонент для Awwwards-анимации текста по буквам с автоскроллом
 const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: number, className?: string }) => {
+  const spanRef = useRef<HTMLSpanElement>(null)
+
   return (
-    <span className={`inline-block ${className}`}>
+    <span ref={spanRef} className={`inline-block ${className}`}>
       {text.split('').map((char, index) => (
         <motion.span
           key={index}
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
+          onAnimationStart={() => {
+            // При начале анимации первой буквы строки проверяем, не выходит ли она за пределы экрана
+            if (index === 0 && spanRef.current) {
+              const container = spanRef.current.closest('.overflow-y-auto') as HTMLElement
+              if (container) {
+                const rect = spanRef.current.getBoundingClientRect()
+                const containerRect = container.getBoundingClientRect()
+                
+                // Если строка появляется близко к нижней границе экрана (или ниже), скроллим контейнер вниз
+                if (rect.bottom > containerRect.bottom - 150) {
+                  container.scrollBy({
+                    top: rect.bottom - containerRect.bottom + 200, // Скроллим так, чтобы строка была чуть выше низа
+                    behavior: 'smooth'
+                  })
+                }
+              }
+            }
+          }}
           transition={{
             delay: delay + index * CHAR_SPEED,
             duration: 0.8,
@@ -77,26 +97,12 @@ const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: nu
 export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps) {
   const text = CONTENT[lang] || CONTENT.ru
 
-  const [isPlaying, setIsPlaying] = useState(false)
   const [showClose, setShowClose] = useState(false)
-  
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
-  }, [])
-
-  useEffect(() => {
-    const audio = new Audio('/audio/start-me-up-8bit.mp3')
-    audio.loop = true
-    audio.volume = 0.35
-    audioRef.current = audio
-    return () => {
-      audio.pause()
-      audioRef.current = null
-    }
   }, [])
 
   const { timings, totalTime } = useMemo(() => {
@@ -130,22 +136,19 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   }, [text]);
 
   useEffect(() => {
+    // В конце анимации показываем кнопку и плавно доскролливаем до самого низа
     const timer = setTimeout(() => {
       setShowClose(true);
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }, (totalTime + 1) * 1000); 
+    
     return () => clearTimeout(timer);
   }, [totalTime]);
-
-  const toggleMusic = () => {
-    if (!audioRef.current) return
-    if (isPlaying) {
-      audioRef.current.pause()
-      setIsPlaying(false)
-    } else {
-      audioRef.current.play().catch(() => {})
-      setIsPlaying(true)
-    }
-  }
 
   return (
     <div className="fixed inset-0 z-[150] flex flex-col bg-[#faf8f5] text-[#1a1a1a] overflow-hidden select-none">
@@ -165,7 +168,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         className="absolute inset-[22px] border-[0.5px] border-[#c9a86c]/20 pointer-events-none z-0" 
       />
 
-      {/* Header с микроинтеракциями */}
+      {/* Header (только кнопка Back) */}
       <motion.header 
         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5 }}
         className="absolute top-0 left-0 right-0 z-50 px-10 pt-12 pb-4 flex items-center justify-between pointer-events-none"
@@ -173,9 +176,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         <button onClick={onClose} className="pointer-events-auto group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer text-[#1a1a1a]/60 hover:text-[#1a1a1a] transition-colors">
           <span className="transform transition-transform duration-500 ease-out group-hover:-translate-x-1">←</span>
           <span>Back</span>
-        </button>
-        <button onClick={toggleMusic} className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-[#1a1a1a]/60 hover:text-[#1a1a1a] transition-colors outline-none">
-          {isPlaying ? 'SOUND: ON' : 'SOUND: OFF'}
         </button>
       </motion.header>
 
@@ -270,4 +270,4 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
       <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#faf8f5] to-transparent z-20 pointer-events-none" />
     </div>
   )
- }
+}
