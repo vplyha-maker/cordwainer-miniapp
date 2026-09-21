@@ -35,12 +35,12 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [selectedBrand, setSelectedBrand] = useState('nike')
   const [selectedGender, setSelectedGender] = useState('all')
   const [searchText, setSearchText] = useState('')
-  const [activeQuery, setActiveQuery] = useState('nike') // то, что реально уходит в API
+  const [activeQuery, setActiveQuery] = useState('nike')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Загрузка данных
+  // Загрузка данных с бэкенда
   const fetchSneakers = useCallback(async (query: string) => {
     setLoading(true)
     setError('')
@@ -50,11 +50,14 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
       const res = await fetch(
         `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=50`
       )
-      if (!res.ok) throw new Error('Ошибка при загрузке данных')
-
+      
       const data = await res.json()
 
-      // API может возвращать results или data
+      if (!res.ok) {
+        throw new Error(data.details || data.error || 'Ошибка при загрузке данных')
+      }
+
+      // Поддерживаем разные варианты структуры ответа от API
       const list = data.results || data.data || data || []
       setSneakers(Array.isArray(list) ? list : [])
     } catch (err: any) {
@@ -76,14 +79,12 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     setActiveQuery(brandId)
   }
 
-  // Поиск по Enter
+  // Поиск по нажатию Enter
   const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const text = searchText.trim()
       if (!text) return
 
-      // Если выбран бренд — ищем "бренд + модель"
-      // Это сильно улучшает поиск (например "new balance 576")
       const query =
         selectedBrand && selectedBrand !== 'all'
           ? `${selectedBrand} ${text}`
@@ -185,7 +186,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         })}
       </div>
 
-      {/* Состояния */}
+      {/* Состояния загрузки / ошибок */}
       {loading && (
         <p className="text-[12px] font-sans uppercase tracking-widest opacity-50 mb-8">
           Ищем в базе...
