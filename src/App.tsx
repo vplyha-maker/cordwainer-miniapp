@@ -17,6 +17,7 @@ import { PricesPage } from './pages/PricesPage/PricesPage'
 import { StylesPage } from './pages/StylesPage'
 import { SalaryCalcPage } from './pages/salary' 
 import { SettingsPage } from './pages/SettingsPage'
+import SneakerIndex from './SneakerIndex'
 
 import {
   getSavedPerfMode,
@@ -48,6 +49,7 @@ export type Screen =
   | 'prices'
   | 'styles'
   | 'settings'
+  | 'sneakers'
 
 export type Lang = 'ru' | 'uk' | 'de'
 export type FavoriteType = 'blog' | 'article'
@@ -77,7 +79,6 @@ function getIsDarkTheme(): boolean {
 export function applyImmediateMutedTheme(isDark: boolean) {
   const root = document.documentElement
 
-  // Переключаем классы, чтобы стили брались из вашего нового index.css
   if (isDark) {
     root.classList.add('dark')
     root.classList.remove('light')
@@ -86,14 +87,12 @@ export function applyImmediateMutedTheme(isDark: boolean) {
     root.classList.remove('dark')
   }
 
-  // Очищаем старые инлайн-цвета, чтобы они не перебивали CSS
   const oldColors = [
     'bg', 'surface', 'surface-2', 'ink', 'muted', 
     'accent', 'accent-strong', 'danger', 'border', 'info', 'success'
   ];
   oldColors.forEach(c => root.style.removeProperty(`--color-${c}`));
 
-  // Оставляем только пигменты для калькулятора цветов (они не влияют на общий дизайн)
   root.style.setProperty('--pigment-lac-dye', '#8B0000')
   root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
   root.style.setProperty('--pigment-orpiment', '#E4D00A')
@@ -103,7 +102,6 @@ export function applyImmediateMutedTheme(isDark: boolean) {
   root.style.setProperty('--pigment-lead-white', '#F5F1EA')
   root.style.setProperty('--pigment-bone-black', '#1C1816')
 
-  // Синхронизируем цвета фона Telegram с новым монохромом
   try {
     const tg = window.Telegram?.WebApp
     if (tg) {
@@ -131,39 +129,32 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
   
-  // === ИЗМЕНЕНИЕ ЗДЕСЬ: Читаем язык из URL ===
   const [lang, setLang] = useState<Lang>(() => {
     try {
-      // 1. Пытаемся поймать параметр ?lang= от Telegram-бота
       const urlParams = new URLSearchParams(window.location.search);
       const langFromBot = urlParams.get('lang') as Lang;
 
       if (langFromBot && ['ru', 'uk', 'de'].includes(langFromBot)) {
-        // Если бот передал язык, сохраняем его в память
         localStorage.setItem('cordwainer_lang', langFromBot);
         localStorage.setItem('app_lang', langFromBot);
         return langFromBot;
       }
 
-      // 2. Если параметра нет, пытаемся достать из localStorage
       const saved = localStorage.getItem('cordwainer_lang') as Lang;
       if (saved && ['ru', 'uk', 'de'].includes(saved)) {
         return saved;
       }
 
-      // 3. Если ничего нет, смотрим на язык системы телефона/браузера
       const sysLang = navigator.language.slice(0, 2);
       if (['ru', 'uk', 'de'].includes(sysLang)) {
         return sysLang as Lang;
       }
       
-      // По умолчанию русский
       return 'ru';
     } catch {
       return 'ru';
     }
   })
-  // ===========================================
 
   const [favorites, setFavorites] = useState<FavoriteItem[]>(() => {
     try {
@@ -322,6 +313,7 @@ export default function App() {
                 onOpenCalcMenu={() => setScreen('calc-menu')}
                 onOpenColors={() => setScreen('colors')}
                 onOpenStyles={() => setScreen('styles')}
+                onOpenSneakers={() => setScreen('sneakers')}
                 onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
                 onOpenPrices={() => setScreen('prices')}
                 lang={lang}
@@ -360,6 +352,8 @@ export default function App() {
             {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
             {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
             {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
+            
+            {screen === 'sneakers' && <SneakerIndex key="sneakers" />}
 
             {screen === 'settings' && (
               <SettingsPage
