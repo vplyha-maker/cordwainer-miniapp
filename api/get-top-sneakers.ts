@@ -18,9 +18,12 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'RAPIDAPI_KEY is not configured in Vercel' });
   }
 
+  // Получаем бренд из параметров запроса (например, /api/get-top-sneakers?query=adidas)
+  const searchQuery = req.query.query || 'nike';
+  const limit = req.query.limit || '50';
+
   try {
-    // Увеличили limit до 50 и поменяли query на более общий бренд или слово
-    const response = await fetch('https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=nike&limit=50&page=1', {
+    const response = await fetch(`https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=${encodeURIComponent(searchQuery)}&limit=${limit}&page=1`, {
       method: 'GET',
       headers: {
         'x-rapidapi-host': 'sneakers-database3.p.rapidapi.com',
