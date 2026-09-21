@@ -18,7 +18,8 @@ import { StylesPage } from './pages/StylesPage'
 import { SalaryCalcPage } from './pages/salary' 
 import { SettingsPage } from './pages/SettingsPage'
 import SneakerIndex from './pages/SneakerIndex'
-import Materials from './pages/Materials' // Импорт новой страницы
+import Materials from './pages/Materials'
+import AdminUpload from './pages/AdminUpload' // Импорт загрузчика
 
 import {
   getSavedPerfMode,
@@ -51,7 +52,8 @@ export type Screen =
   | 'styles'
   | 'settings'
   | 'sneakers'
-  | 'materials' // Добавлен новый экран
+  | 'materials'
+  | 'admin-upload' // Добавлен новый экран для загрузки баз
 
 export type Lang = 'ru' | 'uk' | 'de'
 export type FavoriteType = 'blog' | 'article'
@@ -123,6 +125,7 @@ function getInitialScreen(): Screen {
   try {
     const path = window.location.pathname.replace(/\/+$/, '') || '/'
     if (path === '/forward-ortho-converter') return 'seo-width'
+    if (path === '/AdminUpload') return 'admin-upload' // Маршрутизатор теперь знает эту ссылку
   } catch {}
   return 'welcome'
 }
@@ -360,6 +363,10 @@ export default function App() {
             
             {screen === 'materials' && (
               <Materials key="materials" onBack={() => setScreen('home')} />
+            )}
+
+            {screen === 'admin-upload' && (
+              <AdminUpload key="admin-upload" />
             )}
 
             {screen === 'settings' && (
