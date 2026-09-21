@@ -51,45 +51,44 @@ const CONTENT = {
 
 const CHAR_SPEED = 0.04 
 
-// Компонент для Awwwards-анимации текста по буквам с автоскроллом
+// Обновленный компонент: разбивает текст по словам, чтобы не было переносов посреди слова
 const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: number, className?: string }) => {
-  const spanRef = useRef<HTMLSpanElement>(null)
+  const words = text.split(' ')
+  let globalCharIndex = 0
 
   return (
-    <span ref={spanRef} className={`inline-block ${className}`}>
-      {text.split('').map((char, index) => (
-        <motion.span
-          key={index}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          onAnimationStart={() => {
-            // При начале анимации первой буквы строки проверяем, не выходит ли она за пределы экрана
-            if (index === 0 && spanRef.current) {
-              const container = spanRef.current.closest('.overflow-y-auto') as HTMLElement
-              if (container) {
-                const rect = spanRef.current.getBoundingClientRect()
-                const containerRect = container.getBoundingClientRect()
-                
-                // Если строка появляется близко к нижней границе экрана (или ниже), скроллим контейнер вниз
-                if (rect.bottom > containerRect.bottom - 150) {
-                  container.scrollBy({
-                    top: rect.bottom - containerRect.bottom + 200, // Скроллим так, чтобы строка была чуть выше низа
-                    behavior: 'smooth'
-                  })
-                }
-              }
-            }
-          }}
-          transition={{
-            delay: delay + index * CHAR_SPEED,
-            duration: 0.8,
-            ease: [0.16, 1, 0.3, 1] // Фирменный Apple/Awwwards ease
-          }}
-          className="inline-block whitespace-pre"
-        >
-          {char === ' ' ? '\u00A0' : char}
-        </motion.span>
-      ))}
+    <span className={className}>
+      {words.map((word, wordIndex) => {
+        const wordContent = word.split('').map((char, charIndex) => {
+          const currentDelay = delay + globalCharIndex * CHAR_SPEED
+          globalCharIndex++
+          
+          return (
+            <motion.span
+              key={charIndex}
+              initial={{ opacity: 0, y: 10 }} // Уменьшен шаг Y, чтобы не было прыжков на мобилке
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: currentDelay,
+                duration: 0.8,
+                ease: [0.16, 1, 0.3, 1] 
+              }}
+              className="inline-block"
+            >
+              {char}
+            </motion.span>
+          )
+        })
+        
+        // Учитываем пробел в общем счетчике задержки
+        globalCharIndex++
+
+        return (
+          <span key={wordIndex} className="inline-block whitespace-nowrap mr-[0.25em] last:mr-0">
+            {wordContent}
+          </span>
+        )
+      })}
     </span>
   )
 }
@@ -98,6 +97,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   const text = CONTENT[lang] || CONTENT.ru
 
   const [showClose, setShowClose] = useState(false)
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
@@ -135,16 +135,30 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     return { timings: map, totalTime: currentDelay };
   }, [text]);
 
+  // Логика мягкого автоскролла
   useEffect(() => {
-    // В конце анимации показываем кнопку и плавно доскролливаем до самого низа
+    if (!isAutoScrolling) return;
+
+    const interval = setInterval(() => {
+      if (scrollRef.current) {
+        const { scrollHeight, clientHeight } = scrollRef.current
+        if (scrollHeight > clientHeight) {
+          scrollRef.current.scrollTo({
+            top: scrollHeight,
+            behavior: 'smooth'
+          })
+        }
+      }
+    }, 1000); // Проверяем и доскролливаем каждую секунду
+
+    return () => clearInterval(interval)
+  }, [isAutoScrolling]);
+
+  // Завершение анимации
+  useEffect(() => {
     const timer = setTimeout(() => {
       setShowClose(true);
-      if (scrollRef.current) {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
+      setIsAutoScrolling(false); // Отключаем принудительный скролл в конце
     }, (totalTime + 1) * 1000); 
     
     return () => clearTimeout(timer);
@@ -168,6 +182,9 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         className="absolute inset-[22px] border-[0.5px] border-[#c9a86c]/20 pointer-events-none z-0" 
       />
 
+      {/* Градиент сверху для скрытия текста при скролле под кнопкой BACK */}
+      <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#faf8f5] via-[#faf8f5]/90 to-transparent z-40 pointer-events-none" />
+
       {/* Header (только кнопка Back) */}
       <motion.header 
         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5 }}
@@ -179,16 +196,20 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         </button>
       </motion.header>
 
-      {/* Скролл-контейнер */}
-      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto scroll-smooth scrollbar-hide flex flex-col items-center justify-start pt-32 pb-32 px-6">
-        
+      {/* Скролл-контейнер (отключает автоскролл при ручном касании) */}
+      <div 
+        ref={scrollRef} 
+        onTouchStart={() => setIsAutoScrolling(false)}
+        onWheel={() => setIsAutoScrolling(false)}
+        className="relative z-10 flex-1 overflow-y-auto scroll-smooth scrollbar-hide flex flex-col items-center justify-start pt-32 pb-32 px-6"
+      >
         <div className="w-full max-w-[650px] flex flex-col items-center text-center">
           
           {/* Декор заголовка */}
           <motion.div 
             initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} 
             transition={{ delay: 0.4, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-[300px] md:w-[400px] h-[1px] bg-[#c9a86c] mb-12 flex justify-center items-center"
+            className="relative w-[200px] md:w-[400px] h-[1px] bg-[#c9a86c] mb-12 flex justify-center items-center"
           >
             <div className="w-[5px] h-[5px] rounded-full bg-[#c9a86c] absolute" />
           </motion.div>
@@ -199,13 +220,13 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           />
 
           {/* Абзац 1 */}
-          <div className="flex flex-col items-center space-y-2 mb-12">
+          <div className="flex flex-col items-center space-y-2 mb-12 leading-relaxed">
             <AnimatedText text={text.p1_1} delay={timings.p1_1} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p1_2} delay={timings.p1_2} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
           </div>
 
           {/* Абзац 2 */}
-          <div className="flex flex-col items-center space-y-2 mb-12">
+          <div className="flex flex-col items-center space-y-2 mb-12 leading-relaxed">
             <AnimatedText text={text.p2_1} delay={timings.p2_1} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p2_2} delay={timings.p2_2} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p2_3} delay={timings.p2_3} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
@@ -213,7 +234,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           </div>
 
           {/* Абзац 3 */}
-          <div className="flex flex-col items-center space-y-2 mb-6">
+          <div className="flex flex-col items-center space-y-2 mb-6 leading-relaxed">
             <AnimatedText text={text.p3_1} delay={timings.p3_1} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p3_2} delay={timings.p3_2} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
           </div>
@@ -227,7 +248,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           <motion.div 
             initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} 
             transition={{ delay: timings.decor, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-[200px] md:w-[300px] h-[1px] bg-[#c9a86c] mb-12 flex justify-center items-center"
+            className="relative w-[150px] md:w-[300px] h-[1px] bg-[#c9a86c] mb-12 flex justify-center items-center"
           >
             <div className="w-[5px] h-[5px] rounded-full bg-[#c9a86c] absolute" />
             <svg className="absolute -bottom-6 w-10 h-6 overflow-visible" viewBox="0 0 40 20">
@@ -267,7 +288,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
       </div>
       
       {/* Градиент для мягкого растворения текста внизу экрана */}
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#faf8f5] to-transparent z-20 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#faf8f5] to-transparent z-40 pointer-events-none" />
     </div>
   )
 }
