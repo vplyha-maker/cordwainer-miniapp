@@ -1,5 +1,5 @@
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader(
@@ -18,15 +18,13 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'RAPIDAPI_KEY is not configured in Vercel' });
   }
 
-  // query — основной поисковый запрос (бренд + модель)
-  // limit — сколько карточек вернуть (максимум, что позволяет API)
-  // page — страница (для пагинации)
   const searchQuery = (req.query.query as string) || 'nike';
-  const limit = Math.min(Number(req.query.limit) || 50, 100); // API обычно ограничивает \~100
+  const limit = Math.min(Number(req.query.limit) || 50, 100);
   const page = Number(req.query.page) || 1;
 
   try {
-    const url = `https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=\( {encodeURIComponent(searchQuery)}&limit= \){limit}&page=${page}`;
+    // Исправлен синтаксис шаблонной строки для корректной подстановки переменных
+    const url = `https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=${encodeURIComponent(searchQuery)}&limit=${limit}&page=${page}`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -54,4 +52,4 @@ export default async function handler(req: any, res: any) {
   } catch (error: any) {
     return res.status(500).json({ error: 'Crash: ' + error.message });
   }
- }
+}
