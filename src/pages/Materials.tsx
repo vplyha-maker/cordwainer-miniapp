@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Pool } from '@neondatabase/serverless'
 
 type MaterialsProps = {
   onBack?: () => void
@@ -18,11 +17,9 @@ export default function Materials({ onBack }: MaterialsProps) {
   const [materials, setMaterials] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [displayCount, setDisplayCount] = useState(30) // Показываем порциями для скорости
+  const [displayCount, setDisplayCount] = useState(30)
 
   useEffect(() => {
-    // Загружаем данные через публичный API или напрямую, если настроено.
-    // Попробуем сначала стандартный эндпоинт без параметров, чтобы он точно сработал.
     fetch('/api/get-materials')
       .then((res) => {
         if (!res.ok) throw new Error('Ошибка сервера')
@@ -62,7 +59,7 @@ export default function Materials({ onBack }: MaterialsProps) {
       
       {error && (
         <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl text-red-400 text-sm">
-          Ошибка: {error}. Проверьте соединение с API.
+          Ошибка: {error}
         </div>
       )}
 
@@ -72,10 +69,16 @@ export default function Materials({ onBack }: MaterialsProps) {
             const brand = cleanText(item.footwear_brand)
             const category = cleanText(item.footwear_category)
             const material = cleanText(item.material)
+            const color = cleanText(item.color)
             const size = cleanText(item.shoe_size)
             const price = cleanText(item.price)
             const discount = cleanText(item.discount_percent)
-            const imageUrl = item.image_url
+            
+            // Надежная проверка картинки из базы
+            let imageUrl = item.image_url ? String(item.image_url).trim() : ''
+            if (imageUrl && !imageUrl.startsWith('data:image') && !imageUrl.startsWith('http')) {
+              imageUrl = `data:image/png;base64,${imageUrl}`
+            }
 
             return (
               <div 
@@ -83,13 +86,17 @@ export default function Materials({ onBack }: MaterialsProps) {
                 className="p-4 rounded-2xl border flex gap-4 items-center transition-all"
                 style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
               >
-                {/* Картинка из базы */}
-                {imageUrl && imageUrl.startsWith('data:image') ? (
+                {/* Картинка */}
+                {imageUrl && imageUrl.length > 20 ? (
                   <img 
                     src={imageUrl} 
                     alt={brand} 
-                    className="w-20 h-20 object-cover rounded-xl bg-white/5 flex-shrink-0"
+                    className="w-20 h-20 object-cover rounded-xl bg-white/5 flex-shrink-0 border border-white/10"
                     loading="lazy"
+                    onError={(e) => {
+                      // Если картинка битая, скрываем ее и показываем заглушку
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center text-[10px] opacity-40 uppercase flex-shrink-0 font-sans text-center px-1">
@@ -105,7 +112,7 @@ export default function Materials({ onBack }: MaterialsProps) {
                     </div>
                     {size !== '-' && (
                       <span className="px-2 py-0.5 bg-white/10 rounded-lg text-[10px] font-mono whitespace-nowrap ml-2">
-                        {size}р
+                        {size}p
                       </span>
                     )}
                   </div>
@@ -114,6 +121,10 @@ export default function Materials({ onBack }: MaterialsProps) {
                     <div className="flex justify-between border-b border-white/5 pb-0.5">
                       <span className="opacity-40 uppercase">Материал</span>
                       <span className="text-right truncate ml-2">{material}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-0.5">
+                      <span className="opacity-40 uppercase">Цвет</span>
+                      <span className="text-right truncate ml-2">{color}</span>
                     </div>
                     <div className="flex justify-between items-center mt-1">
                       <span className="opacity-40 uppercase">Цена</span>
