@@ -27,7 +27,6 @@ const GENDERS = [
   { id: 'all', name: 'Все' },
   { id: 'men', name: 'Мужские' },
   { id: 'women', name: 'Женские' },
-  { id: 'kid', name: 'Детские' },
 ]
 
 export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
