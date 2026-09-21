@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 
-export default function Materials() {
+export interface MaterialsProps {
+  onBack?: () => void;
+}
+
+export default function Materials({ onBack }: MaterialsProps) {
   const [materials, setMaterials] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -21,6 +25,18 @@ export default function Materials() {
 
   return (
     <div className="min-h-screen p-6 transition-colors duration-500" style={{ background: '#09090B', color: '#F4F0E8' }}>
+      
+      <header className="pb-6 pt-2 flex items-start justify-between">
+        <button
+          onClick={onBack}
+          className="group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-colors"
+          style={{ color: 'rgba(244, 240, 232, 0.5)' }}
+        >
+          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
+          <span>Back</span>
+        </button>
+      </header>
+
       <h1 className="font-serif text-4xl leading-none mb-6 tracking-tight">
         Материалы & Детали
       </h1>
@@ -47,18 +63,18 @@ export default function Materials() {
               <div className="flex flex-col gap-2 text-xs font-sans tracking-wide">
                 <div className="flex justify-between border-b border-white/5 pb-1">
                   <span className="opacity-40 uppercase">Верх</span>
-                  <span className="text-right ml-4">{item.material_upper}</span>
+                  <span className="text-right ml-4 max-w-[60%] text-right">{item.material_upper}</span>
                 </div>
                 <div className="flex justify-between border-b border-white/5 pb-1">
                   <span className="opacity-40 uppercase">Подошва</span>
-                  <span className="text-right ml-4">{item.material_sole}</span>
+                  <span className="text-right ml-4 max-w-[60%] text-right">{item.material_sole}</span>
                 </div>
                 <div className="flex justify-between border-b border-white/5 pb-1">
                   <span className="opacity-40 uppercase">Цвет</span>
                   <span className="text-right ml-4">{item.color}</span>
                 </div>
                 <div className="flex justify-between mt-2">
-                  <span className="opacity-40 uppercase">Себестоимость / Цена</span>
+                  <span className="opacity-40 uppercase">Цена</span>
                   <span className="font-bold text-[#F4F0E8]">${item.price}</span>
                 </div>
               </div>
@@ -69,4 +85,3 @@ export default function Materials() {
     </div>
   )
 }
-
