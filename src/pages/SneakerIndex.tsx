@@ -36,19 +36,28 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [selectedGender, setSelectedGender] = useState('all')
   const [searchText, setSearchText] = useState('')
   const [activeQuery, setActiveQuery] = useState('nike')
-  const [loading, setLoading] = useState(true)
+  
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Загрузка данных с бэкенда
-  const fetchSneakers = useCallback(async (query: string) => {
-    setLoading(true)
+  // Загрузка данных (при смене запроса сбрасываем страницу на 1)
+  const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+      setSneakers([])
+    }
     setError('')
-    setSneakers([])
 
     try {
+      // Увеличили лимит до 100 для получения большего количества моделей за раз
       const res = await fetch(
-        `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=50`
+        `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
       
       const data = await res.json()
@@ -57,18 +66,29 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         throw new Error(data.details || data.error || 'Ошибка при загрузке данных')
       }
 
-      // Поддерживаем разные варианты структуры ответа от API
       const list = data.results || data.data || data || []
-      setSneakers(Array.isArray(list) ? list : [])
+      const newItems = Array.isArray(list) ? list : []
+
+      // Если пришло меньше 100 элементов, значит страницы кончились
+      if (newItems.length < 100) {
+        setHasMore(false)
+      } else {
+        setHasMore(true)
+      }
+
+      setSneakers((prev) => (append ? [...prev, ...newItems] : newItems))
     } catch (err: any) {
       setError(err.message || 'Не удалось загрузить кроссовки')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [])
 
+  // При изменении поискового запроса всегда загружаем первую страницу заново
   useEffect(() => {
-    fetchSneakers(activeQuery)
+    setPage(1)
+    fetchSneakers(activeQuery, 1, false)
   }, [activeQuery, fetchSneakers])
 
   // Клик по бренду
@@ -79,7 +99,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     setActiveQuery(brandId)
   }
 
-  // Поиск по нажатию Enter
+  // Поиск по Enter
   const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const text = searchText.trim()
@@ -93,6 +113,13 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
       setHasSearched(true)
       setActiveQuery(query)
     }
+  }
+
+  // Загрузка следующей страницы
+  const handleLoadMore = () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchSneakers(activeQuery, nextPage, true)
   }
 
   // Клиентская фильтрация по полу
@@ -186,7 +213,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         })}
       </div>
 
-      {/* Состояния загрузки / ошибок */}
+      {/* Первичная загрузка */}
       {loading && (
         <p className="text-[12px] font-sans uppercase tracking-widest opacity-50 mb-8">
           Ищем в базе...
@@ -197,19 +224,8 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         <p className="text-[13px] font-sans text-red-400 mb-8">{error}</p>
       )}
 
-      {!loading && !error && filteredSneakers.length === 0 && (
-        <div className="mb-10">
-          <p className="text-[13px] font-sans opacity-60 mb-2">
-            Ничего не найдено по запросу «{activeQuery}»
-          </p>
-          <p className="text-[12px] font-sans opacity-40">
-            Попробуй другой бренд или более точную модель (например 576, 550, Dunk Low)
-          </p>
-        </div>
-      )}
-
       {/* Карточки */}
-      <div className="flex flex-col gap-10 pb-28">
+      <div className="flex flex-col gap-10 pb-10">
         {filteredSneakers.map((sneaker) => (
           <div
             key={sneaker.id}
@@ -253,6 +269,33 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
           </div>
         ))}
       </div>
+
+      {/* Если после фильтрации пусто, но общие кроссовки загружены */}
+      {!loading && !error && sneakers.length > 0 && filteredSneakers.length === 0 && (
+        <div className="mb-8 text-center py-6">
+          <p className="text-[13px] font-sans opacity-60 mb-2">
+            В текущей порции нет женских моделей. Нажмите «Загрузить ещё», чтобы подгрузить следующие из базы.
+          </p>
+        </div>
+      )}
+
+      {/* Кнопка подгрузки следующих страниц */}
+      {!loading && !error && hasMore && (
+        <div className="pb-28 text-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="w-full py-4 rounded-xl text-[12px] font-sans uppercase tracking-widest cursor-pointer transition-all"
+            style={{
+              background: 'rgba(244, 240, 232, 0.1)',
+              color: '#F4F0E8',
+              border: '1px solid rgba(244, 240, 232, 0.15)',
+            }}
+          >
+            {loadingMore ? 'Загрузка...' : 'Загрузить ещё'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
