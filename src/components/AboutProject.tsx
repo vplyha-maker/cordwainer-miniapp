@@ -51,7 +51,24 @@ const CONTENT = {
 
 const CHAR_SPEED = 0.04 
 
-const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: number, className?: string }) => {
+// Компонент теперь принимает настройки скорости и плавности
+const AnimatedText = ({ 
+  text, 
+  delay, 
+  className = "", 
+  charSpeed = CHAR_SPEED,
+  duration = 0.8,
+  yOffset = 10,
+  ease = [0.16, 1, 0.3, 1] 
+}: { 
+  text: string, 
+  delay: number, 
+  className?: string,
+  charSpeed?: number,
+  duration?: number,
+  yOffset?: number,
+  ease?: any
+}) => {
   const words = text.split(' ')
   let globalCharIndex = 0
 
@@ -59,18 +76,18 @@ const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: nu
     <span className={className}>
       {words.map((word, wordIndex) => {
         const wordContent = word.split('').map((char, charIndex) => {
-          const currentDelay = delay + globalCharIndex * CHAR_SPEED
+          const currentDelay = delay + globalCharIndex * charSpeed
           globalCharIndex++
           
           return (
             <motion.span
               key={charIndex}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: yOffset }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
                 delay: currentDelay,
-                duration: 0.8,
-                ease: [0.16, 1, 0.3, 1] 
+                duration: duration,
+                ease: ease 
               }}
               className="inline-block"
             >
@@ -104,17 +121,19 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   }, [])
 
   const { timings, totalTime } = useMemo(() => {
-    let currentDelay = 0.5;
+    let currentDelay = 1.2; // Начинаем печатать текст чуть позже, давая время линии разъехаться
     const map: Record<string, number> = {};
     const LINE_PAUSE = 0.15; 
     
-    const processLine = (key: keyof typeof text, extraPause = 0) => {
+    // Функция теперь учитывает индивидуальную скорость печати для разных строк
+    const processLine = (key: keyof typeof text, extraPause = 0, speed = CHAR_SPEED) => {
       const str = text[key];
       map[key] = currentDelay;
-      currentDelay += (str.length * CHAR_SPEED) + LINE_PAUSE + extraPause;
+      currentDelay += (str.length * speed) + LINE_PAUSE + extraPause;
     }
 
-    processLine('title', 0.4);
+    // Заголовок печатается медленнее (0.08 вместо 0.04) и с большей паузой после
+    processLine('title', 0.6, 0.08);
     processLine('p1_1');
     processLine('p1_2', 0.5); 
     processLine('p2_1');
@@ -133,7 +152,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     return { timings: map, totalTime: currentDelay };
   }, [text]);
 
-  // Непрерывный кинематографичный автоскролл
   useEffect(() => {
     if (!isAutoScrolling) return;
 
@@ -148,13 +166,11 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         exactScrollTop = scrollRef.current.scrollTop;
       }
 
-      // Скорость стала чуть больше (было 0.3, стало 0.5)
       exactScrollTop += 0.5; 
       scrollRef.current.scrollTop = exactScrollTop;
 
       const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
       
-      // Проверяем, достигли ли мы абсолютного низа (с запасом 5px на погрешность экранов)
       if (Math.ceil(scrollTop + clientHeight) >= scrollHeight - 5) {
         setIsAutoScrolling(false);
         return;
@@ -165,7 +181,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
 
     startTimeout = setTimeout(() => {
       animationFrameId = requestAnimationFrame(smoothScroll);
-    }, 3500); 
+    }, 4000); // Чуть увеличил задержку перед скроллом, так как заголовок стал плавнее
 
     return () => {
       clearTimeout(startTimeout);
@@ -176,8 +192,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowClose(true);
-      // Убрана принудительная остановка скролла по таймеру!
-      // Теперь скролл остановится сам, только когда доедет до самого низа контейнера.
     }, (totalTime + 1) * 1000); 
     
     return () => clearTimeout(timer);
@@ -212,7 +226,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         </button>
       </motion.header>
 
-      {/* Контейнер скролла */}
       <div 
         ref={scrollRef} 
         onTouchStart={() => setIsAutoScrolling(false)}
@@ -224,14 +237,19 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           
           <motion.div 
             initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} 
-            transition={{ delay: 0.2, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ delay: 0.4, duration: 1.5, ease: [0.16, 1, 0.3, 1] }} // Линия выезжает раньше
             className="relative w-[200px] md:w-[400px] h-[1px] bg-[#c9a86c] mb-12 flex justify-center items-center"
           >
             <div className="w-[5px] h-[5px] rounded-full bg-[#c9a86c] absolute" />
           </motion.div>
 
           <AnimatedText 
-            text={text.title} delay={timings.title} 
+            text={text.title} 
+            delay={timings.title} 
+            charSpeed={0.08} // Печатается в 2 раза медленнее
+            duration={1.5}   // Растворяется дольше
+            yOffset={5}      // Вылетает снизу всего на 5 пикселей (почти на месте)
+            ease={[0.25, 0.1, 0.25, 1]} // Очень мягкая кривая анимации
             className="font-playfair text-3xl md:text-5xl font-bold text-[#1a1a1a] tracking-[0.1em] mb-20" 
           />
 
