@@ -19,7 +19,8 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const response = await fetch('https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=nike%20dunk&limit=10&page=1', {
+    // Увеличили limit до 50 и поменяли query на более общий бренд или слово
+    const response = await fetch('https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=nike&limit=50&page=1', {
       method: 'GET',
       headers: {
         'x-rapidapi-host': 'sneakers-database3.p.rapidapi.com',
