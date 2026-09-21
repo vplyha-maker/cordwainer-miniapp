@@ -51,9 +51,10 @@ export default function Materials({ onBack }: MaterialsProps) {
         </button>
       </header>
 
-      <h1 className="font-serif text-4xl leading-none mb-6 tracking-tight">
-        Каталог обуви & Картинки
+      <h1 className="font-serif text-4xl leading-none mb-2 tracking-tight">
+        Каталог обуви
       </h1>
+      <p className="text-xs opacity-50 mb-6 font-sans">База данных: 9000+ товаров с сылками и характеристиками</p>
 
       {loading && <p className="text-sm opacity-50 animate-pulse">Загрузка каталога из Neon...</p>}
       
@@ -74,32 +75,32 @@ export default function Materials({ onBack }: MaterialsProps) {
             const price = cleanText(item.price)
             const discount = cleanText(item.discount_percent)
             
-            // Проверка картинки
-            let imageUrl = item.image_url ? String(item.image_url).trim() : ''
-            if (imageUrl && !imageUrl.startsWith('data:image') && !imageUrl.startsWith('http')) {
-              imageUrl = `data:image/png;base64,${imageUrl}`
-            }
-            const hasValidImage = imageUrl && imageUrl.length > 30
+            // Прямые ссылки на картинку и товар из твоей базы
+            const imageUrl = item.image_url ? String(item.image_url).trim() : ''
+            const productUrl = item.product_url ? String(item.product_url).trim() : ''
 
             return (
               <div 
                 key={item.id || index} 
-                className="p-4 rounded-2xl border flex gap-4 items-center transition-all"
+                className="p-4 rounded-2xl border flex gap-4 items-center transition-all relative group"
                 style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
               >
-                {/* Картинка выводится только если она есть в базе */}
-                {hasValidImage ? (
+                {/* Картинка по ссылке из базы */}
+                {imageUrl && imageUrl.startsWith('http') ? (
                   <img 
                     src={imageUrl} 
                     alt={brand} 
                     className="w-20 h-20 object-cover rounded-xl bg-white/5 flex-shrink-0 border border-white/10"
                     loading="lazy"
                     onError={(e) => {
-                      // Безопасно скрываем саму картинку при сбое загрузки base64
                       (e.target as HTMLElement).style.display = 'none'
                     }}
                   />
-                ) : null}
+                ) : (
+                  <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center text-[10px] opacity-40 uppercase flex-shrink-0 font-sans text-center px-1">
+                    Нет фото
+                  </div>
+                )}
 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
@@ -125,16 +126,28 @@ export default function Materials({ onBack }: MaterialsProps) {
                     </div>
                     <div className="flex justify-between items-center mt-1">
                       <span className="opacity-40 uppercase">Цена</span>
-                      <div className="text-right">
+                      <div className="text-right flex items-center gap-2">
                         <span className="font-bold text-[#F4F0E8] text-sm">${price}</span>
                         {discount !== '-' && Number(discount) > 0 && (
-                          <span className="ml-1.5 text-[9px] bg-red-900/40 text-red-300 px-1 py-0.5 rounded">
+                          <span className="text-[9px] bg-red-900/40 text-red-300 px-1 py-0.5 rounded">
                             -{discount}%
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Кнопка перехода на оригинальный товар по ссылке из базы */}
+                  {productUrl && productUrl.startsWith('http') && (
+                    <a 
+                      href={productUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="mt-3 block text-center py-1.5 rounded-lg bg-white/5 text-[10px] uppercase font-sans tracking-wider text-[#D8A35C] hover:bg-white/10 transition-colors border border-white/10"
+                    >
+                      Открыть товар на сайте →
+                    </a>
+                  )}
                 </div>
               </div>
             )
