@@ -52,6 +52,21 @@ export default function Materials({ onBack }: MaterialsProps) {
 
   const visibleItems = filteredItems.slice(0, displayCount)
 
+  // Функция гарантированного открытия ссылки во внешнем браузере через API Telegram
+  const handleOpenLink = (url: string) => {
+    if (!url) return
+    try {
+      const tg = window.Telegram?.WebApp
+      if (tg && typeof tg.openLink === 'function') {
+        tg.openLink(url)
+      } else {
+        window.open(url, '_blank')
+      }
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
   return (
     <div className="min-h-screen p-6 transition-colors duration-500" style={{ background: '#09090B', color: '#F4F0E8' }}>
       
@@ -192,16 +207,14 @@ export default function Materials({ onBack }: MaterialsProps) {
                       </div>
                     </div>
 
-                    {/* Нативная ссылка для корректного открытия в браузере */}
+                    {/* Кнопка с вызовом нативного метода открытия ссылок в Telegram */}
                     {productUrl && productUrl.startsWith('http') && (
-                      <a 
-                        href={productUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="mt-3 block w-full text-center py-1.5 rounded-lg bg-white/5 text-[10px] uppercase font-sans tracking-wider text-[#D8A35C] hover:bg-white/10 transition-colors border border-white/10"
+                      <button 
+                        onClick={() => handleOpenLink(productUrl)}
+                        className="mt-3 block w-full text-center py-1.5 rounded-lg bg-white/5 text-[10px] uppercase font-sans tracking-wider text-[#D8A35C] hover:bg-white/10 transition-colors border border-white/10 cursor-pointer"
                       >
                         Открыть товар на сайте →
-                      </a>
+                      </button>
                     )}
                   </div>
                 </div>
