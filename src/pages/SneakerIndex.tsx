@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, KeyboardEvent } from 'react'
 
 interface Sneaker {
   id: string
@@ -35,6 +35,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [selectedBrand, setSelectedBrand] = useState('nike')
   const [selectedGender, setSelectedGender] = useState('all')
   const [searchText, setSearchText] = useState('')
+  const [searchQuery, setSearchQuery] = useState('nike')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -42,7 +43,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     setLoading(true)
     setError('')
     
-    fetch(`/api/get-top-sneakers?query=${selectedBrand}&limit=100`)
+    fetch(`/api/get-top-sneakers?query=${encodeURIComponent(searchQuery)}&limit=100`)
       .then((res) => {
         if (!res.ok) throw new Error('Ошибка при загрузке данных')
         return res.json()
@@ -56,15 +57,23 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [selectedBrand])
+  }, [searchQuery])
 
-  // Фильтрация по полу и строке поиска
+  const handleBrandClick = (brandId: string) => {
+    setSelectedBrand(brandId)
+    setSearchText('')
+    setSearchQuery(brandId)
+  }
+
+  const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchText.trim()) {
+      setSearchQuery(searchText.trim())
+    }
+  }
+
   const filteredSneakers = sneakers.filter((sneaker) => {
     const matchesGender = selectedGender === 'all' || (sneaker.gender && sneaker.gender.toLowerCase().includes(selectedGender))
-    const matchesSearch = searchText === '' || 
-      sneaker.name.toLowerCase().includes(searchText.toLowerCase()) || 
-      sneaker.brand.toLowerCase().includes(searchText.toLowerCase())
-    return matchesGender && matchesSearch
+    return matchesGender
   })
 
   return (
@@ -86,13 +95,14 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         Sneaker Index
       </h1>
 
-      {/* Строка поиска */}
+      {/* Строка глобального поиска (введи модель и нажми Enter) */}
       <div className="mb-6">
         <input
           type="text"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Поиск по названию модели..."
+          onKeyDown={handleSearchSubmit}
+          placeholder="Поиск по всей базе (например, 576, Dunk) + Enter..."
           className="w-full px-4 py-3 rounded-xl text-[14px] font-sans outline-none bg-[#1A1A1A]"
           style={{ 
             color: '#F4F0E8', 
@@ -106,11 +116,11 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         {BRANDS.map((brand) => (
           <button
             key={brand.id}
-            onClick={() => setSelectedBrand(brand.id)}
+            onClick={() => handleBrandClick(brand.id)}
             className="px-4 py-2 rounded-full text-[11px] font-sans uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all"
             style={{
-              background: selectedBrand === brand.id ? '#F4F0E8' : 'transparent',
-              color: selectedBrand === brand.id ? '#09090B' : '#F4F0E8',
+              background: selectedBrand === brand.id && !searchText ? '#F4F0E8' : 'transparent',
+              color: selectedBrand === brand.id && !searchText ? '#09090B' : '#F4F0E8',
               border: '1px solid rgba(244, 240, 232, 0.2)'
             }}
           >
@@ -119,7 +129,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         ))}
       </div>
 
-      {/* Фильтр по полу (Мужские / Женские / Детские) */}
+      {/* Фильтр по полу */}
       <div className="flex gap-2 mb-8">
         {GENDERS.map((gender) => (
           <button
@@ -137,7 +147,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         ))}
       </div>
 
-      {loading && <p className="text-[12px] font-sans uppercase tracking-widest opacity-50">Загрузка базы...</p>}
+      {loading && <p className="text-[12px] font-sans uppercase tracking-widest opacity-50">Поиск по базе...</p>}
       {error && <p className="text-[12px] font-sans text-red-500">{error}</p>}
       {!loading && !error && filteredSneakers.length === 0 && (
         <p className="text-[12px] font-sans uppercase tracking-widest opacity-50">Ничего не найдено</p>
