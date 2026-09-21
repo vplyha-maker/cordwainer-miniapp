@@ -27,6 +27,7 @@ const GENDERS = [
   { id: 'all', name: 'Все' },
   { id: 'men', name: 'Мужские' },
   { id: 'women', name: 'Женские' },
+  { id: 'kid', name: 'Детские' },
 ]
 
 export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
@@ -43,14 +44,11 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Кэш в памяти, чтобы не ждать повторные запросы по уже открытым брендам
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // Загрузка данных с оптимизацией кэша
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
     const cacheKey = `${query}_p${pageNum}`
 
-    // Если страница первая и есть в кэше — отдаем мгновенно!
     if (!append && cacheRef.current[cacheKey]) {
       setSneakers(cacheRef.current[cacheKey])
       setLoading(false)
@@ -131,6 +129,13 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     const nextPage = page + 1
     setPage(nextPage)
     fetchSneakers(activeQuery, nextPage, true)
+  }
+
+  // Функция клика по карточке: открывает поиск модели в украинских магазинах через Google
+  const handleCardClick = (sneaker: Sneaker) => {
+    const searchQuery = `${sneaker.brand} ${sneaker.name} купити в Україні`
+    const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
+    window.open(url, '_blank')
   }
 
   const filteredSneakers = sneakers.filter((sneaker) => {
@@ -227,7 +232,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         <p className="text-[13px] font-sans text-red-400 mb-8">{error}</p>
       )}
 
-      {/* Скелетоны-заглушки вместо пустого экрана во время загрузки */}
+      {/* Скелетоны-заглушки во время загрузки */}
       {loading && (
         <div className="flex flex-col gap-10 pb-10 animate-pulse">
           {[1, 2, 3].map((n) => (
@@ -244,13 +249,14 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         </div>
       )}
 
-      {/* Карточки */}
+      {/* Карточки с возможностью клика */}
       {!loading && (
         <div className="flex flex-col gap-10 pb-10">
           {filteredSneakers.map((sneaker) => (
             <div
               key={sneaker.id}
-              className="border-b pb-10"
+              onClick={() => handleCardClick(sneaker)}
+              className="border-b pb-10 cursor-pointer group transition-opacity duration-200 hover:opacity-80"
               style={{ borderColor: 'rgba(244, 240, 232, 0.12)' }}
             >
               {sneaker.image?.original && (
@@ -258,7 +264,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                   <img
                     src={sneaker.image.original}
                     alt={sneaker.name}
-                    className="w-full h-auto object-cover"
+                    className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
                   />
                 </div>
@@ -282,11 +288,17 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                 {sneaker.name}
               </p>
 
-              {sneaker.retailPrice > 0 && (
-                <p className="text-[11px] font-sans font-medium uppercase tracking-[0.18em]">
-                  Retail · ${sneaker.retailPrice}
-                </p>
-              )}
+              <div className="flex justify-between items-center">
+                {sneaker.retailPrice > 0 ? (
+                  <p className="text-[11px] font-sans font-medium uppercase tracking-[0.18em]">
+                    Retail · ${sneaker.retailPrice}
+                  </p>
+                ) : <span />}
+                
+                <span className="text-[10px] font-sans uppercase tracking-widest text-white/50 group-hover:text-white transition-colors">
+                  Найти в магазинах →
+                </span>
+              </div>
             </div>
           ))}
         </div>
