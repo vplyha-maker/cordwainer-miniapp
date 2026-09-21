@@ -161,6 +161,8 @@ export function HomePage({
       favorites: 'Сохраненное',
       favoritesSub:
         articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
+      supportTitle: 'Поддержать проект',
+      supportDesc: 'На развитие и оплату серверов',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
       searchResults: 'Результаты',
       noResults: 'Записи не найдены',
@@ -195,6 +197,8 @@ export function HomePage({
       favorites: 'Збережене',
       favoritesSub:
         articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
+      supportTitle: 'Підтримати проєкт',
+      supportDesc: 'На розвиток та оплату серверів',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
       searchResults: 'Результати',
       noResults: 'Записів не знайдено',
@@ -229,6 +233,8 @@ export function HomePage({
       favorites: 'Gespeichert',
       favoritesSub:
         articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
+      supportTitle: 'Projekt unterstützen',
+      supportDesc: 'Für Server und Entwicklung',
       quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
       searchResults: 'Ergebnisse',
       noResults: 'Keine Einträge',
@@ -286,6 +292,17 @@ export function HomePage({
       onOpenGlossary?.(res.id)
     }
     setSearchQuery('')
+  }
+
+  const handleSupportClick = () => {
+    const tributeLink = 'https://t.me/tribute/app?startapp=dQO9'
+    const tg = (window as any).Telegram?.WebApp
+    
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(tributeLink)
+    } else {
+      window.open(tributeLink, '_blank')
+    }
   }
 
   const journalColors = isDark
@@ -551,7 +568,7 @@ export function HomePage({
                 {renderList(SYSTEM, 9)}
               </motion.div>
 
-              <motion.div variants={itemVariants} className="mb-16">
+              <motion.div variants={itemVariants} className="mb-4">
                 <button
                   className="w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
                   style={{ borderColor: journalColors.line }}
@@ -587,6 +604,38 @@ export function HomePage({
                         <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
                       </div>
                     ))}
+                  </div>
+                </button>
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="mb-16">
+                <button
+                  onClick={handleSupportClick}
+                  className="group w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
+                  style={{ borderColor: journalColors.line }}
+                >
+                  <div>
+                    <div
+                      className="font-serif text-[26px] leading-none mb-2 text-left transition-transform group-hover:translate-x-1"
+                      style={{ color: journalColors.text }}
+                    >
+                      {t.supportTitle}
+                    </div>
+                    <div
+                      className="text-[10px] font-sans uppercase tracking-[0.2em]"
+                      style={{ color: journalColors.textMuted }}
+                    >
+                      {t.supportDesc}
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className="w-12 h-12 rounded-full border flex items-center justify-center transition-colors"
+                    style={{ borderColor: journalColors.line, color: journalColors.text }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
                   </div>
                 </button>
               </motion.div>
