@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, KeyboardEvent } from 'react'
+import { useEffect, useState, useCallback, useRef, KeyboardEvent } from 'react'
 
 interface Sneaker {
   id: string
@@ -44,8 +44,20 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Загрузка данных (при смене запроса сбрасываем страницу на 1)
+  // Кэш в памяти, чтобы не ждать повторные запросы по уже открытым брендам
+  const cacheRef = useRef<Record<string, Sneaker[]>>({})
+
+  // Загрузка данных с оптимизацией кэша
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
+    const cacheKey = `${query}_p${pageNum}`
+
+    // Если страница первая и есть в кэше — отдаем мгновенно!
+    if (!append && cacheRef.current[cacheKey]) {
+      setSneakers(cacheRef.current[cacheKey])
+      setLoading(false)
+      return
+    }
+
     if (append) {
       setLoadingMore(true)
     } else {
@@ -55,7 +67,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     setError('')
 
     try {
-      // Увеличили лимит до 100 для получения большего количества моделей за раз
       const res = await fetch(
         `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
@@ -69,14 +80,19 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
       const list = data.results || data.data || data || []
       const newItems = Array.isArray(list) ? list : []
 
-      // Если пришло меньше 100 элементов, значит страницы кончились
       if (newItems.length < 100) {
         setHasMore(false)
       } else {
         setHasMore(true)
       }
 
-      setSneakers((prev) => (append ? [...prev, ...newItems] : newItems))
+      setSneakers((prev) => {
+        const updated = append ? [...prev, ...newItems] : newItems
+        if (!append) {
+          cacheRef.current[cacheKey] = updated
+        }
+        return updated
+      })
     } catch (err: any) {
       setError(err.message || 'Не удалось загрузить кроссовки')
     } finally {
@@ -85,13 +101,11 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     }
   }, [])
 
-  // При изменении поискового запроса всегда загружаем первую страницу заново
   useEffect(() => {
     setPage(1)
     fetchSneakers(activeQuery, 1, false)
   }, [activeQuery, fetchSneakers])
 
-  // Клик по бренду
   const handleBrandClick = (brandId: string) => {
     setSelectedBrand(brandId)
     setSearchText('')
@@ -99,7 +113,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     setActiveQuery(brandId)
   }
 
-  // Поиск по Enter
   const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const text = searchText.trim()
@@ -115,14 +128,12 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     }
   }
 
-  // Загрузка следующей страницы
   const handleLoadMore = () => {
     const nextPage = page + 1
     setPage(nextPage)
     fetchSneakers(activeQuery, nextPage, true)
   }
 
-  // Клиентская фильтрация по полу
   const filteredSneakers = sneakers.filter((sneaker) => {
     if (selectedGender === 'all') return true
     if (!sneaker.gender) return false
@@ -213,73 +224,85 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         })}
       </div>
 
-      {/* Первичная загрузка */}
-      {loading && (
-        <p className="text-[12px] font-sans uppercase tracking-widest opacity-50 mb-8">
-          Ищем в базе...
-        </p>
-      )}
-
       {error && (
         <p className="text-[13px] font-sans text-red-400 mb-8">{error}</p>
       )}
 
-      {/* Карточки */}
-      <div className="flex flex-col gap-10 pb-10">
-        {filteredSneakers.map((sneaker) => (
-          <div
-            key={sneaker.id}
-            className="border-b pb-10"
-            style={{ borderColor: 'rgba(244, 240, 232, 0.12)' }}
-          >
-            {sneaker.image?.original && (
-              <div className="w-full rounded-2xl overflow-hidden mb-5 bg-[#141414]">
-                <img
-                  src={sneaker.image.original}
-                  alt={sneaker.name}
-                  className="w-full h-auto object-cover"
-                  loading="lazy"
-                />
+      {/* Скелетоны-заглушки вместо пустого экрана во время загрузки */}
+      {loading && (
+        <div className="flex flex-col gap-10 pb-10 animate-pulse">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="border-b pb-10" style={{ borderColor: 'rgba(244, 240, 232, 0.06)' }}>
+              <div className="w-full h-64 rounded-2xl mb-5 bg-[#161618]" />
+              <div className="flex justify-between items-start mb-3">
+                <div className="h-6 w-28 bg-[#161618] rounded" />
+                <div className="h-5 w-16 bg-[#161618] rounded" />
               </div>
-            )}
+              <div className="h-4 w-3/4 bg-[#161618] rounded mb-4" />
+              <div className="h-3 w-24 bg-[#161618] rounded" />
+            </div>
+          ))}
+        </div>
+      )}
 
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-serif text-[24px] leading-none tracking-tight">
-                {sneaker.brand}
-              </h3>
-              {sneaker.gender && (
-                <span className="text-[9px] font-sans uppercase tracking-widest px-2.5 py-1 rounded bg-[#1A1A1A] opacity-70">
-                  {sneaker.gender}
-                </span>
+      {/* Карточки */}
+      {!loading && (
+        <div className="flex flex-col gap-10 pb-10">
+          {filteredSneakers.map((sneaker) => (
+            <div
+              key={sneaker.id}
+              className="border-b pb-10"
+              style={{ borderColor: 'rgba(244, 240, 232, 0.12)' }}
+            >
+              {sneaker.image?.original && (
+                <div className="w-full rounded-2xl overflow-hidden mb-5 bg-[#141414]">
+                  <img
+                    src={sneaker.image.original}
+                    alt={sneaker.name}
+                    className="w-full h-auto object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-serif text-[24px] leading-none tracking-tight">
+                  {sneaker.brand}
+                </h3>
+                {sneaker.gender && (
+                  <span className="text-[9px] font-sans uppercase tracking-widest px-2.5 py-1 rounded bg-[#1A1A1A] opacity-70">
+                    {sneaker.gender}
+                  </span>
+                )}
+              </div>
+
+              <p
+                className="text-[15px] font-sans font-light mb-4 leading-snug"
+                style={{ color: 'rgba(244, 240, 232, 0.65)' }}
+              >
+                {sneaker.name}
+              </p>
+
+              {sneaker.retailPrice > 0 && (
+                <p className="text-[11px] font-sans font-medium uppercase tracking-[0.18em]">
+                  Retail · ${sneaker.retailPrice}
+                </p>
               )}
             </div>
+          ))}
+        </div>
+      )}
 
-            <p
-              className="text-[15px] font-sans font-light mb-4 leading-snug"
-              style={{ color: 'rgba(244, 240, 232, 0.65)' }}
-            >
-              {sneaker.name}
-            </p>
-
-            {sneaker.retailPrice > 0 && (
-              <p className="text-[11px] font-sans font-medium uppercase tracking-[0.18em]">
-                Retail · ${sneaker.retailPrice}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Если после фильтрации пусто, но общие кроссовки загружены */}
+      {/* Если после фильтрации пусто */}
       {!loading && !error && sneakers.length > 0 && filteredSneakers.length === 0 && (
         <div className="mb-8 text-center py-6">
           <p className="text-[13px] font-sans opacity-60 mb-2">
-            В текущей порции нет женских моделей. Нажмите «Загрузить ещё», чтобы подгрузить следующие из базы.
+            В текущей порции нет моделей для этого пола. Нажмите «Загрузить ещё», чтобы подгрузить следующие.
           </p>
         </div>
       )}
 
-      {/* Кнопка подгрузки следующих страниц */}
+      {/* Кнопка подгрузки */}
       {!loading && !error && hasMore && (
         <div className="pb-28 text-center">
           <button
