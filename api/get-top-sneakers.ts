@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const response = await fetch('https://sneakers-database3.p.rapidapi.com/8356/sneakers%2Bby%2Brelease%2Bdate?releaseDate=2024-10-10&limit=10', {
+    const response = await fetch('https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=nike%20dunk&limit=10&page=1', {
       method: 'GET',
       headers: {
         'x-rapidapi-host': 'sneakers-database3.p.rapidapi.com',
@@ -38,7 +38,7 @@ export default async function handler(req: any, res: any) {
 
     const data = await response.json();
     
-    // Кэшируем ответ на серверах Vercel на 24 часа (86400 секунд)
+    // Кэшируем ответ на 24 часа
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
     
     return res.status(200).json(data);
