@@ -13,6 +13,7 @@ type HomePageProps = {
   onOpenStyles?: () => void
   onOpenGlossary?: (termId?: string) => void
   onOpenPrices?: () => void
+  onOpenSneakers?: () => void
   lang: Lang
   setLang: (lang: Lang) => void
   favorites?: FavoriteItem[]
@@ -88,6 +89,7 @@ export function HomePage({
   onOpenStyles,
   onOpenGlossary,
   onOpenPrices,
+  onOpenSneakers,
   lang,
   setLang,
   favorites = [],
@@ -144,8 +146,8 @@ export function HomePage({
       colorsSub: 'Патина и психология',
       styles: 'Силуэты',
       stylesSub: 'Фасоны и классика',
-      sizes: 'Ортопедия',
-      sizesSub: 'Размеры и колодки',
+      sneakers: 'Сникер-индекс',
+      sneakersSub: 'Календарь релизов',
       calc: 'Калькуляторы',
       calcSub: `${CALCULATORS_COUNT} Модулей`,
       blog: 'Архив',
@@ -180,8 +182,8 @@ export function HomePage({
       colorsSub: 'Патина та психологія',
       styles: 'Силуети',
       stylesSub: 'Фасони та класика',
-      sizes: 'Ортопедія',
-      sizesSub: 'Розміри та колодки',
+      sneakers: 'Снікер-індекс',
+      sneakersSub: 'Календар релізів',
       calc: 'Калькулятори',
       calcSub: `${CALCULATORS_COUNT} Модулів`,
       blog: 'Архів',
@@ -216,8 +218,8 @@ export function HomePage({
       colorsSub: 'Patina & Psychologie',
       styles: 'Silhouetten',
       stylesSub: 'Klassik & Formen',
-      sizes: 'Orthopädie',
-      sizesSub: 'Leisten & Maße',
+      sneakers: 'Sneaker-Index',
+      sneakersSub: 'Release-Kalender',
       calc: 'Rechner',
       calcSub: `${CALCULATORS_COUNT} Module`,
       blog: 'Archiv',
@@ -246,7 +248,7 @@ export function HomePage({
     { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: undefined },
     { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
     { id: 'styles', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
-    { id: 'sizes', title: t.sizes, subtitle: t.sizesSub, action: undefined },
+    { id: 'sneakers', title: t.sneakers, subtitle: t.sneakersSub, action: onOpenSneakers },
   ]
 
   const TOOLS: MenuItem[] = [
