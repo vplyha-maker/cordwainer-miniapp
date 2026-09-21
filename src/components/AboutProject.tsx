@@ -51,7 +51,7 @@ const CONTENT = {
 
 const CHAR_SPEED = 0.04 
 
-// Обновленный компонент: разбивает текст по словам, чтобы не было переносов посреди слова
+// Компонент разбивает текст на слова, чтобы они не переносились по буквам на мобильных экранах
 const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: number, className?: string }) => {
   const words = text.split(' ')
   let globalCharIndex = 0
@@ -66,7 +66,7 @@ const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: nu
           return (
             <motion.span
               key={charIndex}
-              initial={{ opacity: 0, y: 10 }} // Уменьшен шаг Y, чтобы не было прыжков на мобилке
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
                 delay: currentDelay,
@@ -80,7 +80,6 @@ const AnimatedText = ({ text, delay, className = "" }: { text: string, delay: nu
           )
         })
         
-        // Учитываем пробел в общем счетчике задержки
         globalCharIndex++
 
         return (
@@ -106,7 +105,7 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
   }, [])
 
   const { timings, totalTime } = useMemo(() => {
-    let currentDelay = 1.0; 
+    let currentDelay = 0.5; // Начинаем чуть быстрее
     const map: Record<string, number> = {};
     const LINE_PAUSE = 0.15; 
     
@@ -135,30 +134,35 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
     return { timings: map, totalTime: currentDelay };
   }, [text]);
 
-  // Логика мягкого автоскролла
+  // Плавный и аккуратный автоскролл
   useEffect(() => {
     if (!isAutoScrolling) return;
 
-    const interval = setInterval(() => {
-      if (scrollRef.current) {
-        const { scrollHeight, clientHeight } = scrollRef.current
-        if (scrollHeight > clientHeight) {
-          scrollRef.current.scrollTo({
-            top: scrollHeight,
+    let intervalId: ReturnType<typeof setInterval>;
+
+    // Ждем 3.5 секунды (пока напечатается заголовок и первый абзац), затем начинаем плавно скроллить
+    const startTimeout = setTimeout(() => {
+      intervalId = setInterval(() => {
+        if (scrollRef.current && isAutoScrolling) {
+          scrollRef.current.scrollBy({
+            top: 20, // Ползем вниз мелкими шажками
             behavior: 'smooth'
           })
         }
-      }
-    }, 1000); // Проверяем и доскролливаем каждую секунду
+      }, 500); // Каждые полсекунды
+    }, 3500);
 
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(startTimeout);
+      if (intervalId) clearInterval(intervalId);
+    }
   }, [isAutoScrolling]);
 
-  // Завершение анимации
+  // Появление кнопки закрытия
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowClose(true);
-      setIsAutoScrolling(false); // Отключаем принудительный скролл в конце
+      setIsAutoScrolling(false); // Отключаем скролл, когда анимация закончилась
     }, (totalTime + 1) * 1000); 
     
     return () => clearTimeout(timer);
@@ -182,10 +186,10 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         className="absolute inset-[22px] border-[0.5px] border-[#c9a86c]/20 pointer-events-none z-0" 
       />
 
-      {/* Градиент сверху для скрытия текста при скролле под кнопкой BACK */}
-      <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#faf8f5] via-[#faf8f5]/90 to-transparent z-40 pointer-events-none" />
+      {/* Уменьшенный градиент сверху, чтобы не перекрывал заголовок */}
+      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#faf8f5] to-transparent z-40 pointer-events-none" />
 
-      {/* Header (только кнопка Back) */}
+      {/* Header */}
       <motion.header 
         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5 }}
         className="absolute top-0 left-0 right-0 z-50 px-10 pt-12 pb-4 flex items-center justify-between pointer-events-none"
@@ -205,10 +209,9 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
       >
         <div className="w-full max-w-[650px] flex flex-col items-center text-center">
           
-          {/* Декор заголовка */}
           <motion.div 
             initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} 
-            transition={{ delay: 0.4, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ delay: 0.2, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
             className="relative w-[200px] md:w-[400px] h-[1px] bg-[#c9a86c] mb-12 flex justify-center items-center"
           >
             <div className="w-[5px] h-[5px] rounded-full bg-[#c9a86c] absolute" />
@@ -219,13 +222,11 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
             className="font-playfair text-3xl md:text-5xl font-bold text-[#1a1a1a] tracking-[0.1em] mb-20" 
           />
 
-          {/* Абзац 1 */}
           <div className="flex flex-col items-center space-y-2 mb-12 leading-relaxed">
             <AnimatedText text={text.p1_1} delay={timings.p1_1} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p1_2} delay={timings.p1_2} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
           </div>
 
-          {/* Абзац 2 */}
           <div className="flex flex-col items-center space-y-2 mb-12 leading-relaxed">
             <AnimatedText text={text.p2_1} delay={timings.p2_1} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p2_2} delay={timings.p2_2} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
@@ -233,7 +234,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
             <AnimatedText text={text.p2_4} delay={timings.p2_4} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
           </div>
 
-          {/* Абзац 3 */}
           <div className="flex flex-col items-center space-y-2 mb-6 leading-relaxed">
             <AnimatedText text={text.p3_1} delay={timings.p3_1} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
             <AnimatedText text={text.p3_2} delay={timings.p3_2} className="font-cormorant text-xl md:text-2xl text-[#2c2c2c]" />
@@ -244,7 +244,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
             className="font-cormorant text-2xl md:text-3xl font-medium text-[#1a1a1a] mb-24" 
           />
 
-          {/* Декор перед посвящением */}
           <motion.div 
             initial={{ scaleX: 0, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} 
             transition={{ delay: timings.decor, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
@@ -271,7 +270,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
           />
         </div>
         
-        {/* Анимированная кнопка закрытия */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: showClose ? 1 : 0, y: showClose ? 0 : 20 }}
@@ -287,7 +285,6 @@ export default function AboutProject({ lang = 'ru', onClose }: AboutProjectProps
         </motion.div>
       </div>
       
-      {/* Градиент для мягкого растворения текста внизу экрана */}
       <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#faf8f5] to-transparent z-40 pointer-events-none" />
     </div>
   )
