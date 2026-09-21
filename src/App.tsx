@@ -17,7 +17,7 @@ import { PricesPage } from './pages/PricesPage/PricesPage'
 import { StylesPage } from './pages/StylesPage'
 import { SalaryCalcPage } from './pages/salary' 
 import { SettingsPage } from './pages/SettingsPage'
-import SneakerIndex from './SneakerIndex'
+import SneakerIndex from './pages/SneakerIndex'
 
 import {
   getSavedPerfMode,
@@ -353,7 +353,7 @@ export default function App() {
             {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
             {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
             
-            {screen === 'sneakers' && <SneakerIndex key="sneakers" />}
+            {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
 
             {screen === 'settings' && (
               <SettingsPage
