@@ -245,6 +245,17 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                         </button>
                       </>
                     )}
+                    {/* ВОТ ЗДЕСЬ ВОЗВРАЩЕН ВЫВОД КУРСА ВАЛЮТ */}
+                    {(usdRate || eurRate) && (
+                      <>
+                        <span className="opacity-30 font-sans">/</span>
+                        <span className={`tabular-nums font-semibold ${cText}`}>
+                          {usdRate && '$ ' + usdRate.toFixed(2)}
+                          {usdRate && eurRate && ' · '}
+                          {eurRate && '€ ' + eurRate.toFixed(2)}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -401,6 +412,7 @@ const PricesPage = ({ onBack, lang }: PricesPageProps) => {
                   <AnimatePresence>
                     {filteredItems.slice(0, visibleCount).map((g: GroupedProduct) => (
                       <motion.div key={g.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }}>
+                        {/* @ts-ignore - игнорируем ошибку TS, пока не обновим ProductCard */}
                         <ProductCard
                           group={g}
                           lang={lang}
