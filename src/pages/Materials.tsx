@@ -87,7 +87,7 @@ export default function Materials({ onBack }: MaterialsProps) {
                 className="p-4 rounded-2xl border flex gap-4 items-center transition-all"
                 style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
               >
-                {/* Картинка выводится только если она реально есть в базе */}
+                {/* Картинка выводится только если она есть в базе */}
                 {hasValidImage ? (
                   <img 
                     src={imageUrl} 
@@ -95,8 +95,8 @@ export default function Materials({ onBack }: MaterialsProps) {
                     className="w-20 h-20 object-cover rounded-xl bg-white/5 flex-shrink-0 border border-white/10"
                     loading="lazy"
                     onError={(e) => {
-                      // Скрываем элемент при ошибке загрузки base64
-                      (e.target as HTMLElement.parentElement)?.style?.setProperty('display', 'none')
+                      // Безопасно скрываем саму картинку при сбое загрузки base64
+                      (e.target as HTMLElement).style.display = 'none'
                     }}
                   />
                 ) : null}
@@ -104,7 +104,6 @@ export default function Materials({ onBack }: MaterialsProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <div>
-                      {/* Четкий вывод бренда и категории/модели */}
                       <h2 className="font-serif text-xl truncate">{brand !== '-' ? brand : 'Модель'}</h2>
                       <p className="text-[11px] opacity-60 font-sans truncate">{category}</p>
                     </div>
