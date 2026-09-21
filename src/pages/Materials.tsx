@@ -4,7 +4,6 @@ type MaterialsProps = {
   onBack?: () => void
 }
 
-// Функция для очистки текста от всяких мусорных тегов вроде [span_2] или (start_span)
 function cleanText(text: any): string {
   if (!text) return '-'
   return String(text)
@@ -17,21 +16,42 @@ function cleanText(text: any): string {
 export default function Materials({ onBack }: MaterialsProps) {
   const [materials, setMaterials] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+
+  const fetchMaterials = async (pageNum: number, isAppend = false) => {
+    if (isAppend) setLoadingMore(true)
+    else setLoading(true)
+
+    try {
+      const res = await fetch(`/api/get-materials?page=${pageNum}`)
+      if (!res.ok) throw new Error('Ошибка при загрузке данных с сервера')
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      if (data.length < 50) setHasMore(false)
+
+      setMaterials((prev) => isAppend ? [...prev, ...data] : data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
-    fetch('/api/get-materials')
-      .then((res) => {
-        if (!res.ok) throw new Error('Ошибка при загрузке данных с сервера')
-        return res.json()
-      })
-      .then((data) => {
-        if (data.error) throw new Error(data.error)
-        setMaterials(data)
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+    fetchMaterials(1, false)
   }, [])
+
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchMaterials(nextPage, true)
+  }
 
   return (
     <div className="min-h-screen p-6 transition-colors duration-500" style={{ background: '#09090B', color: '#F4F0E8' }}>
@@ -48,10 +68,10 @@ export default function Materials({ onBack }: MaterialsProps) {
       </header>
 
       <h1 className="font-serif text-4xl leading-none mb-6 tracking-tight">
-        Каталог обуви & Материалы
+        Каталог обуви & Картинки
       </h1>
 
-      {loading && <p className="text-sm opacity-50 animate-pulse">Загрузка базы из Neon...</p>}
+      {loading && <p className="text-sm opacity-50 animate-pulse">Загрузка каталога...</p>}
       
       {error && (
         <div className="p-4 bg-red-900/30 border border-red-500/30 rounded-xl text-red-400 text-sm">
@@ -60,7 +80,7 @@ export default function Materials({ onBack }: MaterialsProps) {
       )}
 
       {!loading && !error && (
-        <div className="flex flex-col gap-5 pb-10">
+        <div className="flex flex-col gap-4 pb-10">
           {materials.map((item, index) => {
             const brand = cleanText(item.footwear_brand)
             const category = cleanText(item.footwear_category)
@@ -70,53 +90,73 @@ export default function Materials({ onBack }: MaterialsProps) {
             const size = cleanText(item.shoe_size)
             const price = cleanText(item.price)
             const discount = cleanText(item.discount_percent)
+            const imageUrl = item.image_url // картинка из базы
 
             return (
               <div 
                 key={item.id || index} 
-                className="p-5 rounded-2xl border transition-all"
+                className="p-4 rounded-2xl border flex gap-4 items-center transition-all"
                 style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h2 className="font-serif text-2xl">{brand}</h2>
-                    <p className="text-xs opacity-60 font-sans">{category}</p>
+                {/* Выводим картинку, если она есть */}
+                {imageUrl && imageUrl.startsWith('data:image') ? (
+                  <img 
+                    src={imageUrl} 
+                    alt={brand} 
+                    className="w-20 h-20 object-cover rounded-xl bg-white/5 flex-shrink-0"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center text-[10px] opacity-40 uppercase flex-shrink-0 font-sans">
+                    Нет фото
                   </div>
-                  {size !== '-' && (
-                    <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-mono">
-                      Размер: {size}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex flex-col gap-2 text-xs font-sans tracking-wide mt-4">
-                  <div className="flex justify-between border-b border-white/5 pb-1">
-                    <span className="opacity-40 uppercase">Материал</span>
-                    <span className="text-right ml-4 max-w-[60%]">{material}</span>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                    <div>
+                      <h2 className="font-serif text-xl truncate">{brand}</h2>
+                      <p className="text-[11px] opacity-60 font-sans truncate">{category}</p>
+                    </div>
+                    {size !== '-' && (
+                      <span className="px-2 py-0.5 bg-white/10 rounded-lg text-[10px] font-mono whitespace-nowrap ml-2">
+                        {size}р
+                      </span>
+                    )}
                   </div>
-                  <div className="flex justify-between border-b border-white/5 pb-1">
-                    <span className="opacity-40 uppercase">Цвет</span>
-                    <span className="text-right ml-4">{color}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/5 pb-1">
-                    <span className="opacity-40 uppercase">Наличие</span>
-                    <span className="text-right ml-4 text-emerald-400">{stock}</span>
-                  </div>
-                  <div className="flex justify-between mt-2 items-center">
-                    <span className="opacity-40 uppercase">Цена</span>
-                    <div className="text-right">
-                      <span className="font-bold text-[#F4F0E8] text-base">${price}</span>
-                      {discount !== '-' && Number(discount) > 0 && (
-                        <span className="ml-2 text-[10px] bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded">
-                          -{discount}%
-                        </span>
-                      )}
+                  
+                  <div className="flex flex-col gap-1 text-[11px] font-sans tracking-wide mt-2">
+                    <div className="flex justify-between border-b border-white/5 pb-0.5">
+                      <span className="opacity-40 uppercase">Материал</span>
+                      <span className="text-right truncate ml-2">{material}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="opacity-40 uppercase">Цена</span>
+                      <div className="text-right">
+                        <span className="font-bold text-[#F4F0E8] text-sm">${price}</span>
+                        {discount !== '-' && Number(discount) > 0 && (
+                          <span className="ml-1.5 text-[9px] bg-red-900/40 text-red-300 px-1 py-0.5 rounded">
+                            -{discount}%
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             )
           })}
+
+          {hasMore && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full py-3.5 rounded-xl border text-xs font-sans uppercase tracking-widest mt-2 transition-all active:scale-95"
+              style={{ borderColor: 'rgba(244, 240, 232, 0.2)', background: 'transparent', color: '#F4F0E8' }}
+            >
+              {loadingMore ? 'Загрузка...' : 'Загрузить еще 50 товаров ↓'}
+            </button>
+          )}
         </div>
       )}
     </div>
