@@ -74,11 +74,12 @@ export default function Materials({ onBack }: MaterialsProps) {
             const price = cleanText(item.price)
             const discount = cleanText(item.discount_percent)
             
-            // Надежная проверка картинки из базы
+            // Проверка картинки
             let imageUrl = item.image_url ? String(item.image_url).trim() : ''
             if (imageUrl && !imageUrl.startsWith('data:image') && !imageUrl.startsWith('http')) {
               imageUrl = `data:image/png;base64,${imageUrl}`
             }
+            const hasValidImage = imageUrl && imageUrl.length > 30
 
             return (
               <div 
@@ -86,28 +87,25 @@ export default function Materials({ onBack }: MaterialsProps) {
                 className="p-4 rounded-2xl border flex gap-4 items-center transition-all"
                 style={{ borderColor: 'rgba(244, 240, 232, 0.12)', background: '#141414' }}
               >
-                {/* Картинка */}
-                {imageUrl && imageUrl.length > 20 ? (
+                {/* Картинка выводится только если она реально есть в базе */}
+                {hasValidImage ? (
                   <img 
                     src={imageUrl} 
                     alt={brand} 
                     className="w-20 h-20 object-cover rounded-xl bg-white/5 flex-shrink-0 border border-white/10"
                     loading="lazy"
                     onError={(e) => {
-                      // Если картинка битая, скрываем ее и показываем заглушку
-                      (e.target as HTMLElement).style.display = 'none';
+                      // Скрываем элемент при ошибке загрузки base64
+                      (e.target as HTMLElement.parentElement)?.style?.setProperty('display', 'none')
                     }}
                   />
-                ) : (
-                  <div className="w-20 h-20 rounded-xl bg-white/5 flex items-center justify-center text-[10px] opacity-40 uppercase flex-shrink-0 font-sans text-center px-1">
-                    Нет фото
-                  </div>
-                )}
+                ) : null}
 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <div>
-                      <h2 className="font-serif text-xl truncate">{brand}</h2>
+                      {/* Четкий вывод бренда и категории/модели */}
+                      <h2 className="font-serif text-xl truncate">{brand !== '-' ? brand : 'Модель'}</h2>
                       <p className="text-[11px] opacity-60 font-sans truncate">{category}</p>
                     </div>
                     {size !== '-' && (
