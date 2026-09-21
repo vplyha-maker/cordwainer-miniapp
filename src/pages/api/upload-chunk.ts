@@ -1,7 +1,7 @@
 import { Pool } from '@neondatabase/serverless';
-import type { NextApiRequest, NextApiResponse } from 'next';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+// Убрали импорт типов из Next.js, Vercel сам всё поймет
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Метод не разрешен' });
 
   const { rows } = req.body;
@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const keys = Object.keys(rows[0]).map(k => k.replace(/[^a-zA-Z0-9_]/g, ''));
     const tableName = 'kaggle_shoes';
 
-    // Автоматически создаем таблицу под структуру твоего файла
+    // Автоматически создаем таблицу
     const columnsDef = keys.map(k => `"${k}" TEXT`).join(', ');
     await pool.query(`CREATE TABLE IF NOT EXISTS ${tableName} (id SERIAL PRIMARY KEY, ${columnsDef})`);
 
@@ -27,7 +27,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const rowPlaceholders: string[] = [];
       keys.forEach((_, i) => {
         rowPlaceholders.push(`$${paramIndex++}`);
-        // Оригинальные ключи из CSV
         const originalKey = Object.keys(rows[0])[i];
         flatData.push(row[originalKey] !== undefined ? String(row[originalKey]) : null);
       });
@@ -42,4 +41,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: error.message });
   }
 }
-
