@@ -27,6 +27,7 @@ const GENDERS = [
   { id: 'all', name: 'Все' },
   { id: 'men', name: 'Мужские' },
   { id: 'women', name: 'Женские' },
+  { id: 'kid', name: 'Детские' },
 ]
 
 export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
@@ -130,10 +131,17 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     fetchSneakers(activeQuery, nextPage, true)
   }
 
+  // Исправленный метод открытия ссылок для iOS / Telegram WebApp
   const handleCardClick = (sneaker: Sneaker) => {
     const searchQuery = `${sneaker.brand} ${sneaker.name} купити в Україні`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
-    window.open(url, '_blank')
+
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.openLink) {
+      tg.openLink(url)
+    } else {
+      window.open(url, '_blank')
+    }
   }
 
   const filteredSneakers = sneakers.filter((sneaker) => {
@@ -247,7 +255,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         </div>
       )}
 
-      {/* Карточки с оптимизацией производительности (content-visibility) */}
+      {/* Карточки с оптимизацией производительности */}
       {!loading && (
         <div className="flex flex-col gap-10 pb-10">
           {filteredSneakers.map((sneaker) => (
@@ -257,8 +265,8 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
               className="border-b pb-10 cursor-pointer group transition-opacity duration-200 hover:opacity-80"
               style={{
                 borderColor: 'rgba(244, 240, 232, 0.12)',
-                contentVisibility: 'auto', // Разгружает процессор телефона
-                containIntrinsicSize: 'auto 400px', // Ускоряет прорисовку длинных списков
+                contentVisibility: 'auto',
+                containIntrinsicSize: 'auto 400px',
               }}
             >
               {sneaker.image?.original && (
