@@ -43,9 +43,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
-  const [selectedShoeDetail, setSelectedShoeDetail] = useState<any>(null)
-  const [loadingDetailsId, setLoadingDetailsId] = useState<string | null>(null)
-
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
@@ -133,34 +130,11 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     fetchSneakers(activeQuery, nextPage, true)
   }
 
-  // Умный клик: детайлы запросится только для Nike, для остальных — сразу магазины Украины
-  const handleCardClick = async (sneaker: Sneaker) => {
-    const isNike = sneaker.brand.toLowerCase() === 'nike'
-
-    // Если это Nike — пытаемся запросить глубокие детали из нашего нового API
-    if (isNike) {
-      setLoadingDetailsId(sneaker.id)
-      try {
-        const queryParam = `${sneaker.brand} ${sneaker.name}`
-        const res = await fetch(`/api/get-nike-details?url=${encodeURIComponent(queryParam)}`)
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Детали не найдены')
-        }
-
-        setSelectedShoeDetail(data)
-        setLoadingDetailsId(null)
-        return // Успешно открыли модалку с деталями Nike
-      } catch (err) {
-        console.warn('Nike API не ответил, перенаправляем в поиск')
-        setLoadingDetailsId(null)
-      }
-    }
-
-    // Для всех остальных брендов (или если Nike API упал) — открываем украинские магазины
+  // Стабильный и красивый переход на поиск в украинских магазинах без ошибок
+  const handleCardClick = (sneaker: Sneaker) => {
     const searchQuery = `${sneaker.brand} ${sneaker.name} купити в Україні`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
+
     const tg = (window as any).Telegram?.WebApp
     if (tg?.openLink) {
       tg.openLink(url)
@@ -185,7 +159,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
 
   return (
     <div
-      className="min-h-screen p-6 transition-colors duration-500 relative"
+      className="min-h-screen p-6 transition-colors duration-500"
       style={{ background: '#09090B', color: '#F4F0E8' }}
     >
       {/* Header */}
@@ -291,99 +265,59 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
       {/* Карточки */}
       {!loading && (
         <div className="flex flex-col gap-10 pb-10">
-          {filteredSneakers.map((sneaker) => {
-            const isThisLoading = loadingDetailsId === sneaker.id
-            const isNike = sneaker.brand.toLowerCase() === 'nike'
-
-            return (
-              <div
-                key={sneaker.id}
-                onClick={() => handleCardClick(sneaker)}
-                className="border-b pb-10 cursor-pointer group transition-opacity duration-200 hover:opacity-80 relative"
-                style={{
-                  borderColor: 'rgba(244, 240, 232, 0.12)',
-                  contentVisibility: 'auto',
-                  containIntrinsicSize: 'auto 400px',
-                }}
-              >
-                {sneaker.image?.original && (
-                  <div className="w-full rounded-2xl overflow-hidden mb-5 bg-[#141414] relative">
-                    <img
-                      src={sneaker.image.original}
-                      alt={sneaker.name}
-                      className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    {isThisLoading && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs uppercase tracking-widest text-white">
-                        Загрузка деталей Nike...
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-serif text-[24px] leading-none tracking-tight">
-                    {sneaker.brand}
-                  </h3>
-                  {sneaker.gender && (
-                    <span className="text-[9px] font-sans uppercase tracking-widest px-2.5 py-1 rounded bg-[#1A1A1A] opacity-70">
-                      {sneaker.gender}
-                    </span>
-                  )}
+          {filteredSneakers.map((sneaker) => (
+            <div
+              key={sneaker.id}
+              onClick={() => handleCardClick(sneaker)}
+              className="border-b pb-10 cursor-pointer group transition-opacity duration-200 hover:opacity-80"
+              style={{
+                borderColor: 'rgba(244, 240, 232, 0.12)',
+                contentVisibility: 'auto',
+                containIntrinsicSize: 'auto 400px',
+              }}
+            >
+              {sneaker.image?.original && (
+                <div className="w-full rounded-2xl overflow-hidden mb-5 bg-[#141414]">
+                  <img
+                    src={sneaker.image.original}
+                    alt={sneaker.name}
+                    className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
                 </div>
+              )}
 
-                <p
-                  className="text-[15px] font-sans font-light mb-4 leading-snug"
-                  style={{ color: 'rgba(244, 240, 232, 0.65)' }}
-                >
-                  {sneaker.name}
-                </p>
-
-                <div className="flex justify-between items-center">
-                  {sneaker.retailPrice > 0 ? (
-                    <p className="text-[11px] font-sans font-medium uppercase tracking-[0.18em]">
-                      Retail · ${sneaker.retailPrice}
-                    </p>
-                  ) : <span />}
-                  
-                  <span className="text-[10px] font-sans uppercase tracking-widest text-white/50 group-hover:text-white transition-colors">
-                    {isThisLoading 
-                      ? 'Загрузка...' 
-                      : isNike 
-                        ? 'Детали из API →' 
-                        : 'Найти в магазинах →'}
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-serif text-[24px] leading-none tracking-tight">
+                  {sneaker.brand}
+                </h3>
+                {sneaker.gender && (
+                  <span className="text-[9px] font-sans uppercase tracking-widest px-2.5 py-1 rounded bg-[#1A1A1A] opacity-70">
+                    {sneaker.gender}
                   </span>
-                </div>
+                )}
               </div>
-            )
-          })}
-        </div>
-      )}
 
-      {/* Модальное окно для отображения глубоких деталей Nike */}
-      {selectedShoeDetail && (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#141414] border border-white/15 p-6 rounded-2xl max-w-lg w-full relative max-h-[85vh] flex flex-col">
-            <button 
-              onClick={() => setSelectedShoeDetail(null)}
-              className="absolute top-4 right-4 text-white/50 hover:text-white text-xs uppercase tracking-wider cursor-pointer"
-            >
-              Закрыть ✕
-            </button>
-            <h3 className="font-serif text-2xl mb-4 text-[#F4F0E8]">Характеристики Nike</h3>
-            <div className="bg-[#09090B] p-4 rounded-xl overflow-auto flex-1 border border-white/10">
-              <pre className="text-[11px] text-white/80 font-mono whitespace-pre-wrap">
-                {JSON.stringify(selectedShoeDetail, null, 2)}
-              </pre>
+              <p
+                className="text-[15px] font-sans font-light mb-4 leading-snug"
+                style={{ color: 'rgba(244, 240, 232, 0.65)' }}
+              >
+                {sneaker.name}
+              </p>
+
+              <div className="flex justify-between items-center">
+                {sneaker.retailPrice > 0 ? (
+                  <p className="text-[11px] font-sans font-medium uppercase tracking-[0.18em]">
+                    Retail · ${sneaker.retailPrice}
+                  </p>
+                ) : <span />}
+                
+                <span className="text-[10px] font-sans uppercase tracking-widest text-white/50 group-hover:text-white transition-colors">
+                  Найти в магазинах →
+                </span>
+              </div>
             </div>
-            <button
-              onClick={() => setSelectedShoeDetail(null)}
-              className="mt-4 w-full py-3 rounded-xl bg-[#F4F0E8] text-[#09090B] text-xs font-sans uppercase tracking-widest font-medium cursor-pointer"
-            >
-              Закрыть
-            </button>
-          </div>
+          ))}
         </div>
       )}
 
