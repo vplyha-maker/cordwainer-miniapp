@@ -1,21 +1,22 @@
 import { scrapeZottiCategory } from './scrapers/zotti.js';
 import { scrapeBashmachnikCategory } from './scrapers/bashmachnik.js';
 import { scrapeMasterokCategory } from './scrapers/masterok.js';
-import { saveProduct } from './db/saveProduct.js';
+// Заменили на пакетное сохранение
+import { saveProductsBatch } from './db/saveProduct.js'; 
 
 // Бронебойный очиститель цены перед записью в БД
 function parseScrapedPrice(rawPrice) {
-  if (rawPrice === null || rawPrice === undefined || rawPrice === '') return 0;
+  if (rawPrice === null || rawPrice === undefined || rawPrice === '') return null; // Записываем null, чтобы база понимала отсутствие цены
   
   let s = String(rawPrice).toLowerCase();
   
   // Перехват статуса "Нет в наличии"
-  if (s.includes('нет') || s.includes('немає') || s.includes('null')) return 0;
+  if (s.includes('нет') || s.includes('немає') || s.includes('null')) return null;
 
   // Убираем пробелы (включая неразрывные) и меняем запятую на точку
   s = s.replace(/\s+/g, '').replace(',', '.');
   
-  // 2. ИСПРАВЛЕНИЕ: Надежный парсинг (только числа и до 2 знаков после точки)
+  // Надежный парсинг (только числа и до 2 знаков после точки)
   const match = s.match(/(\d+(?:\.\d{1,2})?)/);
   if (match) {
     const val = parseFloat(match[0]);
@@ -24,7 +25,7 @@ function parseScrapedPrice(rawPrice) {
         return val;
     }
   }
-  return 0;
+  return null;
 }
 
 async function main() {
@@ -36,7 +37,6 @@ async function main() {
   // 1. ZOTTI
   try {
     console.log('\n--- 📦 Парсинг Zotti ---');
-    // 6. ИСПРАВЛЕНИЕ: Предотвращение утечки памяти (отказ от [...zottiHimiya, ...zottiKlei])
     const zottiUrls = [
       { url: '/ua/catalog/cat/himiya', categoryFallback: 'Zotti Каталог' },
       { url: '/ua/catalog/cat/klei', categoryFallback: 'Zotti Каталог' }
@@ -46,26 +46,26 @@ async function main() {
     for (const item of zottiUrls) {
       const scrapedData = await scrapeZottiCategory(item.url);
       
-      // 4. ИСПРАВЛЕНИЕ: Валидация входных данных из скрейпера
-      const validProducts = scrapedData.filter(p => p.name && p.url);
+      // Фильтруем и сразу формируем готовый массив для БД
+      const validProducts = scrapedData
+        .filter(p => p.name && p.url)
+        .map(prod => ({
+          source: 'zotti',
+          sourceId: prod.sourceId || prod.id || prod.url,
+          productCode: prod.productCode || prod.code,
+          name: prod.name,
+          url: prod.url,
+          imageUrl: prod.imageUrl,
+          category: (prod.category && prod.category.trim()) || item.categoryFallback,
+          price: parseScrapedPrice(prod.price) // Применяем очиститель
+        }));
 
-      for (const prod of validProducts) {
-        // 1. ИСПРАВЛЕНИЕ: Обработка ошибок в цикле сохранения
+      if (validProducts.length > 0) {
         try {
-          await saveProduct({
-            source: 'zotti',
-            sourceId: prod.id || prod.url,
-            productCode: prod.code,
-            name: prod.name,
-            url: prod.url,
-            imageUrl: prod.imageUrl,
-            // 5. ИСПРАВЛЕНИЕ: Обработка null и пустых строк в категории
-            category: (prod.category && prod.category.trim()) || item.categoryFallback,
-            price: parseScrapedPrice(prod.price)
-          });
-          zottiTotal++;
+          await saveProductsBatch(validProducts); // Отправляем весь массив одним запросом
+          zottiTotal += validProducts.length;
         } catch (err) {
-          console.error(`❌ Ошибка сохранения товара Zotti ${prod.name}:`, err.message);
+          console.error(`❌ Ошибка пакетного сохранения Zotti:`, err.message);
         }
       }
     }
@@ -87,23 +87,26 @@ async function main() {
 
     for (const url of bashUrls) {
       const scrapedData = await scrapeBashmachnikCategory(url);
-      const validProducts = scrapedData.filter(p => p.name && p.url);
+      
+      const validProducts = scrapedData
+        .filter(p => p.name && p.url)
+        .map(prod => ({
+          source: 'bashmachnik',
+          sourceId: prod.sourceId || prod.id || prod.url,
+          productCode: prod.productCode || prod.code,
+          name: prod.name,
+          url: prod.url,
+          imageUrl: prod.imageUrl,
+          category: (prod.category && prod.category.trim()) || 'Об обувных клеях',
+          price: parseScrapedPrice(prod.price)
+        }));
 
-      for (const prod of validProducts) {
+      if (validProducts.length > 0) {
         try {
-          await saveProduct({
-            source: 'bashmachnik',
-            sourceId: prod.id || prod.url,
-            productCode: prod.code,
-            name: prod.name,
-            url: prod.url,
-            imageUrl: prod.imageUrl,
-            category: (prod.category && prod.category.trim()) || 'Об обувных клеях',
-            price: parseScrapedPrice(prod.price)
-          });
-          bashTotal++;
+          await saveProductsBatch(validProducts);
+          bashTotal += validProducts.length;
         } catch (err) {
-          console.error(`❌ Ошибка сохранения товара Башмачник ${prod.name}:`, err.message);
+          console.error(`❌ Ошибка пакетного сохранения Башмачник:`, err.message);
         }
       }
     }
@@ -132,29 +135,31 @@ async function main() {
     for (let i = 0; i < masterokPaths.length; i++) {
       const path = masterokPaths[i];
       
-      // 3. ИСПРАВЛЕНИЕ: Timeout ДО следующего scrape (начиная со второго запроса)
       if (i > 0) {
         await new Promise((r) => setTimeout(r, 1000));
       }
 
       const items = await scrapeMasterokCategory(path);
-      const validProducts = items.filter(p => p.name && p.url);
       
-      for (const prod of validProducts) {
+      const validProducts = items
+        .filter(p => p.name && p.url)
+        .map(prod => ({
+          source: 'masterok',
+          sourceId: prod.sourceId || prod.id || prod.url,
+          productCode: prod.productCode || prod.code,
+          name: prod.name,
+          url: prod.url,
+          imageUrl: prod.imageUrl,
+          category: (prod.category && prod.category.trim()) || path,
+          price: parseScrapedPrice(prod.price)
+        }));
+
+      if (validProducts.length > 0) {
         try {
-          await saveProduct({
-            source: 'masterok',
-            sourceId: prod.id || prod.url,
-            productCode: prod.code,
-            name: prod.name,
-            url: prod.url,
-            imageUrl: prod.imageUrl,
-            category: (prod.category && prod.category.trim()) || path,
-            price: parseScrapedPrice(prod.price)
-          });
-          masterokTotal++;
+          await saveProductsBatch(validProducts);
+          masterokTotal += validProducts.length;
         } catch (err) {
-          console.error(`❌ Ошибка сохранения товара Masterok ${prod.name}:`, err.message);
+          console.error(`❌ Ошибка пакетного сохранения Masterok:`, err.message);
         }
       }
     }
