@@ -1,8 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as cheerio from 'cheerio';
-// Заменили одиночное сохранение на пакетное
-import { saveProductsBatch } from '../db/saveProduct.js'; 
+// УДАЛЕН импорт saveProductsBatch — теперь это делает main.js
 
 const execAsync = promisify(exec);
 const BASE_URL = 'https://masterok-key.com.ua';
@@ -83,6 +82,7 @@ function extractFromBlocks($, categoryPath, existingMap) {
 
   $('[data-qaid="product-block"]').each((_, el) => {
     const $card =$(el);
+    // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     const productId =
       $card.attr('data-product-id') \vert{}\vert{}$card.attr('data-advtracking-product-id');
 
@@ -97,6 +97,7 @@ function extractFromBlocks($, categoryPath, existingMap) {
     const sourceId = productId || (idMatch ? idMatch[1] : null);
     if (!sourceId) return;
 
+    // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     let name =
       $card.find('a.cs-goods-title').first().text().trim() ||
       $link.attr('title') \vert{}\vert{}$card.find('img').attr('alt') ||
@@ -183,16 +184,6 @@ export async function scrapeMasterokCategory(categoryPath) {
   const products = Array.from(allMap.values());
   console.log('Masterok [' + categoryPath + ']: ' + products.length + ' товаров');
 
-  if (products.length === 0) return products;
-
-  // Пакетная отправка данных
-  try {
-    await saveProductsBatch(products);
-    const withPrice = products.filter((p) => p.price !== null).length;
-    console.log(`✓ Пакетно сохранено: ${products.length} товаров. С ценой: ${withPrice}`);
-  } catch (err) {
-    console.error(`Ошибка при пакетном сохранении в БД (Masterok):`, err.message);
-  }
-
+  // УДАЛЕН блок с сохранением. Просто отдаем собранные данные в main.js.
   return products;
 }
