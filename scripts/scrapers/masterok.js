@@ -1,7 +1,8 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import * as cheerio from 'cheerio';
-import { saveProduct } from '../db/saveProduct.js';
+// Заменили одиночное сохранение на пакетное
+import { saveProductsBatch } from '../db/saveProduct.js'; 
 
 const execAsync = promisify(exec);
 const BASE_URL = 'https://masterok-key.com.ua';
@@ -81,12 +82,11 @@ function extractFromBlocks($, categoryPath, existingMap) {
   const map = existingMap || new Map();
 
   $('[data-qaid="product-block"]').each((_, el) => {
-    const $card = $(el);
+    const $card =$(el);
     const productId =
-      $card.attr('data-product-id') ||
-      $card.attr('data-advtracking-product-id');
+      $card.attr('data-product-id') \vert{}\vert{}$card.attr('data-advtracking-product-id');
 
-    const $link = $card
+    const $link =$card
       .find('a.cs-goods-title, a.cs-image-holder__image-link')
       .first();
     const href = $link.attr('href');
@@ -99,8 +99,7 @@ function extractFromBlocks($, categoryPath, existingMap) {
 
     let name =
       $card.find('a.cs-goods-title').first().text().trim() ||
-      $link.attr('title') ||
-      $card.find('img').attr('alt') ||
+      $link.attr('title') \vert{}\vert{}$card.find('img').attr('alt') ||
       '';
     name = name.replace(/\s+/g, ' ').trim();
     if (!name || name.length < 3) return;
@@ -184,25 +183,16 @@ export async function scrapeMasterokCategory(categoryPath) {
   const products = Array.from(allMap.values());
   console.log('Masterok [' + categoryPath + ']: ' + products.length + ' товаров');
 
-  let withPrice = 0;
-  for (const product of products) {
-    try {
-      await saveProduct(product);
-      if (product.price) withPrice++;
-      console.log(
-        '✓ ' +
-          product.name.slice(0, 55) +
-          ' — ' +
-          (product.price ? product.price + ' грн' : 'нет цены') +
-          ' [id=' +
-          product.sourceId +
-          ']'
-      );
-    } catch (err) {
-      console.error('Ошибка БД "' + product.name + '":', err.message);
-    }
+  if (products.length === 0) return products;
+
+  // Пакетная отправка данных
+  try {
+    await saveProductsBatch(products);
+    const withPrice = products.filter((p) => p.price !== null).length;
+    console.log(`✓ Пакетно сохранено: ${products.length} товаров. С ценой: ${withPrice}`);
+  } catch (err) {
+    console.error(`Ошибка при пакетном сохранении в БД (Masterok):`, err.message);
   }
 
-  console.log('С ценой: ' + withPrice + ' / ' + products.length);
   return products;
 }
