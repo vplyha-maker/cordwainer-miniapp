@@ -10,7 +10,7 @@ export async function saveProductsBatch(products) {
 
   const sql = neon(process.env.DATABASE_URL);
 
-  // 1. Применяем вашу логику генерации ID и очистки к каждому товару в пакете
+  // 1. Применяем логику генерации ID и очистки к каждому товару в пакете
   const formattedProducts = products.map((product) => {
     let stableSourceId = product.sourceId;
     if (!stableSourceId && product.url) {
@@ -65,14 +65,15 @@ export async function saveProductsBatch(products) {
         WHERE source_id IN (SELECT source_id FROM batch_data)
       ),
       upserted_products AS (
-        -- Вставляем или обновляем товары (ваша логика ON CONFLICT)
+        -- Вставляем или обновляем товары
         INSERT INTO products (
           source, source_id, product_code, name, url, image_url, category, current_price, updated_at
         )
         SELECT 
           source, source_id, product_code, name, url, image_url, category, current_price, CURRENT_TIMESTAMP
         FROM batch_data
-        ON CONFLICT (source_id) DO UPDATE SET
+        -- ИСПРАВЛЕНО: добавлено поле source
+        ON CONFLICT (source, source_id) DO UPDATE SET
           name          = EXCLUDED.name,
           url           = EXCLUDED.url,
           image_url     = COALESCE(EXCLUDED.image_url, products.image_url),
