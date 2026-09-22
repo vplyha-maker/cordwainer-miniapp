@@ -1,7 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-// Заменили saveProduct на функцию пакетного сохранения
-import { saveProductsBatch } from '../db/saveProduct.js'; 
+// УДАЛЕН импорт saveProductsBatch — теперь это делает main.js
 
 const BASE_URL = 'https://bashmachnik.com.ua';
 
@@ -63,6 +62,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     );
     if (!$card.length) $card =$a.parent();
 
+    // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     let name =
       $card.find('[data-qaid="product_name"]').first().text().trim() ||
       $card.find('a[data-qaid="product_name"]').first().text().trim() ||
@@ -94,9 +94,11 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     }
 
     const $img =$card.find('img').first();
+    // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     const rawImg =
       $img.attr('data-src') ||
       $img.attr('data-original') \vert{}\vert{}$img.attr('src');
+    
     let imageUrl = absoluteUrl(rawImg);
     if (imageUrl && imageUrl.includes('data:image')) imageUrl = null;
 
@@ -113,19 +115,8 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   });
 
   const products = Array.from(productsMap.values());
-  console.log(`Успешно извлечено уникальных товаров: ${products.length}`);
+  console.log(`Успешно извлечено уникальных товаров (Башмачник): ${products.length}`);
 
-  if (products.length === 0) return products;
-
-  // Пакетная отправка всех данных одним сетевым запросом
-  try {
-    await saveProductsBatch(products);
-    const withPrice = products.filter((p) => p.price !== null).length;
-    console.log(`✓ Пакетно сохранено: ${products.length} товаров. С ценой: ${withPrice}`);
-  } catch (err) {
-    console.error(`Ошибка при пакетном сохранении в БД:`, err.message);
-  }
-
+  // УДАЛЕН блок с сохранением. Просто отдаем данные.
   return products;
 }
-
