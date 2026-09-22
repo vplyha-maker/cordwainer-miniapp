@@ -1,7 +1,7 @@
-
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { saveProduct } from '../db/saveProduct.js';
+// Заменили одиночное сохранение на пакетное
+import { saveProductsBatch } from '../db/saveProduct.js'; 
 
 const BASE_URL = 'https://zotti.ua';
 
@@ -97,23 +97,23 @@ export async function scrapeZottiCategory(categoryPath) {
 
       if (products.length === 0) {
         hasMore = false;
-        console.log('Zotti: товары закончились');
+        console.log('Zotti: товары закончились на ' + start);
       } else {
-        console.log('Zotti: найдено ' + products.length);
+        console.log('Zotti: найдено ' + products.length + ' товаров на странице');
 
-        for (var i = 0; i < products.length; i++) {
-          try {
-            await saveProduct(products[i]);
-          } catch (err) {
-            console.error(
-              'Ошибка сохранения "' + products[i].name + '":',
-              err.message
-            );
-          }
+        // Отправляем данные пакетом (обычно по 20 шт) вместо цикла
+        try {
+          await saveProductsBatch(products);
+          var withPrice = products.filter(function(p) { return p.price !== null; }).length;
+          console.log('✓ Страница сохранена пакетом. С ценой: ' + withPrice + ' / ' + products.length);
+        } catch (err) {
+          console.error('Ошибка при пакетном сохранении (Zotti):', err.message);
         }
 
         allProducts = allProducts.concat(products);
         start = start + limit;
+        
+        // Пауза перед следующей страницей
         await new Promise(function (r) {
           setTimeout(r, 1000);
         });
@@ -124,5 +124,6 @@ export async function scrapeZottiCategory(categoryPath) {
     }
   }
 
+  console.log('Zotti [' + cleanPath + ']: Всего спарсено ' + allProducts.length + ' товаров');
   return allProducts;
 }
