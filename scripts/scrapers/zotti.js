@@ -1,7 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-// Заменили одиночное сохранение на пакетное
-import { saveProductsBatch } from '../db/saveProduct.js'; 
+// УДАЛЕН импорт saveProductsBatch — теперь это делает main.js
 
 const BASE_URL = 'https://zotti.ua';
 
@@ -101,19 +100,11 @@ export async function scrapeZottiCategory(categoryPath) {
       } else {
         console.log('Zotti: найдено ' + products.length + ' товаров на странице');
 
-        // Отправляем данные пакетом (обычно по 20 шт) вместо цикла
-        try {
-          await saveProductsBatch(products);
-          var withPrice = products.filter(function(p) { return p.price !== null; }).length;
-          console.log('✓ Страница сохранена пакетом. С ценой: ' + withPrice + ' / ' + products.length);
-        } catch (err) {
-          console.error('Ошибка при пакетном сохранении (Zotti):', err.message);
-        }
-
+        // Добавляем найденные товары в общий массив
         allProducts = allProducts.concat(products);
         start = start + limit;
         
-        // Пауза перед следующей страницей
+        // Пауза перед следующей страницей (чтобы не забанили)
         await new Promise(function (r) {
           setTimeout(r, 1000);
         });
@@ -125,5 +116,7 @@ export async function scrapeZottiCategory(categoryPath) {
   }
 
   console.log('Zotti [' + cleanPath + ']: Всего спарсено ' + allProducts.length + ' товаров');
+  
+  // Возвращаем все собранные страницы в main.js одним массивом
   return allProducts;
 }
