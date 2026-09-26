@@ -1,12 +1,11 @@
 import { scrapeZottiCategory } from './scrapers/zotti.js';
 import { scrapeBashmachnikCategory } from './scrapers/bashmachnik.js';
 import { scrapeMasterokCategory } from './scrapers/masterok.js';
-// Заменили на пакетное сохранение
 import { saveProductsBatch } from './db/saveProduct.js'; 
 
 // Бронебойный очиститель цены перед записью в БД
 function parseScrapedPrice(rawPrice) {
-  if (rawPrice === null || rawPrice === undefined || rawPrice === '') return null; // Записываем null, чтобы база понимала отсутствие цены
+  if (rawPrice === null || rawPrice === undefined || rawPrice === '') return null;
   
   let s = String(rawPrice).toLowerCase();
   
@@ -46,7 +45,6 @@ async function main() {
     for (const item of zottiUrls) {
       const scrapedData = await scrapeZottiCategory(item.url);
       
-      // Фильтруем и сразу формируем готовый массив для БД
       const validProducts = scrapedData
         .filter(p => p.name && p.url)
         .map(prod => ({
@@ -57,13 +55,16 @@ async function main() {
           url: prod.url,
           imageUrl: prod.imageUrl,
           category: (prod.category && prod.category.trim()) || item.categoryFallback,
-          price: parseScrapedPrice(prod.price) // Применяем очиститель
+          price: parseScrapedPrice(prod.price)
         }));
 
       if (validProducts.length > 0) {
+        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО URL
+        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.url, p])).values());
+        
         try {
-          await saveProductsBatch(validProducts); // Отправляем весь массив одним запросом
-          zottiTotal += validProducts.length;
+          await saveProductsBatch(uniqueProducts); 
+          zottiTotal += uniqueProducts.length;
         } catch (err) {
           console.error(`❌ Ошибка пакетного сохранения Zotti:`, err.message);
         }
@@ -102,9 +103,12 @@ async function main() {
         }));
 
       if (validProducts.length > 0) {
+        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО URL
+        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.url, p])).values());
+
         try {
-          await saveProductsBatch(validProducts);
-          bashTotal += validProducts.length;
+          await saveProductsBatch(uniqueProducts);
+          bashTotal += uniqueProducts.length;
         } catch (err) {
           console.error(`❌ Ошибка пакетного сохранения Башмачник:`, err.message);
         }
@@ -155,9 +159,12 @@ async function main() {
         }));
 
       if (validProducts.length > 0) {
+        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО URL
+        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.url, p])).values());
+
         try {
-          await saveProductsBatch(validProducts);
-          masterokTotal += validProducts.length;
+          await saveProductsBatch(uniqueProducts);
+          masterokTotal += uniqueProducts.length;
         } catch (err) {
           console.error(`❌ Ошибка пакетного сохранения Masterok:`, err.message);
         }
