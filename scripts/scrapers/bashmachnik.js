@@ -102,7 +102,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     
     const rawImg =
       $img.attr('data-src') ||
-      $img.attr('data-original') \vert{}\vert{}$img.attr('src');
+      $img.attr('data-original') || $img.attr('src');
     
     let imageUrl = absoluteUrl(rawImg);
     if (imageUrl && imageUrl.includes('data:image')) imageUrl = null;
