@@ -5,10 +5,11 @@ import * as cheerio from 'cheerio';
 const BASE_URL = 'https://bashmachnik.com.ua';
 
 const skipWords = [
-  'фотогалерея', 'товари та послуги', 'товары и услуги', 'головна', 'главная',
-  'про нас', 'о нас', 'контакты', 'контакти', 'відгуки', 'отзывы',
-  'доставка и оплата', 'доставка і оплата', 'корзина', 'кошик', 'каталог',
-  'prom.ua',
+  'фотогалерея', 'товари та послуги', 'товары и услуги',
+  'головна', 'главная', 'про нас', 'о нас',
+  'контакты', 'контакти', 'відгуки', 'отзывы',
+  'доставка и оплата', 'доставка і оплата',
+  'корзина', 'кошик', 'каталог', 'prom.ua',
 ];
 
 function extractPrice(text) {
@@ -36,7 +37,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   const { data: html } = await axios.get(url, {
     headers: {
       'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       'Accept-Language': 'uk-UA,uk;q=0.9,ru;q=0.8',
     },
     timeout: 20000,
@@ -66,7 +67,10 @@ export async function scrapeBashmachnikCategory(categoryPath) {
       $card.find('[data-qaid="product_name"]').first().text().trim() ||
       $card.find('a[data-qaid="product_name"]').first().text().trim() ||
       $a.attr('title') ||
-      $a.text().trim() \vert{}\vert{}$card.find('h3, h4, .product-title, .b-product-title').first().text().trim();
+      $a.text().trim() || $card.find('h3, h4, .product-title, .b-product-title')
+        .first()
+        .text()
+        .trim();
 
     name = (name || '').replace(/\s+/g, ' ').trim();
     if (!name || name.length < 3) return;
@@ -83,16 +87,19 @@ export async function scrapeBashmachnikCategory(categoryPath) {
       '.product-price',
       '.cs-goods-price__value',
     ];
+    
     for (const sel of priceSelectors) {
       const t = $card.find(sel).first().text();
       price = extractPrice(t);
       if (price) break;
     }
+    
     if (!price) {
       price = extractPrice($card.text());
     }
 
     const $img =$card.find('img').first();
+    
     const rawImg =
       $img.attr('data-src') ||
       $img.attr('data-original') \vert{}\vert{}$img.attr('src');
@@ -113,7 +120,7 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   });
 
   const products = Array.from(productsMap.values());
-  console.log(`Успешно извлечено уникальных товаров (Башмачник): ${products.length}`);
+  console.log(`Успешно извлечено уникальных товаров: ${products.length}`);
 
   return products;
 }
