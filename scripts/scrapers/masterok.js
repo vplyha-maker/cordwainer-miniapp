@@ -84,7 +84,7 @@ function extractFromBlocks($, categoryPath, existingMap) {
     const $card =$(el);
     // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     const productId =
-      $card.attr('data-product-id') \vert{}\vert{}$card.attr('data-advtracking-product-id');
+      $card.attr('data-product-id') || $card.attr('data-advtracking-product-id');
 
     const $link =$card
       .find('a.cs-goods-title, a.cs-image-holder__image-link')
@@ -100,7 +100,7 @@ function extractFromBlocks($, categoryPath, existingMap) {
     // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     let name =
       $card.find('a.cs-goods-title').first().text().trim() ||
-      $link.attr('title') \vert{}\vert{}$card.find('img').attr('alt') ||
+      $link.attr('title') || $card.find('img').attr('alt') ||
       '';
     name = name.replace(/\s+/g, ' ').trim();
     if (!name || name.length < 3) return;
