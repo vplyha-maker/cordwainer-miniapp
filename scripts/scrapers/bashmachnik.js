@@ -62,7 +62,6 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     );
     if (!$card.length) $card =$a.parent();
 
-    // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     let name =
       $card.find('[data-qaid="product_name"]').first().text().trim() ||
       $card.find('a[data-qaid="product_name"]').first().text().trim() ||
@@ -94,7 +93,6 @@ export async function scrapeBashmachnikCategory(categoryPath) {
     }
 
     const $img =$card.find('img').first();
-    // ИСПРАВЛЕНО: \vert{}\vert{} заменены на нормальные ||
     const rawImg =
       $img.attr('data-src') ||
       $img.attr('data-original') \vert{}\vert{}$img.attr('src');
@@ -117,6 +115,5 @@ export async function scrapeBashmachnikCategory(categoryPath) {
   const products = Array.from(productsMap.values());
   console.log(`Успешно извлечено уникальных товаров (Башмачник): ${products.length}`);
 
-  // УДАЛЕН блок с сохранением. Просто отдаем данные.
   return products;
 }
