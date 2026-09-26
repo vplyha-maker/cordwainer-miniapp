@@ -175,6 +175,17 @@ const STYLES_DATA: StyleSlide[] = [
     },
     hideWatermark: true,
   },
+    {
+    id: 'huaraches',
+    video: '/Fason/Huaraches.mp4',
+    title: { ru: 'Гуарачи', uk: 'Гуарачі', de: 'Huaraches' },
+    subtitle: { ru: 'Мексиканское наследие', uk: 'Мексиканська спадщина', de: 'Mexikanisches Erbe' },
+    desc: {
+      ru: 'Аутентичный колорит и изящное ручное плетение кожаных ремешков. Идеальный комфорт для жарких дней, воплощающий дух свободы и многовековые традиции ремесленников.',
+      uk: 'Автентичний колорит та витончене ручне плетіння шкіряних ремінців. Ідеальний комфорт для спекотних днів, що втілює дух свободи та багатовікові традиції ремісників.',
+      de: 'Authentisches Flair und feines Handgeflecht aus Lederriemen. Idealer Komfort für heiße Tage, der den Geist der Freiheit und jahrhundertealte Handwerkstraditionen verkörpert.',
+    },
+  }
 ]
 
 type SlideItemProps = {
