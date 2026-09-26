@@ -38,7 +38,6 @@ export default async function handler(request: Request) {
       Number(eurRow?.rate) > 0
 
     // 2. Если кэш свежий — отдаём его (историю не трогаем)
-    // ДОБАВЛЕНО: явная проверка usdRow и eurRow для TypeScript
     if (isFresh && usdRow && eurRow) {
       return new Response(
         JSON.stringify({
@@ -57,15 +56,14 @@ export default async function handler(request: Request) {
       )
     }
 
-    // 3. Тянем свежие курсы с НБУ
-    const nbuRes = await fetch(
-      'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json',
+    // 3. Тянем свежие курсы с ПРИВАТБАНКА (открытое API, без блокировок)
+    const pbRes = await fetch(
+      'https://api.privatbank.ua/p24api/pubinfo?json&exchange&coursid=5',
       { headers: { Accept: 'application/json' } }
     )
 
-    if (!nbuRes.ok) {
+    if (!pbRes.ok) {
       // Fallback на старый кэш
-      // ДОБАВЛЕНО: явная проверка usdRow и eurRow для TypeScript
       if (usdRow && eurRow && Number(usdRow.rate) > 0 && Number(eurRow.rate) > 0) {
         return new Response(
           JSON.stringify({
@@ -80,19 +78,20 @@ export default async function handler(request: Request) {
           }
         )
       }
-      throw new Error(`NBU error ${nbuRes.status}`)
+      throw new Error(`PrivatBank error ${pbRes.status}`)
     }
 
-    const rates = await nbuRes.json()
-    const usd = rates.find((r: any) => r.cc === 'USD')
-    const eur = rates.find((r: any) => r.cc === 'EUR')
+    const rates = await pbRes.json()
+    // В ПриватБанке названия полей другие: ccy (вместо cc) и sale (вместо rate)
+    const usd = rates.find((r: any) => r.ccy === 'USD')
+    const eur = rates.find((r: any) => r.ccy === 'EUR')
 
-    if (!usd?.rate || !eur?.rate) {
-      throw new Error('USD or EUR not found in NBU response')
+    if (!usd?.sale || !eur?.sale) {
+      throw new Error('USD or EUR not found in PrivatBank response')
     }
 
-    const usdRate = Number(usd.rate)
-    const eurRate = Number(eur.rate)
+    const usdRate = Number(usd.sale)
+    const eurRate = Number(eur.sale)
 
     // 4. Пишем в ИСТОРИЮ (новые строки)
     await sql`
@@ -124,7 +123,7 @@ export default async function handler(request: Request) {
         usd: usdRate,
         eur: eurRate,
         updatedAt: new Date().toISOString(),
-        source: 'nbu',
+        source: 'privatbank',
       }),
       {
         status: 200,
