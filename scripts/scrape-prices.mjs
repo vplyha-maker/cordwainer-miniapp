@@ -3,23 +3,18 @@ import { scrapeBashmachnikCategory } from './scrapers/bashmachnik.js';
 import { scrapeMasterokCategory } from './scrapers/masterok.js';
 import { saveProductsBatch } from './db/saveProduct.js'; 
 
-// Бронебойный очиститель цены перед записью в БД
 function parseScrapedPrice(rawPrice) {
   if (rawPrice === null || rawPrice === undefined || rawPrice === '') return null;
   
   let s = String(rawPrice).toLowerCase();
   
-  // Перехват статуса "Нет в наличии"
   if (s.includes('нет') || s.includes('немає') || s.includes('null')) return null;
 
-  // Убираем пробелы (включая неразрывные) и меняем запятую на точку
   s = s.replace(/\s+/g, '').replace(',', '.');
   
-  // Надежный парсинг (только числа и до 2 знаков после точки)
   const match = s.match(/(\d+(?:\.\d{1,2})?)/);
   if (match) {
     const val = parseFloat(match[0]);
-    // Защита от случайного парсинга 6-значных артикулов как цены
     if (!isNaN(val) && val > 0 && val < 100000) {
         return val;
     }
@@ -59,8 +54,8 @@ async function main() {
         }));
 
       if (validProducts.length > 0) {
-        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО URL
-        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.url, p])).values());
+        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО SOURCE ID
+        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.sourceId, p])).values());
         
         try {
           await saveProductsBatch(uniqueProducts); 
@@ -103,8 +98,8 @@ async function main() {
         }));
 
       if (validProducts.length > 0) {
-        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО URL
-        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.url, p])).values());
+        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО SOURCE ID
+        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.sourceId, p])).values());
 
         try {
           await saveProductsBatch(uniqueProducts);
@@ -159,8 +154,8 @@ async function main() {
         }));
 
       if (validProducts.length > 0) {
-        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО URL
-        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.url, p])).values());
+        // ОЧИСТКА ОТ ДУБЛИКАТОВ ПО SOURCE ID
+        const uniqueProducts = Array.from(new Map(validProducts.map(p => [p.sourceId, p])).values());
 
         try {
           await saveProductsBatch(uniqueProducts);
