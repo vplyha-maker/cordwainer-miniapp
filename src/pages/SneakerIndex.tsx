@@ -57,7 +57,6 @@ const BRANDS = [
   { id: 'birkenstock', name: 'Birkenstock' },
   { id: 'clarks', name: 'Clarks' },
   { id: 'veja', name: 'Veja' },
-  { id: 'autry', name: 'Autry' },
   { id: 'lacoste', name: 'Lacoste' },
   { id: 'calvin klein', name: 'Calvin Klein' },
   { id: 'tommy hilfiger', name: 'Tommy Hilfiger' },
