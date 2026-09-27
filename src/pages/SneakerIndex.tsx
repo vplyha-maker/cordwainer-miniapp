@@ -6,7 +6,6 @@ interface Sneaker {
   name: string
   gender: string
   retailPrice: number
-  // Все возможные варианты дат от API:
   releaseDate?: string
   release_date?: string
   publishedAt?: string
@@ -184,8 +183,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     textFaint: isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(9, 9, 11, 0.3)',
     border: isDark ? 'rgba(244, 240, 232, 0.12)' : 'rgba(9, 9, 11, 0.12)',
     borderFaint: isDark ? 'rgba(244, 240, 232, 0.05)' : 'rgba(9, 9, 11, 0.05)',
-    // Новый стильный фон для карточек: нейтральный серый, который выделит любую обувь
-    imageBg: isDark ? '#1C1C1E' : '#E5E7EB', 
+    imageBg: isDark ? '#1C1C1E' : '#E5E7EB',
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
 
@@ -489,7 +487,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             const rawYear = sneaker.year || sneaker.releaseYear
 
             let releaseYear = null
-            // ИСПРАВЛЕНИЕ: Жесткая проверка на нули
             if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
               const parsed = rawDate.slice(0, 4)
               if (parsed !== '0000') releaseYear = parsed
@@ -512,10 +509,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
-                      // Добавлено object-contain и padding (p-4), чтобы обувь не обрезалась
-                      className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
+                      // ИСПРАВЛЕНИЕ: вернули object-cover без внутренних отступов (padding)
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       style={{
-                        // Этот трюк убирает белый фон у JPEG картинок (в светлой теме)
                         mixBlendMode: isDark ? 'normal' : 'multiply',
                         filter: isDark
                           ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
