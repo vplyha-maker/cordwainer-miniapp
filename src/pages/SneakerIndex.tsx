@@ -58,14 +58,20 @@ const BRANDS = [
   { id: 'birkenstock', name: 'Birkenstock' },
   { id: 'clarks', name: 'Clarks' },
   { id: 'veja', name: 'Veja' },
+  { id: 'autry', name: 'Autry' },
   { id: 'lacoste', name: 'Lacoste' },
   { id: 'calvin klein', name: 'Calvin Klein' },
+  { id: 'tommy hilfiger', name: 'Tommy Hilfiger' },
   { id: 'polo ralph lauren', name: 'Polo Ralph Lauren' },
+  { id: 'dsquared2', name: 'Dsquared2' },
   { id: 'versace', name: 'Versace' },
   { id: 'valentino', name: 'Valentino' },
   { id: 'givenchy', name: 'Givenchy' },
   { id: 'under armour', name: 'Under Armour' },
   { id: 'fila', name: 'Fila' },
+  { id: 'skechers', name: 'Skechers' },
+  { id: 'etnies', name: 'Etnies' },
+  { id: 'osiris', name: 'Osiris' },
   { id: 'dc', name: 'DC' }
 ]
 
@@ -81,7 +87,6 @@ interface SneakerIndexProps {
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
-  // ВОССТАНОВЛЕНО: Чтение ссылок при запуске, чтобы не сломать внешние переходы
   const getInitialQuery = (): string | null => {
     if (typeof window === 'undefined') return null
     const params = new URLSearchParams(window.location.search)
@@ -119,10 +124,8 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // Оптимизированный слушатель скролла
   useEffect(() => {
     const handleScroll = () => {
-      // Кнопка появляется примерно после прокрутки 1.5-2 экранов (600px)
       if (window.scrollY > 600) {
         setShowScrollTop(true)
       } else {
@@ -181,7 +184,8 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     textFaint: isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(9, 9, 11, 0.3)',
     border: isDark ? 'rgba(244, 240, 232, 0.12)' : 'rgba(9, 9, 11, 0.12)',
     borderFaint: isDark ? 'rgba(244, 240, 232, 0.05)' : 'rgba(9, 9, 11, 0.05)',
-    imageBg: isDark ? '#111111' : '#FFFFFF',
+    // Новый стильный фон для карточек: нейтральный серый, который выделит любую обувь
+    imageBg: isDark ? '#1C1C1E' : '#E5E7EB', 
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
 
@@ -481,15 +485,16 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
           {currentDisplayList.map((sneaker) => {
             const isFav = favorites.some(f => f.id === sneaker.id)
 
-            // Умная каскадная проверка всех возможных полей с датой
             const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
             const rawYear = sneaker.year || sneaker.releaseYear
 
             let releaseYear = null
+            // ИСПРАВЛЕНИЕ: Жесткая проверка на нули
             if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
-              releaseYear = rawDate.slice(0, 4) // Достаем '2023' из '2023-05-12' или '2023-11-01T00:00:00Z'
-            } else if (rawYear) {
-              releaseYear = String(rawYear) // Берем готовый год
+              const parsed = rawDate.slice(0, 4)
+              if (parsed !== '0000') releaseYear = parsed
+            } else if (rawYear && String(rawYear) !== '0') {
+              releaseYear = String(rawYear) 
             }
 
             return (
@@ -501,14 +506,17 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
               >
                 {sneaker.image?.original ? (
                   <div
-                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors"
+                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm"
                     style={{ backgroundColor: themeColors.imageBg }}
                   >
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                      // Добавлено object-contain и padding (p-4), чтобы обувь не обрезалась
+                      className="w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-105"
                       style={{
+                        // Этот трюк убирает белый фон у JPEG картинок (в светлой теме)
+                        mixBlendMode: isDark ? 'normal' : 'multiply',
                         filter: isDark
                           ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
                           : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
@@ -518,7 +526,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                   </div>
                 ) : (
                   <div
-                    className="w-full mb-4 aspect-[4/3]"
+                    className="w-full mb-4 aspect-[4/3] rounded-sm"
                     style={{ backgroundColor: themeColors.imageBg }}
                   />
                 )}
@@ -528,7 +536,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     {sneaker.brand}
                   </h3>
 
-                  {/* Кнопка сохранения в архив (кнопка шеринга удалена) */}
                   <button
                     onClick={(e) => toggleFavorite(e, sneaker)}
                     className="p-1 transition-colors"
