@@ -83,12 +83,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
-  // Внутреннее состояние темы, автоопределение
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
 
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // Умный перехватчик темы из глобального приложения
   useEffect(() => {
     if (propTheme) {
       setIsDark(propTheme === 'dark')
@@ -99,28 +97,23 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       const html = document.documentElement
       const body = document.body
       
-      // 1. Проверяем классы (Tailwind и т.д.)
       if (html.classList.contains('light') || body.classList.contains('light')) return false
       if (html.classList.contains('dark') || body.classList.contains('dark')) return true
       
-      // 2. Проверяем data-атрибуты (Next-themes и т.д.)
       if (html.getAttribute('data-theme') === 'light') return false
       if (html.getAttribute('data-theme') === 'dark') return true
       
-      // 3. Проверяем локальное хранилище на популярные ключи
       try {
         const lsTheme = localStorage.getItem('theme') || localStorage.getItem('app-theme') || localStorage.getItem('color-theme')
         if (lsTheme === 'light') return false
         if (lsTheme === 'dark') return true
       } catch (e) {}
 
-      // По умолчанию темная
       return true
     }
 
     setIsDark(checkGlobalTheme())
 
-    // Следим за изменениями классов в DOM, если тема меняется без перезагрузки
     const observer = new MutationObserver(() => {
       setIsDark(checkGlobalTheme())
     })
@@ -288,6 +281,17 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       alert('Ссылка скопирована в буфер обмена!')
     }
   }
+  
+  // Умная обработка кнопки "Назад"
+  const handleBackClick = () => {
+    if (viewState === 'favorites') {
+      // Если мы в архиве, возвращаемся в каталог
+      setViewState('catalog')
+    } else if (onBack) {
+      // Если мы в каталоге, вызываем глобальный выход в меню
+      onBack()
+    }
+  }
 
   const filteredCatalog = sneakers.filter((sneaker) => {
     if (selectedGender === 'all') return true
@@ -315,16 +319,14 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         className="pt-8 pb-6 flex items-start justify-between mb-8"
         style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
       >
-        {onBack ? (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100"
-            style={{ color: themeColors.textMuted }}
-          >
-            <span>←</span>
-            <span>Back</span>
-          </button>
-        ) : <div />}
+        <button
+          onClick={handleBackClick}
+          className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100"
+          style={{ color: themeColors.textMuted, visibility: (viewState === 'catalog' && !onBack) ? 'hidden' : 'visible' }}
+        >
+          <span>←</span>
+          <span>Back</span>
+        </button>
 
         {/* Кнопка переключения Избранного */}
         <button
