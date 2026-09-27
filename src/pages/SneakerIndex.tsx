@@ -63,32 +63,50 @@ const GENDERS = [
 
 interface SneakerIndexProps {
   onBack?: () => void
-  theme?: 'light' | 'dark' 
+  theme?: 'light' | 'dark'
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
-  // 1. Читаем URL при запуске приложения, чтобы понять, не перешел ли человек по ссылке
-  const getInitialQuery = () => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      return params.get('q')
+  // 1. Читаем URL / start_param при запуске
+  const getInitialQuery = (): string | null => {
+    if (typeof window === 'undefined') return null
+
+    // Браузерный шаринг (?q=...)
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    if (q) return q.trim()
+
+    // Telegram Mini App
+    const tg = (window as any).Telegram?.WebApp
+    const startParam =
+      tg?.initDataUnsafe?.start_param ||
+      params.get('tgWebAppStartParam') ||
+      null
+
+    if (startParam && typeof startParam === 'string' && startParam.startsWith('search_')) {
+      // search_Nike_Dunk_Low → Nike Dunk Low
+      return startParam
+        .slice('search_'.length)
+        .replace(/_/g, ' ')
+        .trim()
     }
+
     return null
   }
-  
+
   const initialSharedQuery = getInitialQuery()
 
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
-  
-  // 2. Если есть запрос в URL, устанавливаем его как активный, иначе стандартный 'nike'
+
+  // 2. Если есть запрос из ссылки — используем его, иначе 'nike'
   const [selectedBrand, setSelectedBrand] = useState(initialSharedQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
   const [searchText, setSearchText] = useState(initialSharedQuery || '')
   const [activeQuery, setActiveQuery] = useState(initialSharedQuery || 'nike')
   const [hasSearched, setHasSearched] = useState(!!initialSharedQuery)
-  
+
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -108,15 +126,18 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     const checkGlobalTheme = () => {
       const html = document.documentElement
       const body = document.body
-      
+
       if (html.classList.contains('light') || body.classList.contains('light')) return false
       if (html.classList.contains('dark') || body.classList.contains('dark')) return true
-      
+
       if (html.getAttribute('data-theme') === 'light') return false
       if (html.getAttribute('data-theme') === 'dark') return true
-      
+
       try {
-        const lsTheme = localStorage.getItem('theme') || localStorage.getItem('app-theme') || localStorage.getItem('color-theme')
+        const lsTheme =
+          localStorage.getItem('theme') ||
+          localStorage.getItem('app-theme') ||
+          localStorage.getItem('color-theme')
         if (lsTheme === 'light') return false
         if (lsTheme === 'dark') return true
       } catch (e) {}
@@ -129,7 +150,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     const observer = new MutationObserver(() => {
       setIsDark(checkGlobalTheme())
     })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    })
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
 
     return () => observer.disconnect()
@@ -161,61 +185,64 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     localStorage.setItem('lookbook_favorites', JSON.stringify(favorites))
   }, [favorites])
 
-  const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
-    const cacheKey = `${query}_p${pageNum}`
+  const fetchSneakers = useCallback(
+    async (query: string, pageNum: number, append: boolean = false) => {
+      const cacheKey = `\( {query}_p \){pageNum}`
 
-    if (!append && cacheRef.current[cacheKey]) {
-      setSneakers(cacheRef.current[cacheKey])
-      setLoading(false)
-      return
-    }
-
-    if (append) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-      setSneakers([])
-    }
-    setError('')
-
-    try {
-      const res = await fetch(
-        `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
-      )
-      
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.details || data.error || 'Ошибка при загрузке данных')
+      if (!append && cacheRef.current[cacheKey]) {
+        setSneakers(cacheRef.current[cacheKey])
+        setLoading(false)
+        return
       }
 
-      const list = data.results || data.data || data || []
-      const newItems = Array.isArray(list) ? list : []
-
-      if (newItems.length < 100) {
-        setHasMore(false)
+      if (append) {
+        setLoadingMore(true)
       } else {
-        setHasMore(true)
+        setLoading(true)
+        setSneakers([])
       }
+      setError('')
 
-      setSneakers((prev) => {
-        const updated = append ? [...prev, ...newItems] : newItems
-        if (!append) {
-          cacheRef.current[cacheKey] = updated
+      try {
+        const res = await fetch(
+          `/api/get-top-sneakers?query=\( {encodeURIComponent(query)}&limit=100&page= \){pageNum}`
+        )
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.details || data.error || 'Ошибка при загрузке данных')
         }
-        return updated
-      })
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Не удалось загрузить кроссовки')
+
+        const list = data.results || data.data || data || []
+        const newItems = Array.isArray(list) ? list : []
+
+        if (newItems.length < 100) {
+          setHasMore(false)
+        } else {
+          setHasMore(true)
+        }
+
+        setSneakers((prev) => {
+          const updated = append ? [...prev, ...newItems] : newItems
+          if (!append) {
+            cacheRef.current[cacheKey] = updated
+          }
+          return updated
+        })
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message)
+        } else {
+          setError('Не удалось загрузить кроссовки')
+        }
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
       }
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }, [])
+    },
+    []
+  )
 
   useEffect(() => {
     if (viewState === 'catalog') {
@@ -229,8 +256,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
-    
-    // Очищаем URL, если пользователь начал искать что-то другое
+
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', window.location.pathname)
     }
@@ -242,14 +268,12 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       if (!text) return
 
       const query =
-        selectedBrand && selectedBrand !== 'all'
-          ? `${selectedBrand} ${text}`
-          : text
+        selectedBrand && selectedBrand !== 'all' ? `${selectedBrand} ${text}` : text
 
       setHasSearched(true)
       setActiveQuery(query)
       setViewState('catalog')
-      
+
       if (typeof window !== 'undefined') {
         window.history.pushState({}, '', window.location.pathname)
       }
@@ -275,21 +299,22 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   }
 
   const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
-    e.stopPropagation() 
-    setFavorites(prev => {
-      const isFav = prev.some(item => item.id === sneaker.id)
-      if (isFav) return prev.filter(item => item.id !== sneaker.id)
+    e.stopPropagation()
+    setFavorites((prev) => {
+      const isFav = prev.some((item) => item.id === sneaker.id)
+      if (isFav) return prev.filter((item) => item.id !== sneaker.id)
       return [...prev, sneaker]
     })
   }
-    // 3. Обновленная логика шеринга (с умной очисткой названия)
+
+  // 3. Шаринг
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
-    
-    // 1. Убираем одинарные кавычки, чтобы не ломать поиск API
+
+    // Убираем кавычки
     const cleanName = sneaker.name.replace(/'/g, '').trim()
-    
-    // 2. Умная проверка: если имя УЖЕ содержит бренд, не дублируем его
+
+    // Не дублируем бренд, если он уже есть в названии
     let exactSearch = ''
     if (cleanName.toLowerCase().startsWith(sneaker.brand.toLowerCase())) {
       exactSearch = cleanName
@@ -300,26 +325,31 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     const tg = (window as any).Telegram?.WebApp
 
     if (tg && tg.initData) {
-      // Заменяем пробелы на подчеркивания для ссылки
-      const searchParam = exactSearch.replace(/[^a-zA-Z0-9а-яА-ЯёЁ]/g, '_')
-      
+      // Telegram разрешает только A-Za-z0-9_- (кириллицу оставляем на всякий случай)
+      const searchParam = exactSearch
+        .replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '_')
+
       const botUsername = 'Cordwainer_bot'
       const appName = 'app'
-      
-      const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
+
+      const cleanUrl = `https://t.me/\( {botUsername}/ \){appName}?startapp=search_${searchParam}`
       const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
 
-      const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(cleanUrl)}&text=${encodeURIComponent(shareText)}`
-      
+      const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(
+        cleanUrl
+      )}&text=${encodeURIComponent(shareText)}`
+
       tg.openTelegramLink(tgShareUrl)
       return
     }
 
     // Фоллбэк для браузера
     const currentUrl = new URL(window.location.href)
-    currentUrl.hash = '' 
-    currentUrl.searchParams.set('q', exactSearch) 
-    
+    currentUrl.hash = ''
+    currentUrl.searchParams.set('q', exactSearch)
+
     const cleanBrowserUrl = currentUrl.toString()
     const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
 
@@ -328,15 +358,15 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         await navigator.share({
           title: exactSearch,
           text: shareText,
-          url: cleanBrowserUrl
+          url: cleanBrowserUrl,
         })
         return
       } catch (err) {
         console.log('Share canceled')
       }
-    } 
-    
-    navigator.clipboard.writeText(`${shareText}\n${cleanBrowserUrl}`)
+    }
+
+    navigator.clipboard.writeText(`\( {shareText}\n \){cleanBrowserUrl}`)
     alert('Ссылка скопирована в буфер обмена!')
   }
 
@@ -354,7 +384,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     const genderStr = sneaker.gender.toLowerCase()
 
     if (selectedGender === 'men') {
-      return genderStr === 'men' || (genderStr.includes('men') && !genderStr.includes('women'))
+      return (
+        genderStr === 'men' ||
+        (genderStr.includes('men') && !genderStr.includes('women'))
+      )
     }
     if (selectedGender === 'women') {
       return genderStr.includes('women')
@@ -370,14 +403,17 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
       {/* Header */}
-      <header 
+      <header
         className="pt-8 pb-6 flex items-start justify-between mb-8"
         style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
       >
         <button
           onClick={handleBackClick}
           className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100"
-          style={{ color: themeColors.textMuted, visibility: (viewState === 'catalog' && !onBack) ? 'hidden' : 'visible' }}
+          style={{
+            color: themeColors.textMuted,
+            visibility: viewState === 'catalog' && !onBack ? 'hidden' : 'visible',
+          }}
         >
           <span>←</span>
           <span>Back</span>
@@ -386,7 +422,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         <button
           onClick={() => setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')}
           className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors"
-          style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
+          style={{
+            color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted,
+          }}
         >
           <span>Archive</span>
           <span>[{favorites.length}]</span>
@@ -407,7 +445,11 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={handleSearchSubmit}
               placeholder="Модель (576, Dunk, 550...) + Enter"
-              className={`w-full px-4 py-3.5 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
+              className={`w-full px-4 py-3.5 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${
+                isDark
+                  ? 'placeholder:text-white/30 focus:border-white/40'
+                  : 'placeholder:text-black/30 focus:border-black/40'
+              }`}
               style={{
                 color: themeColors.text,
                 borderBottom: `1px solid ${themeColors.border}`,
@@ -427,7 +469,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer transition-all shrink-0 pb-1"
                     style={{
                       color: isActive ? themeColors.text : themeColors.textMuted,
-                      borderBottom: isActive ? `1px solid ${themeColors.text}` : '1px solid transparent',
+                      borderBottom: isActive
+                        ? `1px solid ${themeColors.text}`
+                        : '1px solid transparent',
                     }}
                   >
                     {brand.name}
@@ -435,10 +479,12 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                 )
               })}
             </div>
-            
-            <div 
-              className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none" 
-              style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
+
+            <div
+              className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none"
+              style={{
+                background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)`,
+              }}
             />
           </div>
 
@@ -462,24 +508,26 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       )}
 
       {error && (
-        <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">{error}</p>
+        <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">
+          {error}
+        </p>
       )}
 
       {loading && viewState === 'catalog' && (
         <div className="flex flex-col gap-12 pb-10 animate-pulse">
           {[1, 2].map((n) => (
             <div key={n} className="pb-8">
-              <div 
-                className="w-full h-[350px] mb-4" 
+              <div
+                className="w-full h-[350px] mb-4"
                 style={{ backgroundColor: themeColors.imageBg }}
               />
-              <div 
-                className="h-5 w-32 mb-2" 
-                style={{ backgroundColor: themeColors.imageBg }} 
+              <div
+                className="h-5 w-32 mb-2"
+                style={{ backgroundColor: themeColors.imageBg }}
               />
-              <div 
-                className="h-4 w-48" 
-                style={{ backgroundColor: themeColors.imageBg }} 
+              <div
+                className="h-4 w-48"
+                style={{ backgroundColor: themeColors.imageBg }}
               />
             </div>
           ))}
@@ -489,7 +537,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       {!loading && (
         <div className="flex flex-col gap-14 pb-10">
           {currentDisplayList.length === 0 && viewState === 'favorites' && (
-            <p 
+            <p
               className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
               style={{ color: themeColors.textMuted }}
             >
@@ -498,7 +546,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
           )}
 
           {currentDisplayList.map((sneaker) => {
-            const isFav = favorites.some(f => f.id === sneaker.id)
+            const isFav = favorites.some((f) => f.id === sneaker.id)
 
             return (
               <div
@@ -508,7 +556,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                 style={{ contentVisibility: 'auto' }}
               >
                 {sneaker.image?.original ? (
-                  <div 
+                  <div
                     className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors"
                     style={{ backgroundColor: themeColors.imageBg }}
                   >
@@ -517,16 +565,16 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                       alt={sneaker.name}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
                       style={{
-                        filter: isDark 
-                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' 
-                          : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
+                        filter: isDark
+                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
+                          : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))',
                       }}
                       loading="lazy"
                     />
                   </div>
                 ) : (
-                  <div 
-                    className="w-full mb-4 aspect-[4/3]" 
+                  <div
+                    className="w-full mb-4 aspect-[4/3]"
                     style={{ backgroundColor: themeColors.imageBg }}
                   />
                 )}
@@ -535,51 +583,72 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                   <h3 className="font-serif text-[20px] leading-tight tracking-tight">
                     {sneaker.brand}
                   </h3>
-                  
+
                   <div className="flex items-center gap-3">
-                    <button 
+                    <button
                       onClick={(e) => handleShare(e, sneaker)}
                       className={`p-1 transition-colors ${themeColors.iconHover}`}
                       style={{ color: themeColors.textMuted }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                        strokeLinecap="square"
+                      >
                         <path d="M4 12v8h16v-8" />
                         <path d="M12 4v12" />
                         <path d="M8 8l4-4 4 4" />
                       </svg>
                     </button>
-                    <button 
+                    <button
                       onClick={(e) => toggleFavorite(e, sneaker)}
                       className="p-1 transition-colors"
                       style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill={isFav ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                      >
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                       </svg>
                     </button>
                   </div>
                 </div>
 
-                <p 
+                <p
                   className="text-[13px] font-sans font-light leading-snug mb-3 pr-12"
-                  style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
+                  style={{
+                    color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+                  }}
                 >
                   {sneaker.name}
                 </p>
 
-                <div 
+                <div
                   className="flex justify-between items-center pt-3"
                   style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
                 >
-                  <p 
+                  <p
                     className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
                     style={{ color: themeColors.textMuted }}
                   >
-                    {sneaker.retailPrice > 0 ? `Retail USD ${sneaker.retailPrice}` : 'Price unav.'}
+                    {sneaker.retailPrice > 0
+                      ? `Retail USD ${sneaker.retailPrice}`
+                      : 'Price unav.'}
                   </p>
-                  <span 
+                  <span
                     className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
-                    style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
+                    style={{
+                      color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)',
+                    }}
                   >
                     Find →
                   </span>
@@ -591,7 +660,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       )}
 
       {!loading && !error && hasMore && viewState === 'catalog' && (
-        <div 
+        <div
           className="pb-28 pt-8 text-center"
           style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
         >
