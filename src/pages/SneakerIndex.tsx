@@ -282,29 +282,32 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       return [...prev, sneaker]
     })
   }
-      // Умный шеринг: берет бренд и точное название модели, отсекая только цвет в конце
+    // 3. Обновленная логика шеринга (с умной очисткой названия)
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
     
-    // Очищаем название от кавычек
+    // 1. Убираем одинарные кавычки, чтобы не ломать поиск API
     const cleanName = sneaker.name.replace(/'/g, '').trim()
-    const nameWords = cleanName.split(' ')
     
-    // Если название длинное, берем первые 3 слова модели (например: "Air Max Plus")
-    // Если короткое — берем целиком
-    const modelWords = nameWords.slice(0, 3).join(' ')
-    const exactSearch = `${sneaker.brand} ${modelWords}` // Получится: "Nike Air Max Plus"
+    // 2. Умная проверка: если имя УЖЕ содержит бренд, не дублируем его
+    let exactSearch = ''
+    if (cleanName.toLowerCase().startsWith(sneaker.brand.toLowerCase())) {
+      exactSearch = cleanName
+    } else {
+      exactSearch = `${sneaker.brand} ${cleanName}`
+    }
 
     const tg = (window as any).Telegram?.WebApp
 
     if (tg && tg.initData) {
+      // Заменяем пробелы на подчеркивания для ссылки
       const searchParam = exactSearch.replace(/[^a-zA-Z0-9а-яА-ЯёЁ]/g, '_')
       
       const botUsername = 'Cordwainer_bot'
       const appName = 'app'
       
       const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
-      const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${cleanName}`
+      const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
 
       const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(cleanUrl)}&text=${encodeURIComponent(shareText)}`
       
@@ -318,12 +321,12 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     currentUrl.searchParams.set('q', exactSearch) 
     
     const cleanBrowserUrl = currentUrl.toString()
-    const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${cleanName}`
+    const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: cleanName,
+          title: exactSearch,
           text: shareText,
           url: cleanBrowserUrl
         })
@@ -337,6 +340,13 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     alert('Ссылка скопирована в буфер обмена!')
   }
 
+  const handleBackClick = () => {
+    if (viewState === 'favorites') {
+      setViewState('catalog')
+    } else if (onBack) {
+      onBack()
+    }
+  }
 
   const filteredCatalog = sneakers.filter((sneaker) => {
     if (selectedGender === 'all') return true
