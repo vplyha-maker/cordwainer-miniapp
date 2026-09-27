@@ -7,10 +7,10 @@ interface Sneaker {
   gender: string
   retailPrice: number
   // Все возможные варианты дат от API:
-  releaseDate?: string 
+  releaseDate?: string
   release_date?: string
   publishedAt?: string
-  year?: string | number 
+  year?: string | number
   releaseYear?: string | number
   image?: {
     original?: string
@@ -57,7 +57,7 @@ const BRANDS = [
   { id: 'dr. martens', name: 'Dr. Martens' },
   { id: 'birkenstock', name: 'Birkenstock' },
   { id: 'clarks', name: 'Clarks' },
-    { id: 'veja', name: 'Veja' },
+  { id: 'veja', name: 'Veja' },
   { id: 'autry', name: 'Autry' },
   { id: 'lacoste', name: 'Lacoste' },
   { id: 'calvin klein', name: 'Calvin Klein' },
@@ -83,7 +83,7 @@ const GENDERS = [
 
 interface SneakerIndexProps {
   onBack?: () => void
-  theme?: 'light' | 'dark' 
+  theme?: 'light' | 'dark'
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
@@ -108,12 +108,12 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
-  
+
   const [selectedBrand, setSelectedBrand] = useState(initialQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
   const [searchText, setSearchText] = useState(initialQuery || '')
   const [activeQuery, setActiveQuery] = useState(initialQuery || 'nike')
-  
+
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -153,13 +153,13 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     const checkGlobalTheme = () => {
       const html = document.documentElement
       const body = document.body
-      
+
       if (html.classList.contains('light') || body.classList.contains('light')) return false
       if (html.classList.contains('dark') || body.classList.contains('dark')) return true
-      
+
       if (html.getAttribute('data-theme') === 'light') return false
       if (html.getAttribute('data-theme') === 'dark') return true
-      
+
       try {
         const lsTheme = localStorage.getItem('theme') || localStorage.getItem('app-theme') || localStorage.getItem('color-theme')
         if (lsTheme === 'light') return false
@@ -227,7 +227,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       const res = await fetch(
         `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
-      
+
       const data = await res.json()
 
       if (!res.ok) {
@@ -274,7 +274,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
-    
+
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', window.location.pathname)
     }
@@ -293,7 +293,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       setHasSearched(true)
       setActiveQuery(query)
       setViewState('catalog')
-      
+
       if (typeof window !== 'undefined') {
         window.history.pushState({}, '', window.location.pathname)
       }
@@ -319,7 +319,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   }
 
   const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
-    e.stopPropagation() 
+    e.stopPropagation()
     setFavorites(prev => {
       const isFav = prev.some(item => item.id === sneaker.id)
       if (isFav) return prev.filter(item => item.id !== sneaker.id)
@@ -357,7 +357,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
       {/* Header */}
-      <header 
+      <header
         className="pt-8 pb-6 flex items-start justify-between mb-8"
         style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
       >
@@ -422,9 +422,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                 )
               })}
             </div>
-            
-            <div 
-              className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none" 
+
+            <div
+              className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none"
               style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
             />
           </div>
@@ -456,17 +456,17 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         <div className="flex flex-col gap-12 pb-10 animate-pulse">
           {[1, 2].map((n) => (
             <div key={n} className="pb-8">
-              <div 
-                className="w-full h-[350px] mb-4" 
+              <div
+                className="w-full h-[350px] mb-4"
                 style={{ backgroundColor: themeColors.imageBg }}
               />
-              <div 
-                className="h-5 w-32 mb-2" 
-                style={{ backgroundColor: themeColors.imageBg }} 
+              <div
+                className="h-5 w-32 mb-2"
+                style={{ backgroundColor: themeColors.imageBg }}
               />
-              <div 
-                className="h-4 w-48" 
-                style={{ backgroundColor: themeColors.imageBg }} 
+              <div
+                className="h-4 w-48"
+                style={{ backgroundColor: themeColors.imageBg }}
               />
             </div>
           ))}
@@ -476,7 +476,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       {!loading && (
         <div className="flex flex-col gap-14 pb-10">
           {currentDisplayList.length === 0 && viewState === 'favorites' && (
-            <p 
+            <p
               className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
               style={{ color: themeColors.textMuted }}
             >
@@ -484,9 +484,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             </p>
           )}
 
-                    {currentDisplayList.map((sneaker) => {
+          {currentDisplayList.map((sneaker) => {
             const isFav = favorites.some(f => f.id === sneaker.id)
-            
+
             // Умная каскадная проверка всех возможных полей с датой
             const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
             const rawYear = sneaker.year || sneaker.releaseYear
@@ -499,14 +499,14 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             }
 
             return (
-         <div
+              <div
                 key={sneaker.id}
                 onClick={() => handleCardClick(sneaker)}
                 className="cursor-pointer group flex flex-col"
                 style={{ contentVisibility: 'auto' }}
               >
                 {sneaker.image?.original ? (
-                  <div 
+                  <div
                     className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors"
                     style={{ backgroundColor: themeColors.imageBg }}
                   >
@@ -515,16 +515,16 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                       alt={sneaker.name}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
                       style={{
-                        filter: isDark 
-                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' 
+                        filter: isDark
+                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
                           : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
                       }}
                       loading="lazy"
                     />
                   </div>
                 ) : (
-                  <div 
-                    className="w-full mb-4 aspect-[4/3]" 
+                  <div
+                    className="w-full mb-4 aspect-[4/3]"
                     style={{ backgroundColor: themeColors.imageBg }}
                   />
                 )}
@@ -533,9 +533,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                   <h3 className="font-serif text-[20px] leading-tight tracking-tight">
                     {sneaker.brand}
                   </h3>
-                  
+
                   {/* Кнопка сохранения в архив (кнопка шеринга удалена) */}
-                  <button 
+                  <button
                     onClick={(e) => toggleFavorite(e, sneaker)}
                     className="p-1 transition-colors"
                     style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
@@ -546,24 +546,24 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                   </button>
                 </div>
 
-                <p 
+                <p
                   className="text-[13px] font-sans font-light leading-snug mb-3 pr-4"
                   style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
                 >
                   {sneaker.name} {releaseYear ? `— ${releaseYear}` : ''}
                 </p>
 
-                <div 
+                <div
                   className="flex justify-between items-center pt-3"
                   style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
                 >
-                  <p 
+                  <p
                     className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
                     style={{ color: themeColors.textMuted }}
                   >
                     {sneaker.retailPrice > 0 ? `Retail USD ${sneaker.retailPrice}` : 'Price unav.'}
                   </p>
-                  <span 
+                  <span
                     className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
                     style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
                   >
@@ -577,7 +577,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       )}
 
       {!loading && !error && hasMore && viewState === 'catalog' && (
-        <div 
+        <div
           className="pb-28 pt-8 text-center"
           style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
         >
