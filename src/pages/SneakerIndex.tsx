@@ -6,8 +6,12 @@ interface Sneaker {
   name: string
   gender: string
   retailPrice: number
-  releaseDate?: string // Полная дата от API
-  year?: string | number // Альтернативное поле года от API
+  // Все возможные варианты дат от API:
+  releaseDate?: string 
+  release_date?: string
+  publishedAt?: string
+  year?: string | number 
+  releaseYear?: string | number
   image?: {
     original?: string
   }
