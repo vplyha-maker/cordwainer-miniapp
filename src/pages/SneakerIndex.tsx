@@ -87,12 +87,11 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 interface SneakerIndexProps {
   onBack?: () => void
   theme?: 'light' | 'dark'
-  lang?: Lang // Сделали необязательным, чтобы избежать ошибки в App.tsx
+  lang?: Lang 
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
   
-  // Умное определение языка: Пропс -> Настройки (localStorage) -> Telegram
   const getActiveLang = (): Lang => {
     if (lang) return lang
     
@@ -119,7 +118,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       back: 'Назад',
       archive: 'Архив',
       savedArchive: 'Сохраненный архив',
-      sneakerIndex: 'Каталог',
+      sneakerIndex: 'Footwear Index',
       searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
       all: 'Все',
       men: 'Мужские',
@@ -132,7 +131,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       loadMore: '+ Загрузить еще',
       loading: 'Загрузка...',
       errorLoad: 'Ошибка при загрузке данных',
-      errorSneakers: 'Не удалось загрузить кроссовки',
+      errorSneakers: 'Не удалось загрузить каталог',
       errorRateLimit: 'Слишком много запросов. Подождите минуту.',
       scrollTop: 'Наверх',
       searchSuffix: 'купить',
@@ -141,7 +140,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       back: 'Назад',
       archive: 'Архів',
       savedArchive: 'Збережений архів',
-      sneakerIndex: 'Каталог',
+      sneakerIndex: 'Footwear Index',
       searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
       all: 'Всі',
       men: 'Чоловічі',
@@ -154,7 +153,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       loadMore: '+ Завантажити ще',
       loading: 'Завантаження...',
       errorLoad: 'Помилка завантаження даних',
-      errorSneakers: 'Не вдалося завантажити кросівки',
+      errorSneakers: 'Не вдалося завантажити каталог',
       errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
       scrollTop: 'Вгору',
       searchSuffix: 'купити в Україні',
@@ -163,7 +162,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       back: 'Zurück',
       archive: 'Archiv',
       savedArchive: 'Gespeichertes Archiv',
-      sneakerIndex: 'Sneaker-Index',
+      sneakerIndex: 'Footwear Index',
       searchPlaceholder: 'Modell (576, Dunk, 550...) + Enter',
       all: 'Alle',
       men: 'Herren',
@@ -176,7 +175,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       loadMore: '+ Mehr laden',
       loading: 'Wird geladen...',
       errorLoad: 'Fehler beim Laden der Daten',
-      errorSneakers: 'Sneaker konnten nicht geladen werden',
+      errorSneakers: 'Katalog konnte nicht geladen werden',
       errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie eine Minute.',
       scrollTop: 'Nach oben',
       searchSuffix: 'kaufen',
