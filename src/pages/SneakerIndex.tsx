@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback, useRef, KeyboardEvent } from 'react'
 
+type Lang = 'ru' | 'uk' | 'de'
+
 interface Sneaker {
   id: string
   brand: string
   name: string
   gender: string
   retailPrice: number
+  // Все возможные варианты дат от API:
   releaseDate?: string
   release_date?: string
   publishedAt?: string
@@ -57,6 +60,7 @@ const BRANDS = [
   { id: 'birkenstock', name: 'Birkenstock' },
   { id: 'clarks', name: 'Clarks' },
   { id: 'veja', name: 'Veja' },
+  { id: 'autry', name: 'Autry' },
   { id: 'lacoste', name: 'Lacoste' },
   { id: 'calvin klein', name: 'Calvin Klein' },
   { id: 'tommy hilfiger', name: 'Tommy Hilfiger' },
@@ -73,18 +77,94 @@ const BRANDS = [
   { id: 'dc', name: 'DC' }
 ]
 
-const GENDERS = [
-  { id: 'all', name: 'Все' },
-  { id: 'men', name: 'Мужские' },
-  { id: 'women', name: 'Женские' },
-]
-
 interface SneakerIndexProps {
   onBack?: () => void
   theme?: 'light' | 'dark'
+  lang?: Lang // Принимаем язык из App.tsx, как в CalcMenuPage
 }
 
-export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
+export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
+  // Определяем итоговый язык (если не передали пропсом, смотрим в Telegram)
+  const getActiveLang = (): Lang => {
+    if (lang) return lang
+    if (typeof window !== 'undefined') {
+      const tg = (window as any).Telegram?.WebApp
+      const tgLang = tg?.initDataUnsafe?.user?.language_code
+      if (tgLang === 'uk' || tgLang === 'ukr') return 'uk'
+      if (tgLang === 'de') return 'de'
+    }
+    return 'ru'
+  }
+
+  const activeLang = getActiveLang()
+
+  // Внутренний словарь переводов по вашему шаблону
+  const t = {
+    ru: {
+      back: 'Назад',
+      archive: 'Архив',
+      savedArchive: 'Сохраненный архив',
+      sneakerIndex: 'Каталог',
+      searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
+      all: 'Все',
+      men: 'Мужские',
+      women: 'Женские',
+      emptyArchive: 'Архив пуст',
+      priceUnav: 'Нет цены',
+      retail: 'Розница USD',
+      find: 'Найти',
+      loadMore: '+ Загрузить еще',
+      loading: 'Загрузка...',
+      errorLoad: 'Ошибка при загрузке данных',
+      errorSneakers: 'Не удалось загрузить кроссовки',
+      scrollTop: 'Наверх',
+    },
+    uk: {
+      back: 'Назад',
+      archive: 'Архів',
+      savedArchive: 'Збережений архів',
+      sneakerIndex: 'Каталог',
+      searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
+      all: 'Всі',
+      men: 'Чоловічі',
+      women: 'Жіночі',
+      emptyArchive: 'Архів порожній',
+      priceUnav: 'Немає ціни',
+      retail: 'Роздріб USD',
+      find: 'Знайти',
+      loadMore: '+ Завантажити ще',
+      loading: 'Завантаження...',
+      errorLoad: 'Помилка завантаження даних',
+      errorSneakers: 'Не вдалося завантажити кросівки',
+      scrollTop: 'Вгору',
+    },
+    de: {
+      back: 'Zurück',
+      archive: 'Archiv',
+      savedArchive: 'Gespeichertes Archiv',
+      sneakerIndex: 'Sneaker-Index',
+      searchPlaceholder: 'Modell (576, Dunk, 550...) + Enter',
+      all: 'Alle',
+      men: 'Herren',
+      women: 'Damen',
+      emptyArchive: 'Archiv leer',
+      priceUnav: 'Preis n.v.',
+      retail: 'UVP USD',
+      find: 'Finden',
+      loadMore: '+ Mehr laden',
+      loading: 'Wird geladen...',
+      errorLoad: 'Fehler beim Laden der Daten',
+      errorSneakers: 'Sneaker konnten nicht geladen werden',
+      scrollTop: 'Nach oben',
+    },
+  }[activeLang]
+
+  const GENDERS = [
+    { id: 'all', name: t.all },
+    { id: 'men', name: t.men },
+    { id: 'women', name: t.women },
+  ]
+
   const getInitialQuery = (): string | null => {
     if (typeof window === 'undefined') return null
     const params = new URLSearchParams(window.location.search)
@@ -226,7 +306,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.details || data.error || 'Ошибка при загрузке данных')
+        throw new Error(data.details || data.error || t.errorLoad)
       }
 
       const list = data.results || data.data || data || []
@@ -249,13 +329,13 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Не удалось загрузить кроссовки')
+        setError(t.errorSneakers)
       }
     } finally {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (viewState === 'catalog') {
@@ -302,7 +382,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   }
 
   const handleCardClick = (sneaker: Sneaker) => {
-    const searchQuery = `${sneaker.brand} ${sneaker.name} купити в Україні`
+    const searchQuery = `${sneaker.brand} ${sneaker.name}`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
 
     const tg = (window as any).Telegram?.WebApp
@@ -362,7 +442,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
           style={{ color: themeColors.textMuted, visibility: (viewState === 'catalog' && !onBack) ? 'hidden' : 'visible' }}
         >
           <span>←</span>
-          <span>Back</span>
+          <span>{t.back}</span>
         </button>
 
         <button
@@ -370,13 +450,13 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
           className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors"
           style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
         >
-          <span>Archive</span>
+          <span>{t.archive}</span>
           <span>[{favorites.length}]</span>
         </button>
       </header>
 
       <h1 className="font-serif text-[12vw] min-[375px]:text-5xl leading-none mb-8 tracking-[-0.02em]">
-        {viewState === 'favorites' ? 'Saved Archive' : 'Sneaker Index'}
+        {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
       </h1>
 
       {viewState === 'catalog' && (
@@ -388,7 +468,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={handleSearchSubmit}
-              placeholder="Модель (576, Dunk, 550...) + Enter"
+              placeholder={t.searchPlaceholder}
               className={`w-full px-4 py-3.5 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
               style={{
                 color: themeColors.text,
@@ -475,7 +555,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
               className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
               style={{ color: themeColors.textMuted }}
             >
-              Архив пуст
+              {t.emptyArchive}
             </p>
           )}
 
@@ -508,7 +588,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
-                      // ИСПРАВЛЕНИЕ: вернули object-cover без внутренних отступов (padding)
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       style={{
                         mixBlendMode: isDark ? 'normal' : 'multiply',
@@ -557,13 +636,13 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
                     style={{ color: themeColors.textMuted }}
                   >
-                    {sneaker.retailPrice > 0 ? `Retail USD ${sneaker.retailPrice}` : 'Price unav.'}
+                    {sneaker.retailPrice > 0 ? `${t.retail} ${sneaker.retailPrice}` : t.priceUnav}
                   </p>
                   <span
                     className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
                     style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
                   >
-                    Find →
+                    {t.find} →
                   </span>
                 </div>
               </div>
@@ -582,7 +661,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             disabled={loadingMore}
             className="text-[10px] font-sans uppercase tracking-[0.3em] cursor-pointer transition-all opacity-60 hover:opacity-100"
           >
-            {loadingMore ? 'Loading...' : '+ Load Archive'}
+            {loadingMore ? t.loading : t.loadMore}
           </button>
         </div>
       )}
@@ -597,7 +676,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             border: `1px solid ${themeColors.border}`,
             color: themeColors.text,
           }}
-          title="Наверх"
+          title={t.scrollTop}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square">
             <path d="M18 15l-6-6-6 6" />
