@@ -37,7 +37,6 @@ const BRANDS = [
   { id: 'fear of god', name: 'Fear of God' },
   { id: 'kith', name: 'Kith' },
   { id: 'palace', name: 'Palace' },
-  { id: 'dc shoes', name: 'DC Shoes' },
   { id: 'balenciaga', name: 'Balenciaga' },
   { id: 'off-white', name: 'Off-White' },
   { id: 'gucci', name: 'Gucci' },
@@ -53,8 +52,7 @@ const BRANDS = [
   { id: 'ugg', name: 'UGG' },
   { id: 'dr. martens', name: 'Dr. Martens' },
   { id: 'birkenstock', name: 'Birkenstock' },
-  { id: 'clarks', name: 'Clarks' },
-  { id: 'mschf', name: 'MSCHF' }
+  { id: 'clarks', name: 'Clarks' }
 ]
 
 const GENDERS = [
