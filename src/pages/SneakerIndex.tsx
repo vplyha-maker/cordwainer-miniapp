@@ -67,21 +67,33 @@ interface SneakerIndexProps {
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
+  // 1. Читаем URL при запуске приложения, чтобы понять, не перешел ли человек по ссылке
+  const getInitialQuery = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('q')
+    }
+    return null
+  }
+  
+  const initialSharedQuery = getInitialQuery()
+
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
   
-  const [selectedBrand, setSelectedBrand] = useState('nike')
+  // 2. Если есть запрос в URL, устанавливаем его как активный, иначе стандартный 'nike'
+  const [selectedBrand, setSelectedBrand] = useState(initialSharedQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
-  const [searchText, setSearchText] = useState('')
-  const [activeQuery, setActiveQuery] = useState('nike')
+  const [searchText, setSearchText] = useState(initialSharedQuery || '')
+  const [activeQuery, setActiveQuery] = useState(initialSharedQuery || 'nike')
+  const [hasSearched, setHasSearched] = useState(!!initialSharedQuery)
   
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
-  const [hasSearched, setHasSearched] = useState(false)
 
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
 
@@ -130,7 +142,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     textFaint: isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(9, 9, 11, 0.3)',
     border: isDark ? 'rgba(244, 240, 232, 0.12)' : 'rgba(9, 9, 11, 0.12)',
     borderFaint: isDark ? 'rgba(244, 240, 232, 0.05)' : 'rgba(9, 9, 11, 0.05)',
-    // Чисто белый фон для карточек в светлой теме, чтобы они контрастировали с фоном страницы #F4F0E8
     imageBg: isDark ? '#111111' : '#FFFFFF',
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
@@ -218,6 +229,11 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
+    
+    // Очищаем URL, если пользователь начал искать что-то другое
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname)
+    }
   }
 
   const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -233,6 +249,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       setHasSearched(true)
       setActiveQuery(query)
       setViewState('catalog')
+      
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', window.location.pathname)
+      }
     }
   }
 
@@ -263,24 +283,45 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     })
   }
 
+  // 3. Обновленная логика шеринга
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
-    const shareData = {
-      title: `${sneaker.brand} ${sneaker.name}`,
-      text: `Смотри, что я нашел: ${sneaker.brand} ${sneaker.name}`,
-      url: window.location.href
+    
+    // Создаем ссылку, которая при открытии сразу введет название этой модели в поиск
+    const exactSearch = `${sneaker.brand} ${sneaker.name}`
+    const currentUrl = new URL(window.location.href)
+    currentUrl.searchParams.set('q', exactSearch) // Добавляем ?q=Nike...
+    const shareUrl = currentUrl.toString()
+
+    const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
+
+    const tg = (window as any).Telegram?.WebApp
+
+    // Если мы внутри Telegram WebApp, используем нативное окно шаринга телеграма
+    if (tg && tg.initData) {
+      const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
+      // Это откроет меню выбора чата внутри Телеграма
+      tg.openTelegramLink(tgShareUrl)
+      return
     }
 
+    // Если мы в обычном мобильном браузере (Safari/Chrome)
     if (navigator.share) {
       try {
-        await navigator.share(shareData)
+        await navigator.share({
+          title: exactSearch,
+          text: shareText,
+          url: shareUrl
+        })
+        return
       } catch (err) {
         console.log('Share canceled')
       }
-    } else {
-      navigator.clipboard.writeText(`${shareData.title}\n${shareData.url}`)
-      alert('Ссылка скопирована в буфер обмена!')
-    }
+    } 
+    
+    // Если ничего не сработало (например, ПК браузер) - копируем
+    navigator.clipboard.writeText(`${shareText}\n${shareUrl}`)
+    alert('Ссылка скопирована в буфер обмена!')
   }
   
   const handleBackClick = () => {
@@ -326,7 +367,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
           <span>Back</span>
         </button>
 
-        {/* Кнопка переключения Избранного */}
         <button
           onClick={() => setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')}
           className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors"
@@ -380,7 +420,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
               })}
             </div>
             
-            {/* Градиент затемнения справа */}
             <div 
               className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none" 
               style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
@@ -410,7 +449,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">{error}</p>
       )}
 
-      {/* Скелетоны */}
       {loading && viewState === 'catalog' && (
         <div className="flex flex-col gap-12 pb-10 animate-pulse">
           {[1, 2].map((n) => (
@@ -432,7 +470,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         </div>
       )}
 
-      {/* Карточки */}
       {!loading && (
         <div className="flex flex-col gap-14 pb-10">
           {currentDisplayList.length === 0 && viewState === 'favorites' && (
@@ -464,7 +501,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                       alt={sneaker.name}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
                       style={{
-                        // 3D-тень по контуру кроссовка: поднимает обувь над фоном
                         filter: isDark 
                           ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' 
                           : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
@@ -484,7 +520,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     {sneaker.brand}
                   </h3>
                   
-                  {/* Иконки действий */}
                   <div className="flex items-center gap-3">
                     <button 
                       onClick={(e) => handleShare(e, sneaker)}
@@ -539,7 +574,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         </div>
       )}
 
-      {/* Кнопка подгрузки */}
       {!loading && !error && hasMore && viewState === 'catalog' && (
         <div 
           className="pb-28 pt-8 text-center"
