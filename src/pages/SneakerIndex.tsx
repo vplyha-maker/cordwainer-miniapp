@@ -8,7 +8,6 @@ interface Sneaker {
   name: string
   gender: string
   retailPrice: number
-  // Все возможные варианты дат от API:
   releaseDate?: string
   release_date?: string
   publishedAt?: string
@@ -77,14 +76,21 @@ const BRANDS = [
   { id: 'dc', name: 'DC' }
 ]
 
+function haptic(kind: 'light' | 'medium' = 'light') {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(kind)
+    else if (navigator.vibrate) navigator.vibrate(kind === 'light' ? 20 : 40)
+  } catch {}
+}
+
 interface SneakerIndexProps {
   onBack?: () => void
   theme?: 'light' | 'dark'
-  lang?: Lang // Принимаем язык из App.tsx, как в CalcMenuPage
+  lang?: Lang
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
-  // Определяем итоговый язык (если не передали пропсом, смотрим в Telegram)
   const getActiveLang = (): Lang => {
     if (lang) return lang
     if (typeof window !== 'undefined') {
@@ -98,7 +104,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const activeLang = getActiveLang()
 
-  // Внутренний словарь переводов по вашему шаблону
   const t = {
     ru: {
       back: 'Назад',
@@ -110,6 +115,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       men: 'Мужские',
       women: 'Женские',
       emptyArchive: 'Архив пуст',
+      notFound: 'Ничего не найдено',
       priceUnav: 'Нет цены',
       retail: 'Розница USD',
       find: 'Найти',
@@ -118,6 +124,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       errorLoad: 'Ошибка при загрузке данных',
       errorSneakers: 'Не удалось загрузить кроссовки',
       scrollTop: 'Наверх',
+      searchSuffix: 'купить',
     },
     uk: {
       back: 'Назад',
@@ -129,6 +136,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       men: 'Чоловічі',
       women: 'Жіночі',
       emptyArchive: 'Архів порожній',
+      notFound: 'Нічого не знайдено',
       priceUnav: 'Немає ціни',
       retail: 'Роздріб USD',
       find: 'Знайти',
@@ -137,6 +145,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       errorLoad: 'Помилка завантаження даних',
       errorSneakers: 'Не вдалося завантажити кросівки',
       scrollTop: 'Вгору',
+      searchSuffix: 'купити в Україні',
     },
     de: {
       back: 'Zurück',
@@ -148,6 +157,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       men: 'Herren',
       women: 'Damen',
       emptyArchive: 'Archiv leer',
+      notFound: 'Nichts gefunden',
       priceUnav: 'Preis n.v.',
       retail: 'UVP USD',
       find: 'Finden',
@@ -156,6 +166,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       errorLoad: 'Fehler beim Laden der Daten',
       errorSneakers: 'Sneaker konnten nicht geladen werden',
       scrollTop: 'Nach oben',
+      searchSuffix: 'kaufen',
     },
   }[activeLang]
 
@@ -201,6 +212,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
+  
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -216,6 +229,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }, [])
 
   const scrollToTop = () => {
+    haptic('light')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -345,6 +359,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }, [activeQuery, fetchSneakers, viewState])
 
   const handleBrandClick = (brandId: string) => {
+    haptic('light')
     setSelectedBrand(brandId)
     setSearchText('')
     setHasSearched(false)
@@ -375,14 +390,22 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }
 
+  const clearSearch = () => {
+    setSearchText('')
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }
+
   const handleLoadMore = () => {
+    haptic('light')
     const nextPage = page + 1
     setPage(nextPage)
     fetchSneakers(activeQuery, nextPage, true)
   }
 
   const handleCardClick = (sneaker: Sneaker) => {
-    const searchQuery = `${sneaker.brand} ${sneaker.name}`
+    const searchQuery = `${sneaker.brand} ${sneaker.name} ${t.searchSuffix}`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
 
     const tg = (window as any).Telegram?.WebApp
@@ -395,6 +418,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
+    haptic('medium')
     setFavorites(prev => {
       const isFav = prev.some(item => item.id === sneaker.id)
       if (isFav) return prev.filter(item => item.id !== sneaker.id)
@@ -403,6 +427,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }
 
   const handleBackClick = () => {
+    haptic('light')
     if (viewState === 'favorites') {
       setViewState('catalog')
     } else if (onBack) {
@@ -431,7 +456,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       className="min-h-screen p-6 transition-colors duration-500 relative"
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
-      {/* Header */}
       <header
         className="pt-8 pb-6 flex items-start justify-between mb-8"
         style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
@@ -446,8 +470,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </button>
 
         <button
-          onClick={() => setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')}
-          className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors"
+          onClick={() => {
+            haptic('light');
+            setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')
+          }}
+          className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors outline-none bg-transparent border-none cursor-pointer"
           style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
         >
           <span>{t.archive}</span>
@@ -461,23 +488,34 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
       {viewState === 'catalog' && (
         <>
-          {/* Поиск */}
-          <div className="mb-6">
+          <div className="mb-6 relative">
             <input
+              ref={searchInputRef}
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={handleSearchSubmit}
               placeholder={t.searchPlaceholder}
-              className={`w-full px-4 py-3.5 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
+              className={`w-full px-4 py-3.5 pr-10 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
               style={{
                 color: themeColors.text,
                 borderBottom: `1px solid ${themeColors.border}`,
               }}
             />
+            {searchText && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 outline-none bg-transparent border-none cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: themeColors.text }}
+                title="Очистить"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
-          {/* Бренды */}
           <div className="relative mb-6">
             <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-none pr-12">
               {BRANDS.map((brand) => {
@@ -486,7 +524,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                   <button
                     key={brand.id}
                     onClick={() => handleBrandClick(brand.id)}
-                    className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer transition-all shrink-0 pb-1"
+                    className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer outline-none bg-transparent transition-all shrink-0 pb-1"
                     style={{
                       color: isActive ? themeColors.text : themeColors.textMuted,
                       borderBottom: isActive ? `1px solid ${themeColors.text}` : '1px solid transparent',
@@ -504,15 +542,14 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             />
           </div>
 
-          {/* Пол */}
           <div className="flex gap-4 mb-10">
             {GENDERS.map((gender) => {
               const isActive = selectedGender === gender.id
               return (
                 <button
                   key={gender.id}
-                  onClick={() => setSelectedGender(gender.id)}
-                  className="text-[9px] font-sans uppercase tracking-widest cursor-pointer transition-all"
+                  onClick={() => { haptic('light'); setSelectedGender(gender.id); }}
+                  className="text-[9px] font-sans uppercase tracking-widest cursor-pointer outline-none bg-transparent border-none transition-all"
                   style={{ color: isActive ? themeColors.text : themeColors.textFaint }}
                 >
                   {gender.name}
@@ -556,6 +593,15 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               style={{ color: themeColors.textMuted }}
             >
               {t.emptyArchive}
+            </p>
+          )}
+
+          {currentDisplayList.length === 0 && viewState === 'catalog' && !error && (
+            <p
+              className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
+              style={{ color: themeColors.textMuted }}
+            >
+              {t.notFound}
             </p>
           )}
 
@@ -612,7 +658,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
                   <button
                     onClick={(e) => toggleFavorite(e, sneaker)}
-                    className="p-1 transition-colors"
+                    className="p-1 outline-none bg-transparent border-none cursor-pointer transition-colors"
                     style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
@@ -651,7 +697,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </div>
       )}
 
-      {!loading && !error && hasMore && viewState === 'catalog' && (
+      {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
         <div
           className="pb-28 pt-8 text-center"
           style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
@@ -659,18 +705,18 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           <button
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="text-[10px] font-sans uppercase tracking-[0.3em] cursor-pointer transition-all opacity-60 hover:opacity-100"
+            className="text-[10px] font-sans uppercase tracking-[0.3em] outline-none bg-transparent border-none cursor-pointer transition-all opacity-60 hover:opacity-100"
+            style={{ color: themeColors.text }}
           >
             {loadingMore ? t.loading : t.loadMore}
           </button>
         </div>
       )}
 
-      {/* Кнопка "Наверх" */}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full shadow-lg transition-all duration-300 cursor-pointer backdrop-blur-md"
+          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full outline-none shadow-lg transition-all duration-300 cursor-pointer backdrop-blur-md"
           style={{
             background: isDark ? 'rgba(25, 25, 25, 0.8)' : 'rgba(240, 235, 225, 0.8)',
             border: `1px solid ${themeColors.border}`,
