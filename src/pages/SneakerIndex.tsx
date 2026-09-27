@@ -12,15 +12,60 @@ interface Sneaker {
 }
 
 const BRANDS = [
+  // --- Абсолютная классика и хайп ---
   { id: 'nike', name: 'Nike' },
-  { id: 'adidas', name: 'Adidas' },
   { id: 'jordan', name: 'Jordan' },
+  { id: 'adidas', name: 'Adidas' },
   { id: 'yeezy', name: 'Yeezy' },
+  
+  // --- Ретро, лайфстайл и кэжуал ---
   { id: 'new balance', name: 'New Balance' },
-  { id: 'puma', name: 'Puma' },
-  { id: 'reebok', name: 'Reebok' },
   { id: 'asics', name: 'Asics' },
   { id: 'converse', name: 'Converse' },
+  { id: 'vans', name: 'Vans' },
+  { id: 'puma', name: 'Puma' },
+  { id: 'reebok', name: 'Reebok' },
+  { id: 'saucony', name: 'Saucony' },
+  { id: 'mizuno', name: 'Mizuno' },
+  
+  // --- Gorpcore, аутдор и бег (на пике популярности) ---
+  { id: 'salomon', name: 'Salomon' },
+  { id: 'hoka', name: 'Hoka' },
+  { id: 'on', name: 'On Running' }, // В API часто ищется как On или On Cloud
+  { id: 'merrell', name: 'Merrell' },
+  { id: 'oakley', name: 'Oakley' },
+  { id: 'arcteryx', name: "Arc'teryx" },
+  
+  // --- Скейтбординг и стритвир ---
+  { id: 'bape', name: 'BAPE' },
+  { id: 'supreme', name: 'Supreme' },
+  { id: 'fear of god', name: 'Fear of God' },
+  { id: 'kith', name: 'Kith' },
+  { id: 'palace', name: 'Palace' },
+  { id: 'dc shoes', name: 'DC Shoes' },
+
+  // --- Люкс и высокая мода (огромный сегмент ресейла) ---
+  { id: 'balenciaga', name: 'Balenciaga' },
+  { id: 'off-white', name: 'Off-White' },
+  { id: 'gucci', name: 'Gucci' },
+  { id: 'prada', name: 'Prada' },
+  { id: 'louis vuitton', name: 'Louis Vuitton' },
+  { id: 'dior', name: 'Dior' },
+  { id: 'maison margiela', name: 'Maison Margiela' },
+  { id: 'rick owens', name: 'Rick Owens' },
+  { id: 'alexander mcqueen', name: 'Alexander McQueen' },
+  { id: 'lanvin', name: 'Lanvin' },
+
+  // --- Альтернативная обувь, сабо и ботинки (активно торгуются на StockX) ---
+  { id: 'crocs', name: 'Crocs' },
+  { id: 'timberland', name: 'Timberland' },
+  { id: 'ugg', name: 'UGG' },
+  { id: 'dr. martens', name: 'Dr. Martens' },
+  { id: 'birkenstock', name: 'Birkenstock' },
+  { id: 'clarks', name: 'Clarks' },
+  { id: 'mschf', name: 'MSCHF' }
+]
+
 ]
 
 const GENDERS = [
