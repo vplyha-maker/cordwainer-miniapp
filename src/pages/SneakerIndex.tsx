@@ -66,7 +66,7 @@ interface SneakerIndexProps {
   theme?: 'light' | 'dark' 
 }
 
-export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexProps) {
+export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
@@ -83,11 +83,52 @@ export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexPro
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
 
+  // Внутреннее состояние темы, автоопределение
+  const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
+
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // Теперь мы строго полагаемся на пропс theme, который передает ваше приложение,
-  // и больше не переписываем его системными настройками Telegram.
-  const isDark = theme === 'dark'
+  // Умный перехватчик темы из глобального приложения
+  useEffect(() => {
+    if (propTheme) {
+      setIsDark(propTheme === 'dark')
+      return
+    }
+
+    const checkGlobalTheme = () => {
+      const html = document.documentElement
+      const body = document.body
+      
+      // 1. Проверяем классы (Tailwind и т.д.)
+      if (html.classList.contains('light') || body.classList.contains('light')) return false
+      if (html.classList.contains('dark') || body.classList.contains('dark')) return true
+      
+      // 2. Проверяем data-атрибуты (Next-themes и т.д.)
+      if (html.getAttribute('data-theme') === 'light') return false
+      if (html.getAttribute('data-theme') === 'dark') return true
+      
+      // 3. Проверяем локальное хранилище на популярные ключи
+      try {
+        const lsTheme = localStorage.getItem('theme') || localStorage.getItem('app-theme') || localStorage.getItem('color-theme')
+        if (lsTheme === 'light') return false
+        if (lsTheme === 'dark') return true
+      } catch (e) {}
+
+      // По умолчанию темная
+      return true
+    }
+
+    setIsDark(checkGlobalTheme())
+
+    // Следим за изменениями классов в DOM, если тема меняется без перезагрузки
+    const observer = new MutationObserver(() => {
+      setIsDark(checkGlobalTheme())
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+
+    return () => observer.disconnect()
+  }, [propTheme])
 
   const themeColors = {
     bg: isDark ? '#09090B' : '#F4F0E8',
@@ -100,7 +141,6 @@ export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexPro
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
 
-  // Загрузка избранного при старте
   useEffect(() => {
     const savedFavs = localStorage.getItem('lookbook_favorites')
     if (savedFavs) {
@@ -112,7 +152,6 @@ export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexPro
     }
   }, [])
 
-  // Сохранение избранного при изменении
   useEffect(() => {
     localStorage.setItem('lookbook_favorites', JSON.stringify(favorites))
   }, [favorites])
