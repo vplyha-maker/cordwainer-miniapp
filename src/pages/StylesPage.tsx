@@ -1,663 +1,802 @@
-import { useState, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import type { Lang } from '../App'
+import { useEffect, useState, useCallback, useRef, KeyboardEvent } from 'react'
 
-type StylesPageProps = {
-  onBack: () => void
-  lang: Lang
-}
+export type Lang = 'ru' | 'uk' | 'de'
 
-type StyleSlide = {
+interface Sneaker {
   id: string
-  video?: string
-  image?: string
-  title: { ru: string; uk: string; de: string }
-  subtitle: { ru: string; uk: string; de: string }
-  desc: { ru: string; uk: string; de: string }
-  hideWatermark?: boolean
+  brand: string
+  name: string
+  gender: string
+  retailPrice: number
+  releaseDate?: string
+  release_date?: string
+  publishedAt?: string
+  year?: string | number
+  releaseYear?: string | number
+  image?: {
+    original?: string
+  }
 }
 
-const getDeviceId = () => {
-  if (typeof window === 'undefined') return 'unknown'
-  const tg = (window as any).Telegram?.WebApp
-  const tgUserId = tg?.initDataUnsafe?.user?.id?.toString()
-  if (tgUserId) return tgUserId
-  let deviceId = localStorage.getItem('cordwainer_device_id')
-  if (!deviceId) {
-    deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
-    localStorage.setItem('cordwainer_device_id', deviceId)
-  }
-  return deviceId
-}
-
-const LockIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-    <path d="M7 11V7a5 5 0 0110 0v4"></path>
-  </svg>
-)
-
-const STYLES_DATA: StyleSlide[] = [
-  {
-    id: 'botford',
-    video: '/Fason/Botford.mp4',
-    title: { ru: 'Ботфорты', uk: 'Ботфорти', de: 'Overknee' },
-    subtitle: { ru: 'Высокий стиль', uk: 'Високий стиль', de: 'Hoher Stil' },
-    desc: {
-      ru: 'Смелость и элегантность в каждом шаге. Визуально удлиняют силуэт и становятся главным, безупречным акцентом любого образа.',
-      uk: 'Сміливість та елегантність у кожному кроці. Візуально подовжують силует і стають головним, бездоганним акцентом будь-якого образу.',
-      de: 'Mut und Eleganz bei jedem Schritt. Verlängern optisch die Silhouette und werden zum perfekten Hauptakzent jedes Looks.',
-    },
-  },
-  {
-    id: 'chelsea',
-    video: '/Fason/chelsi.mp4',
-    title: { ru: 'Челси', uk: 'Челсі', de: 'Chelsea' },
-    subtitle: { ru: 'Вечная классика', uk: 'Вічна класика', de: 'Ewiger Klassiker' },
-    desc: {
-      ru: 'Лаконичный дизайн и максимальный комфорт. Идеальный баланс между строгой классикой и расслабленным повседневным стилем.',
-      uk: 'Лаконічний дизайн та максимальний комфорт. Ідеальний баланс між суворою класикою та розслабленим повсякденним стилем.',
-      de: 'Puristisches Design und maximaler Komfort. Die perfekte Balance zwischen strenger Klassik und entspanntem Alltagsstil.',
-    },
-  },
-  {
-    id: 'martins',
-    video: '/Fason/martins.mp4',
-    title: { ru: 'Мартинсы\n/ Берцы', uk: 'Мартінси\n/ Берці', de: 'Combat\nBoots' },
-    subtitle: { ru: 'Бунтарский дух', uk: 'Бунтарський дух', de: 'Rebellischer Geist' },
-    desc: {
-      ru: 'Грубая эстетика, покорившая мировые подиумы. Массивная подошва и высокая шнуровка создают дерзкий, но притягательный контраст.',
-      uk: 'Груба естетика, що підкорила світові подіуми. Масивна підошва та висока шнурівка створюють зухвалий, але притягальний контраст.',
-      de: 'Raue Ästhetik, die die Laufstege der Welt eroberte. Massive Sohle und hohe Schnürung schaffen einen provokanten, aber anziehenden Kontrast.',
-    },
-  },
-  {
-    id: 'lofer',
-    video: '/Fason/lofer.mp4',
-    title: { ru: 'Лоферы', uk: 'Лофери', de: 'Loafer' },
-    subtitle: { ru: 'Тихая роскошь', uk: 'Тиха розкіш', de: 'Stiller Luxus' },
-    desc: {
-      ru: 'Воплощение элегантности и абсолютного комфорта. Идеальная база, которая делает любой образ статусным и расслабленным одновременно.',
-      uk: 'Втілення елегантності та абсолютного комфорту. Ідеальна база, яка робить будь-який образ статусним і розслабленим водночас.',
-      de: 'Die Verkörperung von Eleganz und absolutem Komfort. Die ideale Basis, die jeden Look zugleich statusbewusst und entspannt wirken lässt.',
-    },
-  },
-  {
-    id: 'sock_boots',
-    video: '/Fason/Sock_boots.mp4',
-    title: { ru: 'Туфли\n/ Чулки', uk: 'Туфлі\n/ Панчохи', de: 'Sock\nBoots' },
-    subtitle: { ru: 'Гибридная эстетика', uk: 'Гібридна естетика', de: 'Hybride Ästhetik' },
-    desc: {
-      ru: 'Смелый гибрид классической лодочки и эластичного трикотажа. Безупречно облегает щиколотку, добавляя образу утонченной дерзости и абсолютного комфорта.',
-      uk: 'Сміливий гібрид класичного човника та еластичного трикотажу. Бездоганно облягає кісточку, додаючи образу вишуканої зухвалості та абсолютного комфорту.',
-      de: 'Ein mutiger Hybrid aus klassischem Pump und elastischem Strick. Umschließt den Knöchel makellos und verleiht dem Look raffinierte Kühnheit und absoluten Komfort.',
-    },
-  },
-  {
-    id: 'cozaki',
-    video: '/Fason/cozaki.mp4',
-    title: { ru: 'Казаки', uk: 'Козаки', de: 'Western\nBoots' },
-    subtitle: { ru: 'Свобода формы', uk: 'Свобода форми', de: 'Freiheit der Form' },
-    desc: {
-      ru: 'Знаковый скошенный каблук и характерный мыс. Идеальный баланс между эстетикой дикого запада и ритмом современного мегаполиса.',
-      uk: 'Знаковий скошений каблук та характерний мис. Ідеальний баланс між естетикою дикого заходу та ритмом сучасного мегаполіса.',
-      de: 'Ikonischer abgeschrägter Absatz und charakteristische Spitze. Die perfekte Balance zwischen der Ästhetik des Wilden Westens und dem Rhythmus der modernen Metropole.',
-    },
-  },
-  {
-    id: 'boti',
-    video: '/Fason/boti.mp4',
-    title: { ru: 'Ботильоны', uk: 'Ботильйони', de: 'Stiefeletten' },
-    subtitle: { ru: 'Идеальные пропорции', uk: 'Ідеальні пропорції', de: 'Perfekte Proportionen' },
-    desc: {
-      ru: 'Безукоризненная архитектура обуви, мягко обнимающая щиколотку. Универсальный силуэт для создания выверенных, элегантных образов.',
-      uk: 'Бездоганна архітектура взуття, що м\'яко обіймає кісточку. Універсальний силует для створення вивірених, елегантних образів.',
-      de: 'Makellose Schuharchitektur, die den Knöchel sanft umschließt. Eine universelle Silhouette zur Kreation ausgewogener, eleganter Looks.',
-    },
-  },
-  {
-    id: 'mary_jane',
-    video: '/Fason/Mary_Jane.mp4',
-    title: { ru: 'Мэри Джейн', uk: 'Мері Джейн', de: 'Mary Jane' },
-    subtitle: { ru: 'Новая романтика', uk: 'Нова романтика', de: 'Neue Romantik' },
-    desc: {
-      ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
-      uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний тон.',
-      de: 'Ein Symbol raffinierter Weiblichkeit. Der markante Riemen über dem Spann und die berührende Retro-Silhouette geben einen koketten, aber stets eleganten Ton an.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'topsaed',
-    video: '/Fason/Topsaed.mp4',
-    title: { ru: 'Топсайдеры', uk: 'Топсайдери', de: 'Bootsschuhe' },
-    subtitle: { ru: 'Эстетика ривьеры', uk: 'Естетика рів\'єри', de: 'Riviera-Ästhetik' },
-    desc: {
-      ru: 'Элитарная расслабленность и дух закрытых яхт-клубов. Нескользящая подошва и круговая шнуровка — безупречная база для теплого сезона.',
-      uk: 'Елітарна розслабленість та дух закритих яхт-клубів. Нековзна підошва та кругова шнурівка — бездоганна база для теплого сезону.',
-      de: 'Elitäre Lässigkeit und der Geist exklusiver Yachtclubs. Rutschfeste Sohle und Rundumschnürung — die makellose Basis für die warme Jahreszeit.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'slingback',
-    video: '/Fason/slingback1.mp4',
-    title: { ru: 'Слингбэки', uk: 'Слінгбеки', de: 'Slingbacks' },
-    subtitle: { ru: 'Изящная строгость', uk: 'Витончена строгість', de: 'Zarte Strenge' },
-    desc: {
-      ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
-      uk: 'Чуттєвий компроміс між класичним човником та босоніжкою. Відкрита п\'ята візуально полегшує силует, роблячи кожен крок невагомим.',
-      de: 'Ein sinnlicher Kompromiss zwischen klassischem Pump und Sandale. Die offene Ferse erleichtert die Silhouette optisch und macht jeden Schritt schwerelos.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'espadrilles',
-    video: '/Fason/Espadrilles.mp4',
-    title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' },
-    subtitle: { ru: 'Средиземноморский шик', uk: 'Середземноморський шик', de: 'Mediterraner Chic' },
-    desc: {
-      ru: 'Культовая летняя база, сплетенная из натурального джута. Воплощение расслабленного шика и абсолютной свободы, идеально дополняющее легкие льняные образы.',
-      uk: 'Культова літня база, сплетена з натурального джуту. Втілення розслабленого шику та абсолютної свободи, що ідеально доповнює легкі лляні образи.',
-      de: 'Die kultige Sommerbasis, geflochten aus natürlicher Jute. Die Verkörperung entspannten Chics und absoluter Freiheit, ideal passend zu leichten Leinen-Looks.',
-    },
-    hideWatermark: true,
-  },
-  {
-    id: 'muli',
-    video: '/Fason/muli.mp4',
-    title: { ru: 'Мюли', uk: 'Мюлі', de: 'Mules' },
-    subtitle: { ru: 'Непринужденная эстетика', uk: 'Невимушена естетика', de: 'Mühelose Ästhetik' },
-    desc: {
-      ru: 'Открытая пятка и изящный силуэт, создающие эффект абсолютной легкости. Идеальный выбор для тех, кто ценит утонченный шик и комфорт в каждом движении.',
-      uk: 'Відкрита п\'ята та витончений силует, що створюють ефект абсолютної легкості. Ідеальний вибір для тих, хто цінує вишуканий шик та комфорт у кожному русі.',
-      de: 'Offene Ferse und eine anmutige Silhouette, die ein Gefühl von absoluter Leichtigkeit vermitteln. Die ideale Wahl für alle, die raffinierten Chic und Komfort in jeder Bewegung schätzen.',
-    },
-    hideWatermark: true,
-  },
-    {
-    id: 'huaraches',
-    video: '/Fason/Huaraches.mp4',
-    title: { ru: 'Гуарачи', uk: 'Гуарачі', de: 'Huaraches' },
-    subtitle: { ru: 'Мексиканское наследие', uk: 'Мексиканська спадщина', de: 'Mexikanisches Erbe' },
-    desc: {
-      ru: 'Аутентичный колорит и изящное ручное плетение кожаных ремешков. Идеальный комфорт для жарких дней, воплощающий дух свободы и многовековые традиции ремесленников.',
-      uk: 'Автентичний колорит та витончене ручне плетіння шкіряних ремінців. Ідеальний комфорт для спекотних днів, що втілює дух свободи та багатовікові традиції ремісників.',
-      de: 'Authentisches Flair und feines Handgeflecht aus Lederriemen. Idealer Komfort für heiße Tage, der den Geist der Freiheit und jahrhundertealte Handwerkstraditionen verkörpert.',
-    },
-  }
+const BRANDS = [
+  { id: 'nike', name: 'Nike' },
+  { id: 'jordan', name: 'Jordan' },
+  { id: 'adidas', name: 'Adidas' },
+  { id: 'yeezy', name: 'Yeezy' },
+  { id: 'new balance', name: 'New Balance' },
+  { id: 'asics', name: 'Asics' },
+  { id: 'converse', name: 'Converse' },
+  { id: 'vans', name: 'Vans' },
+  { id: 'puma', name: 'Puma' },
+  { id: 'reebok', name: 'Reebok' },
+  { id: 'saucony', name: 'Saucony' },
+  { id: 'mizuno', name: 'Mizuno' },
+  { id: 'salomon', name: 'Salomon' },
+  { id: 'hoka', name: 'Hoka' },
+  { id: 'on', name: 'On Running' },
+  { id: 'merrell', name: 'Merrell' },
+  { id: 'oakley', name: 'Oakley' },
+  { id: 'arcteryx', name: "Arc'teryx" },
+  { id: 'bape', name: 'BAPE' },
+  { id: 'supreme', name: 'Supreme' },
+  { id: 'fear of god', name: 'Fear of God' },
+  { id: 'kith', name: 'Kith' },
+  { id: 'palace', name: 'Palace' },
+  { id: 'balenciaga', name: 'Balenciaga' },
+  { id: 'off-white', name: 'Off-White' },
+  { id: 'gucci', name: 'Gucci' },
+  { id: 'prada', name: 'Prada' },
+  { id: 'louis vuitton', name: 'Louis Vuitton' },
+  { id: 'dior', name: 'Dior' },
+  { id: 'maison margiela', name: 'Maison Margiela' },
+  { id: 'rick owens', name: 'Rick Owens' },
+  { id: 'alexander mcqueen', name: 'Alexander McQueen' },
+  { id: 'lanvin', name: 'Lanvin' },
+  { id: 'crocs', name: 'Crocs' },
+  { id: 'timberland', name: 'Timberland' },
+  { id: 'ugg', name: 'UGG' },
+  { id: 'dr. martens', name: 'Dr. Martens' },
+  { id: 'birkenstock', name: 'Birkenstock' },
+  { id: 'clarks', name: 'Clarks' },
+  { id: 'veja', name: 'Veja' },
+  { id: 'autry', name: 'Autry' },
+  { id: 'lacoste', name: 'Lacoste' },
+  { id: 'calvin klein', name: 'Calvin Klein' },
+  { id: 'tommy hilfiger', name: 'Tommy Hilfiger' },
+  { id: 'polo ralph lauren', name: 'Polo Ralph Lauren' },
+  { id: 'dsquared2', name: 'Dsquared2' },
+  { id: 'versace', name: 'Versace' },
+  { id: 'valentino', name: 'Valentino' },
+  { id: 'givenchy', name: 'Givenchy' },
+  { id: 'under armour', name: 'Under Armour' },
+  { id: 'fila', name: 'Fila' },
+  { id: 'skechers', name: 'Skechers' },
+  { id: 'etnies', name: 'Etnies' },
+  { id: 'osiris', name: 'Osiris' },
+  { id: 'dc', name: 'DC' }
 ]
 
-type SlideItemProps = {
-  slide: StyleSlide
-  lang: Lang
-  index: number
-  isActive: boolean
-  isPreloaded: boolean
-  isMuted: boolean
+function haptic(kind: 'light' | 'medium' = 'light') {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(kind)
+    else if (navigator.vibrate) navigator.vibrate(kind === 'light' ? 20 : 40)
+  } catch {}
 }
 
-const smoothEase = [0.25, 1, 0.5, 1];
+interface SneakerIndexProps {
+  onBack?: () => void
+  theme?: 'light' | 'dark'
+  lang?: Lang
+}
 
-function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
-
-  const [isLiked, setIsLiked] = useState(false)
-  const [likesCount, setLikesCount] = useState(0)
-
-  const userId = getDeviceId()
-  const tg = (window as any).Telegram?.WebApp
-
-  useEffect(() => {
-    if (!isPreloaded) return
-    let mounted = true
-    const fetchLikes = async () => {
+export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
+  const getActiveLang = (): Lang => {
+    if (lang) return lang
+    
+    if (typeof window !== 'undefined') {
       try {
-        const res = await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`)
-        if (res.ok && mounted) {
-          const data = await res.json()
-          setLikesCount(data.total || 0)
-          setIsLiked(!!data.isLiked)
+        const savedLang = localStorage.getItem('cordwainer_lang') || localStorage.getItem('app_lang')
+        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') {
+          return savedLang as Lang
         }
-      } catch {}
+      } catch (e) {}
+
+      const tg = (window as any).Telegram?.WebApp
+      const tgLang = tg?.initDataUnsafe?.user?.language_code
+      if (tgLang === 'uk' || tgLang === 'ukr') return 'uk'
+      if (tgLang === 'de') return 'de'
     }
-    fetchLikes()
-    return () => { mounted = false }
-  }, [slide.id, userId, isPreloaded])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video || !slide.video) return
-
-    if (isPreloaded) {
-      if (video.src !== slide.video) {
-        video.src = slide.video
-        video.load()
-      }
-    } else {
-      if (video.src) {
-        video.pause()
-        video.removeAttribute('src')
-        video.load()
-      }
-    }
-  }, [isPreloaded, slide.video])
-
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    if (isActive) {
-      video.currentTime = 0
-      const p = video.play()
-      if (p) p.catch(() => {})
-    } else {
-      video.pause()
-    }
-  }, [isActive])
-
-  const handleLike = async () => {
-    const next = !isLiked
-    setIsLiked(next)
-    setLikesCount(c => next ? c + 1 : c - 1)
-
-    if (tg?.HapticFeedback) {
-      tg.HapticFeedback.impactOccurred(next ? 'medium' : 'light')
-    }
-
-    try {
-      await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: next ? 'like' : 'unlike' }),
-      })
-    } catch {
-      setIsLiked(!next)
-      setLikesCount(c => next ? c - 1 : c + 1)
-    }
+    return 'ru'
   }
 
-  const handleShare = async () => {
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+  const activeLang = getActiveLang()
 
-    const title = slide.title[currentLang].replace('\n', ' ')
-    const text =
-      currentLang === 'de'
-        ? `Sieh dir diesen Stil an: ${title} in der Cordwainer Enzyklopädie!`
-        : currentLang === 'ru'
-          ? `Смотри, какой фасон: ${title} в энциклопедии Cordwainer!`
-          : `Дивись, який фасон: ${title} в енциклопедії Cordwainer!`
-
-    const url = 'https://www.cordwaine.app'
-
-    try {
-      if (tg?.initData) {
-        tg.openTelegramLink(
-          `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
-        )
-        return
-      }
-      if (navigator.share) {
-        await navigator.share({ title: 'Cordwainer', text, url })
-      } else {
-        await navigator.clipboard.writeText(`${text}\n${url}`)
-      }
-    } catch {}
-  }
-
-  return (
-    <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-black">
-      <div className="absolute inset-0 bg-black">
-        {slide.video ? (
-          <video
-            ref={videoRef}
-            preload="none"
-            loop
-            playsInline
-            muted={isMuted}
-            className={`
-              w-full h-full object-cover
-              transition-opacity duration-300 ease-out
-              ${isActive ? 'opacity-100' : 'opacity-0'}
-              ${slide.hideWatermark ? 'scale-[1.08]' : ''}
-            `}
-          />
-        ) : slide.image ? (
-          <img
-            src={slide.image}
-            alt={slide.title[currentLang]}
-            className="w-full h-full object-cover"
-          />
-        ) : null}
-      </div>
-
-      <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-black/80 via-black/30 to-transparent z-10 pointer-events-none" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
-        transition={{ duration: 0.8, ease: smoothEase, delay: 0.1 }}
-        className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between"
-      >
-        <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.35em] text-white/70 mb-2">
-            {slide.subtitle[currentLang]}
-          </p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-lg">
-            {slide.title[currentLang]}
-          </h2>
-        </div>
-        <div className="text-[10px] font-sans tracking-widest text-white/50 mt-1">
-          {String(index + 1).padStart(2, '0')}
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
-        transition={{ duration: 0.8, ease: smoothEase, delay: 0.2 }}
-        className="absolute bottom-6 left-6 right-6 z-20"
-      >
-        <div className="w-full h-px bg-white/20 mb-5" />
-        <div className="flex items-start justify-between gap-4">
-          <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-relaxed text-white/90 max-w-[230px] min-[390px]:max-w-[270px]">
-            {slide.desc[currentLang]}
-          </p>
-
-          <div className="flex items-center gap-4 shrink-0">
-            <button onClick={handleLike} className="flex flex-col items-center gap-1.5">
-              <div
-                className={`
-                  w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border flex items-center justify-center
-                  transition-all duration-200 active:scale-90
-                  ${isLiked
-                    ? 'border-white bg-white text-black'
-                    : 'border-white/40 text-white bg-black/30 backdrop-blur-sm'}
-                `}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-              </div>
-              <span className="text-[8px] tracking-widest uppercase text-white/80">
-                {likesCount || 'LIKE'}
-              </span>
-            </button>
-
-            <button onClick={handleShare} className="flex flex-col items-center gap-1.5">
-              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/40 bg-black/30 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 active:scale-90">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                  <polyline points="16 6 12 2 8 6" />
-                  <line x1="12" y1="2" x2="12" y2="15" />
-                </svg>
-              </div>
-              <span className="text-[8px] tracking-widest uppercase text-white/80">SHARE</span>
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
-const pageVariants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0.4 } },
-  exit: { opacity: 0, transition: { duration: 0.3 } },
-}
-
-export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
-  const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
-  
-  // Новые, правильные тексты в стиле Fashion Editorial
-  const paywallText = {
+  const t = {
     ru: {
-      tag: 'ОГРАНИЧЕНИЕ ПРОСМОТРА',
-      title: 'Полный\nЛукбук',
-      desc: 'Вы посмотрели бесплатную часть ленты. Разблокируйте доступ, чтобы продолжить свайпать и увидеть видео-разборы всех премиальных фасонов обуви.',
-      btn: 'ОТКРЫТЬ ДОСТУП • 1 ⭐️',
-      loading: 'ОБРАБОТКА...'
+      back: 'Назад',
+      archive: 'Архив',
+      savedArchive: 'Сохраненный архив',
+      sneakerIndex: 'Footwear Index',
+      searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
+      all: 'Все',
+      men: 'Мужские',
+      women: 'Женские',
+      emptyArchive: 'Архив пуст',
+      notFound: 'Ничего не найдено',
+      priceUnav: 'Нет цены',
+      retail: 'Розница USD',
+      find: 'Найти',
+      loadMore: '+ Загрузить еще',
+      loading: 'Загрузка...',
+      errorLoad: 'Ошибка при загрузке данных',
+      errorSneakers: 'Не удалось загрузить каталог',
+      errorRateLimit: 'Слишком много запросов. Подождите минуту.',
+      scrollTop: 'Наверх',
+      scrollReturn: 'Вернуться к месту',
+      searchSuffix: 'купить',
     },
     uk: {
-      tag: 'ОБМЕЖЕННЯ ПЕРЕГЛЯДУ',
-      title: 'Повний\nЛукбук',
-      desc: 'Ви переглянули безкоштовну частину стрічки. Розблокуйте доступ, щоб продовжити свайпати та побачити відео-розбори всіх преміальних фасонів взуття.',
-      btn: 'ВІДКРИТИ ДОСТУП • 1 ⭐️',
-      loading: 'ОБРОБКА...'
+      back: 'Назад',
+      archive: 'Архів',
+      savedArchive: 'Збережений архів',
+      sneakerIndex: 'Footwear Index',
+      searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
+      all: 'Всі',
+      men: 'Чоловічі',
+      women: 'Жіночі',
+      emptyArchive: 'Архів порожній',
+      notFound: 'Нічого не знайдено',
+      priceUnav: 'Немає ціни',
+      retail: 'Роздріб USD',
+      find: 'Знайти',
+      loadMore: '+ Завантажити ще',
+      loading: 'Завантаження...',
+      errorLoad: 'Помилка завантаження даних',
+      errorSneakers: 'Не вдалося завантажити каталог',
+      errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
+      scrollTop: 'Вгору',
+      scrollReturn: 'Повернутися',
+      searchSuffix: 'купити в Україні',
     },
     de: {
-      tag: 'ANSICHTSLIMIT',
-      title: 'Volles\nLookbook',
-      desc: 'Sie haben den kostenlosen Teil gesehen. Schalten Sie den Zugang frei, um weiter zu wischen und Videoanalysen aller Premium-Stile zu sehen.',
-      btn: 'FREISCHALTEN FÜR 1 ⭐️',
-      loading: 'LÄDT...'
-    }
-  }[currentLang]
+      back: 'Zurück',
+      archive: 'Archiv',
+      savedArchive: 'Gespeichertes Archiv',
+      sneakerIndex: 'Footwear Index',
+      searchPlaceholder: 'Modell (576, Dunk, 550...) + Enter',
+      all: 'Alle',
+      men: 'Herren',
+      women: 'Damen',
+      emptyArchive: 'Archiv leer',
+      notFound: 'Nichts gefunden',
+      priceUnav: 'Preis n.v.',
+      retail: 'UVP USD',
+      find: 'Finden',
+      loadMore: '+ Mehr laden',
+      loading: 'Wird geladen...',
+      errorLoad: 'Fehler beim Laden der Daten',
+      errorSneakers: 'Katalog konnte nicht geladen werden',
+      errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie eine Minute.',
+      scrollTop: 'Nach oben',
+      scrollReturn: 'Zurückspringen',
+      searchSuffix: 'kaufen',
+    },
+  }[activeLang]
 
-  const [isMuted, setIsMuted] = useState(true)
-  const [activeIndex, setActiveIndex] = useState(0)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const slideRefs = useRef<(HTMLDivElement | null)[]>([])
+  const GENDERS = [
+    { id: 'all', name: t.all },
+    { id: 'men', name: t.men },
+    { id: 'women', name: t.women },
+  ]
 
-  const [isProPurchased, setIsProPurchased] = useState(false)
-  const [isPurchasing, setIsPurchasing] = useState(false)
+  const getInitialQuery = (): string | null => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get('q')
+    if (q) return q.trim()
 
-  // Проверка покупки при запуске страницы
-  useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
-    const userId = tg?.initDataUnsafe?.user?.id
-    if (!userId) return
+    const startParam = tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam') || null
 
-    fetch(`/api/check-purchase?userId=${userId}&productId=pro_videos`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.purchased) setIsProPurchased(true)
-      })
-      .catch(err => console.error("Ошибка проверки:", err))
+    if (startParam && typeof startParam === 'string' && startParam.startsWith('search_')) {
+      return startParam.slice('search_'.length).replace(/_/g, ' ').trim()
+    }
+    return null
+  }
+
+  const initialQuery = getInitialQuery()
+
+  const [sneakers, setSneakers] = useState<Sneaker[]>([])
+  const [favorites, setFavorites] = useState<Sneaker[]>([])
+  const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
+
+  const [selectedBrand, setSelectedBrand] = useState(initialQuery ? 'all' : 'nike')
+  const [selectedGender, setSelectedGender] = useState('all')
+  const [searchText, setSearchText] = useState(initialQuery || '')
+  const [activeQuery, setActiveQuery] = useState(initialQuery || 'nike')
+
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [error, setError] = useState('')
+  const [hasSearched, setHasSearched] = useState(!!initialQuery)
+
+  // УМНЫЙ СКРОЛЛ: состояния кнопки и память позиции
+  const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
+  const returnYRef = useRef<number | null>(null)
+  
+  const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
+  const cacheRef = useRef<Record<string, Sneaker[]>>({})
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY
+      
+      // Если ушли далеко вниз - кнопка направлена ВВЕРХ
+      if (currentY > 600) {
+        setButtonMode(prev => prev !== 'up' ? 'up' : prev)
+      } 
+      // Если мы наверху И есть сохраненная позиция - кнопка направлена ВНИЗ
+      else if (currentY < 100 && returnYRef.current !== null) {
+        setButtonMode(prev => prev !== 'down' ? 'down' : prev)
+      } 
+      // Иначе прячем кнопку
+      else {
+        setButtonMode(prev => prev !== 'hidden' ? 'hidden' : prev)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Показываем только 3 видео, если не куплено
-  const visibleStyles = isProPurchased ? STYLES_DATA : STYLES_DATA.slice(0, 3)
-  const showPaywallSlide = !isProPurchased
+  // Обработчик умного скролла
+  const handleSmartScroll = () => {
+    haptic('light')
+    
+    if (buttonMode === 'up') {
+      // Запоминаем текущую позицию перед полетом наверх
+      returnYRef.current = window.scrollY
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else if (buttonMode === 'down' && returnYRef.current !== null) {
+      // Летим обратно к сохраненной позиции
+      window.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
+      // Очищаем память через секунду, когда анимация закончится
+      setTimeout(() => { returnYRef.current = null }, 1000)
+    }
+  }
 
-  // Перепривязываем Observer при изменении количества слайдов
   useEffect(() => {
-    const root = scrollRef.current
-    if (!root) return
+    if (propTheme) {
+      setIsDark(propTheme === 'dark')
+      return
+    }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            const idx = Number(entry.target.getAttribute('data-index'))
-            if (!Number.isNaN(idx)) {
-              setActiveIndex(idx)
-            }
-          }
-        }
-      },
-      { root, threshold: [0.6] }
-    )
+    const checkGlobalTheme = () => {
+      const html = document.documentElement
+      const body = document.body
 
-    const currentRefs = slideRefs.current.filter(Boolean)
-    currentRefs.forEach(el => observer.observe(el!))
+      if (html.classList.contains('light') || body.classList.contains('light')) return false
+      if (html.classList.contains('dark') || body.classList.contains('dark')) return true
+
+      if (html.getAttribute('data-theme') === 'light') return false
+      if (html.getAttribute('data-theme') === 'dark') return true
+
+      try {
+        const lsTheme = localStorage.getItem('theme') || localStorage.getItem('app-theme') || localStorage.getItem('color-theme')
+        if (lsTheme === 'light') return false
+        if (lsTheme === 'dark') return true
+      } catch (e) {}
+
+      return true
+    }
+
+    setIsDark(checkGlobalTheme())
+
+    const observer = new MutationObserver(() => {
+      setIsDark(checkGlobalTheme())
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
 
     return () => observer.disconnect()
-  }, [isProPurchased])
+  }, [propTheme])
+
+  const themeColors = {
+    bg: isDark ? '#09090B' : '#F4F0E8',
+    text: isDark ? '#F4F0E8' : '#09090B',
+    textMuted: isDark ? 'rgba(244, 240, 232, 0.4)' : 'rgba(9, 9, 11, 0.4)',
+    textFaint: isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(9, 9, 11, 0.3)',
+    border: isDark ? 'rgba(244, 240, 232, 0.12)' : 'rgba(9, 9, 11, 0.12)',
+    borderFaint: isDark ? 'rgba(244, 240, 232, 0.05)' : 'rgba(9, 9, 11, 0.05)',
+    imageBg: isDark ? '#1C1C1E' : '#E5E7EB',
+    iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
+  }
 
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp
-    if (tg) {
-      tg.ready()
-      tg.expand?.()
-      tg.disableVerticalSwipes?.()
+    const savedFavs = localStorage.getItem('lookbook_favorites')
+    if (savedFavs) {
+      try {
+        setFavorites(JSON.parse(savedFavs))
+      } catch (e) {
+        console.error('Failed to parse favorites')
+      }
     }
   }, [])
 
-  const handleProClick = async () => {
-    const tg = (window as any).Telegram?.WebApp;
-    const userId = tg?.initDataUnsafe?.user?.id;
+  useEffect(() => {
+    localStorage.setItem('lookbook_favorites', JSON.stringify(favorites))
+  }, [favorites])
 
-    if (!userId) {
-      alert("Ошибка: Откройте приложение через Telegram.");
-      return;
+  const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
+    const cacheKey = `${query}_p${pageNum}`
+
+    if (!append && cacheRef.current[cacheKey]) {
+      setSneakers(cacheRef.current[cacheKey])
+      setLoading(false)
+      return
     }
 
-    setIsPurchasing(true);
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+      setSneakers([])
+    }
+    setError('')
 
     try {
-      const response = await fetch("/api/create-invoice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, productId: "pro_videos" }) 
-      });
+      const res = await fetch(
+        `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
+      )
 
-      const data = await response.json();
-      if (!response.ok || !data.invoiceLink) throw new Error(data.error);
+      const text = await res.text()
 
-      tg.openInvoice(data.invoiceLink, (status: string) => {
-        if (status === 'paid') {
-          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
-          setIsProPurchased(true); 
-        } else if (status === 'failed') {
-          alert("Оплата была отменена или произошла ошибка.");
+      const upperText = text.toUpperCase()
+      if (upperText.includes('<HTML') || upperText.includes('TOO MANY REQUESTS') || upperText.includes('RATE LIMIT')) {
+        throw new Error('RATE_LIMIT')
+      }
+
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch (e) {
+        throw new Error('PARSE_ERROR')
+      }
+
+      if (data.ERROR === 'RATE LIMIT EXCEEDED' || data.error === 'RATE LIMIT EXCEEDED') {
+        throw new Error('RATE_LIMIT')
+      }
+
+      if (!res.ok) {
+        throw new Error(data.details || data.error || data.message || data.MESSAGE || t.errorLoad)
+      }
+
+      const list = data.results || data.data || data || []
+      const newItems = Array.isArray(list) ? list : []
+
+      if (newItems.length < 100) {
+        setHasMore(false)
+      } else {
+        setHasMore(true)
+      }
+
+      setSneakers((prev) => {
+        const updated = append ? [...prev, ...newItems] : newItems
+        if (!append) {
+          cacheRef.current[cacheKey] = updated
         }
-      });
-    } catch (error: any) {
-      console.error(error);
-      alert(`Сбой сервера: ${error.message}`);
+        return updated
+      })
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message === 'RATE_LIMIT') {
+          setError(t.errorRateLimit)
+        } else {
+          setError(t.errorSneakers)
+        }
+      } else {
+        setError(t.errorSneakers)
+      }
     } finally {
-      setIsPurchasing(false);
+      setLoading(false)
+      setLoadingMore(false)
     }
-  };
+  }, [t])
+
+  useEffect(() => {
+    if (viewState === 'catalog') {
+      setPage(1)
+      fetchSneakers(activeQuery, 1, false)
+    }
+  }, [activeQuery, fetchSneakers, viewState])
+
+  const handleBrandClick = (brandId: string) => {
+    haptic('light')
+    setSelectedBrand(brandId)
+    setSearchText('')
+    setHasSearched(false)
+    setActiveQuery(brandId)
+
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname)
+    }
+  }
+
+  const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const text = searchText.trim()
+      if (!text) return
+
+      const query =
+        selectedBrand && selectedBrand !== 'all'
+          ? `${selectedBrand} ${text}`
+          : text
+
+      setHasSearched(true)
+      setActiveQuery(query)
+      setViewState('catalog')
+
+      if (typeof window !== 'undefined') {
+        window.history.pushState({}, '', window.location.pathname)
+      }
+    }
+  }
+
+  const clearSearch = () => {
+    setSearchText('')
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }
+
+  const handleLoadMore = () => {
+    haptic('light')
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchSneakers(activeQuery, nextPage, true)
+  }
+
+  const handleCardClick = (sneaker: Sneaker) => {
+    const searchQuery = `${sneaker.brand} ${sneaker.name} ${t.searchSuffix}`
+    const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
+
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.openLink) {
+      tg.openLink(url)
+    } else {
+      window.open(url, '_blank')
+    }
+  }
+
+  const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
+    e.stopPropagation()
+    haptic('medium')
+    setFavorites(prev => {
+      const isFav = prev.some(item => item.id === sneaker.id)
+      if (isFav) return prev.filter(item => item.id !== sneaker.id)
+      return [...prev, sneaker]
+    })
+  }
+
+  const handleBackClick = () => {
+    haptic('light')
+    if (viewState === 'favorites') {
+      setViewState('catalog')
+    } else if (onBack) {
+      onBack()
+    }
+  }
+
+  const filteredCatalog = sneakers.filter((sneaker) => {
+    if (selectedGender === 'all') return true
+    if (!sneaker.gender) return false
+    const genderStr = sneaker.gender.toLowerCase()
+
+    if (selectedGender === 'men') {
+      return genderStr === 'men' || (genderStr.includes('men') && !genderStr.includes('women'))
+    }
+    if (selectedGender === 'women') {
+      return genderStr.includes('women')
+    }
+    return genderStr.includes(selectedGender)
+  })
+
+  const currentDisplayList = viewState === 'favorites' ? favorites : filteredCatalog
 
   return (
-    <motion.div
-      variants={pageVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className="fixed inset-0 z-50 bg-[#050505] text-[#F4F0E8] overflow-hidden"
+    <div
+      className="min-h-screen p-6 transition-colors duration-500 relative"
+      style={{ background: themeColors.bg, color: themeColors.text }}
     >
-      <style>{`
-        .snap-container {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior-y: contain;
-          touch-action: pan-y;
-        }
-        .snap-container::-webkit-scrollbar { display: none; }
-        * {
-          -webkit-tap-highlight-color: transparent !important;
-          -webkit-touch-callout: none;
-        }
-      `}</style>
-
-      {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
+      <header
+        className="pt-8 pb-6 flex items-start justify-between mb-8"
+        style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
+      >
         <button
-          onClick={onBack}
-          className="pointer-events-auto flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] text-white/90"
+          onClick={handleBackClick}
+          className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100"
+          style={{ color: themeColors.textMuted, visibility: (viewState === 'catalog' && !onBack) ? 'hidden' : 'visible' }}
         >
-          ← Back
+          <span>←</span>
+          <span>{t.back}</span>
         </button>
+
         <button
           onClick={() => {
-            if ((window as any).Telegram?.WebApp?.HapticFeedback) {
-              ;(window as any).Telegram.WebApp.HapticFeedback.impactOccurred('light')
-            }
-            setIsMuted(v => !v)
+            haptic('light');
+            setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')
           }}
-          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-white/90"
+          className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors outline-none bg-transparent border-none cursor-pointer"
+          style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
         >
-          {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
+          <span>{t.archive}</span>
+          <span>[{favorites.length}]</span>
         </button>
       </header>
 
-      {/* Feed */}
-      <div
-        ref={scrollRef}
-        className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
-      >
-        {visibleStyles.map((slide, index) => {
-          const isPreloaded = Math.abs(activeIndex - index) <= 1
-          const isActive = activeIndex === index
+      <h1 className="font-serif text-[12vw] min-[375px]:text-5xl leading-none mb-8 tracking-[-0.02em]">
+        {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
+      </h1>
 
-          return (
+      {viewState === 'catalog' && (
+        <>
+          <div className="mb-6 relative">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onKeyDown={handleSearchSubmit}
+              placeholder={t.searchPlaceholder}
+              className={`w-full px-4 py-3.5 pr-10 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
+              style={{
+                color: themeColors.text,
+                borderBottom: `1px solid ${themeColors.border}`,
+              }}
+            />
+            {searchText && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 outline-none bg-transparent border-none cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: themeColors.text }}
+                title="Очистить"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="relative mb-6">
+            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-none pr-12">
+              {BRANDS.map((brand) => {
+                const isActive = selectedBrand === brand.id && !hasSearched
+                return (
+                  <button
+                    key={brand.id}
+                    onClick={() => handleBrandClick(brand.id)}
+                    className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer outline-none bg-transparent transition-all shrink-0 pb-1"
+                    style={{
+                      color: isActive ? themeColors.text : themeColors.textMuted,
+                      borderBottom: isActive ? `1px solid ${themeColors.text}` : '1px solid transparent',
+                    }}
+                  >
+                    {brand.name}
+                  </button>
+                )
+              })}
+            </div>
+
             <div
-              key={slide.id}
-              ref={(el) => { slideRefs.current[index] = el }}
-              data-index={index}
-              className="h-full w-full snap-start snap-always"
-            >
-              <SlideItem
-                slide={slide}
-                lang={lang}
-                index={index}
-                isActive={isActive}
-                isPreloaded={isPreloaded}
-                isMuted={isMuted}
+              className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none"
+              style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
+            />
+          </div>
+
+          <div className="flex gap-4 mb-10">
+            {GENDERS.map((gender) => {
+              const isActive = selectedGender === gender.id
+              return (
+                <button
+                  key={gender.id}
+                  onClick={() => { haptic('light'); setSelectedGender(gender.id); }}
+                  className="text-[9px] font-sans uppercase tracking-widest cursor-pointer outline-none bg-transparent border-none transition-all"
+                  style={{ color: isActive ? themeColors.text : themeColors.textFaint }}
+                >
+                  {gender.name}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {error && (
+        <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">{error}</p>
+      )}
+
+      {loading && viewState === 'catalog' && (
+        <div className="flex flex-col gap-12 pb-10 animate-pulse">
+          {[1, 2].map((n) => (
+            <div key={n} className="pb-8">
+              <div
+                className="w-full h-[350px] mb-4"
+                style={{ backgroundColor: themeColors.imageBg }}
+              />
+              <div
+                className="h-5 w-32 mb-2"
+                style={{ backgroundColor: themeColors.imageBg }}
+              />
+              <div
+                className="h-4 w-48"
+                style={{ backgroundColor: themeColors.imageBg }}
               />
             </div>
-          )
-        })}
+          ))}
+        </div>
+      )}
 
-        {/* НОВЫЙ ЭДИТОРИАЛ PAYWALL SLIDE */}
-        {showPaywallSlide && (
-          <div
-            ref={(el) => { slideRefs.current[visibleStyles.length] = el }}
-            data-index={visibleStyles.length}
-            className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6 pb-12"
-          >
-            {/* Огромная фоновая типографика в стиле Vogue */}
-            <div className="absolute top-20 left-4 pointer-events-none select-none">
-              <h2 className="font-serif text-[22vw] leading-[0.8] text-white/5 tracking-tighter">
-                FULL<br/>VIDEO<br/>LOOKBOOK
-              </h2>
-            </div>
+      {!loading && (
+        <div className="flex flex-col gap-14 pb-10">
+          {currentDisplayList.length === 0 && viewState === 'favorites' && (
+            <p
+              className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
+              style={{ color: themeColors.textMuted }}
+            >
+              {t.emptyArchive}
+            </p>
+          )}
 
-            {/* Контент прижат к низу, как описание в самих видео */}
-            <div className="relative z-10 w-full mb-4">
-              <div className="w-full h-px bg-white/20 mb-6" />
-              
-              <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/50 mb-4">
-                {paywallText.tag}
-              </p>
-              
-              <h3 className="font-serif text-4xl min-[390px]:text-5xl tracking-tight text-[#F4F0E8] whitespace-pre-line mb-6">
-                {paywallText.title}
-              </h3>
-              
-              <p className="text-[10px] min-[390px]:text-[11px] font-sans font-light leading-[1.8] text-white/70 max-w-[300px] mb-10">
-                {paywallText.desc}
-              </p>
+          {currentDisplayList.length === 0 && viewState === 'catalog' && !error && (
+            <p
+              className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
+              style={{ color: themeColors.textMuted }}
+            >
+              {t.notFound}
+            </p>
+          )}
 
-              <button
-                onClick={handleProClick}
-                disabled={isPurchasing}
-                className="group relative flex items-center justify-between w-full h-[56px] px-6 border border-white/20 text-[#F4F0E8] hover:bg-white/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer"
+          {currentDisplayList.map((sneaker) => {
+            const isFav = favorites.some(f => f.id === sneaker.id)
+
+            const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
+            const rawYear = sneaker.year || sneaker.releaseYear
+
+            let releaseYear = null
+            if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
+              const parsed = rawDate.slice(0, 4)
+              if (parsed !== '0000') releaseYear = parsed
+            } else if (rawYear && String(rawYear) !== '0') {
+              releaseYear = String(rawYear) 
+            }
+
+            return (
+              <div
+                key={sneaker.id}
+                onClick={() => handleCardClick(sneaker)}
+                className="cursor-pointer group flex flex-col"
+                style={{ contentVisibility: 'auto' }}
               >
-                {isPurchasing ? (
-                  <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse mx-auto">
-                    {paywallText.loading}
-                  </span>
+                {sneaker.image?.original ? (
+                  <div
+                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm"
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  >
+                    <img
+                      src={sneaker.image.original}
+                      alt={sneaker.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      style={{
+                        mixBlendMode: isDark ? 'normal' : 'multiply',
+                        filter: isDark
+                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
+                          : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
+                      }}
+                      loading="lazy"
+                    />
+                  </div>
                 ) : (
-                  <>
-                    <span className="text-[10px] font-sans uppercase tracking-[0.2em]">
-                      {paywallText.btn}
-                    </span>
-                    <LockIcon />
-                  </>
+                  <div
+                    className="w-full mb-4 aspect-[4/3] rounded-sm"
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  />
                 )}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </motion.div>
+
+                <div className="flex justify-between items-start mb-1">
+                  <h3 className="font-serif text-[20px] leading-tight tracking-tight">
+                    {sneaker.brand}
+                  </h3>
+
+                  <button
+                    onClick={(e) => toggleFavorite(e, sneaker)}
+                    className="p-1 outline-none bg-transparent border-none cursor-pointer transition-colors"
+                    style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
+                </div>
+
+                <p
+                  className="text-[13px] font-sans font-light leading-snug mb-3 pr-4"
+                  style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
+                >
+                  {sneaker.name} {releaseYear ? `— ${releaseYear}` : ''}
+                </p>
+
+                <div
+                  className="flex justify-between items-center pt-3"
+                  style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+                >
+                  <p
+                    className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
+                    style={{ color: themeColors.textMuted }}
+                  >
+                    {sneaker.retailPrice > 0 ? `${t.retail} ${sneaker.retailPrice}` : t.priceUnav}
+                  </p>
+                  <span
+                    className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
+                    style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
+                  >
+                    {t.find} →
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
+        <div
+          className="pb-28 pt-8 text-center"
+          style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+        >
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="text-[10px] font-sans uppercase tracking-[0.3em] outline-none bg-transparent border-none cursor-pointer transition-all opacity-60 hover:opacity-100"
+            style={{ color: themeColors.text }}
+          >
+            {loadingMore ? t.loading : t.loadMore}
+          </button>
+        </div>
+      )}
+
+      {/* УМНАЯ КНОПКА СКРОЛЛА */}
+      <button
+        onClick={handleSmartScroll}
+        className={`fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full outline-none shadow-lg transition-all duration-500 cursor-pointer backdrop-blur-md ${
+          buttonMode !== 'hidden' ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+        style={{
+          background: isDark ? 'rgba(25, 25, 25, 0.8)' : 'rgba(240, 235, 225, 0.8)',
+          border: `1px solid ${themeColors.border}`,
+          color: themeColors.text,
+        }}
+        title={buttonMode === 'up' ? t.scrollTop : t.scrollReturn}
+      >
+        <svg 
+          width="14" 
+          height="14" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="1.5" 
+          strokeLinecap="square"
+          className={`transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            buttonMode === 'down' ? 'rotate-180' : 'rotate-0'
+          }`}
+        >
+          <path d="M18 15l-6-6-6 6" />
+        </svg>
+      </button>
+    </div>
   )
 }
