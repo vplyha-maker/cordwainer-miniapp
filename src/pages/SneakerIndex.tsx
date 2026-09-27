@@ -130,7 +130,8 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     textFaint: isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(9, 9, 11, 0.3)',
     border: isDark ? 'rgba(244, 240, 232, 0.12)' : 'rgba(9, 9, 11, 0.12)',
     borderFaint: isDark ? 'rgba(244, 240, 232, 0.05)' : 'rgba(9, 9, 11, 0.05)',
-    imageBg: isDark ? '#111111' : '#E8E3D9',
+    // Чисто белый фон для карточек в светлой теме, чтобы они контрастировали с фоном страницы #F4F0E8
+    imageBg: isDark ? '#111111' : '#FFFFFF',
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
 
@@ -282,13 +283,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     }
   }
   
-  // Умная обработка кнопки "Назад"
   const handleBackClick = () => {
     if (viewState === 'favorites') {
-      // Если мы в архиве, возвращаемся в каталог
       setViewState('catalog')
     } else if (onBack) {
-      // Если мы в каталоге, вызываем глобальный выход в меню
       onBack()
     }
   }
@@ -458,13 +456,19 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
               >
                 {sneaker.image?.original ? (
                   <div 
-                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center"
+                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors"
                     style={{ backgroundColor: themeColors.imageBg }}
                   >
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                      style={{
+                        // 3D-тень по контуру кроссовка: поднимает обувь над фоном
+                        filter: isDark 
+                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' 
+                          : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
+                      }}
                       loading="lazy"
                     />
                   </div>
