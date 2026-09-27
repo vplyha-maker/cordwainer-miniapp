@@ -283,7 +283,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     })
   }
 
-    // 3. Обновленная логика шеринга для Telegram Mini Apps
+    // 3. Обновленная логика шеринга
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
     
@@ -291,16 +291,14 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     const tg = (window as any).Telegram?.WebApp
 
     if (tg && tg.initData) {
-      // 1. Создаем короткий параметр для поиска (заменяем пробелы на подчеркивания)
-      // Telegram startapp поддерживает только латинские буквы, цифры и подчеркивания
+      // Создаем короткий параметр для поиска (заменяем пробелы на подчеркивания)
       const searchParam = exactSearch.replace(/[^a-zA-Z0-9]/g, '_')
       
-      // 2. Формируем красивую прямую ссылку на ВАШЕГО бота
-      // ВНИМАНИЕ: Замените 'YourBotUsername' на реальное имя вашего бота!
-      const botUsername = 'YourBotUsername' // <-- ИЗМЕНИТЕ ЭТО
-      const appName = 'cordwainer' // <-- ИЗМЕНИТЕ ЭТО (название вашего Web App в BotFather, если есть)
+      // ВАШИ РЕАЛЬНЫЕ ДАННЫЕ:
+      const botUsername = 'Cordwainer_bot' // Имя бота из скриншота
+      const appName = 'cordwainer'         // Short Name вашего Web App
       
-      // Формат ссылки: https://t.me/bot_username/app_name?startapp=param
+      // Формируем правильную ссылку для Telegram
       const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
       const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
 
