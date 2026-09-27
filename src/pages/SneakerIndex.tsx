@@ -282,23 +282,30 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       return [...prev, sneaker]
     })
   }
-
-    // 3. Обновленная логика шеринга
+    // 3. Обновленная логика шеринга (с умной очисткой названия)
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
     
-    const exactSearch = `${sneaker.brand} ${sneaker.name}`
+    // 1. Убираем одинарные кавычки, чтобы не ломать поиск API
+    const cleanName = sneaker.name.replace(/'/g, '').trim()
+    
+    // 2. Умная проверка: если имя УЖЕ содержит бренд, не дублируем его
+    let exactSearch = ''
+    if (cleanName.toLowerCase().startsWith(sneaker.brand.toLowerCase())) {
+      exactSearch = cleanName
+    } else {
+      exactSearch = `${sneaker.brand} ${cleanName}`
+    }
+
     const tg = (window as any).Telegram?.WebApp
 
     if (tg && tg.initData) {
-      // Создаем короткий параметр для поиска (заменяем пробелы на подчеркивания)
-      const searchParam = exactSearch.replace(/[^a-zA-Z0-9]/g, '_')
+      // Заменяем пробелы на подчеркивания для ссылки
+      const searchParam = exactSearch.replace(/[^a-zA-Z0-9а-яА-ЯёЁ]/g, '_')
       
-      // ВАШИ РЕАЛЬНЫЕ ДАННЫЕ:
-      const botUsername = 'Cordwainer_bot' // Имя бота из скриншота
-      const appName = 'app'         // Short Name вашего Web App
+      const botUsername = 'Cordwainer_bot'
+      const appName = 'app'
       
-      // Формируем правильную ссылку для Telegram
       const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
       const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
 
@@ -308,9 +315,9 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       return
     }
 
-    // Фоллбэк для обычного браузера (очищаем URL от мусора перед копированием)
+    // Фоллбэк для браузера
     const currentUrl = new URL(window.location.href)
-    currentUrl.hash = '' // Удаляем #tgWebAppData
+    currentUrl.hash = '' 
     currentUrl.searchParams.set('q', exactSearch) 
     
     const cleanBrowserUrl = currentUrl.toString()
@@ -333,7 +340,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     alert('Ссылка скопирована в буфер обмена!')
   }
 
-  
   const handleBackClick = () => {
     if (viewState === 'favorites') {
       setViewState('catalog')
