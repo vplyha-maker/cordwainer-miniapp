@@ -320,10 +320,12 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
 
-      // Читаем как текст, чтобы перехватить HTML ошибки сервера до парсинга JSON
+      // Читаем ответ как текст
       const text = await res.text()
 
-      if (text.includes('<html') || text.includes('TOO MANY REQUESTS')) {
+      // УНИВЕРСАЛЬНЫЙ ПЕРЕХВАТЧИК: Ищем упоминание лимитов в любом виде (HTML или JSON)
+      const upperText = text.toUpperCase()
+      if (upperText.includes('<HTML') || upperText.includes('TOO MANY REQUESTS') || upperText.includes('RATE LIMIT')) {
         throw new Error('RATE_LIMIT')
       }
 
@@ -334,13 +336,9 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         throw new Error('PARSE_ERROR')
       }
 
-      // Перехватываем сообщение о лимите от Zyla Labs
-      if (data.ERROR === 'RATE LIMIT EXCEEDED' || data.error === 'RATE LIMIT EXCEEDED') {
-        throw new Error('RATE_LIMIT')
-      }
-
       if (!res.ok) {
-        throw new Error(data.details || data.error || t.errorLoad)
+        // Учитываем все возможные поля с ошибками, которые может вернуть API
+        throw new Error(data.details || data.error || data.message || data.MESSAGE || t.errorLoad)
       }
 
       const list = data.results || data.data || data || []
@@ -362,6 +360,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.message === 'RATE_LIMIT') {
+          // Выводим локализованное сообщение вместо системного кода
           setError(t.errorRateLimit)
         } else {
           setError(t.errorSneakers)
