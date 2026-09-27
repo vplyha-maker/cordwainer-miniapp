@@ -31,7 +31,7 @@ const BRANDS = [
   // --- Gorpcore, аутдор и бег (на пике популярности) ---
   { id: 'salomon', name: 'Salomon' },
   { id: 'hoka', name: 'Hoka' },
-  { id: 'on', name: 'On Running' }, // В API часто ищется как On или On Cloud
+  { id: 'on', name: 'On Running' },
   { id: 'merrell', name: 'Merrell' },
   { id: 'oakley', name: 'Oakley' },
   { id: 'arcteryx', name: "Arc'teryx" },
@@ -64,8 +64,6 @@ const BRANDS = [
   { id: 'birkenstock', name: 'Birkenstock' },
   { id: 'clarks', name: 'Clarks' },
   { id: 'mschf', name: 'MSCHF' }
-]
-
 ]
 
 const GENDERS = [
@@ -134,8 +132,12 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         }
         return updated
       })
-    } catch (err: any) {
-      setError(err.message || 'Не удалось загрузить кроссовки')
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Не удалось загрузить кроссовки')
+      }
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -175,7 +177,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
     fetchSneakers(activeQuery, nextPage, true)
   }
 
-  // Стабильный и красивый переход на поиск в украинских магазинах без ошибок
   const handleCardClick = (sneaker: Sneaker) => {
     const searchQuery = `${sneaker.brand} ${sneaker.name} купити в Україні`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
@@ -244,9 +245,8 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         </p>
       </div>
 
-     {/* Бренды (с градиентной маской для скролла) */}
+      {/* Бренды (с градиентной маской для скролла) */}
       <div className="relative mb-5">
-        {/* Добавлен pr-12, чтобы последний элемент можно было доскроллить до конца */}
         <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-none pr-12">
           {BRANDS.map((brand) => {
             const isActive = selectedBrand === brand.id && !hasSearched
@@ -254,7 +254,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
               <button
                 key={brand.id}
                 onClick={() => handleBrandClick(brand.id)}
-                // Добавлен shrink-0, чтобы кнопки не сжимались
                 className="px-4 py-2 rounded-full text-[11px] font-sans uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all shrink-0"
                 style={{
                   background: isActive ? '#F4F0E8' : 'transparent',
@@ -268,7 +267,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
           })}
         </div>
         
-      {/* Градиент затемнения справа (pointer-events-none пропускает клики сквозь себя) */}
+        {/* Градиент затемнения справа */}
         <div 
           className="absolute top-0 right-0 bottom-3 w-16 pointer-events-none" 
           style={{
@@ -276,7 +275,6 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
           }}
         />
       </div>
-
 
       {/* Пол */}
       <div className="flex gap-2 mb-8">
