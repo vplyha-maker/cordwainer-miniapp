@@ -268,6 +268,38 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
+  // === НОВЫЙ КОД: ИНТЕГРАЦИЯ DEEP LINKING (ПОДЕЛИТЬСЯ В TELEGRAM) ===
+  useEffect(() => {
+    try {
+      const tg = window.Telegram?.WebApp;
+      
+      // Проверяем, есть ли параметр start_param (он появляется, если перешли по ссылке /bot?startapp=...)
+      if (tg?.initDataUnsafe?.start_param) {
+        const param = tg.initDataUnsafe.start_param;
+        
+        // Если параметр начинается с 'search_', значит кто-то поделился кроссовком
+        if (param.startsWith('search_')) {
+          // 1. Убираем префикс и восстанавливаем пробелы (в ссылке они были '_')
+          const searchQuery = param.replace('search_', '').replace(/_/g, ' ');
+          
+          // 2. Подменяем URL в браузере. Это нужно для того, 
+          // чтобы компонент SneakerIndex при рендере прочитал параметр ?q=... и вставил его в инпут
+          if (typeof window !== 'undefined') {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('q', searchQuery);
+            window.history.replaceState({}, '', newUrl.toString());
+          }
+          
+          // 3. Автоматически переключаем экран на Сникер-индекс
+          setScreen('sneakers');
+        }
+      }
+    } catch (e) {
+      console.error('Ошибка при обработке start_param', e);
+    }
+  }, []);
+  // =================================================================
+
   return (
     <>
       <CustomCursor />
