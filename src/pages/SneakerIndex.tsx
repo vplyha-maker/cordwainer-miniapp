@@ -61,7 +61,13 @@ const GENDERS = [
   { id: 'women', name: 'Женские' },
 ]
 
-export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
+// Добавлен пропс theme для управления светлой/темной версиями
+interface SneakerIndexProps {
+  onBack?: () => void
+  theme?: 'light' | 'dark'
+}
+
+export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexProps) {
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
@@ -79,6 +85,20 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   const [hasSearched, setHasSearched] = useState(false)
 
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
+
+  const isDark = theme === 'dark'
+
+  // Динамическая палитра для светлой и темной тем
+  const themeColors = {
+    bg: isDark ? '#09090B' : '#F4F0E8',
+    text: isDark ? '#F4F0E8' : '#09090B',
+    textMuted: isDark ? 'rgba(244, 240, 232, 0.4)' : 'rgba(9, 9, 11, 0.4)',
+    textFaint: isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(9, 9, 11, 0.3)',
+    border: isDark ? 'rgba(244, 240, 232, 0.12)' : 'rgba(9, 9, 11, 0.12)',
+    borderFaint: isDark ? 'rgba(244, 240, 232, 0.05)' : 'rgba(9, 9, 11, 0.05)',
+    imageBg: isDark ? '#111111' : '#E8E3D9',
+    iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
+  }
 
   // Загрузка избранного при старте
   useEffect(() => {
@@ -202,7 +222,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   }
 
   const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
-    e.stopPropagation() // Предотвращает клик по самой карточке
+    e.stopPropagation() 
     setFavorites(prev => {
       const isFav = prev.some(item => item.id === sneaker.id)
       if (isFav) return prev.filter(item => item.id !== sneaker.id)
@@ -249,15 +269,18 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
   return (
     <div
       className="min-h-screen p-6 transition-colors duration-500"
-      style={{ background: '#09090B', color: '#F4F0E8' }}
+      style={{ background: themeColors.bg, color: themeColors.text }}
     >
       {/* Header */}
-      <header className="pt-8 pb-6 flex items-start justify-between border-b border-white/5 mb-8">
+      <header 
+        className="pt-8 pb-6 flex items-start justify-between mb-8"
+        style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
+      >
         {onBack ? (
           <button
             onClick={onBack}
             className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100"
-            style={{ color: 'rgba(244, 240, 232, 0.5)' }}
+            style={{ color: themeColors.textMuted }}
           >
             <span>←</span>
             <span>Back</span>
@@ -268,7 +291,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         <button
           onClick={() => setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')}
           className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors"
-          style={{ color: viewState === 'favorites' ? '#F4F0E8' : 'rgba(244, 240, 232, 0.5)' }}
+          style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
         >
           <span>Archive</span>
           <span>[{favorites.length}]</span>
@@ -289,10 +312,10 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={handleSearchSubmit}
               placeholder="Модель (576, Dunk, 550...) + Enter"
-              className="w-full px-4 py-3.5 rounded-none text-[13px] font-sans outline-none bg-transparent placeholder:text-white/30 transition-colors focus:border-white/40"
+              className={`w-full px-4 py-3.5 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
               style={{
-                color: '#F4F0E8',
-                borderBottom: '1px solid rgba(244, 240, 232, 0.12)',
+                color: themeColors.text,
+                borderBottom: `1px solid ${themeColors.border}`,
               }}
             />
           </div>
@@ -308,8 +331,8 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                     onClick={() => handleBrandClick(brand.id)}
                     className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer transition-all shrink-0 pb-1"
                     style={{
-                      color: isActive ? '#F4F0E8' : 'rgba(244, 240, 232, 0.4)',
-                      borderBottom: isActive ? '1px solid #F4F0E8' : '1px solid transparent',
+                      color: isActive ? themeColors.text : themeColors.textMuted,
+                      borderBottom: isActive ? `1px solid ${themeColors.text}` : '1px solid transparent',
                     }}
                   >
                     {brand.name}
@@ -318,10 +341,10 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
               })}
             </div>
             
-            {/* Градиент затемнения справа */}
+            {/* Градиент затемнения справа - теперь адаптируется под цвет фона */}
             <div 
               className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none" 
-              style={{ background: 'linear-gradient(to left, #09090B 20%, transparent 100%)' }}
+              style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
             />
           </div>
 
@@ -334,7 +357,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                   key={gender.id}
                   onClick={() => setSelectedGender(gender.id)}
                   className="text-[9px] font-sans uppercase tracking-widest cursor-pointer transition-all"
-                  style={{ color: isActive ? '#F4F0E8' : 'rgba(244, 240, 232, 0.3)' }}
+                  style={{ color: isActive ? themeColors.text : themeColors.textFaint }}
                 >
                   {gender.name}
                 </button>
@@ -353,19 +376,31 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         <div className="flex flex-col gap-12 pb-10 animate-pulse">
           {[1, 2].map((n) => (
             <div key={n} className="pb-8">
-              <div className="w-full h-[350px] bg-[#121212] mb-4" />
-              <div className="h-5 w-32 bg-[#121212] mb-2" />
-              <div className="h-4 w-48 bg-[#121212]" />
+              <div 
+                className="w-full h-[350px] mb-4" 
+                style={{ backgroundColor: themeColors.imageBg }}
+              />
+              <div 
+                className="h-5 w-32 mb-2" 
+                style={{ backgroundColor: themeColors.imageBg }} 
+              />
+              <div 
+                className="h-4 w-48" 
+                style={{ backgroundColor: themeColors.imageBg }} 
+              />
             </div>
           ))}
         </div>
       )}
 
-      {/* Карточки (Стиль Журнала) */}
+      {/* Карточки */}
       {!loading && (
         <div className="flex flex-col gap-14 pb-10">
           {currentDisplayList.length === 0 && viewState === 'favorites' && (
-            <p className="text-[12px] font-sans opacity-50 uppercase tracking-widest text-center py-20">
+            <p 
+              className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
+              style={{ color: themeColors.textMuted }}
+            >
               Архив пуст
             </p>
           )}
@@ -381,7 +416,10 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                 style={{ contentVisibility: 'auto' }}
               >
                 {sneaker.image?.original ? (
-                  <div className="w-full bg-[#111] overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center">
+                  <div 
+                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center"
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  >
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
@@ -390,7 +428,10 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                     />
                   </div>
                 ) : (
-                  <div className="w-full bg-[#111] mb-4 aspect-[4/3]" />
+                  <div 
+                    className="w-full mb-4 aspect-[4/3]" 
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  />
                 )}
 
                 <div className="flex justify-between items-start mb-1">
@@ -398,11 +439,12 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                     {sneaker.brand}
                   </h3>
                   
-                  {/* Иконки действий (Lookbook Style) */}
+                  {/* Иконки действий */}
                   <div className="flex items-center gap-3">
                     <button 
                       onClick={(e) => handleShare(e, sneaker)}
-                      className="text-white/40 hover:text-white transition-colors p-1"
+                      className={`p-1 transition-colors ${themeColors.iconHover}`}
+                      style={{ color: themeColors.textMuted }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square">
                         <path d="M4 12v8h16v-8" />
@@ -412,8 +454,8 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                     </button>
                     <button 
                       onClick={(e) => toggleFavorite(e, sneaker)}
-                      className="transition-colors p-1"
-                      style={{ color: isFav ? '#F4F0E8' : 'rgba(244, 240, 232, 0.4)' }}
+                      className="p-1 transition-colors"
+                      style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -422,15 +464,27 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                   </div>
                 </div>
 
-                <p className="text-[13px] font-sans font-light leading-snug mb-3 pr-12 text-white/60">
+                <p 
+                  className="text-[13px] font-sans font-light leading-snug mb-3 pr-12"
+                  style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
+                >
                   {sneaker.name}
                 </p>
 
-                <div className="flex justify-between items-center border-t border-white/10 pt-3">
-                  <p className="text-[9px] font-sans font-medium uppercase tracking-[0.2em] text-white/50">
+                <div 
+                  className="flex justify-between items-center pt-3"
+                  style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+                >
+                  <p 
+                    className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
+                    style={{ color: themeColors.textMuted }}
+                  >
                     {sneaker.retailPrice > 0 ? `Retail USD ${sneaker.retailPrice}` : 'Price unav.'}
                   </p>
-                  <span className="text-[9px] font-sans uppercase tracking-[0.2em] text-white/80 group-hover:text-white transition-colors">
+                  <span 
+                    className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
+                    style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
+                  >
                     Find →
                   </span>
                 </div>
@@ -440,9 +494,12 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         </div>
       )}
 
-      {/* Кнопка подгрузки (скрыта в режиме избранного) */}
+      {/* Кнопка подгрузки */}
       {!loading && !error && hasMore && viewState === 'catalog' && (
-        <div className="pb-28 pt-8 text-center border-t border-white/5">
+        <div 
+          className="pb-28 pt-8 text-center"
+          style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+        >
           <button
             onClick={handleLoadMore}
             disabled={loadingMore}
