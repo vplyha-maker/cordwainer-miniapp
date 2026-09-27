@@ -244,26 +244,39 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
         </p>
       </div>
 
-      {/* Бренды */}
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-5 scrollbar-none">
-        {BRANDS.map((brand) => {
-          const isActive = selectedBrand === brand.id && !hasSearched
-          return (
-            <button
-              key={brand.id}
-              onClick={() => handleBrandClick(brand.id)}
-              className="px-4 py-2 rounded-full text-[11px] font-sans uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all"
-              style={{
-                background: isActive ? '#F4F0E8' : 'transparent',
-                color: isActive ? '#09090B' : '#F4F0E8',
-                border: '1px solid rgba(244, 240, 232, 0.18)',
-              }}
-            >
-              {brand.name}
-            </button>
-          )
-        })}
+     {/* Бренды (с градиентной маской для скролла) */}
+      <div className="relative mb-5">
+        {/* Добавлен pr-12, чтобы последний элемент можно было доскроллить до конца */}
+        <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-none pr-12">
+          {BRANDS.map((brand) => {
+            const isActive = selectedBrand === brand.id && !hasSearched
+            return (
+              <button
+                key={brand.id}
+                onClick={() => handleBrandClick(brand.id)}
+                // Добавлен shrink-0, чтобы кнопки не сжимались
+                className="px-4 py-2 rounded-full text-[11px] font-sans uppercase tracking-wider whitespace-nowrap cursor-pointer transition-all shrink-0"
+                style={{
+                  background: isActive ? '#F4F0E8' : 'transparent',
+                  color: isActive ? '#09090B' : '#F4F0E8',
+                  border: '1px solid rgba(244, 240, 232, 0.18)',
+                }}
+              >
+                {brand.name}
+              </button>
+            )
+          })}
+        </div>
+        
+      {/* Градиент затемнения справа (pointer-events-none пропускает клики сквозь себя) */}
+        <div 
+          className="absolute top-0 right-0 bottom-3 w-16 pointer-events-none" 
+          style={{
+            background: 'linear-gradient(to left, #09090B 10%, transparent 100%)'
+          }}
+        />
       </div>
+
 
       {/* Пол */}
       <div className="flex gap-2 mb-8">
