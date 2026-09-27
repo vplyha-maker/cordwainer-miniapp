@@ -123,6 +123,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       loading: 'Загрузка...',
       errorLoad: 'Ошибка при загрузке данных',
       errorSneakers: 'Не удалось загрузить кроссовки',
+      errorRateLimit: 'Слишком много запросов. Подождите минуту.',
       scrollTop: 'Наверх',
       searchSuffix: 'купить',
     },
@@ -144,6 +145,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       loading: 'Завантаження...',
       errorLoad: 'Помилка завантаження даних',
       errorSneakers: 'Не вдалося завантажити кросівки',
+      errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
       scrollTop: 'Вгору',
       searchSuffix: 'купити в Україні',
     },
@@ -165,6 +167,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       loading: 'Wird geladen...',
       errorLoad: 'Fehler beim Laden der Daten',
       errorSneakers: 'Sneaker konnten nicht geladen werden',
+      errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie eine Minute.',
       scrollTop: 'Nach oben',
       searchSuffix: 'kaufen',
     },
@@ -317,7 +320,24 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
 
-      const data = await res.json()
+      // Читаем как текст, чтобы перехватить HTML ошибки сервера до парсинга JSON
+      const text = await res.text()
+
+      if (text.includes('<html') || text.includes('TOO MANY REQUESTS')) {
+        throw new Error('RATE_LIMIT')
+      }
+
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch (e) {
+        throw new Error('PARSE_ERROR')
+      }
+
+      // Перехватываем сообщение о лимите от Zyla Labs
+      if (data.ERROR === 'RATE LIMIT EXCEEDED' || data.error === 'RATE LIMIT EXCEEDED') {
+        throw new Error('RATE_LIMIT')
+      }
 
       if (!res.ok) {
         throw new Error(data.details || data.error || t.errorLoad)
@@ -341,7 +361,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       })
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message)
+        if (err.message === 'RATE_LIMIT') {
+          setError(t.errorRateLimit)
+        } else {
+          setError(t.errorSneakers)
+        }
       } else {
         setError(t.errorSneakers)
       }
