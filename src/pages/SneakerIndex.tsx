@@ -87,11 +87,10 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 interface SneakerIndexProps {
   onBack?: () => void
   theme?: 'light' | 'dark'
-  lang?: Lang 
+  lang?: Lang
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
-  
   const getActiveLang = (): Lang => {
     if (lang) return lang
     
@@ -134,6 +133,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       errorSneakers: 'Не удалось загрузить каталог',
       errorRateLimit: 'Слишком много запросов. Подождите минуту.',
       scrollTop: 'Наверх',
+      scrollReturn: 'Вернуться к месту',
       searchSuffix: 'купить',
     },
     uk: {
@@ -156,6 +156,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       errorSneakers: 'Не вдалося завантажити каталог',
       errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
       scrollTop: 'Вгору',
+      scrollReturn: 'Повернутися',
       searchSuffix: 'купити в Україні',
     },
     de: {
@@ -178,6 +179,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       errorSneakers: 'Katalog konnte nicht geladen werden',
       errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie eine Minute.',
       scrollTop: 'Nach oben',
+      scrollReturn: 'Zurückspringen',
       searchSuffix: 'kaufen',
     },
   }[activeLang]
@@ -221,18 +223,29 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(!!initialQuery)
 
-  const [showScrollTop, setShowScrollTop] = useState(false)
+  // УМНЫЙ СКРОЛЛ: состояния кнопки и память позиции
+  const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
+  const returnYRef = useRef<number | null>(null)
+  
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
-  
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 600) {
-        setShowScrollTop(true)
-      } else {
-        setShowScrollTop(false)
+      const currentY = window.scrollY
+      
+      // Если ушли далеко вниз - кнопка направлена ВВЕРХ
+      if (currentY > 600) {
+        setButtonMode(prev => prev !== 'up' ? 'up' : prev)
+      } 
+      // Если мы наверху И есть сохраненная позиция - кнопка направлена ВНИЗ
+      else if (currentY < 100 && returnYRef.current !== null) {
+        setButtonMode(prev => prev !== 'down' ? 'down' : prev)
+      } 
+      // Иначе прячем кнопку
+      else {
+        setButtonMode(prev => prev !== 'hidden' ? 'hidden' : prev)
       }
     }
 
@@ -240,9 +253,20 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const scrollToTop = () => {
+  // Обработчик умного скролла
+  const handleSmartScroll = () => {
     haptic('light')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    
+    if (buttonMode === 'up') {
+      // Запоминаем текущую позицию перед полетом наверх
+      returnYRef.current = window.scrollY
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else if (buttonMode === 'down' && returnYRef.current !== null) {
+      // Летим обратно к сохраненной позиции
+      window.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
+      // Очищаем память через секунду, когда анимация закончится
+      setTimeout(() => { returnYRef.current = null }, 1000)
+    }
   }
 
   useEffect(() => {
@@ -745,22 +769,34 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </div>
       )}
 
-      {showScrollTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full outline-none shadow-lg transition-all duration-300 cursor-pointer backdrop-blur-md"
-          style={{
-            background: isDark ? 'rgba(25, 25, 25, 0.8)' : 'rgba(240, 235, 225, 0.8)',
-            border: `1px solid ${themeColors.border}`,
-            color: themeColors.text,
-          }}
-          title={t.scrollTop}
+      {/* УМНАЯ КНОПКА СКРОЛЛА */}
+      <button
+        onClick={handleSmartScroll}
+        className={`fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full outline-none shadow-lg transition-all duration-500 cursor-pointer backdrop-blur-md ${
+          buttonMode !== 'hidden' ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+        style={{
+          background: isDark ? 'rgba(25, 25, 25, 0.8)' : 'rgba(240, 235, 225, 0.8)',
+          border: `1px solid ${themeColors.border}`,
+          color: themeColors.text,
+        }}
+        title={buttonMode === 'up' ? t.scrollTop : t.scrollReturn}
+      >
+        <svg 
+          width="14" 
+          height="14" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="1.5" 
+          strokeLinecap="square"
+          className={`transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            buttonMode === 'down' ? 'rotate-180' : 'rotate-0'
+          }`}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square">
-            <path d="M18 15l-6-6-6 6" />
-          </svg>
-        </button>
-      )}
+          <path d="M18 15l-6-6-6 6" />
+        </svg>
+      </button>
     </div>
   )
 }
