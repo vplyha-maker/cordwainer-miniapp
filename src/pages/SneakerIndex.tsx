@@ -226,45 +226,44 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   // УМНЫЙ СКРОЛЛ: состояния кнопки и память позиции
   const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
   const returnYRef = useRef<number | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null) // ДОБАВЛЕН REF ДЛЯ КОНТЕЙНЕРА
+  const searchInputRef = useRef<HTMLInputElement>(null)
   
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
-  const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // ИСПРАВЛЕННЫЙ СЛУШАТЕЛЬ СКРОЛЛА (привязан к контейнеру, а не к window)
   useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+
     const handleScroll = () => {
-      const currentY = window.scrollY
+      const currentY = container.scrollTop // Читаем скролл внутри блока
       
-      // Если ушли далеко вниз - кнопка направлена ВВЕРХ
       if (currentY > 600) {
         setButtonMode(prev => prev !== 'up' ? 'up' : prev)
-      } 
-      // Если мы наверху И есть сохраненная позиция - кнопка направлена ВНИЗ
-      else if (currentY < 100 && returnYRef.current !== null) {
+      } else if (currentY < 100 && returnYRef.current !== null) {
         setButtonMode(prev => prev !== 'down' ? 'down' : prev)
-      } 
-      // Иначе прячем кнопку
-      else {
+      } else {
         setButtonMode(prev => prev !== 'hidden' ? 'hidden' : prev)
       }
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Обработчик умного скролла
+  // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК СКРОЛЛА (крутит контейнер)
   const handleSmartScroll = () => {
     haptic('light')
+    const container = scrollRef.current
+    if (!container) return
     
     if (buttonMode === 'up') {
-      // Запоминаем текущую позицию перед полетом наверх
-      returnYRef.current = window.scrollY
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      returnYRef.current = container.scrollTop
+      container.scrollTo({ top: 0, behavior: 'smooth' })
     } else if (buttonMode === 'down' && returnYRef.current !== null) {
-      // Летим обратно к сохраненной позиции
-      window.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
-      // Очищаем память через секунду, когда анимация закончится
+      container.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
       setTimeout(() => { returnYRef.current = null }, 1000)
     }
   }
@@ -509,7 +508,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   return (
     <div
-      className="min-h-screen p-6 transition-colors duration-500 relative"
+      ref={scrollRef} // ДОБАВЛЕН REF ЗДЕСЬ
+      className="h-[100dvh] w-full overflow-y-auto p-6 transition-colors duration-500 relative" // ИЗМЕНЕН КЛАСС ДЛЯ ИЗОЛЯЦИИ СКРОЛЛА
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
       <header
