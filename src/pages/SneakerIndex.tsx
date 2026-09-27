@@ -6,6 +6,8 @@ interface Sneaker {
   name: string
   gender: string
   retailPrice: number
+  releaseDate?: string // Полная дата от API
+  year?: string | number // Альтернативное поле года от API
   image?: {
     original?: string
   }
@@ -67,7 +69,7 @@ interface SneakerIndexProps {
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
-  // Читаем поисковый запрос из ссылки при старте
+  // ВОССТАНОВЛЕНО: Чтение ссылок при запуске, чтобы не сломать внешние переходы
   const getInitialQuery = (): string | null => {
     if (typeof window === 'undefined') return null
     const params = new URLSearchParams(window.location.search)
@@ -101,9 +103,28 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(!!initialQuery)
 
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
-
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
+
+  // Оптимизированный слушатель скролла
+  useEffect(() => {
+    const handleScroll = () => {
+      // Кнопка появляется примерно после прокрутки 1.5-2 экранов (600px)
+      if (window.scrollY > 600) {
+        setShowScrollTop(true)
+      } else {
+        setShowScrollTop(false)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     if (propTheme) {
@@ -235,7 +256,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
-
+    
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', window.location.pathname)
     }
@@ -254,7 +275,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       setHasSearched(true)
       setActiveQuery(query)
       setViewState('catalog')
-
+      
       if (typeof window !== 'undefined') {
         window.history.pushState({}, '', window.location.pathname)
       }
@@ -288,56 +309,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     })
   }
 
-  const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
-    e.stopPropagation()
-    
-    // Очищаем название для стабильного поиска без ошибок 503
-    const cleanName = sneaker.name.replace(/'/g, '').trim()
-    const nameWords = cleanName.split(' ')
-    const shortModel = nameWords.slice(0, 2).join(' ') // Бренд + первые 2 слова модели
-    const exactSearch = `${sneaker.brand} ${shortModel}`
-
-    const tg = (window as any).Telegram?.WebApp
-
-    if (tg && tg.initData) {
-      const searchParam = exactSearch.replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s-]/g, '').trim().replace(/\s+/g, '_')
-      
-      const botUsername = 'Cordwainer_bot'
-      const appName = 'app'
-      
-      const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
-      const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${cleanName}`
-
-      const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(cleanUrl)}&text=${encodeURIComponent(shareText)}`
-      
-      tg.openTelegramLink(tgShareUrl)
-      return
-    }
-
-    const currentUrl = new URL(window.location.href)
-    currentUrl.hash = '' 
-    currentUrl.searchParams.set('q', exactSearch) 
-    
-    const cleanBrowserUrl = currentUrl.toString()
-    const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${cleanName}`
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: sneaker.name,
-          text: shareText,
-          url: cleanBrowserUrl
-        })
-        return
-      } catch (err) {
-        console.log('Share canceled')
-      }
-    } 
-    
-    navigator.clipboard.writeText(`${shareText}\n${cleanBrowserUrl}`)
-    alert('Ссылка скопирована в буфер обмена!')
-  }
-  
   const handleBackClick = () => {
     if (viewState === 'favorites') {
       setViewState('catalog')
@@ -364,7 +335,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
 
   return (
     <div
-      className="min-h-screen p-6 transition-colors duration-500"
+      className="min-h-screen p-6 transition-colors duration-500 relative"
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
       {/* Header */}
@@ -497,6 +468,13 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
 
           {currentDisplayList.map((sneaker) => {
             const isFav = favorites.some(f => f.id === sneaker.id)
+            
+            // Умное извлечение года (работает и с '2023-05-12', и с '2023')
+            const releaseYear = sneaker.releaseDate 
+              ? String(sneaker.releaseDate).slice(0, 4) 
+              : sneaker.year 
+              ? String(sneaker.year) 
+              : null
 
             return (
               <div
@@ -534,35 +512,23 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
                     {sneaker.brand}
                   </h3>
                   
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={(e) => handleShare(e, sneaker)}
-                      className={`p-1 transition-colors ${themeColors.iconHover}`}
-                      style={{ color: themeColors.textMuted }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square">
-                        <path d="M4 12v8h16v-8" />
-                        <path d="M12 4v12" />
-                        <path d="M8 8l4-4 4 4" />
-                      </svg>
-                    </button>
-                    <button 
-                      onClick={(e) => toggleFavorite(e, sneaker)}
-                      className="p-1 transition-colors"
-                      style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                      </svg>
-                    </button>
-                  </div>
+                  {/* Кнопка сохранения в архив (кнопка шеринга удалена) */}
+                  <button 
+                    onClick={(e) => toggleFavorite(e, sneaker)}
+                    className="p-1 transition-colors"
+                    style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                    </svg>
+                  </button>
                 </div>
 
                 <p 
-                  className="text-[13px] font-sans font-light leading-snug mb-3 pr-12"
+                  className="text-[13px] font-sans font-light leading-snug mb-3 pr-4"
                   style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
                 >
-                  {sneaker.name}
+                  {sneaker.name} {releaseYear ? `— ${releaseYear}` : ''}
                 </p>
 
                 <div 
@@ -601,6 +567,24 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             {loadingMore ? 'Loading...' : '+ Load Archive'}
           </button>
         </div>
+      )}
+
+      {/* Кнопка "Наверх" */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full shadow-lg transition-all duration-300 cursor-pointer backdrop-blur-md"
+          style={{
+            background: isDark ? 'rgba(25, 25, 25, 0.8)' : 'rgba(240, 235, 225, 0.8)',
+            border: `1px solid ${themeColors.border}`,
+            color: themeColors.text,
+          }}
+          title="Наверх"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square">
+            <path d="M18 15l-6-6-6 6" />
+          </svg>
+        </button>
       )}
     </div>
   )
