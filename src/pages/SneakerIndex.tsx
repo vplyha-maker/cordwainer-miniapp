@@ -87,11 +87,33 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 interface SneakerIndexProps {
   onBack?: () => void
   theme?: 'light' | 'dark'
-  lang: Lang // Получаем язык строго из родителя (App.tsx)
+  lang?: Lang // Сделали необязательным, чтобы избежать ошибки в App.tsx
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
-  // Словарь переводов в точности по вашему шаблону
+  
+  // Умное определение языка: Пропс -> Настройки (localStorage) -> Telegram
+  const getActiveLang = (): Lang => {
+    if (lang) return lang
+    
+    if (typeof window !== 'undefined') {
+      try {
+        const savedLang = localStorage.getItem('cordwainer_lang') || localStorage.getItem('app_lang')
+        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') {
+          return savedLang as Lang
+        }
+      } catch (e) {}
+
+      const tg = (window as any).Telegram?.WebApp
+      const tgLang = tg?.initDataUnsafe?.user?.language_code
+      if (tgLang === 'uk' || tgLang === 'ukr') return 'uk'
+      if (tgLang === 'de') return 'de'
+    }
+    return 'ru'
+  }
+
+  const activeLang = getActiveLang()
+
   const t = {
     ru: {
       back: 'Назад',
@@ -159,7 +181,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       scrollTop: 'Nach oben',
       searchSuffix: 'kaufen',
     },
-  }[lang]
+  }[activeLang]
 
   const GENDERS = [
     { id: 'all', name: t.all },
