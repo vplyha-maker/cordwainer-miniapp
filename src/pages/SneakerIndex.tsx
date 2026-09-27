@@ -283,35 +283,47 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     })
   }
 
-  // 3. Обновленная логика шеринга
+    // 3. Обновленная логика шеринга для Telegram Mini Apps
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
     
-    // Создаем ссылку, которая при открытии сразу введет название этой модели в поиск
     const exactSearch = `${sneaker.brand} ${sneaker.name}`
-    const currentUrl = new URL(window.location.href)
-    currentUrl.searchParams.set('q', exactSearch) // Добавляем ?q=Nike...
-    const shareUrl = currentUrl.toString()
-
-    const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
-
     const tg = (window as any).Telegram?.WebApp
 
-    // Если мы внутри Telegram WebApp, используем нативное окно шаринга телеграма
     if (tg && tg.initData) {
-      const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
-      // Это откроет меню выбора чата внутри Телеграма
+      // 1. Создаем короткий параметр для поиска (заменяем пробелы на подчеркивания)
+      // Telegram startapp поддерживает только латинские буквы, цифры и подчеркивания
+      const searchParam = exactSearch.replace(/[^a-zA-Z0-9]/g, '_')
+      
+      // 2. Формируем красивую прямую ссылку на ВАШЕГО бота
+      // ВНИМАНИЕ: Замените 'YourBotUsername' на реальное имя вашего бота!
+      const botUsername = 'YourBotUsername' // <-- ИЗМЕНИТЕ ЭТО
+      const appName = 'cordwainer' // <-- ИЗМЕНИТЕ ЭТО (название вашего Web App в BotFather, если есть)
+      
+      // Формат ссылки: https://t.me/bot_username/app_name?startapp=param
+      const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
+      const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
+
+      const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(cleanUrl)}&text=${encodeURIComponent(shareText)}`
+      
       tg.openTelegramLink(tgShareUrl)
       return
     }
 
-    // Если мы в обычном мобильном браузере (Safari/Chrome)
+    // Фоллбэк для обычного браузера (очищаем URL от мусора перед копированием)
+    const currentUrl = new URL(window.location.href)
+    currentUrl.hash = '' // Удаляем #tgWebAppData
+    currentUrl.searchParams.set('q', exactSearch) 
+    
+    const cleanBrowserUrl = currentUrl.toString()
+    const shareText = `Смотри, что я нашел в Cordwainer: ${exactSearch}`
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: exactSearch,
           text: shareText,
-          url: shareUrl
+          url: cleanBrowserUrl
         })
         return
       } catch (err) {
@@ -319,10 +331,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       }
     } 
     
-    // Если ничего не сработало (например, ПК браузер) - копируем
-    navigator.clipboard.writeText(`${shareText}\n${shareUrl}`)
+    navigator.clipboard.writeText(`${shareText}\n${cleanBrowserUrl}`)
     alert('Ссылка скопирована в буфер обмена!')
   }
+
   
   const handleBackClick = () => {
     if (viewState === 'favorites') {
