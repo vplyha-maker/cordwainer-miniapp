@@ -58,20 +58,14 @@ const BRANDS = [
   { id: 'birkenstock', name: 'Birkenstock' },
   { id: 'clarks', name: 'Clarks' },
   { id: 'veja', name: 'Veja' },
-  { id: 'autry', name: 'Autry' },
   { id: 'lacoste', name: 'Lacoste' },
   { id: 'calvin klein', name: 'Calvin Klein' },
-  { id: 'tommy hilfiger', name: 'Tommy Hilfiger' },
   { id: 'polo ralph lauren', name: 'Polo Ralph Lauren' },
-  { id: 'dsquared2', name: 'Dsquared2' },
   { id: 'versace', name: 'Versace' },
   { id: 'valentino', name: 'Valentino' },
   { id: 'givenchy', name: 'Givenchy' },
   { id: 'under armour', name: 'Under Armour' },
   { id: 'fila', name: 'Fila' },
-  { id: 'skechers', name: 'Skechers' },
-  { id: 'etnies', name: 'Etnies' },
-  { id: 'osiris', name: 'Osiris' },
   { id: 'dc', name: 'DC' }
 ]
 
