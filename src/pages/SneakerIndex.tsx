@@ -484,18 +484,22 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
             </p>
           )}
 
-          {currentDisplayList.map((sneaker) => {
+                    {currentDisplayList.map((sneaker) => {
             const isFav = favorites.some(f => f.id === sneaker.id)
             
-            // Умное извлечение года (работает и с '2023-05-12', и с '2023')
-            const releaseYear = sneaker.releaseDate 
-              ? String(sneaker.releaseDate).slice(0, 4) 
-              : sneaker.year 
-              ? String(sneaker.year) 
-              : null
+            // Умная каскадная проверка всех возможных полей с датой
+            const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
+            const rawYear = sneaker.year || sneaker.releaseYear
+
+            let releaseYear = null
+            if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
+              releaseYear = rawDate.slice(0, 4) // Достаем '2023' из '2023-05-12' или '2023-11-01T00:00:00Z'
+            } else if (rawYear) {
+              releaseYear = String(rawYear) // Берем готовый год
+            }
 
             return (
-              <div
+         <div
                 key={sneaker.id}
                 onClick={() => handleCardClick(sneaker)}
                 className="cursor-pointer group flex flex-col"
