@@ -385,7 +385,7 @@ export default function SneakerIndex({ onBack }: { onBack?: () => void }) {
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100 mix-blend-luminosity hover:mix-blend-normal"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100"
                       loading="lazy"
                     />
                   </div>
