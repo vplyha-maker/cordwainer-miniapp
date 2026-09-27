@@ -63,7 +63,7 @@ const GENDERS = [
 
 interface SneakerIndexProps {
   onBack?: () => void
-  theme?: 'light' | 'dark' // Оставлено как фоллбэк, если запускается вне ТГ
+  theme?: 'light' | 'dark' 
 }
 
 export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexProps) {
@@ -82,37 +82,13 @@ export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexPro
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
-  
-  // Состояние для активной темы с автоопределением ТГ
-  const [appTheme, setAppTheme] = useState<'light' | 'dark'>(theme)
 
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // --- ИНТЕГРАЦИЯ ТЕМЫ TELEGRAM ---
-  useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp
-    if (tg) {
-      // Устанавливаем текущую тему при монтировании
-      if (tg.colorScheme) {
-        setAppTheme(tg.colorScheme)
-      }
-      
-      // Слушаем изменения (если пользователь переключил тему свернув приложение)
-      const handleThemeChange = () => {
-        if (tg.colorScheme) setAppTheme(tg.colorScheme)
-      }
-      
-      tg.onEvent('themeChanged', handleThemeChange)
-      return () => tg.offEvent('themeChanged', handleThemeChange)
-    } else {
-      // Фолбэк на пропс, если мы в обычном браузере
-      setAppTheme(theme)
-    }
-  }, [theme])
+  // Теперь мы строго полагаемся на пропс theme, который передает ваше приложение,
+  // и больше не переписываем его системными настройками Telegram.
+  const isDark = theme === 'dark'
 
-  const isDark = appTheme === 'dark'
-
-  // Динамическая палитра для светлой и темной тем
   const themeColors = {
     bg: isDark ? '#09090B' : '#F4F0E8',
     text: isDark ? '#F4F0E8' : '#09090B',
@@ -365,7 +341,7 @@ export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexPro
               })}
             </div>
             
-            {/* Градиент затемнения справа - теперь адаптируется под цвет фона */}
+            {/* Градиент затемнения справа */}
             <div 
               className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none" 
               style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
