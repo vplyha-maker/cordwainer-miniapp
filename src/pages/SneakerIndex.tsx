@@ -61,10 +61,9 @@ const GENDERS = [
   { id: 'women', name: 'Женские' },
 ]
 
-// Добавлен пропс theme для управления светлой/темной версиями
 interface SneakerIndexProps {
   onBack?: () => void
-  theme?: 'light' | 'dark'
+  theme?: 'light' | 'dark' // Оставлено как фоллбэк, если запускается вне ТГ
 }
 
 export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexProps) {
@@ -83,10 +82,35 @@ export default function SneakerIndex({ onBack, theme = 'dark' }: SneakerIndexPro
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
+  
+  // Состояние для активной темы с автоопределением ТГ
+  const [appTheme, setAppTheme] = useState<'light' | 'dark'>(theme)
 
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  const isDark = theme === 'dark'
+  // --- ИНТЕГРАЦИЯ ТЕМЫ TELEGRAM ---
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg) {
+      // Устанавливаем текущую тему при монтировании
+      if (tg.colorScheme) {
+        setAppTheme(tg.colorScheme)
+      }
+      
+      // Слушаем изменения (если пользователь переключил тему свернув приложение)
+      const handleThemeChange = () => {
+        if (tg.colorScheme) setAppTheme(tg.colorScheme)
+      }
+      
+      tg.onEvent('themeChanged', handleThemeChange)
+      return () => tg.offEvent('themeChanged', handleThemeChange)
+    } else {
+      // Фолбэк на пропс, если мы в обычном браузере
+      setAppTheme(theme)
+    }
+  }, [theme])
+
+  const isDark = appTheme === 'dark'
 
   // Динамическая палитра для светлой и темной тем
   const themeColors = {
