@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, UIEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
@@ -469,18 +469,26 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const visibleStyles = isProPurchased ? STYLES_DATA : STYLES_DATA.slice(0, 3)
   const showPaywallSlide = !isProPurchased
 
-  // Обработка скролла (Слушаем контейнер, а не окно)
-  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
-    const currentY = e.currentTarget.scrollTop
-    
-    if (currentY > 800) {
-      setButtonMode(prev => prev !== 'up' ? 'up' : prev)
-    } else if (currentY < 100 && returnYRef.current !== null) {
-      setButtonMode(prev => prev !== 'down' ? 'down' : prev)
-    } else {
-      setButtonMode(prev => prev !== 'hidden' ? 'hidden' : prev)
+  // ПАССИВНЫЙ СЛУШАТЕЛЬ СКРОЛЛА (ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ)
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+
+    const handlePassiveScroll = () => {
+      const currentY = container.scrollTop
+      
+      if (currentY > 800) {
+        setButtonMode(prev => prev !== 'up' ? 'up' : prev)
+      } else if (currentY < 100 && returnYRef.current !== null) {
+        setButtonMode(prev => prev !== 'down' ? 'down' : prev)
+      } else {
+        setButtonMode(prev => prev !== 'hidden' ? 'hidden' : prev)
+      }
     }
-  }
+
+    container.addEventListener('scroll', handlePassiveScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handlePassiveScroll)
+  }, [])
 
   // Клик по умной кнопке
   const handleSmartScroll = () => {
@@ -614,10 +622,9 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </button>
       </header>
 
-      {/* Feed с привязанным обработчиком скролла */}
+      {/* Feed БЕЗ onScroll пропса - слушатель теперь висит в useEffect (passive) */}
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
       >
         {visibleStyles.map((slide, index) => {
