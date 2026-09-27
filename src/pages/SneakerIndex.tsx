@@ -296,7 +296,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       
       // ВАШИ РЕАЛЬНЫЕ ДАННЫЕ:
       const botUsername = 'Cordwainer_bot' // Имя бота из скриншота
-      const appName = 'cordwainer'         // Short Name вашего Web App
+      const appName = 'app'         // Short Name вашего Web App
       
       // Формируем правильную ссылку для Telegram
       const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
