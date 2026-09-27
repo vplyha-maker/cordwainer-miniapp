@@ -67,38 +67,39 @@ interface SneakerIndexProps {
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexProps) {
-  const getInitialId = (): string | null => {
+  // Читаем поисковый запрос из ссылки при старте
+  const getInitialQuery = (): string | null => {
     if (typeof window === 'undefined') return null
     const params = new URLSearchParams(window.location.search)
-    const id = params.get('id')
-    if (id) return id.trim()
+    const q = params.get('q')
+    if (q) return q.trim()
 
     const tg = (window as any).Telegram?.WebApp
     const startParam = tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam') || null
 
-    if (startParam && typeof startParam === 'string' && startParam.startsWith('id_')) {
-      return startParam.slice('id_'.length).trim()
+    if (startParam && typeof startParam === 'string' && startParam.startsWith('search_')) {
+      return startParam.slice('search_'.length).replace(/_/g, ' ').trim()
     }
     return null
   }
 
-  const initialId = getInitialId()
+  const initialQuery = getInitialQuery()
 
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
   
-  const [selectedBrand, setSelectedBrand] = useState('nike')
+  const [selectedBrand, setSelectedBrand] = useState(initialQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
-  const [searchText, setSearchText] = useState('')
-  const [activeQuery, setActiveQuery] = useState('nike')
+  const [searchText, setSearchText] = useState(initialQuery || '')
+  const [activeQuery, setActiveQuery] = useState(initialQuery || 'nike')
   
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState('')
-  const [hasSearched, setHasSearched] = useState(false)
+  const [hasSearched, setHasSearched] = useState(!!initialQuery)
 
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
 
@@ -166,7 +167,6 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
     localStorage.setItem('lookbook_favorites', JSON.stringify(favorites))
   }, [favorites])
 
-  // Исправленная функция запроса без кракозябр
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
     const cacheKey = `${query}_p${pageNum}`
 
@@ -195,16 +195,8 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
         throw new Error(data.details || data.error || 'Ошибка при загрузке данных')
       }
 
-      let list = data.results || data.data || data || []
-      let newItems = Array.isArray(list) ? list : []
-
-      // Если в URL был передан конкретный ID, фильтруем список, оставляя только этот кроссовок
-      if (initialId && !append) {
-        const found = newItems.find((item: Sneaker) => item.id === initialId)
-        if (found) {
-          newItems = [found]
-        }
-      }
+      const list = data.results || data.data || data || []
+      const newItems = Array.isArray(list) ? list : []
 
       if (newItems.length < 100) {
         setHasMore(false)
@@ -229,7 +221,7 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [initialId])
+  }, [])
 
   useEffect(() => {
     if (viewState === 'catalog') {
@@ -299,14 +291,22 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
   const handleShare = async (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
     
+    // Очищаем название для стабильного поиска без ошибок 503
+    const cleanName = sneaker.name.replace(/'/g, '').trim()
+    const nameWords = cleanName.split(' ')
+    const shortModel = nameWords.slice(0, 2).join(' ') // Бренд + первые 2 слова модели
+    const exactSearch = `${sneaker.brand} ${shortModel}`
+
     const tg = (window as any).Telegram?.WebApp
 
     if (tg && tg.initData) {
+      const searchParam = exactSearch.replace(/[^a-zA-Z0-9а-яА-ЯёЁ\s-]/g, '').trim().replace(/\s+/g, '_')
+      
       const botUsername = 'Cordwainer_bot'
       const appName = 'app'
       
-      const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=id_${sneaker.id}`
-      const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${sneaker.name}`
+      const cleanUrl = `https://t.me/${botUsername}/${appName}?startapp=search_${searchParam}`
+      const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${cleanName}`
 
       const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(cleanUrl)}&text=${encodeURIComponent(shareText)}`
       
@@ -316,10 +316,10 @@ export default function SneakerIndex({ onBack, theme: propTheme }: SneakerIndexP
 
     const currentUrl = new URL(window.location.href)
     currentUrl.hash = '' 
-    currentUrl.searchParams.set('id', sneaker.id) 
+    currentUrl.searchParams.set('q', exactSearch) 
     
     const cleanBrowserUrl = currentUrl.toString()
-    const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${sneaker.name}`
+    const shareText = `Смотри, что я нашел в Cordwainer: ${sneaker.brand} ${cleanName}`
 
     if (navigator.share) {
       try {
