@@ -86,26 +86,26 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 
 function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, handleCardClick }: any) {
   const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>('loading')
-  const [useProxyFallback, setUseProxyFallback] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   let rawUrl = sneaker.image?.original || null
-  let finalSrc = null
+  let sources: string[] = []
 
   if (typeof rawUrl === 'string' && rawUrl.trim() !== '' && rawUrl !== 'null') {
-    // 1. Очищаем от старых протоколов и мусорных параметров
     let cleanUrl = rawUrl.replace('http://', 'https://').split('?')[0]
-
-    // 2. ХАК: Внедряем нативные параметры Imgix/StockX, чтобы притвориться их фронтендом
     if (cleanUrl.includes('stockx.com')) {
       cleanUrl = `${cleanUrl}?fit=fill&bg=FFFFFF&w=700&h=500&auto=format,compress&q=90&trim=color`
     }
 
-    // 3. Собираем итоговую ссылку (с резервным прокси на случай жестких Telegram-политик)
-    finalSrc = useProxyFallback ? `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}` : cleanUrl
+    sources = [
+      cleanUrl,
+      `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`
+    ]
   }
 
+  const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
+
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // Защита от ложного 200 OK (когда Cloudflare отдает HTML с капчей вместо картинки)
     if (e.currentTarget.naturalWidth <= 1) {
       handleImageError()
     } else {
@@ -114,11 +114,10 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
   }
 
   const handleImageError = () => {
-    if (!useProxyFallback) {
-      setUseProxyFallback(true) // Включаем единственный надежный резерв
-      setImgState('loading')
+    if (attempt < sources.length - 1) {
+      setAttempt(prev => prev + 1)
     } else {
-      setImgState('error') // Сдаемся окончательно
+      setImgState('error') 
     }
   }
 
@@ -134,14 +133,14 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
 
   return (
     <div onClick={() => handleCardClick(sneaker)} className="cursor-pointer group flex flex-col">
-      {finalSrc ? (
+      {currentSrc ? (
         <div
           className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
           style={{ backgroundColor: themeColors.imageBg }}
         >
           {imgState !== 'error' && (
             <img
-              src={finalSrc}
+              src={currentSrc}
               alt={sneaker.name}
               loading="lazy"
               referrerPolicy="no-referrer"
@@ -155,25 +154,30 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
             />
           )}
           {imgState === 'error' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center break-all z-10">
-              <span className="text-[11px] font-sans uppercase font-bold text-red-500 mb-2">Заблокировано</span>
-              <span 
-                className="text-[9px] font-sans opacity-40 select-all" 
-                style={{ color: themeColors.text }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {rawUrl}
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-10">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-20 mb-2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span className="text-[10px] font-sans uppercase opacity-30 tracking-wider" style={{ color: themeColors.text }}>
+                Фото недоступно
               </span>
             </div>
           )}
         </div>
       ) : (
         <div
-          className="w-full mb-4 aspect-[4/3] rounded-sm flex items-center justify-center"
+          className="w-full mb-4 aspect-[4/3] rounded-sm flex items-center justify-center flex-col"
           style={{ backgroundColor: themeColors.imageBg }}
         >
-          <span className="text-[10px] font-sans uppercase opacity-30 text-center" style={{ color: themeColors.text }}>
-            Нет фото
+           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-20 mb-2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+          <span className="text-[10px] font-sans uppercase opacity-30 tracking-wider" style={{ color: themeColors.text }}>
+            Нет фото в БД
           </span>
         </div>
       )}
