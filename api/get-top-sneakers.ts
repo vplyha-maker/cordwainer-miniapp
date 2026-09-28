@@ -26,18 +26,18 @@ export default async function handler(req: any, res: any) {
   try {
     let rows: any[]
 
-    // === 1. Без поискового запроса (просто бренд или "all") ===
+    // === 1. Без поискового запроса ===
     if (!query || query === 'all') {
       if (gender === 'all') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE gender IN ('men', 'unisex')
           ORDER BY updated_at DESC
@@ -45,7 +45,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'women') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE gender IN ('women', 'unisex')
           ORDER BY updated_at DESC
@@ -60,7 +60,7 @@ export default async function handler(req: any, res: any) {
     else {
       if (gender === 'all') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE 
             LOWER(brand) = ${query}
@@ -79,7 +79,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'men') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE 
             gender IN ('men', 'unisex')
@@ -101,7 +101,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'women') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE 
             gender IN ('women', 'unisex')
@@ -126,19 +126,25 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Приводим к формату, который ждёт фронтенд
-    const results = rows.map((r) => ({
-      id: r.id,
-      brand: r.brand,
-      name: r.name,
-      gender: r.gender || 'unisex',
-      retailPrice: r.retailPrice ?? 0,
-      image: {
-        original: r.image || null
-      },
-      year: r.release_year || null,
-      sku: r.sku || null
-    }))
+    // Приводим к формату, который ждёт фронтенд (жесткий маппинг)
+    const results = rows.map((r) => {
+      const imgUrl = r.image_url ?? r.image ?? r.imageUrl ?? r.imageurl ?? null
+      const price = r.retail_price ?? r.retailprice ?? r.retailPrice ?? 0
+      const year = r.release_year ?? r.releaseyear ?? r.releaseYear ?? null
+
+      return {
+        id: r.id,
+        brand: r.brand,
+        name: r.name,
+        gender: r.gender || 'unisex',
+        retailPrice: price,
+        image: {
+          original: imgUrl
+        },
+        year: year,
+        sku: r.sku || null
+      }
+    })
 
     return res.status(200).json({
       results,
