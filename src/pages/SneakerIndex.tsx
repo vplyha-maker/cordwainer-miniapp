@@ -96,15 +96,15 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
     }
   }
 
-  // Боевой арсенал прокси для обхода Cloudflare
+  // Обновленный арсенал обхода WAF Cloudflare
   const sources = rawUrl ? [
-    // 1. Google OpenSocial (Трастовые IP Google, идеальный обход)
-    `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=2592000&url=${encodeURIComponent(rawUrl)}`,
-    // 2. WordPress Photon CDN (Трастовые IP Automattic)
-    `https://i0.wp.com/${rawUrl.replace(/^https?:\/\//, '')}`,
-    // 3. Statically CDN
+    // 1. Corsproxy.io - отлично маскирует TLS и заголовки, работает как браузер
+    `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`,
+    // 2. AllOrigins - тянет через свои сервера (возвращает raw-файл)
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(rawUrl)}`,
+    // 3. Statically - мощный CDN с другим пулом IP
     `https://cdn.statically.io/img/${rawUrl.replace(/^https?:\/\//, '')}`,
-    // 4. Наш Vercel API
+    // 4. Твой Vercel API (запасной)
     `/api/proxy-image?url=${encodeURIComponent(rawUrl)}`,
     // 5. Прямая ссылка (на удачу)
     rawUrl
@@ -135,7 +135,7 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
               src={currentSrc}
               alt={sneaker.name}
               loading="lazy"
-              referrerPolicy="no-referrer" // Важно для обхода
+              referrerPolicy="no-referrer"
               className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${imgState === 'loading' ? 'opacity-0' : 'opacity-100'}`}
               style={{
                 mixBlendMode: isDark ? 'normal' : 'multiply',
@@ -144,9 +144,9 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
               onLoad={() => setImgState('loaded')}
               onError={() => {
                 if (attempt < sources.length - 1) {
-                  setAttempt(prev => prev + 1) // Переключаемся на следующий хак-прокси
+                  setAttempt(prev => prev + 1) // Если заблокировали, молча пробуем следующий сервис
                 } else {
-                  setImgState('error') // Сдаемся, если всё заблочено
+                  setImgState('error') // Сдаемся только если отвалились ВСЕ 5 методов
                 }
               }}
             />
