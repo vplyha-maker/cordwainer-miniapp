@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ results: [] });
   }
 
-  // БАЗА С ПРЯМЫМИ PNG СЕРВЕРА GOAT (Не блокируются)
+  // НАША ПОЛНАЯ ЛОКАЛЬНАЯ БАЗА
   const LOCAL_DB = [
     { id: 'db-1', brand: 'Nike', name: 'Dunk Low Retro "White Black" (Panda)', gender: 'unisex', price: 110, img: 'https://image.goat.com/attachments/product_template_pictures/images/059/095/367/original/711204_00.png' },
     { id: 'db-2', brand: 'Jordan', name: 'Air Jordan 1 Retro High OG "Chicago"', gender: 'men', price: 250, img: 'https://image.goat.com/attachments/product_template_pictures/images/079/930/806/original/1020726_00.png' },
@@ -26,20 +26,18 @@ export default async function handler(req, res) {
     { id: 'db-10', brand: 'Adidas', name: 'Campus 00s "Core Black"', gender: 'unisex', price: 110, img: 'https://image.goat.com/attachments/product_template_pictures/images/078/200/989/original/1041908_00.png' }
   ];
 
-  const query = (req.query.query || '').toLowerCase();
+  const query = (req.query.query || '').toLowerCase().trim();
   let filtered = LOCAL_DB;
   
   if (query && query !== 'all') {
     filtered = LOCAL_DB.filter(s => 
+      s.brand.toLowerCase() === query || 
       s.brand.toLowerCase().includes(query) || 
       s.name.toLowerCase().includes(query)
     );
   }
 
-  if (filtered.length === 0) {
-    filtered = LOCAL_DB;
-  }
-
+  // Если ничего не нашли по точному запросу, возвращаем пустой массив (чтобы фронтенд честно показал "Ничего не найдено", а не мешал бренды)
   const results = filtered.map(item => ({
     id: item.id,
     brand: item.brand,
