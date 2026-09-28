@@ -96,17 +96,21 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
     }
   }
 
-  // Каскад источников для обхода WAF/Cloudflare блокировок
+  // Боевой арсенал прокси для обхода Cloudflare
   const sources = rawUrl ? [
-    // 1. Публичный CDN (wsrv.nl) - распределенные IP, отлично обходит защиты, оптимизирует вес
-    `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=600&output=webp`,
-    // 2. Наш Vercel Proxy - запасной вариант
+    // 1. Google OpenSocial (Трастовые IP Google, идеальный обход)
+    `https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=2592000&url=${encodeURIComponent(rawUrl)}`,
+    // 2. WordPress Photon CDN (Трастовые IP Automattic)
+    `https://i0.wp.com/${rawUrl.replace(/^https?:\/\//, '')}`,
+    // 3. Statically CDN
+    `https://cdn.statically.io/img/${rawUrl.replace(/^https?:\/\//, '')}`,
+    // 4. Наш Vercel API
     `/api/proxy-image?url=${encodeURIComponent(rawUrl)}`,
-    // 3. Прямая ссылка - последний шанс
+    // 5. Прямая ссылка (на удачу)
     rawUrl
   ] : []
 
-  const currentSrc = sources.length > 0 ? sources[attempt] : null
+  const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
 
   const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
   const rawYear = sneaker.year || sneaker.releaseYear
@@ -131,6 +135,7 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
               src={currentSrc}
               alt={sneaker.name}
               loading="lazy"
+              referrerPolicy="no-referrer" // Важно для обхода
               className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${imgState === 'loading' ? 'opacity-0' : 'opacity-100'}`}
               style={{
                 mixBlendMode: isDark ? 'normal' : 'multiply',
@@ -139,9 +144,9 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
               onLoad={() => setImgState('loaded')}
               onError={() => {
                 if (attempt < sources.length - 1) {
-                  setAttempt(prev => prev + 1) // Если CDN заблокирован, переходим к следующему URL
+                  setAttempt(prev => prev + 1) // Переключаемся на следующий хак-прокси
                 } else {
-                  setImgState('error') // Все 3 метода провалились
+                  setImgState('error') // Сдаемся, если всё заблочено
                 }
               }}
             />
