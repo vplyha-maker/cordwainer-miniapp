@@ -84,6 +84,119 @@ function haptic(kind: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
+// --- ОТДЕЛЬНЫЙ КОМПОНЕНТ КАРТОЧКИ ---
+function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, handleCardClick }: any) {
+  const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>('loading')
+
+  let finalImageUrl = sneaker.image?.original || null
+  if (typeof finalImageUrl === 'string') {
+    if (finalImageUrl.startsWith('http://')) finalImageUrl = finalImageUrl.replace('http://', 'https://')
+    if (finalImageUrl.trim() === 'null' || finalImageUrl.trim() === 'undefined' || finalImageUrl.trim() === '') {
+      finalImageUrl = null
+    }
+  }
+
+  const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
+  const rawYear = sneaker.year || sneaker.releaseYear
+
+  let releaseYear = null
+  if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
+    const parsed = rawDate.slice(0, 4)
+    if (parsed !== '0000') releaseYear = parsed
+  } else if (rawYear && String(rawYear) !== '0') {
+    releaseYear = String(rawYear)
+  }
+
+  return (
+    <div onClick={() => handleCardClick(sneaker)} className="cursor-pointer group flex flex-col">
+      {finalImageUrl ? (
+        <div
+          className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
+          style={{ backgroundColor: themeColors.imageBg }}
+        >
+          {imgState !== 'error' && (
+            <img
+              src={finalImageUrl}
+              alt={sneaker.name}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${imgState === 'loading' ? 'opacity-0' : 'opacity-100'}`}
+              style={{
+                mixBlendMode: isDark ? 'normal' : 'multiply',
+                filter: isDark ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
+              }}
+              onLoad={() => setImgState('loaded')}
+              onError={() => setImgState('error')}
+            />
+          )}
+          {imgState === 'error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center break-all z-10">
+              <span className="text-[11px] font-sans uppercase font-bold text-red-500 mb-2">Заблокировано</span>
+              <span 
+                className="text-[9px] font-sans opacity-40 select-all" 
+                style={{ color: themeColors.text }}
+                onClick={(e) => e.stopPropagation()} // чтобы можно было выделить текст без перехода
+              >
+                {finalImageUrl}
+              </span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          className="w-full mb-4 aspect-[4/3] rounded-sm flex items-center justify-center"
+          style={{ backgroundColor: themeColors.imageBg }}
+        >
+          <span className="text-[10px] font-sans uppercase opacity-30 text-center" style={{ color: themeColors.text }}>
+            Нет фото в БД
+          </span>
+        </div>
+      )}
+
+      <div className="flex justify-between items-start mb-1">
+        <h3 className="font-serif text-[20px] leading-tight tracking-tight">
+          {sneaker.brand}
+        </h3>
+        <button
+          onClick={(e) => toggleFavorite(e, sneaker)}
+          className="p-1 outline-none bg-transparent border-none cursor-pointer transition-colors"
+          style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
+      </div>
+
+      <p
+        className="text-[13px] font-sans font-light leading-snug mb-3 pr-4"
+        style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
+      >
+        {sneaker.name} {releaseYear ? `— ${releaseYear}` : ''}
+      </p>
+
+      <div
+        className="flex justify-between items-center pt-3"
+        style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+      >
+        <p
+          className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
+          style={{ color: themeColors.textMuted }}
+        >
+          {sneaker.retailPrice > 0 ? `${t.retail} ${sneaker.retailPrice}` : t.priceUnav}
+        </p>
+        <span
+          className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
+          style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
+        >
+          {t.find} →
+        </span>
+      </div>
+    </div>
+  )
+}
+// ------------------------------------
+
 interface SneakerIndexProps {
   onBack?: () => void
   theme?: 'light' | 'dark'
@@ -653,107 +766,17 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
           {currentDisplayList.map((sneaker) => {
             const isFav = favorites.some(f => f.id === sneaker.id)
-
-            const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
-            const rawYear = sneaker.year || sneaker.releaseYear
-
-            let releaseYear = null
-            if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
-              const parsed = rawDate.slice(0, 4)
-              if (parsed !== '0000') releaseYear = parsed
-            } else if (rawYear && String(rawYear) !== '0') {
-              releaseYear = String(rawYear) 
-            }
-
-            // Автоконвертация HTTP в HTTPS
-            let finalImageUrl = sneaker.image?.original || null
-            if (finalImageUrl && finalImageUrl.startsWith('http://')) {
-              finalImageUrl = finalImageUrl.replace('http://', 'https://')
-            }
-
             return (
-              <div
+              <SneakerCard
                 key={sneaker.id}
-                onClick={() => handleCardClick(sneaker)}
-                className="cursor-pointer group flex flex-col"
-              >
-                {finalImageUrl ? (
-                  <div
-                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
-                    style={{ backgroundColor: themeColors.imageBg }}
-                  >
-                    <img
-                      src={finalImageUrl}
-                      alt={sneaker.name}
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      style={{
-                        mixBlendMode: isDark ? 'normal' : 'multiply',
-                        filter: isDark
-                          ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
-                          : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
-                      }}
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        // Теперь ставим заглушку, чтобы видеть заблокированные картинки
-                        target.src = 'https://via.placeholder.com/400x300/E5E7EB/a3a3a3?text=Photo+Unavailable'
-                        target.style.mixBlendMode = 'normal'
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="w-full mb-4 aspect-[4/3] rounded-sm flex items-center justify-center"
-                    style={{ backgroundColor: themeColors.imageBg }}
-                  >
-                    <span className="text-[10px] font-sans uppercase opacity-30 text-center">
-                      No Image
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-serif text-[20px] leading-tight tracking-tight">
-                    {sneaker.brand}
-                  </h3>
-
-                  <button
-                    onClick={(e) => toggleFavorite(e, sneaker)}
-                    className="p-1 outline-none bg-transparent border-none cursor-pointer transition-colors"
-                    style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill={isFav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.2">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  </button>
-                </div>
-
-                <p
-                  className="text-[13px] font-sans font-light leading-snug mb-3 pr-4"
-                  style={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }}
-                >
-                  {sneaker.name} {releaseYear ? `— ${releaseYear}` : ''}
-                </p>
-
-                <div
-                  className="flex justify-between items-center pt-3"
-                  style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
-                >
-                  <p
-                    className="text-[9px] font-sans font-medium uppercase tracking-[0.2em]"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    {sneaker.retailPrice > 0 ? `${t.retail} ${sneaker.retailPrice}` : t.priceUnav}
-                  </p>
-                  <span
-                    className={`text-[9px] font-sans uppercase tracking-[0.2em] transition-colors ${themeColors.iconHover}`}
-                    style={{ color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)' }}
-                  >
-                    {t.find} →
-                  </span>
-                </div>
-              </div>
+                sneaker={sneaker}
+                isFav={isFav}
+                toggleFavorite={toggleFavorite}
+                t={t}
+                themeColors={themeColors}
+                isDark={isDark}
+                handleCardClick={handleCardClick}
+              />
             )
           })}
         </div>
