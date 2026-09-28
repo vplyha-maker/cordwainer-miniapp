@@ -89,26 +89,31 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
   const [attempt, setAttempt] = useState(0)
 
   let rawUrl = sneaker.image?.original || null
+  let sources: string[] = []
+
   if (typeof rawUrl === 'string') {
     if (rawUrl.startsWith('http://')) rawUrl = rawUrl.replace('http://', 'https://')
     if (rawUrl.trim() === 'null' || rawUrl.trim() === 'undefined' || rawUrl.trim() === '') {
       rawUrl = null
+    } else {
+      // Подготовка данных для Google AMP Cache
+      const cleanUrl = rawUrl.replace(/^https?:\/\//, '')
+      const domain = cleanUrl.split('/')[0]
+      // Формат AMP требует замены тире на двойное тире, а точек на тире в домене
+      const ampDomain = domain.replace(/-/g, '--').replace(/\./g, '-')
+
+      sources = [
+        // 1. Google AMP Cache (Абсолютный траст)
+        `https://${ampDomain}.cdn.ampproject.org/i/s/${cleanUrl}`,
+        // 2. DuckDuckGo Image Cache (Внутренний прокси поисковика)
+        `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(rawUrl)}`,
+        // 3. API Codetabs (Публичный raw-прокси)
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rawUrl)}`,
+        // 4. Прямая ссылка с фейковым query-параметром (обход жесткого кэша CF)
+        `${rawUrl}?bypass=true&_rnd=${Math.random().toString(36).substring(7)}`
+      ]
     }
   }
-
-  // Обновленный арсенал обхода WAF Cloudflare
-  const sources = rawUrl ? [
-    // 1. Corsproxy.io - отлично маскирует TLS и заголовки, работает как браузер
-    `https://corsproxy.io/?${encodeURIComponent(rawUrl)}`,
-    // 2. AllOrigins - тянет через свои сервера (возвращает raw-файл)
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(rawUrl)}`,
-    // 3. Statically - мощный CDN с другим пулом IP
-    `https://cdn.statically.io/img/${rawUrl.replace(/^https?:\/\//, '')}`,
-    // 4. Твой Vercel API (запасной)
-    `/api/proxy-image?url=${encodeURIComponent(rawUrl)}`,
-    // 5. Прямая ссылка (на удачу)
-    rawUrl
-  ] : []
 
   const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
 
@@ -144,9 +149,9 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
               onLoad={() => setImgState('loaded')}
               onError={() => {
                 if (attempt < sources.length - 1) {
-                  setAttempt(prev => prev + 1) // Если заблокировали, молча пробуем следующий сервис
+                  setAttempt(prev => prev + 1) // Тихий переход на следующий эксплойт
                 } else {
-                  setImgState('error') // Сдаемся только если отвалились ВСЕ 5 методов
+                  setImgState('error') // Сдаемся только в крайнем случае
                 }
               }}
             />
