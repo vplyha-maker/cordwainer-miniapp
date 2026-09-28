@@ -18,7 +18,7 @@ export default async function handler(req: any, res: any) {
 
   // Параметры
   const query = (req.query.query || '').toString().toLowerCase().trim()
-  const gender = (req.query.gender || 'all').toString().toLowerCase().trim() // all | men | women
+  const gender = (req.query.gender || 'all').toString().toLowerCase().trim()
   const page = Math.max(1, parseInt(req.query.page as string) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 40))
   const offset = (page - 1) * limit
@@ -26,30 +26,18 @@ export default async function handler(req: any, res: any) {
   try {
     let rows: any[]
 
-    // Базовый SELECT
-    const selectFields = sql`
-      id,
-      brand,
-      name,
-      gender,
-      retail_price AS "retailPrice",
-      image_url   AS "image",
-      release_year,
-      sku
-    `
-
     // === 1. Без поискового запроса (просто бренд или "all") ===
     if (!query || query === 'all') {
       if (gender === 'all') {
         rows = await sql`
-          SELECT ${selectFields}
+          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
           FROM sneakers
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
         rows = await sql`
-          SELECT ${selectFields}
+          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
           FROM sneakers
           WHERE gender IN ('men', 'unisex')
           ORDER BY updated_at DESC
@@ -57,7 +45,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'women') {
         rows = await sql`
-          SELECT ${selectFields}
+          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
           FROM sneakers
           WHERE gender IN ('women', 'unisex')
           ORDER BY updated_at DESC
@@ -70,15 +58,9 @@ export default async function handler(req: any, res: any) {
 
     // === 2. Есть поисковый запрос ===
     else {
-      // Приоритет:
-      // 1. Точное совпадение бренда
-      // 2. Бренд содержит query
-      // 3. Полнотекстовый поиск по name
-      // 4. LIKE по name
-
       if (gender === 'all') {
         rows = await sql`
-          SELECT ${selectFields}
+          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
           FROM sneakers
           WHERE 
             LOWER(brand) = ${query}
@@ -97,7 +79,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'men') {
         rows = await sql`
-          SELECT ${selectFields}
+          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
           FROM sneakers
           WHERE 
             gender IN ('men', 'unisex')
@@ -119,7 +101,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'women') {
         rows = await sql`
-          SELECT ${selectFields}
+          SELECT id, brand, name, gender, retail_price AS "retailPrice", image_url AS "image", release_year, sku
           FROM sneakers
           WHERE 
             gender IN ('women', 'unisex')
