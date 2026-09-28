@@ -1,55 +1,60 @@
-export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+const SneaksAPI = require('sneaks-api');
+const sneaks = new SneaksAPI();
+
+export default async function handler(req, res) {
+  // Включаем CORS, чтобы фронтенд мог обращаться к этому API
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
-  const apiKey = process.env.RAPIDAPI_KEY;
-
-  if (!apiKey) {
-    return res.status(500).json({ error: 'RAPIDAPI_KEY is not configured in Vercel' });
-  }
-
-  const searchQuery = (req.query.query as string) || 'nike';
-  const limit = Math.min(Number(req.query.limit) || 50, 100);
-  const page = Number(req.query.page) || 1;
-
   try {
-    // Исправлен синтаксис шаблонной строки для корректной подстановки переменных
-    const url = `https://sneakers-database3.p.rapidapi.com/731/search%2Bsneaker?query=${encodeURIComponent(searchQuery)}&limit=${limit}&page=${page}`;
+    const query = req.query.query || 'Nike';
+    const limit = parseInt(req.query.limit) || 100;
+    
+    // В Sneaks API нет встроенной пагинации, поэтому мы запрашиваем больше данных
+    // и обрезаем их вручную на основе переданной страницы
+    const page = parseInt(req.query.page) || 1;
+    const fetchLimit = limit * page; // Если просят 2-ю страницу, тянем 200 и возвращаем 100-200
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': 'sneakers-database3.p.rapidapi.com',
-        'x-rapidapi-key': apiKey,
-      },
+    sneaks.getProducts(query, fetchLimit, function(err, products) {
+      if (err) {
+        console.error("Sneaks API Error:", err);
+        return res.status(500).json({ error: 'Failed to fetch sneakers data', details: err.message });
+      }
+
+      if (!products || products.length === 0) {
+        return res.status(200).json({ results: [] });
+      }
+
+      // Вырезаем нужную "страницу" для фронтенда (пагинация)
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedProducts = products.slice(startIndex, endIndex);
+
+      // Адаптируем ответ Sneaks API под тот формат, который уже ждет ваш SneakerIndex.tsx
+      const formattedResults = paginatedProducts.map(item => ({
+        id: item.styleID || item._id,
+        brand: item.brand,
+        name: item.shoeName,
+        gender: item.gender || 'men', // Sneaks не всегда возвращает пол
+        retailPrice: item.retailPrice || 0,
+        releaseDate: item.releaseDate,
+        releaseYear: item.releaseDate ? item.releaseDate.substring(0, 4) : '',
+        image: {
+          original: item.thumbnail || item.imageLinks?.[0] || ''
+        }
+      }));
+
+      return res.status(200).json({ results: formattedResults });
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({
-        error: 'RapidAPI Error',
-        status: response.status,
-        details: errorText,
-      });
-    }
-
-    const data = await response.json();
-
-    // Кэшируем на сутки
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
-
-    return res.status(200).json(data);
-  } catch (error: any) {
-    return res.status(500).json({ error: 'Crash: ' + error.message });
+  } catch (error) {
+    console.error("Handler Error:", error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }
