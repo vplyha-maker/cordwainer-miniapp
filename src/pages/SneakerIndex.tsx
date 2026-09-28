@@ -86,19 +86,27 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 
 function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, handleCardClick }: any) {
   const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>('loading')
+  const [attempt, setAttempt] = useState(0)
 
-  let finalImageUrl = sneaker.image?.original || null
-  let proxyUrl = null
-
-  if (typeof finalImageUrl === 'string') {
-    if (finalImageUrl.startsWith('http://')) finalImageUrl = finalImageUrl.replace('http://', 'https://')
-    if (finalImageUrl.trim() === 'null' || finalImageUrl.trim() === 'undefined' || finalImageUrl.trim() === '') {
-      finalImageUrl = null
-    } else {
-      // Прогоняем ссылку через наш прокси
-      proxyUrl = `/api/proxy-image?url=${encodeURIComponent(finalImageUrl)}`
+  let rawUrl = sneaker.image?.original || null
+  if (typeof rawUrl === 'string') {
+    if (rawUrl.startsWith('http://')) rawUrl = rawUrl.replace('http://', 'https://')
+    if (rawUrl.trim() === 'null' || rawUrl.trim() === 'undefined' || rawUrl.trim() === '') {
+      rawUrl = null
     }
   }
+
+  // Каскад источников для обхода WAF/Cloudflare блокировок
+  const sources = rawUrl ? [
+    // 1. Публичный CDN (wsrv.nl) - распределенные IP, отлично обходит защиты, оптимизирует вес
+    `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=600&output=webp`,
+    // 2. Наш Vercel Proxy - запасной вариант
+    `/api/proxy-image?url=${encodeURIComponent(rawUrl)}`,
+    // 3. Прямая ссылка - последний шанс
+    rawUrl
+  ] : []
+
+  const currentSrc = sources.length > 0 ? sources[attempt] : null
 
   const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
   const rawYear = sneaker.year || sneaker.releaseYear
@@ -113,14 +121,14 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
 
   return (
     <div onClick={() => handleCardClick(sneaker)} className="cursor-pointer group flex flex-col">
-      {proxyUrl ? (
+      {currentSrc ? (
         <div
           className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
           style={{ backgroundColor: themeColors.imageBg }}
         >
           {imgState !== 'error' && (
             <img
-              src={proxyUrl}
+              src={currentSrc}
               alt={sneaker.name}
               loading="lazy"
               className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${imgState === 'loading' ? 'opacity-0' : 'opacity-100'}`}
@@ -129,7 +137,13 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
                 filter: isDark ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
               }}
               onLoad={() => setImgState('loaded')}
-              onError={() => setImgState('error')}
+              onError={() => {
+                if (attempt < sources.length - 1) {
+                  setAttempt(prev => prev + 1) // Если CDN заблокирован, переходим к следующему URL
+                } else {
+                  setImgState('error') // Все 3 метода провалились
+                }
+              }}
             />
           )}
           {imgState === 'error' && (
@@ -140,7 +154,7 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
                 style={{ color: themeColors.text }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {finalImageUrl}
+                {rawUrl}
               </span>
             </div>
           )}
