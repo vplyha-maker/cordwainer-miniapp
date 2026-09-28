@@ -1,7 +1,7 @@
 name: Обновление картинок StockX
 
 on:
-  workflow_dispatch: # Позволяет запускать скрипт кнопкой вручную
+  workflow_dispatch: 
 
 jobs:
   run-puppeteer-script:
@@ -20,7 +20,6 @@ jobs:
 
       - name: Запускаем скрипт-парсер
         env:
-          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          NEON_DATABASE_URL: ${{ secrets.DATABASE_URL }} 
           IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
         run: node scripts/update-images.js
-
