@@ -84,15 +84,19 @@ function haptic(kind: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-// --- ОТДЕЛЬНЫЙ КОМПОНЕНТ КАРТОЧКИ ---
 function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, handleCardClick }: any) {
   const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>('loading')
 
   let finalImageUrl = sneaker.image?.original || null
+  let proxyUrl = null
+
   if (typeof finalImageUrl === 'string') {
     if (finalImageUrl.startsWith('http://')) finalImageUrl = finalImageUrl.replace('http://', 'https://')
     if (finalImageUrl.trim() === 'null' || finalImageUrl.trim() === 'undefined' || finalImageUrl.trim() === '') {
       finalImageUrl = null
+    } else {
+      // Прогоняем ссылку через наш прокси
+      proxyUrl = `/api/proxy-image?url=${encodeURIComponent(finalImageUrl)}`
     }
   }
 
@@ -109,16 +113,15 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
 
   return (
     <div onClick={() => handleCardClick(sneaker)} className="cursor-pointer group flex flex-col">
-      {finalImageUrl ? (
+      {proxyUrl ? (
         <div
           className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
           style={{ backgroundColor: themeColors.imageBg }}
         >
           {imgState !== 'error' && (
             <img
-              src={finalImageUrl}
+              src={proxyUrl}
               alt={sneaker.name}
-              referrerPolicy="no-referrer"
               loading="lazy"
               className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${imgState === 'loading' ? 'opacity-0' : 'opacity-100'}`}
               style={{
@@ -135,7 +138,7 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
               <span 
                 className="text-[9px] font-sans opacity-40 select-all" 
                 style={{ color: themeColors.text }}
-                onClick={(e) => e.stopPropagation()} // чтобы можно было выделить текст без перехода
+                onClick={(e) => e.stopPropagation()}
               >
                 {finalImageUrl}
               </span>
@@ -195,7 +198,6 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
     </div>
   )
 }
-// ------------------------------------
 
 interface SneakerIndexProps {
   onBack?: () => void
