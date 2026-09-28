@@ -1,9 +1,10 @@
-const { Client } = require('pg')
-const puppeteer = require('puppeteer-extra')
-const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-const axios = require('axios')
-const FormData = require('form-data')
+import pg from 'pg'
+import puppeteer from 'puppeteer-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+import axios from 'axios'
+import FormData from 'form-data'
 
+const { Client } = pg
 puppeteer.use(StealthPlugin())
 
 async function run() {
@@ -67,4 +68,3 @@ async function run() {
 }
 
 run()
-
