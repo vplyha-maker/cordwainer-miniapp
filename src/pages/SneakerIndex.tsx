@@ -328,7 +328,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }, [favorites])
 
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
-    const cacheKey = `${query}_p${pageNum}`
+    const cacheKey = `\( {query}_p \){pageNum}`
 
     if (!append && cacheRef.current[cacheKey]) {
       setSneakers(cacheRef.current[cacheKey])
@@ -340,13 +340,13 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       setLoadingMore(true)
     } else {
       setLoading(true)
-      setSneakers([])
+      // не очищаем список сразу — меньше мигания
     }
     setError('')
 
     try {
       const res = await fetch(
-        `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
+        `/api/get-top-sneakers?query=\( {encodeURIComponent(query)}&limit=100&page= \){pageNum}`
       )
 
       const text = await res.text()
@@ -617,7 +617,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">{error}</p>
       )}
 
-      {loading && viewState === 'catalog' && (
+      {loading && viewState === 'catalog' && sneakers.length === 0 && (
         <div className="flex flex-col gap-12 pb-10 animate-pulse">
           {[1, 2].map((n) => (
             <div key={n} className="pb-8">
@@ -638,7 +638,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </div>
       )}
 
-      {!loading && (
+      {!loading || sneakers.length > 0 ? (
         <div className="flex flex-col gap-14 pb-10">
           {currentDisplayList.length === 0 && viewState === 'favorites' && (
             <p
@@ -649,7 +649,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             </p>
           )}
 
-          {currentDisplayList.length === 0 && viewState === 'catalog' && !error && (
+          {currentDisplayList.length === 0 && viewState === 'catalog' && !error && !loading && (
             <p
               className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
               style={{ color: themeColors.textMuted }}
@@ -686,6 +686,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                     <img
                       src={sneaker.image.original}
                       alt={sneaker.name}
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       style={{
                         mixBlendMode: isDark ? 'normal' : 'multiply',
@@ -693,7 +695,10 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                           ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))'
                           : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
                       }}
-                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                      }}
                     />
                   </div>
                 ) : (
@@ -747,7 +752,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             )
           })}
         </div>
-      )}
+      ) : null}
 
       {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
         <div
