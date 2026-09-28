@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, UIEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 
@@ -122,7 +122,7 @@ const STYLES_DATA: StyleSlide[] = [
     subtitle: { ru: 'Новая романтика', uk: 'Нова романтика', de: 'Neue Romantik' },
     desc: {
       ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
-      uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний тон.',
+      uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний টন.',
       de: 'Ein Symbol raffinierter Weiblichkeit. Der markante Riemen über dem Spann und die berührende Retro-Silhouette geben einen koketten, aber stets eleganten Ton an.',
     },
     hideWatermark: true,
@@ -226,17 +226,19 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     return () => { mounted = false }
   }, [slide.id, userId, isPreloaded])
 
+  // КРИТИЧЕСКИЙ ФИКС: Используем getAttribute, чтобы браузер не перезагружал видео
+  // из-за несовпадения абсолютных (http://...) и относительных (/Fason...) путей
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
 
     if (isPreloaded) {
-      if (video.src !== slide.video) {
-        video.src = slide.video
+      if (video.getAttribute('src') !== slide.video) {
+        video.setAttribute('src', slide.video)
         video.load()
       }
     } else {
-      if (video.src) {
+      if (video.getAttribute('src')) {
         video.pause()
         video.removeAttribute('src')
         video.load()
@@ -449,9 +451,10 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const [isProPurchased, setIsProPurchased] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
 
-  // Умный скролл: состояния
   const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
   const returnYRef = useRef<number | null>(null)
+  // Флаг, блокирующий Observer во время полета умной кнопки
+  const isJumpingRef = useRef(false)
 
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
@@ -469,7 +472,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const visibleStyles = isProPurchased ? STYLES_DATA : STYLES_DATA.slice(0, 3)
   const showPaywallSlide = !isProPurchased
 
-  // ПАССИВНЫЙ СЛУШАТЕЛЬ СКРОЛЛА (ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ)
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -490,7 +492,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     return () => container.removeEventListener('scroll', handlePassiveScroll)
   }, [])
 
-  // Клик по умной кнопке
+  // ИСПРАВЛЕНИЕ: Умный скролл с предсказанием индекса и отключением Observer'а
   const handleSmartScroll = () => {
     const tg = (window as any).Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
@@ -500,19 +502,35 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
     if (buttonMode === 'up') {
       returnYRef.current = container.scrollTop
+      isJumpingRef.current = true
+      setActiveIndex(0) // Начинаем грузить первое видео до приземления
+      
       container.scrollTo({ top: 0, behavior: 'smooth' })
+      setTimeout(() => { isJumpingRef.current = false }, 1000)
+
     } else if (buttonMode === 'down' && returnYRef.current !== null) {
+      isJumpingRef.current = true
+      // Угадываем индекс, на который прилетим (Скролл / Высота экрана)
+      const targetIndex = Math.round(returnYRef.current / Math.max(1, container.clientHeight))
+      setActiveIndex(targetIndex) // Начинаем грузить нужное видео заранее
+      
       container.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
-      setTimeout(() => { returnYRef.current = null }, 1000)
+      setTimeout(() => { 
+        isJumpingRef.current = false
+        returnYRef.current = null 
+      }, 1000)
     }
   }
 
+  // ИСПРАВЛЕНИЕ: Observer игнорирует пролетающие слайды, если нажата кнопка скролла
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
 
     const observer = new IntersectionObserver(
       (entries) => {
+        if (isJumpingRef.current) return // Если мы в полете - игнорируем!
+
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
             const idx = Number(entry.target.getAttribute('data-index'))
@@ -622,7 +640,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </button>
       </header>
 
-      {/* Feed БЕЗ onScroll пропса - слушатель теперь висит в useEffect (passive) */}
       <div
         ref={scrollRef}
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
@@ -703,7 +720,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         )}
       </div>
 
-      {/* УМНАЯ КНОПКА СКРОЛЛА (Расположена выше кнопок лайка и шеринга) */}
       <button
         onClick={handleSmartScroll}
         className={`absolute bottom-[130px] min-[390px]:bottom-[140px] right-6 z-[100] flex items-center justify-center w-11 h-11 rounded-full outline-none shadow-lg transition-all duration-500 cursor-pointer backdrop-blur-md ${
