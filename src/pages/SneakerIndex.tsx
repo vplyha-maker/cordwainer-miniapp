@@ -223,22 +223,20 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [error, setError] = useState('')
   const [hasSearched, setHasSearched] = useState(!!initialQuery)
 
-  // УМНЫЙ СКРОЛЛ: состояния кнопки и память позиции
   const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
   const returnYRef = useRef<number | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null) // ДОБАВЛЕН REF ДЛЯ КОНТЕЙНЕРА
+  const scrollRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // ИСПРАВЛЕННЫЙ СЛУШАТЕЛЬ СКРОЛЛА (привязан к контейнеру, а не к window)
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
 
     const handleScroll = () => {
-      const currentY = container.scrollTop // Читаем скролл внутри блока
+      const currentY = container.scrollTop
       
       if (currentY > 600) {
         setButtonMode(prev => prev !== 'up' ? 'up' : prev)
@@ -253,7 +251,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     return () => container.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК СКРОЛЛА (крутит контейнер)
   const handleSmartScroll = () => {
     haptic('light')
     const container = scrollRef.current
@@ -508,8 +505,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   return (
     <div
-      ref={scrollRef} // ДОБАВЛЕН REF ЗДЕСЬ
-      className="h-[100dvh] w-full overflow-y-auto p-6 transition-colors duration-500 relative" // ИЗМЕНЕН КЛАСС ДЛЯ ИЗОЛЯЦИИ СКРОЛЛА
+      ref={scrollRef}
+      className="h-[100dvh] w-full overflow-y-auto p-6 transition-colors duration-500 relative"
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
       <header
@@ -680,7 +677,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 key={sneaker.id}
                 onClick={() => handleCardClick(sneaker)}
                 className="cursor-pointer group flex flex-col"
-                style={{ contentVisibility: 'auto' }}
               >
                 {sneaker.image?.original ? (
                   <div
@@ -769,7 +765,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </div>
       )}
 
-      {/* УМНАЯ КНОПКА СКРОЛЛА */}
       <button
         onClick={handleSmartScroll}
         className={`fixed bottom-6 right-6 z-50 flex items-center justify-center w-11 h-11 rounded-full outline-none shadow-lg transition-all duration-500 cursor-pointer backdrop-blur-md ${
