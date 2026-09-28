@@ -328,7 +328,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }, [favorites])
 
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
-    const cacheKey = `\( {query}_p \){pageNum}`
+    const cacheKey = `${query}_p${pageNum}`
 
     if (!append && cacheRef.current[cacheKey]) {
       setSneakers(cacheRef.current[cacheKey])
@@ -340,13 +340,12 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       setLoadingMore(true)
     } else {
       setLoading(true)
-      // не очищаем список сразу — меньше мигания
     }
     setError('')
 
     try {
       const res = await fetch(
-        `/api/get-top-sneakers?query=\( {encodeURIComponent(query)}&limit=100&page= \){pageNum}`
+        `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
 
       const text = await res.text()
@@ -427,7 +426,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     const text = searchText.trim()
     if (!text) return
 
-    // Ищем только по тексту, без приклеивания бренда
     setHasSearched(true)
     setActiveQuery(text)
     setViewState('catalog')
