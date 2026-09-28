@@ -86,35 +86,27 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 
 function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, handleCardClick }: any) {
   const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>('loading')
-  const [attempt, setAttempt] = useState(0)
+  const [useProxyFallback, setUseProxyFallback] = useState(false)
 
   let rawUrl = sneaker.image?.original || null
-  if (typeof rawUrl === 'string') {
-    if (rawUrl.startsWith('http://')) rawUrl = rawUrl.replace('http://', 'https://')
-    if (rawUrl.trim() === 'null' || rawUrl.trim() === 'undefined' || rawUrl.trim() === '') {
-      rawUrl = null
+  let finalSrc = null
+
+  if (typeof rawUrl === 'string' && rawUrl.trim() !== '' && rawUrl !== 'null') {
+    // 1. Очищаем от старых протоколов и мусорных параметров
+    let cleanUrl = rawUrl.replace('http://', 'https://').split('?')[0]
+
+    // 2. ХАК: Внедряем нативные параметры Imgix/StockX, чтобы притвориться их фронтендом
+    if (cleanUrl.includes('stockx.com')) {
+      cleanUrl = `${cleanUrl}?fit=fill&bg=FFFFFF&w=700&h=500&auto=format,compress&q=90&trim=color`
     }
+
+    // 3. Собираем итоговую ссылку (с резервным прокси на случай жестких Telegram-политик)
+    finalSrc = useProxyFallback ? `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}` : cleanUrl
   }
 
-  // Арсенал Enterprise-уровня
-  const sources = rawUrl ? [
-    // 1. Cloudinary Fetch API (Белый список Cloudflare, отдает WebP)
-    `https://res.cloudinary.com/demo/image/fetch/q_auto,f_auto/${rawUrl}`,
-    // 2. Nuxt IPX Remote (Официальный прокси-сервер фреймворка Nuxt)
-    `https://ipx.nuxt.com/remote/${rawUrl}`,
-    // 3. Wsrv с параметром default (если ошибка - отдаст пустую 1x1 картинку, что стриггерит наш naturalWidth === 0)
-    `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&default=1`,
-    // 4. Прямая ссылка
-    rawUrl
-  ] : []
-
-  const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
-
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // Хак: Если Cloudflare вернул 200 OK, но внутри HTML-страница (капча), 
-    // браузер не сможет определить размеры (naturalWidth будет 0). 
-    // Значит это ложный успех, переходим к следующему прокси.
-    if (e.currentTarget.naturalWidth === 0 || e.currentTarget.naturalWidth === 1) {
+    // Защита от ложного 200 OK (когда Cloudflare отдает HTML с капчей вместо картинки)
+    if (e.currentTarget.naturalWidth <= 1) {
       handleImageError()
     } else {
       setImgState('loaded')
@@ -122,16 +114,16 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
   }
 
   const handleImageError = () => {
-    if (attempt < sources.length - 1) {
-      setAttempt(prev => prev + 1) // Тихий переход на следующий эксплойт
+    if (!useProxyFallback) {
+      setUseProxyFallback(true) // Включаем единственный надежный резерв
+      setImgState('loading')
     } else {
-      setImgState('error') // Сдаемся только если отвалились ВСЕ методы
+      setImgState('error') // Сдаемся окончательно
     }
   }
 
   const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
   const rawYear = sneaker.year || sneaker.releaseYear
-
   let releaseYear = null
   if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
     const parsed = rawDate.slice(0, 4)
@@ -142,14 +134,14 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
 
   return (
     <div onClick={() => handleCardClick(sneaker)} className="cursor-pointer group flex flex-col">
-      {currentSrc ? (
+      {finalSrc ? (
         <div
           className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
           style={{ backgroundColor: themeColors.imageBg }}
         >
           {imgState !== 'error' && (
             <img
-              src={currentSrc}
+              src={finalSrc}
               alt={sneaker.name}
               loading="lazy"
               referrerPolicy="no-referrer"
@@ -181,7 +173,7 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
           style={{ backgroundColor: themeColors.imageBg }}
         >
           <span className="text-[10px] font-sans uppercase opacity-30 text-center" style={{ color: themeColors.text }}>
-            Нет фото в БД
+            Нет фото
           </span>
         </div>
       )}
