@@ -665,19 +665,25 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               releaseYear = String(rawYear) 
             }
 
+            // Автоконвертация HTTP в HTTPS
+            let finalImageUrl = sneaker.image?.original || null
+            if (finalImageUrl && finalImageUrl.startsWith('http://')) {
+              finalImageUrl = finalImageUrl.replace('http://', 'https://')
+            }
+
             return (
               <div
                 key={sneaker.id}
                 onClick={() => handleCardClick(sneaker)}
                 className="cursor-pointer group flex flex-col"
               >
-                {sneaker.image?.original ? (
+                {finalImageUrl ? (
                   <div
-                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm"
+                    className="w-full overflow-hidden mb-4 aspect-[4/3] flex items-center justify-center transition-colors rounded-sm relative"
                     style={{ backgroundColor: themeColors.imageBg }}
                   >
                     <img
-                      src={sneaker.image.original}
+                      src={finalImageUrl}
                       alt={sneaker.name}
                       referrerPolicy="no-referrer"
                       loading="lazy"
@@ -690,15 +696,21 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                       }}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
-                        target.style.display = 'none'
+                        // Теперь ставим заглушку, чтобы видеть заблокированные картинки
+                        target.src = 'https://via.placeholder.com/400x300/E5E7EB/a3a3a3?text=Photo+Unavailable'
+                        target.style.mixBlendMode = 'normal'
                       }}
                     />
                   </div>
                 ) : (
                   <div
-                    className="w-full mb-4 aspect-[4/3] rounded-sm"
+                    className="w-full mb-4 aspect-[4/3] rounded-sm flex items-center justify-center"
                     style={{ backgroundColor: themeColors.imageBg }}
-                  />
+                  >
+                    <span className="text-[10px] font-sans uppercase opacity-30 text-center">
+                      No Image
+                    </span>
+                  </div>
                 )}
 
                 <div className="flex justify-between items-start mb-1">
