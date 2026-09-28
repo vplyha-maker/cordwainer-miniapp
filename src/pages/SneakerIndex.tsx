@@ -89,33 +89,45 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
   const [attempt, setAttempt] = useState(0)
 
   let rawUrl = sneaker.image?.original || null
-  let sources: string[] = []
-
   if (typeof rawUrl === 'string') {
     if (rawUrl.startsWith('http://')) rawUrl = rawUrl.replace('http://', 'https://')
     if (rawUrl.trim() === 'null' || rawUrl.trim() === 'undefined' || rawUrl.trim() === '') {
       rawUrl = null
-    } else {
-      // Подготовка данных для Google AMP Cache
-      const cleanUrl = rawUrl.replace(/^https?:\/\//, '')
-      const domain = cleanUrl.split('/')[0]
-      // Формат AMP требует замены тире на двойное тире, а точек на тире в домене
-      const ampDomain = domain.replace(/-/g, '--').replace(/\./g, '-')
-
-      sources = [
-        // 1. Google AMP Cache (Абсолютный траст)
-        `https://${ampDomain}.cdn.ampproject.org/i/s/${cleanUrl}`,
-        // 2. DuckDuckGo Image Cache (Внутренний прокси поисковика)
-        `https://external-content.duckduckgo.com/iu/?u=${encodeURIComponent(rawUrl)}`,
-        // 3. API Codetabs (Публичный raw-прокси)
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rawUrl)}`,
-        // 4. Прямая ссылка с фейковым query-параметром (обход жесткого кэша CF)
-        `${rawUrl}?bypass=true&_rnd=${Math.random().toString(36).substring(7)}`
-      ]
     }
   }
 
+  // Арсенал Enterprise-уровня
+  const sources = rawUrl ? [
+    // 1. Cloudinary Fetch API (Белый список Cloudflare, отдает WebP)
+    `https://res.cloudinary.com/demo/image/fetch/q_auto,f_auto/${rawUrl}`,
+    // 2. Nuxt IPX Remote (Официальный прокси-сервер фреймворка Nuxt)
+    `https://ipx.nuxt.com/remote/${rawUrl}`,
+    // 3. Wsrv с параметром default (если ошибка - отдаст пустую 1x1 картинку, что стриггерит наш naturalWidth === 0)
+    `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&default=1`,
+    // 4. Прямая ссылка
+    rawUrl
+  ] : []
+
   const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    // Хак: Если Cloudflare вернул 200 OK, но внутри HTML-страница (капча), 
+    // браузер не сможет определить размеры (naturalWidth будет 0). 
+    // Значит это ложный успех, переходим к следующему прокси.
+    if (e.currentTarget.naturalWidth === 0 || e.currentTarget.naturalWidth === 1) {
+      handleImageError()
+    } else {
+      setImgState('loaded')
+    }
+  }
+
+  const handleImageError = () => {
+    if (attempt < sources.length - 1) {
+      setAttempt(prev => prev + 1) // Тихий переход на следующий эксплойт
+    } else {
+      setImgState('error') // Сдаемся только если отвалились ВСЕ методы
+    }
+  }
 
   const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
   const rawYear = sneaker.year || sneaker.releaseYear
@@ -146,14 +158,8 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
                 mixBlendMode: isDark ? 'normal' : 'multiply',
                 filter: isDark ? 'drop-shadow(0 15px 25px rgba(0,0,0,0.4))' : 'drop-shadow(0 15px 20px rgba(0,0,0,0.08))'
               }}
-              onLoad={() => setImgState('loaded')}
-              onError={() => {
-                if (attempt < sources.length - 1) {
-                  setAttempt(prev => prev + 1) // Тихий переход на следующий эксплойт
-                } else {
-                  setImgState('error') // Сдаемся только в крайнем случае
-                }
-              }}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
             />
           )}
           {imgState === 'error' && (
