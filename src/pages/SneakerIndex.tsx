@@ -423,25 +423,20 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }
 
   const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const text = searchText.trim()
-      if (!text) return
+  if (e.key === 'Enter') {
+    const text = searchText.trim()
+    if (!text) return
 
-      const query =
-        selectedBrand && selectedBrand !== 'all'
-          ? `${selectedBrand} ${text}`
-          : text
+    // Ищем только по тексту, без приклеивания бренда
+    setHasSearched(true)
+    setActiveQuery(text)
+    setViewState('catalog')
 
-      setHasSearched(true)
-      setActiveQuery(query)
-      setViewState('catalog')
-
-      if (typeof window !== 'undefined') {
-        window.history.pushState({}, '', window.location.pathname)
-      }
-    }
-  }
-
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname)
+     }
+   }
+ }
   const clearSearch = () => {
     setSearchText('')
     if (searchInputRef.current) {
