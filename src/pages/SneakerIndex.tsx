@@ -232,16 +232,17 @@ interface SneakerIndexProps {
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
-  // === Получаем уникальный Telegram ID пользователя ===
-  const tgUserId = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id || null : null
-
   const getActiveLang = (): Lang => {
     if (lang) return lang
+    
     if (typeof window !== 'undefined') {
       try {
         const savedLang = localStorage.getItem('cordwainer_lang') || localStorage.getItem('app_lang')
-        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') return savedLang as Lang
+        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') {
+          return savedLang as Lang
+        }
       } catch (e) {}
+
       const tg = (window as any).Telegram?.WebApp
       const tgLang = tg?.initDataUnsafe?.user?.language_code
       if (tgLang === 'uk' || tgLang === 'ukr') return 'uk'
@@ -382,38 +383,13 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
-  // === 1. ЗАГРУЖАЕМ ИЗБРАННОЕ ИЗ БАЗЫ ПРИ ВХОДЕ ===
-  useEffect(() => {
-    if (tgUserId) {
-      // Пользователь из Telegram — тянем из Neon DB
-      fetch(`/api/favorites?user_id=${tgUserId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.favorites) {
-            setFavorites(data.favorites)
-            localStorage.setItem('lookbook_favorites', JSON.stringify(data.favorites)) // Обновляем резервный кэш
-          }
-        })
-        .catch(console.error)
-    } else {
-      // Пользователь в обычном браузере — тянем из памяти устройства
-      const savedFavs = localStorage.getItem('lookbook_favorites')
-      if (savedFavs) {
-        try {
-          setFavorites(JSON.parse(savedFavs))
-        } catch (e) {
-          console.error('Failed to parse favorites')
-        }
-      }
-    }
-  }, [tgUserId])
-
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
 
     const handleScroll = () => {
       const currentY = container.scrollTop
+      
       if (currentY > 600) {
         setButtonMode(prev => prev !== 'up' ? 'up' : prev)
       } else if (currentY < 100 && returnYRef.current !== null) {
@@ -450,8 +426,10 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     const checkGlobalTheme = () => {
       const html = document.documentElement
       const body = document.body
+
       if (html.classList.contains('light') || body.classList.contains('light')) return false
       if (html.classList.contains('dark') || body.classList.contains('dark')) return true
+
       if (html.getAttribute('data-theme') === 'light') return false
       if (html.getAttribute('data-theme') === 'dark') return true
 
@@ -486,6 +464,21 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
 
+  useEffect(() => {
+    const savedFavs = localStorage.getItem('lookbook_favorites')
+    if (savedFavs) {
+      try {
+        setFavorites(JSON.parse(savedFavs))
+      } catch (e) {
+        console.error('Failed to parse favorites')
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('lookbook_favorites', JSON.stringify(favorites))
+  }, [favorites])
+
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
     const cacheKey = `${query}_p${pageNum}`
 
@@ -506,9 +499,10 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       const res = await fetch(
         `/api/get-top-sneakers?query=${encodeURIComponent(query)}&limit=100&page=${pageNum}`
       )
+
       const text = await res.text()
+
       const upperText = text.toUpperCase()
-      
       if (upperText.includes('<HTML') || upperText.includes('TOO MANY REQUESTS') || upperText.includes('RATE LIMIT')) {
         throw new Error('RATE_LIMIT')
       }
@@ -528,31 +522,44 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         throw new Error(data.details || data.error || data.message || data.MESSAGE || t.errorLoad)
       }
 
-      if (data.total !== undefined) setTotalInDb(data.total)
-      else if (data.totalCount !== undefined) setTotalInDb(data.totalCount)
+      if (data.total !== undefined) {
+        setTotalInDb(data.total)
+      } else if (data.totalCount !== undefined) {
+        setTotalInDb(data.totalCount)
+      }
 
       const list = data.results || data.data || data || []
       const newItems = Array.isArray(list) ? list : []
 
-      if (newItems.length < 100) setHasMore(false)
-      else setHasMore(true)
+      if (newItems.length < 100) {
+        setHasMore(false)
+      } else {
+        setHasMore(true)
+      }
 
       setSneakers((prev) => {
         const updated = append ? [...prev, ...newItems] : newItems
-        if (!append) cacheRef.current[cacheKey] = updated
+        if (!append) {
+          cacheRef.current[cacheKey] = updated
+        }
         return updated
       })
 
+      // === БЕРЕМ РЕАЛЬНОЕ ВРЕМЯ ПОСЛЕДНЕГО ДОБАВЛЕНИЯ КРОССОВОК ИЗ БД ===
       if (data.lastUpdate) {
         const dbDate = new Date(data.lastUpdate)
         const pad = (n: number) => n.toString().padStart(2, '0')
+        // Форматируем дату в DD.MM.YYYY HH:MM
         setLastSync(`${pad(dbDate.getDate())}.${pad(dbDate.getMonth() + 1)}.${dbDate.getFullYear()} ${pad(dbDate.getHours())}:${pad(dbDate.getMinutes())}`)
       }
 
     } catch (err: unknown) {
       if (err instanceof Error) {
-        if (err.message === 'RATE_LIMIT') setError(t.errorRateLimit)
-        else setError(t.errorSneakers)
+        if (err.message === 'RATE_LIMIT') {
+          setError(t.errorRateLimit)
+        } else {
+          setError(t.errorSneakers)
+        }
       } else {
         setError(t.errorSneakers)
       }
@@ -575,23 +582,31 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
-    if (typeof window !== 'undefined') window.history.pushState({}, '', window.location.pathname)
-  }
 
-  const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const text = searchText.trim()
-      if (!text) return
-      setHasSearched(true)
-      setActiveQuery(text)
-      setViewState('catalog')
-      if (typeof window !== 'undefined') window.history.pushState({}, '', window.location.pathname)
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname)
     }
   }
 
+  const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter') {
+    const text = searchText.trim()
+    if (!text) return
+
+    setHasSearched(true)
+    setActiveQuery(text)
+    setViewState('catalog')
+
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname)
+     }
+   }
+ }
   const clearSearch = () => {
     setSearchText('')
-    if (searchInputRef.current) searchInputRef.current.focus()
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
   }
 
   const handleLoadMore = () => {
@@ -604,6 +619,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const handleCardClick = (sneaker: Sneaker) => {
     const searchQuery = `${sneaker.brand} ${sneaker.name} ${t.searchSuffix}`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
+
     const tg = (window as any).Telegram?.WebApp
     if (tg?.openLink) {
       tg.openLink(url)
@@ -612,41 +628,36 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }
 
-  // === 2. ФУНКЦИЯ КЛИКА ПО СЕРДЕЧКУ (ОТПРАВЛЯЕМ В БАЗУ) ===
   const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
     e.stopPropagation()
     haptic('medium')
-    
-    // Мгновенно обновляем интерфейс, чтобы юзер не ждал ответа базы
     setFavorites(prev => {
       const isFav = prev.some(item => item.id === sneaker.id)
-      const newFavs = isFav ? prev.filter(item => item.id !== sneaker.id) : [...prev, sneaker]
-      localStorage.setItem('lookbook_favorites', JSON.stringify(newFavs)) // Кэшируем
-      return newFavs
+      if (isFav) return prev.filter(item => item.id !== sneaker.id)
+      return [...prev, sneaker]
     })
-
-    // В фоновом режиме стучимся в API и записываем в Neon
-    if (tgUserId) {
-      fetch('/api/favorites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: tgUserId, sneaker_id: sneaker.id })
-      }).catch(err => console.error('Ошибка сохранения в базу', err))
-    }
   }
 
   const handleBackClick = () => {
     haptic('light')
-    if (viewState === 'favorites') setViewState('catalog')
-    else if (onBack) onBack()
+    if (viewState === 'favorites') {
+      setViewState('catalog')
+    } else if (onBack) {
+      onBack()
+    }
   }
 
   const filteredCatalog = sneakers.filter((sneaker) => {
     if (selectedGender === 'all') return true
     if (!sneaker.gender) return false
     const genderStr = sneaker.gender.toLowerCase()
-    if (selectedGender === 'men') return genderStr === 'men' || (genderStr.includes('men') && !genderStr.includes('women'))
-    if (selectedGender === 'women') return genderStr.includes('women')
+
+    if (selectedGender === 'men') {
+      return genderStr === 'men' || (genderStr.includes('men') && !genderStr.includes('women'))
+    }
+    if (selectedGender === 'women') {
+      return genderStr.includes('women')
+    }
     return genderStr.includes(selectedGender)
   })
 
