@@ -5,7 +5,7 @@ const { Client } = pg
 const ALGOLIA_URL = 'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
 const SEARCH_TERMS = [
-  // 1. Спортивные, беговые и скейт-бренды (Кроссовки и кеды)
+  // 1. Спортивные, беговые и скейт-бренды
   'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse',
   'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 'On',
   'Under Armour', 'Fila', 'Skechers', 'Etnies', 'Osiris', 'DC',
@@ -14,7 +14,7 @@ const SEARCH_TERMS = [
   'BAPE', 'Supreme', 'Fear of God', 'Kith', 'Palace', 'Off-White',
   "Arc'teryx", 'Veja', 'Autry',
 
-  // 3. Люкс и Высокая мода (Кроссовки + Лоферы, туфли, ботинки, мюли)
+  // 3. Люкс и Высокая мода 
   'Prada', 'Prada loafers', 'Prada boots', 'Prada heels', 'Prada mules',
   'Gucci', 'Gucci loafers', 'Gucci slides', 'Gucci boots', 'Gucci heels',
   'Balenciaga', 'Balenciaga boots', 'Balenciaga mules', 'Balenciaga sandals',
@@ -31,7 +31,7 @@ const SEARCH_TERMS = [
   // 4. Премиум кэжуал
   'Lacoste', 'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2',
 
-  // 5. Зима, Аутдор и Повседневная обувь (Ботинки, сабо, сандалии, слипоны)
+  // 5. Зима, Аутдор и Повседневная обувь
   'Timberland', 'Timberland boots', 'Timberland boat shoes',
   'UGG', 'UGG boots', 'UGG slippers', 'UGG Tasman',
   'Crocs', 'Crocs clogs', 'Crocs sandals',
@@ -95,47 +95,46 @@ async function run() {
         const checkRes = await client.query('SELECT id FROM sneakers WHERE id = $1', [id])
         if (checkRes.rows.length > 0) continue 
 
+        console.log(`  -> Обработка модели: ${brand} | ${name}`)
+        
+        // ПО УМОЛЧАНИЮ: берем оригинальную ссылку с GOAT
+        let finalImageUrl = item.main_picture_url
+
         try {
-          console.log(`  -> Новая модель! Качаем: ${brand} | ${name}`)
-          
-          // Скачиваем файл
           const imgRes = await axios.get(item.main_picture_url, { 
             responseType: 'arraybuffer',
-            timeout: 8000 // Не ждем бесконечно, если сервер GOAT завис
+            timeout: 8000 
           })
           
-          // === ПРЕДОХРАНИТЕЛЬ ===
           const contentType = imgRes.headers['content-type'] || ''
           const imgSize = imgRes.data.byteLength || 0
 
-          // Проверяем, что это реальная картинка, а размер больше 2КБ (заглушки весят меньше)
-          if (!contentType.includes('image') || imgSize < 2000) {
-            console.log(`  ⚠️ Пропуск: битая картинка или заглушка (Тип: ${contentType}, Вес: ${imgSize} байт)`)
-            continue // Переходим к следующей модели, не ломая скрипт
+          if (contentType.includes('image') && imgSize > 2000) {
+            const base64Data = Buffer.from(imgRes.data).toString('base64')
+            const form = new URLSearchParams()
+            form.append('image', base64Data)
+
+            const uploadRes = await axios.post(`https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`, form.toString(), {
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            })
+            // ЕСЛИ УСПЕШНО: меняем на ссылку ImgBB
+            finalImageUrl = uploadRes.data.data.url
+            console.log(`  ✅ Фото залито на ImgBB!`)
+          } else {
+            console.log(`  ⚠️ Картинка нестандартная, используем прямую ссылку GOAT.`)
           }
-          // ======================
-
-          const base64Data = Buffer.from(imgRes.data).toString('base64')
-          
-          const form = new URLSearchParams()
-          form.append('image', base64Data)
-
-          const uploadRes = await axios.post(`https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`, form.toString(), {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-          })
-
-          await client.query(`
-            INSERT INTO sneakers (id, brand, name, gender, retail_price, release_year, image_url)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (id) DO NOTHING
-          `, [id, brand, name, gender, price, year, uploadRes.data.data.url])
-
-          console.log(`  ✅ Сохранено!`)
         } catch (imgError) {
-           // Скрываем красные простыни ошибок и пишем аккуратное сообщение
-           const errorMsg = imgError.response ? `Статус ${imgError.response.status}` : imgError.message
-           console.log(`  ⚠️ Пропуск (не удалось загрузить фото): ${errorMsg}`)
+           console.log(`  ⚠️ Ошибка хостинга ImgBB, используем прямую ссылку GOAT.`)
         }
+
+        // ВАЖНО: Модель теперь сохраняется В ЛЮБОМ СЛУЧАЕ
+        await client.query(`
+          INSERT INTO sneakers (id, brand, name, gender, retail_price, release_year, image_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO NOTHING
+        `, [id, brand, name, gender, price, year, finalImageUrl])
+
+        console.log(`  💾 Успешно сохранено в базу!`)
         await new Promise(resolve => setTimeout(resolve, 800)) 
       }
     } catch (err) {
