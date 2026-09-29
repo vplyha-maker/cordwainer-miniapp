@@ -76,6 +76,88 @@ const BRANDS = [
   { id: 'dc', name: 'DC' }
 ]
 
+// === ВЫНОСИМ СЛОВАРЬ ИЗ КОМПОНЕНТА ДЛЯ ПРЕДОТВРАЩЕНИЯ БЕСКОНЕЧНОГО ЦИКЛА ===
+const TRANSLATIONS: Record<Lang, any> = {
+  ru: {
+    back: 'Назад',
+    archive: 'Архив',
+    savedArchive: 'Сохраненный архив',
+    sneakerIndex: 'Footwear Index',
+    searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
+    all: 'Все',
+    men: 'Мужские',
+    women: 'Женские',
+    emptyArchive: 'Архив пуст',
+    notFound: 'Ничего не найдено',
+    priceUnav: 'Нет цены',
+    retail: 'Розница USD',
+    find: 'Найти',
+    loadMore: '+ Загрузить еще',
+    loading: 'Загрузка...',
+    errorLoad: 'Ошибка при загрузке данных',
+    errorSneakers: 'Не удалось загрузить каталог',
+    errorRateLimit: 'Слишком много запросов. Подождите минуту.',
+    scrollTop: 'Наверх',
+    scrollReturn: 'Вернуться к месту',
+    searchSuffix: 'купить',
+    loaded: 'Показано:',
+    totalDb: 'В базе:',
+    updatedAt: 'Обновлено:',
+  },
+  uk: {
+    back: 'Назад',
+    archive: 'Архів',
+    savedArchive: 'Збережений архів',
+    sneakerIndex: 'Footwear Index',
+    searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
+    all: 'Всі',
+    men: 'Чоловічі',
+    women: 'Жіночі',
+    emptyArchive: 'Архів порожній',
+    notFound: 'Нічого не знайдено',
+    priceUnav: 'Немає ціни',
+    retail: 'Роздріб USD',
+    find: 'Знайти',
+    loadMore: '+ Завантажити ще',
+    loading: 'Завантаження...',
+    errorLoad: 'Помилка завантаження даних',
+    errorSneakers: 'Не вдалося завантажити каталог',
+    errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
+    scrollTop: 'Вгору',
+    scrollReturn: 'Повернутися',
+    searchSuffix: 'купити в Україні',
+    loaded: 'Показано:',
+    totalDb: 'В базі:',
+    updatedAt: 'Оновлено:',
+  },
+  de: {
+    back: 'Zurück',
+    archive: 'Archiv',
+    savedArchive: 'Gespeichertes Archiv',
+    sneakerIndex: 'Footwear Index',
+    searchPlaceholder: 'Modell (576, Dunk, 550...) + Enter',
+    all: 'Alle',
+    men: 'Herren',
+    women: 'Damen',
+    emptyArchive: 'Archiv leer',
+    notFound: 'Nichts gefunden',
+    priceUnav: 'Preis n.v.',
+    retail: 'UVP USD',
+    find: 'Finden',
+    loadMore: '+ Mehr laden',
+    loading: 'Wird geladen...',
+    errorLoad: 'Fehler beim Laden der Daten',
+    errorSneakers: 'Katalog konnte nicht geladen werden',
+    errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie eine Minute.',
+    scrollTop: 'Nach oben',
+    scrollReturn: 'Zurückspringen',
+    searchSuffix: 'kaufen',
+    loaded: 'Gezeigt:',
+    totalDb: 'In DB:',
+    updatedAt: 'Aktualisiert:',
+  }
+}
+
 function haptic(kind: 'light' | 'medium' = 'light') {
   try {
     const tg = (window as any).Telegram?.WebApp
@@ -96,7 +178,6 @@ function SneakerCard({ sneaker, isFav, toggleFavorite, t, themeColors, isDark, h
     if (cleanUrl.includes('stockx.com')) {
       cleanUrl = `${cleanUrl}?fit=fill&bg=FFFFFF&w=700&h=500&auto=format,compress&q=90&trim=color`
     }
-
     sources = [
       cleanUrl,
       `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`
@@ -232,17 +313,15 @@ interface SneakerIndexProps {
 }
 
 export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
+  const tgUserId = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id || null : null
+
   const getActiveLang = (): Lang => {
     if (lang) return lang
-    
     if (typeof window !== 'undefined') {
       try {
         const savedLang = localStorage.getItem('cordwainer_lang') || localStorage.getItem('app_lang')
-        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') {
-          return savedLang as Lang
-        }
+        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') return savedLang as Lang
       } catch (e) {}
-
       const tg = (window as any).Telegram?.WebApp
       const tgLang = tg?.initDataUnsafe?.user?.language_code
       if (tgLang === 'uk' || tgLang === 'ukr') return 'uk'
@@ -252,87 +331,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }
 
   const activeLang = getActiveLang()
-
-  const t = {
-    ru: {
-      back: 'Назад',
-      archive: 'Архив',
-      savedArchive: 'Сохраненный архив',
-      sneakerIndex: 'Footwear Index',
-      searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
-      all: 'Все',
-      men: 'Мужские',
-      women: 'Женские',
-      emptyArchive: 'Архив пуст',
-      notFound: 'Ничего не найдено',
-      priceUnav: 'Нет цены',
-      retail: 'Розница USD',
-      find: 'Найти',
-      loadMore: '+ Загрузить еще',
-      loading: 'Загрузка...',
-      errorLoad: 'Ошибка при загрузке данных',
-      errorSneakers: 'Не удалось загрузить каталог',
-      errorRateLimit: 'Слишком много запросов. Подождите минуту.',
-      scrollTop: 'Наверх',
-      scrollReturn: 'Вернуться к месту',
-      searchSuffix: 'купить',
-      loaded: 'Показано:',
-      totalDb: 'В базе:',
-      updatedAt: 'Обновлено:',
-    },
-    uk: {
-      back: 'Назад',
-      archive: 'Архів',
-      savedArchive: 'Збережений архів',
-      sneakerIndex: 'Footwear Index',
-      searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
-      all: 'Всі',
-      men: 'Чоловічі',
-      women: 'Жіночі',
-      emptyArchive: 'Архів порожній',
-      notFound: 'Нічого не знайдено',
-      priceUnav: 'Немає ціни',
-      retail: 'Роздріб USD',
-      find: 'Знайти',
-      loadMore: '+ Завантажити ще',
-      loading: 'Завантаження...',
-      errorLoad: 'Помилка завантаження даних',
-      errorSneakers: 'Не вдалося завантажити каталог',
-      errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
-      scrollTop: 'Вгору',
-      scrollReturn: 'Повернутися',
-      searchSuffix: 'купити в Україні',
-      loaded: 'Показано:',
-      totalDb: 'В базі:',
-      updatedAt: 'Оновлено:',
-    },
-    de: {
-      back: 'Zurück',
-      archive: 'Archiv',
-      savedArchive: 'Gespeichertes Archiv',
-      sneakerIndex: 'Footwear Index',
-      searchPlaceholder: 'Modell (576, Dunk, 550...) + Enter',
-      all: 'Alle',
-      men: 'Herren',
-      women: 'Damen',
-      emptyArchive: 'Archiv leer',
-      notFound: 'Nichts gefunden',
-      priceUnav: 'Preis n.v.',
-      retail: 'UVP USD',
-      find: 'Finden',
-      loadMore: '+ Mehr laden',
-      loading: 'Wird geladen...',
-      errorLoad: 'Fehler beim Laden der Daten',
-      errorSneakers: 'Katalog konnte nicht geladen werden',
-      errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie eine Minute.',
-      scrollTop: 'Nach oben',
-      scrollReturn: 'Zurückspringen',
-      searchSuffix: 'kaufen',
-      loaded: 'Gezeigt:',
-      totalDb: 'In DB:',
-      updatedAt: 'Aktualisiert:',
-    },
-  }[activeLang]
+  const t = TRANSLATIONS[activeLang]
 
   const GENDERS = [
     { id: 'all', name: t.all },
@@ -384,12 +383,34 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const cacheRef = useRef<Record<string, Sneaker[]>>({})
 
   useEffect(() => {
+    if (tgUserId) {
+      fetch(`/api/favorites?user_id=${tgUserId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.favorites) {
+            setFavorites(data.favorites)
+            localStorage.setItem('lookbook_favorites', JSON.stringify(data.favorites))
+          }
+        })
+        .catch(console.error)
+    } else {
+      const savedFavs = localStorage.getItem('lookbook_favorites')
+      if (savedFavs) {
+        try {
+          setFavorites(JSON.parse(savedFavs))
+        } catch (e) {
+          console.error('Failed to parse favorites')
+        }
+      }
+    }
+  }, [tgUserId])
+
+  useEffect(() => {
     const container = scrollRef.current
     if (!container) return
 
     const handleScroll = () => {
       const currentY = container.scrollTop
-      
       if (currentY > 600) {
         setButtonMode(prev => prev !== 'up' ? 'up' : prev)
       } else if (currentY < 100 && returnYRef.current !== null) {
@@ -426,10 +447,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     const checkGlobalTheme = () => {
       const html = document.documentElement
       const body = document.body
-
       if (html.classList.contains('light') || body.classList.contains('light')) return false
       if (html.classList.contains('dark') || body.classList.contains('dark')) return true
-
       if (html.getAttribute('data-theme') === 'light') return false
       if (html.getAttribute('data-theme') === 'dark') return true
 
@@ -463,21 +482,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     imageBg: isDark ? '#1C1C1E' : '#E5E7EB',
     iconHover: isDark ? 'hover:text-white' : 'hover:text-black',
   }
-
-  useEffect(() => {
-    const savedFavs = localStorage.getItem('lookbook_favorites')
-    if (savedFavs) {
-      try {
-        setFavorites(JSON.parse(savedFavs))
-      } catch (e) {
-        console.error('Failed to parse favorites')
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    localStorage.setItem('lookbook_favorites', JSON.stringify(favorites))
-  }, [favorites])
 
   const fetchSneakers = useCallback(async (query: string, pageNum: number, append: boolean = false) => {
     const cacheKey = `${query}_p${pageNum}`
@@ -545,21 +549,16 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         return updated
       })
 
-      // === БЕРЕМ РЕАЛЬНОЕ ВРЕМЯ ПОСЛЕДНЕГО ДОБАВЛЕНИЯ КРОССОВОК ИЗ БД ===
       if (data.lastUpdate) {
         const dbDate = new Date(data.lastUpdate)
         const pad = (n: number) => n.toString().padStart(2, '0')
-        // Форматируем дату в DD.MM.YYYY HH:MM
         setLastSync(`${pad(dbDate.getDate())}.${pad(dbDate.getMonth() + 1)}.${dbDate.getFullYear()} ${pad(dbDate.getHours())}:${pad(dbDate.getMinutes())}`)
       }
 
     } catch (err: unknown) {
       if (err instanceof Error) {
-        if (err.message === 'RATE_LIMIT') {
-          setError(t.errorRateLimit)
-        } else {
-          setError(t.errorSneakers)
-        }
+        if (err.message === 'RATE_LIMIT') setError(t.errorRateLimit)
+        else setError(t.errorSneakers)
       } else {
         setError(t.errorSneakers)
       }
@@ -567,7 +566,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [t])
+  }, [t]) // Объект 't' теперь берется из глобальной константы и не пересоздается
 
   useEffect(() => {
     if (viewState === 'catalog') {
@@ -582,31 +581,23 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
-
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', window.location.pathname)
-    }
+    if (typeof window !== 'undefined') window.history.pushState({}, '', window.location.pathname)
   }
 
   const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>) => {
-  if (e.key === 'Enter') {
-    const text = searchText.trim()
-    if (!text) return
+    if (e.key === 'Enter') {
+      const text = searchText.trim()
+      if (!text) return
+      setHasSearched(true)
+      setActiveQuery(text)
+      setViewState('catalog')
+      if (typeof window !== 'undefined') window.history.pushState({}, '', window.location.pathname)
+    }
+  }
 
-    setHasSearched(true)
-    setActiveQuery(text)
-    setViewState('catalog')
-
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', window.location.pathname)
-     }
-   }
- }
   const clearSearch = () => {
     setSearchText('')
-    if (searchInputRef.current) {
-      searchInputRef.current.focus()
-    }
+    if (searchInputRef.current) searchInputRef.current.focus()
   }
 
   const handleLoadMore = () => {
@@ -619,7 +610,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const handleCardClick = (sneaker: Sneaker) => {
     const searchQuery = `${sneaker.brand} ${sneaker.name} ${t.searchSuffix}`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
-
     const tg = (window as any).Telegram?.WebApp
     if (tg?.openLink) {
       tg.openLink(url)
@@ -633,31 +623,32 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     haptic('medium')
     setFavorites(prev => {
       const isFav = prev.some(item => item.id === sneaker.id)
-      if (isFav) return prev.filter(item => item.id !== sneaker.id)
-      return [...prev, sneaker]
+      const newFavs = isFav ? prev.filter(item => item.id !== sneaker.id) : [...prev, sneaker]
+      localStorage.setItem('lookbook_favorites', JSON.stringify(newFavs))
+      return newFavs
     })
+
+    if (tgUserId) {
+      fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: tgUserId, sneaker_id: sneaker.id })
+      }).catch(err => console.error('Ошибка сохранения в базу', err))
+    }
   }
 
   const handleBackClick = () => {
     haptic('light')
-    if (viewState === 'favorites') {
-      setViewState('catalog')
-    } else if (onBack) {
-      onBack()
-    }
+    if (viewState === 'favorites') setViewState('catalog')
+    else if (onBack) onBack()
   }
 
   const filteredCatalog = sneakers.filter((sneaker) => {
     if (selectedGender === 'all') return true
     if (!sneaker.gender) return false
     const genderStr = sneaker.gender.toLowerCase()
-
-    if (selectedGender === 'men') {
-      return genderStr === 'men' || (genderStr.includes('men') && !genderStr.includes('women'))
-    }
-    if (selectedGender === 'women') {
-      return genderStr.includes('women')
-    }
+    if (selectedGender === 'men') return genderStr === 'men' || (genderStr.includes('men') && !genderStr.includes('women'))
+    if (selectedGender === 'women') return genderStr.includes('women')
     return genderStr.includes(selectedGender)
   })
 
