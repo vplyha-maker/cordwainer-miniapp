@@ -278,6 +278,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       searchSuffix: 'купить',
       loaded: 'Показано:',
       totalDb: 'В базе:',
+      updatedAt: 'Обновлено:',
     },
     uk: {
       back: 'Назад',
@@ -303,6 +304,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       searchSuffix: 'купити в Україні',
       loaded: 'Показано:',
       totalDb: 'В базі:',
+      updatedAt: 'Оновлено:',
     },
     de: {
       back: 'Zurück',
@@ -328,6 +330,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       searchSuffix: 'kaufen',
       loaded: 'Gezeigt:',
       totalDb: 'In DB:',
+      updatedAt: 'Aktualisiert:',
     },
   }[activeLang]
 
@@ -358,6 +361,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
   const [totalInDb, setTotalInDb] = useState<number | null>(null)
+  const [lastSync, setLastSync] = useState<string>('') // <-- Стейт для даты и времени обновления
 
   const [selectedBrand, setSelectedBrand] = useState(initialQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
@@ -518,7 +522,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         throw new Error(data.details || data.error || data.message || data.MESSAGE || t.errorLoad)
       }
 
-      // Вытаскиваем total из ответа API, если он есть
       if (data.total !== undefined) {
         setTotalInDb(data.total)
       } else if (data.totalCount !== undefined) {
@@ -541,6 +544,12 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         }
         return updated
       })
+
+      // === Генерируем красивую дату и время успешной загрузки ===
+      const now = new Date()
+      const pad = (n: number) => n.toString().padStart(2, '0')
+      setLastSync(`${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`)
+
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.message === 'RATE_LIMIT') {
@@ -670,6 +679,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           <span>{t.back}</span>
         </button>
 
+        {/* КНОПКА АРХИВА С ВЕКТОРНЫМ СЕРДЦЕМ И ЦИФРОЙ ВНУТРИ */}
         <button
           onClick={() => {
             haptic('light');
@@ -679,7 +689,33 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
         >
           <span>{t.archive}</span>
-          <span>[{favorites.length}]</span>
+          <div className="relative flex items-center justify-center">
+            <svg 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill={viewState === 'favorites' ? "currentColor" : "none"} 
+              stroke="currentColor" 
+              strokeWidth="1.2"
+            >
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              {favorites.length > 0 && (
+                <text 
+                  x="12" 
+                  y="13.5" 
+                  textAnchor="middle" 
+                  alignmentBaseline="middle"
+                  fontSize={favorites.length > 99 ? "6" : "7.5"} 
+                  fill={viewState === 'favorites' ? themeColors.bg : "currentColor"} 
+                  fontWeight="600" 
+                  stroke="none"
+                  style={{ fontFamily: 'sans-serif' }}
+                >
+                  {favorites.length}
+                </text>
+              )}
+            </svg>
+          </div>
         </button>
       </header>
 
@@ -690,7 +726,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         
         {viewState === 'catalog' && (
           <div 
-            className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.15em]" 
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-sans uppercase tracking-[0.15em]" 
             style={{ color: themeColors.textMuted }}
           >
             <span>{t.loaded} {currentDisplayList.length}</span>
@@ -698,6 +734,13 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               <>
                 <span className="opacity-30">|</span>
                 <span>{t.totalDb} {totalInDb}</span>
+              </>
+            )}
+            {/* БЛОК С ДАТОЙ И ВРЕМЕНЕМ ОБНОВЛЕНИЯ */}
+            {lastSync && (
+              <>
+                <span className="opacity-30 hidden sm:inline">|</span>
+                <span className="w-full sm:w-auto mt-1 sm:mt-0">{t.updatedAt} {lastSync}</span>
               </>
             )}
           </div>
