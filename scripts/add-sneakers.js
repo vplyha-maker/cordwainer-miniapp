@@ -42,7 +42,6 @@ const SEARCH_TERMS = [
   'Oakley', 'Oakley mules', 'Oakley boots'
 ]
 
-
 async function run() {
   console.log('Подключаемся к базе Neon...')
   const client = new Client({ connectionString: process.env.NEON_DATABASE_URL })
@@ -90,8 +89,6 @@ async function run() {
         const brand = item.brand_name || randomBrand
         const name = item.name || 'Sneaker'
         const gender = item.gender ? item.gender[0] : 'unisex'
-        
-        // ОШИБКА ИСПРАВЛЕНА ЗДЕСЬ: Добавлено Math.round() для округления до целого доллара
         const price = item.retail_price_cents ? Math.round(item.retail_price_cents / 100) : 0
         const year = item.release_date_year || 2024
 
@@ -100,7 +97,24 @@ async function run() {
 
         try {
           console.log(`  -> Новая модель! Качаем: ${brand} | ${name}`)
-          const imgRes = await axios.get(item.main_picture_url, { responseType: 'arraybuffer' })
+          
+          // Скачиваем файл
+          const imgRes = await axios.get(item.main_picture_url, { 
+            responseType: 'arraybuffer',
+            timeout: 8000 // Не ждем бесконечно, если сервер GOAT завис
+          })
+          
+          // === ПРЕДОХРАНИТЕЛЬ ===
+          const contentType = imgRes.headers['content-type'] || ''
+          const imgSize = imgRes.data.byteLength || 0
+
+          // Проверяем, что это реальная картинка, а размер больше 2КБ (заглушки весят меньше)
+          if (!contentType.includes('image') || imgSize < 2000) {
+            console.log(`  ⚠️ Пропуск: битая картинка или заглушка (Тип: ${contentType}, Вес: ${imgSize} байт)`)
+            continue // Переходим к следующей модели, не ломая скрипт
+          }
+          // ======================
+
           const base64Data = Buffer.from(imgRes.data).toString('base64')
           
           const form = new URLSearchParams()
@@ -118,7 +132,9 @@ async function run() {
 
           console.log(`  ✅ Сохранено!`)
         } catch (imgError) {
-           console.log(`  ❌ Ошибка загрузки:`, imgError.message)
+           // Скрываем красные простыни ошибок и пишем аккуратное сообщение
+           const errorMsg = imgError.response ? `Статус ${imgError.response.status}` : imgError.message
+           console.log(`  ⚠️ Пропуск (не удалось загрузить фото): ${errorMsg}`)
         }
         await new Promise(resolve => setTimeout(resolve, 800)) 
       }
