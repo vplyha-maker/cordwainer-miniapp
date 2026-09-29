@@ -11,13 +11,13 @@ async function run() {
   const client = new Client({ connectionString: process.env.NEON_DATABASE_URL })
   await client.connect()
 
-  const page = Math.floor(Math.random() * 50)
+  // Ограничиваем рандом до 10 страниц (макс. 1000 результатов), чтобы не получать пустые ответы от API
+  const page = Math.floor(Math.random() * 10)
   console.log(`Сканируем глобальный каталог (Страница ${page})...`)
 
   const queryData = {
     requests: [{
       indexName: "product_variants_v2",
-      // Запрашиваем 100 элементов (размеров), чтобы было из чего отфильтровать уникальные
       params: `query=${encodeURIComponent(SEARCH_QUERY)}&hitsPerPage=100&page=${page}&facetFilters=[["product_category:shoes"]]`
     }]
   }
@@ -26,7 +26,6 @@ async function run() {
     const { data } = await axios.post(ALGOLIA_URL, queryData)
     const rawSneakers = data.results[0].hits
 
-    // --- ФИЛЬТРАЦИЯ ДУБЛИКАТОВ ---
     const uniqueSneakers = []
     const seenIds = new Set()
 
@@ -35,19 +34,16 @@ async function run() {
 
       const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       
-      // Если такого ID еще не было в этой пачке, добавляем в массив
       if (!seenIds.has(id)) {
         seenIds.add(id)
         uniqueSneakers.push(item)
       }
     }
 
-    // Берем только первые 20 УНИКАЛЬНЫХ моделей для обработки
     const sneakersToProcess = uniqueSneakers.slice(0, 20)
 
     console.log(`Отфильтровано дублей. Начинаем заливку ${sneakersToProcess.length} уникальных эталонных моделей...`)
 
-    // --- ПРОЦЕСС ЗАГРУЗКИ ---
     for (const item of sneakersToProcess) {
       const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       const brand = item.brand_name || 'Unknown'
@@ -102,3 +98,4 @@ async function run() {
 }
 
 run()
+
