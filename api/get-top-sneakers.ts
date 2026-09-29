@@ -41,9 +41,10 @@ export default async function handler(req: any, res: any) {
   const isBrandSearch = KNOWN_BRANDS.includes(query)
 
   try {
-    // === 1. Глобальный счетчик ВСЕХ моделей в БД (для счетчика в UI) ===
-    const totalCountRes = await sql`SELECT count(*) FROM sneakers`
-    const globalTotal = parseInt(totalCountRes[0].count, 10)
+    // === 1. Глобальный счетчик ВСЕХ моделей в БД и реальное время последнего обновления ===
+    const metaRes = await sql`SELECT count(*) as total, max(updated_at) as last_update FROM sneakers`
+    const globalTotal = parseInt(metaRes[0].total, 10)
+    const dbLastUpdate = metaRes[0].last_update
 
     let rows: any[] = []
 
@@ -172,7 +173,8 @@ export default async function handler(req: any, res: any) {
       results,
       page,
       limit,
-      total: globalTotal, // Глобальный счетчик ВСЕЙ базы передается сюда!
+      total: globalTotal, // Глобальный счетчик ВСЕЙ базы
+      lastUpdate: dbLastUpdate, // <-- Реальное время из БД передается на фронтенд
       count: results.length
     })
   } catch (error: any) {
