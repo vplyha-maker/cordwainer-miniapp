@@ -5,17 +5,43 @@ const { Client } = pg
 const ALGOLIA_URL = 'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
 const SEARCH_TERMS = [
-  'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse', 
-  'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 
-  'On Running', 'Merrell', 'Oakley', "Arc'teryx", 'BAPE', 'Supreme', 
-  'Fear of God', 'Kith', 'Palace', 'Balenciaga', 'Off-White', 'Gucci', 
-  'Prada', 'Louis Vuitton', 'Dior', 'Maison Margiela', 'Rick Owens', 
-  'Alexander McQueen', 'Lanvin', 'Crocs', 'Timberland', 'UGG', 
-  'Dr. Martens', 'Birkenstock', 'Clarks', 'Veja', 'Autry', 'Lacoste', 
-  'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2', 
-  'Versace', 'Valentino', 'Givenchy', 'Under Armour', 'Fila', 'Skechers', 
-  'Etnies', 'Osiris', 'DC'
+  // 1. Спортивные, беговые и скейт-бренды (Кроссовки и кеды)
+  'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse',
+  'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 'On',
+  'Under Armour', 'Fila', 'Skechers', 'Etnies', 'Osiris', 'DC',
+
+  // 2. Стритвир и нишевые марки
+  'BAPE', 'Supreme', 'Fear of God', 'Kith', 'Palace', 'Off-White',
+  "Arc'teryx", 'Veja', 'Autry',
+
+  // 3. Люкс и Высокая мода (Кроссовки + Лоферы, туфли, ботинки, мюли)
+  'Prada', 'Prada loafers', 'Prada boots', 'Prada heels', 'Prada mules',
+  'Gucci', 'Gucci loafers', 'Gucci slides', 'Gucci boots', 'Gucci heels',
+  'Balenciaga', 'Balenciaga boots', 'Balenciaga mules', 'Balenciaga sandals',
+  'Louis Vuitton', 'Louis Vuitton loafers', 'Louis Vuitton boots', 'Louis Vuitton mules',
+  'Dior', 'Dior heels', 'Dior boots', 'Dior sandals',
+  'Maison Margiela', 'Maison Margiela Tabi', 'Maison Margiela boots', 'Maison Margiela loafers',
+  'Rick Owens', 'Rick Owens boots',
+  'Alexander McQueen', 'Alexander McQueen boots', 'Alexander McQueen loafers',
+  'Lanvin', 'Lanvin sneakers', 'Lanvin boots',
+  'Versace', 'Versace loafers', 'Versace heels',
+  'Valentino', 'Valentino heels', 'Valentino boots',
+  'Givenchy', 'Givenchy boots', 'Givenchy slides',
+
+  // 4. Премиум кэжуал
+  'Lacoste', 'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2',
+
+  // 5. Зима, Аутдор и Повседневная обувь (Ботинки, сабо, сандалии, слипоны)
+  'Timberland', 'Timberland boots', 'Timberland boat shoes',
+  'UGG', 'UGG boots', 'UGG slippers', 'UGG Tasman',
+  'Crocs', 'Crocs clogs', 'Crocs sandals',
+  'Dr. Martens', 'Dr. Martens boots', 'Dr. Martens oxfords', 'Dr. Martens loafers',
+  'Birkenstock', 'Birkenstock sandals', 'Birkenstock clogs', 'Birkenstock Boston',
+  'Clarks', 'Clarks Wallabee', 'Clarks Desert Boot',
+  'Merrell', 'Merrell boots', 'Merrell moc',
+  'Oakley', 'Oakley mules', 'Oakley boots'
 ]
+
 
 async function run() {
   console.log('Подключаемся к базе Neon...')
