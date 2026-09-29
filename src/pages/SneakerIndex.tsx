@@ -607,9 +607,18 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     fetchSneakers(activeQuery, nextPage, true)
   }
 
-  const handleCardClick = (sneaker: Sneaker) => {
-    const searchQuery = `${sneaker.brand} ${sneaker.name} ${t.searchSuffix}`
+    const handleCardClick = (sneaker: Sneaker) => {
+    // Убираем повторение бренда, если оно уже есть в начале названия модели
+    let cleanName = sneaker.name.trim()
+    const brandRegex = new RegExp(`^${sneaker.brand}\\s*`, 'i')
+    if (brandRegex.test(cleanName)) {
+      cleanName = cleanName.replace(brandRegex, '')
+    }
+
+    // Формируем чистый запрос: Бренд + Название + Суффикс (например: "купить в Україні")
+    const searchQuery = `${sneaker.brand} ${cleanName} ${t.searchSuffix}`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
+
     const tg = (window as any).Telegram?.WebApp
     if (tg?.openLink) {
       tg.openLink(url)
