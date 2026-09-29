@@ -4,7 +4,6 @@ import axios from 'axios'
 const { Client } = pg
 const ALGOLIA_URL = 'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
-// Полный список твоих брендов из приложения
 const SEARCH_TERMS = [
   'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse', 
   'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 
@@ -23,11 +22,8 @@ async function run() {
   const client = new Client({ connectionString: process.env.NEON_DATABASE_URL })
   await client.connect()
 
-  // Делаем 15 заходов за один запуск экшена
   for (let i = 0; i < 15; i++) {
-    // Выбираем случайный бренд из твоего списка
     const randomBrand = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
-    // Берем случайную страницу от 0 до 5 (чтобы вытягивать самые популярные и свежие модели)
     const randomPage = Math.floor(Math.random() * 6) 
 
     console.log(`\n=========================================`)
@@ -65,16 +61,16 @@ async function run() {
 
       for (const item of uniqueSneakers) {
         const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-        
-        // Берем оригинальное имя бренда из API, либо подставляем то, которое искали
         const brand = item.brand_name || randomBrand
         const name = item.name || 'Sneaker'
         const gender = item.gender ? item.gender[0] : 'unisex'
-        const price = item.retail_price_cents ? item.retail_price_cents / 100 : 0
+        
+        // ОШИБКА ИСПРАВЛЕНА ЗДЕСЬ: Добавлено Math.round() для округления до целого доллара
+        const price = item.retail_price_cents ? Math.round(item.retail_price_cents / 100) : 0
         const year = item.release_date_year || 2024
 
         const checkRes = await client.query('SELECT id FROM sneakers WHERE id = $1', [id])
-        if (checkRes.rows.length > 0) continue // Пропускаем теки, что уже есть
+        if (checkRes.rows.length > 0) continue 
 
         try {
           console.log(`  -> Новая модель! Качаем: ${brand} | ${name}`)
