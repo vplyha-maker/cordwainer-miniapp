@@ -76,13 +76,18 @@ export default async function handler(req: any, res: any) {
       }
     }
     
-    // === 3. СТРОГИЙ ПОИСК ПО БРЕНДУ (исключает ложные срабатывания типа Salomon) ===
+    // === 3. СТРОГИЙ ПОИСК ПО БРЕНДУ (Ищем самостоятельное слово в названии бренда) ===
     else if (isBrandSearch) {
       if (gender === 'all') {
         rows = await sql`
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
-          WHERE LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'}
+          WHERE (
+            LOWER(brand) = ${query} 
+            OR LOWER(brand) LIKE ${query + ' %'} 
+            OR LOWER(brand) LIKE ${'% ' + query} 
+            OR LOWER(brand) LIKE ${'% ' + query + ' %'}
+          )
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
@@ -91,7 +96,12 @@ export default async function handler(req: any, res: any) {
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE gender IN ('men', 'unisex')
-            AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'})
+            AND (
+              LOWER(brand) = ${query} 
+              OR LOWER(brand) LIKE ${query + ' %'} 
+              OR LOWER(brand) LIKE ${'% ' + query} 
+              OR LOWER(brand) LIKE ${'% ' + query + ' %'}
+            )
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
@@ -100,7 +110,12 @@ export default async function handler(req: any, res: any) {
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE gender IN ('women', 'unisex')
-            AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'})
+            AND (
+              LOWER(brand) = ${query} 
+              OR LOWER(brand) LIKE ${query + ' %'} 
+              OR LOWER(brand) LIKE ${'% ' + query} 
+              OR LOWER(brand) LIKE ${'% ' + query + ' %'}
+            )
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
@@ -173,8 +188,8 @@ export default async function handler(req: any, res: any) {
       results,
       page,
       limit,
-      total: globalTotal, // Глобальный счетчик ВСЕЙ базы
-      lastUpdate: dbLastUpdate, // <-- Реальное время из БД передается на фронтенд
+      total: globalTotal, 
+      lastUpdate: dbLastUpdate,
       count: results.length
     })
   } catch (error: any) {
