@@ -276,6 +276,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       scrollTop: 'Наверх',
       scrollReturn: 'Вернуться к месту',
       searchSuffix: 'купить',
+      loaded: 'Показано:',
+      totalDb: 'В базе:',
     },
     uk: {
       back: 'Назад',
@@ -299,6 +301,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       scrollTop: 'Вгору',
       scrollReturn: 'Повернутися',
       searchSuffix: 'купити в Україні',
+      loaded: 'Показано:',
+      totalDb: 'В базі:',
     },
     de: {
       back: 'Zurück',
@@ -322,6 +326,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       scrollTop: 'Nach oben',
       scrollReturn: 'Zurückspringen',
       searchSuffix: 'kaufen',
+      loaded: 'Gezeigt:',
+      totalDb: 'In DB:',
     },
   }[activeLang]
 
@@ -351,6 +357,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
+  const [totalInDb, setTotalInDb] = useState<number | null>(null)
 
   const [selectedBrand, setSelectedBrand] = useState(initialQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
@@ -511,6 +518,13 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         throw new Error(data.details || data.error || data.message || data.MESSAGE || t.errorLoad)
       }
 
+      // Вытаскиваем total из ответа API, если он есть
+      if (data.total !== undefined) {
+        setTotalInDb(data.total)
+      } else if (data.totalCount !== undefined) {
+        setTotalInDb(data.totalCount)
+      }
+
       const list = data.results || data.data || data || []
       const newItems = Array.isArray(list) ? list : []
 
@@ -669,9 +683,26 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </button>
       </header>
 
-      <h1 className="font-serif text-[12vw] min-[375px]:text-5xl leading-none mb-8 tracking-[-0.02em]">
-        {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
-      </h1>
+      <div className="flex flex-col mb-8">
+        <h1 className="font-serif text-[12vw] min-[375px]:text-5xl leading-none tracking-[-0.02em] mb-3">
+          {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
+        </h1>
+        
+        {viewState === 'catalog' && (
+          <div 
+            className="flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.15em]" 
+            style={{ color: themeColors.textMuted }}
+          >
+            <span>{t.loaded} {currentDisplayList.length}</span>
+            {totalInDb !== null && (
+              <>
+                <span className="opacity-30">|</span>
+                <span>{t.totalDb} {totalInDb}</span>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {viewState === 'catalog' && (
         <>
