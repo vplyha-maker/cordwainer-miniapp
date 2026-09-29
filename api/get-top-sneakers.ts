@@ -23,15 +23,31 @@ export default async function handler(req: any, res: any) {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 40))
   const offset = (page - 1) * limit
 
+  // Список точных брендов для "Умного поиска"
+  const KNOWN_BRANDS = [
+    'nike', 'jordan', 'adidas', 'yeezy', 'new balance', 'asics', 'converse', 
+    'vans', 'puma', 'reebok', 'saucony', 'mizuno', 'salomon', 'hoka', 
+    'on', 'merrell', 'oakley', "arc'teryx", 'bape', 'supreme', 
+    'fear of god', 'kith', 'palace', 'balenciaga', 'off-white', 'gucci', 
+    'prada', 'louis vuitton', 'dior', 'maison margiela', 'rick owens', 
+    'alexander mcqueen', 'lanvin', 'crocs', 'timberland', 'ugg', 
+    'dr. martens', 'birkenstock', 'clarks', 'veja', 'autry', 'lacoste', 
+    'calvin klein', 'tommy hilfiger', 'polo ralph lauren', 'dsquared2', 
+    'versace', 'valentino', 'givenchy', 'under armour', 'fila', 'skechers', 
+    'etnies', 'osiris', 'dc'
+  ]
+
+  // Проверяем, является ли запрос кликом по бренду
+  const isBrandSearch = KNOWN_BRANDS.includes(query)
+
   try {
-    // === 1. ПОЛУЧАЕМ АБСОЛЮТНОЕ КОЛИЧЕСТВО ВСЕХ МОДЕЛЕЙ В БАЗЕ ===
-    // Этот запрос игнорирует любые фильтры и считает вообще все кроссовки
+    // === 1. Глобальный счетчик ВСЕХ моделей в БД (для счетчика в UI) ===
     const totalCountRes = await sql`SELECT count(*) FROM sneakers`
     const globalTotal = parseInt(totalCountRes[0].count, 10)
 
     let rows: any[] = []
 
-    // === 2. Без поискового запроса ===
+    // === 2. Запрос "ВСЕ" (Пустой запрос) ===
     if (!query || query === 'all') {
       if (gender === 'all') {
         rows = await sql`
@@ -56,82 +72,83 @@ export default async function handler(req: any, res: any) {
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
-      } else {
-        rows = []
       }
     }
-
-    // === 3. Есть поисковый запрос (или выбран конкретный бренд) ===
-    else {
+    
+    // === 3. СТРОГИЙ ПОИСК ПО БРЕНДУ (исключает ложные срабатывания типа Salomon) ===
+    else if (isBrandSearch) {
       if (gender === 'all') {
         rows = await sql`
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
-          WHERE 
-            LOWER(brand) = ${query}
-            OR LOWER(brand) LIKE ${'%' + query + '%'}
-            OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
-            OR LOWER(name) LIKE ${'%' + query + '%'}
-          ORDER BY
-            CASE 
-              WHEN LOWER(brand) = ${query} THEN 0
-              WHEN LOWER(brand) LIKE ${query + '%'} THEN 1
-              WHEN to_tsvector('english', name) @@ plainto_tsquery('english', ${query}) THEN 2
-              ELSE 3
-            END,
-            updated_at DESC
+          WHERE LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'}
+          ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
         rows = await sql`
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
-          WHERE 
-            gender IN ('men', 'unisex')
-            AND (
-              LOWER(brand) = ${query}
-              OR LOWER(brand) LIKE ${'%' + query + '%'}
-              OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
-              OR LOWER(name) LIKE ${'%' + query + '%'}
-            )
-          ORDER BY
-            CASE 
-              WHEN LOWER(brand) = ${query} THEN 0
-              WHEN LOWER(brand) LIKE ${query + '%'} THEN 1
-              WHEN to_tsvector('english', name) @@ plainto_tsquery('english', ${query}) THEN 2
-              ELSE 3
-            END,
-            updated_at DESC
+          WHERE gender IN ('men', 'unisex')
+            AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'})
+          ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'women') {
         rows = await sql`
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
-          WHERE 
-            gender IN ('women', 'unisex')
-            AND (
-              LOWER(brand) = ${query}
-              OR LOWER(brand) LIKE ${'%' + query + '%'}
-              OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
-              OR LOWER(name) LIKE ${'%' + query + '%'}
-            )
-          ORDER BY
-            CASE 
-              WHEN LOWER(brand) = ${query} THEN 0
-              WHEN LOWER(brand) LIKE ${query + '%'} THEN 1
-              WHEN to_tsvector('english', name) @@ plainto_tsquery('english', ${query}) THEN 2
-              ELSE 3
-            END,
-            updated_at DESC
+          WHERE gender IN ('women', 'unisex')
+            AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'})
+          ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
-      } else {
-        rows = []
       }
     }
 
-    // Приводим к формату, который ждёт фронтенд
+    // === 4. ОБЫЧНЫЙ ПОИСК (ввод текста руками в строку: "dunk", "travis", и т.д.) ===
+    else {
+      if (gender === 'all') {
+        rows = await sql`
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          FROM sneakers
+          WHERE 
+            LOWER(brand) LIKE ${'%' + query + '%'}
+            OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
+            OR LOWER(name) LIKE ${'%' + query + '%'}
+          ORDER BY updated_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `
+      } else if (gender === 'men') {
+        rows = await sql`
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          FROM sneakers
+          WHERE gender IN ('men', 'unisex')
+            AND (
+              LOWER(brand) LIKE ${'%' + query + '%'}
+              OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
+              OR LOWER(name) LIKE ${'%' + query + '%'}
+            )
+          ORDER BY updated_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `
+      } else if (gender === 'women') {
+        rows = await sql`
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          FROM sneakers
+          WHERE gender IN ('women', 'unisex')
+            AND (
+              LOWER(brand) LIKE ${'%' + query + '%'}
+              OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
+              OR LOWER(name) LIKE ${'%' + query + '%'}
+            )
+          ORDER BY updated_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `
+      }
+    }
+
+    // Приводим к формату фронтенда
     const results = rows.map((r) => {
       const imgUrl = r.image_url ?? r.image ?? r.imageUrl ?? r.imageurl ?? null
       const price = r.retail_price ?? r.retailprice ?? r.retailPrice ?? 0
@@ -155,7 +172,7 @@ export default async function handler(req: any, res: any) {
       results,
       page,
       limit,
-      total: globalTotal, // <-- Теперь сюда ВСЕГДА уходит глобальное количество всей БД
+      total: globalTotal, // Глобальный счетчик ВСЕЙ базы передается сюда!
       count: results.length
     })
   } catch (error: any) {
