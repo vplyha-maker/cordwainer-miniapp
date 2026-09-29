@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, KeyboardEvent } from 'react'
+import AboutView from './AboutView' // Импортируем новый файл
 
 export type Lang = 'ru' | 'uk' | 'de'
 
@@ -76,11 +77,11 @@ const BRANDS = [
   { id: 'dc', name: 'DC' }
 ]
 
-// === ВЫНОСИМ СЛОВАРЬ ИЗ КОМПОНЕНТА ДЛЯ ПРЕДОТВРАЩЕНИЯ БЕСКОНЕЧНОГО ЦИКЛА ===
 const TRANSLATIONS: Record<Lang, any> = {
   ru: {
     back: 'Назад',
     archive: 'Архив',
+    info: 'Инфо',
     savedArchive: 'Сохраненный архив',
     sneakerIndex: 'Footwear Index',
     searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
@@ -107,6 +108,7 @@ const TRANSLATIONS: Record<Lang, any> = {
   uk: {
     back: 'Назад',
     archive: 'Архів',
+    info: 'Інфо',
     savedArchive: 'Збережений архів',
     sneakerIndex: 'Footwear Index',
     searchPlaceholder: 'Модель (576, Dunk, 550...) + Enter',
@@ -133,6 +135,7 @@ const TRANSLATIONS: Record<Lang, any> = {
   de: {
     back: 'Zurück',
     archive: 'Archiv',
+    info: 'Info',
     savedArchive: 'Gespeichertes Archiv',
     sneakerIndex: 'Footwear Index',
     searchPlaceholder: 'Modell (576, Dunk, 550...) + Enter',
@@ -358,7 +361,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const [sneakers, setSneakers] = useState<Sneaker[]>([])
   const [favorites, setFavorites] = useState<Sneaker[]>([])
-  const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
+  // ДОБАВЛЕНО: Состояние 'about' для страницы информации
+  const [viewState, setViewState] = useState<'catalog' | 'favorites' | 'about'>('catalog')
   const [totalInDb, setTotalInDb] = useState<number | null>(null)
   const [lastSync, setLastSync] = useState<string>('') 
 
@@ -566,7 +570,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [t]) // Объект 't' теперь берется из глобальной константы и не пересоздается
+  }, [t]) 
 
   useEffect(() => {
     if (viewState === 'catalog') {
@@ -607,15 +611,13 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     fetchSneakers(activeQuery, nextPage, true)
   }
 
-    const handleCardClick = (sneaker: Sneaker) => {
-    // Убираем повторение бренда, если оно уже есть в начале названия модели
+  const handleCardClick = (sneaker: Sneaker) => {
     let cleanName = sneaker.name.trim()
     const brandRegex = new RegExp(`^${sneaker.brand}\\s*`, 'i')
     if (brandRegex.test(cleanName)) {
       cleanName = cleanName.replace(brandRegex, '')
     }
 
-    // Формируем чистый запрос: Бренд + Название + Суффикс (например: "купить в Україні")
     const searchQuery = `${sneaker.brand} ${cleanName} ${t.searchSuffix}`
     const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
 
@@ -648,8 +650,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const handleBackClick = () => {
     haptic('light')
-    if (viewState === 'favorites') setViewState('catalog')
-    else if (onBack) onBack()
+    if (viewState !== 'catalog') {
+      setViewState('catalog')
+    } else if (onBack) {
+      onBack()
+    }
   }
 
   const filteredCatalog = sneakers.filter((sneaker) => {
@@ -682,223 +687,244 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           <span>{t.back}</span>
         </button>
 
-        <button
-          onClick={() => {
-            haptic('light');
-            setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')
-          }}
-          className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors outline-none bg-transparent border-none cursor-pointer"
-          style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
-        >
-          <span>{t.archive}</span>
-          <div className="relative flex items-center justify-center">
-            <svg 
-              width="24" 
-              height="24" 
-              viewBox="0 0 24 24" 
-              fill={viewState === 'favorites' ? "currentColor" : "none"} 
-              stroke="currentColor" 
-              strokeWidth="1.2"
-            >
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              {favorites.length > 0 && (
-                <text 
-                  x="12" 
-                  y="13.5" 
-                  textAnchor="middle" 
-                  alignmentBaseline="middle"
-                  fontSize={favorites.length > 99 ? "6" : "7.5"} 
-                  fill={viewState === 'favorites' ? themeColors.bg : "currentColor"} 
-                  fontWeight="600" 
-                  stroke="none"
-                  style={{ fontFamily: 'sans-serif' }}
-                >
-                  {favorites.length}
-                </text>
-              )}
-            </svg>
-          </div>
-        </button>
+        {/* ДОБАВЛЕНО: Блок с двумя кнопками (ИНФО и АРХИВ) */}
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => {
+              haptic('light');
+              setViewState(viewState === 'about' ? 'catalog' : 'about')
+            }}
+            className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors outline-none bg-transparent border-none cursor-pointer"
+            style={{ color: viewState === 'about' ? themeColors.text : themeColors.textMuted }}
+          >
+            <span>{t.info}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              haptic('light');
+              setViewState(viewState === 'catalog' ? 'favorites' : 'catalog')
+            }}
+            className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] transition-colors outline-none bg-transparent border-none cursor-pointer"
+            style={{ color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted }}
+          >
+            <span>{t.archive}</span>
+            <div className="relative flex items-center justify-center">
+              <svg 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill={viewState === 'favorites' ? "currentColor" : "none"} 
+                stroke="currentColor" 
+                strokeWidth="1.2"
+              >
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                {favorites.length > 0 && (
+                  <text 
+                    x="12" 
+                    y="13.5" 
+                    textAnchor="middle" 
+                    alignmentBaseline="middle"
+                    fontSize={favorites.length > 99 ? "6" : "7.5"} 
+                    fill={viewState === 'favorites' ? themeColors.bg : "currentColor"} 
+                    fontWeight="600" 
+                    stroke="none"
+                    style={{ fontFamily: 'sans-serif' }}
+                  >
+                    {favorites.length}
+                  </text>
+                )}
+              </svg>
+            </div>
+          </button>
+        </div>
       </header>
 
-      <div className="flex flex-col mb-8">
-        <h1 className="font-serif text-[12vw] min-[375px]:text-5xl leading-none tracking-[-0.02em] mb-3">
-          {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
-        </h1>
-        
-        {viewState === 'catalog' && (
-          <div 
-            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-sans uppercase tracking-[0.15em]" 
-            style={{ color: themeColors.textMuted }}
-          >
-            <span>{t.loaded} {currentDisplayList.length}</span>
-            {totalInDb !== null && (
-              <>
-                <span className="opacity-30">|</span>
-                <span>{t.totalDb} {totalInDb}</span>
-              </>
-            )}
-            {lastSync && (
-              <>
-                <span className="opacity-30 hidden sm:inline">|</span>
-                <span className="w-full sm:w-auto mt-1 sm:mt-0">{t.updatedAt} {lastSync}</span>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {viewState === 'catalog' && (
+      {/* РЕНДЕР СТРАНИЦЫ 'ABOUT' */}
+      {viewState === 'about' ? (
+        <AboutView lang={activeLang} themeColors={themeColors} isDark={isDark} />
+      ) : (
         <>
-          <div className="mb-6 relative">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              onKeyDown={handleSearchSubmit}
-              placeholder={t.searchPlaceholder}
-              className={`w-full px-4 py-3.5 pr-10 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
-              style={{
-                color: themeColors.text,
-                borderBottom: `1px solid ${themeColors.border}`,
-              }}
-            />
-            {searchText && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 outline-none bg-transparent border-none cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
-                style={{ color: themeColors.text }}
-                title="Очистить"
+          <div className="flex flex-col mb-8">
+            <h1 className="font-serif text-[12vw] min-[375px]:text-5xl leading-none tracking-[-0.02em] mb-3">
+              {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
+            </h1>
+            
+            {viewState === 'catalog' && (
+              <div 
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-sans uppercase tracking-[0.15em]" 
+                style={{ color: themeColors.textMuted }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
+                <span>{t.loaded} {currentDisplayList.length}</span>
+                {totalInDb !== null && (
+                  <>
+                    <span className="opacity-30">|</span>
+                    <span>{t.totalDb} {totalInDb}</span>
+                  </>
+                )}
+                {lastSync && (
+                  <>
+                    <span className="opacity-30 hidden sm:inline">|</span>
+                    <span className="w-full sm:w-auto mt-1 sm:mt-0">{t.updatedAt} {lastSync}</span>
+                  </>
+                )}
+              </div>
             )}
           </div>
 
-          <div className="relative mb-6">
-            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-none pr-12">
-              {BRANDS.map((brand) => {
-                const isActive = selectedBrand === brand.id && !hasSearched
-                return (
+          {viewState === 'catalog' && (
+            <>
+              <div className="mb-6 relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onKeyDown={handleSearchSubmit}
+                  placeholder={t.searchPlaceholder}
+                  className={`w-full px-4 py-3.5 pr-10 rounded-none text-[13px] font-sans outline-none bg-transparent transition-colors ${isDark ? 'placeholder:text-white/30 focus:border-white/40' : 'placeholder:text-black/30 focus:border-black/40'}`}
+                  style={{
+                    color: themeColors.text,
+                    borderBottom: `1px solid ${themeColors.border}`,
+                  }}
+                />
+                {searchText && (
                   <button
-                    key={brand.id}
-                    onClick={() => handleBrandClick(brand.id)}
-                    className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer outline-none bg-transparent transition-all shrink-0 pb-1"
-                    style={{
-                      color: isActive ? themeColors.text : themeColors.textMuted,
-                      borderBottom: isActive ? `1px solid ${themeColors.text}` : '1px solid transparent',
-                    }}
+                    onClick={clearSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 outline-none bg-transparent border-none cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
+                    style={{ color: themeColors.text }}
+                    title="Очистить"
                   >
-                    {brand.name}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
                   </button>
+                )}
+              </div>
+
+              <div className="relative mb-6">
+                <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-none pr-12">
+                  {BRANDS.map((brand) => {
+                    const isActive = selectedBrand === brand.id && !hasSearched
+                    return (
+                      <button
+                        key={brand.id}
+                        onClick={() => handleBrandClick(brand.id)}
+                        className="text-[10px] font-sans uppercase tracking-[0.15em] whitespace-nowrap cursor-pointer outline-none bg-transparent transition-all shrink-0 pb-1"
+                        style={{
+                          color: isActive ? themeColors.text : themeColors.textMuted,
+                          borderBottom: isActive ? `1px solid ${themeColors.text}` : '1px solid transparent',
+                        }}
+                      >
+                        {brand.name}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div
+                  className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none"
+                  style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
+                />
+              </div>
+
+              <div className="flex gap-4 mb-10">
+                {GENDERS.map((gender) => {
+                  const isActive = selectedGender === gender.id
+                  return (
+                    <button
+                      key={gender.id}
+                      onClick={() => { haptic('light'); setSelectedGender(gender.id); }}
+                      className="text-[9px] font-sans uppercase tracking-widest cursor-pointer outline-none bg-transparent border-none transition-all"
+                      style={{ color: isActive ? themeColors.text : themeColors.textFaint }}
+                    >
+                      {gender.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {error && (
+            <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">{error}</p>
+          )}
+
+          {loading && viewState === 'catalog' && sneakers.length === 0 && (
+            <div className="flex flex-col gap-12 pb-10 animate-pulse">
+              {[1, 2].map((n) => (
+                <div key={n} className="pb-8">
+                  <div
+                    className="w-full h-[350px] mb-4"
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  />
+                  <div
+                    className="h-5 w-32 mb-2"
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  />
+                  <div
+                    className="h-4 w-48"
+                    style={{ backgroundColor: themeColors.imageBg }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading || sneakers.length > 0 ? (
+            <div className="flex flex-col gap-14 pb-10">
+              {currentDisplayList.length === 0 && viewState === 'favorites' && (
+                <p
+                  className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
+                  style={{ color: themeColors.textMuted }}
+                >
+                  {t.emptyArchive}
+                </p>
+              )}
+
+              {currentDisplayList.length === 0 && viewState === 'catalog' && !error && !loading && (
+                <p
+                  className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
+                  style={{ color: themeColors.textMuted }}
+                >
+                  {t.notFound}
+                </p>
+              )}
+
+              {currentDisplayList.map((sneaker) => {
+                const isFav = favorites.some(f => f.id === sneaker.id)
+                return (
+                  <SneakerCard
+                    key={sneaker.id}
+                    sneaker={sneaker}
+                    isFav={isFav}
+                    toggleFavorite={toggleFavorite}
+                    t={t}
+                    themeColors={themeColors}
+                    isDark={isDark}
+                    handleCardClick={handleCardClick}
+                  />
                 )
               })}
             </div>
+          ) : null}
 
+          {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
             <div
-              className="absolute top-0 right-0 bottom-4 w-12 pointer-events-none"
-              style={{ background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)` }}
-            />
-          </div>
-
-          <div className="flex gap-4 mb-10">
-            {GENDERS.map((gender) => {
-              const isActive = selectedGender === gender.id
-              return (
-                <button
-                  key={gender.id}
-                  onClick={() => { haptic('light'); setSelectedGender(gender.id); }}
-                  className="text-[9px] font-sans uppercase tracking-widest cursor-pointer outline-none bg-transparent border-none transition-all"
-                  style={{ color: isActive ? themeColors.text : themeColors.textFaint }}
-                >
-                  {gender.name}
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
-
-      {error && (
-        <p className="text-[11px] font-sans uppercase tracking-widest text-red-400/80 mb-8">{error}</p>
-      )}
-
-      {loading && viewState === 'catalog' && sneakers.length === 0 && (
-        <div className="flex flex-col gap-12 pb-10 animate-pulse">
-          {[1, 2].map((n) => (
-            <div key={n} className="pb-8">
-              <div
-                className="w-full h-[350px] mb-4"
-                style={{ backgroundColor: themeColors.imageBg }}
-              />
-              <div
-                className="h-5 w-32 mb-2"
-                style={{ backgroundColor: themeColors.imageBg }}
-              />
-              <div
-                className="h-4 w-48"
-                style={{ backgroundColor: themeColors.imageBg }}
-              />
+              className="pb-28 pt-8 text-center"
+              style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+            >
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="text-[10px] font-sans uppercase tracking-[0.3em] outline-none bg-transparent border-none cursor-pointer transition-all opacity-60 hover:opacity-100"
+                style={{ color: themeColors.text }}
+              >
+                {loadingMore ? t.loading : t.loadMore}
+              </button>
             </div>
-          ))}
-        </div>
-      )}
-
-      {!loading || sneakers.length > 0 ? (
-        <div className="flex flex-col gap-14 pb-10">
-          {currentDisplayList.length === 0 && viewState === 'favorites' && (
-            <p
-              className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
-              style={{ color: themeColors.textMuted }}
-            >
-              {t.emptyArchive}
-            </p>
           )}
-
-          {currentDisplayList.length === 0 && viewState === 'catalog' && !error && !loading && (
-            <p
-              className="text-[12px] font-sans uppercase tracking-widest text-center py-20"
-              style={{ color: themeColors.textMuted }}
-            >
-              {t.notFound}
-            </p>
-          )}
-
-          {currentDisplayList.map((sneaker) => {
-            const isFav = favorites.some(f => f.id === sneaker.id)
-            return (
-              <SneakerCard
-                key={sneaker.id}
-                sneaker={sneaker}
-                isFav={isFav}
-                toggleFavorite={toggleFavorite}
-                t={t}
-                themeColors={themeColors}
-                isDark={isDark}
-                handleCardClick={handleCardClick}
-              />
-            )
-          })}
-        </div>
-      ) : null}
-
-      {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
-        <div
-          className="pb-28 pt-8 text-center"
-          style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
-        >
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="text-[10px] font-sans uppercase tracking-[0.3em] outline-none bg-transparent border-none cursor-pointer transition-all opacity-60 hover:opacity-100"
-            style={{ color: themeColors.text }}
-          >
-            {loadingMore ? t.loading : t.loadMore}
-          </button>
-        </div>
+        </>
       )}
 
       <button
