@@ -3,11 +3,7 @@ import axios from 'axios'
 
 const { Client } = pg
 
-// Ты можешь вписать сюда конкретную модель (например, "Nike Dunk"), 
-// или оставить пустые кавычки "", тогда скрипт будет качать всё подряд из мировых топов.
 const SEARCH_QUERY = "" 
-
-// Публичный поисковой ключ GOAT (работает без токенов и регистраций)
 const ALGOLIA_URL = 'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
 async function run() {
@@ -15,27 +11,44 @@ async function run() {
   const client = new Client({ connectionString: process.env.NEON_DATABASE_URL })
   await client.connect()
 
-  // Генерируем случайную страницу от 0 до 50, чтобы каждый твой клик добавлял новые кроссовки
   const page = Math.floor(Math.random() * 50)
   console.log(`Сканируем глобальный каталог (Страница ${page})...`)
 
   const queryData = {
     requests: [{
-      indexName: "product_variants_v2", // База всех кроссовок
-      params: `query=${encodeURIComponent(SEARCH_QUERY)}&hitsPerPage=20&page=${page}&facetFilters=[["product_category:shoes"]]`
+      indexName: "product_variants_v2",
+      // Запрашиваем 100 элементов (размеров), чтобы было из чего отфильтровать уникальные
+      params: `query=${encodeURIComponent(SEARCH_QUERY)}&hitsPerPage=100&page=${page}&facetFilters=[["product_category:shoes"]]`
     }]
   }
 
   try {
     const { data } = await axios.post(ALGOLIA_URL, queryData)
-    const sneakers = data.results[0].hits
+    const rawSneakers = data.results[0].hits
 
-    console.log(`Получено ${sneakers.length} эталонных моделей из API. Начинаем заливку...`)
+    // --- ФИЛЬТРАЦИЯ ДУБЛИКАТОВ ---
+    const uniqueSneakers = []
+    const seenIds = new Set()
 
-    for (const item of sneakers) {
-      if (!item.main_picture_url) continue // Пропускаем, если у них нет фото
+    for (const item of rawSneakers) {
+      if (!item.main_picture_url) continue 
 
-      // Раскладываем JSON по полочкам
+      const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      
+      // Если такого ID еще не было в этой пачке, добавляем в массив
+      if (!seenIds.has(id)) {
+        seenIds.add(id)
+        uniqueSneakers.push(item)
+      }
+    }
+
+    // Берем только первые 20 УНИКАЛЬНЫХ моделей для обработки
+    const sneakersToProcess = uniqueSneakers.slice(0, 20)
+
+    console.log(`Отфильтровано дублей. Начинаем заливку ${sneakersToProcess.length} уникальных эталонных моделей...`)
+
+    // --- ПРОЦЕСС ЗАГРУЗКИ ---
+    for (const item of sneakersToProcess) {
       const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       const brand = item.brand_name || 'Unknown'
       const name = item.name || 'Sneaker'
@@ -45,21 +58,18 @@ async function run() {
 
       console.log(`\n👟 Найдено: ${brand} | ${name}`)
 
-      // 1. Проверяем, есть ли уже этот ID у тебя в базе
       const checkRes = await client.query('SELECT id FROM sneakers WHERE id = $1', [id])
       if (checkRes.rows.length > 0) {
         console.log(`  ⏭ Уже есть в твоей БД. Пропускаем.`)
         continue
       }
 
-      // 2. Скачиваем фото (у GOAT нет блокировок Cloudflare, качается за миллисекунду)
       try {
         console.log(`  -> Скачиваем студийное фото...`)
         const imgRes = await axios.get(item.main_picture_url, { responseType: 'arraybuffer' })
         const base64Data = Buffer.from(imgRes.data).toString('base64')
         
-        // 3. Перекидываем на твой надежный ImgBB
-        console.log(`  -> Сохраняем на твой ImgBB...`)
+        console.log(`  -> Сохраняем на ImgBB...`)
         const form = new URLSearchParams()
         form.append('image', base64Data)
 
@@ -69,7 +79,6 @@ async function run() {
 
         const newCleanUrl = uploadRes.data.data.url
 
-        // 4. Заливаем всё это великолепие в твой Neon
         await client.query(`
           INSERT INTO sneakers (id, brand, name, gender, retail_price, release_year, image_url)
           VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -81,7 +90,6 @@ async function run() {
          console.log(`  ❌ Ошибка загрузки картинки:`, imgError.message)
       }
       
-      // Делаем легкую паузу
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
@@ -94,4 +102,3 @@ async function run() {
 }
 
 run()
-
