@@ -1,202 +1,121 @@
-import { neon } from '@neondatabase/serverless'
+import pg from 'pg'
+import axios from 'axios'
 
-export default async function handler(req: any, res: any) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+const { Client } = pg
+const ALGOLIA_URL = 'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+const SEARCH_TERMS = [
+  'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse', 
+  'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 
+  'On', 'Merrell', 'Oakley', "Arc'teryx", 'BAPE', 'Supreme', 
+  'Fear of God', 'Kith', 'Palace', 'Balenciaga', 'Off-White', 'Gucci', 
+  'Prada', 'Louis Vuitton', 'Dior', 'Maison Margiela', 'Rick Owens', 
+  'Alexander McQueen', 'Lanvin', 'Crocs', 'Timberland', 'UGG', 
+  'Dr. Martens', 'Birkenstock', 'Clarks', 'Veja', 'Autry', 'Lacoste', 
+  'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2', 
+  'Versace', 'Valentino', 'Givenchy', 'Under Armour', 'Fila', 'Skechers', 
+  'Etnies', 'Osiris', 'DC'
+]
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+async function run() {
+  console.log('Подключаемся к базе Neon...')
+  const client = new Client({ connectionString: process.env.NEON_DATABASE_URL })
+  await client.connect()
 
-  const sql = neon(process.env.DATABASE_URL!)
+  for (let i = 0; i < 15; i++) {
+    const randomBrand = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
+    const randomPage = Math.floor(Math.random() * 6) 
 
-  // Параметры
-  const query = (req.query.query || '').toString().toLowerCase().trim()
-  const gender = (req.query.gender || 'all').toString().toLowerCase().trim()
-  const page = Math.max(1, parseInt(req.query.page as string) || 1)
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 40))
-  const offset = (page - 1) * limit
+    console.log(`\n=========================================`)
+    console.log(`📡 ШАГ ${i + 1}/15 | ИЩЕМ БРЕНД: "${randomBrand}" (Страница ${randomPage})...`)
+    
+    const queryData = {
+      requests: [{
+        indexName: "product_variants_v2",
+        params: `query=${encodeURIComponent(randomBrand)}&hitsPerPage=100&page=${randomPage}&facetFilters=[["product_category:shoes"]]`
+      }]
+    }
 
-  // Список точных брендов для "Умного поиска"
-  const KNOWN_BRANDS = [
-    'nike', 'jordan', 'adidas', 'yeezy', 'new balance', 'asics', 'converse', 
-    'vans', 'puma', 'reebok', 'saucony', 'mizuno', 'salomon', 'hoka', 
-    'on', 'merrell', 'oakley', "arc'teryx", 'bape', 'supreme', 
-    'fear of god', 'kith', 'palace', 'balenciaga', 'off-white', 'gucci', 
-    'prada', 'louis vuitton', 'dior', 'maison margiela', 'rick owens', 
-    'alexander mcqueen', 'lanvin', 'crocs', 'timberland', 'ugg', 
-    'dr. martens', 'birkenstock', 'clarks', 'veja', 'autry', 'lacoste', 
-    'calvin klein', 'tommy hilfiger', 'polo ralph lauren', 'dsquared2', 
-    'versace', 'valentino', 'givenchy', 'under armour', 'fila', 'skechers', 
-    'etnies', 'osiris', 'dc'
-  ]
-
-  // Проверяем, является ли запрос кликом по бренду
-  const isBrandSearch = KNOWN_BRANDS.includes(query)
-
-  try {
-    // === 1. Глобальный счетчик ВСЕХ моделей в БД и реальное время последнего обновления ===
-    const metaRes = await sql`SELECT count(*) as total, max(updated_at) as last_update FROM sneakers`
-    const globalTotal = parseInt(metaRes[0].total, 10)
-    const dbLastUpdate = metaRes[0].last_update
-
-    let rows: any[] = []
-
-    // === 2. Запрос "ВСЕ" (Пустой запрос) ===
-    if (!query || query === 'all') {
-      if (gender === 'all') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      } else if (gender === 'men') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE gender IN ('men', 'unisex')
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      } else if (gender === 'women') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE gender IN ('women', 'unisex')
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
+    try {
+      const { data } = await axios.post(ALGOLIA_URL, queryData)
+      const rawSneakers = data.results[0].hits
+      if (!rawSneakers || rawSneakers.length === 0) {
+        console.log('Пустая страница, идем дальше...')
+        continue
       }
+
+      const uniqueSneakers = []
+      const seenIds = new Set()
+
+      for (const item of rawSneakers) {
+        if (!item.main_picture_url) continue 
+        const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        
+        if (!seenIds.has(id)) {
+          seenIds.add(id)
+          uniqueSneakers.push(item)
+        }
+      }
+
+      console.log(`Найдено ${uniqueSneakers.length} уникальных моделей. Проверяем в БД...`)
+
+      for (const item of uniqueSneakers) {
+        const id = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const brand = item.brand_name || randomBrand
+        const name = item.name || 'Sneaker'
+        const gender = item.gender ? item.gender[0] : 'unisex'
+        const price = item.retail_price_cents ? Math.round(item.retail_price_cents / 100) : 0
+        
+        // === ИСПРАВЛЕНИЕ: УМНЫЙ ПОИСК ГОДА ВЫПУСКА ===
+        let year = 0;
+        if (item.release_date) {
+          if (typeof item.release_date === 'string') {
+             year = parseInt(item.release_date.substring(0, 4)) || 0;
+          } else if (typeof item.release_date === 'number') {
+             year = new Date(item.release_date * 1000).getFullYear() || 0;
+          }
+        } else if (item.release_date_year) {
+          year = parseInt(item.release_date_year) || 0;
+        } else if (item.release_year) {
+          year = parseInt(item.release_year) || 0;
+        }
+
+        const checkRes = await client.query('SELECT id FROM sneakers WHERE id = $1', [id])
+        if (checkRes.rows.length > 0) continue 
+
+        try {
+          console.log(`  -> Новая модель! Качаем: ${brand} | ${name} (${year || 'Год скрыт'})`)
+          const imgRes = await axios.get(item.main_picture_url, { responseType: 'arraybuffer' })
+          const base64Data = Buffer.from(imgRes.data).toString('base64')
+          
+          const form = new URLSearchParams()
+          form.append('image', base64Data)
+
+          const uploadRes = await axios.post(`https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`, form.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          })
+
+          await client.query(`
+            INSERT INTO sneakers (id, brand, name, gender, retail_price, release_year, image_url)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (id) DO NOTHING
+          `, [id, brand, name, gender, price, year, uploadRes.data.data.url])
+
+          console.log(`  ✅ Сохранено!`)
+        } catch (imgError) {
+           console.log(`  ❌ Ошибка загрузки:`, imgError.message)
+        }
+        await new Promise(resolve => setTimeout(resolve, 800)) 
+      }
+    } catch (err) {
+      console.error('Ошибка API:', err.message)
     }
     
-    // === 3. СТРОГИЙ ПОИСК ПО БРЕНДУ (Ищем самостоятельное слово в названии бренда) ===
-    else if (isBrandSearch) {
-      if (gender === 'all') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE (
-            LOWER(brand) = ${query} 
-            OR LOWER(brand) LIKE ${query + ' %'} 
-            OR LOWER(brand) LIKE ${'% ' + query} 
-            OR LOWER(brand) LIKE ${'% ' + query + ' %'}
-          )
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      } else if (gender === 'men') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE gender IN ('men', 'unisex')
-            AND (
-              LOWER(brand) = ${query} 
-              OR LOWER(brand) LIKE ${query + ' %'} 
-              OR LOWER(brand) LIKE ${'% ' + query} 
-              OR LOWER(brand) LIKE ${'% ' + query + ' %'}
-            )
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      } else if (gender === 'women') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE gender IN ('women', 'unisex')
-            AND (
-              LOWER(brand) = ${query} 
-              OR LOWER(brand) LIKE ${query + ' %'} 
-              OR LOWER(brand) LIKE ${'% ' + query} 
-              OR LOWER(brand) LIKE ${'% ' + query + ' %'}
-            )
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      }
-    }
-
-    // === 4. ОБЫЧНЫЙ ПОИСК (ввод текста руками в строку: "dunk", "travis", и т.д.) ===
-    else {
-      if (gender === 'all') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE 
-            LOWER(brand) LIKE ${'%' + query + '%'}
-            OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
-            OR LOWER(name) LIKE ${'%' + query + '%'}
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      } else if (gender === 'men') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE gender IN ('men', 'unisex')
-            AND (
-              LOWER(brand) LIKE ${'%' + query + '%'}
-              OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
-              OR LOWER(name) LIKE ${'%' + query + '%'}
-            )
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      } else if (gender === 'women') {
-        rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
-          FROM sneakers
-          WHERE gender IN ('women', 'unisex')
-            AND (
-              LOWER(brand) LIKE ${'%' + query + '%'}
-              OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
-              OR LOWER(name) LIKE ${'%' + query + '%'}
-            )
-          ORDER BY updated_at DESC
-          LIMIT ${limit} OFFSET ${offset}
-        `
-      }
-    }
-
-    // Приводим к формату фронтенда
-    const results = rows.map((r) => {
-      const imgUrl = r.image_url ?? r.image ?? r.imageUrl ?? r.imageurl ?? null
-      const price = r.retail_price ?? r.retailprice ?? r.retailPrice ?? 0
-      const year = r.release_year ?? r.releaseyear ?? r.releaseYear ?? null
-
-      return {
-        id: r.id,
-        brand: r.brand,
-        name: r.name,
-        gender: r.gender || 'unisex',
-        retailPrice: price,
-        image: {
-          original: imgUrl
-        },
-        year: year,
-        sku: r.sku || null
-      }
-    })
-
-    return res.status(200).json({
-      results,
-      page,
-      limit,
-      total: globalTotal, 
-      lastUpdate: dbLastUpdate,
-      count: results.length
-    })
-  } catch (error: any) {
-    console.error('[get-top-sneakers]', error)
-    return res.status(500).json({
-      error: 'Database error',
-      message: error?.message || 'Unknown error'
-    })
+    await new Promise(resolve => setTimeout(resolve, 2000)) 
   }
+
+  await client.end()
+  console.log('\n🏁 МЕГА-ЦИКЛ ЗАВЕРШЕН!')
 }
+
+run()
