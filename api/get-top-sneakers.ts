@@ -16,14 +16,12 @@ export default async function handler(req: any, res: any) {
 
   const sql = neon(process.env.DATABASE_URL!)
 
-  // Параметры
   const query = (req.query.query || '').toString().toLowerCase().trim()
   const gender = (req.query.gender || 'all').toString().toLowerCase().trim()
   const page = Math.max(1, parseInt(req.query.page as string) || 1)
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 40))
   const offset = (page - 1) * limit
 
-  // Список точных брендов для "Умного поиска"
   const KNOWN_BRANDS = [
     'nike', 'jordan', 'adidas', 'yeezy', 'new balance', 'asics', 'converse', 
     'vans', 'puma', 'reebok', 'saucony', 'mizuno', 'salomon', 'hoka', 
@@ -37,25 +35,22 @@ export default async function handler(req: any, res: any) {
     'etnies', 'osiris', 'dc'
   ]
 
-  // Проверяем, является ли запрос кликом по бренду
   const isBrandSearch = KNOWN_BRANDS.includes(query)
 
   try {
-    // === ИСПРАВЛЕНИЕ: Убираем запрос к несуществующей колонке updated_at ===
-    const totalCountRes = await sql`SELECT count(*) as total FROM sneakers`
-    const globalTotal = parseInt(totalCountRes[0].total, 10)
-    
-    // Временно отдаем текущее время сервера, пока не добавим колонку в БД
-    const dbLastUpdate = new Date().toISOString() 
+    // === ВОЗВРАЩАЕМ РЕАЛЬНОЕ ВРЕМЯ ИЗ НОВОЙ КОЛОНКИ created_at ===
+    const metaRes = await sql`SELECT count(*) as total, max(created_at) as last_update FROM sneakers`
+    const globalTotal = parseInt(metaRes[0].total, 10)
+    const dbLastUpdate = metaRes[0].last_update 
 
     let rows: any[] = []
 
-    // === 2. Запрос "ВСЕ" (Пустой запрос) ===
     if (!query || query === 'all') {
       if (gender === 'all') {
         rows = await sql`
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
@@ -63,6 +58,7 @@ export default async function handler(req: any, res: any) {
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE gender IN ('men', 'unisex')
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'women') {
@@ -70,12 +66,12 @@ export default async function handler(req: any, res: any) {
           SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
           FROM sneakers
           WHERE gender IN ('women', 'unisex')
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       }
     }
     
-    // === 3. СТРОГИЙ ПОИСК ПО БРЕНДУ (Ищем самостоятельное слово в названии бренда) ===
     else if (isBrandSearch) {
       if (gender === 'all') {
         rows = await sql`
@@ -87,6 +83,7 @@ export default async function handler(req: any, res: any) {
             OR LOWER(brand) LIKE ${'% ' + query} 
             OR LOWER(brand) LIKE ${'% ' + query + ' %'}
           )
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
@@ -100,6 +97,7 @@ export default async function handler(req: any, res: any) {
               OR LOWER(brand) LIKE ${'% ' + query} 
               OR LOWER(brand) LIKE ${'% ' + query + ' %'}
             )
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'women') {
@@ -113,12 +111,12 @@ export default async function handler(req: any, res: any) {
               OR LOWER(brand) LIKE ${'% ' + query} 
               OR LOWER(brand) LIKE ${'% ' + query + ' %'}
             )
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       }
     }
 
-    // === 4. ОБЫЧНЫЙ ПОИСК (ввод текста руками в строку: "dunk", "travis", и т.д.) ===
     else {
       if (gender === 'all') {
         rows = await sql`
@@ -128,6 +126,7 @@ export default async function handler(req: any, res: any) {
             LOWER(brand) LIKE ${'%' + query + '%'}
             OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
             OR LOWER(name) LIKE ${'%' + query + '%'}
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
@@ -140,6 +139,7 @@ export default async function handler(req: any, res: any) {
               OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
               OR LOWER(name) LIKE ${'%' + query + '%'}
             )
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'women') {
@@ -152,12 +152,12 @@ export default async function handler(req: any, res: any) {
               OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query})
               OR LOWER(name) LIKE ${'%' + query + '%'}
             )
+          ORDER BY created_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       }
     }
 
-    // Приводим к формату фронтенда
     const results = rows.map((r) => {
       const imgUrl = r.image_url ?? r.image ?? r.imageUrl ?? r.imageurl ?? null
       const price = r.retail_price ?? r.retailprice ?? r.retailPrice ?? 0
@@ -169,9 +169,7 @@ export default async function handler(req: any, res: any) {
         name: r.name,
         gender: r.gender || 'unisex',
         retailPrice: price,
-        image: {
-          original: imgUrl
-        },
+        image: { original: imgUrl },
         year: year,
         sku: r.sku || null
       }
