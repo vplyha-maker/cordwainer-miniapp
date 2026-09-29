@@ -24,20 +24,20 @@ export default async function handler(req: any, res: any) {
   const offset = (page - 1) * limit
 
   try {
-    let rows: any[]
+    let rows: any[] = []
 
     // === 1. Без поискового запроса ===
     if (!query || query === 'all') {
       if (gender === 'all') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku, count(*) OVER() AS full_count
           FROM sneakers
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
       } else if (gender === 'men') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku, count(*) OVER() AS full_count
           FROM sneakers
           WHERE gender IN ('men', 'unisex')
           ORDER BY updated_at DESC
@@ -45,14 +45,12 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'women') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku, count(*) OVER() AS full_count
           FROM sneakers
           WHERE gender IN ('women', 'unisex')
           ORDER BY updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
-      } else {
-        rows = []
       }
     }
 
@@ -60,7 +58,7 @@ export default async function handler(req: any, res: any) {
     else {
       if (gender === 'all') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku, count(*) OVER() AS full_count
           FROM sneakers
           WHERE 
             LOWER(brand) = ${query}
@@ -79,7 +77,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'men') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku, count(*) OVER() AS full_count
           FROM sneakers
           WHERE 
             gender IN ('men', 'unisex')
@@ -101,7 +99,7 @@ export default async function handler(req: any, res: any) {
         `
       } else if (gender === 'women') {
         rows = await sql`
-          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku
+          SELECT id, brand, name, gender, retail_price, image_url, release_year, sku, count(*) OVER() AS full_count
           FROM sneakers
           WHERE 
             gender IN ('women', 'unisex')
@@ -121,10 +119,11 @@ export default async function handler(req: any, res: any) {
             updated_at DESC
           LIMIT ${limit} OFFSET ${offset}
         `
-      } else {
-        rows = []
       }
     }
+
+    // Вытаскиваем точное количество из первой строки, если данные есть
+    const total = rows.length > 0 ? parseInt(rows[0].full_count, 10) : 0
 
     // Приводим к формату, который ждёт фронтенд (жесткий маппинг)
     const results = rows.map((r) => {
@@ -150,6 +149,7 @@ export default async function handler(req: any, res: any) {
       results,
       page,
       limit,
+      total, // <-- Теперь эта переменная отправляется во фронтенд!
       count: results.length
     })
   } catch (error: any) {
