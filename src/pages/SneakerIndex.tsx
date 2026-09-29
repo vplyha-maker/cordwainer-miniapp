@@ -361,7 +361,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
   const [totalInDb, setTotalInDb] = useState<number | null>(null)
-  const [lastSync, setLastSync] = useState<string>('') // <-- Стейт для даты и времени обновления
+  const [lastSync, setLastSync] = useState<string>('') 
 
   const [selectedBrand, setSelectedBrand] = useState(initialQuery ? 'all' : 'nike')
   const [selectedGender, setSelectedGender] = useState('all')
@@ -545,10 +545,13 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         return updated
       })
 
-      // === Генерируем красивую дату и время успешной загрузки ===
-      const now = new Date()
-      const pad = (n: number) => n.toString().padStart(2, '0')
-      setLastSync(`${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`)
+      // === БЕРЕМ РЕАЛЬНОЕ ВРЕМЯ ПОСЛЕДНЕГО ДОБАВЛЕНИЯ КРОССОВОК ИЗ БД ===
+      if (data.lastUpdate) {
+        const dbDate = new Date(data.lastUpdate)
+        const pad = (n: number) => n.toString().padStart(2, '0')
+        // Форматируем дату в DD.MM.YYYY HH:MM
+        setLastSync(`${pad(dbDate.getDate())}.${pad(dbDate.getMonth() + 1)}.${dbDate.getFullYear()} ${pad(dbDate.getHours())}:${pad(dbDate.getMinutes())}`)
+      }
 
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -679,7 +682,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           <span>{t.back}</span>
         </button>
 
-        {/* КНОПКА АРХИВА С ВЕКТОРНЫМ СЕРДЦЕМ И ЦИФРОЙ ВНУТРИ */}
         <button
           onClick={() => {
             haptic('light');
@@ -736,7 +738,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 <span>{t.totalDb} {totalInDb}</span>
               </>
             )}
-            {/* БЛОК С ДАТОЙ И ВРЕМЕНЕМ ОБНОВЛЕНИЯ */}
             {lastSync && (
               <>
                 <span className="opacity-30 hidden sm:inline">|</span>
