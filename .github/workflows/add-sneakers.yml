@@ -1,1 +1,28 @@
+name: 👟 Авто-наполнение базы
+
+on:
+  workflow_dispatch: 
+  schedule:
+    - cron: '0 0 * * *' # БОНУС: Скрипт будет сам просыпаться каждую ночь в 00:00 и добавлять по 20 новых кроссовок!
+
+jobs:
+  run-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Скачиваем репозиторий
+        uses: actions/checkout@v3
+
+      - name: Устанавливаем Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Устанавливаем только нужное
+        run: npm install pg axios
+
+      - name: Запускаем авто-наполнение
+        env:
+          NEON_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+        run: node scripts/add-sneakers.js
 
