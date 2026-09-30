@@ -185,8 +185,29 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Автентичний колорит та витончене ручне плетіння шкіряних ремінців. Ідеальний комфорт для спекотних днів, що втілює дух свободи та багатовікові традиції ремісників.',
       de: 'Authentisches Flair und feines Handgeflecht aus Lederriemen. Idealer Komfort für heiße Tage, der den Geist der Freiheit und jahrhundertealte Handwerkstraditionen verkörpert.',
     },
+      {
+    id: 'riding',
+    video: '/Fason/Riding.mp4',
+    title: { ru: 'Жокейские сапоги', uk: 'Жокейські чоботи', de: 'Reiterstiefel' },
+    subtitle: { ru: 'Аристократичная стать', uk: 'Аристократична стать', de: 'Aristokratische Haltung' },
+    desc: {
+      ru: 'Строгие линии и элегантный прямой крой, вдохновленный конным спортом. Безупречно держат форму голенища, придавая любому образу благородство и утонченную строгость.',
+      uk: 'Строгі лінії та елегантний прямий крій, натхненний кінним спортом. Бездоганно тримають форму халяви, надаючи будь-якому образу шляхетності та витонченої суворості.',
+      de: 'Strenge Linien und ein eleganter, gerader Schnitt, inspiriert vom Reitsport. Sie behalten perfekt ihre Schaftform und verleihen jedem Look eine edle und raffinierte Strenge.',
+    },
+  },
+  {
+    id: 'gladiator',
+    video: '/Fason/Gladiator.mp4',
+    title: { ru: 'Гладиаторы', uk: 'Гладіатори', de: 'Gladiatoren' },
+    subtitle: { ru: 'Античная эстетика', uk: 'Антична естетика', de: 'Antike Ästhetik' },
+    desc: {
+      ru: 'Эффектное сплетение множества ремешков, изящно обхватывающих ногу. Смелый отсыл к историческому наследию, который делает даже самый простой летний наряд невероятно выразительным.',
+      uk: 'Ефектне сплетіння безлічі ремінців, що витончено охоплюють ногу. Сміливе відсилання до історичної спадщини, яке робить навіть найпростіше літнє вбрання неймовірно виразним.',
+      de: 'Ein spektakuläres Geflecht aus vielen Riemen, die das Bein elegant umschließen. Eine mutige Hommage an das historische Erbe, die selbst das einfachste Sommeroutfit unglaublich ausdrucksstark macht.',
+    },
   }
-]
+ ]
 
 type SlideItemProps = {
   slide: StyleSlide
