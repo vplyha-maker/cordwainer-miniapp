@@ -185,7 +185,7 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Автентичний колорит та витончене ручне плетіння шкіряних ремінців. Ідеальний комфорт для спекотних днів, що втілює дух свободи та багатовікові традиції ремісників.',
       de: 'Authentisches Flair und feines Handgeflecht aus Lederriemen. Idealer Komfort für heiße Tage, der den Geist der Freiheit und jahrhundertealte Handwerkstraditionen verkörpert.',
     },
-      {
+    {
     id: 'riding',
     video: '/Fason/Riding.mp4',
     title: { ru: 'Жокейские сапоги', uk: 'Жокейські чоботи', de: 'Reiterstiefel' },
