@@ -206,7 +206,7 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Ефектне сплетіння безлічі ремінців, що витончено охоплюють ногу. Сміливе відсилання до історичної спадщини, яке робить навіть найпростіше літнє вбрання неймовірно виразним.',
       de: 'Ein spektakuläres Geflecht aus vielen Riemen, die das Bein elegant umschließen. Eine mutige Hommage an das historische Erbe, die selbst das einfachste Sommeroutfit unglaublich ausdrucksstark macht.',
     },
-  }
+  },
  ]
 
 type SlideItemProps = {
