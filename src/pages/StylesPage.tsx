@@ -122,7 +122,7 @@ const STYLES_DATA: StyleSlide[] = [
     subtitle: { ru: 'Новая романтика', uk: 'Нова романтика', de: 'Neue Romantik' },
     desc: {
       ru: 'Символ утонченной женственности. Узнаваемый ремешок на подъеме и трогательный ретро-силуэт задают кокетливый, но неизменно элегантный тон.',
-      uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний টন.',
+      uk: 'Символ витонченої жіночності. Впізнаваний ремінець на підйомі та зворушливий ретро-силует задають кокетливий, але незмінно елегантний тон.',
       de: 'Ein Symbol raffinierter Weiblichkeit. Der markante Riemen über dem Spann und die berührende Retro-Silhouette geben einen koketten, aber stets eleganten Ton an.',
     },
     hideWatermark: true,
@@ -185,7 +185,8 @@ const STYLES_DATA: StyleSlide[] = [
       uk: 'Автентичний колорит та витончене ручне плетіння шкіряних ремінців. Ідеальний комфорт для спекотних днів, що втілює дух свободи та багатовікові традиції ремісників.',
       de: 'Authentisches Flair und feines Handgeflecht aus Lederriemen. Idealer Komfort für heiße Tage, der den Geist der Freiheit und jahrhundertealte Handwerkstraditionen verkörpert.',
     },
-    {
+  },
+  {
     id: 'riding',
     video: '/Fason/Riding.mp4',
     title: { ru: 'Жокейские сапоги', uk: 'Жокейські чоботи', de: 'Reiterstiefel' },
