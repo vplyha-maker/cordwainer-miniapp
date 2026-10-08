@@ -198,8 +198,7 @@ export default function HackerUploader() {
 
     // TextDecoder в режиме stream: true запоминает "оборванные"
     // UTF-8 байты между чанками и корректно склеивает их
-    const decoder = new TextDecoder('utf-8', { stream: true });
-
+    const decoder = new TextDecoder('utf-8');
     // Отправка одного батча строк на сервер
     const sendBatch = async (batch: Record<string, string>[]) => {
       if (batch.length === 0) return;
