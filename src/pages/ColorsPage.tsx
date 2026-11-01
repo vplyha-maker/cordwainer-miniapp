@@ -44,1044 +44,422 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 }
 
 /* ============================================================================
-   1. СНИКЕР В РАКУРСЕ 3/4 (3D RUNNER SILHOUETTE)
+   1. RUNNER — LUXURY LOW-TOP RUNNER (Стиль: Brunello Cucinelli / Loro Piana)
    ============================================================================ */
 function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0] // 60%/55% — Основной каркас, мысок, пятка
-  const secondaryColor = colors[1] // 30%/20% — Верх союзки, язычок, внешний валик воротника
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Внутренняя подкладка, стелька, танкетка
-  const accentColor = colors[colors.length - 1] // 10% — Протектор, свуш, лейбл стельки и язычка
+  const mainColor = colors[0]        // 60% — Кожаный остов (берцы, носок, пятка)
+  const secondaryColor = colors[1]   // 30% — Замшевая союзка, язычок, задник
+  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Подкладка, спойлер подошвы
+  const accentColor = colors[colors.length - 1] // 10% — Тонкий латеральный акцент, ходовой слой подошвы
 
-  const strokeColor = isDark ? 'rgba(244, 240, 232, 0.32)' : 'rgba(28, 24, 22, 0.28)'
-  const stitchColor = isDark ? 'rgba(244, 240, 232, 0.5)' : 'rgba(28, 24, 22, 0.45)'
-  const midsoleBase = isDark ? '#201F1D' : '#FCFBF9'
-  const midsoleSide = isDark ? '#121110' : '#E5DFD5'
-  const laceColor = isDark ? '#F0ECE1' : '#FFFFFF'
+  const strokeColor = isDark ? 'rgba(244, 240, 232, 0.4)' : 'rgba(28, 24, 22, 0.35)'
+  const stitchColor = isDark ? 'rgba(244, 240, 232, 0.55)' : 'rgba(28, 24, 22, 0.45)'
+  const soleBase = isDark ? '#1C1A18' : '#FAF8F5'
 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 640 400"
-      className="w-full h-auto max-h-[250px] md:max-h-[320px] select-none overflow-visible"
-      style={{
-        filter: isDark
-          ? 'drop-shadow(0 28px 36px rgba(0,0,0,0.65))'
-          : 'drop-shadow(0 22px 30px rgba(0,0,0,0.1))',
-      }}
+      viewBox="0 0 680 320"
+      className="w-full h-auto max-h-[220px] md:max-h-[280px] select-none"
     >
       <defs>
-        <radialGradient id="r3d-floor" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.8' : '0.22'} />
-          <stop offset="65%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.06'} />
+        {/* Журнальная мягкая тень от студийного софтбокса */}
+        <radialGradient id="r-shadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.6' : '0.14'} />
+          <stop offset="60%" stopColor="#000000" stopOpacity={isDark ? '0.15' : '0.03'} />
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        {/* 3D объем для внешних кожаных деталей */}
-        <linearGradient id="r3d-mainVol" x1="15%" y1="0%" x2="45%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.22' : '0.35'} />
-          <stop offset="40%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.5' : '0.28'} />
+        {/* Благородный матовый градиент верха (кожа/нубук без бликов пластика) */}
+        <linearGradient id="r-matte" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.08' : '0.15'} />
+          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.35' : '0.18'} />
         </linearGradient>
 
-        {/* Верхний свет для союзки и язычка (плоскости, обращенные вверх к зрителю) */}
-        <linearGradient id="r3d-topPlane" x1="0%" y1="0%" x2="80%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.28' : '0.42'} />
-          <stop offset="55%" stopColor="#ffffff" stopOpacity="0.02" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.3" />
-        </linearGradient>
-
-        {/* Глубокая 3D-тень внутри горловины (Подкладка) */}
-        <linearGradient id="r3d-liningDepth" x1="0%" y1="0%" x2="90%" y2="100%">
-          <stop offset="0%" stopColor="#000000" stopOpacity="0.08" />
-          <stop offset="50%" stopColor="#000000" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.78" />
-        </linearGradient>
-
-        {/* Тень для стельки, уходящей внутрь носка */}
-        <linearGradient id="r3d-insoleGrad" x1="0%" y1="20%" x2="100%" y2="80%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.12" />
-          <stop offset="45%" stopColor="#000000" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.82" />
-        </linearGradient>
-
-        <linearGradient id="r3d-midsole" x1="0%" y1="0%" x2="10%" y2="100%">
-          <stop offset="0%" stopColor={midsoleBase} />
-          <stop offset="100%" stopColor={midsoleSide} />
+        <linearGradient id="r-suede" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.05' : '0.1'} />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0.22" />
         </linearGradient>
       </defs>
 
-      {/* Тень на полу под углом 3/4 */}
-      <ellipse
-        cx="330"
-        cy="346"
-        rx="265"
-        ry="26"
-        transform="rotate(2.5 330 346)"
-        fill="url(#r3d-floor)"
-      />
+      <ellipse cx="340" cy="285" rx="270" ry="12" fill="url(#r-shadow)" />
 
-      {/* 1. ДАЛЬНЯЯ (МЕДИАЛЬНАЯ) ПЛАНКА ШНУРОВКИ И ЗАДНИЙ КАНТ */}
-      <g style={{ transition: 'all 0.5s ease' }}>
+      <g stroke={strokeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.5s ease' }}>
+        
+        {/* ХОДОВОЙ СЛОЙ ПОДОШВЫ (Outsole — Accent 10%) */}
         <path
-          d="M 218 114 C 242 92, 265 95, 295 122 C 335 156, 378 188, 412 204 L 365 225 L 205 155 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-        />
-        <path
-          d="M 218 114 C 242 92, 265 95, 295 122 C 335 156, 378 188, 412 204 L 365 225 L 205 155 Z"
-          fill="#000000"
-          fillOpacity="0.28"
-        />
-      </g>
-
-      {/* 2. ОТКРЫТАЯ 3D-ЧАША ГОРЛОВИНЫ: ПОДКЛАДКА И СТЕЛЬКА (Tertiary 15%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Внешний валик дальнего борта воротника */}
-        <path
-          d="M 88 152 C 95 116, 158 102, 224 116 C 242 120, 255 135, 258 155 L 92 188 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-        />
-        <path
-          d="M 88 152 C 95 116, 158 102, 224 116 C 242 120, 255 135, 258 155 L 92 188 Z"
-          fill="#000000"
-          fillOpacity="0.15"
-        />
-
-        {/* Внутренняя стенка подкладки (Lining) */}
-        <path
-          d="M 96 154 C 106 124, 162 112, 218 124 C 242 130, 262 152, 265 182 L 222 225 L 102 212 Z"
-          fill={tertiaryColor}
-          stroke={strokeColor}
+          d="M 108 266 L 568 266 C 586 266, 598 258, 604 246 L 588 246 C 540 256, 440 260, 340 260 C 230 260, 150 258, 106 254 Z"
+          fill={accentColor}
           strokeWidth="1.2"
         />
-        <path
-          d="M 96 154 C 106 124, 162 112, 218 124 C 242 130, 262 152, 265 182 L 222 225 L 102 212 Z"
-          fill="url(#r3d-liningDepth)"
-        />
-        {/* Вертикальные ребра мягкой текстильной подкладки пятки */}
-        <path
-          d="M 132 124 C 128 148, 128 172, 134 195 M 168 121 C 165 145, 165 170, 172 195"
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth="1"
-          opacity="0.6"
-        />
 
-        {/* Видимая стелька на дне обуви (Insole / Footbed) */}
+        {/* МЕЖПОДОШВА (Midsole — Элегантная белая/кремовая база с клином) */}
         <path
-          d="M 110 182 C 142 168, 195 170, 245 188 L 218 228 L 108 210 Z"
-          fill={tertiaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 110 182 C 142 168, 195 170, 245 188 L 218 228 L 108 210 Z"
-          fill="url(#r3d-insoleGrad)"
-        />
-        {/* Фирменный подпятник на стельке (Акцент 10%) */}
-        <path
-          d="M 132 184 L 176 188 L 166 202 L 124 196 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="0.9"
-        />
-      </g>
-
-      {/* 3. ОБЪЕМНЫЙ ЯЗЫЧОК В 3/4 (Tongue — Secondary 30%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 206 168 C 208 122, 224 84, 252 76 C 278 70, 305 84, 315 112 C 335 152, 368 186, 405 208 L 285 228 C 252 208, 222 188, 206 168 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 206 168 C 208 122, 224 84, 252 76 C 278 70, 305 84, 315 112 C 335 152, 368 186, 405 208 L 285 228 C 252 208, 222 188, 206 168 Z"
-          fill="url(#r3d-topPlane)"
-        />
-        {/* Тканый лейбл на вершине язычка (Акцент 10%) */}
-        <path
-          d="M 246 78 C 266 74, 286 78, 298 88 L 286 112 C 272 102, 254 98, 236 102 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.1"
-        />
-      </g>
-
-      {/* 4. ВЕРХНЯЯ ПЛОСКОСТЬ МЫСКА И СОЮЗКИ В 3/4 (Vamp — Secondary 30%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 295 198 L 395 190 C 448 202, 505 212, 552 232 C 572 242, 578 258, 565 274 C 510 296, 415 304, 325 296 L 178 282 L 185 204 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-        />
-        <path
-          d="M 295 198 L 395 190 C 448 202, 505 212, 552 232 C 572 242, 578 258, 565 274 C 510 296, 415 304, 325 296 L 178 282 L 185 204 Z"
-          fill="url(#r3d-topPlane)"
-        />
-        {/* Перспективная 3D-сетка перфорации на верхней площадке носка */}
-        <g fill={strokeColor} opacity="0.75">
-          <ellipse cx="445" cy="216" rx="2.8" ry="1.6" transform="rotate(12 445 216)" />
-          <ellipse cx="464" cy="220" rx="2.8" ry="1.6" transform="rotate(12 464 220)" />
-          <ellipse cx="483" cy="224" rx="2.8" ry="1.6" transform="rotate(12 483 224)" />
-          <ellipse cx="502" cy="229" rx="2.8" ry="1.6" transform="rotate(12 502 229)" />
-          <ellipse cx="435" cy="228" rx="2.8" ry="1.6" transform="rotate(12 435 228)" />
-          <ellipse cx="454" cy="232" rx="2.8" ry="1.6" transform="rotate(12 454 232)" />
-          <ellipse cx="473" cy="236" rx="2.8" ry="1.6" transform="rotate(12 473 236)" />
-          <ellipse cx="492" cy="241" rx="2.8" ry="1.6" transform="rotate(12 492 241)" />
-        </g>
-      </g>
-
-      {/* 5. ПЕРЕДНИЙ (ЛАТЕРАЛЬНЫЙ) ВОРОТНИК, ПЕРЕКРЫВАЮЩИЙ ПОДКЛАДКУ */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 88 152 C 102 162, 132 182, 168 196 C 198 206, 224 192, 244 162 L 266 184 L 162 242 L 72 202 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-        />
-        <path
-          d="M 88 152 C 102 162, 132 182, 168 196 C 198 206, 224 192, 244 162 L 266 184 L 162 242 L 72 202 Z"
-          fill="url(#r3d-mainVol)"
-        />
-        {/* Объемный кант горловины (отделяет внешнюю часть от внутренней подкладки) */}
-        <path
-          d="M 88 152 C 102 162, 132 182, 168 196 C 198 206, 224 192, 244 162"
-          fill="none"
-          stroke={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.8)'}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      </g>
-
-      {/* 6. 3D ШНУРОВКА МЕЖДУ ДВУМЯ БОРТАМИ */}
-      <g>
-        {[
-          { x1: 256, y1: 145, x2: 298, y2: 122, accent: true },
-          { x1: 282, y1: 166, x2: 324, y2: 144, accent: true },
-          { x1: 308, y1: 185, x2: 350, y2: 164, accent: false },
-          { x1: 334, y1: 202, x2: 375, y2: 182, accent: false },
-          { x1: 360, y1: 216, x2: 398, y2: 198, accent: false },
-        ].map((lace, idx) => (
-          <g key={idx}>
-            {/* Тень от шнурка на язычке */}
-            <path
-              d={`M ${lace.x1} ${lace.y1 + 3} Q ${(lace.x1 + lace.x2) / 2} ${(lace.y1 + lace.y2) / 2 - 4} ${lace.x2} ${lace.y2 + 3}`}
-              fill="none"
-              stroke="#000000"
-              strokeWidth="6"
-              strokeLinecap="round"
-              opacity="0.22"
-            />
-            {/* Объемный плоский шнурок */}
-            <path
-              d={`M ${lace.x1} ${lace.y1} Q ${(lace.x1 + lace.x2) / 2} ${(lace.y1 + lace.y2) / 2 - 8} ${lace.x2} ${lace.y2}`}
-              fill="none"
-              stroke={laceColor}
-              strokeWidth="6"
-              strokeLinecap="round"
-            />
-            <path
-              d={`M ${lace.x1} ${lace.y1} Q ${(lace.x1 + lace.x2) / 2} ${(lace.y1 + lace.y2) / 2 - 8} ${lace.x2} ${lace.y2}`}
-              fill="none"
-              stroke={strokeColor}
-              strokeWidth="6"
-              strokeLinecap="round"
-              opacity="0.3"
-            />
-          </g>
-        ))}
-      </g>
-
-      {/* 7. ОСНОВНОЙ БОКОВОЙ КАРКАС / БЕРЦЫ (Main 60%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 152 222 C 192 212, 224 182, 242 146 C 250 130, 264 128, 276 138 C 310 168, 352 200, 396 220 C 374 248, 360 275, 356 302 L 178 294 C 160 270, 152 246, 152 222 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 152 222 C 192 212, 224 182, 242 146 C 250 130, 264 128, 276 138 C 310 168, 352 200, 396 220 C 374 248, 360 275, 356 302 L 178 294 C 160 270, 152 246, 152 222 Z"
-          fill="url(#r3d-mainVol)"
-        />
-        <path
-          d="M 160 226 C 198 216, 228 186, 246 152 C 253 138, 263 137, 272 145 C 304 174, 344 204, 386 223 C 366 248, 353 274, 349 298"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1.1"
-          strokeDasharray="3.5 3.5"
-        />
-        {/* Ближние люверсы поверх планки */}
-        {[
-          { x: 258, y: 146, accent: true },
-          { x: 284, y: 167, accent: true },
-          { x: 310, y: 186, accent: false },
-          { x: 336, y: 203, accent: false },
-          { x: 362, y: 217, accent: false },
-        ].map((eye, idx) => (
-          <g key={idx}>
-            <circle
-              cx={eye.x}
-              cy={eye.y}
-              r="5.2"
-              fill={eye.accent ? accentColor : tertiaryColor}
-              stroke={strokeColor}
-              strokeWidth="1.2"
-            />
-            <circle cx={eye.x} cy={eye.y} r="2.2" fill="#181818" />
-          </g>
-        ))}
-      </g>
-
-      {/* 8. ОБЪЕМНЫЙ ОБТЕКАТЕЛЬ МЫСКА В 3/4 (Mudguard — Main 60%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 336 302 C 344 260, 380 236, 432 240 C 482 244, 535 236, 562 232 C 578 245, 582 264, 572 280 C 512 304, 422 308, 336 302 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 336 302 C 344 260, 380 236, 432 240 C 482 244, 535 236, 562 232 C 578 245, 582 264, 572 280 C 512 304, 422 308, 336 302 Z"
-          fill="url(#r3d-mainVol)"
-        />
-        <path
-          d="M 344 296 C 352 262, 385 243, 432 247 C 480 250, 530 243, 558 239"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1.1"
-          strokeDasharray="3.5 3.5"
-        />
-      </g>
-
-      {/* 9. ЗАДНИК И ФИКСАТОР ПЯТКИ (Heel Counter — Main 60% + Tertiary 15%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 56 286 C 52 240, 65 190, 88 152 C 110 180, 144 202, 188 216 C 202 244, 208 272, 204 296 C 145 295, 92 292, 56 286 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 56 286 C 52 240, 65 190, 88 152 C 110 180, 144 202, 188 216 C 202 244, 208 272, 204 296 C 145 295, 92 292, 56 286 Z"
-          fill="url(#r3d-mainVol)"
-        />
-        {/* Внешний 3D-стабилизатор пятки (Heel Clip) */}
-        <path
-          d="M 56 286 C 54 264, 58 244, 68 230 C 100 245, 136 260, 162 295 C 122 294, 84 291, 56 286 Z"
-          fill={tertiaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.3"
-        />
-        {/* Петля на пятке */}
-        <path
-          d="M 68 164 C 60 150, 64 132, 78 128 C 86 126, 90 138, 88 152 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 85 162 C 106 186, 138 206, 180 220 C 192 246, 198 272, 195 292"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1.1"
-          strokeDasharray="3.5 3.5"
-        />
-      </g>
-
-      {/* 10. БОКОВОЙ Сoncept-ЛОГОТИП (Accent 10%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 166 228 C 208 262, 280 270, 375 236 C 315 280, 235 292, 152 258 C 142 252, 148 215, 166 228 Z"
-          fill={accentColor}
-          stroke={strokeColor}
+          d="M 98 238 C 96 250, 102 260, 108 266 C 210 268, 380 268, 568 266 C 586 266, 598 258, 604 246 C 606 235, 598 226, 582 224 C 510 236, 420 242, 320 242 C 210 242, 140 240, 98 238 Z"
+          fill={soleBase}
           strokeWidth="1.4"
-          strokeLinejoin="round"
         />
-      </g>
-
-      {/* 11. 3D-ПОДОШВА В ПЕРСПЕКТИВЕ 3/4 (Midsole & Outsole) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Протектор (Outsole — Accent 10%) */}
+        {/* Задний спойлер-стабилизатор подошвы (Tertiary 15%) */}
         <path
-          d="M 64 320 C 66 335, 98 342, 150 343 L 252 343 L 260 335 L 278 335 L 285 343 L 432 343 C 505 343, 566 326, 584 298 L 575 286 C 520 315, 420 326, 305 325 C 190 324, 102 322, 64 320 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-
-        {/* Объемная межподошва (Midsole) */}
-        <path
-          d="M 56 286 C 50 304, 55 318, 64 324 C 142 330, 250 332, 360 332 C 472 332, 548 316, 584 298 C 590 282, 584 268, 572 266 C 508 294, 415 304, 305 300 C 195 296, 118 294, 56 286 Z"
-          fill="url(#r3d-midsole)"
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-
-        {/* Амортизирующая капсула в пятке (Tertiary 15%) */}
-        <path
-          d="M 80 300 C 126 304, 185 306, 228 306 C 236 306, 240 311, 240 316 C 240 321, 234 324, 226 324 C 178 324, 120 321, 76 316 C 70 312, 74 302, 80 300 Z"
+          d="M 98 238 C 96 245, 100 252, 106 256 L 225 256 C 230 256, 234 252, 234 247 C 234 242, 230 240, 222 240 L 115 238 Z"
           fill={tertiaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.1"
-        />
-
-        {/* Грань 3D-пресса подошвы */}
-        <path
-          d="M 60 308 C 155 315, 278 317, 405 314 C 492 312, 550 298, 582 284"
-          fill="none"
-          stroke={strokeColor}
+          fillOpacity="0.85"
           strokeWidth="1"
         />
+
+        {/* ПОДКЛАДКА ВОРОТНИКА (Collar Lining — Tertiary 15%) */}
+        <path
+          d="M 148 116 C 172 108, 204 122, 232 142 C 255 158, 276 154, 290 128 L 272 106 C 242 118, 185 108, 148 116 Z"
+          fill={tertiaryColor}
+          strokeWidth="1.2"
+        />
+
+        {/* ЯЗЫЧОК (Tongue — Secondary 30%) */}
+        <path
+          d="M 272 106 C 280 84, 302 78, 320 86 C 342 108, 372 152, 408 188 L 316 202 C 290 168, 274 130, 272 106 Z"
+          fill={secondaryColor}
+          strokeWidth="1.3"
+        />
+        <path
+          d="M 272 106 C 280 84, 302 78, 320 86 C 342 108, 372 152, 408 188 L 316 202 Z"
+          fill="url(#r-suede)"
+        />
+
+        {/* ВЕРХНЯЯ СОЮЗКА (Vamp — Secondary 30%) */}
+        <path
+          d="M 224 172 L 400 170 C 445 184, 498 198, 545 208 C 532 232, 460 242, 360 242 L 224 238 Z"
+          fill={secondaryColor}
+          strokeWidth="1.3"
+        />
+        <path
+          d="M 224 172 L 400 170 C 445 184, 498 198, 545 208 C 532 232, 460 242, 360 242 L 224 238 Z"
+          fill="url(#r-suede)"
+        />
+
+        {/* ОСНОВНОЙ КАРКАС И БЕРЦЫ (Quarters Overlay — Main 60%) */}
+        <path
+          d="M 198 188 C 238 178, 268 145, 285 116 C 294 104, 305 102, 315 110 C 345 138, 382 170, 420 188 C 400 212, 386 235, 382 242 L 222 242 C 205 224, 198 206, 198 188 Z"
+          fill={mainColor}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M 198 188 C 238 178, 268 145, 285 116 C 294 104, 305 102, 315 110 C 345 138, 382 170, 420 188 C 400 212, 386 235, 382 242 L 222 242 Z"
+          fill="url(#r-matte)"
+        />
+        <path
+          d="M 205 192 C 242 182, 270 150, 288 122 C 296 110, 304 110, 312 116 C 340 144, 375 174, 410 191"
+          fill="none"
+          stroke={stitchColor}
+          strokeWidth="1"
+          strokeDasharray="3 3"
+        />
+
+        {/* НОСОК-ОБТЕКАТЕЛЬ (Toe Cap — Main 60%) */}
+        <path
+          d="M 368 242 C 374 212, 404 195, 450 198 C 495 200, 540 202, 562 208 C 576 218, 582 228, 574 236 C 520 244, 442 244, 368 242 Z"
+          fill={mainColor}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M 368 242 C 374 212, 404 195, 450 198 C 495 200, 540 202, 562 208 C 576 218, 582 228, 574 236 Z"
+          fill="url(#r-matte)"
+        />
+
+        {/* ЗАДНИК (Heel Counter — Main 60%) */}
+        <path
+          d="M 98 238 C 95 204, 105 160, 126 125 C 145 146, 178 165, 222 178 C 234 202, 238 224, 236 242 C 185 242, 135 240, 98 238 Z"
+          fill={mainColor}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M 98 238 C 95 204, 105 160, 126 125 C 145 146, 178 165, 222 178 C 234 202, 238 224, 236 242 Z"
+          fill="url(#r-matte)"
+        />
+
+        {/* ДИЗАЙНЕРСКАЯ АКЦЕНТНАЯ ЛИНИЯ (Accent 10%) */}
+        <path
+          d="M 215 198 C 255 225, 315 228, 395 198 C 345 235, 275 242, 202 216 Z"
+          fill={accentColor}
+          strokeWidth="1.2"
+        />
+
+        {/* ШНУРОВКА (Минималистичные белые/светлые штрихи) */}
+        {[
+          { x1: 304, y1: 122, x2: 328, y2: 110 },
+          { x1: 326, y1: 140, x2: 350, y2: 128 },
+          { x1: 348, y1: 156, x2: 372, y2: 144 },
+          { x1: 370, y1: 172, x2: 394, y2: 160 },
+        ].map((l, i) => (
+          <path
+            key={i}
+            d={`M ${l.x1} ${l.y1} L ${l.x2} ${l.y2}`}
+            stroke={isDark ? '#FAF8F5' : '#FFFFFF'}
+            strokeWidth="3.5"
+            strokeLinecap="round"
+          />
+        ))}
       </g>
     </svg>
   )
 }
 
 /* ============================================================================
-   2. КЛАССИЧЕСКИЕ ДЕРБИ БРОГИ В РАКУРСЕ 3/4 (3D DERBY SILHOUETTE)
+   2. DERBY — BESPOKE CLASSIC BROGUE (Стиль: John Lobb / Edward Green)
    ============================================================================ */
 function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0] // 60%/55% — Берцы, крыловидный мысок с медальоном, задник
-  const secondaryColor = colors[1] // 30%/20% — Верх союзки и язычок
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Внутренняя кожаная подкладка, стелька и рант Гудьир
-  const accentColor = colors[colors.length - 1] // 10% — Набойка, профилактика, тиснение на стельке, шнурки
+  const mainColor = colors[0]        // 60% — Берцы, крыловидный мысок (Wingtip), пяточный стакан
+  const secondaryColor = colors[1]   // 30% — Союзка (Vamp), язычок
+  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Кожаная подкладка, рант Goodyear
+  const accentColor = colors[colors.length - 1] // 10% — Набойка каблука, подошва, шнурки
 
-  const strokeColor = isDark ? 'rgba(244, 240, 232, 0.32)' : 'rgba(28, 24, 22, 0.28)'
-  const stitchColor = isDark ? 'rgba(244, 240, 232, 0.52)' : 'rgba(28, 24, 22, 0.45)'
-  const soleLeather = isDark ? '#261F1B' : '#DAC8B5'
-  const soleEdge = isDark ? '#15110E' : '#B2997E'
+  const strokeColor = isDark ? 'rgba(244, 240, 232, 0.4)' : 'rgba(28, 24, 22, 0.35)'
+  const stitchColor = isDark ? 'rgba(244, 240, 232, 0.55)' : 'rgba(28, 24, 22, 0.45)'
+  const soleWood = isDark ? '#2B221E' : '#C8B29B'
 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 640 400"
-      className="w-full h-auto max-h-[250px] md:max-h-[320px] select-none overflow-visible"
-      style={{
-        filter: isDark
-          ? 'drop-shadow(0 28px 36px rgba(0,0,0,0.65))'
-          : 'drop-shadow(0 22px 30px rgba(0,0,0,0.1))',
-      }}
+      viewBox="0 0 680 320"
+      className="w-full h-auto max-h-[220px] md:max-h-[280px] select-none"
     >
       <defs>
-        <radialGradient id="d3d-floor" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.8' : '0.22'} />
-          <stop offset="65%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.06'} />
+        <radialGradient id="d-shadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.6' : '0.14'} />
+          <stop offset="60%" stopColor="#000000" stopOpacity={isDark ? '0.15' : '0.03'} />
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        <linearGradient id="d3d-calf" x1="10%" y1="0%" x2="35%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.26' : '0.4'} />
-          <stop offset="38%" stopColor="#ffffff" stopOpacity="0.03" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.52' : '0.3'} />
-        </linearGradient>
-
-        <linearGradient id="d3d-topVamp" x1="0%" y1="0%" x2="80%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.25' : '0.38'} />
-          <stop offset="50%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.32" />
-        </linearGradient>
-
-        {/* Глубокая 3D-тень внутри кожаной горловины Дерби */}
-        <linearGradient id="d3d-lining" x1="0%" y1="0%" x2="90%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.1" />
-          <stop offset="45%" stopColor="#000000" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.75" />
-        </linearGradient>
-
-        <linearGradient id="d3d-insole" x1="0%" y1="0%" x2="100%" y2="85%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
-          <stop offset="45%" stopColor="#000000" stopOpacity="0.15" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.82" />
-        </linearGradient>
-
-        <linearGradient id="d3d-sole" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={soleLeather} />
-          <stop offset="100%" stopColor={soleEdge} />
+        {/* Глассаж / лоск полированной телячьей кожи */}
+        <linearGradient id="d-glacage" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.15' : '0.22'} />
+          <stop offset="45%" stopColor="#ffffff" stopOpacity="0.02" />
+          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.4' : '0.2'} />
         </linearGradient>
       </defs>
 
-      <ellipse
-        cx="330"
-        cy="346"
-        rx="260"
-        ry="24"
-        transform="rotate(2 330 346)"
-        fill="url(#d3d-floor)"
-      />
+      <ellipse cx="340" cy="285" rx="265" ry="11" fill="url(#d-shadow)" />
 
-      {/* 1. ДАЛЬНЕЕ (МЕДИАЛЬНОЕ) КРЫЛО БЕРЦЕВ ОТКРЫТОЙ ШНУРОВКИ */}
-      <g style={{ transition: 'all 0.5s ease' }}>
+      <g stroke={strokeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.5s ease' }}>
+        
+        {/* НАБОРНЫЙ КАБЛУК И ПОДОШВА (Leather Sole & Stacked Heel) */}
+        {/* Каблук */}
+        <path d="M 112 248 L 205 250 L 205 274 L 112 274 Z" fill={soleWood} strokeWidth="1.4" />
+        <line x1="112" y1="257" x2="205" y2="258" stroke={strokeColor} strokeWidth="0.9" />
+        <line x1="112" y1="265" x2="205" y2="266" stroke={strokeColor} strokeWidth="0.9" />
+        {/* Набойка (Accent 10%) */}
+        <path d="M 112 274 L 205 274 L 203 282 L 115 282 Z" fill={accentColor} strokeWidth="1.2" />
+
+        {/* Профиль подошвы с выраженной талией (Fiddleback Waist) */}
         <path
-          d="M 228 122 C 250 105, 272 108, 298 132 C 334 162, 368 188, 398 205 L 348 228 L 215 168 Z"
-          fill={mainColor}
-          stroke={strokeColor}
+          d="M 205 250 C 240 250, 275 264, 320 268 L 525 268 C 555 268, 580 260, 592 248 L 588 240 C 545 252, 450 255, 320 255 C 260 255, 230 242, 205 242 Z"
+          fill={soleWood}
           strokeWidth="1.4"
         />
+        {/* Профилактика подошвы (Accent 10%) */}
         <path
-          d="M 228 122 C 250 105, 272 108, 298 132 C 334 162, 368 188, 398 205 L 348 228 L 215 168 Z"
-          fill="#000000"
-          fillOpacity="0.28"
-        />
-      </g>
-
-      {/* 2. ОТКРЫТАЯ 3D-ГОРЛОВИНА: КОЖАНАЯ ПОДКЛАДКА И СТЕЛЬКА (Tertiary 15%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Петля на пятке */}
-        <path
-          d="M 80 166 C 70 154, 72 138, 84 134 C 92 132, 95 144, 92 160 Z"
+          d="M 310 268 L 525 268 C 550 268, 572 262, 588 252 L 570 274 C 550 280, 515 282, 470 282 L 325 282 Z"
           fill={accentColor}
-          stroke={strokeColor}
           strokeWidth="1.2"
         />
 
-        {/* Дальняя внутренняя стенка кожаной подкладки (без зазоров, уходит глубоко под берцы) */}
+        {/* РАНТ ГУДЬИР (Goodyear Welt — Tertiary 15%) */}
         <path
-          d="M 86 158 C 102 124, 165 112, 232 126 C 255 132, 270 155, 272 185 L 235 235 L 90 225 Z"
+          d="M 106 238 C 175 242, 245 242, 320 254 C 435 255, 525 250, 586 238 L 588 244 C 530 256, 440 262, 320 260 C 235 248, 165 248, 106 244 Z"
           fill={tertiaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-        />
-        <path
-          d="M 86 158 C 102 124, 165 112, 232 126 C 255 132, 270 155, 272 185 L 235 235 L 90 225 Z"
-          fill="url(#d3d-lining)"
-        />
-        {/* Задний внутренний шов пяточного кармана */}
-        <path
-          d="M 118 126 C 112 150, 112 175, 116 198"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-
-        {/* Анатомическая кожаная стелька на дне горловины (Insole) */}
-        <path
-          d="M 98 184 C 138 168, 195 170, 255 190 L 225 232 L 96 218 Z"
-          fill={tertiaryColor}
-          stroke={strokeColor}
           strokeWidth="1.2"
         />
         <path
-          d="M 98 184 C 138 168, 195 170, 255 190 L 225 232 L 96 218 Z"
-          fill="url(#d3d-insole)"
-        />
-        {/* Тисненый герб Cordwainer на подпятнике стельки (Акцент 10%) */}
-        <path
-          d="M 122 184 L 172 189 L 162 204 L 114 197 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="0.9"
-        />
-      </g>
-
-      {/* 3. КОЖАНЫЙ ЯЗЫЧОК В РАКУРСЕ 3/4 (Secondary 30%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 218 175 C 222 135, 238 102, 262 96 C 284 92, 306 104, 318 128 C 338 162, 366 190, 396 208 L 288 228 C 255 210, 230 192, 218 175 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-        />
-        <path
-          d="M 218 175 C 222 135, 238 102, 262 96 C 284 92, 306 104, 318 128 C 338 162, 366 190, 396 208 L 288 228 C 255 210, 230 192, 218 175 Z"
-          fill="url(#d3d-topVamp)"
-        />
-      </g>
-
-      {/* 4. ОБЪЕМНАЯ СОЮЗКА В 3/4 (Vamp — Secondary 30%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 285 202 L 382 195 C 435 208, 488 222, 535 238 C 515 280, 425 304, 322 302 L 195 292 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-        />
-        <path
-          d="M 285 202 L 382 195 C 435 208, 488 222, 535 238 C 515 280, 425 304, 322 302 L 195 292 Z"
-          fill="url(#d3d-topVamp)"
-        />
-      </g>
-
-      {/* 5. ВОЩЕНАЯ ШНУРОВКА МЕЖДУ ДВУМЯ БЕРЦАМИ */}
-      <g>
-        {[
-          { x1: 274, y1: 152, x2: 308, y2: 132 },
-          { x1: 298, y1: 170, x2: 332, y2: 150 },
-          { x1: 322, y1: 188, x2: 355, y2: 168 },
-          { x1: 346, y1: 204, x2: 378, y2: 185 },
-        ].map((lace, idx) => (
-          <g key={idx}>
-            <path
-              d={`M ${lace.x1} ${lace.y1 + 2} Q ${(lace.x1 + lace.x2) / 2} ${(lace.y1 + lace.y2) / 2 - 4} ${lace.x2} ${lace.y2 + 2}`}
-              fill="none"
-              stroke="#000000"
-              strokeWidth="4"
-              strokeLinecap="round"
-              opacity="0.25"
-            />
-            <path
-              d={`M ${lace.x1} ${lace.y1} Q ${(lace.x1 + lace.x2) / 2} ${(lace.y1 + lace.y2) / 2 - 6} ${lace.x2} ${lace.y2}`}
-              fill="none"
-              stroke={accentColor}
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              style={{ transition: 'all 0.5s ease' }}
-            />
-          </g>
-        ))}
-      </g>
-
-      {/* 6. ПЕРЕДНИЕ (ЛАТЕРАЛЬНЫЕ) БЕРЦЫ ОТКРЫТОЙ ШНУРОВКИ (Main 60%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 86 158 C 110 175, 146 196, 184 205 C 218 212, 242 182, 260 144 C 266 132, 278 132, 288 142 C 320 170, 355 198, 388 215 C 362 232, 346 256, 358 276 C 325 292, 295 300, 275 302 L 155 292 L 82 225 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 86 158 C 110 175, 146 196, 184 205 C 218 212, 242 182, 260 144 C 266 132, 278 132, 288 142 C 320 170, 355 198, 388 215 C 362 232, 346 256, 358 276 C 325 292, 295 300, 275 302 L 155 292 L 82 225 Z"
-          fill="url(#d3d-calf)"
-        />
-        {/* Светлый кант по верхнему срезу кожи горловины для 3D-разделения с подкладкой */}
-        <path
-          d="M 86 158 C 110 175, 146 196, 184 205 C 218 212, 242 182, 260 144"
-          fill="none"
-          stroke={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.8)'}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
-        {/* Двойная строчка и брогирование берцев */}
-        <path
-          d="M 266 148 C 298 176, 332 202, 376 218 C 352 235, 338 256, 348 274"
+          d="M 112 242 C 180 245, 248 245, 320 257 C 430 258, 520 253, 580 241"
           fill="none"
           stroke={stitchColor}
           strokeWidth="1.1"
-          strokeDasharray="3 3"
-        />
-        <g fill={strokeColor} opacity="0.8">
-          <circle cx="370" cy="225" r="2" />
-          <circle cx="360" cy="234" r="2" />
-          <circle cx="353" cy="245" r="2" />
-          <circle cx="350" cy="257" r="2" />
-          <circle cx="353" cy="269" r="2" />
-        </g>
-        {/* Металлические люверсы */}
-        {[
-          { x: 274, y: 152, accent: true },
-          { x: 298, y: 170, accent: false },
-          { x: 322, y: 188, accent: false },
-          { x: 346, y: 204, accent: false },
-        ].map((eye, idx) => (
-          <g key={idx}>
-            <circle
-              cx={eye.x}
-              cy={eye.y}
-              r="4.5"
-              fill={eye.accent ? accentColor : tertiaryColor}
-              stroke={strokeColor}
-              strokeWidth="1.2"
-            />
-            <circle cx={eye.x} cy={eye.y} r="1.8" fill="#141414" />
-          </g>
-        ))}
-      </g>
-
-      {/* 7. 3D КРЫЛОВИДНЫЙ МЫСОК С МЕДАЛЬОНОМ СВЕРХУ (Wingtip — Main 60%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 322 302 C 345 272, 382 246, 428 222 C 436 240, 462 245, 482 230 C 492 222, 485 212, 470 208 C 512 216, 558 232, 574 254 C 582 266, 580 278, 574 286 C 518 304, 428 306, 322 302 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 322 302 C 345 272, 382 246, 428 222 C 436 240, 462 245, 482 230 C 492 222, 485 212, 470 208 C 512 216, 558 232, 574 254 C 582 266, 580 278, 574 286 C 518 304, 428 306, 322 302 Z"
-          fill="url(#d3d-calf)"
-        />
-        <path
-          d="M 332 296 C 354 270, 388 248, 426 229 C 436 245, 462 250, 484 235 C 518 242, 550 252, 568 268"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        {/* Перфорация крыла и 3D-медальон на верхней площадке мыска */}
-        <g fill={strokeColor} opacity="0.82">
-          <circle cx="345" cy="286" r="2.2" />
-          <circle cx="360" cy="274" r="2.2" />
-          <circle cx="376" cy="263" r="2.2" />
-          <circle cx="393" cy="253" r="2.2" />
-          <circle cx="410" cy="243" r="2.2" />
-          <circle cx="425" cy="235" r="2.2" />
-          <circle cx="442" cy="247" r="2.2" />
-          <circle cx="460" cy="250" r="2.2" />
-          <circle cx="478" cy="244" r="2.2" />
-          <circle cx="496" cy="246" r="2.2" />
-          <circle cx="514" cy="250" r="2.2" />
-          <circle cx="532" cy="256" r="2.2" />
-          {/* Розетка медальона в перспективе */}
-          <ellipse cx="512" cy="268" rx="3.4" ry="2.2" transform="rotate(14 512 268)" />
-          <ellipse cx="526" cy="271" rx="2.4" ry="1.6" transform="rotate(14 526 271)" />
-          <ellipse cx="498" cy="265" rx="2.4" ry="1.6" transform="rotate(14 498 265)" />
-          <ellipse cx="515" cy="259" rx="2.4" ry="1.6" transform="rotate(14 515 259)" />
-          <ellipse cx="509" cy="277" rx="2.4" ry="1.6" transform="rotate(14 509 277)" />
-          <ellipse cx="540" cy="274" rx="2.6" ry="1.7" transform="rotate(14 540 274)" />
-        </g>
-      </g>
-
-      {/* 8. ЖЕСТКИЙ ЗАДНИК (Heel Counter — Main 60%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 62 284 C 58 242, 68 195, 86 158 C 122 184, 162 212, 195 250 C 204 265, 208 280, 206 292 C 148 291, 98 288, 62 284 Z"
-          fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 62 284 C 58 242, 68 195, 86 158 C 122 184, 162 212, 195 250 C 204 265, 208 280, 206 292 C 148 291, 98 288, 62 284 Z"
-          fill="url(#d3d-calf)"
-        />
-        <path
-          d="M 84 166 C 118 190, 156 218, 188 254 C 196 266, 200 278, 198 288"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1"
-          strokeDasharray="3.5 3.5"
-        />
-        <g fill={strokeColor} opacity="0.78">
-          <circle cx="98" cy="182" r="2" />
-          <circle cx="115" cy="195" r="2" />
-          <circle cx="132" cy="208" r="2" />
-          <circle cx="149" cy="222" r="2" />
-          <circle cx="165" cy="238" r="2" />
-          <circle cx="180" cy="254" r="2" />
-          <circle cx="190" cy="272" r="2" />
-        </g>
-      </g>
-
-      {/* 9. РАНТ ГУДЬИР, КОЖАНАЯ ПОДОШВА И НАБОРНЫЙ КАБЛУК В 3/4 */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Наборный каблук с 3D-разворотом */}
-        <path
-          d="M 64 294 L 190 298 L 190 328 C 142 332, 92 330, 64 325 Z"
-          fill="url(#d3d-sole)"
-          stroke={strokeColor}
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-        {/* Внутренняя теневая грань каблука (3D глубина) */}
-        <path
-          d="M 190 298 L 208 292 L 208 318 L 190 328 Z"
-          fill="#000000"
-          fillOpacity="0.35"
-          stroke={strokeColor}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-        <line x1="64" y1="305" x2="190" y2="308" stroke={strokeColor} strokeWidth="1" />
-        <line x1="64" y1="315" x2="190" y2="318" stroke={strokeColor} strokeWidth="1" />
-
-        {/* Акцентная набойка каблука (Accent 10%) */}
-        <path
-          d="M 64 325 C 92 330, 142 332, 190 328 L 208 318 L 206 326 L 188 336 C 140 340, 90 338, 66 334 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
+          strokeDasharray="3 2"
         />
 
-        {/* Основная кожаная подошва */}
+        {/* ПОДКЛАДКА ВОРОТНИКА (Lining — Tertiary 15%) */}
         <path
-          d="M 190 298 C 228 298, 268 318, 318 324 L 522 324 C 554 324, 576 312, 584 296 L 578 286 C 532 304, 440 310, 318 308 C 258 308, 222 290, 190 290 Z"
-          fill="url(#d3d-sole)"
-          stroke={strokeColor}
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-
-        {/* Акцентная профилактика мыска (Accent 10%) */}
-        <path
-          d="M 308 324 L 522 324 C 550 324, 570 315, 580 302 L 560 330 C 540 337, 505 339, 465 339 L 325 338 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-
-        {/* Выступающий 3D-рант Гудьир (Goodyear Welt — Tertiary 15%) */}
-        <path
-          d="M 60 282 C 132 288, 220 288, 318 302 C 438 304, 528 298, 578 282 L 582 290 C 530 306, 438 312, 318 310 C 220 296, 132 296, 60 292 Z"
+          d="M 136 128 C 160 114, 195 128, 230 148 C 258 162, 280 152, 296 124 L 275 106 C 242 120, 178 114, 136 128 Z"
           fill={tertiaryColor}
-          stroke={strokeColor}
+          strokeWidth="1.2"
+        />
+
+        {/* ЯЗЫЧОК (Tongue — Secondary 30%) */}
+        <path
+          d="M 275 106 C 285 86, 305 82, 322 92 C 342 114, 372 152, 405 182 L 320 196 C 298 166, 280 132, 275 106 Z"
+          fill={secondaryColor}
+          strokeWidth="1.3"
+        />
+
+        {/* СОЮЗКА (Vamp — Secondary 30%) */}
+        <path
+          d="M 240 166 L 392 154 C 445 178, 502 198, 545 208 C 525 240, 435 255, 325 254 L 240 248 Z"
+          fill={secondaryColor}
           strokeWidth="1.3"
         />
         <path
-          d="M 66 287 C 138 292, 222 292, 318 306 C 435 308, 524 302, 575 286"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1.3"
-          strokeDasharray="4 3"
+          d="M 240 166 L 392 154 C 445 178, 502 198, 545 208 C 525 240, 435 255, 325 254 L 240 248 Z"
+          fill="url(#d-glacage)"
         />
+
+        {/* БЕРЦЫ ОТКРЫТОЙ ШНУРОВКИ (Quarters — Main 60%) */}
+        <path
+          d="M 134 132 C 160 128, 195 145, 230 156 C 262 165, 285 138, 305 108 C 312 98, 322 98, 330 106 C 358 132, 390 158, 420 174 C 395 192, 378 218, 390 236 C 355 248, 315 254, 290 255 L 188 248 L 134 186 Z"
+          fill={mainColor}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M 134 132 C 160 128, 195 145, 230 156 C 262 165, 285 138, 305 108 C 312 98, 322 98, 330 106 C 358 132, 390 158, 420 174 C 395 192, 378 218, 390 236 C 355 248, 315 254, 290 255 L 188 248 Z"
+          fill="url(#d-glacage)"
+        />
+        {/* Перфорация вдоль берцев */}
+        <g fill={strokeColor} opacity="0.65">
+          <circle cx="340" cy="180" r="1.6" />
+          <circle cx="352" cy="192" r="1.6" />
+          <circle cx="362" cy="204" r="1.6" />
+          <circle cx="372" cy="216" r="1.6" />
+        </g>
+
+        {/* КРЫЛОВИДНЫЙ МЫСОК С МЕДАЛЬОНОМ (Wingtip Toe Cap — Main 60%) */}
+        <path
+          d="M 365 254 C 388 226, 424 204, 468 184 C 476 198, 498 204, 518 195 C 550 202, 582 210, 594 220 C 600 228, 598 236, 594 242 C 540 254, 455 256, 365 254 Z"
+          fill={mainColor}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M 365 254 C 388 226, 424 204, 468 184 C 476 198, 498 204, 518 195 C 550 202, 582 210, 594 220 C 600 228, 598 236, 594 242 Z"
+          fill="url(#d-glacage)"
+        />
+        {/* Изящный медальон на мыске */}
+        <g fill={strokeColor} opacity="0.75">
+          <circle cx="530" cy="225" r="2.2" />
+          <circle cx="542" cy="225" r="1.5" />
+          <circle cx="518" cy="225" r="1.5" />
+          <circle cx="530" cy="216" r="1.5" />
+          <circle cx="530" cy="234" r="1.5" />
+          <circle cx="555" cy="228" r="1.8" />
+        </g>
+
+        {/* ЖЕСТКИЙ ЗАДНИК (Heel Counter — Main 60%) */}
+        <path
+          d="M 106 238 C 102 202, 114 162, 134 132 C 165 152, 202 176, 235 210 C 242 222, 246 236, 244 246 C 190 245, 142 242, 106 238 Z"
+          fill={mainColor}
+          strokeWidth="1.4"
+        />
+        <path
+          d="M 106 238 C 102 202, 114 162, 134 132 C 165 152, 202 176, 235 210 C 242 222, 246 236, 244 246 Z"
+          fill="url(#d-glacage)"
+        />
+
+        {/* ТОНКИЕ ВОЩЕНЫЕ ШНУРКИ (Accent 10%) */}
+        {[
+          { x1: 312, y1: 114, x2: 330, y2: 104 },
+          { x1: 332, y1: 130, x2: 350, y2: 120 },
+          { x1: 352, y1: 146, x2: 370, y2: 136 },
+          { x1: 372, y1: 162, x2: 390, y2: 152 },
+        ].map((l, i) => (
+          <path
+            key={i}
+            d={`M ${l.x1} ${l.y1} L ${l.x2} ${l.y2}`}
+            stroke={accentColor}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        ))}
       </g>
     </svg>
   )
 }
 
 /* ============================================================================
-   3. ЖЕНСКИЕ ЛОДОЧКИ НА ШПИЛЬКЕ В РАКУРСЕ 3/4 (3D STILETTO PUMP SILHOUETTE)
+   3. PUMP — HAUTE COUTURE STILETTO (Стиль: Christian Louboutin / Gianvito Rossi)
    ============================================================================ */
 function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0] // 60%/55% — Скульптурный внешний корпус лодочки
-  const secondaryColor = colors[1] // 30%/20% — Шпилька, пяточная чашка и заостренный мысок-кап
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Полностью открытая 3D-поверхность внутренней подкладки и стельки
-  const accentColor = colors[colors.length - 1] // 10% — Лакированная подошва, набойка, подпятник и пряжка
+  const mainColor = colors[0]        // 60% — Скульптурный корпус лодочки (D'Orsay line)
+  const secondaryColor = colors[1]   // 30% — Шпилька, пяточная чашка, мысок-кап
+  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Внутренняя кожаная стелька
+  const accentColor = colors[colors.length - 1] // 10% — Лакированная подошва, набойка, пряжка
 
-  const strokeColor = isDark ? 'rgba(244, 240, 232, 0.32)' : 'rgba(28, 24, 22, 0.28)'
-  const stitchColor = isDark ? 'rgba(244, 240, 232, 0.5)' : 'rgba(28, 24, 22, 0.42)'
+  const strokeColor = isDark ? 'rgba(244, 240, 232, 0.4)' : 'rgba(28, 24, 22, 0.35)'
 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 640 400"
-      className="w-full h-auto max-h-[250px] md:max-h-[320px] select-none overflow-visible"
-      style={{
-        filter: isDark
-          ? 'drop-shadow(0 28px 36px rgba(0,0,0,0.65))'
-          : 'drop-shadow(0 22px 30px rgba(0,0,0,0.1))',
-      }}
+      viewBox="0 0 680 320"
+      className="w-full h-auto max-h-[220px] md:max-h-[280px] select-none"
     >
       <defs>
-        <radialGradient id="p3d-floor" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.8' : '0.22'} />
-          <stop offset="65%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.06'} />
+        <radialGradient id="p-shadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.6' : '0.14'} />
+          <stop offset="60%" stopColor="#000000" stopOpacity={isDark ? '0.15' : '0.03'} />
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        {/* Атласный/кожаный 3D-блик для корпуса */}
-        <linearGradient id="p3d-bodySheen" x1="15%" y1="0%" x2="40%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.28' : '0.45'} />
-          <stop offset="42%" stopColor="#ffffff" stopOpacity="0.02" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.52' : '0.28'} />
-        </linearGradient>
-
-        {/* Теневой градиент для дальней внутренней стенки подкладки */}
-        <linearGradient id="p3d-medialWall" x1="0%" y1="0%" x2="85%" y2="100%">
-          <stop offset="0%" stopColor="#000000" stopOpacity="0.12" />
-          <stop offset="55%" stopColor="#000000" stopOpacity="0.38" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.72" />
-        </linearGradient>
-
-        {/* Свет и глубина на открытой стельке (Footbed) */}
-        <linearGradient id="p3d-footbed" x1="0%" y1="0%" x2="95%" y2="90%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-          <stop offset="50%" stopColor="#000000" stopOpacity="0.08" />
-          <stop offset="85%" stopColor="#000000" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.78" />
-        </linearGradient>
-
-        <linearGradient id="p3d-heel" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
-          <stop offset="50%" stopColor="#000000" stopOpacity="0.05" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.42" />
+        {/* Шёлковый блеск вечерней туфли */}
+        <linearGradient id="p-satin" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.18' : '0.3'} />
+          <stop offset="40%" stopColor="#ffffff" stopOpacity="0.02" />
+          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.42' : '0.2'} />
         </linearGradient>
       </defs>
 
-      {/* Опорные тени на полу под шпилькой и мыском */}
-      <ellipse
-        cx="330"
-        cy="346"
-        rx="245"
-        ry="18"
-        transform="rotate(2 330 346)"
-        fill="url(#p3d-floor)"
-      />
-      <ellipse cx="114" cy="342" rx="38" ry="8" fill="url(#p3d-floor)" />
-      <ellipse cx="445" cy="342" rx="135" ry="12" fill="url(#p3d-floor)" />
+      <ellipse cx="360" cy="285" rx="240" ry="9" fill="url(#p-shadow)" />
+      <ellipse cx="160" cy="282" rx="25" ry="6" fill="url(#p-shadow)" />
 
-      {/* 1. 3D КАБЛУК-ШПИЛЬКА С ВНУТРЕННЕЙ И ВНЕШНЕЙ ГРАНЬЮ (Secondary 30%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Внутренняя (теневая) грань шпильки, уходящая под свод */}
+      <g stroke={strokeColor} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'all 0.5s ease' }}>
+        
+        {/* ИЗЯЩНАЯ ШПИЛЬКА (Stiletto Heel — Secondary 30%) */}
         <path
-          d="M 118 192 L 154 206 C 134 238, 124 280, 120 330 L 112 330 Z"
+          d="M 148 160 L 190 172 C 176 200, 168 238, 164 274 L 154 274 C 154 230, 152 192, 148 160 Z"
           fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 118 192 L 154 206 C 134 238, 124 280, 120 330 L 112 330 Z"
-          fill="#000000"
-          fillOpacity="0.42"
-        />
-
-        {/* Внешняя (лицевая) грань шпильки */}
-        <path
-          d="M 94 184 L 132 198 C 122 232, 116 278, 114 330 L 102 330 C 102 276, 100 225, 94 184 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 94 184 L 132 198 C 122 232, 116 278, 114 330 L 102 330 C 102 276, 100 225, 94 184 Z"
-          fill="url(#p3d-heel)"
-        />
-
-        {/* Набойка шпильки (Accent 10%) */}
-        <path
-          d="M 102 330 L 120 330 L 119 340 L 102 340 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.2"
-        />
-      </g>
-
-      {/* 2. ОТКРЫТАЯ 3D-ПОЛОСТЬ ЛОДОЧКИ: ПОДКЛАДКА И СТЕЛЬКА (Tertiary 15%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Дальняя (медиальная) внутренняя стенка подкладки — видна благодаря ракурсу 3/4 */}
-        <path
-          d="M 102 76 C 145 64, 198 96, 258 150 C 318 204, 376 238, 434 246 L 408 288 L 106 168 Z"
-          fill={tertiaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.4"
-        />
-        <path
-          d="M 102 76 C 145 64, 198 96, 258 150 C 318 204, 376 238, 434 246 L 408 288 L 106 168 Z"
-          fill="url(#p3d-medialWall)"
-        />
-
-        {/* Открытая анатомическая стелька во всю длину стопы (Insole / Footbed) */}
-        <path
-          d="M 112 132 C 148 122, 202 152, 265 205 C 322 252, 375 274, 422 268 L 385 304 C 295 282, 195 215, 112 168 Z"
-          fill={tertiaryColor}
-          stroke={strokeColor}
           strokeWidth="1.3"
         />
-        <path
-          d="M 112 132 C 148 122, 202 152, 265 205 C 322 252, 375 274, 422 268 L 385 304 C 295 282, 195 215, 112 168 Z"
-          fill="url(#p3d-footbed)"
-        />
+        {/* Набойка (Accent 10%) */}
+        <path d="M 154 274 L 164 274 L 164 282 L 154 282 Z" fill={accentColor} strokeWidth="1.2" />
 
-        {/* Простроченный кожаный подпятник с логотипом на стельке (Accent 10%) */}
+        {/* ОТКРЫТАЯ ВНУТРЕННЯЯ СТЕЛЬКА (Insole — Tertiary 15%) */}
         <path
-          d="M 134 138 C 154 136, 182 152, 208 175 L 188 192 C 162 170, 138 154, 122 150 Z"
-          fill={accentColor}
-          fillOpacity="0.9"
-          stroke={strokeColor}
-          strokeWidth="1"
+          d="M 154 75 C 182 72, 225 106, 280 156 C 330 202, 380 234, 420 236 L 390 255 C 310 230, 215 165, 154 122 Z"
+          fill={tertiaryColor}
+          strokeWidth="1.2"
         />
-      </g>
+        {/* Тиснение на подпятнике (Accent 10%) */}
+        <path d="M 185 108 L 215 132 L 206 140 L 176 116 Z" fill={accentColor} fillOpacity="0.85" strokeWidth="0.8" />
 
-      {/* 3. КОНТРАСТНАЯ ЛАКИРОВАННАЯ ПОДОШВА ПОД СВОДОМ (Signature Outsole — Accent 10%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
+        {/* ЛАКИРОВАННАЯ ПОДОШВА ПОД СВОДОМ (Outsole — Accent 10%) */}
         <path
-          d="M 98 182 C 154 194, 218 242, 290 302 C 324 330, 355 340, 395 340 L 495 340 C 534 340, 566 326, 582 306 L 574 298 C 546 318, 512 328, 478 328 L 392 328 C 355 328, 326 318, 294 292 C 222 232, 158 184, 98 174 Z"
+          d="M 150 158 C 198 168, 255 212, 320 262 C 350 282, 380 286, 412 286 L 505 286 C 535 286, 560 276, 576 264 L 570 258 C 545 270, 520 276, 492 276 L 410 276 C 380 276, 352 268, 322 245 C 255 195, 202 154, 150 150 Z"
           fill={accentColor}
-          stroke={strokeColor}
           strokeWidth="1.3"
-          strokeLinejoin="round"
         />
-      </g>
 
-      {/* 4. БЛИЖНИЙ (ЛАТЕРАЛЬНЫЙ) КОРПУС ЛОДОЧКИ С ГЛУБОКИМ ВЫРЕЗОМ ДЕКОЛЬТЕ (Main 60%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
+        {/* ГРАЦИОЗНЫЙ КОРПУС ЛОДОЧКИ С ДЕКОЛЬТЕ (Main 60%) */}
         <path
-          d="M 102 76 C 82 108, 80 148, 94 180 C 152 192, 216 240, 290 298 C 325 324, 354 330, 392 330 L 482 330 C 522 330, 558 318, 578 298 C 562 272, 505 248, 434 246 C 415 268, 378 278, 332 266 C 275 250, 218 206, 168 152 C 136 116, 114 86, 102 76 Z"
+          d="M 154 75 C 138 100, 136 136, 146 162 C 198 172, 255 212, 322 262 C 352 282, 380 286, 412 286 L 498 286 C 532 286, 560 276, 578 262 C 542 240, 482 222, 422 222 C 370 220, 318 198, 262 152 C 215 112, 178 82, 154 75 Z"
           fill={mainColor}
-          stroke={strokeColor}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 102 76 C 82 108, 80 148, 94 180 C 152 192, 216 240, 290 298 C 325 324, 354 330, 392 330 L 482 330 C 522 330, 558 318, 578 298 C 562 272, 505 248, 434 246 C 415 268, 378 278, 332 266 C 275 250, 218 206, 168 152 C 136 116, 114 86, 102 76 Z"
-          fill="url(#p3d-bodySheen)"
-        />
-        {/* 3D-кант по ближнему вырезу лодочки (четко отделяет внешний корпус от стельки внутри) */}
-        <path
-          d="M 102 76 C 114 86, 136 116, 168 152 C 218 206, 275 250, 332 266 C 378 278, 415 268, 434 246"
-          fill="none"
-          stroke={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.85)'}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-        />
-      </g>
-
-      {/* 5. СКУЛЬПТУРНАЯ ПЯТОЧНАЯ ЧАШКА И 3D МЫСОК-КАП (Secondary 30%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        {/* Пяточная деталь */}
-        <path
-          d="M 102 76 C 82 108, 80 148, 94 180 C 124 186, 155 202, 186 225 C 178 190, 152 142, 102 76 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 102 76 C 82 108, 80 148, 94 180 C 124 186, 155 202, 186 225 C 178 190, 152 142, 102 76 Z"
-          fill="url(#p3d-bodySheen)"
-        />
-
-        {/* Заостренный 3D-мысок (Pointed Toe Cap — видна вся верхняя плоскость) */}
-        <path
-          d="M 434 246 C 495 250, 554 272, 578 298 C 558 318, 522 330, 482 330 L 448 330 C 462 302, 456 270, 434 246 Z"
-          fill={secondaryColor}
-          stroke={strokeColor}
           strokeWidth="1.4"
-          strokeLinejoin="round"
         />
         <path
-          d="M 434 246 C 495 250, 554 272, 578 298 C 558 318, 522 330, 482 330 L 448 330 C 462 302, 456 270, 434 246 Z"
-          fill="url(#p3d-bodySheen)"
+          d="M 154 75 C 138 100, 136 136, 146 162 C 198 172, 255 212, 322 262 C 352 282, 380 286, 412 286 L 498 286 C 532 286, 560 276, 578 262 C 542 240, 482 222, 422 222 C 370 220, 318 198, 262 152 C 215 112, 178 82, 154 75 Z"
+          fill="url(#p-satin)"
         />
 
-        {/* Тонкая шелковая строчка */}
+        {/* ПЯТОЧНАЯ ЧАШКА (Secondary 30%) */}
         <path
-          d="M 106 88 C 122 104, 144 134, 174 166 C 224 218, 280 258, 335 272"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-        <path
-          d="M 428 250 C 448 272, 454 302, 442 326"
-          fill="none"
-          stroke={stitchColor}
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-      </g>
-
-      {/* 6. ОБЪЕМНАЯ ПРЯЖКА В ПЕРСПЕКТИВЕ 3/4 НА МЫСКЕ (Accent 10%) */}
-      <g style={{ transition: 'all 0.5s ease' }}>
-        <path
-          d="M 412 246 L 462 256 L 452 278 L 402 266 Z"
-          fill={accentColor}
-          stroke={strokeColor}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 420 252 L 452 259 L 445 271 L 413 263 Z"
+          d="M 154 75 C 138 100, 136 136, 146 162 C 172 168, 200 180, 228 200 C 220 170, 198 128, 154 75 Z"
           fill={secondaryColor}
-          stroke={strokeColor}
-          strokeWidth="1"
+          strokeWidth="1.2"
         />
+
+        {/* ОСТРЫЙ МЫСОК-КАП (Secondary 30%) */}
+        <path
+          d="M 466 226 C 504 235, 545 248, 578 262 C 558 276, 532 286, 498 286 L 472 286 C 480 262, 478 242, 466 226 Z"
+          fill={secondaryColor}
+          strokeWidth="1.3"
+        />
+
+        {/* ЮВЕЛИРНАЯ ФУРНИТУРА / ПРЯЖКА НА МЫСКЕ (Accent 10%) */}
+        <path d="M 450 220 L 485 232 L 478 248 L 442 236 Z" fill={accentColor} strokeWidth="1.1" />
+        <path d="M 454 225 L 479 233 L 474 243 L 449 235 Z" fill={mainColor} strokeWidth="0.8" />
       </g>
     </svg>
   )
@@ -1688,7 +1066,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </p>
           </div>
 
-          {/* СИЛУЭТЫ ОБУВИ В 3/4, ПЕРЕКЛЮЧАТЕЛЬ И СВОТЧИ */}
+          {/* СИЛУЭТЫ ОБУВИ, ПЕРЕКЛЮЧАТЕЛЬ И СВОТЧИ */}
           <div className="flex-1 w-full max-w-md">
             {/* Переключатель силуэтов обуви */}
             <div className="flex justify-center items-center gap-6 mb-4">
@@ -1717,7 +1095,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               })}
             </div>
 
-            {/* Визуализация выбранной 3D-модели */}
+            {/* Визуализация выбранной модели */}
             <div className="mb-10 flex justify-center items-center px-2 min-h-[215px] md:min-h-[265px]">
               <AnimatePresence mode="wait">
                 <motion.div
