@@ -8,6 +8,9 @@ type FlipCardProps = {
   index?: number
   isDark?: boolean
   flipHint?: string
+  isLocked?: boolean
+  onUnlock?: (e: React.MouseEvent) => void
+  isPurchasing?: boolean
 }
 
 const CATEGORY_LABELS: Record<NonNullable<GlossaryTerm['category']>, { ru: string; uk: string; de: string }> = {
@@ -20,16 +23,6 @@ const CATEGORY_LABELS: Record<NonNullable<GlossaryTerm['category']>, { ru: strin
   other: { ru: 'Прочее', uk: 'Інше', de: 'Sonstiges' },
 }
 
-const CATEGORY_ICON: Record<NonNullable<GlossaryTerm['category']>, React.ReactNode> = {
-  material: <path d="M9 3H15L17.5 5.5L21 7.5L19.5 12.5L20.5 17.5L15.5 21H8.5L3.5 17.5L4.5 12.5L3 7.5L6.5 5.5L9 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-  part: <path d="M2.5 17.5C4 17.5 6 17 7.5 15L11.5 9.5C12.5 8.2 13.8 7.5 15.5 7.5H19.5C20.6 7.5 21.5 8.4 21.5 9.5V14.5C21.5 16.2 19.8 17.5 18 17.5H2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-  process: <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93L4.93 19.07" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-  tool: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-  type: <path d="M4 17.5V14c0-2.5 1.5-4.5 4-5.5l4-1.5L14 3h6v4.5c0 3.5-2.5 6-5 7.5L12 17.5H4.5A.5.5 0 0 1 4 17.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-  defect: <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-  other: <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />,
-}
-
 function haptic(style: 'light' | 'medium' = 'light') {
   try {
     const tg = (window as any).Telegram?.WebApp
@@ -37,7 +30,7 @@ function haptic(style: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-export function FlipCard({ term, lang, index = 0, isDark = true, flipHint = 'TAP TO READ' }: FlipCardProps) {
+export function FlipCard({ term, lang, isDark = true, flipHint = 'FLIP', isLocked = false, onUnlock, isPurchasing = false }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false)
 
   const title = lang === 'de' && (term as any).termDe ? (term as any).termDe 
@@ -53,14 +46,19 @@ export function FlipCard({ term, lang, index = 0, isDark = true, flipHint = 'TAP
                 : term.example
 
   const cat = term.category ?? 'other'
-  const icon = CATEGORY_ICON[cat]
 
-  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
-  const cSurface = isDark ? 'bg-[#111111]' : 'bg-[#EAE6DF]'
+  // Lookbook цветовая палитра
+  const cSurface = isDark ? 'bg-[#141414] border-white/10' : 'bg-[#EAE6DF] border-black/10'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/40' : 'text-[#1C1816]/40'
 
   const stopEvent = (e: React.SyntheticEvent) => e.stopPropagation()
+
+  const paywallText = {
+    ru: { desc: 'Архив закрыт', btn: 'ОТКРЫТЬ • 1 ⭐️' },
+    uk: { desc: 'Архів закритий', btn: 'ВІДКРИТИ • 1 ⭐️' },
+    de: { desc: 'Archiv gesperrt', btn: 'ÖFFNEN • 1 ⭐️' }
+  }[lang]
 
   return (
     <div
@@ -68,51 +66,48 @@ export function FlipCard({ term, lang, index = 0, isDark = true, flipHint = 'TAP
       tabIndex={0}
       onClick={() => { haptic('light'); setFlipped((f) => !f) }}
       aria-expanded={flipped}
-      className="group relative w-full aspect-[3/4] min-h-[220px] max-h-[300px] text-left outline-none cursor-pointer"
-      style={{ perspective: '1200px', WebkitPerspective: '1200px' }}
+      className="group relative w-full aspect-[3/4] min-h-[240px] text-left outline-none cursor-pointer"
+      style={{ perspective: '1400px', WebkitPerspective: '1400px' }}
     >
       <div
-        className="relative w-full h-full"
+        className="relative w-full h-full transition-transform duration-700"
         style={{
           transformStyle: 'preserve-3d',
           WebkitTransformStyle: 'preserve-3d',
-          transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)',
           transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          WebkitTransform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
         }}
       >
         {/* FRONT */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-between p-4 md:p-5 border ${cLine} ${cSurface} shadow-sm`}
+          className={`absolute inset-0 flex flex-col justify-between p-5 md:p-6 border ${cSurface} transition-all duration-300 group-hover:border-opacity-40`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            transform: 'rotateY(0deg)',
-            WebkitTransform: 'rotateY(0deg)',
             zIndex: 2,
             pointerEvents: flipped ? 'none' : 'auto',
           }}
         >
-          <div className="w-full flex items-center justify-between z-10">
-            <span className={`text-[8.5px] md:text-[9px] font-sans uppercase tracking-[0.15em] truncate pr-2 ${cTextMuted}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[8px] font-sans uppercase tracking-[0.25em] ${cTextMuted}`}>
               {CATEGORY_LABELS[cat][lang]}
             </span>
-            <div className={`w-4 h-4 md:w-5 md:h-5 flex items-center justify-center shrink-0 ${cTextMuted}`}>
-              <svg width="100%" height="100%" viewBox="0 0 24 24">
-                {icon}
-              </svg>
-            </div>
+            {isLocked && (
+              <span className={`text-[9px] font-sans uppercase tracking-widest ${cTextMuted}`}>
+                ✦ PRO
+              </span>
+            )}
           </div>
 
-          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[100px] md:text-[120px] leading-none opacity-5 pointer-events-none select-none ${cText}`}>
+          {/* Большая инициал-буква на фоне в стиле редакционного глянца */}
+          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-serif text-[120px] leading-none opacity-[0.03] select-none pointer-events-none ${cText}`}>
             {title.charAt(0).toUpperCase()}
           </div>
 
-          <div className="w-full flex flex-col items-center text-center z-10 mt-auto px-1">
-            <h3 className={`font-serif text-[17px] md:text-[20px] leading-[1.15] mb-3 break-words hyphens-auto w-full ${cText}`}>
+          <div className="flex flex-col justify-end z-10">
+            <h3 className={`font-serif text-[18px] md:text-[20px] leading-[1.1] tracking-tight mb-4 ${cText}`}>
               {title}
             </h3>
-            <div className={`text-[8px] font-sans tracking-[0.25em] uppercase transition-opacity opacity-0 group-hover:opacity-100 ${cTextMuted}`}>
+            <div className={`text-[7.5px] font-sans uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${cTextMuted}`}>
               {flipHint}
             </div>
           </div>
@@ -120,44 +115,61 @@ export function FlipCard({ term, lang, index = 0, isDark = true, flipHint = 'TAP
 
         {/* BACK */}
         <div
-          className={`absolute inset-0 flex flex-col p-4 md:p-5 border ${cLine} ${cSurface} shadow-sm`}
+          className={`absolute inset-0 flex flex-col justify-between p-5 md:p-6 border ${cSurface}`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
             transform: 'rotateY(180deg)',
-            WebkitTransform: 'rotateY(180deg)',
             zIndex: 1,
             pointerEvents: flipped ? 'auto' : 'none',
           }}
         >
-          <div className={`flex items-center justify-between pb-3 mb-3 border-b ${cLine} shrink-0`}>
-            <h3 className={`font-serif text-[15px] md:text-[17px] leading-tight break-words pr-2 ${cText}`}>
-              {title}
-            </h3>
-          </div>
-
-          <div
-            className="flex-1 overflow-y-auto scrollbar-hide overscroll-contain pb-2"
-            onClick={stopEvent}
-            onPointerDown={stopEvent}
-            onTouchStart={stopEvent}
-            onWheel={stopEvent}
-          >
-            <p className={`text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.6] ${cTextMuted}`}>
-              {definition}
-            </p>
-
-            {example && (
-              <div className={`mt-3 pt-3 border-t ${cLine}`}>
-                <span className={`block mb-1 text-[7.5px] font-sans uppercase tracking-[0.25em] ${cText}`}>
-                  {lang === 'de' ? 'BEISPIEL' : lang === 'uk' ? 'ПРИКЛАД' : 'ПРИМЕР'}
+          {isLocked ? (
+            <div className="flex flex-col h-full justify-between items-center text-center py-2">
+              <div className="flex flex-col items-center justify-center flex-1 gap-2">
+                <span className={`text-[10px] uppercase tracking-[0.2em] ${cTextMuted}`}>
+                  {paywallText.desc}
                 </span>
-                <p className={`font-serif text-[12px] md:text-[13px] italic leading-[1.4] ${cTextMuted}`}>
-                  {example}
+                <h3 className={`font-serif text-[16px] leading-snug line-clamp-2 ${cText}`}>
+                  {title}
+                </h3>
+              </div>
+              <button
+                onClick={onUnlock}
+                disabled={isPurchasing}
+                className={`w-full py-3 border ${cText === 'text-[#F4F0E8]' ? 'border-white/20 hover:bg-white/10' : 'border-black/20 hover:bg-black/10'} ${cText} text-[9px] font-sans uppercase tracking-[0.2em] transition-all active:scale-[0.98] outline-none bg-transparent`}
+              >
+                {isPurchasing ? 'Processing...' : paywallText.btn}
+              </button>
+            </div>
+          ) : (
+            <div 
+              className="flex flex-col h-full justify-between overflow-y-auto scrollbar-hide"
+              onClick={stopEvent}
+              onPointerDown={stopEvent}
+              onTouchStart={stopEvent}
+            >
+              <div>
+                <div className={`text-[8px] font-sans uppercase tracking-[0.25em] mb-3 pb-2 border-b ${cText === 'text-[#F4F0E8]' ? 'border-white/10' : 'border-black/10'} ${cTextMuted}`}>
+                  {title}
+                </div>
+                <p className={`font-sans font-light text-[11px] md:text-[12px] leading-[1.6] ${cTextMuted}`}>
+                  {definition}
                 </p>
               </div>
-            )}
-          </div>
+
+              {example && (
+                <div className={`mt-4 pt-3 border-t ${cText === 'text-[#F4F0E8]' ? 'border-white/10' : 'border-black/10'}`}>
+                  <span className={`block text-[7px] font-sans uppercase tracking-[0.3em] mb-1 ${cText}`}>
+                    {lang === 'de' ? 'Beispiel' : lang === 'uk' ? 'Приклад' : 'Пример'}
+                  </span>
+                  <p className={`font-serif text-[11px] italic leading-relaxed ${cTextMuted}`}>
+                    {example}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
