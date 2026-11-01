@@ -31,18 +31,12 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   } catch {}
 }
 
-        <path
-          d="M166 95.727c-2.619-6.497-8.875-10.758-15.88-10.758h-33.124c41.934 124.159 136.457 224.064 269.15 276.32l1.182 1.303v-46.733C246.242 272.128 181.92 135.211 166 95.727"
-          fill="url(#secGrad)"
-          style={{ transition: 'all 0.5s ease' }}
-        />
 function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
   const mainColor = colors[0] // 60% / 55% — Основной корпус (берцы, носок, пятка)
   const secondaryColor = colors[1] // 30% / 20% — Союзка, язычок, воротник
   const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% (для тетрад) — Подкладка, вставка в подошву, люверсы
   const accentColor = colors[colors.length - 1] // 10% — Свуш/логотип, протектор, брендинг, верхние люверсы
 
-  // Цвета контуров и нейтральных баз с учетом темы
   const strokeColor = isDark ? 'rgba(244, 240, 232, 0.28)' : 'rgba(28, 24, 22, 0.25)'
   const stitchColor = isDark ? 'rgba(244, 240, 232, 0.45)' : 'rgba(28, 24, 22, 0.4)'
   const midsoleBase = isDark ? '#1A1918' : '#FAF8F5'
@@ -53,37 +47,37 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 600 380"
-      className="w-full h-auto max-h-[250px] md:max-h-[320px] select-none overflow-visible"
+      className="w-full h-auto max-h-[240px] md:max-h-[320px] select-none overflow-visible"
+      style={{ 
+        filter: isDark 
+          ? 'drop-shadow(0 25px 35px rgba(0,0,0,0.6))' 
+          : 'drop-shadow(0 20px 30px rgba(0,0,0,0.08))' 
+      }}
     >
       <defs>
-        {/* Мягкая реалистичная тень на полу */}
         <radialGradient id="floorShadow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.75' : '0.18'} />
           <stop offset="60%" stopColor="#000000" stopOpacity={isDark ? '0.3' : '0.06'} />
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        {/* Световой градиент для придания 3D-объема плоским цветам кожи */}
         <linearGradient id="leatherSheen" x1="0%" y1="0%" x2="25%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.16' : '0.28'} />
           <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
           <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.45' : '0.22'} />
         </linearGradient>
 
-        {/* Градиент глубины для замши/нубука (вторичный цвет) */}
         <linearGradient id="suedeShade" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#000000" stopOpacity="0.1" />
           <stop offset="50%" stopColor="#ffffff" stopOpacity="0.08" />
           <stop offset="100%" stopColor="#000000" stopOpacity="0.35" />
         </linearGradient>
 
-        {/* Объем для межподошвы (Midsole) */}
         <linearGradient id="midsoleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor={midsoleBase} />
           <stop offset="100%" stopColor={midsoleShadow} />
         </linearGradient>
 
-        {/* Блик для акцентных деталей */}
         <linearGradient id="accentSheen" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
           <stop offset="40%" stopColor="#ffffff" stopOpacity="0" />
@@ -94,7 +88,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
       {/* Тень под кроссовком */}
       <ellipse cx="305" cy="342" rx="255" ry="18" fill="url(#floorShadow)" />
 
-      {/* Подошва-протектор (Outsole — Акцент 10%) */}
+      {/* Подошва-протектор (Outsole) */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 58 318 C 58 331, 85 336, 130 336 L 235 336 L 242 329 L 258 329 L 265 336 L 415 336 L 423 329 L 438 329 L 445 336 L 518 336 C 546 336, 560 324, 565 304 L 550 302 C 500 315, 400 322, 290 322 C 180 322, 95 320, 58 318 Z"
@@ -110,7 +104,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Межподошва (Midsole — нейтральная база, чтобы цвета палитры читались чисто) */}
+      {/* Межподошва (Midsole) */}
       <g>
         <path
           d="M 48 282 C 45 300, 50 314, 58 320 C 135 324, 240 325, 345 325 C 445 325, 520 316, 565 304 C 570 288, 564 268, 548 264 C 480 278, 390 286, 285 286 C 185 286, 110 288, 48 282 Z"
@@ -119,7 +113,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
-        {/* Амортизирующая танкетка в пятке (Tertiary / Secondary) */}
         <path
           d="M 72 296 C 115 298, 175 299, 215 299 C 222 299, 226 304, 226 309 C 226 314, 220 317, 212 317 C 165 317, 110 316, 68 312 C 63 308, 66 298, 72 296 Z"
           fill={tertiaryColor}
@@ -128,14 +121,12 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="1"
           style={{ transition: 'all 0.5s ease' }}
         />
-        {/* Рельефные линии молдинга подошвы */}
         <path
           d="M 52 302 C 140 307, 260 308, 380 306 C 460 304, 525 296, 563 286"
           fill="none"
           stroke={strokeColor}
           strokeWidth="1"
         />
-        {/* Прострочка мыска подошвы */}
         <path
           d="M 440 312 C 485 309, 530 300, 560 290"
           fill="none"
@@ -145,7 +136,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Внутренняя подкладка и стелька (Lining — Tertiary 15% / Secondary) */}
+      {/* Внутренняя подкладка и стелька */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 92 128 C 112 114, 145 128, 172 152 C 195 172, 225 165, 240 135 L 215 95 C 185 112, 130 105, 92 128 Z"
@@ -160,7 +151,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Язычок (Tongue — Secondary 30%) */}
+      {/* Язычок */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 212 92 C 222 65, 250 58, 272 68 C 295 95, 330 148, 372 192 L 265 215 C 240 175, 218 125, 212 92 Z"
@@ -173,7 +164,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 212 92 C 222 65, 250 58, 272 68 C 295 95, 330 148, 372 192 L 265 215 C 240 175, 218 125, 212 92 Z"
           fill="url(#suedeShade)"
         />
-        {/* Тканый ярлык на язычке (Акцент 10%) */}
         <path
           d="M 232 67 C 245 63, 258 65, 266 72 L 256 92 C 246 86, 234 85, 224 88 Z"
           fill={accentColor}
@@ -182,7 +172,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Мягкий воротник лодыжки (Ankle Collar — Secondary 30%) */}
+      {/* Воротник лодыжки */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 78 140 C 90 118, 125 125, 160 150 C 185 168, 212 162, 232 132 L 258 165 L 140 225 L 68 188 Z"
@@ -196,7 +186,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Верхняя часть мыска и боковая панель (Vamp & Quarter Base — Secondary 30%) */}
+      {/* Союзка и боковая панель */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 165 185 L 355 182 C 405 198, 465 215, 518 228 C 500 265, 420 285, 320 285 L 165 280 Z"
@@ -208,7 +198,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 165 185 L 355 182 C 405 198, 465 215, 518 228 C 500 265, 420 285, 320 285 L 165 280 Z"
           fill="url(#leatherSheen)"
         />
-        {/* Перфорация на носке для детализации */}
         <g fill={strokeColor} opacity="0.7">
           <circle cx="435" cy="215" r="1.8" />
           <circle cx="448" cy="218" r="1.8" />
@@ -220,7 +209,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         </g>
       </g>
 
-      {/* Основной каркас: Берцы, планка шнуровки и крыло (Main Quarter Overlay — Main 60%) */}
+      {/* Основной каркас (Берцы) */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 145 205 C 185 190, 215 155, 232 122 C 242 104, 255 102, 268 112 C 302 145, 342 182, 385 205 C 362 232, 348 260, 345 286 L 175 286 C 155 260, 145 232, 145 205 Z"
@@ -233,7 +222,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 145 205 C 185 190, 215 155, 232 122 C 242 104, 255 102, 268 112 C 302 145, 342 182, 385 205 C 362 232, 348 260, 345 286 L 175 286 C 155 260, 145 232, 145 205 Z"
           fill="url(#leatherSheen)"
         />
-        {/* Двойная строчка по контуру берцев */}
         <path
           d="M 153 209 C 190 194, 220 160, 236 128 C 244 113, 253 112, 264 120 C 296 151, 334 186, 374 207 C 354 233, 341 258, 338 282"
           fill="none"
@@ -243,7 +231,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Защитное крыло мыска (Mudguard / Toe Cap — Main 60%) */}
+      {/* Защитное крыло мыска */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 328 286 C 335 245, 368 218, 415 220 C 460 222, 505 220, 530 224 C 546 236, 554 250, 548 264 C 485 278, 405 286, 328 286 Z"
@@ -265,7 +253,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Задник и фиксатор пятки (Heel Counter — Main 60% + Tertiary 15%) */}
+      {/* Задник и фиксатор пятки */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 48 282 C 44 238, 56 185, 78 140 C 98 165, 130 185, 175 198 C 188 228, 195 258, 192 286 C 135 286, 85 285, 48 282 Z"
@@ -278,7 +266,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 48 282 C 44 238, 56 185, 78 140 C 98 165, 130 185, 175 198 C 188 228, 195 258, 192 286 C 135 286, 85 285, 48 282 Z"
           fill="url(#leatherSheen)"
         />
-        {/* Жесткий пластиковый/кожаный стабилизатор пятки (Heel Clip) */}
         <path
           d="M 48 282 C 46 260, 50 240, 58 225 C 88 238, 122 252, 148 285 C 110 285, 75 284, 48 282 Z"
           fill={tertiaryColor}
@@ -300,7 +287,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Фирменный динамичный вектор-росчерк на боку (Accent 10%) */}
+      {/* Боковой брендинг/логотип */}
       <g style={{ transition: 'all 0.5s ease' }}>
         <path
           d="M 155 215 C 195 248, 265 256, 358 222 C 300 266, 222 278, 142 246 C 132 241, 138 202, 155 215 Z"
@@ -315,7 +302,7 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Люверсы и перекрестная объемная шнуровка */}
+      {/* Шнуровка */}
       <g>
         {[
           { x1: 256, y1: 118, x2: 282, y2: 102, accent: true },
@@ -325,7 +312,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           { x1: 352, y1: 194, x2: 376, y2: 178, accent: false },
         ].map((lace, idx) => (
           <g key={idx}>
-            {/* Люверс */}
             <circle
               cx={lace.x1}
               cy={lace.y1}
@@ -336,7 +322,6 @@ function SneakerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
               style={{ transition: 'all 0.5s ease' }}
             />
             <circle cx={lace.x1} cy={lace.y1} r="2" fill={isDark ? '#111' : '#333'} />
-            {/* Плоский шнурок */}
             <path
               d={`M ${lace.x1} ${lace.y1} Q ${(lace.x1 + lace.x2) / 2 - 4} ${(lace.y1 + lace.y2) / 2 - 6} ${lace.x2} ${lace.y2}`}
               fill="none"
@@ -366,12 +351,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [blackAmount, setBlackAmount] = useState(0.05)
   const [showGuide, setShowGuide] = useState(false)
   
-  // === PAYWALL СОСТОЯНИЯ ===
   const [isProPurchased, setIsProPurchased] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [showProModal, setShowProModal] = useState(false)
 
-  // Читаем тему синхронно при инициализации
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
       return document.documentElement.classList.contains('dark')
@@ -393,7 +376,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return () => observer.disconnect()
   }, [])
 
-  // Автоматическая проверка покупки при загрузке
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
@@ -407,7 +389,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       .catch(err => console.error("Ошибка проверки покупки:", err))
   }, [])
 
-  // Оплата
   const handleProClick = async () => {
     const tg = (window as any).Telegram?.WebApp;
     const userId = tg?.initDataUnsafe?.user?.id;
@@ -802,7 +783,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Утонченные журнальные слайдеры */
         input[type=range] {
           -webkit-appearance: none;
           background: transparent;
@@ -858,14 +838,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       <div className="px-6 pb-24">
         
-        {/* ЗАГОЛОВОК СТРАНИЦЫ */}
         <div className="mb-10">
           <h1 className="font-serif text-[18vw] min-[400px]:text-6xl leading-[0.85] tracking-[-0.04em]">
             {t.title}
           </h1>
         </div>
 
-        {/* НАВИГАЦИЯ СХЕМ (Журнальная горизонтальная лента) */}
         <div className={`flex overflow-x-auto gap-8 pb-5 mb-10 border-b ${cLine} scrollbar-hide`}>
           {SCHEMES.map(s => {
              const isFree = s === 'complementary' || s === 'analogous'
@@ -888,7 +866,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
         <div className="flex flex-col md:flex-row gap-12 md:gap-16 items-center md:items-start mb-16">
           
-          {/* ЦВЕТОВОЙ КРУГ */}
           <div className="flex flex-col items-center shrink-0">
             <div
               ref={wheelRef}
@@ -922,15 +899,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </p>
           </div>
 
-          {/* ВИЗУАЛИЗАЦИЯ И СВОТЧИ */}
           <div className="flex-1 w-full max-w-md">
             
-            {/* Кроссовок */}
             <div className="mb-12 flex justify-center items-center px-4">
               <SneakerSvg colors={colors} isDark={isDark} />
             </div>
 
-            {/* Слайдеры Тон/Тень */}
             <div className="grid grid-cols-2 gap-8 mb-12">
               <div>
                 <div className={`flex justify-between text-[9px] font-sans uppercase tracking-widest mb-4 ${cTextMuted}`}>
@@ -962,7 +936,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </div>
             </div>
 
-            {/* Журнальные Pantone-свотчи */}
             <div className={`grid gap-4 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {colors.map((c, i) => (
                 <div key={i} className="flex flex-col">
@@ -980,7 +953,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* ЦИТАТА */}
         <div className="pb-10 pt-4">
           <div className="flex flex-col items-center text-center px-4">
             <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
@@ -995,7 +967,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
       </div>
 
-      {/* ===== МОДАЛКА PRO ДОСТУПА ===== */}
       <AnimatePresence>
         {showProModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#000000]/70 backdrop-blur-sm">
@@ -1049,7 +1020,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         )}
       </AnimatePresence>
 
-      {/* OVERLAY: ГИД (Анимированное журнальное окно) */}
       <AnimatePresence>
         {showGuide && (
           <motion.div 
