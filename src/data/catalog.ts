@@ -1,4 +1,5 @@
 export type ShoeCategory = 'Ботинки' | 'Кроссовки' | 'Туфли';
+export type SizeKey = 40 | 41 | 42 | 43 | 44 | 45;
 
 export interface ShoeItem {
   id: string;
@@ -10,6 +11,17 @@ export interface ShoeItem {
   image: string;       // Путь к файлу в папке public/catalog/
 }
 
+export interface CartItem {
+  uid: string;
+  shoe: ShoeItem;
+  orderMode: 'wholesale' | 'sample';
+  sizeRun: Record<SizeKey, number>;
+  boxesCount: number;
+  sampleSize: SizeKey;
+  totalPairs: number;
+  formulaText: string;
+}
+
 export const cardioCatalog: ShoeItem[] = [
   // Модель 223
   { id: '223', modelNumber: '223', category: 'Кроссовки', color: 'Белый', features: ['Мех', 'Gore-Tex'], image: '/catalog/223.jpg' },
@@ -18,7 +30,6 @@ export const cardioCatalog: ShoeItem[] = [
   // Модель 226 (две вариации подошвы)
   { id: '226', modelNumber: '226', variant: '#1', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/226.jpg' },
   { id: '226-1', modelNumber: '226', variant: '#2', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/226(1).jpg' },
-
 
   // Модель 188
   { id: '188', modelNumber: '188', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/188.jpg' },
@@ -80,17 +91,3 @@ export const cardioCatalog: ShoeItem[] = [
   { id: '20', modelNumber: '20', category: 'Кроссовки', color: 'Черный', features: [], image: '/catalog/20.jpg' },
   { id: '210', modelNumber: '210', category: 'Ботинки', color: 'Черный', features: [], image: '/catalog/210.jpg' },
 ];
-// Добавьте этот тип в src/data/catalog.ts
-export type SizeKey = 40 | 41 | 42 | 43 | 44 | 45;
-
-export interface CartItem {
-  uid: string;
-  shoe: ShoeItem;
-  orderMode: 'wholesale' | 'sample';
-  sizeRun: Record<SizeKey, number>;
-  boxesCount: number;
-  sampleSize: SizeKey;
-  totalPairs: number;
-  formulaText: string;
-}
-
