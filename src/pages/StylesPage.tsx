@@ -50,10 +50,8 @@ const LockIcon = () => (
 const UI_TEXT = {
   ru: {
     back: 'Назад',
-    mute: 'ЗВУК',
-    sound: 'ВКЛ',
-    like: 'ЛАЙК',
-    share: 'ШЕЙР',
+    aboutStyle: 'О фасоне',
+    hideDesc: 'Скрыть',
     copied: 'Ссылка скопирована',
     up: 'Наверх',
     down: 'Вернуться',
@@ -71,10 +69,8 @@ const UI_TEXT = {
   },
   uk: {
     back: 'Назад',
-    mute: 'ЗВУК',
-    sound: 'УВІМК',
-    like: 'ЛАЙК',
-    share: 'ШЕЙР',
+    aboutStyle: 'Про фасон',
+    hideDesc: 'Сховати',
     copied: 'Посилання скопійовано',
     up: 'Вгору',
     down: 'Повернутися',
@@ -92,10 +88,8 @@ const UI_TEXT = {
   },
   de: {
     back: 'Zurück',
-    mute: 'TON',
-    sound: 'AN',
-    like: 'LIKE',
-    share: 'TEILEN',
+    aboutStyle: 'Details',
+    hideDesc: 'Schließen',
     copied: 'Link kopiert',
     up: 'Nach oben',
     down: 'Zurück',
@@ -223,7 +217,7 @@ const STYLES_DATA: StyleSlide[] = [
     subtitle: { ru: 'Изящная строгость', uk: 'Витончена строгість', de: 'Zarte Strenge' },
     desc: {
       ru: 'Чувственный компромисс между классической лодочкой и босоножкой. Открытая пятка визуально облегчает силуэт, делая каждый шаг невесомым.',
-      uk: "Чуттєвий компроміс між класичним човником та босоніжкою. Відкрита п'ята візуально полегшує силуэт, роблячи кожен крок невагомим.",
+      uk: "Чуттєвий компроміс між класичним човником та босоніжкою. Відкрита п'ята візуально полегшує силует, роблячи кожен крок невагомим.",
       de: 'Ein sinnlicher Kompromiss zwischen klassischem Pump und Sandale. Die offene Ferse erleichtert die Silhouette optisch und macht jeden Schritt schwerelos.',
     },
     hideWatermark: true,
@@ -319,6 +313,7 @@ function SlideItem({
   const [isLiked, setIsLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
+  const [isDescOpen, setIsDescOpen] = useState(false)
   const [isVideoLoaded, setIsVideoLoaded] = useState(false)
   const [heartBurst, setHeartBurst] = useState<{ id: number; x: number; y: number } | null>(null)
 
@@ -326,7 +321,6 @@ function SlideItem({
   const tg = (window as any).Telegram?.WebApp
   const t = UI_TEXT[lang]
 
-  // Загрузка лайков с кэшированием (без повторных запросов при скролле туда-сюда)
   useEffect(() => {
     if (!isPreloaded || hasFetchedLikesRef.current) return
     let mounted = true
@@ -348,7 +342,6 @@ function SlideItem({
     }
   }, [slide.id, userId, isPreloaded])
 
-  // Управление буфером видео
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
@@ -369,7 +362,6 @@ function SlideItem({
     }
   }, [isPreloaded, slide.video])
 
-  // Воспроизведение и сброс в фоне без черной вспышки
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -382,6 +374,7 @@ function SlideItem({
       video.pause()
       video.currentTime = 0
       setIsPaused(false)
+      setIsDescOpen(false)
     }
   }, [isActive])
 
@@ -411,8 +404,14 @@ function SlideItem({
     [isLiked, slide.id, tg, userId]
   )
 
-  // Распознавание одиночного тапа (Play/Pause) и двойного тапа (Лайк с сердцем)
   const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Если открыта карточка описания, одиночный тап по видео просто закрывает её, освобождая кадр
+    if (isDescOpen) {
+      setIsDescOpen(false)
+      if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
+      return
+    }
+
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
@@ -421,7 +420,6 @@ function SlideItem({
       window.clearTimeout(tapTimeoutRef.current)
       tapTimeoutRef.current = null
 
-      // Двойной тап — ставим лайк и показываем сердце в точке касания
       setHeartBurst({ id: Date.now(), x, y })
       triggerLikeRequest(true)
       setTimeout(() => setHeartBurst(null), 850)
@@ -472,6 +470,11 @@ function SlideItem({
     } catch {}
   }
 
+  const toggleDesc = () => {
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+    setIsDescOpen((v) => !v)
+  }
+
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#050505]">
       {/* Видео / Изображение */}
@@ -502,7 +505,7 @@ function SlideItem({
         ) : null}
       </div>
 
-      {/* Зона жестов по видео (Single tap = Pause/Play, Double tap = Like) */}
+      {/* Интерактивная область видео */}
       <div
         onClick={handleVideoTap}
         className="absolute inset-0 z-10 cursor-pointer select-none"
@@ -527,7 +530,7 @@ function SlideItem({
         )}
       </AnimatePresence>
 
-      {/* Центральный индикатор паузы */}
+      {/* Индикатор паузы */}
       <AnimatePresence>
         {isPaused && isActive && (
           <motion.div
@@ -537,8 +540,8 @@ function SlideItem({
             transition={{ duration: 0.2 }}
             className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
           >
-            <div className="w-16 h-16 rounded-full bg-black/45 backdrop-blur-md border border-white/25 flex items-center justify-center text-white">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="ml-1">
+            <div className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="ml-1">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
             </div>
@@ -546,78 +549,132 @@ function SlideItem({
         )}
       </AnimatePresence>
 
-      {/* Верхний и нижний градиенты для идеальной читаемости текста */}
-      <div className="absolute top-0 left-0 right-0 h-[38%] bg-gradient-to-b from-black/85 via-black/35 to-transparent z-10 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 h-[45%] bg-gradient-to-t from-black/95 via-black/55 to-transparent z-10 pointer-events-none" />
+      {/* Деликатные градиенты: внизу только легкая 20%-я дымка, не затемняющая обувь */}
+      <div className="absolute top-0 left-0 right-0 h-[32%] bg-gradient-to-b from-black/75 via-black/25 to-transparent z-10 pointer-events-none" />
+      <div
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-500 ${
+          isDescOpen
+            ? 'h-[50%] from-black/90 via-black/60 to-transparent'
+            : 'h-[20%] from-black/60 via-black/20 to-transparent'
+        }`}
+      />
 
-      {/* Верхний блок: Заголовок и счетчик 01 / 15 */}
+      {/* Верхний редакционный блок: поднят выше, чтобы не перекрывать центр кадра */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
-        transition={{ duration: 0.8, ease: smoothEase, delay: 0.1 }}
-        className="absolute top-[96px] left-6 right-6 z-20 flex items-start justify-between pointer-events-none"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
+        transition={{ duration: 0.7, ease: smoothEase, delay: 0.08 }}
+        className="absolute top-[68px] left-6 right-6 z-20 flex items-start justify-between pointer-events-none"
       >
         <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/70 mb-2">
+          <p className="text-[9px] font-sans uppercase tracking-[0.38em] text-white/75 mb-1.5 drop-shadow">
             {slide.subtitle[lang]}
           </p>
-          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.08] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-lg">
+          <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.06] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
             {slide.title[lang]}
           </h2>
         </div>
-        <div className="text-[10px] font-sans tracking-[0.25em] text-white/60 mt-1 tabular-nums">
+
+        <div className="text-[10px] font-sans tracking-[0.22em] text-white/65 mt-1 tabular-nums drop-shadow">
           <span>{String(index + 1).padStart(2, '0')}</span>
-          <span className="text-white/30 mx-1">/</span>
-          <span className="text-white/35">{String(totalCount).padStart(2, '0')}</span>
+          <span className="text-white/35 mx-1">/</span>
+          <span className="text-white/40">{String(totalCount).padStart(2, '0')}</span>
         </div>
       </motion.div>
 
-      {/* Нижний блок: Вертикальная Reels-панель справа + описание на всю ширину */}
+      {/* Нижний компактный лукбук-док (освобождает 90% высоты видео) */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 15 }}
-        transition={{ duration: 0.8, ease: smoothEase, delay: 0.2 }}
-        className="absolute bottom-7 left-6 right-6 z-20 flex flex-col pointer-events-none"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
+        transition={{ duration: 0.7, ease: smoothEase, delay: 0.15 }}
+        className="absolute bottom-5 left-6 right-6 z-20 flex flex-col pointer-events-none"
       >
-        {/* Вертикальный стек кнопок справа над линией */}
-        <div className="self-end flex flex-col items-center gap-4 mb-5 pointer-events-auto">
-          {/* Кнопка звука */}
-          <button onClick={onToggleMute} className="flex flex-col items-center gap-1 group">
-            <div className="w-10 h-10 rounded-full border border-white/35 bg-black/40 backdrop-blur-md flex items-center justify-center text-white transition-all duration-200 active:scale-90">
+        {/* Выдвижная карточка с полным текстом (открывается только по запросу) */}
+        <AnimatePresence>
+          {isDescOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ duration: 0.28, ease: smoothEase }}
+              onClick={toggleDesc}
+              className="pointer-events-auto mb-3 p-4 rounded-2xl bg-black/65 backdrop-blur-xl border border-white/15 shadow-2xl cursor-pointer"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/50">
+                  {slide.subtitle[lang]}
+                </span>
+                <span className="text-[8px] font-sans uppercase tracking-[0.2em] text-white/60">
+                  {t.hideDesc} ✕
+                </span>
+              </div>
+              <p className="text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.65] text-[#F4F0E8]/95">
+                {slide.desc[lang]}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Тонкая редакционная линия */}
+        <div className="w-full h-px bg-white/20 mb-3" />
+
+        {/* Нижний ряд: Тизер описания слева + 3 чистые иконки справа */}
+        <div className="flex items-center justify-between gap-3 pointer-events-auto">
+          {/* Кнопка-тизер в 1 строку */}
+          <button
+            onClick={toggleDesc}
+            className="flex-1 min-w-0 text-left group py-0.5 pr-2 active:opacity-70 transition-opacity"
+          >
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[8px] font-sans uppercase tracking-[0.28em] text-white/65">
+                {t.aboutStyle}
+              </span>
+              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-white/30 text-[9px] leading-none text-white/80">
+                {isDescOpen ? '−' : '+'}
+              </span>
+            </div>
+            <p className="text-[11px] font-sans font-light text-white/85 truncate">
+              {slide.desc[lang]}
+            </p>
+          </button>
+
+          {/* Горизонтальный ряд иконок без лишних текстовых подписей */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Звук */}
+            <button
+              onClick={onToggleMute}
+              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90"
+            >
               {isMuted ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                   <line x1="23" y1="9" x2="17" y2="15"></line>
                   <line x1="17" y1="9" x2="23" y2="15"></line>
                 </svg>
               ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                   <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                 </svg>
               )}
-            </div>
-            <span className="text-[8px] tracking-[0.2em] uppercase text-white/75">
-              {isMuted ? t.mute : t.sound}
-            </span>
-          </button>
+            </button>
 
-          {/* Кнопка Лайка */}
-          <button onClick={() => triggerLikeRequest(false)} className="flex flex-col items-center gap-1">
-            <div
+            {/* Лайк (с аккуратным счетчиком внутри капсулы, если есть лайки) */}
+            <button
+              onClick={() => triggerLikeRequest(false)}
               className={`
-                w-10 h-10 rounded-full border flex items-center justify-center
+                h-9 px-2.5 min-w-[36px] rounded-full border flex items-center justify-center gap-1.5
                 transition-all duration-200 active:scale-90
                 ${
                   isLiked
-                    ? 'border-white bg-white text-black shadow-[0_0_16px_rgba(255,255,255,0.4)]'
-                    : 'border-white/35 text-white bg-black/40 backdrop-blur-md'
+                    ? 'border-white bg-white text-black shadow-[0_0_14px_rgba(255,255,255,0.35)]'
+                    : 'border-white/30 text-white bg-black/35 backdrop-blur-md'
                 }
               `}
             >
               <svg
-                width="15"
-                height="15"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill={isLiked ? 'currentColor' : 'none'}
                 stroke="currentColor"
@@ -625,31 +682,26 @@ function SlideItem({
               >
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
-            </div>
-            <span className="text-[8px] tracking-[0.2em] uppercase text-white/75 tabular-nums">
-              {likesCount > 0 ? likesCount : t.like}
-            </span>
-          </button>
+              {likesCount > 0 && (
+                <span className="text-[9px] font-sans tracking-wider tabular-nums">
+                  {likesCount}
+                </span>
+              )}
+            </button>
 
-          {/* Кнопка Поделиться */}
-          <button onClick={handleShare} className="flex flex-col items-center gap-1">
-            <div className="w-10 h-10 rounded-full border border-white/35 bg-black/40 backdrop-blur-md flex items-center justify-center text-white transition-all duration-200 active:scale-90">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            {/* Поделиться */}
+            <button
+              onClick={handleShare}
+              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                 <polyline points="16 6 12 2 8 6" />
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
-            </div>
-            <span className="text-[8px] tracking-[0.2em] uppercase text-white/75">{t.share}</span>
-          </button>
+            </button>
+          </div>
         </div>
-
-        {/* Разделительная линия и текст на всю ширину экрана */}
-        <div className="w-full h-px bg-white/25 mb-4" />
-
-        <p className="text-[11px] min-[390px]:text-[12px] font-sans font-light leading-[1.65] text-white/90 max-w-[94%]">
-          {slide.desc[lang]}
-        </p>
       </motion.div>
     </div>
   )
@@ -685,7 +737,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     setTimeout(() => setToastMessage(null), 2400)
   }, [])
 
-  // Проверка покупки при старте
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
@@ -705,7 +756,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     s.title[currentLang].replace('\n', ' ')
   )
 
-  // Отслеживание позиции скролла для кнопки "Наверх / Вернуться"
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -755,7 +805,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     }
   }
 
-  // IntersectionObserver для определения активного слайда
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
@@ -782,7 +831,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     return () => observer.disconnect()
   }, [isProPurchased])
 
-  // Инициализация Telegram WebApp и системной кнопки Назад
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
     if (!tg) return
@@ -877,28 +925,27 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         }
       `}</style>
 
-      {/* Верхняя панель: Кнопка Назад слева + Умный скролл справа (без наложений на Reels-док) */}
-      <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-[max(2.25rem,env(safe-area-inset-top))] pb-3 flex justify-between items-center pointer-events-none">
+      {/* Компактный верхний хедер с минимальным отступом от системной шапки Telegram */}
+      <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-4 pb-2 flex justify-between items-center pointer-events-none">
         <button
           onClick={onBack}
-          className="pointer-events-auto flex items-center gap-2 py-2 px-3.5 -ml-2 rounded-full bg-black/35 backdrop-blur-md border border-white/15 text-[10px] font-sans uppercase tracking-[0.2em] text-white/90 active:scale-95 transition-transform"
+          className="pointer-events-auto flex items-center gap-1.5 py-1.5 px-3 -ml-1 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-[9px] font-sans uppercase tracking-[0.2em] text-white/85 active:scale-95 transition-transform"
         >
           <span>←</span>
           <span>{t.back}</span>
         </button>
 
-        {/* Кнопка Наверх / Вернуться в шапке */}
         <button
           onClick={handleSmartScroll}
-          className={`pointer-events-auto flex items-center gap-1.5 py-2 px-3.5 rounded-full bg-black/45 backdrop-blur-md border border-white/20 text-[9px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] transition-all duration-500 active:scale-95 ${
+          className={`pointer-events-auto flex items-center gap-1.5 py-1.5 px-3 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-[9px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] transition-all duration-500 active:scale-95 ${
             buttonMode !== 'hidden'
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 -translate-y-3 pointer-events-none'
           }`}
         >
           <svg
-            width="12"
-            height="12"
+            width="11"
+            height="11"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -914,21 +961,21 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         </button>
       </header>
 
-      {/* Всплывающий тост при копировании ссылки */}
+      {/* Тост при копировании ссылки */}
       <AnimatePresence>
         {toastMessage && (
           <motion.div
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-[120] px-4 py-2 rounded-full bg-white text-black text-[10px] font-sans uppercase tracking-[0.2em] shadow-xl pointer-events-none"
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-[120] px-4 py-2 rounded-full bg-white text-black text-[10px] font-sans uppercase tracking-[0.2em] shadow-xl pointer-events-none"
           >
             {toastMessage}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Основная вертикальная лента */}
+      {/* Основная лента */}
       <div
         ref={scrollRef}
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
@@ -961,7 +1008,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           )
         })}
 
-        {/* High-Fashion Paywall Slide с живым размытым видео-тизером */}
+        {/* High-Fashion Paywall Slide */}
         {showPaywallSlide && (
           <div
             ref={(el) => {
@@ -970,7 +1017,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
             data-index={visibleStyles.length}
             className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6 pb-10"
           >
-            {/* Живое размытое видео 4-го фасона на фоне */}
             {STYLES_DATA[3]?.video && (
               <video
                 src={STYLES_DATA[3].video}
@@ -982,10 +1028,8 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
               />
             )}
 
-            {/* Драматичное затемнение */}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 z-0 pointer-events-none" />
 
-            {/* Фоновая типографика в стиле Vogue */}
             <div className="absolute top-24 left-4 pointer-events-none select-none z-0">
               <h2 className="font-serif text-[22vw] leading-[0.8] text-white/[0.04] tracking-tighter">
                 FULL
@@ -996,7 +1040,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
               </h2>
             </div>
 
-            {/* Контент пейволла */}
             <div className="relative z-10 w-full mb-2">
               <div className="w-full h-px bg-white/20 mb-6" />
 
@@ -1012,7 +1055,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 {t.paywall.desc}
               </p>
 
-              {/* Тизер-чипсы заблокированных фасонов */}
               <div className="flex flex-wrap gap-1.5 mb-8">
                 {lockedPreviewTitles.map((title) => (
                   <span
