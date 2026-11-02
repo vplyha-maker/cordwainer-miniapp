@@ -15,10 +15,10 @@ export const cardioCatalog: ShoeItem[] = [
   { id: '223', modelNumber: '223', category: 'Кроссовки', color: 'Белый', features: ['Мех', 'Gore-Tex'], image: '/catalog/223.jpg' },
   { id: '223-1', modelNumber: '223', category: 'Кроссовки', color: 'Черный', features: ['Мех', 'Gore-Tex'], image: '/catalog/223(1).jpg' },
 
-  // Модель 226
-  { id: '226', modelNumber: '226', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/226.jpg' },
-  { id: '226-1', modelNumber: '226', variant: 'Вариант 2', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/226(1).jpg' },
-  { id: '226-base', modelNumber: '226', variant: 'Базовый', category: 'Ботинки', color: 'Черный', features: [], image: '/catalog/226.jpg' }, // Проверьте имя файла (дублирует 226.jpg)
+  // Модель 226 (две вариации подошвы)
+  { id: '226', modelNumber: '226', variant: '#1', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/226.jpg' },
+  { id: '226-1', modelNumber: '226', variant: '#2', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/226(1).jpg' },
+
 
   // Модель 188
   { id: '188', modelNumber: '188', category: 'Ботинки', color: 'Черный', features: ['Подошва трактор'], image: '/catalog/188.jpg' },
