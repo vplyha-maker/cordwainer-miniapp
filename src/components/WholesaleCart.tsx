@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type CartItem, type SizeKey } from '../data/catalog';
+import { type CartItem } from '../data/catalog';
 
 type WholesaleCartProps = {
   items: CartItem[];
@@ -11,8 +11,8 @@ type WholesaleCartProps = {
 
 // 👇 ВПИШИТЕ СЮДА TELEGRAM-ЮЗЕРНЕЙМЫ (без @) ДВУХ РУКОВОДИТЕЛЕЙ
 const MANAGERS = [
-  { label: 'Отправить заказ • Руководитель 1', username: 'USERNAME_BOSS_1' },
-  { label: 'Отправить заказ • Руководитель 2', username: 'USERNAME_BOSS_2' },
+  { label: 'Отправить заказ • Руководитель 1', username: 'ГЕОРГИЙ' },
+  { label: 'Отправить заказ • Руководитель 2', username: 'БОРИС' },
 ];
 
 const NP_API_KEY = '';
