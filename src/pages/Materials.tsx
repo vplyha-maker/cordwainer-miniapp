@@ -5,6 +5,12 @@ type MaterialsProps = {
   onBack?: () => void;
 };
 
+// 👇 ВПИШИТЕ СЮДА TELEGRAM-ЮЗЕРНЕЙМЫ (без @) ДВУХ РУКОВОДИТЕЛЕЙ
+const MANAGERS = [
+  { label: 'Отправить заказ • Руководитель 1', username: 'USERNAME_BOSS_1' },
+  { label: 'Отправить заказ • Руководитель 2', username: 'USERNAME_BOSS_2' },
+];
+
 const CATEGORIES: ('Все' | ShoeCategory)[] = ['Все', 'Ботинки', 'Кроссовки', 'Туфли'];
 const FEATURE_FILTERS = ['Все', 'Мех', 'Gore-Tex', 'Подошва трактор'] as const;
 
@@ -33,21 +39,18 @@ export function Materials({ onBack }: MaterialsProps) {
   const [activeFeature, setActiveFeature] = useState<string>('Все');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Если выбрана модель — открываем отдельную полную страницу
   const [selectedShoe, setSelectedShoe] = useState<ShoeItem | null>(null);
 
-  // Режим заказа и размерная сетка
   const [orderMode, setOrderMode] = useState<'sample' | 'wholesale'>('wholesale');
   const [sizeRun, setSizeRun] = useState<Record<SizeKey, number>>(STANDARD_8_RUN);
   const [sampleSize, setSampleSize] = useState<SizeKey>(42);
   const [boxesCount, setBoxesCount] = useState<number>(1);
 
-  // Логистика Новой Почты
   const [selectedCity, setSelectedCity] = useState(RECIPIENT_CITIES[0]);
   const [deliveryCost, setDeliveryCost] = useState<number | null>(null);
   const [calcLoading, setCalcLoading] = useState(false);
+  const [copiedOrder, setCopiedOrder] = useState(false);
 
-  // Прокрутка наверх при открытии страницы модели
   useEffect(() => {
     if (selectedShoe) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -149,8 +152,54 @@ export function Materials({ onBack }: MaterialsProps) {
     };
   }, [selectedShoe, orderMode, totalPairs, estimatedBoxes, selectedCity]);
 
+  // Формирование текста B2B-заявки
+  const buildOrderMessage = () => {
+    if (!selectedShoe) return '';
+    const sizeDetails =
+      orderMode === 'sample'
+        ? `Тестовый образец (1 пара) — размер ${sampleSize}`
+        : `Опт (ростовок: ×${boxesCount}) — ` +
+          SIZES.filter((sz) => sizeRun[sz] > 0)
+            .map((sz) => `${sz}р.(${sizeRun[sz] * boxesCount}шт)`)
+            .join(', ');
+
+    const featuresText =
+      selectedShoe.features.length > 0 ? `\nОсобенности: ${selectedShoe.features.join(', ')}` : '';
+
+    return (
+      `📦 B2B ЗАЯВКА • CARDIO (Харьков)\n` +
+      `────────────────────\n` +
+      `Модель: № ${selectedShoe.modelNumber} ${selectedShoe.variant || ''} (${selectedShoe.category})\n` +
+      `Цвет: ${selectedShoe.color}${featuresText}\n` +
+      `Формула: ${sizeDetails}\n` +
+      `Общий объем: ${totalPairs} пар (мест НП: ${estimatedBoxes})\n` +
+      `Доставка НП: г. ${selectedCity.name} (ориентировочно ${deliveryCost} ₴)\n` +
+      `────────────────────\n` +
+      `Подскажите актуальный оптовый прайс и сроки отгрузки.`
+    );
+  };
+
+  // Отправка заявки выбранному руководителю в Telegram
+  const sendOrderToManager = (username: string) => {
+    const cleanUsername = username.replace('@', '').trim();
+    const text = encodeURIComponent(buildOrderMessage());
+    const url = `https://t.me/${cleanUsername}?text=${text}`;
+    window.open(url, '_blank');
+  };
+
+  // Копирование текста заявки в буфер обмена
+  const copyOrderText = async () => {
+    try {
+      await navigator.clipboard.writeText(buildOrderMessage());
+      setCopiedOrder(true);
+      setTimeout(() => setCopiedOrder(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
   // =========================================================================
-  // ЭКРАН 1: ПОЛНАЯ СТРАНИЦА МОДЕЛИ (когда пользователь кликнул на обувь)
+  // ЭКРАН 1: ПОЛНАЯ СТРАНИЦА МОДЕЛИ
   // =========================================================================
   if (selectedShoe) {
     return (
@@ -221,7 +270,7 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Полное квадратное фото без обрезки */}
+        {/* Полное квадратное фото */}
         <div
           style={{
             backgroundColor: '#FFFFFF',
@@ -331,7 +380,7 @@ export function Materials({ onBack }: MaterialsProps) {
           </button>
         </div>
 
-        {/* Блок размерной сетки (2 ряда по 3 колонки — идеально под экран смартфона) */}
+        {/* Блок размерной сетки (3 колонки × 2 ряда) */}
         <div
           style={{
             backgroundColor: '#FFFFFF',
@@ -385,7 +434,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 </div>
               </div>
 
-              {/* Сетка 3 колонки × 2 ряда */}
               <div
                 style={{
                   display: 'grid',
@@ -446,7 +494,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 ))}
               </div>
 
-              {/* Выбор количества ростовок */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <span style={{ fontSize: '13px', color: '#444' }}>Количество ростовок:</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -470,7 +517,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 </div>
               </div>
 
-              {/* Итоговая формула */}
               <div style={{ marginTop: '12px', fontSize: '12px', color: '#444', borderTop: '1px dashed #DDD', paddingTop: '10px' }}>
                 Формула заказа:{' '}
                 <strong>
@@ -514,7 +560,7 @@ export function Materials({ onBack }: MaterialsProps) {
             backgroundColor: '#FFFFFF',
             border: '1px solid #E5E2DC',
             padding: '14px',
-            marginBottom: '24px',
+            marginBottom: '16px',
           }}
         >
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
@@ -559,16 +605,70 @@ export function Materials({ onBack }: MaterialsProps) {
             </div>
           </div>
         </div>
+
+        {/* Блок отправки заказа двум руководителям в Telegram */}
+        <div
+          style={{
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #1A1A1A',
+            padding: '14px',
+            marginBottom: '32px',
+          }}
+        >
+          <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#555', marginBottom: '10px', fontWeight: 700 }}>
+            Оформление оптового заказа напрямую:
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {MANAGERS.map((mgr, idx) => (
+              <button
+                key={idx}
+                disabled={totalPairs === 0}
+                onClick={() => sendOrderToManager(mgr.username)}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  backgroundColor: idx === 0 ? '#1A1A1A' : '#333333',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  cursor: totalPairs === 0 ? 'not-allowed' : 'pointer',
+                  opacity: totalPairs === 0 ? 0.5 : 1,
+                }}
+              >
+                ✈️ {mgr.label}
+              </button>
+            ))}
+
+            <button
+              onClick={copyOrderText}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: '#FAF9F6',
+                color: '#1A1A1A',
+                border: '1px solid #CCC',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {copiedOrder ? '✓ Текст заявки скопирован!' : '📋 Скопировать текст заявки (для Viber / др. чата)'}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   // =========================================================================
-  // ЭКРАН 2: ОСНОВНОЙ КАТАЛОГ (сетка всех моделей)
+  // ЭКРАН 2: ОСНОВНОЙ КАТАЛОГ
   // =========================================================================
   return (
     <div style={{ backgroundColor: '#F7F6F2', minHeight: '100vh', padding: '16px', color: '#1A1A1A' }}>
-      {/* Шапка */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <span style={{ fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#777' }}>
@@ -597,7 +697,6 @@ export function Materials({ onBack }: MaterialsProps) {
         )}
       </div>
 
-      {/* Поиск */}
       <input
         type="text"
         placeholder="Поиск по номеру модели (226, 228...) или цвету..."
@@ -616,7 +715,6 @@ export function Materials({ onBack }: MaterialsProps) {
         }}
       />
 
-      {/* Фильтры категорий */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
         {CATEGORIES.map((category) => {
           const isActive = activeCategory === category;
@@ -640,7 +738,6 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Быстрые фильтры особенностей */}
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px' }}>
         {FEATURE_FILTERS.map((feat) => {
           const isActive = activeFeature === feat;
@@ -664,7 +761,6 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Сетка каталога */}
       <div
         style={{
           display: 'grid',
