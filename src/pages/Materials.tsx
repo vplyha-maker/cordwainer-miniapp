@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { cardioCatalog, ShoeCategory } from '../data/catalog';
+import { useState, useMemo } from 'react';
+import { cardioCatalog, type ShoeCategory } from '../data/catalog';
 
 type MaterialsProps = {
   onBack?: () => void;
@@ -7,7 +7,7 @@ type MaterialsProps = {
 
 const CATEGORIES: ('Все' | ShoeCategory)[] = ['Все', 'Ботинки', 'Кроссовки', 'Туфли'];
 
-export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
+export function Materials({ onBack }: MaterialsProps) {
   const [activeCategory, setActiveCategory] = useState<'Все' | ShoeCategory>('Все');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -43,7 +43,8 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
               fontSize: '11px',
               letterSpacing: '1px',
               textTransform: 'uppercase',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              color: '#1A1A1A'
             }}
           >
             Назад
@@ -64,12 +65,13 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
           marginBottom: '12px',
           border: '1px solid #DDD',
           backgroundColor: '#FFF',
+          color: '#1A1A1A',
           fontSize: '13px',
           outline: 'none'
         }}
       />
 
-      {/* Фильтры категорий в стиле Pegres */}
+      {/* Фильтры категорий */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '16px' }}>
         {CATEGORIES.map((category) => {
           const isActive = activeCategory === category;
@@ -94,7 +96,7 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
         })}
       </div>
 
-      {/* Сетка каталога (2 колонки на мобильном) */}
+      {/* Сетка каталога */}
       <div
         style={{
           display: 'grid',
@@ -115,7 +117,6 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
               position: 'relative'
             }}
           >
-            {/* Бейдж модификации подошвы (#1, #2) */}
             {shoe.variant && (
               <span
                 style={{
@@ -126,14 +127,14 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
                   border: '1px solid #DDD',
                   padding: '2px 6px',
                   fontSize: '10px',
-                  fontWeight: 600
+                  fontWeight: 600,
+                  color: '#1A1A1A'
                 }}
               >
                 {shoe.variant}
               </span>
             )}
 
-            {/* Квадратное фото */}
             <img
               src={shoe.image}
               alt={`Модель ${shoe.modelNumber}`}
@@ -146,7 +147,6 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
               }}
             />
 
-            {/* Описание модели */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <span style={{ fontFamily: 'serif', fontSize: '17px', fontWeight: 600 }}>
@@ -159,7 +159,6 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
                 Цвет: <strong>{shoe.color}</strong>
               </div>
 
-              {/* Теги: Мех, Gore-Tex, Трактор */}
               {shoe.features.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                   {shoe.features.map((feat) => (
@@ -183,4 +182,6 @@ export const Materials: React.FC<MaterialsProps> = ({ onBack }) => {
       </div>
     </div>
   );
-};
+}
+
+export default Materials;
