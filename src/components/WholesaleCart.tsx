@@ -9,7 +9,6 @@ type WholesaleCartProps = {
   onClose: () => void;
 };
 
-// 👇 ВПИШИТЕ СЮДА ЧИСЛОВЫЕ TELEGRAM ID ДВУХ РУКОВОДИТЕЛЕЙ (например: '123456789')
 const MANAGERS = [
   { label: 'Отправить заказ • Борис', telegramId: '8529254699' },
   { label: 'Отправить заказ • Георгий', telegramId: '6034597342' },
@@ -135,10 +134,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     );
   };
 
-  const sendToManager = (username: string) => {
-    const clean = username.replace('@', '').trim();
+  const sendToTelegramId = (telegramId: string) => {
+    if (!telegramId) return;
     const text = encodeURIComponent(buildInvoiceText());
-    window.open(`https://t.me/${clean}?text=${text}`, '_blank');
+    window.open(`https://t.me/${telegramId}?text=${text}`, '_blank');
   };
 
   const copyInvoice = async () => {
@@ -452,7 +451,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               {MANAGERS.map((mgr, idx) => (
                 <button
                   key={idx}
-                  onClick={() => sendToManager(mgr.username)}
+                  onClick={() => sendToTelegramId(mgr.telegramId)}
                   style={{
                     width: '100%',
                     padding: '13px',
