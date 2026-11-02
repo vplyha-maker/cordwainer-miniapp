@@ -41,20 +41,6 @@ function haptic(style: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-const StaticIcon = ({ type, className }: { type: 'length' | 'ball' | 'instep' | 'heel', className?: string }) => {
-  const paths = {
-    length: "M3 12h18M5 9v6M19 9v6",
-    ball: "M12 5c-4.4 0-8 3.1-8 7s3.6 7 8 7 8-3.1 8-7",
-    instep: "M4 16c0-6 4-10 8-10s8 4 8 10",
-    heel: "M18 6L6 18M7 7l-2 2 2 2"
-  }
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={`shrink-0 ${className}`}>
-      <path d={paths[type]} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 export function HeelCalcPage({ onBack, lang }: Props) {
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') return document.documentElement.classList.contains('dark')
@@ -150,7 +136,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         @keyframes fadeUp {
-          0% { opacity: 0; transform: translateY(16px); }
+          0% { opacity: 0; transform: translateY(12px); }
           100% { opacity: 1; transform: translateY(0); }
         }
         .stagger-item {
@@ -160,38 +146,43 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       `}</style>
 
       {/* HEADER */}
-      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20 shrink-0">
+      <header className="px-6 pt-7 pb-3 flex items-center justify-between z-20 shrink-0 border-b border-[var(--color-border)]">
         <button 
+          type="button"
           onClick={() => { haptic('light'); onBack(); }}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer p-2 -m-2 ${cTextMuted} transition-colors touch-manipulation`}
+          className={`group flex items-center gap-2.5 text-[9px] font-sans uppercase tracking-[0.25em] outline-none border-none bg-transparent cursor-pointer p-1 -m-1 ${cTextMuted} transition-colors touch-manipulation`}
         >
           <span className="transform transition-transform group-active:-translate-x-1">←</span>
-          <span>Back</span>
+          <span>ATELIER INDEX</span>
         </button>
+        <span className="font-mono text-[8px] uppercase tracking-[0.3em] opacity-40">
+          ARCHIVE // CALC N° 03
+        </span>
       </header>
 
       {/* CONTENT */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-24 scrollbar-hide w-full">
         
         {/* Title */}
-        <div className="stagger-item mb-8 w-full" style={{ animationDelay: '0.05s' }}>
-          <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.4em] mb-4 ${cTextMuted}`}>
+        <div className="stagger-item my-7 w-full" style={{ animationDelay: '0.05s' }}>
+          <p className={`text-[8.5px] font-sans uppercase tracking-[0.35em] mb-2 ${cTextMuted}`}>
             {t.desc}
           </p>
-          <h1 className="font-serif text-[13vw] min-[400px]:text-5xl leading-[0.9] tracking-tight">
+          <h1 className="font-serif text-4xl sm:text-5xl font-light tracking-tight">
             {t.title}
           </h1>
         </div>
 
-        {/* Toggles (Horizontal Scroll) */}
-        <div className="stagger-item mb-6" style={{ animationDelay: '0.1s' }}>
-          <div className={`flex gap-6 pb-3 border-b ${cLine} mb-4`}>
+        {/* Mode & Type Toggles */}
+        <div className="stagger-item mb-7 space-y-3" style={{ animationDelay: '0.1s' }}>
+          <div className={`flex gap-6 pb-2.5 border-b ${cLine}`}>
             {(['flat', 'rocker'] as const).map((type) => (
               <button
                 key={type}
+                type="button"
                 onClick={() => { haptic('light'); setSoleType(type) }}
-                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent p-2 -m-2 cursor-pointer touch-manipulation ${
-                  soleType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60`
+                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent p-1 -m-1 cursor-pointer touch-manipulation ${
+                  soleType === type ? `italic ${cText} underline underline-offset-8 opacity-100` : `${cTextMuted} opacity-50 hover:opacity-100`
                 }`}
               >
                 {t[type]}
@@ -199,14 +190,15 @@ export function HeelCalcPage({ onBack, lang }: Props) {
             ))}
           </div>
 
-          <div className="flex overflow-x-auto gap-6 pb-2 scrollbar-hide">
+          <div className="flex overflow-x-auto gap-5 pb-1 scrollbar-hide items-center">
             {soleType === 'flat' ? (
               (['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
                 <button
                   key={type}
+                  type="button"
                   onClick={() => { haptic('light'); setHeelType(type) }}
-                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent p-2 -m-2 cursor-pointer whitespace-nowrap touch-manipulation ${
-                    heelType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50`
+                  className={`text-[11px] font-serif transition-all outline-none border-none bg-transparent p-1 -m-1 cursor-pointer whitespace-nowrap touch-manipulation ${
+                    heelType === type ? `italic ${cText} opacity-100 font-medium scale-105 origin-left` : `${cTextMuted} opacity-50 hover:opacity-100`
                   }`}
                 >
                   {t[type]}
@@ -220,9 +212,10 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               ]).map(({ type, labelKey }) => (
                 <button
                   key={type}
+                  type="button"
                   onClick={() => handleRockerType(type)}
-                  className={`text-[10px] font-serif transition-all outline-none border-none bg-transparent p-2 -m-2 cursor-pointer whitespace-nowrap touch-manipulation ${
-                    rockerType === type ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-50`
+                  className={`text-[11px] font-serif transition-all outline-none border-none bg-transparent p-1 -m-1 cursor-pointer whitespace-nowrap touch-manipulation ${
+                    rockerType === type ? `italic ${cText} opacity-100 font-medium scale-105 origin-left` : `${cTextMuted} opacity-50 hover:opacity-100`
                   }`}
                 >
                   {t[labelKey]}
@@ -233,7 +226,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
 
         {/* Visualizer Canvas */}
-        <div className="stagger-item w-full mb-10 relative" style={{ animationDelay: '0.15s' }}>
+        <div className="stagger-item w-full mb-8" style={{ animationDelay: '0.15s' }}>
           <HeelCanvas
             geometry={geometry}
             eng={eng}
@@ -250,7 +243,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
 
         {/* Controls Grid */}
-        <div className="stagger-item grid grid-cols-2 gap-x-6 gap-y-6 mb-12" style={{ animationDelay: '0.2s' }}>
+        <div className="stagger-item grid grid-cols-2 gap-4 mb-10" style={{ animationDelay: '0.2s' }}>
           <JournalStepper label={t.size} value={shoeSize} min={33} max={48} onChange={setShoeSize} isDark={isDark} />
           <JournalStepper label={t.heel} value={heelHeight} min={10} max={130} onChange={setHeelHeight} unit={t.mm} isDark={isDark} />
           <JournalStepper label={t.toe} value={toeThickness} min={0} max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)} onChange={setToeThickness} unit={t.mm} isDark={isDark} />
@@ -267,16 +260,17 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
 
         {/* Specs Accordion */}
-        <div className="stagger-item w-full" style={{ animationDelay: '0.25s' }}>
+        <div className="stagger-item w-full pt-2" style={{ animationDelay: '0.25s' }}>
           <button
+            type="button"
             onClick={() => { haptic('light'); setShowSpecs(!showSpecs); }}
-            className={`w-full flex items-center justify-between py-4 -my-4 border-b transition-colors outline-none cursor-pointer ${cLine} ${cTextMuted} touch-manipulation`}
+            className={`w-full flex items-center justify-between py-4 border-y transition-colors outline-none cursor-pointer ${cLine} ${cText} touch-manipulation`}
           >
-            <span className="text-[9px] font-sans uppercase tracking-[0.2em]">
+            <span className="text-[9px] font-sans uppercase tracking-[0.25em] font-medium">
               {t.specsBtn}
             </span>
             <motion.div animate={{ rotate: showSpecs ? 180 : 0 }} transition={{ duration: 0.3 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 9l-7 7-7-7" /></svg>
+              <span className="text-xs">↓</span>
             </motion.div>
           </button>
 
@@ -289,8 +283,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                <div className="pt-8 space-y-2 pb-4">
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+                <div className="py-6 space-y-4 border-b border-[var(--color-border)]">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-5">
                     <SpecCell label={t.specПерекат} value={`${rockerStartPct}%`} infoKey="перекат" onInfo={() => setActiveInfo('перекат')} isDark={isDark} />
                     <SpecCell label={t.specГеленок} value={`${eng.shankLength}`} unit={t.mm} infoKey="геленок" onInfo={() => setActiveInfo('геленок')} isDark={isDark} />
                     <SpecCell label={t.specСталь} value={`${eng.steelThickness.toFixed(1)}`} unit={t.mm} infoKey="сталь" onInfo={() => setActiveInfo('сталь')} isDark={isDark} />
@@ -327,8 +321,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     )}
                   </div>
 
-                  <div className={`mt-8 pt-4 border-t ${cLine} text-center`}>
-                    <span className={`font-mono text-[9px] uppercase tracking-widest ${cTextMuted}`}>
+                  <div className={`pt-3 border-t ${cLine} text-center opacity-60`}>
+                    <span className="font-mono text-[8px] uppercase tracking-widest">
                       Angle = arcsin((H − T) / L_eff)
                     </span>
                   </div>
@@ -345,25 +339,38 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           <motion.div
             key="info-modal-backdrop" 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md cursor-pointer touch-manipulation"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/75 backdrop-blur-sm cursor-pointer touch-manipulation"
             onClick={() => setActiveInfo(null)}
           >
             <motion.div
-              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+              initial={{ scale: 0.96, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 8 }}
               onClick={e => e.stopPropagation()} 
-              className={`w-full max-w-[320px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col cursor-default relative z-10`}
+              className={`w-full max-w-[340px] p-8 border ${cLine} ${cBg} shadow-2xl flex flex-col cursor-default relative z-10 rounded-[16px]`}
             >
-              <h3 className={`font-serif text-2xl leading-tight mb-4 ${cText} capitalize`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-mono text-[8px] uppercase tracking-[0.3em] opacity-50">
+                  SPECIFICATION ARCHIVE
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveInfo(null)}
+                  className="text-xs opacity-60 hover:opacity-150 p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <h3 className={`font-serif text-2xl leading-tight mb-3 ${cText} capitalize`}>
                  {activeInfo}
               </h3>
-              <p className={`text-[12px] font-sans font-light leading-[1.6] mb-8 ${cTextMuted}`}>
+              <p className={`text-[12px] font-sans font-light leading-[1.65] mb-8 ${cTextMuted}`}>
                 {infos[activeInfo]}
               </p>
               
               <button
                 type="button"
                 onClick={() => setActiveInfo(null)}
-                className={`w-full py-4 border transition-all active:scale-95 text-[9px] font-sans uppercase tracking-[0.3em] cursor-pointer ${cText} ${cLine} touch-manipulation`}
+                className="w-full py-3.5 border border-[var(--color-border)] text-[9px] font-sans uppercase tracking-[0.3em] cursor-pointer bg-[var(--color-ink)] text-[var(--color-bg)] font-medium rounded-[10px] active:scale-95 transition-transform"
               >
                 Close
               </button>
@@ -376,7 +383,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 }
 
 // ------------------------------------------------------------------
-// КОМПАКТНЫЕ ЖУРНАЛЬНЫЕ КОМПОНЕНТЫ
+// ЖУРНАЛЬНЫЕ КОМПОНЕНТЫ УПРАВЛЕНИЯ
 // ------------------------------------------------------------------
 
 function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }: any) {
@@ -385,25 +392,25 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
 
   return (
-    <div className={`flex flex-col border-b ${cLine} pb-3 justify-between`}>
-      <span className={`text-[8.5px] uppercase tracking-[0.2em] mb-3 ${cTextMuted} truncate pr-1`}>{label}</span>
+    <div className={`flex flex-col border ${cLine} rounded-[14px] p-3.5 bg-[var(--color-surface)] justify-between shadow-[0_4px_20px_rgb(0,0,0,0.02)]`}>
+      <span className={`text-[8px] uppercase tracking-[0.25em] mb-2 ${cTextMuted} truncate pr-1 font-mono`}>
+        {label}
+      </span>
       <div className="flex items-center justify-between">
         <button 
           type="button"
           onClick={() => { if(value > min) { haptic('light'); onChange(value - 1) } }} 
-          // Увеличена зона клика с помощью p-4 -m-4
-          className={`text-2xl leading-none p-4 -m-4 outline-none cursor-pointer touch-manipulation ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
+          className={`w-7 h-7 flex items-center justify-center rounded-[8px] bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation ${value <= min ? 'opacity-20 cursor-not-allowed' : `active:scale-95 ${cText}`}`}
         >
-          -
+          −
         </button>
-        <span className={`font-serif text-3xl tabular-nums ${cText}`}>
-          {value}<span className={`font-sans text-[10px] ml-1 ${cTextMuted}`}>{unit}</span>
+        <span className={`font-serif text-2xl tabular-nums ${cText}`}>
+          {value}<span className={`font-sans text-[9px] ml-0.5 opacity-60`}>{unit}</span>
         </span>
         <button 
           type="button"
           onClick={() => { if(value < max) { haptic('light'); onChange(value + 1) } }} 
-          // Увеличена зона клика с помощью p-4 -m-4
-          className={`text-2xl leading-none p-4 -m-4 outline-none cursor-pointer touch-manipulation ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-90 ${cTextMuted}`}`}
+          className={`w-7 h-7 flex items-center justify-center rounded-[8px] bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation ${value >= max ? 'opacity-20 cursor-not-allowed' : `active:scale-95 ${cText}`}`}
         >
           +
         </button>
@@ -416,71 +423,64 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
-  const cDanger = '#ef4444' // red-500
+  const cDanger = '#E11D48'
 
   return (
     <div className={`flex flex-col border-b ${cLine} pb-3 relative`}>
-      
-      {/* Кликабельным сделана вся строка: и текст, и иконка */}
       <div 
-        className="flex items-center gap-2 mb-2 pr-4 cursor-pointer touch-manipulation group relative"
+        className="flex items-center justify-between mb-1.5 cursor-pointer touch-manipulation group"
         onClick={(e) => {
           e.stopPropagation();
           onInfo();
         }}
       >
-        {/* Невидимая расширенная зона по вертикали (+12px сверху и снизу) */}
-        <div className="absolute -inset-y-3 -inset-x-2" />
-        
-        <span className={`relative text-[8.5px] uppercase tracking-[0.2em] truncate ${cTextMuted} transition-opacity group-active:opacity-50`}>
+        <span className={`text-[8px] uppercase tracking-[0.2em] truncate ${cTextMuted} font-mono`}>
           {label}
         </span>
-        
-        {/* Визуальная кнопка стала чуть больше (w-4 h-4), но реагирует на клик всей строки */}
-        <div className={`relative z-10 w-4 h-4 rounded-full border ${cLine} flex items-center justify-center text-[9px] font-bold shrink-0 transition-transform group-active:scale-90 ${cTextMuted}`}>
-          !
+        <div className={`w-3.5 h-3.5 rounded-full border ${cLine} flex items-center justify-center text-[7.5px] font-mono font-bold shrink-0 opacity-60 group-hover:opacity-100 transition-opacity`}>
+          ?
         </div>
       </div>
       
-      <span className={`font-serif text-xl md:text-2xl tabular-nums`} style={{ color: danger ? cDanger : cText }}>
+      <span className="font-serif text-xl md:text-2xl tabular-nums" style={{ color: danger ? cDanger : cText }}>
         {value}
-        {unit && <span className={`font-sans text-[9px] ml-1 ${cTextMuted}`}>{unit}</span>}
+        {unit && <span className="font-sans text-[9px] ml-1 opacity-60">{unit}</span>}
       </span>
     </div>
   )
 }
 
 // ------------------------------------------------------------------
-// ТЕКСТОВЫЕ ДАННЫЕ
+// ТЕКСТОВЫЕ ДАННЫЕ И ЛОКАЛИЗАЦИЯ
 // ------------------------------------------------------------------
 
 function getLabels(lang: Lang) {
   const C = HEEL_CONST
   const ru = {
-    title: 'Инженерия',
-    desc: 'Баланс & Аудит профиля',
+    title: 'Инженерия каблука',
+    desc: 'Биомеханический баланс & Аудит профиля',
     size: 'Размер', heel: 'Каблук', toe: 'Платформа', angle: 'Угол', start: 'Перекат',
-    fixBtn: 'Баланс', offset: 'Смещение', tipW: 'Набойка',
+    fixBtn: 'Автобаланс', offset: 'Смещение', tipW: 'Набойка',
     internalSlope: 'Наклон колодки:', loadLbl: 'Нагрузка на плюсну:',
-    successTitle: '✅ БАЛАНС В НОРМЕ', successDesc: 'Физиологическая норма.',
-    warnTitle: '⚠️ ВЫСОКИЙ ПОДЪЕМ',
+    successTitle: 'БАЛАНС В НОРМЕ', successDesc: 'Физиологическая нагрузка сбалансирована.',
+    warnTitle: 'ВЫСОКИЙ ПОДЪЕМ',
     warn1Desc: `Угол больше ${C.COMFORT_ANGLE}°. Увеличьте платформу или уменьшите каблук.`,
     warn2Desc: 'Чрезмерный рокер при низком каблуке.',
-    errTitle: '⚠️ КРИТИЧЕСКИЙ НАКЛОН',
+    errTitle: 'КРИТИЧЕСКИЙ НАКЛОН',
     errDesc: `Угол колодки > ${C.CRITICAL_ANGLE}°. Требуется утолщение платформы или снижение каблука.`,
-    padTitle: '⚠️ КРИТИЧЕСКАЯ НАГРУЗКА НА ПЛЮСНУ',
+    padTitle: 'КРИТИЧЕСКАЯ НАГРУЗКА НА ПЛЮСНУ',
     padDesc: 'Требуется обязательная установка встроенного метатарзального пелота в стельку.',
-    negDropTitle: '⚠️ ОБРАТНЫЙ УКЛОН', negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
-    heelBackTitle: '⚠️ КАБЛУК ЗАВАЛЕН НАЗАД',
+    negDropTitle: 'ОБРАТНЫЙ УКЛОН', negDropDesc: 'Платформа выше каблука. Нарушение биомеханики.',
+    heelBackTitle: 'КАБЛУК ЗАВАЛЕН НАЗАД',
     heelBackDesc: 'Ошибка: Каблук завален назад, произойдет перелом супинатора.',
-    heelFwdTitle: '⚠️ СМЕЩЕНИЕ ВПЕРЁД',
+    heelFwdTitle: 'СМЕЩЕНИЕ ВПЕРЁД',
     heelFwdDesc: `Набойка смещена вперёд больше чем на ${C.MAX_HEEL_OFFSET_MM} мм. Снижена стабильность.`,
-    invertTitle: '⚠️ РИСК ИНВЕРСИИ',
+    invertTitle: 'РИСК ИНВЕРСИИ',
     invertDesc: 'Набойка слишком узкая при высоком каблуке — высокий риск подворачивания.',
     heelLbl: 'ПЯТКА', toeLbl: 'НОСОК',
     stiletto: 'Шпилька', block: 'Блок', kitten: 'Рюмочка', flared: 'Трапеция',
     flat: 'Стандарт', rocker: 'Рокер',
-    specsBtn: 'Спецификация', dropLbl: 'Перепад',
+    specsBtn: 'Техническая спецификация ↗', dropLbl: 'Перепад',
     massTitle: 'Распределение массы',
     forefoot: 'Носок',
     rearfoot: 'Пятка',
@@ -503,30 +503,30 @@ function getLabels(lang: Lang) {
   }
   const uk = {
     ...ru,
-    title: 'Інженерія',
-    desc: 'Баланс & Аудит профілю',
-    size: 'Розмір', heel: 'Підбор', toe: 'Платформа', angle: 'Кут', start: 'Перекат',
-    fixBtn: 'Баланс', offset: 'Зміщення', tipW: 'Набійка',
+    title: 'Інженерія каблука',
+    desc: 'Біомеханічний баланс & Аудит профілю',
+    size: 'Розмір', heel: 'Підбір', toe: 'Платформа', angle: 'Кут', start: 'Перекат',
+    fixBtn: 'Автобаланс', offset: 'Зміщення', tipW: 'Набійка',
     internalSlope: 'Нахил колодки:', loadLbl: 'Навантаження на плюсну:',
-    successTitle: '✅ БАЛАНС У НОРМІ', successDesc: 'Фізіологічна норма.',
-    warnTitle: '⚠️ ВИСОКИЙ ПІДЙОМ',
-    warn1Desc: `Кут більше ${C.COMFORT_ANGLE}°. Збільште платформу або зменште підбор.`,
+    successTitle: 'БАЛАНС У НОРМІ', successDesc: 'Фізіологічне навантаження збалансоване.',
+    warnTitle: 'ВИСОКИЙ ПІДЙОМ',
+    warn1Desc: `Кут більше ${C.COMFORT_ANGLE}°. Збільште платформу або зменште підбір.`,
     warn2Desc: 'Надмірний рокер при низькому підборі.',
-    errTitle: '⚠️ КРИТИЧНИЙ НАХИЛ',
+    errTitle: 'КРИТИЧНИЙ НАХИЛ',
     errDesc: `Кут колодки > ${C.CRITICAL_ANGLE}°. Потрібне потовщення платформи або зниження підбора.`,
-    padTitle: '⚠️ КРИТИЧНЕ НАВАНТАЖЕННЯ НА ПЛЮСНУ',
+    padTitle: 'КРИТИЧНЕ НАВАНТАЖЕННЯ НА ПЛЮСНУ',
     padDesc: 'Потрібна обовʼязкова установка вбудованого метатарзального пелота у устілку.',
-    negDropTitle: '⚠️ ЗВОРОТНІЙ УХИЛ', negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
-    heelBackTitle: '⚠️ ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
+    negDropTitle: 'ЗВОРОТНІЙ УХИЛ', negDropDesc: 'Платформа вища за підбор. Порушення біомеханіки.',
+    heelBackTitle: 'ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
     heelBackDesc: 'Помилка: Підбор завалений назад, відбудеться перелом супінатора.',
-    heelFwdTitle: '⚠️ ЗМІЩЕННЯ ВПЕРЕД',
+    heelFwdTitle: 'ЗМІЩЕННЯ ВПЕРЕД',
     heelFwdDesc: `Набійка зміщена вперед більше ніж на ${C.MAX_HEEL_OFFSET_MM} мм. Знижена стабільність.`,
-    invertTitle: '⚠️ РИЗИК ІНВЕРСІЇ',
+    invertTitle: 'РИЗИК ІНВЕРСІЇ',
     invertDesc: 'Набійка занадто вузька при високому підборі — ризик підвертання.',
     heelLbl: "П'ЯТКА", toeLbl: 'НОСОК',
     stiletto: 'Шпилька', block: 'Блок', kitten: 'Чарочка', flared: 'Трапеція',
     flat: 'Стандарт', rocker: 'Рокер',
-    specsBtn: 'Специфікація', dropLbl: 'Перепад',
+    specsBtn: 'Технічна специфікація ↗', dropLbl: 'Перепад',
     massTitle: 'Розподіл маси',
     forefoot: 'Носок',
     rearfoot: "П'ятка",
@@ -537,7 +537,7 @@ function getLabels(lang: Lang) {
     apexM1: 'Апекс M1',
     apexM5: 'Апекс M5',
     carbonInsert: 'Карбон (товщ.)',
-    rockerForefoot: 'Метатарзалгия',
+    rockerForefoot: 'Метатарзалгія',
     rockerHeelToToe: 'Артроз',
     rockerNegative: 'Діабет. стопа',
     specПерекат: 'Перекат',
@@ -548,30 +548,31 @@ function getLabels(lang: Lang) {
     mm: 'mm'
   }
   const de = {
-    title: 'Engineering',
-    desc: 'Balance & Profil Audit',
+    ...ru,
+    title: 'Absatz-Engineering',
+    desc: 'Biokinetische Balance & Profil-Audit',
     size: 'Größe', heel: 'Absatz', toe: 'Plateau', angle: 'Winkel', start: 'Rolle',
-    fixBtn: 'Balance', offset: 'Versatz', tipW: 'Fleck',
-    internalSlope: 'Leisten Neigung:', loadLbl: 'Belastung auf Ballen:',
-    successTitle: '✅ BALANCE OPTIMAL', successDesc: 'Physiologische Norm erreicht.',
-    warnTitle: '⚠️ HOHER SPRENGUNGSWINKEL',
-    warn1Desc: `Winkel über ${C.COMFORT_ANGLE}°. Bitte Plateau erhöhen oder Absatz reduzieren.`,
+    fixBtn: 'Autobalan.', offset: 'Versatz', tipW: 'Fleck',
+    internalSlope: 'Leistenneigung:', loadLbl: 'Vorfußbelastung:',
+    successTitle: 'BALANCE OPTIMAL', successDesc: 'Physiologische Norm im Gleichgewicht.',
+    warnTitle: 'HOHER SPRENGUNGSWINKEL',
+    warn1Desc: `Winkel über ${C.COMFORT_ANGLE}°. Plateau erhöhen oder Absatz reduzieren.`,
     warn2Desc: 'Zu starker Rocker bei niedrigem Absatz.',
-    errTitle: '⚠️ KRITISCHE NEIGUNG',
-    errDesc: `Leistenwinkel > ${C.CRITICAL_ANGLE}°. Plateaudicke erhöhen oder Absatzhöhe verringern.`,
-    padTitle: '⚠️ KRITISCHE BALLENBELASTUNG',
+    errTitle: 'KRITISCHE NEIGUNG',
+    errDesc: `Leistenwinkel > ${C.CRITICAL_ANGLE}°. Plateaudicke erhöhen oder Absatz verringern.`,
+    padTitle: 'KRITISCHE VORFUẞBELASTUNG',
     padDesc: 'Einbau einer Pelotte zur Entlastung zwingend erforderlich.',
-    negDropTitle: '⚠️ NEGATIVE SPRENGUNG', negDropDesc: 'Plateau höher als Absatz. Biomechanik gestört.',
-    heelBackTitle: '⚠️ ABSATZ NACH HINTEN GENEIGT',
-    heelBackDesc: 'Fehler: Absatz zu weit hinten. Gefahr des Gelenkfederbruchs.',
-    heelFwdTitle: '⚠️ ABSATZ NACH VORNE VERLAGERT',
-    heelFwdDesc: `Absatzfleck > ${C.MAX_HEEL_OFFSET_MM} mm nach vorne. Reduzierte Stabilität.`,
-    invertTitle: '⚠️ INVERSIONSRISIKO',
+    negDropTitle: 'NEGATIVE SPRENGUNG', negDropDesc: 'Plateau höher als Absatz.',
+    heelBackTitle: 'ABSATZ NACH HINTEN GENEIGT',
+    heelBackDesc: 'Fehler: Absatz zu weit hinten. Gelenkfederbruchgefahr.',
+    heelFwdTitle: 'ABSATZ NACH VORNE VERLAGERT',
+    heelFwdDesc: `Absatzfleck > ${C.MAX_HEEL_OFFSET_MM} mm nach vorne.`,
+    invertTitle: 'INVERSIONSRISIKO',
     invertDesc: 'Absatzfleck zu schmal bei hohem Absatz — Umknickgefahr.',
     heelLbl: 'FERSE', toeLbl: 'SPITZE',
     stiletto: 'Stiletto', block: 'Block', kitten: 'Kitten', flared: 'Ausgestellt',
     flat: 'Standard', rocker: 'Rocker',
-    specsBtn: 'Spezifikationen', dropLbl: 'Sprengung',
+    specsBtn: 'Technische Spezifikation ↗', dropLbl: 'Sprengung',
     massTitle: 'Gewichtsverteilung',
     forefoot: 'Vorfuß',
     rearfoot: 'Ferse',
