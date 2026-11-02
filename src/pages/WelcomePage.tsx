@@ -29,15 +29,26 @@ function hasVisitedBefore(): boolean {
   }
 }
 
-export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
+function haptic(style: 'light' | 'medium' = 'light') {
+  try {
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style)
+  } catch {}
+}
+
+export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageProps) {
   const [firstName] = useState(getTelegramFirstName)
   const [returning] = useState(hasVisitedBefore)
-  const [isDark, setIsDark] = useState(true)
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark')
+    }
+    return true
+  })
 
   useEffect(() => {
     const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
     checkTheme()
-    
+
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
@@ -56,223 +67,201 @@ export function WelcomePage({ onStart, lang, setLang }: WelcomePageProps) {
       localStorage.setItem('app_lang', defaultLang)
       localStorage.setItem('cordwainer_lang', defaultLang)
     }
-    try { localStorage.setItem('cordwainer_visited', '1') } catch {}
+    try {
+      localStorage.setItem('cordwainer_visited', '1')
+    } catch {}
   }, [lang, setLang])
 
   const t = {
     ru: {
-      hello: 'Привет',
-      helloBack: 'Снова здесь',
-      welcome: 'Добро пожаловать',
-      welcomeBack: 'С возвращением',
+      hello: 'АТЕЛЬЕ ОТКРЫТО',
+      helloBack: 'С ВОЗВРАЩЕНИЕМ',
+      issue: 'ISSUE N° 01',
+      season: 'ARCHIVE EDITION',
       tagline: 'Энциклопедия обувного мастерства',
+      subhead: 'The Shoemaker’s Lexicon & Bespoke System',
       value: 'Материалы, цвета, фасоны и калькуляторы — для сапожника, модельера и ортопеда.',
-      issue: 'ISSUE 01',
-      start: 'НАЧАТЬ ИССЛЕДОВАНИЕ',
+      ch1: '01 / Материалы',
+      ch2: '02 / Силуэты',
+      ch3: '03 / Расчёты',
+      start: 'ОТКРЫТЬ АРХИВ',
+      journal: 'ЖУРНАЛ',
     },
     uk: {
-      hello: 'Привіт',
-      helloBack: 'Знову тут',
-      welcome: 'Ласкаво просимо',
-      welcomeBack: 'З поверненням',
+      hello: 'АТЕЛЬЄ ВІДКРИТО',
+      helloBack: 'З ПОВЕРНЕННЯМ',
+      issue: 'ISSUE N° 01',
+      season: 'ARCHIVE EDITION',
       tagline: 'Енциклопедія взуттєвої майстерності',
+      subhead: 'The Shoemaker’s Lexicon & Bespoke System',
       value: 'Матеріали, кольори, фасони і калькулятори — для шевця, модельєра та ортопеда.',
-      issue: 'ISSUE 01',
-      start: 'ПОЧАТИ ДОСЛІДЖЕННЯ',
+      ch1: '01 / Матеріали',
+      ch2: '02 / Силуети',
+      ch3: '03 / Розрахунки',
+      start: 'ВІДКРИТИ АРХІВ',
+      journal: 'ЖУРНАЛ',
     },
     de: {
-      hello: 'Hallo',
-      helloBack: 'Wieder da',
-      welcome: 'Willkommen',
-      welcomeBack: 'Willkommen zurück',
+      hello: 'ATELIER GEÖFFNET',
+      helloBack: 'WILLKOMMEN ZURÜCK',
+      issue: 'ISSUE N° 01',
+      season: 'ARCHIVE EDITION',
       tagline: 'Enzyklopädie der Schuhmacherkunst',
+      subhead: 'The Shoemaker’s Lexicon & Bespoke System',
       value: 'Materialien, Farben, Leisten und Rechner — für Schuhmacher, Designer und Orthopäden.',
-      issue: 'ISSUE 01',
-      start: 'ENTDECKEN',
+      ch1: '01 / Materialien',
+      ch2: '02 / Silhouetten',
+      ch3: '03 / Rechner',
+      start: 'ARCHIV ÖFFNEN',
+      journal: 'JOURNAL',
     },
   }[lang]
 
-  const greeting = returning
-    ? firstName ? `${t.helloBack}, ${firstName}` : t.welcomeBack
-    : firstName ? `${t.hello}, ${firstName}` : t.welcome
+  const greetingText = returning
+    ? firstName
+      ? `${t.helloBack}, ${firstName.toUpperCase()}`
+      : t.helloBack
+    : firstName
+    ? `${t.hello}, ${firstName.toUpperCase()}`
+    : t.hello
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
-  const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/70' : 'text-[#1C1816]/70'
-  const cTextFaint = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
-  const cLine = isDark ? 'bg-[#F4F0E8]/30' : 'bg-[#1C1816]/20'
-  
-  const cGrad = isDark ? 'from-[#0A0A0A] via-[#0A0A0A]/85' : 'from-[#F2EFE9] via-[#F2EFE9]/80'
-  const cOverlay = isDark ? 'bg-black/20' : 'bg-transparent'
-  const imgOpacity = isDark ? '0.75' : '0.95'
+  const cText = isDark ? 'text-[#F4EFE6]' : 'text-[#141210]'
+  const cMuted = isDark ? 'text-[#F4EFE6]/65' : 'text-[#141210]/65'
+  const cBorder = isDark ? 'border-[#F4EFE6]/15' : 'border-[#141210]/15'
+  const cAccent = isDark ? 'text-[#C5A880]' : 'text-[#8C6D46]'
+
+  // Чистый CSS-градиент без конфликтов слоев в Android WebView
+  const vignetteStyle: React.CSSProperties = {
+    background: isDark
+      ? 'linear-gradient(to top, #0A0A0A 0%, rgba(10,10,10,0.92) 32%, rgba(10,10,10,0.35) 62%, rgba(10,10,10,0.15) 100%)'
+      : 'linear-gradient(to top, #F2EFE9 0%, rgba(242,239,233,0.92) 30%, rgba(242,239,233,0.28) 60%, rgba(242,239,233,0.0) 100%)',
+  }
 
   return (
-    <main className={`relative flex h-[100dvh] w-full flex-col overflow-hidden transition-colors duration-[1.5s] ${cBg}`}>
-      
-      <style>{`
-        @keyframes coutureZoom {
-          0% { opacity: 0; transform: scale(1.1); }
-          100% { opacity: var(--img-opacity); transform: scale(1); }
-        }
-        @keyframes coutureFadeUp {
-          0% { opacity: 0; transform: translateY(24px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes btnGlare {
-          0%   { background-position: -200% center; }
-          30%  { background-position: -200% center; }
-          70%  { background-position: 200% center; }
-          100% { background-position: 200% center; }
-        }
-
-        /* ТЁМНАЯ ТЕМА */
-        .glare-text-dark {
-          background: linear-gradient(
-            105deg,
-            #F4F0E8 20%,
-            #C8C4BC 38%,
-            #FFFFFF 48%,
-            #FFFFFF 52%,
-            #C8C4BC 62%,
-            #F4F0E8 80%
-          );
-          background-size: 280% 100%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-          color: transparent;
-          animation: btnGlare 3.6s linear infinite;
-          will-change: background-position;
-          transform: translateZ(0);
-        }
-        .glare-line-dark {
-          background: linear-gradient(
-            105deg,
-            #F4F0E8 20%,
-            #C8C4BC 38%,
-            #FFFFFF 48%,
-            #FFFFFF 52%,
-            #C8C4BC 62%,
-            #F4F0E8 80%
-          );
-          background-size: 280% 100%;
-          animation: btnGlare 3.6s linear infinite;
-          will-change: background-position;
-          transform: translateZ(0);
-        }
-
-        /* СВЕТЛАЯ ТЕМА */
-        .glare-text-light {
-          background: linear-gradient(
-            105deg,
-            #1C1816 20%,
-            #1C1816 38%,
-            #999999 48%,
-            #999999 52%,
-            #1C1816 62%,
-            #1C1816 80%
-          );
-          background-size: 280% 100%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-          color: transparent;
-          animation: btnGlare 3.6s linear infinite;
-          will-change: background-position;
-          transform: translateZ(0);
-        }
-        .glare-line-light {
-          background: linear-gradient(
-            105deg,
-            #1C1816 20%,
-            #1C1816 38%,
-            #999999 48%,
-            #999999 52%,
-            #1C1816 62%,
-            #1C1816 80%
-          );
-          background-size: 280% 100%;
-          animation: btnGlare 3.6s linear infinite;
-          will-change: background-position;
-          transform: translateZ(0);
-        }
-        
-        .anim-bg {
-          animation: coutureZoom 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        
-        .anim-item {
-          opacity: 0;
-          animation: coutureFadeUp 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
-
-      {/* 1. ФОН */}
-      <div className="absolute inset-0 z-0">
+    <main className={`relative flex h-[100dvh] w-full flex-col justify-between overflow-hidden select-none ${cBg} ${cText}`}>
+      {/* 1. ПОЛНОЭКРАННАЯ ФОТОГРАФИЯ ОБЛОЖКИ (БЕЗ ОБРЕЗКИ ТАЙЛОВ) */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
         <img
           src="/hero-cover.webp"
-          alt=""
+          alt="Cordwainer Lookbook Cover"
           fetchPriority="high"
-          decoding="async"
-          style={{ '--img-opacity': imgOpacity } as React.CSSProperties}
-          className="anim-bg absolute inset-0 h-full w-full object-cover object-[center_top] transition-opacity duration-1000"
+          className={`h-full w-full object-cover object-[center_top] ${
+            isDark ? 'opacity-75' : 'opacity-95'
+          }`}
         />
-        <div className={`absolute inset-0 z-10 transition-colors duration-1000 ${cOverlay}`} />
-        <div className={`absolute bottom-0 left-0 right-0 h-[60%] z-10 bg-gradient-to-t ${cGrad} to-transparent pointer-events-none transition-colors duration-1000`} />
+        <div className="absolute inset-0" style={vignetteStyle} />
       </div>
 
-      {/* 2. МЕТА-ДАННЫЕ (только ISSUE 01 слева) */}
-      <div 
-        className="anim-item absolute top-6 left-6 right-6 z-30 flex items-start"
-        style={{ animationDelay: '0.1s' }}
-      >
-        <span className={`text-[10px] font-sans font-medium uppercase tracking-[0.35em] transition-colors duration-1000 ${cTextMuted}`}>
-          {t.issue}
-        </span>
-      </div>
+      {/* 2. ВЕРХНИЙ КОЛОНТИТУЛ ЛУКБУКА (MASTHEAD HEADER) */}
+      <header className="relative z-20 px-6 pt-5 pb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${isDark ? 'bg-[#C5A880]' : 'bg-[#141210]'}`} />
+          <span className="font-mono text-[9.5px] uppercase tracking-[0.3em]">
+            {t.issue}
+          </span>
+          <span className={`font-mono text-[8.5px] uppercase tracking-[0.2em] hidden min-[360px]:inline ${cMuted}`}>
+            // {t.season}
+          </span>
+        </div>
 
-      {/* 3. ОСНОВНОЙ КОНТЕНТ */}
-      <section className="relative z-30 flex h-full w-full flex-col justify-end px-6 pb-12 sm:pb-16">
-        <div className="flex w-full flex-col">
-          
-          <div className="anim-item" style={{ animationDelay: '0.3s' }}>
-            <p className={`mb-3 text-[10px] font-sans font-medium uppercase leading-[1.6] tracking-[0.25em] transition-colors duration-1000 ${cTextMuted}`}>
-              {t.tagline}
-            </p>
-          </div>
+        {/* Переключатель языков на обложке в стиле модных домов */}
+        <div className={`flex items-center border ${cBorder} px-1 py-0.5 backdrop-blur-md ${isDark ? 'bg-black/30' : 'bg-[#F2EFE9]/60'}`}>
+          {(['ru', 'uk', 'de'] as Lang[]).map((l) => {
+            const active = lang === l
+            return (
+              <button
+                key={l}
+                type="button"
+                onClick={() => {
+                  haptic('light')
+                  setLang(l)
+                }}
+                className={`px-2 py-1 text-[8px] font-mono uppercase tracking-[0.2em] border-0 outline-none cursor-pointer transition-colors ${
+                  active
+                    ? isDark
+                      ? 'bg-[#F4EFE6] text-[#0A0A0A] font-semibold'
+                      : 'bg-[#141210] text-[#F2EFE9] font-semibold'
+                    : `bg-transparent ${cMuted}`
+                }`}
+              >
+                {l === 'uk' ? 'UA' : l.toUpperCase()}
+              </button>
+            )
+          })}
+        </div>
+      </header>
 
-          <div className="anim-item" style={{ animationDelay: '0.45s' }}>
-            <h1 className={`mb-6 font-serif text-[12.5vw] min-[375px]:text-5xl sm:text-6xl leading-[0.9] tracking-[-0.02em] transition-colors duration-1000 ${cText}`}>
-              Cordwainer
-            </h1>
-          </div>
+      {/* 3. НИЖНИЙ ЖУРНАЛЬНЫЙ РАЗВОРОТ ОБЛОЖКИ */}
+      <section className="relative z-20 flex flex-col justify-end px-6 pb-9 sm:pb-12 mt-auto">
+        {/* Персональный статус / приветствие ателье */}
+        <div className="flex items-center justify-between mb-2">
+          <span className={`font-mono text-[8.5px] uppercase tracking-[0.28em] ${cAccent}`}>
+            ✦ {greetingText}
+          </span>
+          <span className={`font-serif italic text-[11px] ${cMuted}`}>
+            Vol. I — IV
+          </span>
+        </div>
 
-          <div className="anim-item" style={{ animationDelay: '0.6s' }}>
-            <div className={`mb-6 h-px w-10 transition-colors duration-1000 ${cLine}`} />
-            <p className={`mb-10 max-w-[320px] text-[14px] font-sans font-light leading-[1.6] transition-colors duration-1000 ${isDark ? 'text-[#F4F0E8]/80' : 'text-[#1C1816]/80'}`}>
-              {t.value}
-            </p>
-          </div>
-          
-          {/* Кнопка с бликом */}
-          <div className="anim-item" style={{ animationDelay: '0.75s' }}>
+        {/* Надзаголовок */}
+        <p className={`text-[9.5px] font-sans font-medium uppercase tracking-[0.28em] mb-1.5 ${cMuted}`}>
+          {t.tagline}
+        </p>
+
+        {/* Главный титул издания */}
+        <h1 className="font-serif font-normal text-[14vw] min-[390px]:text-[56px] sm:text-[64px] leading-[0.88] tracking-[-0.03em] mb-2">
+          Cordwainer
+        </h1>
+
+        <p className={`font-serif italic text-[13px] mb-5 ${cAccent}`}>
+          {t.subhead}
+        </p>
+
+        {/* Индексная строка разделов номера */}
+        <div className={`grid grid-cols-3 gap-2 py-2.5 mb-5 border-y ${cBorder} text-[8px] font-mono uppercase tracking-[0.16em] ${cMuted}`}>
+          <span className="truncate">{t.ch1}</span>
+          <span className={`truncate border-l pl-2 ${cBorder}`}>{t.ch2}</span>
+          <span className={`truncate border-l pl-2 ${cBorder}`}>{t.ch3}</span>
+        </div>
+
+        {/* Описание */}
+        <p className={`mb-7 max-w-[340px] text-[13px] font-sans font-light leading-[1.6] ${isDark ? 'text-[#F4EFE6]/80' : 'text-[#141210]/80'}`}>
+          {t.value}
+        </p>
+
+        {/* Кнопки действия (Основной вход + Журнал) */}
+        <div className="flex items-stretch gap-2.5 w-full">
+          <button
+            type="button"
+            onClick={() => {
+              haptic('medium')
+              onStart?.()
+            }}
+            className={`flex-1 py-4 px-5 flex items-center justify-between text-[10px] font-sans font-medium uppercase tracking-[0.25em] border transition-transform active:scale-[0.98] cursor-pointer outline-none ${
+              isDark
+                ? 'bg-[#F4EFE6] text-[#0A0A0A] border-[#F4EFE6]'
+                : 'bg-[#141210] text-[#F2EFE9] border-[#141210]'
+            }`}
+          >
+            <span>{t.start}</span>
+            <span className="text-[13px] leading-none">→</span>
+          </button>
+
+          {onOpenBlog && (
             <button
               type="button"
-              onClick={onStart}
-              className={`group relative inline-flex items-center gap-4 self-start text-[11px] font-sans font-medium uppercase tracking-[0.2em] transition-colors duration-1000 active:opacity-60 ${cText}`}
+              onClick={() => {
+                haptic('light')
+                onOpenBlog()
+              }}
+              className={`px-4 py-4 border ${cBorder} text-[9px] font-mono uppercase tracking-[0.22em] bg-transparent ${cText} active:scale-[0.98] cursor-pointer outline-none`}
             >
-              <span className={`relative z-10 transition-transform duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1 ${isDark ? 'glare-text-dark' : 'glare-text-light'}`}>
-                {t.start}
-              </span>
-              
-              <span className={`relative z-10 block h-[1px] w-12 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:w-16 ${isDark ? 'glare-line-dark' : 'glare-line-light'}`} />
+              {t.journal}
             </button>
-          </div>
-          
+          )}
         </div>
       </section>
-
     </main>
   )
 }
