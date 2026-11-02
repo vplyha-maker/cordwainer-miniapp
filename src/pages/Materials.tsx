@@ -26,7 +26,6 @@ export function Materials({ onBack }: MaterialsProps) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
-  // Загрузка корзины из памяти телефона
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem(CART_STORAGE_KEY);
@@ -40,11 +39,10 @@ export function Materials({ onBack }: MaterialsProps) {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     } catch {
-      // Игнорируем ошибки приватного режима
+      // Ignore storage errors
     }
   }, [cart]);
 
-  // Параметры выбора размеров внутри карточки модели
   const [orderMode, setOrderMode] = useState<'sample' | 'wholesale'>('wholesale');
   const [sizeRun, setSizeRun] = useState<Record<SizeKey, number>>(STANDARD_8_RUN);
   const [sampleSize, setSampleSize] = useState<SizeKey>(42);
@@ -64,6 +62,15 @@ export function Materials({ onBack }: MaterialsProps) {
   const totalPairs = orderMode === 'sample' ? 1 : pairsPerBox * boxesCount;
   const cartTotalPairs = useMemo(() => cart.reduce((s, i) => s + i.totalPairs, 0), [cart]);
 
+  // Словарь: сколько пар каждой модели уже лежит в корзине (для бейджей в каталоге)
+  const pairsInCartByShoeId = useMemo(() => {
+    const map: Record<string, number> = {};
+    cart.forEach((item) => {
+      map[item.shoe.id] = (map[item.shoe.id] || 0) + item.totalPairs;
+    });
+    return map;
+  }, [cart]);
+
   const updateSizeCount = (size: SizeKey, delta: number) => {
     setSizeRun((prev) => {
       const nextVal = Math.max(0, Math.min(10, (prev[size] || 0) + delta));
@@ -71,7 +78,6 @@ export function Materials({ onBack }: MaterialsProps) {
     });
   };
 
-  // Добавление выбранной модели с её ростовкой в общую корзину
   const addCurrentShoeToCart = () => {
     if (!selectedShoe || totalPairs === 0) return;
 
@@ -117,7 +123,7 @@ export function Materials({ onBack }: MaterialsProps) {
     return cardioCatalog.filter((item) => item.modelNumber === selectedShoe.modelNumber);
   }, [selectedShoe]);
 
-  // ЭКРАН 1: ОПТОВАЯ КОРЗИНА (из отдельного файла)
+  // ЭКРАН 1: ОПТОВАЯ НАКЛАДНАЯ (КОРЗИНА)
   if (isCartOpen) {
     return (
       <WholesaleCart
@@ -129,8 +135,10 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 2: ПОЛНАЯ СТРАНИЦА МОДЕЛИ
+  // ЭКРАН 2: СТРАНИЦА МОДЕЛИ
   if (selectedShoe) {
+    const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
+
     return (
       <div
         style={{
@@ -179,9 +187,35 @@ export function Materials({ onBack }: MaterialsProps) {
               cursor: 'pointer',
             }}
           >
-            🛒 Заказ ({cart.length})
+            🛒 Накладная ({cart.length} мод. • {cartTotalPairs} п.)
           </button>
         </div>
+
+        {/* Уведомление, если эта модель уже есть в накладной */}
+        {alreadyInCartPairs > 0 && (
+          <div
+            style={{
+              backgroundColor: '#DCFCE7',
+              border: '1px solid #86EFAC',
+              color: '#14532D',
+              padding: '8px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              marginBottom: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>✓ Эта модель уже в заказе ({alreadyInCartPairs} пар)</span>
+            <span
+              onClick={() => setIsCartOpen(true)}
+              style={{ textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Посмотреть
+            </span>
+          </div>
+        )}
 
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>
@@ -462,7 +496,6 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Кнопка добавления этой модели в общую оптовую корзину */}
         <button
           disabled={totalPairs === 0}
           onClick={addCurrentShoeToCart}
@@ -481,8 +514,8 @@ export function Materials({ onBack }: MaterialsProps) {
           }}
         >
           {justAdded
-            ? `✓ Добавлено в заказ (${totalPairs} пар)!`
-            : `➕ Добавить в оптовый заказ (${totalPairs} пар)`}
+            ? `✓ Добавлено в накладную (+${totalPairs} пар)!`
+            : `➕ Добавить в общий заказ (${totalPairs} пар)`}
         </button>
 
         {cart.length > 0 && (
@@ -500,7 +533,7 @@ export function Materials({ onBack }: MaterialsProps) {
               cursor: 'pointer',
             }}
           >
-            🛒 Перейти к оформлению ({cart.length} мод. • {cartTotalPairs} пар) →
+            🛒 Открыть сводную накладную ({cart.length} поз. • {cartTotalPairs} пар) →
           </button>
         )}
       </div>
@@ -509,7 +542,7 @@ export function Materials({ onBack }: MaterialsProps) {
 
   // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ
   return (
-    <div style={{ backgroundColor: '#F7F6F2', minHeight: '100vh', padding: '16px 16px 85px 16px', color: '#1A1A1A' }}>
+    <div style={{ backgroundColor: '#F7F6F2', minHeight: '100vh', padding: '16px 16px 135px 16px', color: '#1A1A1A' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <span style={{ fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#777' }}>
@@ -540,7 +573,7 @@ export function Materials({ onBack }: MaterialsProps) {
 
       <input
         type="text"
-        placeholder="Поиск по номеру модели (226, 228...) или цвету..."
+        placeholder="Поиск по номеру модели (227, 20, 70...) или цвету..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         style={{
@@ -611,13 +644,15 @@ export function Materials({ onBack }: MaterialsProps) {
       >
         {filteredShoes.map((shoe) => {
           const variantsCount = cardioCatalog.filter((i) => i.modelNumber === shoe.modelNumber).length;
+          const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
+
           return (
             <div
               key={shoe.id}
               onClick={() => setSelectedShoe(shoe)}
               style={{
                 backgroundColor: '#FFFFFF',
-                border: '1px solid #EAE8E3',
+                border: inCartPairs > 0 ? '2px solid #15803D' : '1px solid #EAE8E3',
                 padding: '10px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -626,6 +661,25 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
+              {/* Зеленый бейдж, если модель уже добавлена в заказ */}
+              {inCartPairs > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    backgroundColor: '#15803D',
+                    color: '#FFFFFF',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    zIndex: 2,
+                  }}
+                >
+                  ✓ В заказе: {inCartPairs} п.
+                </span>
+              )}
+
               {shoe.variant && (
                 <span
                   style={{
@@ -693,7 +747,9 @@ export function Materials({ onBack }: MaterialsProps) {
                   }}
                 >
                   <span>{variantsCount > 1 ? `Вариантов: ${variantsCount}` : '40–45 разм.'}</span>
-                  <span style={{ fontWeight: 600, color: '#1A1A1A' }}>Выбрать →</span>
+                  <span style={{ fontWeight: 600, color: inCartPairs > 0 ? '#15803D' : '#1A1A1A' }}>
+                    {inCartPairs > 0 ? '+ Дозаказать' : 'Выбрать →'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -701,7 +757,7 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Плавающая нижняя панель корзины (появляется, когда добавлена хотя бы 1 модель) */}
+      {/* Плавающий док-бар внизу экрана с мини-лентой всех выбранных моделей (227, 20, 70...) */}
       {cart.length > 0 && (
         <div
           style={{
@@ -711,32 +767,70 @@ export function Materials({ onBack }: MaterialsProps) {
             right: 0,
             backgroundColor: '#1A1A1A',
             color: '#FFFFFF',
-            padding: '12px 16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            padding: '10px 14px',
             zIndex: 900,
-            boxShadow: '0 -4px 12px rgba(0,0,0,0.15)',
+            boxShadow: '0 -4px 16px rgba(0,0,0,0.22)',
           }}
         >
-          <div style={{ fontSize: '13px' }}>
-            🛒 В заказе: <strong>{cart.length} мод.</strong> ({cartTotalPairs} пар)
-          </div>
-          <button
-            onClick={() => setIsCartOpen(true)}
+          {/* Горизонтальная лента выбранных позиций */}
+          <div
             style={{
-              backgroundColor: '#FFFFFF',
-              color: '#1A1A1A',
-              border: 'none',
-              padding: '8px 14px',
-              fontSize: '12px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              cursor: 'pointer',
+              display: 'flex',
+              gap: '6px',
+              overflowX: 'auto',
+              paddingBottom: '8px',
+              marginBottom: '8px',
+              borderBottom: '1px solid #333',
             }}
           >
-            Оформить →
-          </button>
+            {cart.map((item) => (
+              <div
+                key={item.uid}
+                onClick={() => setIsCartOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#2B2B2B',
+                  padding: '3px 8px 3px 4px',
+                  flexShrink: 0,
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                <img
+                  src={item.shoe.image}
+                  alt={item.shoe.modelNumber}
+                  style={{ width: '22px', height: '22px', objectFit: 'contain', backgroundColor: '#FFF' }}
+                />
+                <span>
+                  №{item.shoe.modelNumber}: <strong>{item.totalPairs}п.</strong> (
+                  {item.orderMode === 'sample' ? 'обр.' : `×${item.boxesCount}`})
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '13px' }}>
+              🛒 Итого: <strong>{cart.length} поз.</strong> ({cartTotalPairs} пар)
+            </div>
+            <button
+              onClick={() => setIsCartOpen(true)}
+              style={{
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A',
+                border: 'none',
+                padding: '8px 14px',
+                fontSize: '12px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Открыть накладную →
+            </button>
+          </div>
         </div>
       )}
     </div>
