@@ -5,7 +5,7 @@ import {
   type GlossaryTerm,
 } from '../data/glossary'
 import type { Lang } from '../App'
-import { FlipCard } from './FlipCard'
+import { FlipCard } from '../components/FlipCard'
 
 type GlossaryPageProps = {
   onBack?: () => void
