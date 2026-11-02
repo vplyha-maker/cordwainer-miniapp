@@ -11,8 +11,8 @@ type WholesaleCartProps = {
 
 // 👇 ВПИШИТЕ СЮДА TELEGRAM-ЮЗЕРНЕЙМЫ (без @) ДВУХ РУКОВОДИТЕЛЕЙ
 const MANAGERS = [
-  { label: 'Отправить заказ • Руководитель 1', username: 'USERNAME_BOSS_1' },
-  { label: 'Отправить заказ • Руководитель 2', username: 'USERNAME_BOSS_2' },
+  { label: 'Отправить заказ • Руководитель 1', username: 'Георгий' },
+  { label: 'Отправить заказ • Руководитель 2', username: 'Борис' },
 ];
 
 const NP_API_KEY = '';
