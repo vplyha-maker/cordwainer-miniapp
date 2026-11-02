@@ -25,8 +25,10 @@ type HomePageProps = {
 
 type MenuItem = {
   id: string
+  roman: string
   title: string
   subtitle: string
+  tag: string
   action?: () => void
   dot?: boolean
 }
@@ -73,13 +75,13 @@ const containerVariants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 },
+    transition: { staggerChildren: 0.07, delayChildren: 0.05 },
   },
 }
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] } },
 }
 
 export function HomePage({
@@ -137,139 +139,154 @@ export function HomePage({
 
   const t = {
     ru: {
-      menu: 'Меню',
-      search: 'Поиск (материалы, конструкции...)',
-      learning: 'Исследование',
-      tools: 'Инструментарий',
-      system: 'Система',
+      back: 'Назад',
+      issue: 'ВЫПУСК № 01 — ЦИФРОВАЯ ЭНЦИКЛОПЕДИЯ',
+      heroTag: 'ВИДЕО-ЛУКБУК • 15 СИЛУЭТОВ',
+      heroTitle: 'Анатомия\nФормы',
+      heroCta: 'Смотреть лукбук',
+      search: 'Поиск по материалам, колодкам, статьям...',
+      clear: 'Сброс',
+      learning: 'I. ЭКСПОЗИЦИЯ И ФАКТУРА',
+      tools: 'II. ИНСТРУМЕНТАРИЙ И АРХИВ',
+      system: 'III. СИСТЕМА И КОЛЛЕКЦИЯ',
       materials: 'Материалы',
       materialsSub: 'Кожа, замша, подошвы',
       colors: 'Цвета',
-      colorsSub: 'Патина и психология',
+      colorsSub: 'Патина и колористика',
       styles: 'Силуэты',
-      stylesSub: 'Фасоны и классика',
+      stylesSub: '15 культовых фасонов',
       sneakers: 'Footwear Index',
       sneakersSub: 'Каталог и релизы',
       calc: 'Калькуляторы',
-      calcSub: `${CALCULATORS_COUNT} Модулей`,
-      blog: 'Архив',
-      blogSub: hasNewBlog ? 'Новое издание' : 'Статьи',
+      calcSub: `${CALCULATORS_COUNT} точных модулей`,
+      blog: 'Архив статей',
+      blogSub: hasNewBlog ? 'Свежий выпуск' : 'Журнал',
       glossary: 'Глоссарий',
       glossarySub: glossaryLabel(glossaryCount, 'ru'),
       prices: 'Рынок',
-      pricesSub: 'Сводка цен',
-      settings: 'Настройки',
-      settingsSub: 'Тема, язык, интерфейс',
+      pricesSub: 'Индекс цен',
+      settings: 'Интерфейс',
+      settingsSub: 'Тема и язык',
       profile: 'Профиль',
-      profileSub: 'Аккаунт и данные',
-      favorites: 'Сохраненное',
+      profileSub: 'Личные данные',
+      favorites: 'Личный архив',
       favoritesSub:
-        articleFavorites.length > 0 ? `Томов: ${articleFavorites.length}` : 'Архив пуст',
-      supportTitle: 'Поддержать проект',
-      supportDesc: 'На развитие и оплату серверов',
+        articleFavorites.length > 0 ? `Сохранено томов: ${articleFavorites.length}` : 'Пусто',
+      supportTitle: 'Меценатство',
+      supportDesc: 'Поддержать издание',
       quote: '«Мастерство — в деталях. Знание — в опыте.»',
-      searchResults: 'Результаты',
-      noResults: 'Записи не найдены',
+      searchResults: 'Найдено в архиве',
+      noResults: 'По вашему запросу записей не найдено',
       section: 'Раздел',
     },
     uk: {
-      menu: 'Меню',
-      search: 'Пошук (матеріали, конструкції...)',
-      learning: 'Дослідження',
-      tools: 'Інструментарій',
-      system: 'Система',
+      back: 'Назад',
+      issue: 'ВИПУСК № 01 — ЦИФРОВА ЕНЦИКЛОПЕДІЯ',
+      heroTag: 'ВІДЕО-ЛУКБУК • 15 СИЛУЕТІВ',
+      heroTitle: 'Анатомія\nФорми',
+      heroCta: 'Дивитися лукбук',
+      search: 'Пошук за матеріалами, колодками, статтями...',
+      clear: 'Скинути',
+      learning: 'I. ЕКСПОЗИЦІЯ ТА ФАКТУРА',
+      tools: 'II. ІНСТРУМЕНТАРІЙ ТА АРХІВ',
+      system: 'III. СИСТЕМА ТА КОЛЕКЦІЯ',
       materials: 'Матеріали',
       materialsSub: 'Шкіра, замша, підошви',
       colors: 'Кольори',
-      colorsSub: 'Патина та психологія',
+      colorsSub: 'Патина та колористика',
       styles: 'Силуети',
-      stylesSub: 'Фасони та класика',
+      stylesSub: '15 культових фасонів',
       sneakers: 'Footwear Index',
       sneakersSub: 'Каталог та релізи',
       calc: 'Калькулятори',
-      calcSub: `${CALCULATORS_COUNT} Модулів`,
-      blog: 'Архів',
-      blogSub: hasNewBlog ? 'Нове видання' : 'Статті',
+      calcSub: `${CALCULATORS_COUNT} точних модулів`,
+      blog: 'Архів статей',
+      blogSub: hasNewBlog ? 'Свіжий випуск' : 'Журнал',
       glossary: 'Глосарій',
       glossarySub: glossaryLabel(glossaryCount, 'uk'),
       prices: 'Ринок',
-      pricesSub: 'Зведення цін',
-      settings: 'Налаштування',
-      settingsSub: 'Тема, мова, інтерфейс',
+      pricesSub: 'Індекс цін',
+      settings: 'Інтерфейс',
+      settingsSub: 'Тема та мова',
       profile: 'Профіль',
-      profileSub: 'Акаунт та дані',
-      favorites: 'Збережене',
+      profileSub: 'Особисті дані',
+      favorites: 'Особистий архів',
       favoritesSub:
-        articleFavorites.length > 0 ? `Томів: ${articleFavorites.length}` : 'Архів порожній',
-      supportTitle: 'Підтримати проєкт',
-      supportDesc: 'На розвиток та оплату серверів',
+        articleFavorites.length > 0 ? `Збережено томів: ${articleFavorites.length}` : 'Порожньо',
+      supportTitle: 'Меценатство',
+      supportDesc: 'Підтримати видання',
       quote: '«Майстерність — в деталях. Знання — в досвіді.»',
-      searchResults: 'Результати',
-      noResults: 'Записів не знайдено',
+      searchResults: 'Знайдено в архіві',
+      noResults: 'За вашим запитом записів не знайдено',
       section: 'Розділ',
     },
     de: {
-      menu: 'Menü',
-      search: 'Suchen (Materialien, Formen...)',
-      learning: 'Forschung',
-      tools: 'Werkzeuge',
-      system: 'System',
+      back: 'Zurück',
+      issue: 'AUSGABE № 01 — DIGITALE ENZYKLOPÄDIE',
+      heroTag: 'VIDEO-LOOKBOOK • 15 SILHOUETTEN',
+      heroTitle: 'Anatomie\nder Form',
+      heroCta: 'Lookbook öffnen',
+      search: 'Materialien, Leisten, Artikel suchen...',
+      clear: 'Löschen',
+      learning: 'I. EXPOSITION & TEXTUR',
+      tools: 'II. WERKZEUGE & ARCHIV',
+      system: 'III. SYSTEM & SAMMLUNG',
       materials: 'Materialien',
-      materialsSub: 'Leder, Sohlen',
+      materialsSub: 'Leder, Wildleder, Sohlen',
       colors: 'Farben',
-      colorsSub: 'Patina & Psychologie',
+      colorsSub: 'Patina & Farblehre',
       styles: 'Silhouetten',
-      stylesSub: 'Klassik & Formen',
+      stylesSub: '15 ikonische Schnitte',
       sneakers: 'Footwear Index',
       sneakersSub: 'Katalog & Releases',
       calc: 'Rechner',
-      calcSub: `${CALCULATORS_COUNT} Module`,
-      blog: 'Archiv',
-      blogSub: hasNewBlog ? 'Neue Ausgabe' : 'Artikel',
+      calcSub: `${CALCULATORS_COUNT} Präzisionsmodule`,
+      blog: 'Artikelarchiv',
+      blogSub: hasNewBlog ? 'Neue Ausgabe' : 'Journal',
       glossary: 'Glossar',
       glossarySub: glossaryLabel(glossaryCount, 'de'),
       prices: 'Markt',
-      pricesSub: 'Preisübersicht',
-      settings: 'Einstellungen',
-      settingsSub: 'Design, Sprache',
+      pricesSub: 'Preisindex',
+      settings: 'Oberfläche',
+      settingsSub: 'Design & Sprache',
       profile: 'Profil',
-      profileSub: 'Account & Daten',
-      favorites: 'Gespeichert',
+      profileSub: 'Persönliche Daten',
+      favorites: 'Persönliches Archiv',
       favoritesSub:
-        articleFavorites.length > 0 ? `Ausgaben: ${articleFavorites.length}` : 'Leeres Archiv',
-      supportTitle: 'Projekt unterstützen',
-      supportDesc: 'Für Server und Entwicklung',
+        articleFavorites.length > 0 ? `Gespeicherte Bände: ${articleFavorites.length}` : 'Leer',
+      supportTitle: 'Patronat',
+      supportDesc: 'Edition unterstützen',
       quote: '„Meisterschaft liegt im Detail. Wissen in der Erfahrung.“',
-      searchResults: 'Ergebnisse',
-      noResults: 'Keine Einträge',
+      searchResults: 'Suchergebnisse',
+      noResults: 'Keine Einträge gefunden',
       section: 'Bereich',
     },
   }[safeLang]
 
   const LEARNING: MenuItem[] = [
-    { id: 'materials', title: t.materials, subtitle: t.materialsSub, action: onOpenMaterials },
-    { id: 'colors', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
-    { id: 'styles', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
-    { id: 'sneakers', title: t.sneakers, subtitle: t.sneakersSub, action: onOpenSneakers },
+    { id: 'materials', roman: '01', tag: 'ATELIER', title: t.materials, subtitle: t.materialsSub, action: onOpenMaterials },
+    { id: 'colors', roman: '02', tag: 'PALETTE', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
+    { id: 'styles', roman: '03', tag: 'LOOKBOOK', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
+    { id: 'sneakers', roman: '04', tag: 'CATALOG', title: t.sneakers, subtitle: t.sneakersSub, action: onOpenSneakers },
   ]
 
   const TOOLS: MenuItem[] = [
-    { id: 'calc', title: t.calc, subtitle: t.calcSub, action: onOpenCalcMenu },
-    { id: 'blog', title: t.blog, subtitle: t.blogSub, action: onOpenBlog, dot: hasNewBlog },
-    { id: 'glossary', title: t.glossary, subtitle: t.glossarySub, action: () => onOpenGlossary?.() },
-    { id: 'prices', title: t.prices, subtitle: t.pricesSub, action: onOpenPrices },
+    { id: 'calc', roman: '05', tag: 'UTILITY', title: t.calc, subtitle: t.calcSub, action: onOpenCalcMenu },
+    { id: 'blog', roman: '06', tag: 'EDITORIAL', title: t.blog, subtitle: t.blogSub, action: onOpenBlog, dot: hasNewBlog },
+    { id: 'glossary', roman: '07', tag: 'LEXICON', title: t.glossary, subtitle: t.glossarySub, action: () => onOpenGlossary?.() },
+    { id: 'prices', roman: '08', tag: 'VALUATION', title: t.prices, subtitle: t.pricesSub, action: onOpenPrices },
   ]
 
   const SYSTEM: MenuItem[] = [
-    { id: 'settings', title: t.settings, subtitle: t.settingsSub, action: () => onChangeTab?.('settings') },
-    { id: 'profile', title: t.profile, subtitle: t.profileSub, action: () => onChangeTab?.('profile') },
+    { id: 'settings', roman: '09', tag: 'PREFERENCES', title: t.settings, subtitle: t.settingsSub, action: () => onChangeTab?.('settings') },
+    { id: 'profile', roman: '10', tag: 'IDENTITY', title: t.profile, subtitle: t.profileSub, action: () => onChangeTab?.('profile') },
   ]
 
   const query = searchQuery.trim().toLowerCase()
   const searchResults: Array<{ id: string; type: string; title: string; subtitle: string }> = []
 
   if (query) {
-    [...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
+    ;[...LEARNING, ...TOOLS, ...SYSTEM].forEach((item) => {
       if (item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query)) {
         searchResults.push({ type: 'category', id: item.id, title: item.title, subtitle: t.section })
       }
@@ -301,7 +318,7 @@ export function HomePage({
   const handleSupportClick = () => {
     const tributeLink = 'https://t.me/tribute/app?startapp=dQO9'
     const tg = (window as any).Telegram?.WebApp
-    
+
     if (tg?.openTelegramLink) {
       tg.openTelegramLink(tributeLink)
     } else {
@@ -309,97 +326,49 @@ export function HomePage({
     }
   }
 
-  const journalColors = isDark
+  const palette = isDark
     ? {
         text: '#F4F0E8',
-        textMuted: 'rgba(244, 240, 232, 0.5)',
-        line: 'rgba(244, 240, 232, 0.15)',
-        hover: '#FFFFFF',
-        bg: 'linear-gradient(135deg, #1A1A1A 0%, #050505 100%)',
-        noiseOpacity: 0.04,
+        textMuted: 'rgba(244, 240, 232, 0.45)',
+        textSubtle: 'rgba(244, 240, 232, 0.28)',
+        line: 'rgba(244, 240, 232, 0.14)',
+        lineStrong: 'rgba(244, 240, 232, 0.32)',
+        surface: 'rgba(255, 255, 255, 0.02)',
+        bg: '#080808',
+        noiseOpacity: 0.035,
         noiseBlend: 'screen' as const,
-        placeholder: 'rgba(244, 240, 232, 0.3)',
-        borderAvatar: '#1A1A1A',
+        accentRed: '#991B1B',
       }
     : {
-        text: '#231F1D',
-        textMuted: 'rgba(35, 31, 29, 0.5)',
-        line: 'rgba(35, 31, 29, 0.15)',
-        hover: '#000000',
-        bg: 'linear-gradient(135deg, #F9F7F3 0%, #EAE6DD 100%)',
-        noiseOpacity: 0.07,
+        text: '#181615',
+        textMuted: 'rgba(24, 22, 21, 0.5)',
+        textSubtle: 'rgba(24, 22, 21, 0.32)',
+        line: 'rgba(24, 22, 21, 0.12)',
+        lineStrong: 'rgba(24, 22, 21, 0.28)',
+        surface: 'rgba(24, 22, 21, 0.025)',
+        bg: '#F4F1EA',
+        noiseOpacity: 0.05,
         noiseBlend: 'multiply' as const,
-        placeholder: 'rgba(35, 31, 29, 0.3)',
-        borderAvatar: '#F9F7F3',
+        accentRed: '#881313',
       }
 
   const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
 
-  const renderList = (items: MenuItem[], startIndex: number = 1) => (
-    <div className="flex flex-col mb-16">
-      {items.map((item, idx) => {
-        const num = startIndex + idx
-        const numStr = num < 10 ? `0${num}` : `${num}`
-        return (
-          <motion.button
-            variants={itemVariants}
-            key={item.id}
-            onClick={item.action}
-            disabled={!item.action}
-            className={`group relative flex items-end justify-between py-6 border-b outline-none bg-transparent text-left transition-all ${
-              item.action
-                ? 'active:opacity-50 cursor-pointer'
-                : 'opacity-40 cursor-default'
-            }`}
-            style={{ borderColor: journalColors.line }}
-          >
-            <div className="flex items-start gap-4">
-              <span
-                className="text-[9px] font-sans tracking-widest mt-2"
-                style={{ color: journalColors.textMuted }}
-              >
-                {numStr}
-              </span>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`font-serif text-[7vw] min-[375px]:text-3xl leading-[1.1] transition-transform ${
-                    item.action ? 'group-hover:translate-x-1 group-active:translate-x-1' : ''
-                  }`}
-                  style={{ color: journalColors.text }}
-                >
-                  {item.title}
-                </div>
-                {item.dot && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#991B1B] block mb-4" />
-                )}
-              </div>
-            </div>
-            <div
-              className="text-[10px] font-sans tracking-[0.1em] text-right w-[40%]"
-              style={{ color: journalColors.textMuted }}
-            >
-              {item.subtitle}
-            </div>
-          </motion.button>
-        )
-      })}
-    </div>
-  )
-
   return (
     <div
-      className="relative min-h-[100dvh] w-full overflow-hidden transition-colors duration-500"
+      className="relative min-h-[100dvh] w-full overflow-x-hidden transition-colors duration-500 select-none"
       style={{
-        background: journalColors.bg,
-        color: journalColors.text,
+        background: palette.bg,
+        color: palette.text,
       }}
     >
+      {/* Текстура журнальной бумаги */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-500"
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-500"
         style={{
           backgroundImage: noiseBg,
-          opacity: journalColors.noiseOpacity,
-          mixBlendMode: journalColors.noiseBlend,
+          opacity: palette.noiseOpacity,
+          mixBlendMode: palette.noiseBlend,
         }}
       />
 
@@ -410,102 +379,129 @@ export function HomePage({
         }
       `}</style>
 
-      <div className="relative z-10 flex flex-col min-h-screen">
-        <header className="px-6 pt-8 pb-4 flex items-start justify-between">
+      <div className="relative z-10 flex flex-col min-h-screen max-w-[540px] mx-auto px-5 sm:px-8">
+        {/* Верхний колонтитул (Running Header) */}
+        <header
+          className="pt-6 pb-4 flex items-center justify-between border-b"
+          style={{ borderColor: palette.line }}
+        >
           {onBack ? (
             <button
               onClick={onBack}
-              className="group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-colors"
-              style={{ color: journalColors.textMuted }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = journalColors.hover)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = journalColors.textMuted)}
+              className="group flex items-center gap-2 text-[9px] font-sans uppercase tracking-[0.28em] outline-none border-0 bg-transparent cursor-pointer active:opacity-50 transition-opacity"
+              style={{ color: palette.textMuted }}
             >
-              <span className="transform transition-transform group-hover:-translate-x-1">←</span>
-              <span>Back</span>
+              <span>←</span>
+              <span>{t.back}</span>
             </button>
           ) : (
-            <div className="w-10"></div>
+            <span
+              className="text-[9px] font-sans uppercase tracking-[0.32em]"
+              style={{ color: palette.textMuted }}
+            >
+              EST. MMXXVI
+            </span>
           )}
 
-          <div className="flex items-center gap-4">
-            {['ru', 'uk', 'de'].map((l) => (
-              <button
-                key={l}
-                onClick={() => handleLangChange(l as Lang)}
-                className="text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300"
-                style={{
-                  color: safeLang === l ? journalColors.text : journalColors.textMuted,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = journalColors.hover)}
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.color =
-                    safeLang === l ? journalColors.text : journalColors.textMuted)
-                }
-              >
-                {l === 'uk' ? 'UKR' : l}
-              </button>
+          {/* Переключатель языков со слэшами */}
+          <div className="flex items-center gap-3">
+            {(['ru', 'uk', 'de'] as Lang[]).map((l, i) => (
+              <div key={l} className="flex items-center gap-3">
+                <button
+                  onClick={() => handleLangChange(l)}
+                  className="text-[9px] font-sans uppercase tracking-[0.28em] outline-none border-0 bg-transparent cursor-pointer transition-all"
+                  style={{
+                    color: safeLang === l ? palette.text : palette.textSubtle,
+                    borderBottom: safeLang === l ? `1px solid ${palette.text}` : '1px solid transparent',
+                    paddingBottom: '2px',
+                  }}
+                >
+                  {l === 'uk' ? 'UKR' : l}
+                </button>
+                {i < 2 && (
+                  <span className="text-[8px]" style={{ color: palette.line }}>
+                    /
+                  </span>
+                )}
+              </div>
             ))}
           </div>
         </header>
 
         <motion.div
-          className="px-6 pb-24"
+          className="pb-20"
           initial="hidden"
           animate="show"
           variants={containerVariants}
         >
-          <motion.div variants={itemVariants} className="mb-12 mt-4">
+          {/* Журнальная шапка (Masthead) вместо слова "Меню" */}
+          <motion.div variants={itemVariants} className="pt-7 pb-6">
+            <div className="flex items-center justify-between mb-3">
+              <span
+                className="text-[8px] font-sans uppercase tracking-[0.35em]"
+                style={{ color: palette.textMuted }}
+              >
+                {t.issue}
+              </span>
+              <span
+                className="text-[8px] font-serif italic"
+                style={{ color: palette.textMuted }}
+              >
+                Vol. I
+              </span>
+            </div>
+
             <h1
-              className="font-serif text-[18vw] leading-[0.8] tracking-[-0.04em]"
-              style={{ color: journalColors.text }}
+              className="font-serif text-[13.5vw] min-[440px]:text-[62px] leading-[0.86] tracking-[-0.03em] uppercase font-normal"
+              style={{ color: palette.text }}
             >
-              {t.menu}
+              Cordwainer
             </h1>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="mb-16">
+          {/* Редакционная строка поиска */}
+          <motion.div variants={itemVariants} className="mb-8">
             <div
-              className="relative flex items-end border-b pb-3 transition-colors"
-              style={{ borderColor: journalColors.line }}
+              className="relative flex items-center py-2.5 px-3.5 border transition-colors"
+              style={{
+                borderColor: searchQuery ? palette.lineStrong : palette.line,
+                backgroundColor: palette.surface,
+              }}
             >
               <span
-                className="text-[12px] font-serif italic mr-4"
-                style={{ color: journalColors.textMuted }}
+                className="text-[10px] font-serif italic mr-3 shrink-0"
+                style={{ color: palette.textMuted }}
               >
-                Find.
+                Index.
               </span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
-                className="w-full bg-transparent outline-none border-0 text-[16px] font-sans font-light placeholder:font-light"
-                style={
-                  {
-                    color: journalColors.text,
-                    '--placeholder-color': journalColors.placeholder,
-                  } as CSSProperties
-                }
+                className="w-full bg-transparent outline-none border-0 text-[12px] font-sans font-light placeholder:opacity-50"
+                style={{ color: palette.text } as CSSProperties}
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="ml-2 text-[10px] uppercase tracking-widest outline-none border-0 bg-transparent cursor-pointer"
-                  style={{ color: journalColors.textMuted }}
+                  className="ml-2 text-[8px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer shrink-0"
+                  style={{ color: palette.textMuted }}
                 >
-                  Clear
+                  {t.clear}
                 </button>
               )}
             </div>
           </motion.div>
 
           {query ? (
+            /* Выдача поиска */
             <div>
               <p
-                className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6"
-                style={{ color: journalColors.textMuted }}
+                className="text-[9px] font-sans uppercase tracking-[0.3em] mb-4 pb-2 border-b"
+                style={{ color: palette.textMuted, borderColor: palette.line }}
               >
-                {t.searchResults} / {searchResults.length}
+                {t.searchResults} — {searchResults.length}
               </p>
               {searchResults.length > 0 ? (
                 <div className="flex flex-col">
@@ -513,28 +509,28 @@ export function HomePage({
                     <button
                       key={`${res.type}-${res.id}-${i}`}
                       onClick={() => handleResultClick(res)}
-                      className="w-full group flex items-center justify-between py-5 border-b text-left outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
-                      style={{ borderColor: journalColors.line }}
+                      className="w-full group flex items-baseline justify-between py-4 border-b text-left outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
+                      style={{ borderColor: palette.line }}
                     >
                       <div
-                        className="font-serif text-[22px] leading-none transition-transform group-hover:translate-x-1"
-                        style={{ color: journalColors.text }}
+                        className="font-serif text-[21px] leading-snug pr-4 transition-transform group-hover:translate-x-1"
+                        style={{ color: palette.text }}
                       >
                         {res.title}
                       </div>
                       <div
-                        className="text-[9px] font-sans uppercase tracking-[0.2em]"
-                        style={{ color: journalColors.textMuted }}
+                        className="text-[8px] font-sans uppercase tracking-[0.25em] shrink-0"
+                        style={{ color: palette.textMuted }}
                       >
-                        {res.subtitle}
+                        {res.subtitle} ↗
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div
-                  className="py-12 text-[14px] font-serif italic text-center"
-                  style={{ color: journalColors.textMuted }}
+                  className="py-16 text-[14px] font-serif italic text-center"
+                  style={{ color: palette.textMuted }}
                 >
                   {t.noResults}
                 </div>
@@ -542,125 +538,368 @@ export function HomePage({
             </div>
           ) : (
             <>
-              <motion.div variants={itemVariants} className="mb-4">
-                <p
-                  className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4"
-                  style={{ color: journalColors.textMuted }}
+              {/* HERO LOOKBOOK BANNER — Живое превью видео-лукбука */}
+              {onOpenStyles && (
+                <motion.div variants={itemVariants} className="mb-12">
+                  <button
+                    onClick={onOpenStyles}
+                    className="group relative w-full h-[230px] overflow-hidden border outline-none bg-[#0A0A0A] text-left cursor-pointer block"
+                    style={{ borderColor: palette.line }}
+                  >
+                    <video
+                      src="/Fason/Botford.mp4"
+                      poster="/Fason/posters/Botford.jpg"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover opacity-75 scale-105 transition-transform duration-700 ease-out group-hover:scale-100 group-active:scale-100"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/30" />
+
+                    <div className="relative z-10 h-full p-5 flex flex-col justify-between text-[#F4F0E8]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
+                          {t.heroTag}
+                        </span>
+                        <span className="text-[9px] font-sans tracking-[0.25em] text-white/60">
+                          01 / 15
+                        </span>
+                      </div>
+
+                      <div className="flex items-end justify-between gap-4">
+                        <h2 className="font-serif text-3xl leading-[1.02] tracking-tight whitespace-pre-line">
+                          {t.heroTitle}
+                        </h2>
+                        <div className="flex items-center gap-2 pb-1 text-[9px] font-sans uppercase tracking-[0.25em] text-white/90 border-b border-white/40 shrink-0">
+                          <span>{t.heroCta}</span>
+                          <span>↗</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                </motion.div>
+              )}
+
+              {/* СЕКЦИЯ I: 2-колоночная редакционная сетка (Lookbook Grid) */}
+              <motion.div variants={itemVariants} className="mb-12">
+                <div
+                  className="flex items-center justify-between pb-2.5 mb-0 border-b"
+                  style={{ borderColor: palette.lineStrong }}
                 >
-                  {t.learning}
-                </p>
-                {renderList(LEARNING, 1)}
+                  <span
+                    className="text-[9px] font-sans uppercase tracking-[0.32em]"
+                    style={{ color: palette.text }}
+                  >
+                    {t.learning}
+                  </span>
+                  <span
+                    className="text-[8px] font-sans tracking-[0.25em]"
+                    style={{ color: palette.textMuted }}
+                  >
+                    01—04
+                  </span>
+                </div>
+
+                <div
+                  className="grid grid-cols-2 border-l border-r"
+                  style={{ borderColor: palette.line }}
+                >
+                  {LEARNING.map((item, idx) => (
+                    <button
+                      key={item.id}
+                      onClick={item.action}
+                      disabled={!item.action}
+                      className={`group relative p-4 sm:p-5 min-h-[132px] flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
+                        idx % 2 === 0 ? 'border-r' : ''
+                      } ${
+                        item.action
+                          ? 'cursor-pointer active:opacity-50'
+                          : 'opacity-40 cursor-default'
+                      }`}
+                      style={{ borderColor: palette.line }}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span
+                          className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {item.roman}
+                        </span>
+                        <span
+                          className="text-[7px] font-sans uppercase tracking-[0.28em]"
+                          style={{ color: palette.textSubtle }}
+                        >
+                          {item.tag}
+                        </span>
+                      </div>
+
+                      <div className="my-2">
+                        <div
+                          className="font-serif text-[22px] sm:text-[25px] leading-[1.08] tracking-tight mb-1.5 transition-transform group-hover:translate-x-0.5"
+                          style={{ color: palette.text }}
+                        >
+                          {item.title}
+                        </div>
+                        <div
+                          className="text-[9px] font-sans uppercase tracking-[0.14em] leading-snug line-clamp-1"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {item.subtitle}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </motion.div>
 
-              <motion.div variants={itemVariants} className="mb-4">
-                <p
-                  className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4"
-                  style={{ color: journalColors.textMuted }}
+              {/* СЕКЦИЯ II: Инструментарий (Чистый индекс с выравниванием в одну линию) */}
+              <motion.div variants={itemVariants} className="mb-12">
+                <div
+                  className="flex items-center justify-between pb-2.5 border-b"
+                  style={{ borderColor: palette.lineStrong }}
                 >
-                  {t.tools}
-                </p>
-                {renderList(TOOLS, 5)}
+                  <span
+                    className="text-[9px] font-sans uppercase tracking-[0.32em]"
+                    style={{ color: palette.text }}
+                  >
+                    {t.tools}
+                  </span>
+                  <span
+                    className="text-[8px] font-sans tracking-[0.25em]"
+                    style={{ color: palette.textMuted }}
+                  >
+                    05—08
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  {TOOLS.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={item.action}
+                      disabled={!item.action}
+                      className={`group flex items-center justify-between py-4 border-b outline-none bg-transparent text-left transition-opacity ${
+                        item.action
+                          ? 'cursor-pointer active:opacity-50'
+                          : 'opacity-40 cursor-default'
+                      }`}
+                      style={{ borderColor: palette.line }}
+                    >
+                      <div className="flex items-baseline gap-3.5 min-w-0 pr-3">
+                        <span
+                          className="text-[9px] font-sans tracking-[0.22em] tabular-nums shrink-0"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {item.roman}
+                        </span>
+                        <span
+                          className="font-serif text-[24px] leading-none tracking-tight truncate transition-transform group-hover:translate-x-1"
+                          style={{ color: palette.text }}
+                        >
+                          {item.title}
+                        </span>
+                        {item.dot && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0 self-center"
+                            style={{ backgroundColor: palette.accentRed }}
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span
+                          className="text-[8px] font-sans uppercase tracking-[0.22em]"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {item.subtitle}
+                        </span>
+                        <span
+                          className="text-[10px]"
+                          style={{ color: palette.textSubtle }}
+                        >
+                          ↗
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </motion.div>
 
-              <motion.div variants={itemVariants} className="mb-4">
-                <p
-                  className="text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-4"
-                  style={{ color: journalColors.textMuted }}
+              {/* СЕКЦИЯ III: Система + Архив + Меценатство (компактная журнальная сетка вместо пустых коробок) */}
+              <motion.div variants={itemVariants} className="mb-14">
+                <div
+                  className="flex items-center justify-between pb-2.5 border-b"
+                  style={{ borderColor: palette.lineStrong }}
                 >
-                  {t.system}
-                </p>
-                {renderList(SYSTEM, 9)}
-              </motion.div>
+                  <span
+                    className="text-[9px] font-sans uppercase tracking-[0.32em]"
+                    style={{ color: palette.text }}
+                  >
+                    {t.system}
+                  </span>
+                  <span
+                    className="text-[8px] font-sans tracking-[0.25em]"
+                    style={{ color: palette.textMuted }}
+                  >
+                    09—12
+                  </span>
+                </div>
 
-              <motion.div variants={itemVariants} className="mb-4">
+                {/* Настройки и Профиль в 2 колонки */}
+                <div
+                  className="grid grid-cols-2 border-l border-r border-b"
+                  style={{ borderColor: palette.line }}
+                >
+                  {SYSTEM.map((item, idx) => (
+                    <button
+                      key={item.id}
+                      onClick={item.action}
+                      className={`group p-4 text-left bg-transparent outline-none cursor-pointer active:opacity-50 transition-opacity ${
+                        idx === 0 ? 'border-r' : ''
+                      }`}
+                      style={{ borderColor: palette.line }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span
+                          className="text-[8px] font-sans tracking-[0.25em]"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {item.roman}
+                        </span>
+                        <span
+                          className="text-[9px]"
+                          style={{ color: palette.textSubtle }}
+                        >
+                          ↗
+                        </span>
+                      </div>
+                      <div
+                        className="font-serif text-[20px] leading-tight mb-1"
+                        style={{ color: palette.text }}
+                      >
+                        {item.title}
+                      </div>
+                      <div
+                        className="text-[8px] font-sans uppercase tracking-[0.2em]"
+                        style={{ color: palette.textMuted }}
+                      >
+                        {item.subtitle}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Личный архив (Сохраненное) — строгие прямоугольные портретные срезы вместо кружков */}
                 <button
-                  className="w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
-                  style={{ borderColor: journalColors.line }}
                   onClick={() => {
                     if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
                     else if (articleFavorites.length > 1) onOpenFavorites?.()
                   }}
+                  className="w-full flex items-center justify-between py-4 px-4 border-l border-r border-b outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
+                  style={{ borderColor: palette.line, backgroundColor: palette.surface }}
                 >
-                  <div>
-                    <div
-                      className="font-serif text-[26px] leading-none mb-2 text-left"
-                      style={{ color: journalColors.text }}
-                    >
-                      {t.favorites}
+                  <div className="text-left">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <span
+                        className="text-[8px] font-sans tracking-[0.25em]"
+                        style={{ color: palette.textMuted }}
+                      >
+                        11
+                      </span>
+                      <span
+                        className="font-serif text-[20px] leading-none"
+                        style={{ color: palette.text }}
+                      >
+                        {t.favorites}
+                      </span>
                     </div>
                     <div
-                      className="text-[10px] font-sans uppercase tracking-[0.2em]"
-                      style={{ color: journalColors.textMuted }}
+                      className="text-[8px] font-sans uppercase tracking-[0.22em] pl-5"
+                      style={{ color: palette.textMuted }}
                     >
                       {t.favoritesSub}
                     </div>
                   </div>
-                  <div className="flex -space-x-4">
-                    {articleFavorites.slice(0, 3).map((item, idx) => (
-                      <div
-                        key={item.id}
-                        className="w-12 h-12 rounded-full border-2 overflow-hidden grayscale"
-                        style={{
-                          zIndex: 10 - idx,
-                          borderColor: journalColors.borderAvatar,
-                        }}
-                      >
-                        <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </button>
-              </motion.div>
 
-              <motion.div variants={itemVariants} className="mb-16">
+                  {articleFavorites.length > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      {articleFavorites.slice(0, 3).map((item) => (
+                        <div
+                          key={item.id}
+                          className="w-8 h-10 border overflow-hidden grayscale contrast-125"
+                          style={{ borderColor: palette.lineStrong }}
+                        >
+                          <img src={item.imagePng} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span
+                      className="text-[9px] font-serif italic"
+                      style={{ color: palette.textSubtle }}
+                    >
+                      —
+                    </span>
+                  )}
+                </button>
+
+                {/* Меценатство / Поддержать проект — элегантная издательская строка */}
                 <button
                   onClick={handleSupportClick}
-                  className="group w-full flex items-center justify-between p-6 border outline-none bg-transparent cursor-pointer transition-colors active:bg-current/5"
-                  style={{ borderColor: journalColors.line }}
+                  className="group w-full flex items-center justify-between py-4 px-4 border-l border-r border-b outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
+                  style={{ borderColor: palette.line }}
                 >
-                  <div>
-                    <div
-                      className="font-serif text-[26px] leading-none mb-2 text-left transition-transform group-hover:translate-x-1"
-                      style={{ color: journalColors.text }}
-                    >
-                      {t.supportTitle}
+                  <div className="text-left">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <span
+                        className="text-[8px] font-sans tracking-[0.25em]"
+                        style={{ color: palette.textMuted }}
+                      >
+                        12
+                      </span>
+                      <span
+                        className="font-serif text-[20px] leading-none"
+                        style={{ color: palette.text }}
+                      >
+                        {t.supportTitle}
+                      </span>
                     </div>
                     <div
-                      className="text-[10px] font-sans uppercase tracking-[0.2em]"
-                      style={{ color: journalColors.textMuted }}
+                      className="text-[8px] font-sans uppercase tracking-[0.22em] pl-5"
+                      style={{ color: palette.textMuted }}
                     >
                       {t.supportDesc}
                     </div>
                   </div>
-                  
-                  <div 
-                    className="w-12 h-12 rounded-full border flex items-center justify-center transition-colors"
-                    style={{ borderColor: journalColors.line, color: journalColors.text }}
+
+                  <span
+                    className="text-[9px] font-sans uppercase tracking-[0.25em] border px-2.5 py-1 transition-colors"
+                    style={{ borderColor: palette.lineStrong, color: palette.text }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                    </svg>
-                  </div>
+                    TRIBUTE ↗
+                  </span>
                 </button>
               </motion.div>
 
-              <motion.div variants={itemVariants} className="pb-10">
+              {/* Редакционный колофон (Footer) */}
+              <motion.div variants={itemVariants} className="pt-2 pb-6">
                 <div className="flex flex-col items-center text-center px-4">
                   <div
-                    className="w-px h-12 mb-8 border-l"
-                    style={{ borderColor: journalColors.line }}
+                    className="w-px h-8 mb-5"
+                    style={{ backgroundColor: palette.lineStrong }}
                   />
                   <p
-                    className="font-serif text-[18px] sm:text-[20px] italic leading-[1.5]"
-                    style={{ color: journalColors.textMuted }}
+                    className="font-serif text-[16px] italic leading-[1.5] max-w-[280px]"
+                    style={{ color: palette.textMuted }}
                   >
                     {t.quote}
                   </p>
                   <p
-                    className="mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em]"
-                    style={{ color: journalColors.text }}
+                    className="mt-4 text-[8px] font-sans uppercase tracking-[0.45em]"
+                    style={{ color: palette.textSubtle }}
                   >
-                    Cordwainer
+                    CORDWAINER ATELIER • MMXXVI
                   </p>
                 </div>
               </motion.div>
