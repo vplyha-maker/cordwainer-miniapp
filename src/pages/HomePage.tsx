@@ -547,8 +547,8 @@ export function HomePage({
       style={{ borderColor: palette.line }}
     >
       <video
-        src="/Fason/lofer.mp4" /* Заменено на лоферы или другой файл с крупным планом */
-        poster="/Fason/posters/lofer.jpg"
+        src="/Fason/Topsaed.mp4" /* Заменено на лоферы или другой файл с крупным планом */
+        poster="/Fason/posters/Topsaed.jpg"
         autoPlay
         loop
         muted
