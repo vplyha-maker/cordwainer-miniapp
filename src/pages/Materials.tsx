@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { cardioCatalog, type ShoeCategory, type ShoeItem } from '../data/catalog';
-import { WholesaleCart, type CartItem } from '../components/WholesaleCart';
+import { cardioCatalog, type ShoeCategory, type ShoeItem, type CartItem, type SizeKey } from '../data/catalog';
+import { WholesaleCart } from '../components/WholesaleCart';
 
 type MaterialsProps = {
   onBack?: () => void;
@@ -10,7 +10,6 @@ const CATEGORIES: ('Все' | ShoeCategory)[] = ['Все', 'Ботинки', 'К
 const FEATURE_FILTERS = ['Все', 'Мех', 'Gore-Tex', 'Подошва трактор'] as const;
 
 const SIZES = [40, 41, 42, 43, 44, 45] as const;
-type SizeKey = (typeof SIZES)[number];
 
 const STANDARD_8_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 2, 43: 2, 44: 1, 45: 1 };
 const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1, 45: 1 };
@@ -62,7 +61,6 @@ export function Materials({ onBack }: MaterialsProps) {
   const totalPairs = orderMode === 'sample' ? 1 : pairsPerBox * boxesCount;
   const cartTotalPairs = useMemo(() => cart.reduce((s, i) => s + i.totalPairs, 0), [cart]);
 
-  // Словарь: сколько пар каждой модели уже лежит в корзине (для бейджей в каталоге)
   const pairsInCartByShoeId = useMemo(() => {
     const map: Record<string, number> = {};
     cart.forEach((item) => {
@@ -128,6 +126,21 @@ export function Materials({ onBack }: MaterialsProps) {
     return (
       <WholesaleCart
         items={cart}
+        onUpdateQuantity={(uid, newBoxes) => {
+          if (newBoxes < 1) return;
+          setCart((prev) =>
+            prev.map((item) => {
+              if (item.uid !== uid) return item;
+              const pairsPerRun = Object.values(item.sizeRun).reduce((a, b) => a + b, 0);
+              const newTotalPairs = pairsPerRun * newBoxes;
+              return {
+                ...item,
+                boxesCount: newBoxes,
+                totalPairs: newTotalPairs,
+              };
+            })
+          );
+        }}
         onRemove={(uid) => setCart((prev) => prev.filter((item) => item.uid !== uid))}
         onClear={() => setCart([])}
         onClose={() => setIsCartOpen(false)}
@@ -191,7 +204,6 @@ export function Materials({ onBack }: MaterialsProps) {
           </button>
         </div>
 
-        {/* Уведомление, если эта модель уже есть в накладной */}
         {alreadyInCartPairs > 0 && (
           <div
             style={{
@@ -661,7 +673,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
-              {/* Зеленый бейдж, если модель уже добавлена в заказ */}
               {inCartPairs > 0 && (
                 <span
                   style={{
@@ -757,7 +768,6 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Плавающий док-бар внизу экрана с мини-лентой всех выбранных моделей (227, 20, 70...) */}
       {cart.length > 0 && (
         <div
           style={{
@@ -772,7 +782,6 @@ export function Materials({ onBack }: MaterialsProps) {
             boxShadow: '0 -4px 16px rgba(0,0,0,0.22)',
           }}
         >
-          {/* Горизонтальная лента выбранных позиций */}
           <div
             style={{
               display: 'flex',
