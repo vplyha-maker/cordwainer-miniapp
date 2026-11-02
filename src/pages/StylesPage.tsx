@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, UIEvent } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useRef, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import type { Lang } from '../App'
 
 type StylesPageProps = {
@@ -10,6 +10,7 @@ type StylesPageProps = {
 type StyleSlide = {
   id: string
   video?: string
+  poster?: string // Добавлено превью для гладкого перехода видео
   image?: string
   title: { ru: string; uk: string; de: string }
   subtitle: { ru: string; uk: string; de: string }
@@ -41,6 +42,7 @@ const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
     video: '/Fason/Botford.mp4',
+    poster: '/Fason/posters/Botford.jpg', // Рекомендуется добавить превью-картинки
     title: { ru: 'Ботфорты', uk: 'Ботфорти', de: 'Overknee' },
     subtitle: { ru: 'Высокий стиль', uk: 'Високий стиль', de: 'Hoher Stil' },
     desc: {
@@ -208,7 +210,7 @@ const STYLES_DATA: StyleSlide[] = [
       de: 'Ein spektakuläres Geflecht aus vielen Riemen, die das Bein elegant umschließen. Eine mutige Hommage an das historische Erbe, die selbst das einfachste Sommeroutfit unglaublich ausdrucksstark macht.',
     },
   },
- ]
+]
 
 type SlideItemProps = {
   slide: StyleSlide
@@ -217,11 +219,12 @@ type SlideItemProps = {
   isActive: boolean
   isPreloaded: boolean
   isMuted: boolean
+  onToggleMute: () => void
 }
 
 const smoothEase = [0.25, 1, 0.5, 1];
 
-function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: SlideItemProps) {
+function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted, onToggleMute }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentLang = lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
 
@@ -248,8 +251,6 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
     return () => { mounted = false }
   }, [slide.id, userId, isPreloaded])
 
-  // КРИТИЧЕСКИЙ ФИКС: Используем getAttribute, чтобы браузер не перезагружал видео
-  // из-за несовпадения абсолютных (http://...) и относительных (/Fason...) путей
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
@@ -340,6 +341,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             loop
             playsInline
             muted={isMuted}
+            poster={slide.poster}
             className={`
               w-full h-full object-cover
               transition-opacity duration-300 ease-out
@@ -365,7 +367,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
         className="absolute top-[100px] left-6 right-6 z-20 flex items-start justify-between"
       >
         <div>
-          <p className="text-[9px] font-sans uppercase tracking-[0.35em] text-white/70 mb-2">
+          <p className="text-[9px] font-sans uppercase tracking-[0.4em] text-white/70 mb-2">
             {slide.subtitle[currentLang]}
           </p>
           <h2 className="font-serif text-3xl min-[390px]:text-4xl leading-[1.1] tracking-tight text-[#F4F0E8] whitespace-pre-line drop-shadow-lg">
@@ -389,7 +391,30 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
             {slide.desc[currentLang]}
           </p>
 
+          {/* Единая Reels-панель справа */}
           <div className="flex items-center gap-4 shrink-0">
+            {/* Кнопка звука */}
+            <button onClick={onToggleMute} className="flex flex-col items-center gap-1.5">
+              <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/40 bg-black/30 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 active:scale-90">
+                {isMuted ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <line x1="23" y1="9" x2="17" y2="15"></line>
+                    <line x1="17" y1="9" x2="23" y2="15"></line>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                  </svg>
+                )}
+              </div>
+              <span className="text-[8px] tracking-widest uppercase text-white/80">
+                {isMuted ? 'MUTE' : 'SOUND'}
+              </span>
+            </button>
+
+            {/* Кнопка Лайка */}
             <button onClick={handleLike} className="flex flex-col items-center gap-1.5">
               <div
                 className={`
@@ -409,6 +434,7 @@ function SlideItem({ slide, lang, index, isActive, isPreloaded, isMuted }: Slide
               </span>
             </button>
 
+            {/* Кнопка Поделиться */}
             <button onClick={handleShare} className="flex flex-col items-center gap-1.5">
               <div className="w-9 h-9 min-[390px]:w-10 min-[390px]:h-10 rounded-full border border-white/40 bg-black/30 backdrop-blur-sm flex items-center justify-center text-white transition-all duration-200 active:scale-90">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -475,7 +501,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
   const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
   const returnYRef = useRef<number | null>(null)
-  // Флаг, блокирующий Observer во время полета умной кнопки
   const isJumpingRef = useRef(false)
 
   useEffect(() => {
@@ -514,7 +539,6 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     return () => container.removeEventListener('scroll', handlePassiveScroll)
   }, [])
 
-  // ИСПРАВЛЕНИЕ: Умный скролл с предсказанием индекса и отключением Observer'а
   const handleSmartScroll = () => {
     const tg = (window as any).Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
@@ -525,16 +549,15 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     if (buttonMode === 'up') {
       returnYRef.current = container.scrollTop
       isJumpingRef.current = true
-      setActiveIndex(0) // Начинаем грузить первое видео до приземления
+      setActiveIndex(0)
       
       container.scrollTo({ top: 0, behavior: 'smooth' })
       setTimeout(() => { isJumpingRef.current = false }, 1000)
 
     } else if (buttonMode === 'down' && returnYRef.current !== null) {
       isJumpingRef.current = true
-      // Угадываем индекс, на который прилетим (Скролл / Высота экрана)
       const targetIndex = Math.round(returnYRef.current / Math.max(1, container.clientHeight))
-      setActiveIndex(targetIndex) // Начинаем грузить нужное видео заранее
+      setActiveIndex(targetIndex)
       
       container.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
       setTimeout(() => { 
@@ -544,14 +567,13 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     }
   }
 
-  // ИСПРАВЛЕНИЕ: Observer игнорирует пролетающие слайды, если нажата кнопка скролла
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (isJumpingRef.current) return // Если мы в полете - игнорируем!
+        if (isJumpingRef.current) return
 
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
@@ -618,6 +640,13 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     }
   };
 
+  const handleToggleMute = () => {
+    if ((window as any).Telegram?.WebApp?.HapticFeedback) {
+      ;(window as any).Telegram.WebApp.HapticFeedback.impactOccurred('light')
+    }
+    setIsMuted(v => !v)
+  }
+
   return (
     <motion.div
       variants={pageVariants}
@@ -639,26 +668,22 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
           -webkit-tap-highlight-color: transparent !important;
           -webkit-touch-callout: none;
         }
+        @keyframes subtleGlow {
+          0%, 100% { border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+          50% { border-color: rgba(255, 255, 255, 0.5); box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); }
+        }
+        .paywall-btn {
+          animation: subtleGlow 4s infinite ease-in-out;
+        }
       `}</style>
 
-      {/* Header */}
+      {/* Header — теперь здесь только кнопка Назад */}
       <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-10 pb-4 flex justify-between items-start pointer-events-none">
         <button
           onClick={onBack}
           className="pointer-events-auto flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] text-white/90"
         >
           ← Back
-        </button>
-        <button
-          onClick={() => {
-            if ((window as any).Telegram?.WebApp?.HapticFeedback) {
-              ;(window as any).Telegram.WebApp.HapticFeedback.impactOccurred('light')
-            }
-            setIsMuted(v => !v)
-          }}
-          className="pointer-events-auto text-[10px] font-sans uppercase tracking-[0.2em] text-white/90"
-        >
-          {isMuted ? 'SOUND: OFF' : 'SOUND: ON'}
         </button>
       </header>
 
@@ -684,26 +709,30 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 isActive={isActive}
                 isPreloaded={isPreloaded}
                 isMuted={isMuted}
+                onToggleMute={handleToggleMute}
               />
             </div>
           )
         })}
 
-        {/* НОВЫЙ ЭДИТОРИАЛ PAYWALL SLIDE */}
+        {/* High-Fashion Paywall Slide */}
         {showPaywallSlide && (
           <div
             ref={(el) => { slideRefs.current[visibleStyles.length] = el }}
             data-index={visibleStyles.length}
             className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6 pb-12"
           >
+            {/* Градиентные подложки для драматичного чтения */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent z-0 pointer-events-none" />
+
             {/* Огромная фоновая типографика в стиле Vogue */}
-            <div className="absolute top-20 left-4 pointer-events-none select-none">
-              <h2 className="font-serif text-[22vw] leading-[0.8] text-white/5 tracking-tighter">
+            <div className="absolute top-20 left-4 pointer-events-none select-none z-0">
+              <h2 className="font-serif text-[22vw] leading-[0.8] text-white/[0.03] tracking-tighter">
                 FULL<br/>VIDEO<br/>LOOKBOOK
               </h2>
             </div>
 
-            {/* Контент прижат к низу, как описание в самих видео */}
+            {/* Контент прижат к низу */}
             <div className="relative z-10 w-full mb-4">
               <div className="w-full h-px bg-white/20 mb-6" />
               
@@ -722,7 +751,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
               <button
                 onClick={handleProClick}
                 disabled={isPurchasing}
-                className="group relative flex items-center justify-between w-full h-[56px] px-6 border border-white/20 text-[#F4F0E8] hover:bg-white/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer"
+                className="paywall-btn group relative flex items-center justify-between w-full h-[56px] px-6 border text-[#F4F0E8] hover:bg-white/5 active:scale-95 transition-all outline-none bg-black/40 backdrop-blur-md cursor-pointer"
               >
                 {isPurchasing ? (
                   <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse mx-auto">
