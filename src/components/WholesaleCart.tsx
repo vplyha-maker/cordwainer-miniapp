@@ -1,19 +1,9 @@
 import { useState, useEffect } from 'react';
-import { type ShoeItem } from '../data/catalog';
-
-export interface CartItem {
-  uid: string;
-  shoe: ShoeItem;
-  orderMode: 'wholesale' | 'sample';
-  sizeRun: Record<number, number>;
-  boxesCount: number;
-  sampleSize: number;
-  totalPairs: number;
-  formulaText: string;
-}
+import { type CartItem } from '../data/catalog';
 
 type WholesaleCartProps = {
   items: CartItem[];
+  onUpdateQuantity: (uid: string, newBoxesCount: number) => void;
   onRemove: (uid: string) => void;
   onClear: () => void;
   onClose: () => void;
@@ -39,7 +29,7 @@ const RECIPIENT_CITIES = [
   { name: 'Харьков (по городу)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.7 },
 ];
 
-export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCartProps) {
+export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
   const [selectedCity, setSelectedCity] = useState(RECIPIENT_CITIES[0]);
   const [branchOrComment, setBranchOrComment] = useState('');
   const [clientContact, setClientContact] = useState('');
@@ -47,7 +37,6 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
   const [calcLoading, setCalcLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Общее количество пар и грузовых мест по всему заказу
   const grandTotalPairs = items.reduce((sum, item) => sum + item.totalPairs, 0);
   const grandTotalBoxes = Math.max(1, Math.ceil(grandTotalPairs / 8));
 
@@ -55,7 +44,6 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // Расчет доставки Новой Почты на всю партию обуви
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
@@ -119,7 +107,6 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
     };
   }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
 
-  // Формирование единой оптовой накладной для Telegram
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
       const variantStr = item.shoe.variant ? ` ${item.shoe.variant}` : '';
@@ -173,7 +160,6 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
         boxSizing: 'border-box',
       }}
     >
-      {/* Шапка корзины */}
       <div
         style={{
           display: 'flex',
@@ -249,68 +235,118 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
         </div>
       ) : (
         <>
-          {/* Список набранных моделей */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-            {items.map((item, idx) => (
-              <div
-                key={item.uid}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #EAE8E3',
-                  padding: '12px',
-                  display: 'flex',
-                  gap: '12px',
-                  alignItems: 'center',
-                }}
-              >
-                <img
-                  src={item.shoe.image}
-                  alt={item.shoe.modelNumber}
-                  style={{
-                    width: '68px',
-                    height: '68px',
-                    objectFit: 'contain',
-                    border: '1px solid #F0EFEA',
-                    flexShrink: 0,
-                  }}
-                />
+            {items.map((item, idx) => {
+              const isSample = item.orderMode === 'sample';
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '15px', fontWeight: 700, fontFamily: 'serif' }}>
-                    {idx + 1}. Модель № {item.shoe.modelNumber} {item.shoe.variant || ''}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>
-                    Цвет: <strong>{item.shoe.color}</strong> ({item.shoe.category})
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#333', marginTop: '4px', lineHeight: 1.35 }}>
-                    {item.formulaText}
-                  </div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, marginTop: '4px' }}>
-                    Итого: {item.totalPairs} пар
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onRemove(item.uid)}
+              return (
+                <div
+                  key={item.uid}
                   style={{
-                    background: '#FAF9F6',
-                    border: '1px solid #DDD',
-                    width: '30px',
-                    height: '30px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: '#555',
-                    flexShrink: 0,
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #EAE8E3',
+                    padding: '12px',
+                    display: 'flex',
+                    gap: '12px',
+                    alignItems: 'center',
                   }}
-                  title="Удалить позицию"
                 >
-                  ✕
-                </button>
-              </div>
-            ))}
+                  <img
+                    src={item.shoe.image}
+                    alt={item.shoe.modelNumber}
+                    style={{
+                      width: '68px',
+                      height: '68px',
+                      objectFit: 'contain',
+                      border: '1px solid #F0EFEA',
+                      flexShrink: 0,
+                    }}
+                  />
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '15px', fontWeight: 700, fontFamily: 'serif' }}>
+                      {idx + 1}. Модель № {item.shoe.modelNumber} {item.shoe.variant || ''}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>
+                      Цвет: <strong>{item.shoe.color}</strong> ({item.shoe.category})
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#333', marginTop: '4px', lineHeight: 1.35 }}>
+                      {item.formulaText}
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '8px',
+                        borderTop: '1px dashed #EAE8E3',
+                        paddingTop: '6px',
+                      }}
+                    >
+                      <span style={{ fontSize: '12px', fontWeight: 700 }}>
+                        Итого: {item.totalPairs} пар
+                      </span>
+
+                      {/* Кнопки изменения количества ростовок (если это опт) */}
+                      {!isSample && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '11px', color: '#666' }}>Ростовок:</span>
+                          <button
+                            onClick={() => onUpdateQuantity(item.uid, item.boxesCount - 1)}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              border: '1px solid #CCC',
+                              backgroundColor: '#FAF9F6',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                            }}
+                          >
+                            −
+                          </button>
+                          <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '16px', textAlign: 'center' }}>
+                            {item.boxesCount}
+                          </span>
+                          <button
+                            onClick={() => onUpdateQuantity(item.uid, item.boxesCount + 1)}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              border: '1px solid #CCC',
+                              backgroundColor: '#FAF9F6',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onRemove(item.uid)}
+                    style={{
+                      background: '#FAF9F6',
+                      border: '1px solid #DDD',
+                      width: '30px',
+                      height: '30px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: '#555',
+                      flexShrink: '0',
+                    }}
+                    title="Удалить позицию"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Данные получателя и расчет Новой Почты по всей партии */}
           <div
             style={{
               backgroundColor: '#FFFFFF',
@@ -400,7 +436,6 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
             </div>
           </div>
 
-          {/* Кнопки отправки двум руководителям */}
           <div
             style={{
               backgroundColor: '#FFFFFF',
@@ -456,4 +491,3 @@ export function WholesaleCart({ items, onRemove, onClear, onClose }: WholesaleCa
     </div>
   );
 }
-
