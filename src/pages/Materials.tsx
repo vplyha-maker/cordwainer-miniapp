@@ -8,7 +8,14 @@ type MaterialsProps = {
 const CATEGORIES: ('Все' | ShoeCategory)[] = ['Все', 'Ботинки', 'Кроссовки', 'Туфли'];
 const FEATURE_FILTERS = ['Все', 'Мех', 'Gore-Tex', 'Подошва трактор'] as const;
 
-// Вставьте сюда ваш ключ из личного кабинета Новой Почты (если пусто — работает встроенный расчет по тарифам НП)
+const SIZES = [40, 41, 42, 43, 44, 45] as const;
+type SizeKey = (typeof SIZES)[number];
+
+// Пресеты ростовок
+const STANDARD_8_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 2, 43: 2, 44: 1, 45: 1 };
+const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1, 45: 1 };
+
+// Ключ API Новой Почты (если пусто — работает встроенный тарифный расчет по весу и зонам)
 const NP_API_KEY = '';
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
@@ -28,15 +35,35 @@ export function Materials({ onBack }: MaterialsProps) {
   const [activeFeature, setActiveFeature] = useState<string>('Все');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Выбранная модель для детального просмотра (модальное окно)
+  // Выбранная модель для детального окна
   const [selectedShoe, setSelectedShoe] = useState<ShoeItem | null>(null);
 
-  // Состояния B2B-калькулятора Новой Почты
+  // Режим заказа и размерная сетка
   const [orderMode, setOrderMode] = useState<'sample' | 'wholesale'>('wholesale');
-  const [boxesCount, setBoxesCount] = useState<number>(1); // 1 ростовка = 8 пар
+  const [sizeRun, setSizeRun] = useState<Record<SizeKey, number>>(STANDARD_8_RUN);
+  const [sampleSize, setSampleSize] = useState<SizeKey>(42);
+  const [boxesCount, setBoxesCount] = useState<number>(1);
+
+  // Логистика Новой Почты
   const [selectedCity, setSelectedCity] = useState(RECIPIENT_CITIES[0]);
   const [deliveryCost, setDeliveryCost] = useState<number | null>(null);
   const [calcLoading, setCalcLoading] = useState(false);
+
+  // Подсчет пар в одной ростовке и общего объема заказа
+  const pairsPerBox = useMemo(() => {
+    return SIZES.reduce((sum, sz) => sum + (sizeRun[sz] || 0), 0);
+  }, [sizeRun]);
+
+  const totalPairs = orderMode === 'sample' ? 1 : pairsPerBox * boxesCount;
+  const estimatedBoxes = orderMode === 'sample' ? 1 : Math.max(1, Math.ceil(totalPairs / 8));
+
+  // Изменение количества пар конкретного размера в ростовке
+  const updateSizeCount = (size: SizeKey, delta: number) => {
+    setSizeRun((prev) => {
+      const nextVal = Math.max(0, Math.min(10, (prev[size] || 0) + delta));
+      return { ...prev, [size]: nextVal };
+    });
+  };
 
   // Фильтрация каталога
   const filteredShoes = useMemo(() => {
@@ -52,7 +79,7 @@ export function Materials({ onBack }: MaterialsProps) {
     });
   }, [activeCategory, activeFeature, searchQuery]);
 
-  // Все варианты цветов и подошв для открытой модели (как на Pegres)
+  // Все варианты цветов и подошв для открытой модели
   const modelVariants = useMemo(() => {
     if (!selectedShoe) return [];
     return cardioCatalog.filter((item) => item.modelNumber === selectedShoe.modelNumber);
@@ -60,16 +87,19 @@ export function Materials({ onBack }: MaterialsProps) {
 
   // Расчет стоимости доставки из Харькова
   useEffect(() => {
-    if (!selectedShoe) return;
+    if (!selectedShoe || totalPairs === 0) {
+      setDeliveryCost(0);
+      return;
+    }
 
-    const pairs = orderMode === 'sample' ? 1 : boxesCount * 8;
-    // Объемный вес: 1 коробка обуви ~2 кг, оптовый ящик на 8 пар ~15 кг объемного веса
-    const totalWeight = orderMode === 'sample' ? 2 : boxesCount * 15;
-    const seatsAmount = orderMode === 'sample' ? 1 : boxesCount;
+    // Объемный вес: ~1.9 кг на 1 пару в индивидуальной коробке
+    const totalWeight = Math.max(2, Math.round(totalPairs * 1.9));
 
-    // Резервная формула по тарифам Новой Почты, если API-ключ еще не указан
     const calculateFallback = () => {
-      const base = orderMode === 'sample' ? 95 : 160 + (boxesCount - 1) * 95;
+      if (orderMode === 'sample') {
+        return Math.round(95 * selectedCity.zoneMultiplier);
+      }
+      const base = 140 + (totalPairs - 1) * 14;
       return Math.round(base * selectedCity.zoneMultiplier);
     };
 
@@ -93,9 +123,9 @@ export function Materials({ onBack }: MaterialsProps) {
           CityRecipient: selectedCity.ref,
           Weight: String(totalWeight),
           ServiceType: 'WarehouseWarehouse',
-          Cost: String(pairs * 1500),
+          Cost: String(totalPairs * 1500),
           CargoType: 'Cargo',
-          SeatsAmount: String(seatsAmount),
+          SeatsAmount: String(estimatedBoxes),
         },
       }),
     })
@@ -118,7 +148,7 @@ export function Materials({ onBack }: MaterialsProps) {
     return () => {
       cancelled = true;
     };
-  }, [selectedShoe, orderMode, boxesCount, selectedCity]);
+  }, [selectedShoe, orderMode, totalPairs, estimatedBoxes, selectedCity]);
 
   return (
     <div style={{ backgroundColor: '#F7F6F2', minHeight: '100vh', padding: '16px', color: '#1A1A1A' }}>
@@ -194,7 +224,7 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Быстрые фильтры особенностей (Мех, Gore-Tex, Трактор) */}
+      {/* Быстрые фильтры особенностей */}
       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px' }}>
         {FEATURE_FILTERS.map((feat) => {
           const isActive = activeFeature === feat;
@@ -314,8 +344,8 @@ export function Materials({ onBack }: MaterialsProps) {
                     color: '#555',
                   }}
                 >
-                  <span>{variantsCount > 1 ? `Цветов/версий: ${variantsCount}` : '1 исполнение'}</span>
-                  <span style={{ fontWeight: 600, color: '#1A1A1A' }}>B2B →</span>
+                  <span>{variantsCount > 1 ? `Вариантов: ${variantsCount}` : '40–45 разм.'}</span>
+                  <span style={{ fontWeight: 600, color: '#1A1A1A' }}>Ростовка →</span>
                 </div>
               </div>
             </div>
@@ -323,7 +353,7 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Детальное окно модели (стиль Pegres + Калькулятор Новой Почты) */}
+      {/* Детальное окно модели (Стиль Pegres + Размерная сетка + Новая Почта) */}
       {selectedShoe && (
         <div
           onClick={() => setSelectedShoe(null)}
@@ -343,21 +373,21 @@ export function Materials({ onBack }: MaterialsProps) {
               backgroundColor: '#FFFFFF',
               width: '100%',
               maxWidth: '520px',
-              maxHeight: '90vh',
+              maxHeight: '92vh',
               overflowY: 'auto',
-              padding: '20px',
+              padding: '18px',
               boxSizing: 'border-box',
               borderTopLeftRadius: '14px',
               borderTopRightRadius: '14px',
             }}
           >
-            {/* Верхняя панель модалки */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            {/* Шапка модалки */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <div>
                 <span style={{ fontSize: '11px', color: '#777', textTransform: 'uppercase' }}>
-                  {selectedShoe.category} • Cardio Харьков
+                  {selectedShoe.category} • Цвет: {selectedShoe.color}
                 </span>
-                <h2 style={{ fontFamily: 'serif', fontSize: '24px', margin: 0 }}>
+                <h2 style={{ fontFamily: 'serif', fontSize: '23px', margin: 0 }}>
                   Модель № {selectedShoe.modelNumber} {selectedShoe.variant || ''}
                 </h2>
               </div>
@@ -370,6 +400,7 @@ export function Materials({ onBack }: MaterialsProps) {
                   height: '32px',
                   cursor: 'pointer',
                   fontSize: '16px',
+                  color: '#1A1A1A',
                 }}
               >
                 ✕
@@ -382,19 +413,19 @@ export function Materials({ onBack }: MaterialsProps) {
               alt={selectedShoe.modelNumber}
               style={{
                 width: '100%',
-                maxHeight: '280px',
+                maxHeight: '240px',
                 objectFit: 'contain',
                 backgroundColor: '#FFF',
                 border: '1px solid #F0EFEA',
-                marginBottom: '14px',
+                marginBottom: '12px',
               }}
             />
 
-            {/* Переключатель всех расцветок и подошв этой модели (как на Pegres) */}
+            {/* Переключатель всех расцветок и подошв этой модели */}
             {modelVariants.length > 1 && (
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#666', marginBottom: '8px' }}>
-                  Другие цвета и подошвы модели № {selectedShoe.modelNumber}:
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#666', marginBottom: '6px' }}>
+                  Исполнения модели № {selectedShoe.modelNumber}:
                 </div>
                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
                   {modelVariants.map((v) => {
@@ -406,7 +437,7 @@ export function Materials({ onBack }: MaterialsProps) {
                         style={{
                           border: isCurrent ? '2px solid #1A1A1A' : '1px solid #DDD',
                           padding: '4px',
-                          width: '64px',
+                          width: '62px',
                           flexShrink: 0,
                           cursor: 'pointer',
                           textAlign: 'center',
@@ -428,52 +459,207 @@ export function Materials({ onBack }: MaterialsProps) {
               </div>
             )}
 
-            {/* Блок калькулятора Новой Почты (B2B) */}
+            {/* Переключатель режима: Опт (Ростовка) или Образец (1 пара) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
+              <button
+                onClick={() => setOrderMode('wholesale')}
+                style={{
+                  padding: '9px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: '1px solid #1A1A1A',
+                  backgroundColor: orderMode === 'wholesale' ? '#1A1A1A' : '#FFF',
+                  color: orderMode === 'wholesale' ? '#FFF' : '#1A1A1A',
+                  cursor: 'pointer',
+                }}
+              >
+                Опт (Ростовка)
+              </button>
+              <button
+                onClick={() => setOrderMode('sample')}
+                style={{
+                  padding: '9px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: '1px solid #1A1A1A',
+                  backgroundColor: orderMode === 'sample' ? '#1A1A1A' : '#FFF',
+                  color: orderMode === 'sample' ? '#FFF' : '#1A1A1A',
+                  cursor: 'pointer',
+                }}
+              >
+                Образец (1 пара)
+              </button>
+            </div>
+
+            {/* Блок размерной сетки */}
+            <div
+              style={{
+                backgroundColor: '#FAF9F6',
+                border: '1px solid #E5E2DC',
+                padding: '12px',
+                marginBottom: '12px',
+              }}
+            >
+              {orderMode === 'wholesale' ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      📏 Размерная сетка ящика (40–45)
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        onClick={() => setSizeRun(STANDARD_8_RUN)}
+                        style={{
+                          fontSize: '10px',
+                          padding: '3px 7px',
+                          border: '1px solid #CCC',
+                          backgroundColor: '#FFF',
+                          cursor: 'pointer',
+                          color: '#1A1A1A',
+                        }}
+                      >
+                        Стандарт 8 пар
+                      </button>
+                      <button
+                        onClick={() => setSizeRun(EVEN_6_RUN)}
+                        style={{
+                          fontSize: '10px',
+                          padding: '3px 7px',
+                          border: '1px solid #CCC',
+                          backgroundColor: '#FFF',
+                          cursor: 'pointer',
+                          color: '#1A1A1A',
+                        }}
+                      >
+                        Ровный 6 пар
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Таблица размеров 40-45 с кнопками +/- */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', marginBottom: '10px' }}>
+                    {SIZES.map((sz) => (
+                      <div
+                        key={sz}
+                        style={{
+                          border: '1px solid #DDD',
+                          backgroundColor: '#FFF',
+                          textAlign: 'center',
+                          padding: '6px 2px',
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', color: '#777', marginBottom: '4px' }}>р. {sz}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                          <button
+                            onClick={() => updateSizeCount(sz, -1)}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              border: '1px solid #DDD',
+                              background: '#F7F6F2',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              padding: 0,
+                              color: '#1A1A1A',
+                            }}
+                          >
+                            −
+                          </button>
+                          <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '14px' }}>
+                            {sizeRun[sz]}
+                          </span>
+                          <button
+                            onClick={() => updateSizeCount(sz, 1)}
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              border: '1px solid #DDD',
+                              background: '#F7F6F2',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              padding: 0,
+                              color: '#1A1A1A',
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Выбор количества таких ростовок */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: '#555' }}>Количество ростовок:</span>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      {[1, 2, 3, 5, 10].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setBoxesCount(num)}
+                          style={{
+                            padding: '4px 9px',
+                            border: boxesCount === num ? '1px solid #1A1A1A' : '1px solid #CCC',
+                            backgroundColor: boxesCount === num ? '#1A1A1A' : '#FFF',
+                            color: boxesCount === num ? '#FFF' : '#1A1A1A',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ×{num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Итоговая разбивка по размерам */}
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#555', borderTop: '1px dashed #DDD', paddingTop: '6px' }}>
+                    Формула заказа:{' '}
+                    <strong>
+                      {SIZES.filter((sz) => sizeRun[sz] > 0)
+                        .map((sz) => `${sz}(${sizeRun[sz] * boxesCount})`)
+                        .join(' • ') || 'Выберите размеры'}
+                    </strong>
+                  </div>
+                </>
+              ) : (
+                /* Выбор одного размера для образца */
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px' }}>
+                    📏 Выберите размер тестового образца:
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
+                    {SIZES.map((sz) => (
+                      <button
+                        key={sz}
+                        onClick={() => setSampleSize(sz)}
+                        style={{
+                          padding: '8px 0',
+                          border: sampleSize === sz ? '2px solid #1A1A1A' : '1px solid #CCC',
+                          backgroundColor: sampleSize === sz ? '#1A1A1A' : '#FFF',
+                          color: sampleSize === sz ? '#FFF' : '#1A1A1A',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Блок калькулятора Новой Почты */}
             <div
               style={{
                 backgroundColor: '#F7F6F2',
                 border: '1px solid #E5E2DC',
-                padding: '14px',
-                marginBottom: '14px',
+                padding: '12px',
               }}
             >
-              <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-                📦 Расчет доставки «Нова Пошта» (из Харькова)
-              </div>
-
-              {/* Переключатель: 1 пара (образец) или Ростовки (опт) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
-                <button
-                  onClick={() => setOrderMode('wholesale')}
-                  style={{
-                    padding: '8px',
-                    fontSize: '12px',
-                    border: '1px solid #1A1A1A',
-                    backgroundColor: orderMode === 'wholesale' ? '#1A1A1A' : '#FFF',
-                    color: orderMode === 'wholesale' ? '#FFF' : '#1A1A1A',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Опт (Ростовка 8 пар)
-                </button>
-                <button
-                  onClick={() => setOrderMode('sample')}
-                  style={{
-                    padding: '8px',
-                    fontSize: '12px',
-                    border: '1px solid #1A1A1A',
-                    backgroundColor: orderMode === 'sample' ? '#1A1A1A' : '#FFF',
-                    color: orderMode === 'sample' ? '#FFF' : '#1A1A1A',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Образец (1 пара)
-                </button>
-              </div>
-
-              {/* Выбор города получателя */}
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12px', color: '#555', minWidth: '90px' }}>Город доставки:</span>
+                <span style={{ fontSize: '12px', color: '#555', minWidth: '110px' }}>📦 Доставка НП в:</span>
                 <select
                   value={selectedCity.name}
                   onChange={(e) => {
@@ -482,9 +668,10 @@ export function Materials({ onBack }: MaterialsProps) {
                   }}
                   style={{
                     flex: 1,
-                    padding: '7px',
+                    padding: '6px',
                     border: '1px solid #CCC',
                     backgroundColor: '#FFF',
+                    color: '#1A1A1A',
                     fontSize: '12px',
                   }}
                 >
@@ -496,46 +683,20 @@ export function Materials({ onBack }: MaterialsProps) {
                 </select>
               </div>
 
-              {/* Количество ящиков (если выбран опт) */}
-              {orderMode === 'wholesale' && (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '12px', color: '#555', minWidth: '90px' }}>Ящиков (ростовок):</span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {[1, 2, 3, 5, 10].map((num) => (
-                      <button
-                        key={num}
-                        onClick={() => setBoxesCount(num)}
-                        style={{
-                          padding: '5px 10px',
-                          border: boxesCount === num ? '1px solid #1A1A1A' : '1px solid #CCC',
-                          backgroundColor: boxesCount === num ? '#1A1A1A' : '#FFF',
-                          color: boxesCount === num ? '#FFF' : '#1A1A1A',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Итог по доставке */}
               <div
                 style={{
                   borderTop: '1px solid #DDD',
-                  paddingTop: '10px',
+                  paddingTop: '8px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}
               >
                 <div style={{ fontSize: '12px', color: '#444' }}>
-                  Объем: <strong>{orderMode === 'sample' ? '1 пара (2 кг)' : `${boxesCount * 8} пар (${boxesCount} ящ.)`}</strong>
+                  Итого: <strong>{totalPairs} пар</strong> ({estimatedBoxes} мест)
                 </div>
                 <div style={{ fontSize: '15px', fontWeight: 700 }}>
-                  {calcLoading ? 'Расчет...' : `≈ ${deliveryCost} ₴`}
+                  {calcLoading ? 'Расчет...' : `Доставка ≈ ${deliveryCost} ₴`}
                 </div>
               </div>
             </div>
