@@ -12,10 +12,11 @@ import {
   type RecipeResult,
   getPigmentCategory,
   simulateLayersKM,
-  rgbToLabObj,
-  calculateDeltaE2000Lab,
+  rgbToLab,
+  calculateDeltaE2000,
   hexToRgbObj,
 } from '../utils/calculatorLogic'
+
 import { mixSpectra, spectrumToRGB, rgbToHex } from '../utils/colorScience'
 
 interface ColorCalcPageProps {
