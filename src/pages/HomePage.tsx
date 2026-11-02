@@ -547,8 +547,8 @@ export function HomePage({
                     style={{ borderColor: palette.line }}
                   >
                     <video
-                      src="/Fason/Botford.mp4"
-                      poster="/Fason/posters/Botford.jpg"
+                      src="/Fason/slingback1.mp4"
+                      poster="/Fason/posters/slingback1.jpg"
                       autoPlay
                       loop
                       muted
