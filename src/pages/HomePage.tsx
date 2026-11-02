@@ -538,48 +538,51 @@ export function HomePage({
             </div>
           ) : (
             <>
-              {/* HERO LOOKBOOK BANNER — Живое превью видео-лукбука */}
-              {onOpenStyles && (
-                <motion.div variants={itemVariants} className="mb-12">
-                  <button
-                    onClick={onOpenStyles}
-                    className="group relative w-full h-[230px] overflow-hidden border outline-none bg-[#0A0A0A] text-left cursor-pointer block"
-                    style={{ borderColor: palette.line }}
-                  >
-                    <video
-                      src="/Fason/slingback1.mp4"
-                      poster="/Fason/posters/slingback1.jpg"
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="absolute inset-0 w-full h-full object-cover opacity-75 scale-105 transition-transform duration-700 ease-out group-hover:scale-100 group-active:scale-100"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/30" />
+              {/* HERO LOOKBOOK BANNER — С исправленным кадром и крупным планом обуви */}
+{onOpenStyles && (
+  <motion.div variants={itemVariants} className="mb-12">
+    <button
+      onClick={onOpenStyles}
+      className="group relative w-full h-[250px] overflow-hidden border outline-none bg-[#0A0A0A] text-left cursor-pointer block"
+      style={{ borderColor: palette.line }}
+    >
+      <video
+        src="/Fason/lofer.mp4" /* Заменено на лоферы или другой файл с крупным планом */
+        poster="/Fason/posters/lofer.jpg"
+        autoPlay
+        loop
+        muted
+        playsInline
+        /* Используем object-center и scale, чтобы обувь была в фокусе */
+        className="absolute inset-0 w-full h-full object-cover object-center opacity-85 scale-100 transition-transform duration-700 ease-out group-hover:scale-105"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/20" />
 
-                    <div className="relative z-10 h-full p-5 flex flex-col justify-between text-[#F4F0E8]">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
-                          {t.heroTag}
-                        </span>
-                        <span className="text-[9px] font-sans tracking-[0.25em] text-white/60">
-                          01 / 15
-                        </span>
-                      </div>
+      <div className="relative z-10 h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4F0E8]">
+        <div className="flex items-center justify-between">
+          <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
+            {t.heroTag}
+          </span>
+          <span className="text-[9px] font-sans tracking-[0.25em] text-white/60">
+            01 / 15
+          </span>
+        </div>
 
-                      <div className="flex items-end justify-between gap-4">
-                        <h2 className="font-serif text-3xl leading-[1.02] tracking-tight whitespace-pre-line">
-                          {t.heroTitle}
-                        </h2>
-                        <div className="flex items-center gap-2 pb-1 text-[9px] font-sans uppercase tracking-[0.25em] text-white/90 border-b border-white/40 shrink-0">
-                          <span>{t.heroCta}</span>
-                          <span>↗</span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </motion.div>
-              )}
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-3xl sm:text-4xl leading-[1.02] tracking-tight whitespace-pre-line drop-shadow-md">
+              {t.heroTitle}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2 pb-1 text-[9px] font-sans uppercase tracking-[0.25em] text-white/90 border-b border-white/40 shrink-0">
+            <span>{t.heroCta}</span>
+            <span>↗</span>
+          </div>
+        </div>
+      </div>
+    </button>
+  </motion.div>
+)}
 
               {/* СЕКЦИЯ I: 2-колоночная редакционная сетка (Lookbook Grid) */}
               <motion.div variants={itemVariants} className="mb-12">
