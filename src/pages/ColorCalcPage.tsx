@@ -120,9 +120,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const squareColor = displayHex || '#1E1B19'
 
   const mixedLab = useMemo(() => {
-    if (!mixedColor?.rgb) return null
-    return rgbToLabObj(mixedColor.rgb.r, mixedColor.rgb.g, mixedColor.rgb.b)
-  }, [mixedColor])
+  if (!mixedColor?.rgb) return null
+  return rgbToLab(mixedColor.rgb.r, mixedColor.rgb.g, mixedColor.rgb.b)
+}, [mixedColor])
 
   // Симуляция выкраски в 1, 2, 3 слоя по Кубелке-Мунку
   const layerSwatches = useMemo(() => {
