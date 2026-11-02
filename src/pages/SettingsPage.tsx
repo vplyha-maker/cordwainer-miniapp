@@ -14,28 +14,81 @@ type SettingsPageProps = {
 type FontMode = 'classic' | 'system'
 type FontSize = 'small' | 'medium' | 'large'
 
+const SERIF_STACK = '"Playfair Display", Georgia, "Times New Roman", serif'
+const SANS_STACK = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+
 function haptic(kind: 'light' | 'medium' = 'light') {
   try {
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(kind)
   } catch {}
 }
 
-function applyFontMode(mode: FontMode) {
+function ensureTypographyStyleTag() {
+  if (typeof document === 'undefined') return
+  const styleId = 'cordwainer-typography-rules'
+  if (document.getElementById(styleId)) return
+
+  const style = document.createElement('style')
+  style.id = styleId
+  style.textContent = `
+    /* Режим "Изящный" (Classic Editorial Serif) */
+    html.font-mode-classic .font-serif,
+    html.font-mode-classic .font-display {
+      font-family: ${SERIF_STACK} !important;
+    }
+
+    /* Режим "Строгий" (Strict Swiss Grotesque Sans) */
+    html.font-mode-strict .font-serif,
+    html.font-mode-strict .font-display {
+      font-family: ${SANS_STACK} !important;
+      font-style: normal !important;
+      letter-spacing: -0.025em !important;
+    }
+  `
+  document.head.appendChild(style)
+}
+
+export function applyFontMode(mode: FontMode) {
+  if (typeof document === 'undefined') return
+  ensureTypographyStyleTag()
+
   const root = document.documentElement
   if (mode === 'system') {
-    root.style.setProperty('--font-display', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif')
-    root.style.setProperty('--font-body', 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif')
+    root.classList.add('font-mode-strict')
+    root.classList.remove('font-mode-classic')
+    root.style.setProperty('--font-serif', SANS_STACK)
+    root.style.setProperty('--font-display', SANS_STACK)
+    root.style.setProperty('--font-body', SANS_STACK)
+    root.style.setProperty('--font-sans', SANS_STACK)
   } else {
-    root.style.setProperty('--font-display', '"Playfair Display", "Times New Roman", serif')
-    root.style.setProperty('--font-body', '"Inter", system-ui, -apple-system, sans-serif')
+    root.classList.add('font-mode-classic')
+    root.classList.remove('font-mode-strict')
+    root.style.setProperty('--font-serif', SERIF_STACK)
+    root.style.setProperty('--font-display', SERIF_STACK)
+    root.style.setProperty('--font-body', SANS_STACK)
+    root.style.setProperty('--font-sans', SANS_STACK)
   }
 }
 
-function applyFontSize(size: FontSize) {
+export function applyFontSize(size: FontSize) {
+  if (typeof document === 'undefined') return
   const root = document.documentElement
-  const scale = size === 'small' ? '0.94' : size === 'large' ? '1.07' : '1'
+  const scale = size === 'small' ? '0.92' : size === 'large' ? '1.08' : '1'
   root.style.setProperty('--font-scale', scale)
   root.style.fontSize = `calc(16px * ${scale})`
+}
+
+// Автоматическая инициализация при запуске приложения
+if (typeof window !== 'undefined') {
+  try {
+    const savedFont = localStorage.getItem('cordwainer_font') as FontMode | null
+    applyFontMode(savedFont === 'system' ? 'system' : 'classic')
+
+    const savedSize = localStorage.getItem('cordwainer_font_size') as FontSize | null
+    if (savedSize === 'small' || savedSize === 'medium' || savedSize === 'large') {
+      applyFontSize(savedSize)
+    }
+  } catch {}
 }
 
 export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPageProps) {
@@ -47,7 +100,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const [showWidgetHint, setShowWidgetHint] = useState(false)
 
   useLayoutEffect(() => {
-    // 1. ИСПРАВЛЕНИЕ СКРОЛЛА: Принудительно скроллим в начало при открытии
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
 
     const savedGraphics = getSavedPerfMode()
@@ -68,6 +120,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       setFont(savedFont)
       applyFontMode(savedFont)
     } else {
+      setFont('classic')
       applyFontMode('classic')
     }
 
@@ -76,6 +129,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
       setFontSize(savedSize)
       applyFontSize(savedSize)
     } else {
+      setFontSize('medium')
       applyFontSize('medium')
     }
   }, [])
@@ -210,15 +264,16 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
+  const isStrictFont = font === 'system'
+
   const renderOptionGroup = (
-    title: string, 
-    options: { label: string; value: string }[], 
-    currentValue: string, 
-    onChange: (val: any) => void, 
-    delay: string,
+    title: string,
+    options: { label: string; value: string; previewStyle?: React.CSSProperties }[],
+    currentValue: string,
+    onChange: (val: any) => void,
     desc?: string
   ) => (
-    <div className={`stagger-item border-b ${cLine} py-8`} style={{ animationDelay: delay }}>
+    <div className={`border-b ${cLine} py-8`}>
       <p className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-6 ${cTextMuted}`}>
         {title}
       </p>
@@ -228,16 +283,18 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           return (
             <button
               key={opt.value}
+              type="button"
               onClick={() => onChange(opt.value)}
-              className="group flex items-center gap-6 text-left transition-all active:opacity-50"
+              className="group flex items-center gap-6 text-left transition-opacity active:opacity-50 bg-transparent border-0 outline-none cursor-pointer"
             >
               <span className={`text-[9px] font-sans tracking-[0.2em] transition-opacity w-6 ${isActive ? 'opacity-100' : 'opacity-20'}`}>
                 {isActive ? '—' : ''}
               </span>
-              <span 
-                className={`font-serif text-[6.5vw] min-[375px]:text-3xl transition-all duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                  isActive 
-                    ? 'italic opacity-100 translate-x-2' 
+              <span
+                style={opt.previewStyle}
+                className={`font-serif text-[6.5vw] min-[375px]:text-3xl transition-all duration-300 ${
+                  isActive
+                    ? `${isStrictFont ? 'font-medium' : 'italic'} opacity-100 translate-x-2`
                     : 'opacity-30 group-hover:opacity-70'
                 }`}
               >
@@ -256,24 +313,13 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
   )
 
   return (
-    <div className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}>
-      
-      <style>{`
-        @keyframes fadeUp {
-          0% { opacity: 0; transform: translateY(16px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        .stagger-item {
-          opacity: 0;
-          animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
-
+    <div className={`relative min-h-[100dvh] w-full transition-colors duration-500 ${cBg} ${cText}`}>
       {/* HEADER */}
       <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
-        <button 
-          onClick={onBack || (() => onChangeTab('search'))} 
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] ${cTextMuted} ${cHover} transition-colors`}
+        <button
+          type="button"
+          onClick={onBack || (() => onChangeTab('search'))}
+          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] bg-transparent border-0 outline-none cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
         >
           <span className="transform transition-transform group-hover:-translate-x-1">←</span>
           <span>Back</span>
@@ -282,9 +328,7 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
 
       {/* ОСНОВНОЙ КОНТЕНТ */}
       <div className="px-6 pb-24">
-        
-        {/* 2. ИСПРАВЛЕНИЕ ЗАГОЛОВКА: Убран vw, задан фиксированный изящный размер и добавлены отступы */}
-        <div className="stagger-item mt-2 mb-12" style={{ animationDelay: '0.1s' }}>
+        <div className="mt-2 mb-12">
           <h1 className="font-serif text-5xl min-[400px]:text-6xl leading-[0.95] tracking-tight">
             {t.title}
           </h1>
@@ -295,33 +339,38 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           [
             { label: 'Русский', value: 'ru' },
             { label: 'Українська', value: 'uk' },
-            { label: 'Deutsch', value: 'de' }
+            { label: 'Deutsch', value: 'de' },
           ],
           lang,
-          handleLangChange,
-          '0.15s'
+          handleLangChange
         )}
 
         {renderOptionGroup(
           t.theme,
           [
             { label: t.themeLight, value: 'light' },
-            { label: t.themeDark, value: 'dark' }
+            { label: t.themeDark, value: 'dark' },
           ],
           theme,
-          handleThemeChange,
-          '0.2s'
+          handleThemeChange
         )}
 
         {renderOptionGroup(
           t.font,
           [
-            { label: t.fontClassic, value: 'classic' },
-            { label: t.fontSystem, value: 'system' }
+            {
+              label: t.fontClassic,
+              value: 'classic',
+              previewStyle: { fontFamily: SERIF_STACK, fontStyle: font === 'classic' ? 'italic' : 'normal' },
+            },
+            {
+              label: t.fontSystem,
+              value: 'system',
+              previewStyle: { fontFamily: SANS_STACK, fontStyle: 'normal', letterSpacing: '-0.025em' },
+            },
           ],
           font,
-          handleFontChange,
-          '0.25s'
+          handleFontChange
         )}
 
         {renderOptionGroup(
@@ -329,29 +378,28 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
           [
             { label: t.sizeSmall, value: 'small' },
             { label: t.sizeMedium, value: 'medium' },
-            { label: t.sizeLarge, value: 'large' }
+            { label: t.sizeLarge, value: 'large' },
           ],
           fontSize,
-          handleFontSizeChange,
-          '0.3s'
+          handleFontSizeChange
         )}
 
         {renderOptionGroup(
           t.graphics,
           [
             { label: t.graphicsHigh, value: 'full' },
-            { label: t.graphicsLow, value: 'fast' }
+            { label: t.graphicsLow, value: 'fast' },
           ],
           graphics,
           handleGraphicsChange,
-          '0.35s',
           t.graphicsDesc
         )}
 
-        <div className="stagger-item py-12" style={{ animationDelay: '0.4s' }}>
-          <button 
-            onClick={handleAddToHome} 
-            className={`w-full p-8 border text-left transition-colors active:bg-current/5 ${cLine}`}
+        <div className="py-12">
+          <button
+            type="button"
+            onClick={handleAddToHome}
+            className={`w-full p-8 border text-left transition-colors active:bg-current/5 bg-transparent cursor-pointer ${cLine}`}
           >
             <div className="font-serif text-[7vw] min-[375px]:text-3xl mb-4">{t.install}</div>
             <div className={`text-[10px] font-sans uppercase tracking-[0.2em] leading-relaxed max-w-[85%] ${cTextMuted}`}>
@@ -359,7 +407,6 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
             </div>
           </button>
         </div>
-
       </div>
 
       <AnimatePresence>
@@ -376,17 +423,20 @@ export function SettingsPage({ lang, setLang, onChangeTab, onBack }: SettingsPag
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 10, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className={`w-full max-w-sm p-8 border shadow-2xl ${isDark ? 'bg-[#0A0A0A] border-white/10' : 'bg-[#F2EFE9] border-black/10'}`}
+              className={`w-full max-w-sm p-8 border shadow-2xl ${
+                isDark ? 'bg-[#0A0A0A] border-white/10' : 'bg-[#F2EFE9] border-black/10'
+              }`}
             >
               <h3 className="font-serif text-2xl mb-4 text-center">{t.hintTitle}</h3>
               <p className={`text-[10px] font-sans uppercase tracking-[0.2em] text-center leading-[1.8] mb-8 ${cTextMuted}`}>
                 {t.hintText}
               </p>
               <button
+                type="button"
                 onClick={() => setShowWidgetHint(false)}
-                className={`w-full py-4 border text-[10px] font-sans uppercase tracking-[0.3em] transition-colors ${
-                  isDark 
-                    ? 'border-white/20 hover:bg-white hover:text-black' 
+                className={`w-full py-4 border text-[10px] font-sans uppercase tracking-[0.3em] transition-colors bg-transparent cursor-pointer ${
+                  isDark
+                    ? 'border-white/20 hover:bg-white hover:text-black'
                     : 'border-black/20 hover:bg-black hover:text-white'
                 }`}
               >
