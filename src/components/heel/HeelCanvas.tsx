@@ -31,26 +31,30 @@ type Props = {
   onFix?: () => void
 }
 
-const AUDIT_STYLES: Record<string, { color: string; bg: string; border: string }> = {
+const AUDIT_STYLES: Record<string, { color: string; bg: string; border: string; badge: string }> = {
   SUCCESS: {
-    color: 'var(--pigment-malachite, #047857)',
-    bg: 'color-mix(in srgb, var(--pigment-malachite, #047857) 12%, var(--color-surface))',
-    border: 'color-mix(in srgb, var(--pigment-malachite, #047857) 30%, transparent)',
+    color: 'var(--color-ink)',
+    bg: 'color-mix(in srgb, var(--color-surface) 90%, var(--color-ink) 4%)',
+    border: 'var(--color-border)',
+    badge: '✦ CERTIFIED BALANCE',
   },
   WARNING: {
     color: 'var(--color-accent, #B46513)',
-    bg: 'color-mix(in srgb, var(--color-accent, #B46513) 12%, var(--color-surface))',
-    border: 'color-mix(in srgb, var(--color-accent, #B46513) 30%, transparent)',
+    bg: 'color-mix(in srgb, var(--color-surface) 88%, var(--color-accent) 8%)',
+    border: 'color-mix(in srgb, var(--color-accent) 30%, transparent)',
+    badge: '⚠ BIOMECHANIC WARNING',
   },
   ERROR: {
-    color: 'var(--pigment-lac-dye, #E11D48)',
-    bg: 'color-mix(in srgb, var(--pigment-lac-dye, #E11D48) 12%, var(--color-surface))',
-    border: 'color-mix(in srgb, var(--pigment-lac-dye, #E11D48) 30%, transparent)',
+    color: '#E11D48',
+    bg: 'color-mix(in srgb, var(--color-surface) 88%, #E11D48 8%)',
+    border: 'color-mix(in srgb, #E11D48 30%, transparent)',
+    badge: '✕ CRITICAL DEVIATION',
   },
   INFO: {
-    color: 'var(--pigment-azurite, #1D4ED8)',
-    bg: 'color-mix(in srgb, var(--pigment-azurite, #1D4ED8) 12%, var(--color-surface))',
-    border: 'color-mix(in srgb, var(--pigment-azurite, #1D4ED8) 30%, transparent)',
+    color: 'var(--color-accent)',
+    bg: 'color-mix(in srgb, var(--color-surface) 90%, var(--color-accent) 6%)',
+    border: 'var(--color-border)',
+    badge: 'ℹ ARCHIVAL NOTICE',
   },
 }
 
@@ -69,9 +73,7 @@ export function HeelCanvas({
 }: Props) {
   const isInfo = audit.titleKey === 'negDropTitle'
   const styleObj = isInfo ? AUDIT_STYLES.INFO : AUDIT_STYLES[audit.status] || AUDIT_STYLES.INFO
-
-  const showEntry =
-    soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
+  const showEntry = soleType === 'flat' && (heelType === 'kitten' || heelType === 'flared')
 
   const massTitle = t.massTitle ?? 'Распределение массы'
   const rearLabel = t.rearfoot ?? t.heelLbl
@@ -80,221 +82,234 @@ export function HeelCanvas({
   const dropMm = heelHeight - toeThickness
 
   const offsetColor = eng.heelOffsetTooFarBack
-    ? 'var(--pigment-lac-dye, #E11D48)'
+    ? '#E11D48'
     : eng.heelOffsetTooFarForward
     ? 'var(--color-accent, #B46513)'
-    : 'var(--pigment-malachite, #047857)'
+    : 'var(--color-ink)'
 
   return (
     <div 
-      className="flex flex-col rounded-[20px] border overflow-hidden shadow-sm transition-colors"
+      className="flex flex-col rounded-[16px] border overflow-hidden transition-all duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
       style={{
         backgroundColor: styleObj.bg,
         borderColor: styleObj.border,
       }}
     >
-      <div className="flex items-start justify-between gap-3 px-4 pt-3 pb-2">
+      {/* Статус-панель аудита в стиле кутюрного паспорта изделия */}
+      <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-[var(--color-border)]">
         <div className="min-w-0">
-          <div className="text-[13px] font-bold leading-tight" style={{ color: styleObj.color }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[8px] uppercase tracking-[0.25em] opacity-60">
+              {styleObj.badge}
+            </span>
+          </div>
+          <div className="font-serif text-[15px] md:text-[17px] font-normal leading-snug tracking-tight">
             {auditTitle}
           </div>
-          <div className="text-[11px] font-medium mt-1 leading-snug line-clamp-2 text-[var(--color-ink)] opacity-80">
+          <div className="text-[11px] font-sans font-light mt-0.5 leading-relaxed opacity-75">
             {auditMessage}
           </div>
         </div>
         {audit.status === 'ERROR' && onFix && (
           <button
+            type="button"
             onClick={onFix}
-            className="shrink-0 text-[11px] font-bold py-1.5 px-3 rounded-[10px] active:scale-95 transition-transform shadow-sm whitespace-nowrap"
-            style={{
-              background: 'var(--color-ink)',
-              color: 'var(--color-bg)',
-            }}
+            className="shrink-0 text-[9px] font-sans uppercase tracking-[0.2em] py-2 px-3.5 rounded-[10px] active:scale-95 transition-transform cursor-pointer outline-none border border-[var(--color-border)] bg-[var(--color-ink)] text-[var(--color-bg)] font-medium shadow-sm"
           >
-            🪄 {t.fixBtn}
+            {t.fixBtn} 🪄
           </button>
         )}
       </div>
 
-      <div className="relative w-full" style={{ height: g.svgHeight }}>
+      {/* Архитектурный чертеж (SVG Blueprint) */}
+      <div className="relative w-full px-2 py-3" style={{ height: g.svgHeight + 10 }}>
         <svg
           width="100%"
           height="100%"
-          viewBox={`0 0 ${g.svgWidth} ${g.svgHeight}`}
-          preserveAspectRatio="xMidYMax meet"
+          viewBox={`0 0 ${g.svgWidth} ${g.svgHeight + 10}`}
+          preserveAspectRatio="xMidYMid meet"
           className="overflow-visible"
         >
-          <text
-            x={(g.xHeel + g.xToe) / 2 - 42}
-            y="8"
-            fill="var(--color-muted)"
-            fontSize="7"
-            fontWeight="bold"
-          >
-            {massTitle}
-          </text>
+          {/* Сетка чертежа (миллиметровка ателье) */}
+          <defs>
+            <pattern id="atelier-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.04" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#atelier-grid)" />
 
-          <text x={Math.max(2, g.xHeel - 2)} y="18" fill="var(--color-muted)" fontSize="7" fontWeight="bold">
-            {rearLabel}
-          </text>
-          <text x={Math.max(2, g.xHeel - 2)} y="30" fill="var(--pigment-malachite, #047857)" fontSize="12" fontWeight="bold">
-            {eng.heelLoad}%
-          </text>
+          {/* МЕТРИКИ МАССЫ И ВЕКТОРЫ ВЫШЕ ЧЕРТЕЖА */}
+          <g transform="translate(0, 4)">
+            <text x={Math.max(8, g.xHeel - 4)} y="12" fill="var(--color-muted)" fontSize="7" fontFamily="monospace" letterSpacing="0.1em">
+              {rearLabel.toUpperCase()}
+            </text>
+            <text x={Math.max(8, g.xHeel - 4)} y="23" fill="var(--color-ink)" fontSize="11" fontFamily="serif" fontWeight="bold">
+              {eng.heelLoad}%
+            </text>
 
-          <text x={g.xToe - 32} y="18" fill="var(--color-muted)" fontSize="7" fontWeight="bold">
-            {foreLabel}
-          </text>
-          <text x={g.xToe - 32} y="30" fill="var(--pigment-lac-dye, #E11D48)" fontSize="12" fontWeight="bold">
-            {eng.forefootLoad}%
-          </text>
+            <text x={g.xToe - 42} y="12" fill="var(--color-muted)" fontSize="7" fontFamily="monospace" letterSpacing="0.1em">
+              {foreLabel.toUpperCase()}
+            </text>
+            <text x={g.xToe - 42} y="23" fill="#E11D48" fontSize="11" fontFamily="serif" fontWeight="bold">
+              {eng.forefootLoad}%
+            </text>
 
-          {showEntry && (
-            <>
-              <text
-                x={(g.xHeel + g.xToe) / 2 - 28}
-                y="18"
-                fill="var(--color-muted)"
-                fontSize="7"
-                fontWeight="bold"
-              >
-                {entryLabel}
-              </text>
-              <text
-                x={(g.xHeel + g.xToe) / 2 - 14}
-                y="30"
-                fill="var(--color-accent, #B46513)"
-                fontSize="12"
-                fontWeight="bold"
-              >
-                {eng.entryAngleDeg}°
-              </text>
-            </>
-          )}
+            {showEntry && (
+              <>
+                <text x={(g.xHeel + g.xToe) / 2 - 32} y="12" fill="var(--color-muted)" fontSize="7" fontFamily="monospace" letterSpacing="0.1em">
+                  {entryLabel.toUpperCase()}
+                </text>
+                <text x={(g.xHeel + g.xToe) / 2 - 16} y="23" fill="var(--color-accent)" fontSize="11" fontFamily="serif" fontWeight="bold">
+                  {eng.entryAngleDeg}°
+                </text>
+              </>
+            )}
+          </g>
 
+          {/* БАЗОВАЯ ЛИНИЯ ПОЛА (GROUND LINE) */}
           <line
-            x1="0"
-            y1={g.yGround}
-            x2={g.svgWidth}
-            y2={g.yGround}
+            x1="10"
+            y1={g.yGround + 6}
+            x2={g.svgWidth - 10}
+            y2={g.yGround + 6}
             stroke="var(--color-border)"
-            strokeWidth="1.5"
-            strokeDasharray="2 2"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+            opacity="0.8"
           />
+          <text x="14" y={g.yGround + 18} fill="var(--color-muted)" fontSize="6.5" fontFamily="monospace" letterSpacing="0.15em">
+            LINEA BASALIS // FLOOR
+          </text>
           
+          {/* ЛИНИЯ СТОПЫ */}
           <line
             x1={g.xHeel - 8}
-            y1={g.yFootBall}
+            y1={g.yFootBall + 6}
             x2={g.xToe + 8}
-            y2={g.yFootBall}
-            stroke="var(--pigment-azurite, #1D4ED8)"
-            strokeWidth="1.5"
-            strokeDasharray="3 3"
-            opacity="0.6"
+            y2={g.yFootBall + 6}
+            stroke="var(--color-accent)"
+            strokeWidth="1"
+            strokeDasharray="2 2"
+            opacity="0.4"
           />
 
+          {/* ОСЬ ЦЕНТРА ПЯТКИ */}
           {soleType === 'flat' && (
             <>
               <line
                 x1={g.xHeelCenter}
-                y1={g.yFootHeel - 8}
+                y1={g.yFootHeel - 4}
                 x2={g.xHeelCenter}
-                y2={g.yGround + 4}
+                y2={g.yGround + 6}
                 stroke={offsetColor}
-                strokeWidth="1.5"
-                strokeDasharray="4 3"
+                strokeWidth="1"
+                strokeDasharray="3 3"
               />
               <circle
                 cx={g.xTipCenter}
-                cy={g.yGround}
-                r="3"
+                cy={g.yGround + 6}
+                r="2.5"
                 fill={offsetColor}
               />
             </>
           )}
 
-          {soleType === 'rocker' ? (
-            <text
-              x={g.xBall + 8}
-              y={Math.min(g.yFootBall - 10, g.yGround - 14)}
-              fill="var(--pigment-azurite, #1D4ED8)"
-              fontSize="8"
-              fontWeight="bold"
-            >
-              {t.dropLbl}: {dropMm} {t.mm || 'мм'}
-            </text>
-          ) : (
-            <text
-              x={g.xHeelCenter + 12}
-              y={g.yGround - 8}
-              fill="var(--pigment-azurite, #1D4ED8)"
-              fontSize="8"
-              fontWeight="bold"
-            >
-              {t.dropLbl}: {dropMm} {t.mm || 'мм'}
-            </text>
-          )}
+          {/* ПОКАЗАТЕЛЬ ПЕРЕПАДА (DROP) */}
+          <g transform="translate(0, 6)">
+            {soleType === 'rocker' ? (
+              <text
+                x={g.xBall + 8}
+                y={Math.min(g.yFootBall - 8, g.yGround - 10)}
+                fill="var(--color-accent)"
+                fontSize="8"
+                fontFamily="monospace"
+                fontWeight="bold"
+              >
+                {t.dropLbl.toUpperCase()}: {dropMm} {t.mm || 'mm'}
+              </text>
+            ) : (
+              <text
+                x={g.xHeelCenter + 12}
+                y={g.yGround - 6}
+                fill="var(--color-accent)"
+                fontSize="8"
+                fontFamily="monospace"
+                fontWeight="bold"
+              >
+                {t.dropLbl.toUpperCase()}: {dropMm} {t.mm || 'mm'}
+              </text>
+            )}
+          </g>
 
+          {/* КОНТУР КАБЛУКА */}
           <path 
             d={g.heelPath} 
-            fill="color-mix(in srgb, var(--color-accent, #B46513) 90%, transparent)" 
+            fill="var(--color-ink)" 
+            opacity="0.9"
+            transform="translate(0, 6)"
           />
+          
+          {/* КОНТУР ПОДОШВЫ / КОЛОДКИ */}
           <path
             d={g.solePath}
-            fill="var(--color-ink)"
-            stroke="var(--color-accent, #B46513)"
-            strokeWidth="1.5"
+            fill="var(--color-surface-2)"
+            stroke="var(--color-ink)"
+            strokeWidth="1.25"
             strokeLinejoin="round"
+            transform="translate(0, 6)"
           />
 
+          {/* СУПИНАТОР (STEEL SHANK) */}
           {soleType === 'flat' && (
             <path
               d={g.shankCurve}
               fill="none"
-              stroke="var(--color-muted)"
-              strokeWidth={Math.max(1.5, eng.steelThickness * g.scale)}
+              stroke="var(--color-accent)"
+              strokeWidth={Math.max(2, eng.steelThickness * (g.scale * 0.8))}
               strokeLinecap="round"
+              transform="translate(0, 6)"
             />
           )}
 
+          {/* ТОЧКА РОКЕРА */}
           {soleType === 'rocker' && (
-            <>
-              <circle cx={g.xBall} cy={g.yFootBall} r="3" fill="var(--pigment-lac-dye, #E11D48)" />
+            <g transform="translate(0, 6)">
+              <circle cx={g.xBall} cy={g.yFootBall} r="3" fill="#E11D48" />
               <line
                 x1={g.xBall}
                 y1={g.yFootBall}
                 x2={g.xBall}
                 y2={g.yGround}
-                stroke="var(--pigment-lac-dye, #E11D48)"
-                strokeWidth="1.5"
+                stroke="#E11D48"
+                strokeWidth="1"
                 strokeDasharray="2 2"
               />
-            </>
+            </g>
           )}
         </svg>
       </div>
 
+      {/* ТЕХНИЧЕСКИЙ ФУТЕР ЧЕРТЕЖА */}
       <div 
-        className="px-4 py-2.5 flex justify-between text-[11px] font-medium"
+        className="px-5 py-3 flex items-center justify-between text-[11px] font-mono tracking-wider"
         style={{
           borderTop: '1px solid var(--color-border)',
-          background: 'color-mix(in srgb, var(--color-ink) 4%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--color-surface) 60%, transparent)',
           color: 'var(--color-muted)'
         }}
       >
         <span>
-          {t.internalSlope}{' '}
-          <strong className="text-[12px] font-bold text-[var(--color-ink)]">
+          {t.internalSlope.toUpperCase()}{' '}
+          <strong className="text-[12px] font-bold text-[var(--color-ink)] font-serif">
             {eng.internalSlope.toFixed(1)}°
           </strong>
         </span>
         <span>
-          {t.loadLbl}{' '}
+          {t.loadLbl.toUpperCase()}{' '}
           <strong
-            className="text-[12px] font-bold"
+            className="text-[12px] font-bold font-serif"
             style={{
-              color: eng.forefootLoad >= HEEL_CONST.CRITICAL_LOAD 
-                ? 'var(--pigment-lac-dye, #E11D48)' 
-                : 'var(--color-ink)'
+              color: eng.forefootLoad >= HEEL_CONST.CRITICAL_LOAD ? '#E11D48' : 'var(--color-ink)'
             }}
           >
             {eng.forefootLoad}%
