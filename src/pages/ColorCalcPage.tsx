@@ -52,11 +52,11 @@ function detectIOS(): boolean {
 function calculateDeltaE2000Hex(hex1: string, hex2: string): number {
   const rgb1 = hexToRgbObj(hex1)
   const rgb2 = hexToRgbObj(hex2)
-  return calculateDeltaE2000Lab(
-    rgbToLabObj(rgb1.r, rgb1.g, rgb1.b),
-    rgbToLabObj(rgb2.r, rgb2.g, rgb2.b)
+  return calculateDeltaE2000(
+    rgbToLab(rgb1.r, rgb1.g, rgb1.b),
+    rgbToLab(rgb2.r, rgb2.g, rgb2.b)
   )
-}
+    }
 
 export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [pigments, setPigments] = useState<Pigment[]>([])
