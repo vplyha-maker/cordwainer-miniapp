@@ -134,11 +134,21 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     );
   };
 
-  const sendToTelegramId = (telegramId: string) => {
+    const sendToTelegramId = (telegramId: string) => {
     if (!telegramId) return;
     const text = encodeURIComponent(buildInvoiceText());
-    window.open(`https://t.me/${telegramId}?text=${text}`, '_blank');
+    const url = `https://t.me/${telegramId}?text=${text}`;
+
+    // Проверяем, открыто ли приложение внутри Telegram Mini App
+    // @ts-ignore
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      // @ts-ignore
+      window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, '_blank');
+    }
   };
+
 
   const copyInvoice = async () => {
     try {
