@@ -19,7 +19,7 @@ import { SalaryCalcPage } from './pages/salary'
 import { SettingsPage } from './pages/SettingsPage'
 import SneakerIndex from './pages/SneakerIndex'
 import Materials from './pages/Materials'
-import AdminUpload from './pages/AdminUpload' // Импорт загрузчика
+import AdminUpload from './pages/AdminUpload'
 
 import {
   getSavedPerfMode,
@@ -53,7 +53,7 @@ export type Screen =
   | 'settings'
   | 'sneakers'
   | 'materials'
-  | 'admin-upload' // Добавлен новый экран для загрузки баз
+  | 'admin-upload'
 
 export type Lang = 'ru' | 'uk' | 'de'
 export type FavoriteType = 'blog' | 'article'
@@ -94,8 +94,8 @@ export function applyImmediateMutedTheme(isDark: boolean) {
   const oldColors = [
     'bg', 'surface', 'surface-2', 'ink', 'muted', 
     'accent', 'accent-strong', 'danger', 'border', 'info', 'success'
-  ];
-  oldColors.forEach(c => root.style.removeProperty(`--color-${c}`));
+  ]
+  oldColors.forEach(c => root.style.removeProperty(`--color-${c}`))
 
   root.style.setProperty('--pigment-lac-dye', '#8B0000')
   root.style.setProperty('--pigment-egyptian-blue', '#1034A6')
@@ -106,12 +106,18 @@ export function applyImmediateMutedTheme(isDark: boolean) {
   root.style.setProperty('--pigment-lead-white', '#F5F1EA')
   root.style.setProperty('--pigment-bone-black', '#1C1816')
 
+  // Синхронизируем цвет системной подложки с реальным фоном страниц (#F2EFE9 / #0A0A0A)
+  const bg = isDark ? '#0A0A0A' : '#F2EFE9'
+  root.style.backgroundColor = bg
+  if (document.body) {
+    document.body.style.backgroundColor = bg
+  }
+
   try {
     const tg = window.Telegram?.WebApp
     if (tg) {
-      const bg = isDark ? '#09090B' : '#F9FAFB'
-      tg.setHeaderColor(bg)
-      tg.setBackgroundColor(bg)
+      tg.setHeaderColor?.(bg)
+      tg.setBackgroundColor?.(bg)
     }
   } catch {}
 }
@@ -125,7 +131,7 @@ function getInitialScreen(): Screen {
   try {
     const path = window.location.pathname.replace(/\/+$/, '') || '/'
     if (path === '/forward-ortho-converter') return 'seo-width'
-    if (path === '/AdminUpload') return 'admin-upload' // Маршрутизатор теперь знает эту ссылку
+    if (path === '/AdminUpload') return 'admin-upload'
   } catch {}
   return 'welcome'
 }
@@ -133,31 +139,41 @@ function getInitialScreen(): Screen {
 export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
+
+  // Отключаем кастомный SmoothScroll на мобильных WebView, чтобы не ломать GPU-тайлы
+  const [isMobileWebView] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return (
+      Boolean(window.Telegram?.WebApp?.initData) ||
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0
+    )
+  })
   
   const [lang, setLang] = useState<Lang>(() => {
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const langFromBot = urlParams.get('lang') as Lang;
+      const urlParams = new URLSearchParams(window.location.search)
+      const langFromBot = urlParams.get('lang') as Lang
 
       if (langFromBot && ['ru', 'uk', 'de'].includes(langFromBot)) {
-        localStorage.setItem('cordwainer_lang', langFromBot);
-        localStorage.setItem('app_lang', langFromBot);
-        return langFromBot;
+        localStorage.setItem('cordwainer_lang', langFromBot)
+        localStorage.setItem('app_lang', langFromBot)
+        return langFromBot
       }
 
-      const saved = localStorage.getItem('cordwainer_lang') as Lang;
+      const saved = localStorage.getItem('cordwainer_lang') as Lang
       if (saved && ['ru', 'uk', 'de'].includes(saved)) {
-        return saved;
+        return saved
       }
 
-      const sysLang = navigator.language.slice(0, 2);
+      const sysLang = navigator.language.slice(0, 2)
       if (['ru', 'uk', 'de'].includes(sysLang)) {
-        return sysLang as Lang;
+        return sysLang as Lang
       }
       
-      return 'ru';
+      return 'ru'
     } catch {
-      return 'ru';
+      return 'ru'
     }
   })
 
@@ -268,154 +284,137 @@ export default function App() {
     return () => { cancelled = true }
   }, [])
 
-  // === НОВЫЙ КОД: ИНТЕГРАЦИЯ DEEP LINKING (ПОДЕЛИТЬСЯ В TELEGRAM) ===
   useEffect(() => {
     try {
-      const tg = window.Telegram?.WebApp;
-      
-      // Проверяем, есть ли параметр start_param (он появляется, если перешли по ссылке /bot?startapp=...)
+      const tg = window.Telegram?.WebApp
       if (tg?.initDataUnsafe?.start_param) {
-        const param = tg.initDataUnsafe.start_param;
-        
-        // Если параметр начинается с 'search_', значит кто-то поделился кроссовком
+        const param = tg.initDataUnsafe.start_param
         if (param.startsWith('search_')) {
-          // 1. Убираем префикс и восстанавливаем пробелы (в ссылке они были '_')
-          const searchQuery = param.replace('search_', '').replace(/_/g, ' ');
-          
-          // 2. Подменяем URL в браузере. Это нужно для того, 
-          // чтобы компонент SneakerIndex при рендере прочитал параметр ?q=... и вставил его в инпут
+          const searchQuery = param.replace('search_', '').replace(/_/g, ' ')
           if (typeof window !== 'undefined') {
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('q', searchQuery);
-            window.history.replaceState({}, '', newUrl.toString());
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.set('q', searchQuery)
+            window.history.replaceState({}, '', newUrl.toString())
           }
-          
-          // 3. Автоматически переключаем экран на Сникер-индекс
-          setScreen('sneakers');
+          setScreen('sneakers')
         }
       }
     } catch (e) {
-      console.error('Ошибка при обработке start_param', e);
+      console.error('Ошибка при обработке start_param', e)
     }
-  }, []);
-  // =================================================================
+  }, [])
+
+  const appContent = (
+    <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe">
+      {showPerfHint && (
+        <div
+          className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
+          style={{ background: 'rgba(29,24,21,0.96)', border: '1px solid rgba(198,164,122,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}
+        >
+          <div className="mb-2 leading-snug text-[#B9ACA0]">
+            {lang === 'de' ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert.' : lang === 'uk' ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим.' : 'Интерфейс работает неравномерно. Включён быстрый режим.'}
+          </div>
+          <div className="flex gap-2">
+            <button className="flex-1 py-2 rounded-xl text-[11px] font-semibold" style={{ background: '#D8A35C', color: '#151210' }} onClick={() => { savePerfMode('fast'); applyPerfMode('fast'); setShowPerfHint(false) }}>OK</button>
+            <button className="flex-1 py-2 rounded-xl text-[11px] font-medium text-[#B9ACA0]" style={{ border: '1px solid rgba(185,172,160,0.25)' }} onClick={() => { savePerfMode('full'); applyPerfMode('full'); setShowPerfHint(false) }}>
+              {lang === 'de' ? 'Hohe Qualität beibehalten' : lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence mode="wait">
+        {screen === 'welcome' && (
+          <WelcomePage
+            key="welcome"
+            onStart={() => setScreen('home')}
+            onOpenBlog={() => setScreen('blog')}
+            lang={lang}
+            setLang={handleSetLang}
+            favorites={favorites}
+            onChangeTab={(tab) => {
+              if (tab === 'settings') { setPrevMainScreen('welcome'); setScreen('settings') }
+              if (tab === 'search') setScreen('home')
+            }}
+          />
+        )}
+
+        {screen === 'home' && (
+          <HomePage
+            key="home"
+            onChangeTab={(tab) => {
+              if (tab === 'settings') { setPrevMainScreen('home'); setScreen('settings') }
+              if (tab === 'profile') setScreen('welcome') 
+            }}
+            onBack={() => setScreen('welcome')}
+            onOpenBlog={() => setScreen('blog')}
+            onOpenCalcMenu={() => setScreen('calc-menu')}
+            onOpenColors={() => setScreen('colors')}
+            onOpenStyles={() => setScreen('styles')}
+            onOpenSneakers={() => setScreen('sneakers')}
+            onOpenMaterials={() => setScreen('materials')} 
+            onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
+            onOpenPrices={() => setScreen('prices')}
+            lang={lang}
+            setLang={handleSetLang}
+            favorites={favorites}
+            onOpenArticle={(articleId) => { setPendingArticleId(articleId); setShowOnlyFavorites(false); setScreen('blog') }}
+            onOpenFavorites={() => { setPendingArticleId(null); setShowOnlyFavorites(true); setScreen('blog') }}
+          />
+        )}
+
+        {screen === 'blog' && (
+          <BlogPage
+            key="blog"
+            onBack={() => { setPendingArticleId(null); setShowOnlyFavorites(false); setScreen('home') }}
+            lang={lang}
+            isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
+            onToggleFavorite={() => toggleFavorite({ id: 'blog-orvard', type: 'blog', imagePng: '/blog-hero.webp' })}
+            favoriteArticleIds={favorites.filter((f) => f.type === 'article').map((f) => f.id)}
+            onToggleArticleFavorite={(articleId, cover) => toggleFavorite({ id: articleId, type: 'article', imagePng: cover || `/${articleId}.png` })}
+            initialArticleId={pendingArticleId}
+            onArticleOpened={() => setPendingArticleId(null)}
+            initialShowFavorites={showOnlyFavorites}
+          />
+        )}
+
+        {screen === 'calc-menu' && (
+          <CalcMenuPage key="calc-menu" lang={lang} onBack={() => setScreen('home')} onOpenSizeCalc={() => setScreen('size-calc')} onOpenWidthCalc={() => setScreen('width-calc')} onOpenHeelCalc={() => setScreen('heel-calc')} onOpenColorCalc={() => setScreen('color-calc')} onOpenSalaryCalc={() => setScreen('salary-calc')} />
+        )}
+        {screen === 'salary-calc' && <SalaryCalcPage key="salary-calc" onBack={() => setScreen('calc-menu')} lang={lang} />}
+        {screen === 'size-calc' && <SizeCalcPage key="size-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'width-calc' && <WidthCalcPage key="width-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'heel-calc' && <HeelCalcPage key="heel-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'color-calc' && <ColorCalcPage key="color-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
+        {screen === 'colors' && <ColorsPage key="colors" onBack={() => setScreen('home')} lang={lang} setLang={handleSetLang} />}
+        {screen === 'styles' && <StylesPage key="styles" onBack={() => setScreen('home')} lang={lang} />}
+        {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
+        {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
+        {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
+        {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
+        {screen === 'materials' && <Materials key="materials" onBack={() => setScreen('home')} />}
+        {screen === 'admin-upload' && <AdminUpload key="admin-upload" />}
+
+        {screen === 'settings' && (
+          <SettingsPage
+            key="settings"
+            lang={lang}
+            setLang={handleSetLang}
+            onBack={() => setScreen(prevMainScreen)}
+            onChangeTab={(tab) => {
+              if (tab === 'search') setScreen('home')
+              if (tab === 'profile') setScreen('welcome')
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
 
   return (
     <>
-      <CustomCursor />
-      <SmoothScroll>
-        <div className="app-shell min-h-[100dvh] bg-[var(--color-bg)] text-[var(--color-ink)] font-body tg-safe transition-colors duration-300">
-          {showPerfHint && (
-            <div
-              className="fixed top-3 left-3 right-3 z-[100] rounded-2xl px-3.5 py-3 text-[12px] text-[#F5F1EB] max-w-[var(--app-max-width)] mx-auto"
-              style={{ background: 'rgba(29,24,21,0.96)', border: '1px solid rgba(198,164,122,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}
-            >
-              <div className="mb-2 leading-snug text-[#B9ACA0]">
-                {lang === 'de' ? 'Die Benutzeroberfläche reagiert langsam. Der Schnellmodus wurde aktiviert.' : lang === 'uk' ? 'Інтерфейс працює нерівномірно. Увімкнено швидкий режим.' : 'Интерфейс работает неравномерно. Включён швидкий режим.'}
-              </div>
-              <div className="flex gap-2">
-                <button className="flex-1 py-2 rounded-xl text-[11px] font-semibold" style={{ background: '#D8A35C', color: '#151210' }} onClick={() => { savePerfMode('fast'); applyPerfMode('fast'); setShowPerfHint(false) }}>OK</button>
-                <button className="flex-1 py-2 rounded-xl text-[11px] font-medium text-[#B9ACA0]" style={{ border: '1px solid rgba(185,172,160,0.25)' }} onClick={() => { savePerfMode('full'); applyPerfMode('full'); setShowPerfHint(false) }}>
-                  {lang === 'de' ? 'Hohe Qualität beibehalten' : lang === 'uk' ? 'Залишити красивий' : 'Оставить красивый'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <AnimatePresence mode="wait">
-            {screen === 'welcome' && (
-              <WelcomePage
-                key="welcome"
-                onStart={() => setScreen('home')}
-                onOpenBlog={() => setScreen('blog')}
-                lang={lang}
-                setLang={handleSetLang}
-                favorites={favorites}
-                onChangeTab={(tab) => {
-                  if (tab === 'settings') { setPrevMainScreen('welcome'); setScreen('settings') }
-                  if (tab === 'search') setScreen('home')
-                }}
-              />
-            )}
-
-            {screen === 'home' && (
-              <HomePage
-                key="home"
-                onChangeTab={(tab) => {
-                  if (tab === 'settings') { setPrevMainScreen('home'); setScreen('settings') }
-                  if (tab === 'profile') setScreen('welcome') 
-                }}
-                onBack={() => setScreen('welcome')}
-                onOpenBlog={() => setScreen('blog')}
-                onOpenCalcMenu={() => setScreen('calc-menu')}
-                onOpenColors={() => setScreen('colors')}
-                onOpenStyles={() => setScreen('styles')}
-                onOpenSneakers={() => setScreen('sneakers')}
-                onOpenMaterials={() => setScreen('materials')} 
-                onOpenGlossary={(termId) => { setSelectedGlossaryTermId(termId || null); setScreen('glossary') }}
-                onOpenPrices={() => setScreen('prices')}
-                lang={lang}
-                setLang={handleSetLang}
-                favorites={favorites}
-                onOpenArticle={(articleId) => { setPendingArticleId(articleId); setShowOnlyFavorites(false); setScreen('blog') }}
-                onOpenFavorites={() => { setPendingArticleId(null); setShowOnlyFavorites(true); setScreen('blog') }}
-              />
-            )}
-
-            {screen === 'blog' && (
-              <BlogPage
-                key="blog"
-                onBack={() => { setPendingArticleId(null); setShowOnlyFavorites(false); setScreen('home') }}
-                lang={lang}
-                isFavorite={favorites.some((f) => f.id === 'blog-orvard')}
-                onToggleFavorite={() => toggleFavorite({ id: 'blog-orvard', type: 'blog', imagePng: '/blog-hero.webp' })}
-                favoriteArticleIds={favorites.filter((f) => f.type === 'article').map((f) => f.id)}
-                onToggleArticleFavorite={(articleId, cover) => toggleFavorite({ id: articleId, type: 'article', imagePng: cover || `/${articleId}.png` })}
-                initialArticleId={pendingArticleId}
-                onArticleOpened={() => setPendingArticleId(null)}
-                initialShowFavorites={showOnlyFavorites}
-              />
-            )}
-
-            {screen === 'calc-menu' && (
-              <CalcMenuPage key="calc-menu" lang={lang} onBack={() => setScreen('home')} onOpenSizeCalc={() => setScreen('size-calc')} onOpenWidthCalc={() => setScreen('width-calc')} onOpenHeelCalc={() => setScreen('heel-calc')} onOpenColorCalc={() => setScreen('color-calc')} onOpenSalaryCalc={() => setScreen('salary-calc')} />
-            )}
-            {screen === 'salary-calc' && <SalaryCalcPage key="salary-calc" onBack={() => setScreen('calc-menu')} lang={lang} />}
-            {screen === 'size-calc' && <SizeCalcPage key="size-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-            {screen === 'width-calc' && <WidthCalcPage key="width-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-            {screen === 'heel-calc' && <HeelCalcPage key="heel-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-            {screen === 'color-calc' && <ColorCalcPage key="color-calc" lang={lang} onBack={() => setScreen('calc-menu')} />}
-            {screen === 'colors' && <ColorsPage key="colors" onBack={() => setScreen('home')} lang={lang} setLang={handleSetLang} />}
-            {screen === 'styles' && <StylesPage key="styles" onBack={() => setScreen('home')} lang={lang} />}
-            {screen === 'glossary' && <GlossaryPage key="glossary" lang={lang} initialTermId={selectedGlossaryTermId} onBack={() => { setSelectedGlossaryTermId(null); setScreen('home') }} />}
-            {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
-            {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
-            
-            {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
-            
-            {screen === 'materials' && (
-              <Materials key="materials" onBack={() => setScreen('home')} />
-            )}
-
-            {screen === 'admin-upload' && (
-              <AdminUpload key="admin-upload" />
-            )}
-
-            {screen === 'settings' && (
-              <SettingsPage
-                key="settings"
-                lang={lang}
-                setLang={handleSetLang}
-                onBack={() => setScreen(prevMainScreen)}
-                onChangeTab={(tab) => {
-                  if (tab === 'search') setScreen('home')
-                  if (tab === 'profile') setScreen('welcome')
-                }}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-      </SmoothScroll>
+      {!isMobileWebView && <CustomCursor />}
+      {isMobileWebView ? appContent : <SmoothScroll>{appContent}</SmoothScroll>}
     </>
   )
 }
