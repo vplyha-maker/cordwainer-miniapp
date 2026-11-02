@@ -9,10 +9,11 @@ type WholesaleCartProps = {
   onClose: () => void;
 };
 
-// 👇 ВПИШИТЕ СЮДА TELEGRAM-ЮЗЕРНЕЙМЫ (без @) ДВУХ РУКОВОДИТЕЛЕЙ
+// 👇 ВПИШИТЕ СЮДА ЧИСЛОВЫЕ TELEGRAM ID ДВУХ РУКОВОДИТЕЛЕЙ (например: '123456789')
 const MANAGERS = [
-  { label: 'Отправить заказ • ГЕОРГИЙ', username: 'USERNAME_BOSS_1' },
-  { label: 'Отправить заказ • БОРИС', username: 'USERNAME_BOSS_2' },
+  { label: 'Отправить заказ • Борис', telegramId: '8529254699' },
+  { label: 'Отправить заказ • Георгий', telegramId: '6034597342' },
+  { label: 'Отправить заказ • Test', telegramId: '8686072747' },
 ];
 
 const NP_API_KEY = '';
