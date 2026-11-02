@@ -76,8 +76,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
     ru: {
       hello: 'АТЕЛЬЕ ОТКРЫТО',
       helloBack: 'С ВОЗВРАЩЕНИЕМ',
-      issue: 'ISSUE N° 01',
-      season: 'ARCHIVE EDITION',
       tagline: 'Энциклопедия обувного мастерства',
       subhead: 'The Shoemaker’s Lexicon & Bespoke System',
       value: 'Материалы, цвета, фасоны и калькуляторы — для сапожника, модельера и ортопеда.',
@@ -90,8 +88,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
     uk: {
       hello: 'АТЕЛЬЄ ВІДКРИТО',
       helloBack: 'З ПОВЕРНЕННЯМ',
-      issue: 'ISSUE N° 01',
-      season: 'ARCHIVE EDITION',
       tagline: 'Енциклопедія взуттєвої майстерності',
       subhead: 'The Shoemaker’s Lexicon & Bespoke System',
       value: 'Матеріали, кольори, фасони і калькулятори — для шевця, модельєра та ортопеда.',
@@ -104,8 +100,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
     de: {
       hello: 'ATELIER GEÖFFNET',
       helloBack: 'WILLKOMMEN ZURÜCK',
-      issue: 'ISSUE N° 01',
-      season: 'ARCHIVE EDITION',
       tagline: 'Enzyklopädie der Schuhmacherkunst',
       subhead: 'The Shoemaker’s Lexicon & Bespoke System',
       value: 'Materialien, Farben, Leisten und Rechner — für Schuhmacher, Designer und Orthopäden.',
@@ -131,7 +125,6 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
   const cBorder = isDark ? 'border-[#F4EFE6]/15' : 'border-[#141210]/15'
   const cAccent = isDark ? 'text-[#C5A880]' : 'text-[#8C6D46]'
 
-  // Чистый CSS-градиент без конфликтов слоев в Android WebView
   const vignetteStyle: React.CSSProperties = {
     background: isDark
       ? 'linear-gradient(to top, #0A0A0A 0%, rgba(10,10,10,0.92) 32%, rgba(10,10,10,0.35) 62%, rgba(10,10,10,0.15) 100%)'
@@ -140,7 +133,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
 
   return (
     <main className={`relative flex h-[100dvh] w-full flex-col justify-between overflow-hidden select-none ${cBg} ${cText}`}>
-      {/* 1. ПОЛНОЭКРАННАЯ ФОТОГРАФИЯ ОБЛОЖКИ (БЕЗ ОБРЕЗКИ ТАЙЛОВ) */}
+      {/* 1. ФОНОВАЯ ИЛЛЮСТРАЦИЯ ОБЛОЖКИ */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <img
           src="/hero-cover.webp"
@@ -153,19 +146,16 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
         <div className="absolute inset-0" style={vignetteStyle} />
       </div>
 
-      {/* 2. ВЕРХНИЙ КОЛОНТИТУЛ ЛУКБУКА (MASTHEAD HEADER) */}
+      {/* 2. ШАПКА ОБЛОЖКИ (ИСПРАВЛЕННЫЙ КОМПАКТНЫЙ РЯД БЕЗ ПЕРЕНОСОВ) */}
       <header className="relative z-20 px-6 pt-5 pb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${isDark ? 'bg-[#C5A880]' : 'bg-[#141210]'}`} />
-          <span className="font-mono text-[9.5px] uppercase tracking-[0.3em]">
-            {t.issue}
-          </span>
-          <span className={`font-mono text-[8.5px] uppercase tracking-[0.2em] hidden min-[360px]:inline ${cMuted}`}>
-            // {t.season}
+          <span className="font-mono text-[9px] uppercase tracking-[0.25em]">
+            ISSUE N° 01 // ARCHIVE
           </span>
         </div>
 
-        {/* Переключатель языков на обложке в стиле модных домов */}
+        {/* Переключатель языков */}
         <div className={`flex items-center border ${cBorder} px-1 py-0.5 backdrop-blur-md ${isDark ? 'bg-black/30' : 'bg-[#F2EFE9]/60'}`}>
           {(['ru', 'uk', 'de'] as Lang[]).map((l) => {
             const active = lang === l
@@ -192,9 +182,9 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
         </div>
       </header>
 
-      {/* 3. НИЖНИЙ ЖУРНАЛЬНЫЙ РАЗВОРОТ ОБЛОЖКИ */}
+      {/* 3. НИЖНИЙ ЖУРНАЛЬНЫЙ БЛОК */}
       <section className="relative z-20 flex flex-col justify-end px-6 pb-9 sm:pb-12 mt-auto">
-        {/* Персональный статус / приветствие ателье */}
+        {/* Приветствие */}
         <div className="flex items-center justify-between mb-2">
           <span className={`font-mono text-[8.5px] uppercase tracking-[0.28em] ${cAccent}`}>
             ✦ {greetingText}
@@ -209,7 +199,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
           {t.tagline}
         </p>
 
-        {/* Главный титул издания */}
+        {/* Главный титул */}
         <h1 className="font-serif font-normal text-[14vw] min-[390px]:text-[56px] sm:text-[64px] leading-[0.88] tracking-[-0.03em] mb-2">
           Cordwainer
         </h1>
@@ -218,7 +208,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
           {t.subhead}
         </p>
 
-        {/* Индексная строка разделов номера */}
+        {/* Индекс разделов */}
         <div className={`grid grid-cols-3 gap-2 py-2.5 mb-5 border-y ${cBorder} text-[8px] font-mono uppercase tracking-[0.16em] ${cMuted}`}>
           <span className="truncate">{t.ch1}</span>
           <span className={`truncate border-l pl-2 ${cBorder}`}>{t.ch2}</span>
@@ -230,7 +220,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
           {t.value}
         </p>
 
-        {/* Кнопки действия (Основной вход + Журнал) */}
+        {/* Кнопки */}
         <div className="flex items-stretch gap-2.5 w-full">
           <button
             type="button"
