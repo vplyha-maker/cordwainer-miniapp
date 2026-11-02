@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type CartItem } from '../data/catalog';
+import { type CartItem, type SizeKey } from '../data/catalog';
 
 type WholesaleCartProps = {
   items: CartItem[];
@@ -11,8 +11,8 @@ type WholesaleCartProps = {
 
 // 👇 ВПИШИТЕ СЮДА TELEGRAM-ЮЗЕРНЕЙМЫ (без @) ДВУХ РУКОВОДИТЕЛЕЙ
 const MANAGERS = [
-  { label: 'Отправить заказ • Руководитель 1', username: 'Георгий' },
-  { label: 'Отправить заказ • Руководитель 2', username: 'Борис' },
+  { label: 'Отправить заказ • Руководитель 1', username: 'USERNAME_BOSS_1' },
+  { label: 'Отправить заказ • Руководитель 2', username: 'USERNAME_BOSS_2' },
 ];
 
 const NP_API_KEY = '';
@@ -288,7 +288,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         Итого: {item.totalPairs} пар
                       </span>
 
-                      {/* Кнопки изменения количества ростовок (если это опт) */}
                       {!isSample && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontSize: '11px', color: '#666' }}>Ростовок:</span>
@@ -336,7 +335,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       cursor: 'pointer',
                       fontSize: '14px',
                       color: '#555',
-                      flexShrink: '0',
+                      flexShrink: 0,
                     }}
                     title="Удалить позицию"
                   >
