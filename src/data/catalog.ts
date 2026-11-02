@@ -80,4 +80,17 @@ export const cardioCatalog: ShoeItem[] = [
   { id: '20', modelNumber: '20', category: 'Кроссовки', color: 'Черный', features: [], image: '/catalog/20.jpg' },
   { id: '210', modelNumber: '210', category: 'Ботинки', color: 'Черный', features: [], image: '/catalog/210.jpg' },
 ];
+// Добавьте этот тип в src/data/catalog.ts
+export type SizeKey = 40 | 41 | 42 | 43 | 44 | 45;
+
+export interface CartItem {
+  uid: string;
+  shoe: ShoeItem;
+  orderMode: 'wholesale' | 'sample';
+  sizeRun: Record<SizeKey, number>;
+  boxesCount: number;
+  sampleSize: SizeKey;
+  totalPairs: number;
+  formulaText: string;
+}
 
