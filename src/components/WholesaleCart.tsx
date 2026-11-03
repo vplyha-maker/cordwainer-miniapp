@@ -263,7 +263,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       .then((data) => {
         if (cancelled) return;
         if (data?.data?.[0]?.Cost) {
-          setDeliveryCost(Number(data.data[0].Cost));
+          // Округляем до целого числа, чтобы избежать дробных сумм вроде 337.5
+          setDeliveryCost(Math.round(Number(data.data[0].Cost)));
         } else {
           setDeliveryCost(calculateFallback());
         }
@@ -332,7 +333,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       `════════════════════\n` +
       `📊 Позиций в заказе: ${items.length}\n` +
       `👟 Общий объем: ${grandTotalPairs} пар (мест НП: ~${grandTotalBoxes})\n` +
-      `🚚 Доставка НП: ${selectedCity.fullLabel} (≈ ${deliveryCost} ₴)` +
+      `🚚 Доставка НП: ${selectedCity.fullLabel} (≈ ${Math.round(deliveryCost)} ₴)` +
       `${contactLine}${branchLine}\n` +
       `════════════════════\n` +
       `Подтвердите наличие/сроки отшива и реквизиты.`
@@ -353,7 +354,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           clientContact: clientContact,
           branchOrComment: branchOrComment,
           totalPairs: grandTotalPairs,
-          deliveryCost: deliveryCost,
+          deliveryCost: Math.round(deliveryCost), // Гарантированно отправляем целое число в базу данных
           invoiceText: text,
         }),
       });
@@ -860,7 +861,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 Объем: <strong>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} кор.)
               </div>
               <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.3px' }}>
-                {calcLoading ? 'Расчет...' : `Доставка ≈ ${deliveryCost} ₴`}
+                {calcLoading ? 'Расчет...' : `Доставка ≈ ${Math.round(deliveryCost)} ₴`}
               </div>
             </div>
           </div>
