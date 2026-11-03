@@ -914,6 +914,9 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               </button>
             </div>
           </div>
+
+          {/* Блок прямой связи с руководством (внутри общего контейнера) */}
+          <ManagersContactCard />
         </>
       )}
     </div>
