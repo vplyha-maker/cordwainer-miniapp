@@ -25,9 +25,9 @@ type WarehouseOption = {
 };
 
 const MANAGERS = [
-  { label: 'Отправить заказ • Борис', telegramId: '8529254699', name: 'Борис' },
-  { label: 'Отправить заказ • Георгий', telegramId: '6034597342', name: 'Георгий' },
-  { label: 'Отправить заказ • Test', telegramId: '8686072747', name: 'Test' },
+  { label: 'Передать спецификацию • Борис', telegramId: '8529254699', name: 'Борис' },
+  { label: 'Передать спецификацию • Георгий', telegramId: '6034597342', name: 'Георгий' },
+  { label: 'Передать спецификацию • Test', telegramId: '8686072747', name: 'Test' },
 ];
 
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
@@ -42,6 +42,18 @@ const POPULAR_CITIES: CityOption[] = [
   { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
   { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
 ];
+
+const THEME = {
+  bg: '#F2EFE9',
+  surface: '#F8F6F1',
+  surfaceActive: '#EAE5DC',
+  ink: '#161514',
+  inkMuted: '#6E6A63',
+  inkLight: '#9A958C',
+  border: '#DCD7CC',
+  serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
+  sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
+};
 
 async function callNovaPoshta(
   modelName: string,
@@ -263,7 +275,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       .then((data) => {
         if (cancelled) return;
         if (data?.data?.[0]?.Cost) {
-          // Округляем до целого числа, чтобы избежать дробных сумм вроде 337.5
           setDeliveryCost(Math.round(Number(data.data[0].Cost)));
         } else {
           setDeliveryCost(calculateFallback());
@@ -354,7 +365,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           clientContact: clientContact,
           branchOrComment: branchOrComment,
           totalPairs: grandTotalPairs,
-          deliveryCost: Math.round(deliveryCost), // Гарантированно отправляем целое число в базу данных
+          deliveryCost: Math.round(deliveryCost),
           invoiceText: text,
         }),
       });
@@ -385,12 +396,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     width: '100%',
     boxSizing: 'border-box',
     padding: '10px 34px 10px 12px',
-    border: '1px solid #D6D3CB',
-    fontSize: '14px',
-    backgroundColor: '#FFFFFF',
-    color: '#1A1A1A',
-    WebkitTextFillColor: '#1A1A1A',
-    caretColor: '#1A1A1A',
+    border: `1px solid ${THEME.border}`,
+    fontSize: '13px',
+    backgroundColor: THEME.surface,
+    color: THEME.ink,
+    WebkitTextFillColor: THEME.ink,
+    caretColor: THEME.ink,
     colorScheme: 'light',
     outline: 'none',
   };
@@ -399,10 +410,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     <div
       className="wholesale-cart-light"
       style={{
-        backgroundColor: '#F7F6F2',
+        backgroundColor: THEME.bg,
         minHeight: '100vh',
-        padding: '16px',
-        color: '#1A1A1A',
+        padding: '18px 16px 60px 16px',
+        color: THEME.ink,
+        fontFamily: THEME.sans,
         colorScheme: 'light',
         boxSizing: 'border-box',
       }}
@@ -412,20 +424,20 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         .wholesale-cart-light select,
         .wholesale-cart-light textarea {
           color-scheme: light !important;
-          color: #1A1A1A !important;
-          -webkit-text-fill-color: #1A1A1A !important;
-          caret-color: #1A1A1A !important;
-          background-color: #FFFFFF !important;
+          color: #161514 !important;
+          -webkit-text-fill-color: #161514 !important;
+          caret-color: #161514 !important;
+          background-color: #F8F6F1 !important;
           opacity: 1 !important;
         }
         .wholesale-cart-light input::placeholder {
-          color: #888888 !important;
-          -webkit-text-fill-color: #888888 !important;
+          color: #8C877E !important;
+          -webkit-text-fill-color: #8C877E !important;
           opacity: 1 !important;
         }
       `}</style>
 
-      {/* Шапка корзины */}
+      {/* Верхний колонтитул Бордеро */}
       <div
         style={{
           display: 'flex',
@@ -433,24 +445,24 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           alignItems: 'center',
           marginBottom: '16px',
           paddingBottom: '12px',
-          borderBottom: '1px solid #E2DFD7',
+          borderBottom: `1px solid ${THEME.border}`,
         }}
       >
         <button
           onClick={onClose}
           style={{
-            background: '#FFFFFF',
-            border: '1px solid #D6D3CB',
-            padding: '8px 14px',
-            fontSize: '11px',
-            letterSpacing: '0.5px',
+            background: 'transparent',
+            border: 'none',
+            padding: '4px 0',
+            fontSize: '10px',
+            letterSpacing: '1.5px',
             textTransform: 'uppercase',
             fontWeight: 500,
             cursor: 'pointer',
-            color: '#1A1A1A',
+            color: THEME.ink,
           }}
         >
-          ← Каталог
+          ← В архив моделей
         </button>
 
         {items.length > 0 && (
@@ -459,55 +471,89 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '11px',
-              letterSpacing: '0.5px',
+              fontSize: '9px',
+              letterSpacing: '1.2px',
               textTransform: 'uppercase',
-              color: '#888',
+              color: THEME.inkMuted,
               cursor: 'pointer',
             }}
           >
-            Очистить
+            Аннулировать список
           </button>
         )}
       </div>
 
-      <h1 style={{ fontFamily: 'serif', fontSize: '24px', margin: '0 0 16px 0', fontWeight: 500, letterSpacing: '0.5px' }}>
-        Оптовая накладная ({items.length})
-      </h1>
+      <div style={{ marginBottom: '20px' }}>
+        <div
+          style={{
+            fontSize: '9px',
+            letterSpacing: '1.8px',
+            textTransform: 'uppercase',
+            color: THEME.inkMuted,
+            marginBottom: '4px',
+          }}
+        >
+          ДОКУМЕНТ // ОПТОВОЕ БОРДЕРО
+        </div>
+        <h1
+          style={{
+            fontFamily: THEME.serif,
+            fontSize: '32px',
+            margin: 0,
+            fontWeight: 400,
+            letterSpacing: '0.2px',
+          }}
+        >
+          Спецификация заказа ({items.length})
+        </h1>
+      </div>
 
       {items.length === 0 ? (
         <div
           style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #EAE8E3',
-            padding: '40px 16px',
+            backgroundColor: THEME.surface,
+            border: `1px solid ${THEME.border}`,
+            padding: '48px 20px',
             textAlign: 'center',
           }}
         >
-          <p style={{ fontSize: '13px', color: '#666', margin: '0 0 16px 0', letterSpacing: '0.3px' }}>
-            В вашем оптовом заказе пока нет выбранных моделей.
+          <p
+            style={{
+              fontFamily: THEME.serif,
+              fontStyle: 'italic',
+              fontSize: '16px',
+              color: THEME.inkMuted,
+              margin: '0 0 20px 0',
+            }}
+          >
+            Спецификация пуста. Выберите силуэты в основном архиве.
           </p>
           <button
             onClick={onClose}
             style={{
-              padding: '12px 20px',
-              backgroundColor: '#1A1A1A',
+              padding: '12px 24px',
+              backgroundColor: THEME.ink,
               color: '#FFFFFF',
               border: 'none',
-              fontSize: '11px',
-              letterSpacing: '1px',
+              fontSize: '10px',
+              letterSpacing: '1.5px',
               textTransform: 'uppercase',
               cursor: 'pointer',
               fontWeight: 500,
             }}
           >
-            Перейти в каталог
+            Открыть архив →
           </button>
         </div>
       ) : (
         <>
-          {/* Список товаров */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+          {/* Табличный реестр позиций заказа */}
+          <div
+            style={{
+              borderTop: `1px solid ${THEME.border}`,
+              marginBottom: '24px',
+            }}
+          >
             {items.map((item, idx) => {
               const isSample = item.orderMode === 'sample';
 
@@ -515,8 +561,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 <div
                   key={item.uid}
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #EAE8E3',
+                    backgroundColor: THEME.surface,
+                    borderBottom: `1px solid ${THEME.border}`,
+                    borderLeft: `1px solid ${THEME.border}`,
+                    borderRight: `1px solid ${THEME.border}`,
                     padding: '12px',
                     display: 'flex',
                     gap: '12px',
@@ -527,22 +575,42 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     src={item.shoe.image}
                     alt={item.shoe.modelNumber}
                     style={{
-                      width: '64px',
-                      height: '64px',
+                      width: '68px',
+                      height: '58px',
                       objectFit: 'contain',
-                      border: '1px solid #F0EFEA',
                       flexShrink: 0,
+                      mixBlendMode: 'multiply',
                     }}
                   />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'serif', letterSpacing: '0.3px' }}>
-                      {idx + 1}. Модель № {item.shoe.modelNumber} {item.shoe.variant || ''}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <div style={{ fontSize: '16px', fontFamily: THEME.serif }}>
+                        <span style={{ fontSize: '10px', color: THEME.inkLight, marginRight: '6px', fontFamily: THEME.sans }}>
+                          0{idx + 1}
+                        </span>
+                        № {item.shoe.modelNumber} {item.shoe.variant || ''}
+                      </div>
+                      <button
+                        onClick={() => onRemove(item.uid)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          color: THEME.inkLight,
+                          padding: '0 2px',
+                        }}
+                        title="Удалить позицию"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
-                      Цвет: <strong>{item.shoe.color}</strong> ({item.shoe.category})
+
+                    <div style={{ fontSize: '10px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: '2px' }}>
+                      {item.shoe.color} • {item.shoe.category}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#444', marginTop: '4px', lineHeight: 1.35 }}>
+                    <div style={{ fontSize: '11px', color: THEME.ink, marginTop: '5px', lineHeight: 1.35 }}>
                       {item.formulaText}
                     </div>
 
@@ -552,45 +620,47 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         marginTop: '8px',
-                        borderTop: '1px dashed #EAE8E3',
-                        paddingTop: '6px',
+                        borderTop: `1px solid ${THEME.border}`,
+                        paddingTop: '8px',
                       }}
                     >
-                      <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.3px' }}>
-                        Итого: {item.totalPairs} пар
+                      <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '14px' }}>
+                        Объем: <strong>{item.totalPairs} пар</strong>
                       </span>
 
                       {!isSample && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '10px', color: '#888' }}>Коробов:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${THEME.border}`, backgroundColor: THEME.bg }}>
+                          <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.8px', color: THEME.inkMuted, padding: '0 8px' }}>
+                            Коробов
+                          </span>
                           <button
                             onClick={() => onUpdateQuantity(item.uid, item.boxesCount - 1)}
                             style={{
-                              width: '22px',
-                              height: '22px',
-                              border: '1px solid #D6D3CB',
-                              backgroundColor: '#FAF9F6',
-                              color: '#1A1A1A',
+                              width: '24px',
+                              height: '24px',
+                              border: 'none',
+                              borderLeft: `1px solid ${THEME.border}`,
+                              backgroundColor: THEME.surface,
+                              color: THEME.ink,
                               cursor: 'pointer',
-                              fontWeight: 600,
                               fontSize: '12px',
                             }}
                           >
                             −
                           </button>
-                          <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '16px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, minWidth: '22px', textAlign: 'center' }}>
                             {item.boxesCount}
                           </span>
                           <button
                             onClick={() => onUpdateQuantity(item.uid, item.boxesCount + 1)}
                             style={{
-                              width: '22px',
-                              height: '22px',
-                              border: '1px solid #D6D3CB',
-                              backgroundColor: '#FAF9F6',
-                              color: '#1A1A1A',
+                              width: '24px',
+                              height: '24px',
+                              border: 'none',
+                              borderLeft: `1px solid ${THEME.border}`,
+                              backgroundColor: THEME.surface,
+                              color: THEME.ink,
                               cursor: 'pointer',
-                              fontWeight: 600,
                               fontSize: '12px',
                             }}
                           >
@@ -600,47 +670,41 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       )}
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => onRemove(item.uid)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      width: '24px',
-                      height: '24px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      color: '#999',
-                      flexShrink: 0,
-                    }}
-                    title="Удалить позицию"
-                  >
-                    ✕
-                  </button>
                 </div>
               );
             })}
           </div>
 
-          {/* Блок логистики */}
+          {/* II. БЛОК ЛОГИСТИКИ */}
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2DFD7',
-              padding: '14px',
-              marginBottom: '16px',
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.border}`,
+              padding: '16px',
+              marginBottom: '20px',
             }}
           >
-            <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#777', marginBottom: '10px' }}>
-              Логистика отправки (Харьков)
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1.4px',
+                color: THEME.inkMuted,
+                marginBottom: '12px',
+              }}
+            >
+              <span>I. ЛОГИСТИКА И ПОЛУЧАТЕЛЬ</span>
+              <span>НОВА ПОШТА</span>
             </div>
 
-            <div style={{ fontSize: '12px', color: '#333', marginBottom: '8px' }}>
-              Пункт назначения: <strong>{selectedCity.fullLabel}</strong>
+            <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '10px' }}>
+              Направление: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
             </div>
 
             {/* Быстрые города */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
               {POPULAR_CITIES.map((city) => {
                 const isSelected = selectedCity.ref === city.ref;
                 return (
@@ -649,14 +713,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     type="button"
                     onClick={() => handleSelectCity(city)}
                     style={{
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      border: isSelected ? '1px solid #1A1A1A' : '1px solid #D6D3CB',
-                      backgroundColor: isSelected ? '#1A1A1A' : '#FAF9F6',
-                      color: isSelected ? '#FFFFFF' : '#444',
+                      padding: '5px 9px',
+                      fontSize: '10px',
+                      border: `1px solid ${isSelected ? THEME.ink : THEME.border}`,
+                      backgroundColor: isSelected ? THEME.ink : THEME.bg,
+                      color: isSelected ? '#FFFFFF' : THEME.ink,
                       cursor: 'pointer',
-                      fontWeight: isSelected ? 500 : 400,
-                      letterSpacing: '0.3px',
+                      letterSpacing: '0.5px',
                     }}
                   >
                     {city.name}
@@ -696,12 +759,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    fontSize: '13px',
-                    color: '#888',
+                    fontSize: '12px',
+                    color: THEME.inkMuted,
                     cursor: 'pointer',
                     padding: '4px',
                   }}
-                  title="Очистить"
                 >
                   ✕
                 </button>
@@ -717,19 +779,19 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       left: 0,
                       right: 0,
                       zIndex: 30,
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #D6D3CB',
+                      backgroundColor: THEME.surface,
+                      border: `1px solid ${THEME.border}`,
                       maxHeight: '220px',
                       overflowY: 'auto',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
                     }}
                   >
                     {citySearching ? (
-                      <div style={{ padding: '10px 12px', fontSize: '12px', color: '#666' }}>
-                        Поиск в базе Новой Почты...
+                      <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
+                        Запрос в реестр Новой Почты...
                       </div>
                     ) : cityResults.length === 0 ? (
-                      <div style={{ padding: '10px 12px', fontSize: '12px', color: '#888' }}>
+                      <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
                         Населенный пункт не найден
                       </div>
                     ) : (
@@ -740,10 +802,9 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           style={{
                             padding: '9px 12px',
                             fontSize: '12px',
-                            borderBottom: '1px solid #F0EFEA',
+                            borderBottom: `1px solid ${THEME.border}`,
                             cursor: 'pointer',
-                            color: '#1A1A1A',
-                            backgroundColor: '#FFFFFF',
+                            color: THEME.ink,
                           }}
                         >
                           {c.fullLabel}
@@ -758,7 +819,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             <div style={{ marginBottom: '8px' }}>
               <input
                 type="text"
-                placeholder="Имя и Телефон получателя..."
+                placeholder="ФИО и телефон получателя..."
                 value={clientContact}
                 onChange={(e) => setClientContact(e.target.value)}
                 style={inputStyle}
@@ -766,7 +827,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             </div>
 
             {/* Отделение НП */}
-            <div style={{ position: 'relative', marginBottom: '10px' }}>
+            <div style={{ position: 'relative', marginBottom: '12px' }}>
               <input
                 type="text"
                 placeholder={
@@ -799,12 +860,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    fontSize: '13px',
-                    color: '#888',
+                    fontSize: '12px',
+                    color: THEME.inkMuted,
                     cursor: 'pointer',
                     padding: '4px',
                   }}
-                  title="Очистить"
                 >
                   ✕
                 </button>
@@ -818,11 +878,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     left: 0,
                     right: 0,
                     zIndex: 25,
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D6D3CB',
+                    backgroundColor: THEME.surface,
+                    border: `1px solid ${THEME.border}`,
                     maxHeight: '200px',
                     overflowY: 'auto',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
                   }}
                 >
                   {filteredWarehouses.map((w) => (
@@ -835,10 +895,9 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       style={{
                         padding: '8px 12px',
                         fontSize: '11px',
-                        borderBottom: '1px solid #F0EFEA',
+                        borderBottom: `1px solid ${THEME.border}`,
                         cursor: 'pointer',
-                        color: '#1A1A1A',
-                        backgroundColor: '#FFFFFF',
+                        color: THEME.ink,
                       }}
                     >
                       {w.description}
@@ -850,33 +909,44 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
             <div
               style={{
-                borderTop: '1px solid #EAE8E3',
-                paddingTop: '8px',
+                borderTop: `1px solid ${THEME.border}`,
+                paddingTop: '10px',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center',
+                alignItems: 'baseline',
               }}
             >
-              <div style={{ fontSize: '12px', color: '#555' }}>
-                Объем: <strong>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} кор.)
+              <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                Партия: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} мест)
               </div>
-              <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.3px' }}>
-                {calcLoading ? 'Расчет...' : `Доставка ≈ ${Math.round(deliveryCost)} ₴`}
+              <div style={{ fontFamily: THEME.serif, fontSize: '16px', fontWeight: 600 }}>
+                {calcLoading ? 'Расчет тарифа...' : `Логистика ≈ ${Math.round(deliveryCost)} ₴`}
               </div>
             </div>
           </div>
 
-          {/* Премиальный блок отправки заказа */}
+          {/* Блок отправки в отдел производства */}
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E2DFD7',
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.border}`,
               padding: '16px',
-              marginBottom: '16px',
+              marginBottom: '18px',
             }}
           >
-            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#777', marginBottom: '12px', fontWeight: 600 }}>
-              Передать заказ ({items.length} мод.):
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1.4px',
+                color: THEME.inkMuted,
+                marginBottom: '12px',
+              }}
+            >
+              <span>II. УТВЕРЖДЕНИЕ И ОТПРАВКА</span>
+              <span>DIRECT</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -886,12 +956,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   onClick={() => sendToManager(mgr)}
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    backgroundColor: idx === 0 ? '#1A1A1A' : '#FFFFFF',
-                    color: idx === 0 ? '#FFFFFF' : '#1A1A1A',
-                    border: '1px solid #1A1A1A',
-                    fontSize: '11px',
-                    letterSpacing: '0.8px',
+                    padding: '13px 16px',
+                    backgroundColor: idx === 0 ? THEME.ink : 'transparent',
+                    color: idx === 0 ? '#FFFFFF' : THEME.ink,
+                    border: `1px solid ${THEME.ink}`,
+                    fontSize: '10px',
+                    letterSpacing: '1.3px',
                     fontWeight: 500,
                     textTransform: 'uppercase',
                     cursor: 'pointer',
@@ -901,7 +971,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   }}
                 >
                   <span>{mgr.label}</span>
-                  <span style={{ fontSize: '13px' }}>→</span>
+                  <span>→</span>
                 </button>
               ))}
 
@@ -911,21 +981,20 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   width: '100%',
                   padding: '10px',
                   backgroundColor: 'transparent',
-                  color: '#555',
-                  border: '1px dashed #D6D3CB',
-                  fontSize: '11px',
-                  letterSpacing: '0.5px',
-                  fontWeight: 500,
+                  color: THEME.inkMuted,
+                  border: `1px dashed ${THEME.border}`,
+                  fontSize: '10px',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
                   cursor: 'pointer',
                   marginTop: '4px',
                 }}
               >
-                {copied ? '✓ Накладная скопирована в буфер' : '📋 Скопировать текст накладной'}
+                {copied ? '✓ Текст спецификации скопирован' : 'Скопировать бордеро в буфер'}
               </button>
             </div>
           </div>
 
-          {/* Карточка прямой связи с руководством */}
           <ManagersContactCard />
         </>
       )}
