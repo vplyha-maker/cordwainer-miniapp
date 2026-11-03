@@ -16,6 +16,20 @@ const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1,
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
 
+const THEME = {
+  bg: '#F2EFE9',
+  surface: '#F8F6F1',
+  surfaceActive: '#EAE5DC',
+  ink: '#161514',
+  inkMuted: '#6E6A63',
+  inkLight: '#9A958C',
+  border: '#DCD7CC',
+  borderStrong: '#161514',
+  accentGreen: '#1E4620',
+  serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
+  sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
+};
+
 export function Materials({ onBack }: MaterialsProps) {
   const [activeCategory, setActiveCategory] = useState<'Все' | ShoeCategory>('Все');
   const [activeFeature, setActiveFeature] = useState<string>('Все');
@@ -148,27 +162,30 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 2: СТРАНИЦА МОДЕЛИ (LOOKBOOK DETAIL)
+  // ЭКРАН 2: ДОСЬЕ МОДЕЛИ (BESPOKE SPECIFICATION SHEET)
   if (selectedShoe) {
     const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
 
     return (
       <div
         style={{
-          backgroundColor: '#F7F6F2',
+          backgroundColor: THEME.bg,
           minHeight: '100vh',
-          padding: '24px 20px 100px 20px',
-          color: '#1A1A1A',
+          padding: '20px 16px 110px 16px',
+          color: THEME.ink,
           boxSizing: 'border-box',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontFamily: THEME.sans,
         }}
       >
+        {/* Верхняя навигация досье */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '24px',
+            paddingBottom: '14px',
+            marginBottom: '20px',
+            borderBottom: `1px solid ${THEME.border}`,
           }}
         >
           <button
@@ -176,129 +193,275 @@ export function Materials({ onBack }: MaterialsProps) {
             style={{
               background: 'transparent',
               border: 'none',
-              padding: '0',
-              fontSize: '11px',
-              letterSpacing: '1px',
+              padding: '4px 0',
+              fontSize: '10px',
+              letterSpacing: '1.5px',
               textTransform: 'uppercase',
               cursor: 'pointer',
-              color: '#555',
+              color: THEME.ink,
               fontWeight: 500,
             }}
           >
-            ← Назад в каталог
+            ← В архив моделей
           </button>
 
           <button
             onClick={() => setIsCartOpen(true)}
             style={{
-              background: 'transparent',
-              border: '1px solid #1A1A1A',
-              padding: '8px 14px',
-              fontSize: '11px',
-              letterSpacing: '0.8px',
+              background: cart.length > 0 ? THEME.ink : 'transparent',
+              border: `1px solid ${THEME.ink}`,
+              padding: '7px 12px',
+              fontSize: '10px',
+              letterSpacing: '1.2px',
               textTransform: 'uppercase',
               fontWeight: 500,
               cursor: 'pointer',
-              color: '#1A1A1A',
+              color: cart.length > 0 ? '#FFFFFF' : THEME.ink,
             }}
           >
-            Накладная ({cart.length} • {cartTotalPairs} п.)
+            Бордеро ({cart.length} • {cartTotalPairs} п.)
           </button>
         </div>
 
+        {/* Индикатор наличия в заказе */}
         {alreadyInCartPairs > 0 && (
           <div
             style={{
-              backgroundColor: '#EFECE6',
-              borderLeft: '2px solid #1A1A1A',
+              backgroundColor: THEME.surfaceActive,
+              border: `1px solid ${THEME.border}`,
+              borderLeft: `3px solid ${THEME.ink}`,
               padding: '10px 14px',
               fontSize: '11px',
-              letterSpacing: '0.5px',
+              letterSpacing: '0.4px',
               marginBottom: '20px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              color: '#333',
+              color: THEME.ink,
             }}
           >
-            <span>Модель уже добавлена в заказ ({alreadyInCartPairs} пар)</span>
+            <span>В текущей спецификации: <strong>{alreadyInCartPairs} пар</strong></span>
             <span
               onClick={() => setIsCartOpen(true)}
-              style={{ textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+              style={{
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                borderBottom: `1px solid ${THEME.ink}`,
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
             >
-              Смотреть
+              Открыть →
             </span>
           </div>
         )}
 
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px' }}>
-            {selectedShoe.category} / {selectedShoe.color}
+        {/* Заголовок и индекс модели */}
+        <div style={{ marginBottom: '16px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '10px',
+              color: THEME.inkMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '1.6px',
+              marginBottom: '6px',
+            }}
+          >
+            <span>ДОСЬЕ СИЛУЭТА // {selectedShoe.category}</span>
+            <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
+              Lot № {selectedShoe.modelNumber}
+            </span>
           </div>
-          <h1 style={{ fontFamily: 'serif', fontSize: '32px', margin: '0', fontWeight: 400, letterSpacing: '0.5px' }}>
-            Модель № {selectedShoe.modelNumber} {selectedShoe.variant || ''}
+
+          <h1
+            style={{
+              fontFamily: THEME.serif,
+              fontSize: '36px',
+              margin: '0',
+              fontWeight: 400,
+              letterSpacing: '-0.3px',
+              lineHeight: 1.05,
+            }}
+          >
+            Модель № {selectedShoe.modelNumber}
+            {selectedShoe.variant && (
+              <span style={{ fontSize: '20px', color: THEME.inkMuted, fontStyle: 'italic', marginLeft: '8px' }}>
+                ({selectedShoe.variant})
+              </span>
+            )}
           </h1>
+
+          <div
+            style={{
+              fontFamily: THEME.serif,
+              fontStyle: 'italic',
+              fontSize: '15px',
+              color: THEME.inkMuted,
+              marginTop: '4px',
+            }}
+          >
+            Исполнение: {selectedShoe.color}
+          </div>
+        </div>
+
+        {/* Экспозиция товара (без белого квадрата благодаря multiply) */}
+        <div
+          style={{
+            backgroundColor: THEME.surface,
+            border: `1px solid ${THEME.border}`,
+            padding: '28px 20px',
+            marginBottom: '20px',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '12px',
+              fontSize: '9px',
+              letterSpacing: '1.5px',
+              color: THEME.inkLight,
+              textTransform: 'uppercase',
+            }}
+          >
+            FIG. 01 — PROFILE
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '12px',
+              fontSize: '9px',
+              letterSpacing: '1.5px',
+              color: THEME.inkLight,
+              textTransform: 'uppercase',
+            }}
+          >
+            40—45 EUR
+          </div>
+
+          <img
+            src={selectedShoe.image}
+            alt={`Модель ${selectedShoe.modelNumber}`}
+            style={{
+              width: '100%',
+              maxWidth: '340px',
+              aspectRatio: '4 / 3',
+              objectFit: 'contain',
+              display: 'block',
+              margin: '0 auto',
+              mixBlendMode: 'multiply',
+              filter: 'contrast(1.04)',
+            }}
+          />
+
           {selectedShoe.features.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '6px',
+                marginTop: '16px',
+                paddingTop: '12px',
+                borderTop: `1px solid ${THEME.border}`,
+              }}
+            >
               {selectedShoe.features.map((feat) => (
                 <span
                   key={feat}
-                  style={{ fontSize: '10px', color: '#666', letterSpacing: '0.5px', textTransform: 'uppercase' }}
+                  style={{
+                    fontSize: '9px',
+                    color: THEME.inkMuted,
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase',
+                    padding: '3px 8px',
+                    border: `1px solid ${THEME.border}`,
+                    backgroundColor: THEME.bg,
+                  }}
                 >
-                  [{feat}]
+                  {feat}
                 </span>
               ))}
             </div>
           )}
         </div>
 
-        {/* Большое фото товара в стиле люкс */}
-        <div
-          style={{
-            backgroundColor: '#FAF9F6',
-            padding: '24px',
-            marginBottom: '24px',
-            textAlign: 'center',
-          }}
-        >
-          <img
-            src={selectedShoe.image}
-            alt={`Модель ${selectedShoe.modelNumber}`}
-            style={{
-              width: '100%',
-              maxWidth: '380px',
-              aspectRatio: '1 / 1',
-              objectFit: 'contain',
-              display: 'block',
-              margin: '0 auto',
-            }}
-          />
-        </div>
-
+        {/* Варианты исполнения (палитра модели) */}
         {modelVariants.length > 1 && (
           <div style={{ marginBottom: '24px' }}>
-            <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: '#888', marginBottom: '10px' }}>
-              Доступные варианты исполнения:
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1.4px',
+                color: THEME.inkMuted,
+                marginBottom: '10px',
+              }}
+            >
+              <span>I. ПАЛИТРА И КОЖИ</span>
+              <span>01—0{modelVariants.length}</span>
             </div>
-            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
-              {modelVariants.map((v) => {
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.min(modelVariants.length, 4)}, 1fr)`,
+                borderTop: `1px solid ${THEME.border}`,
+                borderLeft: `1px solid ${THEME.border}`,
+              }}
+            >
+              {modelVariants.map((v, i) => {
                 const isCurrent = v.id === selectedShoe.id;
                 return (
                   <div
                     key={v.id}
                     onClick={() => setSelectedShoe(v)}
                     style={{
-                      borderBottom: isCurrent ? '2px solid #1A1A1A' : '1px solid transparent',
-                      paddingBottom: '6px',
-                      width: '64px',
-                      flexShrink: 0,
+                      borderRight: `1px solid ${THEME.border}`,
+                      borderBottom: `1px solid ${THEME.border}`,
+                      backgroundColor: isCurrent ? THEME.surfaceActive : THEME.surface,
+                      padding: '8px',
                       cursor: 'pointer',
                       textAlign: 'center',
-                      opacity: isCurrent ? 1 : 0.6,
+                      position: 'relative',
                     }}
                   >
-                    <img src={v.image} alt={v.color} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'contain' }} />
-                    <div style={{ fontSize: '10px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div
+                      style={{
+                        fontSize: '8px',
+                        color: THEME.inkLight,
+                        textAlign: 'left',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      0{i + 1}
+                    </div>
+                    <img
+                      src={v.image}
+                      alt={v.color}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1/1',
+                        objectFit: 'contain',
+                        mixBlendMode: 'multiply',
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        marginTop: '6px',
+                        fontWeight: isCurrent ? 600 : 400,
+                        color: THEME.ink,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {v.color}
                     </div>
                   </div>
@@ -308,108 +471,220 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        {/* Переключатель режимов заказа */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', borderBottom: '1px solid #E2DFD7', paddingBottom: '12px' }}>
-          <button
-            onClick={() => setOrderMode('wholesale')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '0',
-              fontSize: '12px',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              fontWeight: orderMode === 'wholesale' ? 600 : 400,
-              color: orderMode === 'wholesale' ? '#1A1A1A' : '#888',
-              cursor: 'pointer',
-            }}
-          >
-            Оптовая ростовка
-          </button>
-          <button
-            onClick={() => setOrderMode('sample')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '0',
-              fontSize: '12px',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              fontWeight: orderMode === 'sample' ? 600 : 400,
-              color: orderMode === 'sample' ? '#1A1A1A' : '#888',
-              cursor: 'pointer',
-            }}
-          >
-            Тестовый образец (1 пара)
-          </button>
-        </div>
-
+        {/* II. КОНФИГУРАТОР ПАРТИИ */}
         <div style={{ marginBottom: '24px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.4px',
+              color: THEME.inkMuted,
+              marginBottom: '10px',
+            }}
+          >
+            <span>II. ФОРМАТ КОМПЛЕКТАЦИИ</span>
+            <span>B2B SPEC</span>
+          </div>
+
+          {/* Переключатель Опт / Образец в виде табличных вкладок */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              border: `1px solid ${THEME.ink}`,
+              marginBottom: '20px',
+            }}
+          >
+            <button
+              onClick={() => setOrderMode('wholesale')}
+              style={{
+                backgroundColor: orderMode === 'wholesale' ? THEME.ink : 'transparent',
+                color: orderMode === 'wholesale' ? '#FFFFFF' : THEME.ink,
+                border: 'none',
+                padding: '11px 8px',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1.2px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Оптовая ростовка
+            </button>
+            <button
+              onClick={() => setOrderMode('sample')}
+              style={{
+                backgroundColor: orderMode === 'sample' ? THEME.ink : 'transparent',
+                color: orderMode === 'sample' ? '#FFFFFF' : THEME.ink,
+                border: 'none',
+                borderLeft: `1px solid ${THEME.ink}`,
+                padding: '11px 8px',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1.2px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Образец (1 пара)
+            </button>
+          </div>
+
           {orderMode === 'wholesale' ? (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#666' }}>
-                  Размерный ряд коробки (40–45)
+              {/* Пресеты ростовки */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '10px',
+                }}
+              >
+                <span style={{ fontSize: '11px', color: THEME.inkMuted, fontStyle: 'italic', fontFamily: THEME.serif }}>
+                  Матрица короба (пар на размер):
                 </span>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     onClick={() => setSizeRun(STANDARD_8_RUN)}
-                    style={{ background: 'none', border: 'none', fontSize: '10px', color: '#555', cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{
+                      background: THEME.surface,
+                      border: `1px solid ${THEME.border}`,
+                      padding: '4px 8px',
+                      fontSize: '9px',
+                      letterSpacing: '0.8px',
+                      textTransform: 'uppercase',
+                      color: THEME.ink,
+                      cursor: 'pointer',
+                    }}
                   >
-                    8 пар
+                    Стандарт (8)
                   </button>
                   <button
                     onClick={() => setSizeRun(EVEN_6_RUN)}
-                    style={{ background: 'none', border: 'none', fontSize: '10px', color: '#555', cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{
+                      background: THEME.surface,
+                      border: `1px solid ${THEME.border}`,
+                      padding: '4px 8px',
+                      fontSize: '9px',
+                      letterSpacing: '0.8px',
+                      textTransform: 'uppercase',
+                      color: THEME.ink,
+                      cursor: 'pointer',
+                    }}
                   >
-                    6 пар
+                    Ровная (6)
                   </button>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
+              {/* Архитектурная таблица размеров 40-45 в 6 колонок */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  borderTop: `1px solid ${THEME.border}`,
+                  borderLeft: `1px solid ${THEME.border}`,
+                  marginBottom: '18px',
+                }}
+              >
                 {SIZES.map((sz) => (
                   <div
                     key={sz}
                     style={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E2DC',
-                      padding: '10px 8px',
+                      backgroundColor: sizeRun[sz] > 0 ? THEME.surface : THEME.bg,
+                      borderRight: `1px solid ${THEME.border}`,
+                      borderBottom: `1px solid ${THEME.border}`,
                       textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
                     }}
                   >
-                    <div style={{ fontSize: '11px', color: '#777', marginBottom: '6px' }}>{sz} р.</div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <button
-                        onClick={() => updateSizeCount(sz, -1)}
-                        style={{ background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer', color: '#666', padding: '0 4px' }}
-                      >
-                        −
-                      </button>
-                      <span style={{ fontSize: '14px', fontWeight: 600 }}>{sizeRun[sz]}</span>
-                      <button
-                        onClick={() => updateSizeCount(sz, 1)}
-                        style={{ background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer', color: '#666', padding: '0 4px' }}
-                      >
-                        +
-                      </button>
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        color: THEME.inkMuted,
+                        padding: '6px 0',
+                        borderBottom: `1px solid ${THEME.border}`,
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      {sz}
                     </div>
+                    <button
+                      onClick={() => updateSizeCount(sz, 1)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '6px 0',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        color: THEME.inkMuted,
+                      }}
+                    >
+                      +
+                    </button>
+                    <div
+                      style={{
+                        fontFamily: THEME.serif,
+                        fontSize: '18px',
+                        fontWeight: 600,
+                        padding: '2px 0',
+                        color: sizeRun[sz] > 0 ? THEME.ink : THEME.inkLight,
+                      }}
+                    >
+                      {sizeRun[sz]}
+                    </div>
+                    <button
+                      onClick={() => updateSizeCount(sz, -1)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '6px 0',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        color: THEME.inkMuted,
+                      }}
+                    >
+                      −
+                    </button>
                   </div>
                 ))}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#666' }}>Количество коробов:</span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {[1, 2, 3, 5, 10].map((num) => (
+              {/* Множитель коробов */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '12px',
+                  borderTop: `1px solid ${THEME.border}`,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1.2px',
+                    color: THEME.inkMuted,
+                  }}
+                >
+                  Количество коробов:
+                </span>
+                <div style={{ display: 'flex', border: `1px solid ${THEME.border}` }}>
+                  {[1, 2, 3, 5, 10].map((num, idx) => (
                     <button
                       key={num}
                       onClick={() => setBoxesCount(num)}
                       style={{
-                        padding: '6px 10px',
-                        border: boxesCount === num ? '1px solid #1A1A1A' : '1px solid #D6D3CB',
-                        backgroundColor: boxesCount === num ? '#1A1A1A' : '#FFFFFF',
-                        color: boxesCount === num ? '#FFFFFF' : '#1A1A1A',
+                        padding: '7px 12px',
+                        border: 'none',
+                        borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
+                        backgroundColor: boxesCount === num ? THEME.ink : THEME.surface,
+                        color: boxesCount === num ? '#FFFFFF' : THEME.ink,
                         fontSize: '11px',
                         fontWeight: 500,
                         cursor: 'pointer',
@@ -423,25 +698,42 @@ export function Materials({ onBack }: MaterialsProps) {
             </>
           ) : (
             <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#666', marginBottom: '10px' }}>
-                Выберите размер образца:
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontFamily: THEME.serif,
+                  fontStyle: 'italic',
+                  color: THEME.inkMuted,
+                  marginBottom: '10px',
+                }}
+              >
+                Выберите размер тестовой пары для шоурума:
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  borderTop: `1px solid ${THEME.border}`,
+                  borderLeft: `1px solid ${THEME.border}`,
+                }}
+              >
                 {SIZES.map((sz) => (
                   <button
                     key={sz}
                     onClick={() => setSampleSize(sz)}
                     style={{
-                      padding: '10px 0',
-                      border: sampleSize === sz ? '1px solid #1A1A1A' : '1px solid #D6D3CB',
-                      backgroundColor: sampleSize === sz ? '#1A1A1A' : '#FFFFFF',
-                      color: sampleSize === sz ? '#FFFFFF' : '#1A1A1A',
+                      padding: '14px 0',
+                      border: 'none',
+                      borderRight: `1px solid ${THEME.border}`,
+                      borderBottom: `1px solid ${THEME.border}`,
+                      backgroundColor: sampleSize === sz ? THEME.ink : THEME.surface,
+                      color: sampleSize === sz ? '#FFFFFF' : THEME.ink,
                       fontSize: '12px',
-                      fontWeight: 500,
+                      fontFamily: THEME.serif,
                       cursor: 'pointer',
                     }}
                   >
-                    {sz} р.
+                    {sz}
                   </button>
                 ))}
               </div>
@@ -449,121 +741,218 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
+        {/* Кнопка добавления */}
         <button
           disabled={totalPairs === 0}
           onClick={addCurrentShoeToCart}
           style={{
             width: '100%',
-            padding: '14px',
-            backgroundColor: justAdded ? '#15803D' : '#1A1A1A',
+            padding: '16px 20px',
+            backgroundColor: justAdded ? THEME.accentGreen : THEME.ink,
             color: '#FFFFFF',
             border: 'none',
             fontSize: '11px',
             fontWeight: 500,
             textTransform: 'uppercase',
-            letterSpacing: '1px',
+            letterSpacing: '1.8px',
             cursor: totalPairs === 0 ? 'not-allowed' : 'pointer',
-            marginBottom: '10px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             transition: 'background-color 0.2s ease',
           }}
         >
-          {justAdded
-            ? `✓ Добавлено в накладную (${totalPairs} пар)`
-            : `Добавить в накладную — ${totalPairs} пар`}
+          <span>
+            {justAdded ? '✓ Занесено в бордеро' : 'Включить в спецификацию'}
+          </span>
+          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '14px', textTransform: 'none', letterSpacing: '0' }}>
+            {totalPairs} пар →
+          </span>
         </button>
       </div>
     );
   }
 
-  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ (LOOKBOOK GRID)
+  // ЭКРАН 3: АРХИВНЫЙ КАТАЛОГ В СТИЛЕ CORDWAINER (SWISS EDITORIAL GRID)
   return (
     <div
       style={{
-        backgroundColor: '#F7F6F2',
+        backgroundColor: THEME.bg,
         minHeight: '100vh',
-        padding: '20px 16px 120px 16px',
-        color: '#1A1A1A',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        padding: '18px 16px 120px 16px',
+        color: THEME.ink,
+        fontFamily: THEME.sans,
+        boxSizing: 'border-box',
       }}
     >
-      {/* Шапка */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-        <div>
-          <span style={{ fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', color: '#888' }}>
-            Харьков • B2B Showroom
+      {/* Верхний колонтитул (как на скринах 3 и 4) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingBottom: '10px',
+          marginBottom: '14px',
+          borderBottom: `1px solid ${THEME.border}`,
+          fontSize: '9px',
+          letterSpacing: '1.8px',
+          textTransform: 'uppercase',
+          color: THEME.inkMuted,
+        }}
+      >
+        <span>ВЫПУСК № 01 — ОПТОВЫЙ АРХИВ</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '11px' }}>
+            Vol. I
           </span>
-          <h1 style={{ fontFamily: 'serif', fontSize: '28px', margin: '2px 0 0 0', fontWeight: 400, letterSpacing: '0.5px' }}>
-            Cardio Footwear
-          </h1>
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${THEME.border}`,
+                padding: '4px 9px',
+                fontSize: '9px',
+                letterSpacing: '1.2px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                color: THEME.ink,
+              }}
+            >
+              ← Индекс
+            </button>
+          )}
         </div>
-        {onBack && (
+      </div>
+
+      {/* Журнальный заголовок */}
+      <div style={{ marginBottom: '18px' }}>
+        <h1
+          style={{
+            fontFamily: THEME.serif,
+            fontSize: '42px',
+            margin: '0',
+            fontWeight: 400,
+            letterSpacing: '0.5px',
+            lineHeight: 0.98,
+            textTransform: 'uppercase',
+          }}
+        >
+          Cardio
+        </h1>
+        <div
+          style={{
+            fontFamily: THEME.serif,
+            fontStyle: 'italic',
+            fontSize: '14px',
+            color: THEME.inkMuted,
+            marginTop: '4px',
+          }}
+        >
+          The B2B Shoemaker’s Archive & Seasonal Line Sheet • Kharkiv
+        </div>
+      </div>
+
+      {/* Поле поиска со встроенным курсивным префиксом Index. (как на скрине 3) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: THEME.surface,
+          border: `1px solid ${THEME.border}`,
+          padding: '0 12px',
+          marginBottom: '20px',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: THEME.serif,
+            fontStyle: 'italic',
+            fontSize: '13px',
+            color: THEME.inkMuted,
+            marginRight: '10px',
+            userSelect: 'none',
+          }}
+        >
+          Index.
+        </span>
+        <input
+          type="text"
+          placeholder="Поиск по номеру колодки, артикулу или коже..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '11px 0',
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: THEME.ink,
+            fontSize: '12px',
+            outline: 'none',
+          }}
+        />
+        {searchQuery && (
           <button
-            onClick={onBack}
+            onClick={() => setSearchQuery('')}
             style={{
-              background: 'transparent',
-              border: '1px solid #D6D3CB',
-              padding: '6px 12px',
-              fontSize: '10px',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
+              background: 'none',
+              border: 'none',
+              color: THEME.inkMuted,
               cursor: 'pointer',
-              color: '#1A1A1A',
+              fontSize: '12px',
             }}
           >
-            Назад
+            ✕
           </button>
         )}
       </div>
 
-      {/* Поиск */}
-      <input
-        type="text"
-        placeholder="Поиск по номеру модели или цвету..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+      {/* Рубрикатор категорий (в стиле 01 / МАТЕРИАЛЫ | 02 / СИЛУЭТЫ со скрина 4) */}
+      <div
         style={{
-          width: '100%',
-          boxSizing: 'border-box',
-          padding: '11px 14px',
-          marginBottom: '16px',
-          border: '1px solid #D6D3CB',
-          backgroundColor: '#FFFFFF',
-          color: '#1A1A1A',
-          fontSize: '13px',
-          outline: 'none',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          borderTop: `1px solid ${THEME.border}`,
+          borderBottom: `1px solid ${THEME.border}`,
+          marginBottom: '12px',
         }}
-      />
-
-      {/* Категории (минималистичные вкладки) */}
-      <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '8px', borderBottom: '1px solid #E2DFD7' }}>
-        {CATEGORIES.map((category) => {
+      >
+        {CATEGORIES.map((category, idx) => {
           const isActive = activeCategory === category;
           return (
             <button
               key={category}
               onClick={() => setActiveCategory(category)}
               style={{
-                background: 'transparent',
+                background: isActive ? THEME.ink : 'transparent',
+                color: isActive ? '#FFFFFF' : THEME.ink,
                 border: 'none',
-                padding: '4px 0',
-                fontSize: '12px',
+                borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
+                padding: '9px 4px',
+                fontSize: '9px',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
                 cursor: 'pointer',
-                color: isActive ? '#1A1A1A' : '#888',
                 fontWeight: isActive ? 600 : 400,
                 whiteSpace: 'nowrap',
-                borderBottom: isActive ? '2px solid #1A1A1A' : '2px solid transparent',
               }}
             >
-              {category}
+              <span style={{ opacity: 0.55, marginRight: '3px' }}>0{idx + 1}</span> {category}
             </button>
           );
         })}
       </div>
 
-      {/* Сезонные фильтры */}
-      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '16px', marginBottom: '20px' }}>
+      {/* Фильтры спецификаций (Мех / Gore-Tex / Трактор) */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '6px',
+          overflowX: 'auto',
+          paddingBottom: '14px',
+          marginBottom: '14px',
+        }}
+      >
         {FEATURE_FILTERS.map((feat) => {
           const isActive = activeFeature === feat;
           return (
@@ -571,128 +960,197 @@ export function Materials({ onBack }: MaterialsProps) {
               key={feat}
               onClick={() => setActiveFeature(feat)}
               style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '2px 0',
-                fontSize: '11px',
-                color: isActive ? '#1A1A1A' : '#777',
+                backgroundColor: isActive ? THEME.surfaceActive : 'transparent',
+                border: `1px solid ${isActive ? THEME.ink : THEME.border}`,
+                padding: '5px 10px',
+                fontSize: '10px',
+                color: isActive ? THEME.ink : THEME.inkMuted,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                textDecoration: isActive ? 'underline' : 'none',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.6px',
               }}
             >
-              {feat === 'Все' ? 'Все модели' : feat}
+              {feat === 'Все' ? 'Все спецификации' : feat}
             </button>
           );
         })}
       </div>
 
-      {/* Сетка товаров (без тяжелых карточек и рамок) */}
+      {/* Заголовок секции перед сеткой (как «I. ЭКСПОЗИЦИЯ И ФАКТУРА 01—04» на скрине 3) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '10px',
+          letterSpacing: '1.6px',
+          textTransform: 'uppercase',
+          color: THEME.inkMuted,
+          marginBottom: '8px',
+        }}
+      >
+        <span>I. РЕЕСТР ДОСТУПНЫХ СИЛУЭТОВ</span>
+        <span>01—{String(filteredShoes.length).padStart(2, '0')}</span>
+      </div>
+
+      {/* Архитектурная табличная сетка без зазоров (Swiss Grid) */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '24px 16px',
+          borderTop: `1px solid ${THEME.border}`,
+          borderLeft: `1px solid ${THEME.border}`,
         }}
       >
-        {filteredShoes.map((shoe) => {
+        {filteredShoes.map((shoe, index) => {
           const variantsCount = cardioCatalog.filter((i) => i.modelNumber === shoe.modelNumber).length;
           const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
+          const cellIndex = String(index + 1).padStart(2, '0');
 
           return (
             <div
               key={shoe.id}
               onClick={() => setSelectedShoe(shoe)}
               style={{
+                backgroundColor: inCartPairs > 0 ? '#EFECE4' : THEME.surface,
+                borderRight: `1px solid ${THEME.border}`,
+                borderBottom: `1px solid ${THEME.border}`,
+                padding: '12px 12px 14px 12px',
                 display: 'flex',
                 flexDirection: 'column',
+                justifyContent: 'space-between',
                 cursor: 'pointer',
                 position: 'relative',
+                boxSizing: 'border-box',
               }}
             >
+              {/* Верхняя мета-строка ячейки: 01 ... КАТЕГОРИЯ */}
               <div
                 style={{
-                  backgroundColor: '#FAF9F6',
-                  padding: '12px',
-                  marginBottom: '10px',
-                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '9px',
+                  letterSpacing: '1.2px',
+                  color: THEME.inkLight,
+                  textTransform: 'uppercase',
+                  marginBottom: '8px',
                 }}
               >
-                {inCartPairs > 0 && (
+                <span>{cellIndex}</span>
+                {inCartPairs > 0 ? (
                   <span
                     style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      backgroundColor: '#1A1A1A',
+                      backgroundColor: THEME.ink,
                       color: '#FFFFFF',
-                      padding: '2px 6px',
-                      fontSize: '9px',
-                      letterSpacing: '0.5px',
-                      textTransform: 'uppercase',
+                      padding: '2px 5px',
+                      fontSize: '8px',
+                      letterSpacing: '0.8px',
                     }}
                   >
-                    В заказе: {inCartPairs}п.
+                    В БОРДЕРО: {inCartPairs} П.
                   </span>
+                ) : (
+                  <span>{shoe.category}</span>
                 )}
+              </div>
 
-                {shoe.variant && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      color: '#666',
-                      fontSize: '10px',
-                      letterSpacing: '0.5px',
-                    }}
-                  >
-                    {shoe.variant}
-                  </span>
-                )}
-
+              {/* Фото обуви с mix-blend-mode: multiply (растворяет белый фон) */}
+              <div
+                style={{
+                  padding: '6px 4px',
+                  marginBottom: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <img
                   src={shoe.image}
                   alt={`Модель ${shoe.modelNumber}`}
                   loading="lazy"
                   style={{
                     width: '100%',
-                    aspectRatio: '1 / 1',
+                    aspectRatio: '4 / 3',
                     objectFit: 'contain',
+                    mixBlendMode: 'multiply',
+                    filter: 'contrast(1.04)',
                   }}
                 />
               </div>
 
+              {/* Нижний типографический блок карточки */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontFamily: 'serif', fontSize: '16px', fontWeight: 500, letterSpacing: '0.3px' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: THEME.serif,
+                      fontSize: '20px',
+                      fontWeight: 400,
+                      color: THEME.ink,
+                      letterSpacing: '0.2px',
+                    }}
+                  >
                     № {shoe.modelNumber}
                   </span>
-                  <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    {shoe.category}
-                  </span>
+                  {shoe.variant && (
+                    <span
+                      style={{
+                        fontFamily: THEME.serif,
+                        fontStyle: 'italic',
+                        fontSize: '11px',
+                        color: THEME.inkMuted,
+                      }}
+                    >
+                      {shoe.variant}
+                    </span>
+                  )}
                 </div>
 
-                <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>
+                <div
+                  style={{
+                    fontSize: '10px',
+                    color: THEME.inkMuted,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.8px',
+                    marginTop: '2px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {shoe.color}
                 </div>
 
                 <div
                   style={{
-                    marginTop: '6px',
+                    marginTop: '10px',
+                    paddingTop: '8px',
+                    borderTop: `1px solid ${THEME.border}`,
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    fontSize: '10px',
-                    color: '#888',
+                    fontSize: '9px',
+                    letterSpacing: '1px',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
                   }}
                 >
-                  <span>{variantsCount > 1 ? `${variantsCount} варианта` : '40–45'}</span>
-                  <span style={{ color: inCartPairs > 0 ? '#15803D' : '#1A1A1A', fontWeight: 500 }}>
-                    {inCartPairs > 0 ? 'Дозаказать →' : 'Выбрать →'}
+                  <span style={{ color: THEME.inkLight }}>
+                    {variantsCount > 1 ? `${variantsCount} КОЖИ` : '40—45'}
+                  </span>
+                  <span
+                    style={{
+                      color: inCartPairs > 0 ? THEME.accentGreen : THEME.ink,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {inCartPairs > 0 ? 'Изменить →' : 'Досье →'}
                   </span>
                 </div>
               </div>
@@ -701,7 +1159,7 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Фиксированная нижняя панель корзины */}
+      {/* Нижняя фиксированная панель Бордеро */}
       {cart.length > 0 && (
         <div
           style={{
@@ -709,32 +1167,37 @@ export function Materials({ onBack }: MaterialsProps) {
             bottom: 0,
             left: 0,
             right: 0,
-            backgroundColor: '#1A1A1A',
+            backgroundColor: THEME.ink,
             color: '#FFFFFF',
             padding: '12px 16px',
             zIndex: 900,
-            boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
+            borderTop: `1px solid ${THEME.ink}`,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '12px', letterSpacing: '0.5px' }}>
-              Накладная: <strong>{cart.length} мод.</strong> ({cartTotalPairs} пар)
+            <div>
+              <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#A09C94' }}>
+                СВОДНАЯ СПЕЦИФИКАЦИЯ
+              </div>
+              <div style={{ fontFamily: THEME.serif, fontSize: '16px', marginTop: '1px' }}>
+                {cart.length} мод. — <span style={{ fontStyle: 'italic' }}>{cartTotalPairs} пар</span>
+              </div>
             </div>
             <button
               onClick={() => setIsCartOpen(true)}
               style={{
-                backgroundColor: '#FFFFFF',
-                color: '#1A1A1A',
+                backgroundColor: THEME.surface,
+                color: THEME.ink,
                 border: 'none',
-                padding: '8px 16px',
-                fontSize: '11px',
+                padding: '10px 16px',
+                fontSize: '10px',
                 fontWeight: 600,
-                letterSpacing: '1px',
+                letterSpacing: '1.4px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
               }}
             >
-              Сводная накладная →
+              Открыть бордеро →
             </button>
           </div>
         </div>
