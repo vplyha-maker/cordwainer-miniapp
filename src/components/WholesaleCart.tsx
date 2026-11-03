@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { type CartItem } from '../data/catalog';
+import { ManagersContactCard } from './ManagersContactCard';
+
 
 type WholesaleCartProps = {
   items: CartItem[];
