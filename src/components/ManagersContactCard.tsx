@@ -13,7 +13,7 @@ export const MANAGERS_LIST: ManagerContact[] = [
   {
     index: '01',
     name: 'Борис',
-    role: 'Дирекция • Производство',
+    role: 'Руководитель • Производство',
     telegramId: '8529254699',
     phone: '+380974541511',
     phoneDisplay: '+380 (97) 454-15-11',
@@ -21,7 +21,7 @@ export const MANAGERS_LIST: ManagerContact[] = [
   {
     index: '02',
     name: 'Георгий',
-    role: 'Дирекция • Опт',
+    role: 'Руководитель • Опт',
     telegramId: '6034597342',
     phone: '+380677193716',
     phoneDisplay: '+380 (67) 719-37-16',
@@ -36,7 +36,7 @@ export const MANAGERS_LIST: ManagerContact[] = [
   },
 ];
 
-// Глобальный кэш предзагруженных аудиофайлов, чтобы они не удалялись сборщиком мусора при перерисовке React
+// Кэш предзагруженных аудиофайлов
 const audioCache: Record<string, HTMLAudioElement> = {};
 
 export function preloadAppSounds() {
@@ -52,7 +52,6 @@ export function preloadAppSounds() {
   });
 }
 
-// Резервный синтезатор звука (сработает, если браузер не нашел mp3-файл или заблокировал его)
 function playFallbackSynth(type: 'zakaz.mp3' | 'nul.mp3') {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,16 +65,14 @@ function playFallbackSynth(type: 'zakaz.mp3' | 'nul.mp3') {
     gain.connect(ctx.destination);
 
     if (type === 'zakaz.mp3') {
-      // Двойной восходящий сигнал успешного заказа
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12); // E5
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12);
       gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.35);
     } else {
-      // Нисходящий звук аннулирования / сброса
       osc.type = 'sine';
       osc.frequency.setValueAtTime(380, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.25);
@@ -85,11 +82,10 @@ function playFallbackSynth(type: 'zakaz.mp3' | 'nul.mp3') {
       osc.stop(ctx.currentTime + 0.26);
     }
   } catch {
-    // Игнорируем
+    // Ignore
   }
 }
 
-// Надежное воспроизведение звука из кэша с проверкой обоих путей (/nul.mp3 и /sounds/nul.mp3)
 export function playAppSound(fileName: 'zakaz.mp3' | 'nul.mp3') {
   try {
     let audio = audioCache[fileName];
@@ -102,7 +98,6 @@ export function playAppSound(fileName: 'zakaz.mp3' | 'nul.mp3') {
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch(() => {
-        // Пробуем альтернативный путь или включаем синтезатор
         const altAudio = new Audio(`/sounds/${fileName}`);
         altAudio.volume = 1.0;
         altAudio.play().catch(() => {
@@ -115,7 +110,6 @@ export function playAppSound(fileName: 'zakaz.mp3' | 'nul.mp3') {
   }
 }
 
-// Тактильный отклик (Telegram WebApp Haptics + Вибрация телефона)
 export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'medium') {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,7 +133,7 @@ export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | '
       }
     }
   } catch {
-    // Игнорируем
+    // Ignore
   }
 }
 
@@ -180,15 +174,14 @@ export function ManagersContactCard({
   const [pressedButtonKey, setPressedButtonKey] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
-  const [statusToast, setStatusToast] = useState<string | null>(null);
+  const [viberModalMgr, setViberModalMgr] = useState<ManagerContact | null>(null);
 
-  // Защита от детей и кликеров
+  // Защита от случайного нажатия детьми и кликерами
   const [confirmingManager, setConfirmingManager] = useState<ManagerContact | null>(null);
   const [guardTargetCode, setGuardTargetCode] = useState<number>(0);
   const [guardOptions, setGuardOptions] = useState<number[]>([]);
   const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
 
-  // Предзагружаем звуки сразу при монтировании
   useEffect(() => {
     preloadAppSounds();
   }, []);
@@ -200,11 +193,6 @@ export function ManagersContactCard({
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
-
-  const showToast = (msg: string) => {
-    setStatusToast(msg);
-    setTimeout(() => setStatusToast(null), 3500);
-  };
 
   const openSecurityGuard = (mgr: ManagerContact) => {
     const correct = Math.floor(10 + Math.random() * 89);
@@ -248,7 +236,6 @@ export function ManagersContactCard({
       triggerHaptic('error');
       playAppSound('nul.mp3');
       setConfirmingManager(null);
-      showToast('Неверный защитный код. Отправка отменена.');
       return;
     }
 
@@ -271,56 +258,41 @@ export function ManagersContactCard({
     }
   };
 
-  // Безопасный запуск Тел / Viber / Telegram без падения WebView в ошибку ERR_UNKNOWN_URL_SCHEME
-  const handleMessengerAction = async (
-    type: 'tel' | 'viber' | 'tg',
-    mgr: ManagerContact
-  ) => {
-    const key = `${type}-${mgr.telegramId}`;
+  // Telegram — работает напрямую внутри Telegram
+  const handleTelegramClick = (mgr: ManagerContact) => {
+    const key = `tg-${mgr.telegramId}`;
     setPressedButtonKey(key);
     setSelectedManagerId(mgr.telegramId);
     triggerHaptic('medium');
     setTimeout(() => setPressedButtonKey(null), 180);
 
     const cleanDigits = mgr.phone.replace(/\D/g, '');
+    const tgUrl = `https://t.me/+${cleanDigits}`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tgWebApp = (window as any)?.Telegram?.WebApp;
 
-    // Всегда страхуем пользователя копированием номера в буфер обмена
+    if (tgWebApp?.openTelegramLink) {
+      tgWebApp.openTelegramLink(tgUrl);
+    } else {
+      window.open(tgUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  // Viber — БЕЗ открытия сайта: копирует номер в буфер и открывает карточку прямо поверх экрана
+  const handleViberClick = async (mgr: ManagerContact) => {
+    const key = `viber-${mgr.telegramId}`;
+    setPressedButtonKey(key);
+    setSelectedManagerId(mgr.telegramId);
+    triggerHaptic('success');
+    setTimeout(() => setPressedButtonKey(null), 180);
+
     try {
       await navigator.clipboard.writeText(mgr.phone);
     } catch {
-      // Игнорируем
+      // Fallback
     }
 
-    if (type === 'tel') {
-      showToast(`📞 Номер ${mgr.name} (${mgr.phoneDisplay}) скопирован • Вызов...`);
-      // Если открыто внутри Telegram Mini App, открываем внешний мост звонка, чтобы не ронять WebView
-      const bridgeUrl = `${window.location.origin}${window.location.pathname}?open_tel=${cleanDigits}`;
-      if (tgWebApp?.openLink) {
-        tgWebApp.openLink(bridgeUrl);
-      } else {
-        window.open(`tel:+${cleanDigits}`, '_top');
-      }
-    } else if (type === 'viber') {
-      showToast(`💬 Номер ${mgr.name} скопирован • Открываем Viber...`);
-      // Открываем через системный браузер телефона (Telegram.WebApp.openLink принимает только https://),
-      // а системный браузер сам запускает приложение Viber без ошибки ERR_UNKNOWN_URL_SCHEME
-      const bridgeUrl = `${window.location.origin}${window.location.pathname}?open_viber=${cleanDigits}`;
-      if (tgWebApp?.openLink) {
-        tgWebApp.openLink(bridgeUrl);
-      } else {
-        window.open(`viber://chat?number=%2B${cleanDigits}`, '_blank');
-      }
-    } else if (type === 'tg') {
-      showToast(`✈️ Открываем чат Telegram (${mgr.name})...`);
-      const tgUrl = `https://t.me/+${cleanDigits}`;
-      if (tgWebApp?.openTelegramLink) {
-        tgWebApp.openTelegramLink(tgUrl);
-      } else {
-        window.open(tgUrl, '_blank', 'noopener,noreferrer');
-      }
-    }
+    setViberModalMgr(mgr);
   };
 
   const handleCopyClick = () => {
@@ -346,14 +318,14 @@ export function ManagersContactCard({
         color: THEME.ink,
       }}
     >
-      {/* Журнальная шапка секции */}
+      {/* Шапка секции */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '10px',
-          letterSpacing: '1.6px',
+          letterSpacing: '1.4px',
           textTransform: 'uppercase',
           color: THEME.inkMuted,
           marginBottom: '8px',
@@ -361,25 +333,91 @@ export function ManagersContactCard({
       >
         <span>
           {onSendOrder
-            ? `II. ДИРЕКЦИЯ И ОТПРАВКА (${itemsCount || 0} МОД.)`
-            : 'ДИРЕКЦИЯ МАНУФАКТУРЫ'}
+            ? `II. ОТПРАВКА ЗАКАЗА И СВЯЗЬ (${itemsCount || 0} МОД.)`
+            : 'СВЯЗЬ С РУКОВОДСТВОМ ФАБРИКИ'}
         </span>
-        <span>DIRECT • VIBER • TG</span>
+        <span>ТЕЛ • VIBER • TG</span>
       </div>
 
-      {/* Всплывающее уведомление о вызове / копировании номера */}
-      {statusToast && (
+      {/* Всплывающее окно при нажатии на Viber (без перехода на сайт) */}
+      {viberModalMgr && (
         <div
           style={{
             backgroundColor: THEME.ink,
             color: '#FFFFFF',
-            padding: '10px 12px',
-            marginBottom: '10px',
-            fontSize: '11px',
-            letterSpacing: '0.4px',
+            padding: '16px',
+            marginBottom: '12px',
+            border: `1px solid ${THEME.ink}`,
           }}
         >
-          {statusToast}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: '#A8A39A' }}>
+              ✓ НОМЕР СКОПИРОВАН ДЛЯ VIBER
+            </span>
+            <button
+              type="button"
+              onClick={() => setViberModalMgr(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                cursor: 'pointer',
+                padding: '2px 6px',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div style={{ fontFamily: THEME.serif, fontSize: '20px', marginBottom: '4px' }}>
+            {viberModalMgr.name}: {viberModalMgr.phoneDisplay}
+          </div>
+
+          <div style={{ fontSize: '11px', color: '#D0CCC4', lineHeight: 1.4, marginBottom: '12px' }}>
+            Номер уже скопирован в буфер обмена телефона — вставьте его в поиске Viber, либо свяжитесь в один клик:
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <a
+              href={`tel:${viberModalMgr.phone}`}
+              onClick={() => triggerHaptic('medium')}
+              style={{
+                padding: '10px 0',
+                backgroundColor: THEME.surface,
+                color: THEME.ink,
+                textDecoration: 'none',
+                textAlign: 'center',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+              }}
+            >
+              Позвонить ↗
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                const m = viberModalMgr;
+                setViberModalMgr(null);
+                handleTelegramClick(m);
+              }}
+              style={{
+                padding: '10px 0',
+                backgroundColor: 'transparent',
+                color: '#FFFFFF',
+                border: '1px solid #FFFFFF',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Написать в TG ↗
+            </button>
+          </div>
         </div>
       )}
 
@@ -405,7 +443,7 @@ export function ManagersContactCard({
           }}
         >
           <div>
-            <strong>Накладная заблокирована:</strong> заполните {missingFields.join(', ')}
+            <strong>Заполните данные доставки:</strong> {missingFields.join(', ')}
           </div>
           <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', flexShrink: 0, textDecoration: 'underline' }}>
             Заполнить ↑
@@ -413,7 +451,7 @@ export function ManagersContactCard({
         </div>
       )}
 
-      {/* Модальная вставка защиты от детей и автокликеров */}
+      {/* Подтверждение отправки (защита от случайных нажатий) */}
       {confirmingManager && (
         <div
           style={{
@@ -426,7 +464,7 @@ export function ManagersContactCard({
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <span style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#A8A39A' }}>
-              ЗАЩИТА ОТ СЛУЧАЙНОЙ ОТПРАВКИ
+              ПОДТВЕРЖДЕНИЕ ОТПРАВКИ
             </span>
             <button
               type="button"
@@ -448,7 +486,7 @@ export function ManagersContactCard({
           </div>
 
           <div style={{ fontFamily: THEME.serif, fontSize: '17px', marginBottom: '12px', lineHeight: 1.3 }}>
-            Отправить заказ руководителю <strong>{confirmingManager.name}</strong>? Для подтверждения нажмите код{' '}
+            Отправить накладную руководителю (<strong>{confirmingManager.name}</strong>)? Нажмите число{' '}
             <span style={{ textDecoration: 'underline', fontWeight: 700 }}>{guardTargetCode}</span>:
           </div>
 
@@ -476,7 +514,7 @@ export function ManagersContactCard({
         </div>
       )}
 
-      {/* Единый табличный реестр (Swiss Grid) */}
+      {/* Таблица руководителей */}
       <div
         style={{
           borderTop: `1px solid ${THEME.border}`,
@@ -515,7 +553,7 @@ export function ManagersContactCard({
                 transition: 'background-color 0.15s ease',
               }}
             >
-              {/* Верхняя строка: Индекс, Имя, Роль и Телефон */}
+              {/* Верхняя строка: Имя и номер телефона */}
               <div
                 style={{
                   padding: '12px 14px 10px 14px',
@@ -575,7 +613,7 @@ export function ManagersContactCard({
                 </span>
               </div>
 
-              {/* Нижняя строка: 4 действия в одну линию (Отправить заказ | Тел. | Viber | TG) */}
+              {/* Нижняя строка: 4 кнопки (Отправить заказ | Тел. | Viber | TG) */}
               <div
                 style={{
                   display: 'grid',
@@ -625,11 +663,17 @@ export function ManagersContactCard({
                   </button>
                 )}
 
-                <button
-                  type="button"
+                {/* Прямая телефонная ссылка tel: (без открытия сайта) */}
+                <a
+                  href={`tel:${mgr.phone}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleMessengerAction('tel', mgr);
+                    const key = `tel-${mgr.telegramId}`;
+                    setPressedButtonKey(key);
+                    setSelectedManagerId(mgr.telegramId);
+                    triggerHaptic('medium');
+                    navigator.clipboard?.writeText(mgr.phone).catch(() => {});
+                    setTimeout(() => setPressedButtonKey(null), 180);
                   }}
                   style={{
                     display: 'flex',
@@ -639,10 +683,10 @@ export function ManagersContactCard({
                     backgroundColor:
                       pressedButtonKey === `tel-${mgr.telegramId}` ? THEME.ink : 'transparent',
                     color: pressedButtonKey === `tel-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
-                    border: 'none',
+                    textDecoration: 'none',
                     borderRight: `1px solid ${THEME.border}`,
                     fontSize: '9px',
-                    fontWeight: 500,
+                    fontWeight: 600,
                     letterSpacing: '0.8px',
                     textTransform: 'uppercase',
                     cursor: 'pointer',
@@ -650,13 +694,14 @@ export function ManagersContactCard({
                   }}
                 >
                   ТЕЛ. ↗
-                </button>
+                </a>
 
+                {/* Кнопка Viber — копирует номер и открывает плашку внутри приложения */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleMessengerAction('viber', mgr);
+                    handleViberClick(mgr);
                   }}
                   style={{
                     display: 'flex',
@@ -664,8 +709,16 @@ export function ManagersContactCard({
                     justifyContent: 'center',
                     padding: '11px 4px',
                     backgroundColor:
-                      pressedButtonKey === `viber-${mgr.telegramId}` ? THEME.ink : 'transparent',
-                    color: pressedButtonKey === `viber-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
+                      viberModalMgr?.telegramId === mgr.telegramId
+                        ? THEME.accentGreen
+                        : pressedButtonKey === `viber-${mgr.telegramId}`
+                        ? THEME.ink
+                        : 'transparent',
+                    color:
+                      viberModalMgr?.telegramId === mgr.telegramId ||
+                      pressedButtonKey === `viber-${mgr.telegramId}`
+                        ? '#FFFFFF'
+                        : THEME.ink,
                     border: 'none',
                     borderRight: `1px solid ${THEME.border}`,
                     fontSize: '9px',
@@ -676,14 +729,15 @@ export function ManagersContactCard({
                     transition: 'all 0.12s ease',
                   }}
                 >
-                  VIBER ↗
+                  {viberModalMgr?.telegramId === mgr.telegramId ? 'СКОПИР.' : 'VIBER'}
                 </button>
 
+                {/* Кнопка Telegram */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleMessengerAction('tg', mgr);
+                    handleTelegramClick(mgr);
                   }}
                   style={{
                     display: 'flex',
@@ -710,7 +764,7 @@ export function ManagersContactCard({
         })}
       </div>
 
-      {/* ВЫДЕЛЕННАЯ ЗАМЕТНАЯ КНОПКА КОПИРОВАНИЯ НАКЛАДНОЙ */}
+      {/* Крупная заметная кнопка копирования накладной */}
       {onCopyInvoice && (
         <div
           style={{
@@ -747,8 +801,8 @@ export function ManagersContactCard({
           >
             <span>
               {copied
-                ? '✓ ТЕКСТ НАКЛАДНОЙ СКОПИРОВАН В БУФЕР'
-                : 'СКОПИРОВАТЬ ТЕКСТ НАКЛАДНОЙ В БУФЕР'}
+                ? '✓ ТЕКСТ НАКЛАДНОЙ СКОПИРОВАН'
+                : 'СКОПИРОВАТЬ ТЕКСТ НАКЛАДНОЙ'}
             </span>
             <span
               style={{
@@ -761,13 +815,13 @@ export function ManagersContactCard({
                 border: '1px solid rgba(255,255,255,0.35)',
               }}
             >
-              {copied ? 'Copied ✓' : 'Copy ↗'}
+              {copied ? 'Готово ✓' : 'Копировать'}
             </span>
           </button>
         </div>
       )}
 
-      {/* Архивный колонтитул в самом низу */}
+      {/* Нижняя подпись */}
       <div
         style={{
           marginTop: '14px',
@@ -779,8 +833,8 @@ export function ManagersContactCard({
           color: THEME.inkLight,
         }}
       >
-        <span>CORDWAINER // CARDIO B2B</span>
-        <span>KHARKIV ATELIER</span>
+        <span>CARDIO FOOTWEAR // ОПТ</span>
+        <span>ХАРЬКОВ</span>
       </div>
     </div>
   );
