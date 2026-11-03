@@ -930,34 +930,6 @@ export function Materials({ onBack }: MaterialsProps) {
         />
       </div>
 
-      {/* Заголовок бренда */}
-      <div style={{ marginBottom: '18px' }}>
-        <h1
-          style={{
-            fontFamily: THEME.serif,
-            fontSize: '40px',
-            margin: '0',
-            fontWeight: 400,
-            letterSpacing: '0.5px',
-            lineHeight: 1,
-            textTransform: 'uppercase',
-          }}
-        >
-          Cardio Footwear
-        </h1>
-        <div
-          style={{
-            fontFamily: THEME.serif,
-            fontStyle: 'italic',
-            fontSize: '14px',
-            color: THEME.inkMuted,
-            marginTop: '4px',
-          }}
-        >
-          Оптовый шоурум и заказ моделей от производителя
-        </div>
-      </div>
-
       {/* Поле поиска */}
       <div
         style={{
