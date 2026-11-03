@@ -35,248 +35,76 @@ const MANAGERS = [
   { label: 'Отправить заказ • Test', telegramId: '8686072747', name: 'Test' },
 ];
 
-const NP_API_KEY = import.meta.env.VITE_NP_API_KEY || '';
+// Реальные ключи API Новой Почты из бизнес-кабинета
+const NP_API_KEYS = [
+  import.meta.env.VITE_NP_API_KEY,
+  'cd6a2ad00e721a0ce6d246522c082905',
+  '93d600bbcf03232f807cabc2ca757407',
+].filter((k): k is string => Boolean(k && k.trim()));
+
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
+// Только быстрые кнопки под шапкой (с официальными Ref Новой Почты)
 const POPULAR_CITIES: CityOption[] = [
-  { name: 'Киев', uaName: 'Київ', fullLabel: 'г. Киев (Київ)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
-  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'г. Днепр (Дніпро)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
-  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'г. Одесса (Одеса)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Львов', uaName: 'Львів', fullLabel: 'г. Львов (Львів)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Харьков', uaName: 'Харків', fullLabel: 'г. Харьков (Харків)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.7 },
-  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'г. Полтава', ref: 'db5c8892-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.85 },
-  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'г. Запорожье (Запоріжжя)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
-  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'г. Винница (Вінниця)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
+  { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
+  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
+  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
+  { name: 'Львов', uaName: 'Львів', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
+  { name: 'Харьков', uaName: 'Харків', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.7 },
+  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.85 },
+  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
+  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
 ];
 
-// Расширенный справочник городов Украины с поддержкой поиска на укр., рус. и суржике
-const UKRAINE_CITIES_DIRECTORY: CityOption[] = [
-  ...POPULAR_CITIES,
-  { name: 'Николаев', uaName: 'Миколаїв', fullLabel: 'г. Миколаїв / Николаев (Миколаївська обл.)', ref: 'db5c888c-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Сумы', uaName: 'Суми', fullLabel: 'г. Суми / Сумы (Сумська обл.)', ref: 'db5c88e5-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.85 },
-  { name: 'Черкассы', uaName: 'Черкаси', fullLabel: 'г. Черкаси / Черкассы (Черкаська обл.)', ref: 'db5c8902-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
-  { name: 'Чернигов', uaName: 'Чернігів', fullLabel: 'г. Чернігів / Чернигов (Чернігівська обл.)', ref: 'db5c897c-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.0 },
-  { name: 'Житомир', uaName: 'Житомир', fullLabel: 'г. Житомир (Житомирська обл.)', ref: 'db5c88c4-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Хмельницкий', uaName: 'Хмельницький', fullLabel: 'г. Хмельницький / Хмельницкий', ref: 'db5c88ac-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Черновцы', uaName: 'Чернівці', fullLabel: 'г. Чернівці / Черновцы (Чернівецька обл.)', ref: 'e221d627-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Ровно', uaName: 'Рівне', fullLabel: 'г. Рівне / Ровно (Рівненська обл.)', ref: 'db5c896a-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Луцк', uaName: 'Луцьк', fullLabel: 'г. Луцьк / Луцк (Волинська обл.)', ref: 'db5c893b-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Тернополь', uaName: 'Тернопіль', fullLabel: 'г. Тернопіль / Тернополь (Тернопільська обл.)', ref: 'db5c8900-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Ивано-Франковск', uaName: 'Івано-Франківськ', fullLabel: 'г. Івано-Франківськ / Ивано-Франковск', ref: 'db5c8904-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Ужгород', uaName: 'Ужгород', fullLabel: 'г. Ужгород (Закарпатська обл.)', ref: 'e221d642-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.15 },
-  { name: 'Кропивницкий', uaName: 'Кропивницький', fullLabel: 'г. Кропивницький / Кропивницкий', ref: 'db5c891b-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
-  { name: 'Херсон', uaName: 'Херсон', fullLabel: 'г. Херсон (Херсонська обл.)', ref: 'db5c88cc-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Кривой Рог', uaName: 'Кривий Ріг', fullLabel: 'г. Кривий Ріг / Кривой Рог (Дніпропетровська обл.)', ref: 'db5c890d-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
-  { name: 'Кременчуг', uaName: 'Кременчук', fullLabel: 'г. Кременчук / Кременчуг (Полтавська обл.)', ref: 'db5c8915-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
-  { name: 'Белая Церковь', uaName: 'Біла Церква', fullLabel: 'г. Біла Церква / Белая Церковь (Київська обл.)', ref: 'db5c88d8-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.0 },
-  { name: 'Каменское', uaName: 'Кам’янське', fullLabel: 'г. Кам’янське / Каменское (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Павлоград', uaName: 'Павлоград', fullLabel: 'г. Павлоград (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.85 },
-  { name: 'Никополь', uaName: 'Нікополь', fullLabel: 'г. Нікополь / Никополь (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Новомосковск / Самар', uaName: 'Самар', fullLabel: 'г. Самар / Новомосковск (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Марганец', uaName: 'Марганець', fullLabel: 'г. Марганець / Марганец (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Желтые Воды', uaName: 'Жовті Води', fullLabel: 'г. Жовті Води / Желтые Воды (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Покров', uaName: 'Покров', fullLabel: 'г. Покров (Дніпропетровська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Умань', uaName: 'Умань', fullLabel: 'г. Умань (Черкаська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Бровары', uaName: 'Бровари', fullLabel: 'г. Бровари / Бровары (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Борисполь', uaName: 'Бориспіль', fullLabel: 'г. Бориспіль / Борисполь (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Ирпень', uaName: 'Ірпінь', fullLabel: 'г. Ірпінь / Ирпень (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Буча', uaName: 'Буча', fullLabel: 'г. Буча (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Фастов', uaName: 'Фастів', fullLabel: 'г. Фастів / Фастов (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Обухов', uaName: 'Обухів', fullLabel: 'г. Обухів / Обухов (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Васильков', uaName: 'Васильків', fullLabel: 'г. Васильків / Васильков (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Вишневое', uaName: 'Вишневе', fullLabel: 'г. Вишневе / Вишневое (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Боярка', uaName: 'Боярка', fullLabel: 'г. Боярка (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Переяслав', uaName: 'Переяслав', fullLabel: 'г. Переяслав (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Славутич', uaName: 'Славутич', fullLabel: 'г. Славутич (Київська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Яготин', uaName: 'Яготин', fullLabel: 'г. Яготин (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Вышгород', uaName: 'Вишгород', fullLabel: 'г. Вишгород / Вышгород (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Мироновка', uaName: 'Миронівка', fullLabel: 'г. Миронівка / Мироновка (Київська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Бердичев', uaName: 'Бердичів', fullLabel: 'г. Бердичів / Бердичев (Житомирська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Коростень', uaName: 'Коростень', fullLabel: 'г. Коростень (Житомирська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Звягель / Новоград-Волынский', uaName: 'Звягель', fullLabel: 'г. Звягель / Новоград-Волинський (Житомирська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Малин', uaName: 'Малин', fullLabel: 'г. Малин (Житомирська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Коростышев', uaName: 'Коростишів', fullLabel: 'г. Коростишів / Коростышев (Житомирська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Нежин', uaName: 'Ніжин', fullLabel: 'г. Ніжин / Нежин (Чернігівська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Прилуки', uaName: 'Прилуки', fullLabel: 'г. Прилуки (Чернігівська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Бахмач', uaName: 'Бахмач', fullLabel: 'г. Бахмач (Чернігівська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Конотоп', uaName: 'Конотоп', fullLabel: 'г. Конотоп (Сумська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Шостка', uaName: 'Шостка', fullLabel: 'г. Шостка (Сумська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Ахтырка', uaName: 'Охтирка', fullLabel: 'г. Охтирка / Ахтырка (Сумська обл.)', ref: '', zoneMultiplier: 0.85 },
-  { name: 'Ромны', uaName: 'Ромни', fullLabel: 'г. Ромни / Ромны (Сумська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Глухов', uaName: 'Глухів', fullLabel: 'г. Глухів / Глухов (Сумська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Тростянец', uaName: 'Тростянець', fullLabel: 'г. Тростянець / Тростянец (Сумська обл.)', ref: '', zoneMultiplier: 0.85 },
-  { name: 'Кролевец', uaName: 'Кролевець', fullLabel: 'г. Кролевець / Кролевец (Сумська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Лебедин', uaName: 'Лебедин', fullLabel: 'г. Лебедин (Сумська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Лубны', uaName: 'Лубни', fullLabel: 'г. Лубни / Лубны (Полтавська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Миргород', uaName: 'Миргород', fullLabel: 'г. Миргород (Полтавська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Горишни Плавни', uaName: 'Горішні Плавні', fullLabel: 'г. Горішні Плавні (Полтавська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Гадяч', uaName: 'Гадяч', fullLabel: 'г. Гадяч (Полтавська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Пирятин', uaName: 'Пирятин', fullLabel: 'г. Пирятин (Полтавська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Карловка', uaName: 'Карлівка', fullLabel: 'г. Карлівка / Карловка (Полтавська обл.)', ref: '', zoneMultiplier: 0.85 },
-  { name: 'Кобеляки', uaName: 'Кобеляки', fullLabel: 'г. Кобеляки (Полтавська обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Александрия', uaName: 'Олександрія', fullLabel: 'г. Олександрія / Александрия (Кіровоградська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Светловодск', uaName: 'Світловодськ', fullLabel: 'г. Світловодськ / Светловодск (Кіровоградська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Знаменка', uaName: 'Знам’янка', fullLabel: 'г. Знам’янка / Знаменка (Кіровоградська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Долинская', uaName: 'Долинська', fullLabel: 'г. Долинська / Долинская (Кіровоградська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Смела', uaName: 'Сміла', fullLabel: 'г. Сміла / Смела (Черкаська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Золотоноша', uaName: 'Золотоноша', fullLabel: 'г. Золотоноша (Черкаська обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Канев', uaName: 'Канів', fullLabel: 'г. Канів / Канев (Черкаська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Корсунь-Шевченковский', uaName: 'Корсунь-Шевченківський', fullLabel: 'г. Корсунь-Шевченківський (Черкаська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Звенигородка', uaName: 'Звенигородка', fullLabel: 'г. Звенигородка (Черкаська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Шпола', uaName: 'Шпола', fullLabel: 'г. Шпола (Черкаська обл.)', ref: '', zoneMultiplier: 1.0 },
-  { name: 'Измаил', uaName: 'Ізмаїл', fullLabel: 'г. Ізмаїл / Измаил (Одеська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Черноморск', uaName: 'Чорноморськ', fullLabel: 'г. Чорноморськ / Черноморск (Одеська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Белгород-Днестровский', uaName: 'Білгород-Дністровський', fullLabel: 'г. Білгород-Дністровський (Одеська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Подольск', uaName: 'Подільськ', fullLabel: 'г. Подільськ / Подольск (Одеська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Южное / Пивденное', uaName: 'Південне', fullLabel: 'г. Південне / Южное (Одеська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Килиия', uaName: 'Кілія', fullLabel: 'г. Кілія / Килия (Одеська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Рени', uaName: 'Рені', fullLabel: 'г. Рені / Рени (Одеська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Балта', uaName: 'Балта', fullLabel: 'г. Балта (Одеська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Раздельная', uaName: 'Роздільна', fullLabel: 'г. Роздільна / Раздельная (Одеська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Болград', uaName: 'Болград', fullLabel: 'г. Болград (Одеська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Арциз', uaName: 'Арциз', fullLabel: 'г. Арциз (Одеська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Первомайск', uaName: 'Первомайськ', fullLabel: 'г. Первомайськ / Первомайск (Миколаївська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Вознесенск', uaName: 'Вознесенськ', fullLabel: 'г. Вознесенськ / Вознесенск (Миколаївська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Южноукраинск', uaName: 'Південноукраїнськ', fullLabel: 'г. Південноукраїнськ / Южноукраинск (Миколаївська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Новый Буг', uaName: 'Новий Буг', fullLabel: 'г. Новий Буг / Новый Буг (Миколаївська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Очаков', uaName: 'Очаків', fullLabel: 'г. Очаків / Очаков (Миколаївська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Баштанка', uaName: 'Баштанка', fullLabel: 'г. Баштанка (Миколаївська обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Каменец-Подольский', uaName: 'Кам’янець-Подільський', fullLabel: 'г. Кам’янець-Подільський (Хмельницька обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Шепетовка', uaName: 'Шепетівка', fullLabel: 'г. Шепетівка / Шепетовка (Хмельницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Нетешин', uaName: 'Нетішин', fullLabel: 'г. Нетішин / Нетешин (Хмельницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Славута', uaName: 'Славута', fullLabel: 'г. Славута (Хмельницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Староконстантинов', uaName: 'Старокостянтинів', fullLabel: 'г. Старокостянтинів (Хмельницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Полонное', uaName: 'Полонне', fullLabel: 'г. Полонне / Полонное (Хмельницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Волочиск', uaName: 'Волочиськ', fullLabel: 'г. Волочиськ / Волочиск (Хмельницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Жмеринка', uaName: 'Жмеринка', fullLabel: 'г. Жмеринка (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Могилев-Подольский', uaName: 'Могилів-Подільський', fullLabel: 'г. Могилів-Подільський (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Хмельник', uaName: 'Хмільник', fullLabel: 'г. Хмільник / Хмельник (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Гайсин', uaName: 'Гайсин', fullLabel: 'г. Гайсин (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Казатин', uaName: 'Козятин', fullLabel: 'г. Козятин / Казатин (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Ладыжин', uaName: 'Ладижин', fullLabel: 'г. Ладижин / Ладыжин (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Калиновка', uaName: 'Калинівка', fullLabel: 'г. Калинівка / Калиновка (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Бар', uaName: 'Бар', fullLabel: 'г. Бар (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Тульчин', uaName: 'Тульчин', fullLabel: 'г. Тульчин (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Бершадь', uaName: 'Бершадь', fullLabel: 'г. Бершадь (Вінницька обл.)', ref: '', zoneMultiplier: 1.05 },
-  { name: 'Ковель', uaName: 'Ковель', fullLabel: 'г. Ковель (Волинська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Нововолынск', uaName: 'Нововолинськ', fullLabel: 'г. Нововолинськ (Волинська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Владимир', uaName: 'Володимир', fullLabel: 'г. Володимир / Владимир (Волинська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Вараш', uaName: 'Вараш', fullLabel: 'г. Вараш (Рівненська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Дубно', uaName: 'Дубно', fullLabel: 'г. Дубно (Рівненська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Костополь', uaName: 'Костопіль', fullLabel: 'г. Костопіль / Костополь (Рівненська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Сарны', uaName: 'Сарни', fullLabel: 'г. Сарни / Сарны (Рівненська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Здолбунов', uaName: 'Здолбунів', fullLabel: 'г. Здолбунів / Здолбунов (Рівненська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Дрогобыч', uaName: 'Дрогобич', fullLabel: 'г. Дрогобич (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Стрый', uaName: 'Стрий', fullLabel: 'г. Стрий / Стрый (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Шептицкий / Червоноград', uaName: 'Шептицький', fullLabel: 'г. Шептицький / Червоноград (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Самбор', uaName: 'Самбір', fullLabel: 'г. Самбір / Самбор (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Трускавец', uaName: 'Трускавець', fullLabel: 'г. Трускавець / Трускавец (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Борислав', uaName: 'Борислав', fullLabel: 'г. Борислав (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Новояворовск', uaName: 'Новояворівськ', fullLabel: 'г. Новояворівськ (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Золочев', uaName: 'Золочів', fullLabel: 'г. Золочів / Золочев (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Броды', uaName: 'Броди', fullLabel: 'г. Броди / Броды (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Сокаль', uaName: 'Сокаль', fullLabel: 'г. Сокаль (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Стебник', uaName: 'Стебник', fullLabel: 'г. Стебник (Львівська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Калуш', uaName: 'Калуш', fullLabel: 'г. Калуш (Івано-Франківська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Коломыя', uaName: 'Коломия', fullLabel: 'г. Коломия / Коломыя (Івано-Франківська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Надворная', uaName: 'Надвірна', fullLabel: 'г. Надвірна / Надворная (Івано-Франківська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Долина', uaName: 'Долина', fullLabel: 'г. Долина (Івано-Франківська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Бурштын', uaName: 'Бурштин', fullLabel: 'г. Бурштин / Бурштын (Івано-Франківська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Яремче', uaName: 'Яремче', fullLabel: 'г. Яремче (Івано-Франківська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Чортков', uaName: 'Чортків', fullLabel: 'г. Чортків / Чортков (Тернопільська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Кременец', uaName: 'Кременець', fullLabel: 'г. Кременець / Кременец (Тернопільська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Бережаны', uaName: 'Бережани', fullLabel: 'г. Бережани / Бережаны (Тернопільська обл.)', ref: '', zoneMultiplier: 1.1 },
-  { name: 'Мукачево', uaName: 'Мукачево', fullLabel: 'г. Мукачево (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Хуст', uaName: 'Хуст', fullLabel: 'г. Хуст (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Виноградов', uaName: 'Виноградів', fullLabel: 'г. Виноградів / Виноградов (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Берегово', uaName: 'Берегове', fullLabel: 'г. Берегове / Берегово (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Свалява', uaName: 'Свалява', fullLabel: 'г. Свалява (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Рахов', uaName: 'Рахів', fullLabel: 'г. Рахів / Рахов (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Тячев', uaName: 'Тячів', fullLabel: 'г. Тячів / Тячев (Закарпатська обл.)', ref: '', zoneMultiplier: 1.15 },
-  { name: 'Лозовая', uaName: 'Лозова', fullLabel: 'г. Лозова / Лозовая (Харківська обл.)', ref: '', zoneMultiplier: 0.8 },
-  { name: 'Чугуев', uaName: 'Чугуїв', fullLabel: 'г. Чугуїв / Чугуев (Харківська обл.)', ref: '', zoneMultiplier: 0.75 },
-  { name: 'Изюм', uaName: 'Ізюм', fullLabel: 'г. Ізюм / Изюм (Харківська обл.)', ref: '', zoneMultiplier: 0.8 },
-  { name: 'Берестин / Красноград', uaName: 'Берестин', fullLabel: 'г. Берестин / Красноград (Харківська обл.)', ref: '', zoneMultiplier: 0.8 },
-  { name: 'Златополь / Первомайский', uaName: 'Златопіль', fullLabel: 'г. Златопіль / Первомайский (Харківська обл.)', ref: '', zoneMultiplier: 0.8 },
-  { name: 'Балаклея', uaName: 'Балаклія', fullLabel: 'г. Балаклія / Балаклея (Харківська обл.)', ref: '', zoneMultiplier: 0.8 },
-  { name: 'Мерефа', uaName: 'Мерефа', fullLabel: 'г. Мерефа (Харківська обл.)', ref: '', zoneMultiplier: 0.75 },
-  { name: 'Люботин', uaName: 'Люботин', fullLabel: 'г. Люботин (Харківська обл.)', ref: '', zoneMultiplier: 0.75 },
-  { name: 'Дергачи', uaName: 'Дергачі', fullLabel: 'г. Дергачі / Дергачи (Харківська обл.)', ref: '', zoneMultiplier: 0.75 },
-  { name: 'Богодухов', uaName: 'Богодухів', fullLabel: 'г. Богодухів / Богодухов (Харківська обл.)', ref: '', zoneMultiplier: 0.8 },
-  { name: 'Змиев', uaName: 'Зміїв', fullLabel: 'г. Зміїв / Змиев (Харківська обл.)', ref: '', zoneMultiplier: 0.75 },
-  { name: 'Валки', uaName: 'Валки', fullLabel: 'г. Валки (Харківська обл.)', ref: '', zoneMultiplier: 0.75 },
-  { name: 'Краматорск', uaName: 'Краматорськ', fullLabel: 'г. Краматорськ / Краматорск (Донецька обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Славянск', uaName: 'Слов’янськ', fullLabel: 'г. Слов’янськ / Славянск (Донецька обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Покровск', uaName: 'Покровськ', fullLabel: 'г. Покровськ / Покровск (Донецька обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Мирноград', uaName: 'Мирноград', fullLabel: 'г. Мирноград (Донецька обл.)', ref: '', zoneMultiplier: 0.95 },
-  { name: 'Дружковка', uaName: 'Дружківка', fullLabel: 'г. Дружківка / Дружковка (Донецька обл.)', ref: '', zoneMultiplier: 0.9 },
-  { name: 'Доброполье', uaName: 'Добропілля', fullLabel: 'г. Добропілля / Доброполье (Донецька обл.)', ref: '', zoneMultiplier: 0.95 },
-];
-
-// Нормализация текста для поиска (миколаив === миколаїв)
-function normalizeSearch(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/['’`"]/g, '')
-    .replace(/[іїйы]/g, 'и')
-    .replace(/[єэё]/g, 'е')
-    .replace(/ґ/g, 'г')
-    .trim();
-}
-
-// Перевод частых русскоязычных/суржиковых вводов в украинский формат для API Новой Почты
-function toUkrainianApiQuery(raw: string): string {
-  const clean = raw.trim();
-  const lower = clean.toLowerCase();
-
-  const dictionary: Record<string, string> = {
-    николаев: 'Миколаїв',
-    миколаив: 'Миколаїв',
-    миколаев: 'Миколаїв',
-    киев: 'Київ',
-    днепр: 'Дніпро',
-    харьков: 'Харків',
-    одесса: 'Одеса',
-    львов: 'Львів',
-    запорожье: 'Запоріжжя',
-    винница: 'Вінниця',
-    ровно: 'Рівне',
-    ривне: 'Рівне',
-    черновцы: 'Чернівці',
-    чернигов: 'Чернігів',
-    черкассы: 'Черкаси',
-    сумы: 'Суми',
-    луцк: 'Луцьк',
-    тернополь: 'Тернопіль',
-    хмельницкий: 'Хмельницький',
-    кропивницкий: 'Кропивницький',
-    кривой: 'Кривий Ріг',
-    кременчуг: 'Кременчук',
-    каменское: 'Кам’янське',
-    белая: 'Біла Церква',
-    ивано: 'Івано-Франківськ',
-  };
-
-  for (const [ruKey, uaVal] of Object.entries(dictionary)) {
-    if (lower.startsWith(ruKey)) {
-      return uaVal;
+// Универсальный запрос к API Новой Почты с автоматическим перебором ключей при ошибке
+async function callNovaPoshta(
+  modelName: string,
+  calledMethod: string,
+  methodProperties: Record<string, unknown>
+) {
+  for (const apiKey of NP_API_KEYS) {
+    try {
+      const res = await fetch('https://api.novaposhta.ua/v2.0/json/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey,
+          modelName,
+          calledMethod,
+          methodProperties,
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        return data;
+      }
+    } catch {
+      // Переход к следующему ключу при сетевой ошибке
     }
   }
-
-  return clean;
+  return null;
 }
 
-// Резервный генератор отделений на случай, если API-ключ НП не задан в Vercel
-function buildFallbackWarehouses(cityName: string): WarehouseOption[] {
-  const list: WarehouseOption[] = [];
-  for (let i = 1; i <= 50; i++) {
-    list.push({
-      ref: `fallback-wh-${i}`,
-      number: String(i),
-      description: `Отделение НП №${i} (г. ${cityName})`,
-    });
+// Генерация вариантов написания (чтобы ввод «миколаив» или «николаев» находил в базе НП «Миколаїв»)
+function buildSearchVariants(raw: string): string[] {
+  const clean = raw.trim();
+  const lower = clean.toLowerCase();
+  const variants = new Set<string>([clean]);
+
+  // Если ввели через «ив» (миколаив, киив, чернигив, львив, харкив)
+  if (lower.includes('аив') || lower.includes('яив') || lower.includes('иив')) {
+    variants.add(clean.replace(/ив/gi, 'їв').replace(/иїв/gi, 'іївка'));
+    variants.add(clean.replace(/([аяиії])ив/gi, '$1їв'));
   }
-  return list;
+  if (lower.includes('и')) {
+    variants.add(clean.replace(/и/gi, 'і'));
+    variants.add(clean.replace(/ив$/i, 'їв'));
+  }
+  if (lower.startsWith('никола')) {
+    variants.add('Миколаїв');
+  }
+
+  return Array.from(variants);
 }
 
 export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
@@ -303,36 +131,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // 1. Мгновенный поиск по встроенной базе + живой поиск через API Новой Почты
+  // 1. Поиск любых населенных пунктов Украины напрямую через API Новой Почты
   useEffect(() => {
     const trimmed = cityQuery.trim();
-    if (trimmed.length < 1) {
-      setCityResults(POPULAR_CITIES);
-      setCitySearching(false);
-      return;
-    }
 
-    const qNorm = normalizeSearch(trimmed);
-
-    // Фильтрация по названию города (сначала те, которые НАЧИНАЮТСЯ с запроса)
-    const startsWithMatches: CityOption[] = [];
-    const includesMatches: CityOption[] = [];
-
-    for (const c of UKRAINE_CITIES_DIRECTORY) {
-      const nameNorm = normalizeSearch(c.name);
-      const uaNorm = normalizeSearch(c.uaName);
-
-      if (nameNorm.startsWith(qNorm) || uaNorm.startsWith(qNorm)) {
-        startsWithMatches.push(c);
-      } else if (qNorm.length >= 2 && (nameNorm.includes(qNorm) || uaNorm.includes(qNorm))) {
-        includesMatches.push(c);
-      }
-    }
-
-    const localMatches = [...startsWithMatches, ...includesMatches];
-    setCityResults(localMatches);
-
-    if (trimmed.length < 2) {
+    // Если в поле сейчас стоит уже выбранный город или пусто — не спамим запросами
+    if (trimmed.length < 1 || trimmed === selectedCity.fullLabel) {
+      setCityResults([]);
       setCitySearching(false);
       return;
     }
@@ -342,150 +147,97 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
     const timer = setTimeout(async () => {
       try {
-        const apiSearchString = toUkrainianApiQuery(trimmed);
+        const searchVariants = buildSearchVariants(trimmed);
+        const collected: CityOption[] = [];
+        const seenRefs = new Set<string>();
 
-        const fetchCitiesByQuery = async (searchStr: string) => {
-          const res = await fetch('https://api.novaposhta.ua/v2.0/json/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              apiKey: NP_API_KEY,
-              modelName: 'Address',
-              calledMethod: 'getCities',
-              methodProperties: {
-                FindByString: searchStr,
-                Limit: '30',
-              },
-            }),
+        for (const queryStr of searchVariants) {
+          const dataCities = await callNovaPoshta('Address', 'getCities', {
+            FindByString: queryStr,
+            Limit: '50',
           });
-          return res.json();
-        };
 
-        let dataCities = await fetchCitiesByQuery(apiSearchString);
+          if (cancelled) return;
 
-        // Если ввели русскую «и» в украинском названии (напр. «миколаив»), пробуем заменить и -> і
-        if (
-          (!Array.isArray(dataCities?.data) || dataCities.data.length === 0) &&
-          apiSearchString.toLowerCase().includes('и')
-        ) {
-          const uaVariant = apiSearchString.replace(/и/gi, 'і');
-          dataCities = await fetchCitiesByQuery(uaVariant);
-        }
+          if (Array.isArray(dataCities?.data)) {
+            for (const item of dataCities.data as Array<Record<string, string>>) {
+              const ref = item.Ref;
+              if (!ref || seenRefs.has(ref)) continue;
+              seenRefs.add(ref);
 
-        if (cancelled) return;
+              const ua = item.Description || '';
+              const ru = item.DescriptionRu || ua;
+              const type = item.SettlementTypeDescription || 'м.';
+              const area = item.AreaDescription || '';
 
-        const combined: CityOption[] = [...localMatches];
-        const seenNames = new Set(localMatches.map((m) => normalizeSearch(m.uaName)));
+              const namePart = ru && ru.toLowerCase() !== ua.toLowerCase() ? `${ua} / ${ru}` : ua;
+              const fullLabel = area ? `${type} ${namePart} (${area} обл.)` : `${type} ${namePart}`;
 
-        if (Array.isArray(dataCities?.data)) {
-          for (const item of dataCities.data as Array<Record<string, string>>) {
-            const ua = item.Description || '';
-            const ru = item.DescriptionRu || ua;
-            const area = item.AreaDescriptionRu || item.AreaDescription || '';
-            const key = normalizeSearch(ua);
-
-            const existingIdx = combined.findIndex((c) => normalizeSearch(c.uaName) === key);
-            if (existingIdx >= 0 && item.Ref) {
-              combined[existingIdx] = { ...combined[existingIdx], ref: item.Ref };
-            } else if (item.Ref && !seenNames.has(key)) {
-              seenNames.add(key);
-              combined.push({
-                name: ru,
+              collected.push({
+                name: ru || ua,
                 uaName: ua,
-                fullLabel: area ? `г. ${ua} / ${ru} (${area} обл.)` : `г. ${ua}`,
-                ref: item.Ref,
+                fullLabel,
+                ref,
                 zoneMultiplier: 1,
               });
             }
           }
+
+          if (collected.length > 0) {
+            break;
+          }
         }
 
         if (!cancelled) {
-          setCityResults(combined);
+          setCityResults(collected);
         }
       } catch {
-        // Оставляем результаты из встроенного справочника
+        if (!cancelled) {
+          setCityResults([]);
+        }
       } finally {
         if (!cancelled) {
           setCitySearching(false);
         }
       }
-    }, 220);
+    }, 250);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [cityQuery]);
+  }, [cityQuery, selectedCity.fullLabel]);
 
-  // 2. Автоматическая подгрузка отделений Новой Почты выбранного города
+  // 2. Загрузка реальных отделений и почтоматов Новой Почты для выбранного города
   useEffect(() => {
+    if (!selectedCity.ref) {
+      setWarehouses([]);
+      return;
+    }
+
     let cancelled = false;
     setWarehousesLoading(true);
 
     const loadWarehouses = async () => {
       try {
-        let cityRef = selectedCity.ref;
-
-        // Если для города еще не сохранен Ref, запрашиваем его по названию
-        if (!cityRef) {
-          const resCity = await fetch('https://api.novaposhta.ua/v2.0/json/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              apiKey: NP_API_KEY,
-              modelName: 'Address',
-              calledMethod: 'getCities',
-              methodProperties: {
-                FindByString: selectedCity.uaName,
-                Limit: '5',
-              },
-            }),
-          });
-          const dataCity = await resCity.json();
-          if (Array.isArray(dataCity?.data) && dataCity.data[0]?.Ref) {
-            cityRef = dataCity.data[0].Ref;
-          }
-        }
-
-        const methodProperties: Record<string, string> = {
-          Limit: '500',
-        };
-        if (cityRef) {
-          methodProperties.CityRef = cityRef;
-        } else {
-          methodProperties.CityName = selectedCity.uaName;
-        }
-
-        const resWh = await fetch('https://api.novaposhta.ua/v2.0/json/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            apiKey: NP_API_KEY,
-            modelName: 'Address',
-            calledMethod: 'getWarehouses',
-            methodProperties,
-          }),
+        const dataWh = await callNovaPoshta('Address', 'getWarehouses', {
+          CityRef: selectedCity.ref,
         });
-        const dataWh = await resWh.json();
 
         if (cancelled) return;
 
-        if (dataWh?.success && Array.isArray(dataWh.data) && dataWh.data.length > 0) {
+        if (Array.isArray(dataWh?.data)) {
           const list: WarehouseOption[] = dataWh.data.map((w: Record<string, string>) => ({
             ref: w.Ref,
-            number: w.Number || '',
-            description: w.DescriptionRu || w.Description || '',
+            number: String(w.Number || ''),
+            description: w.Description || w.DescriptionRu || '',
           }));
           setWarehouses(list);
         } else {
-          // Если API-ключ не задан или вернул пустой ответ — включаем резервный список отделений
-          setWarehouses(buildFallbackWarehouses(selectedCity.uaName));
+          setWarehouses([]);
         }
       } catch {
-        if (!cancelled) {
-          setWarehouses(buildFallbackWarehouses(selectedCity.uaName));
-        }
+        if (!cancelled) setWarehouses([]);
       } finally {
         if (!cancelled) setWarehousesLoading(false);
       }
@@ -498,7 +250,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [selectedCity]);
 
-  // 3. Расчет стоимости доставки через API Новой Почты (с резервным тарифом по зонам)
+  // 3. Расчет стоимости доставки через API Новой Почты
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
@@ -515,7 +267,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       return Math.round(base * selectedCity.zoneMultiplier);
     };
 
-    if (!NP_API_KEY || !selectedCity.ref) {
+    if (!selectedCity.ref) {
       setDeliveryCost(calculateFallback());
       return;
     }
@@ -523,28 +275,18 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     let cancelled = false;
     setCalcLoading(true);
 
-    fetch('https://api.novaposhta.ua/v2.0/json/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey: NP_API_KEY,
-        modelName: 'InternetDocument',
-        calledMethod: 'getDocumentPrice',
-        methodProperties: {
-          CitySender: KHARKIV_CITY_REF,
-          CityRecipient: selectedCity.ref,
-          Weight: String(totalWeight),
-          ServiceType: 'WarehouseWarehouse',
-          Cost: String(grandTotalPairs * 1500),
-          CargoType: 'Cargo',
-          SeatsAmount: String(grandTotalBoxes),
-        },
-      }),
+    callNovaPoshta('InternetDocument', 'getDocumentPrice', {
+      CitySender: KHARKIV_CITY_REF,
+      CityRecipient: selectedCity.ref,
+      Weight: String(totalWeight),
+      ServiceType: 'WarehouseWarehouse',
+      Cost: String(grandTotalPairs * 1500),
+      CargoType: 'Cargo',
+      SeatsAmount: String(grandTotalBoxes),
     })
-      .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
-        if (data?.success && data?.data?.[0]?.Cost) {
+        if (data?.data?.[0]?.Cost) {
           setDeliveryCost(Number(data.data[0].Cost));
         } else {
           setDeliveryCost(calculateFallback());
@@ -562,54 +304,31 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
 
-  // Умная фильтрация и сортировка отделений НП (точное совпадение номера — всегда на 1 месте)
-  const getFilteredWarehouses = (): WarehouseOption[] => {
+  // Фильтрация реальных отделений НП (при вводе «12» сначала идет отделение №12, затем 120-е и совпадения по улице)
+  const filteredWarehouses = (() => {
     const q = branchOrComment.trim().toLowerCase();
-    const digitsOnly = q.replace(/\D/g, '');
+    if (!q) return warehouses.slice(0, 50);
 
-    if (!q) {
-      return warehouses.slice(0, 35);
-    }
-
-    const exactNumberMatches: WarehouseOption[] = [];
-    const prefixNumberMatches: WarehouseOption[] = [];
-    const textMatches: WarehouseOption[] = [];
+    const digits = q.replace(/\D/g, '');
+    const exactNum: WarehouseOption[] = [];
+    const startsNum: WarehouseOption[] = [];
+    const byText: WarehouseOption[] = [];
 
     for (const w of warehouses) {
-      const wNum = w.number.toLowerCase();
-      const wDesc = w.description.toLowerCase();
+      const num = w.number.toLowerCase();
+      const desc = w.description.toLowerCase();
 
-      if (digitsOnly && wNum === digitsOnly) {
-        exactNumberMatches.push(w);
-      } else if (digitsOnly && wNum.startsWith(digitsOnly)) {
-        prefixNumberMatches.push(w);
-      } else if (wNum.includes(q) || wDesc.includes(q)) {
-        textMatches.push(w);
+      if (digits && num === digits) {
+        exactNum.push(w);
+      } else if (digits && num.startsWith(digits)) {
+        startsNum.push(w);
+      } else if (num.includes(q) || desc.includes(q)) {
+        byText.push(w);
       }
     }
 
-    const merged = [...exactNumberMatches, ...prefixNumberMatches, ...textMatches];
-
-    // Если пользователь ввел номер (например 125), которого нет в первых 50 резервных
-    if (merged.length === 0 && digitsOnly) {
-      return [
-        {
-          ref: `custom-wh-${digitsOnly}`,
-          number: digitsOnly,
-          description: `Отделение НП №${digitsOnly} (г. ${selectedCity.uaName})`,
-        },
-        {
-          ref: `custom-postomat-${digitsOnly}`,
-          number: digitsOnly,
-          description: `Почтомат НП №${digitsOnly} (г. ${selectedCity.uaName})`,
-        },
-      ];
-    }
-
-    return merged.slice(0, 35);
-  };
-
-  const filteredWarehouses = getFilteredWarehouses();
+    return [...exactNum, ...startsNum, ...byText].slice(0, 50);
+  })();
 
   const handleSelectCity = (city: CityOption) => {
     setSelectedCity(city);
@@ -937,10 +656,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             {/* Быстрые кнопки популярных городов */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
               {POPULAR_CITIES.map((city) => {
-                const isSelected = selectedCity.uaName === city.uaName;
+                const isSelected = selectedCity.ref === city.ref;
                 return (
                   <button
-                    key={city.name}
+                    key={city.ref}
                     type="button"
                     onClick={() => handleSelectCity(city)}
                     style={{
@@ -959,18 +678,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               })}
             </div>
 
-            {/* Поле живого поиска любого города Украины */}
+            {/* Поле живого поиска города через API Новой Почты */}
             <div style={{ position: 'relative', marginBottom: '10px' }}>
               <input
                 type="text"
-                placeholder="🔍 Введите город Украины (напр. Миколаїв, Суми, Умань)..."
+                placeholder="🔍 Введите город или село (поиск Новой Почты)..."
                 value={cityQuery}
-                onFocus={() => {
-                  if (cityQuery === selectedCity.fullLabel) {
-                    setCityQuery('');
-                  }
-                  setShowCityDropdown(true);
-                }}
+                onFocus={() => setShowCityDropdown(true)}
                 onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
                 onChange={(e) => {
                   setCityQuery(e.target.value);
@@ -985,6 +699,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   onMouseDown={(e) => {
                     e.preventDefault();
                     setCityQuery('');
+                    setCityResults([]);
                     setShowCityDropdown(true);
                   }}
                   style={{
@@ -1005,66 +720,51 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 </button>
               )}
 
-              {showCityDropdown && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 30,
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #1A1A1A',
-                    maxHeight: '220px',
-                    overflowY: 'auto',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  }}
-                >
-                  {cityResults.length === 0 && citySearching ? (
-                    <div style={{ padding: '10px', fontSize: '13px', color: '#444' }}>
-                      Поиск в базе Новой Почты...
-                    </div>
-                  ) : cityResults.length === 0 && cityQuery.trim().length > 0 ? (
-                    <div
-                      onMouseDown={() =>
-                        handleSelectCity({
-                          name: cityQuery.trim(),
-                          uaName: cityQuery.trim(),
-                          fullLabel: `г. ${cityQuery.trim()}`,
-                          ref: '',
-                          zoneMultiplier: 1.05,
-                        })
-                      }
-                      style={{
-                        padding: '10px 12px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        color: '#111111',
-                        backgroundColor: '#FFFFFF',
-                      }}
-                    >
-                      ✓ Выбрать населенный пункт: <strong>{cityQuery.trim()}</strong>
-                    </div>
-                  ) : (
-                    cityResults.map((c, i) => (
-                      <div
-                        key={`${c.uaName}-${i}`}
-                        onMouseDown={() => handleSelectCity(c)}
-                        style={{
-                          padding: '10px 12px',
-                          fontSize: '13px',
-                          borderBottom: '1px solid #F0EFEA',
-                          cursor: 'pointer',
-                          color: '#111111',
-                          backgroundColor: '#FFFFFF',
-                        }}
-                      >
-                        {c.fullLabel}
+              {showCityDropdown &&
+                cityQuery.trim().length >= 1 &&
+                cityQuery.trim() !== selectedCity.fullLabel && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 30,
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #1A1A1A',
+                      maxHeight: '240px',
+                      overflowY: 'auto',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {citySearching ? (
+                      <div style={{ padding: '10px 12px', fontSize: '13px', color: '#444' }}>
+                        Поиск в базе Новой Почты...
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    ) : cityResults.length === 0 ? (
+                      <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                        Населенный пункт не найден в базе НП
+                      </div>
+                    ) : (
+                      cityResults.map((c) => (
+                        <div
+                          key={c.ref}
+                          onMouseDown={() => handleSelectCity(c)}
+                          style={{
+                            padding: '10px 12px',
+                            fontSize: '13px',
+                            borderBottom: '1px solid #F0EFEA',
+                            cursor: 'pointer',
+                            color: '#111111',
+                            backgroundColor: '#FFFFFF',
+                          }}
+                        >
+                          {c.fullLabel}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
             </div>
 
             {/* Контакт клиента */}
@@ -1078,14 +778,16 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               />
             </div>
 
-            {/* Выбор отделения НП или свой комментарий */}
+            {/* Выбор реального отделения НП */}
             <div style={{ position: 'relative', marginBottom: '12px' }}>
               <input
                 type="text"
                 placeholder={
                   warehousesLoading
-                    ? 'Загрузка отделений Новой Почты...'
-                    : `№ отделения НП в ${selectedCity.uaName} (напр. 12)...`
+                    ? `Загрузка отделений НП (${selectedCity.uaName})...`
+                    : warehouses.length > 0
+                    ? `№ отделения или улица в ${selectedCity.uaName} (отделений: ${warehouses.length})...`
+                    : '№ отделения Новой Почты или комментарий...'
                 }
                 value={branchOrComment}
                 onFocus={() => setShowWarehouseDropdown(true)}
@@ -1133,7 +835,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     zIndex: 25,
                     backgroundColor: '#FFFFFF',
                     border: '1px solid #1A1A1A',
-                    maxHeight: '210px',
+                    maxHeight: '220px',
                     overflowY: 'auto',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   }}
