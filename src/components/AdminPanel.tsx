@@ -3,15 +3,21 @@ import React, { useState } from 'react';
 export const AdminPanel: React.FC = () => {
   const ADMIN_ID = 8686072747; // Ваш ID из Telegram
   
+  // Пытаемся получить пользователя из Telegram WebApp
   const currentUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-  const isAdmin = currentUser?.id === ADMIN_ID;
+  const currentUserId = currentUser?.id;
+
+  // ДЕБАГ: Если вы открываете в браузере для теста или это ваш ID — показываем панель
+  // (Уберите || true после того, как проверите, что панель появилась)
+  const isDevOrTest = true; // <--- Временный флаг для проверки на экране
+  const isAdmin = isDevOrTest || (currentUserId === ADMIN_ID);
 
   const [targetUserId, setTargetUserId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [status, setStatus] = useState<{ text: string; isError: boolean } | null>(null);
 
   if (!isAdmin) {
-    return null; // Обычные пользователи вообще не увидят эту панель
+    return null; // Обычные пользователи не увидят
   }
 
   const handleGrant = async () => {
@@ -48,7 +54,9 @@ export const AdminPanel: React.FC = () => {
   return (
     <div style={styles.card}>
       <h3 style={styles.title}>🛠 Админ-панель Cardio</h3>
-      <p style={styles.subtitle}>Выдача премиум-доступа клиенту</p>
+      <p style={styles.subtitle}>
+        {currentUserId ? `Ваш ID: ${currentUserId}` : '⚠️ Запущено вне Telegram (тест)'}
+      </p>
 
       <div style={styles.formGroup}>
         <input
