@@ -134,8 +134,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     );
   };
 
-    const sendToTelegramId = (telegramId: string) => {
-      const sendToTelegramId = async (telegramId: string) => {
+    const sendToTelegramId = async (telegramId: string) => {
     if (!telegramId) return;
     const text = buildInvoiceText();
 
@@ -160,6 +159,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       alert('Ошибка соединения с сервером.');
     }
   };
+
 
 
 
