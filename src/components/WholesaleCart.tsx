@@ -56,18 +56,6 @@ const THEME = {
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
 
-// Автоматический перехватчик при открытии во внешнем браузере (?open_viber=380... или ?open_tel=380...)
-if (typeof window !== 'undefined') {
-  const params = new URLSearchParams(window.location.search);
-  const viberNum = params.get('open_viber');
-  const telNum = params.get('open_tel');
-  if (viberNum) {
-    window.location.replace(`viber://chat?number=%2B${viberNum.replace(/\D/g, '')}`);
-  } else if (telNum) {
-    window.location.replace(`tel:+${telNum.replace(/\D/g, '')}`);
-  }
-}
-
 async function callNovaPoshta(
   modelName: string,
   calledMethod: string,
@@ -363,7 +351,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     logisticsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  // Аннулирование со звуком nul.mp3 и паузой 150мс, чтобы звук не обрывался при размонтировании списка
   const handleClearCart = () => {
     triggerHaptic('warning');
     playAppSound('nul.mp3');
@@ -426,7 +413,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(`✓ Спецификация успешно отправлена руководителю (${manager.name})!`);
+        alert(`✓ Заказ успешно отправлен руководителю (${manager.name})!`);
         return true;
       } else {
         alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
@@ -496,7 +483,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         }
       `}</style>
 
-      {/* Верхний колонтитул Бордеро */}
+      {/* Верхняя шапка накладной */}
       <div
         style={{
           display: 'flex',
@@ -517,14 +504,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             border: 'none',
             padding: '4px 0',
             fontSize: '10px',
-            letterSpacing: '1.5px',
+            letterSpacing: '1.4px',
             textTransform: 'uppercase',
-            fontWeight: 500,
+            fontWeight: 600,
             cursor: 'pointer',
             color: THEME.ink,
           }}
         >
-          ← В архив моделей
+          ← Назад в каталог
         </button>
 
         {items.length > 0 && (
@@ -536,14 +523,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               border: `1px solid ${THEME.danger}`,
               padding: '6px 10px',
               fontSize: '9px',
-              letterSpacing: '1.2px',
+              letterSpacing: '1.1px',
               textTransform: 'uppercase',
               color: THEME.danger,
               fontWeight: 600,
               cursor: 'pointer',
             }}
           >
-            ✕ Аннулировать список
+            ✕ Очистить накладную
           </button>
         )}
       </div>
@@ -552,13 +539,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         <div
           style={{
             fontSize: '9px',
-            letterSpacing: '1.8px',
+            letterSpacing: '1.6px',
             textTransform: 'uppercase',
             color: THEME.inkMuted,
             marginBottom: '4px',
           }}
         >
-          ДОКУМЕНТ // ОПТОВОЕ БОРДЕРО
+          CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ
         </div>
         <h1
           style={{
@@ -569,7 +556,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             letterSpacing: '0.2px',
           }}
         >
-          Спецификация заказа ({items.length})
+          Оптовая накладная ({items.length})
         </h1>
       </div>
 
@@ -591,7 +578,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               margin: '0 0 20px 0',
             }}
           >
-            Спецификация пуста. Выберите силуэты в основном архиве.
+            В вашей накладной пока нет выбранных моделей.
           </p>
           <button
             onClick={() => {
@@ -604,18 +591,18 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               color: '#FFFFFF',
               border: 'none',
               fontSize: '10px',
-              letterSpacing: '1.5px',
+              letterSpacing: '1.4px',
               textTransform: 'uppercase',
               cursor: 'pointer',
               fontWeight: 500,
             }}
           >
-            Открыть архив →
+            Перейти в каталог →
           </button>
         </div>
       ) : (
         <>
-          {/* Табличный реестр позиций заказа */}
+          {/* Список выбранных моделей */}
           <div
             style={{
               borderTop: `1px solid ${THEME.border}`,
@@ -698,7 +685,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       }}
                     >
                       <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '14px' }}>
-                        Объем: <strong>{item.totalPairs} пар</strong>
+                        Итого: <strong>{item.totalPairs} пар</strong>
                       </span>
 
                       {!isSample && (
@@ -756,7 +743,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             })}
           </div>
 
-          {/* I. БЛОК ЛОГИСТИКИ И ОБЯЗАТЕЛЬНЫХ ПОЛЕЙ ПОЛУЧАТЕЛЯ */}
+          {/* I. ДАННЫЕ ДОСТАВКИ И ПОЛУЧАТЕЛЯ */}
           <div ref={logisticsRef} style={{ marginBottom: '24px' }}>
             <div
               style={{
@@ -764,12 +751,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 justifyContent: 'space-between',
                 fontSize: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '1.6px',
+                letterSpacing: '1.4px',
                 color: THEME.inkMuted,
                 marginBottom: '8px',
               }}
             >
-              <span>I. ЛОГИСТИКА И ПОЛУЧАТЕЛЬ (ОБЯЗАТЕЛЬНО)</span>
+              <span>I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА</span>
               <span>НОВА ПОШТА</span>
             </div>
 
@@ -781,10 +768,9 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               }}
             >
               <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '10px' }}>
-                Направление: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
+                Город доставки: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
               </div>
 
-              {/* Быстрые города */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
                 {POPULAR_CITIES.map((city) => {
                   const isSelected = selectedCity.ref === city.ref;
@@ -809,7 +795,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 })}
               </div>
 
-              {/* 1. Поиск населенного пункта */}
+              {/* 1. Город */}
               <div style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   type="text"
@@ -869,7 +855,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     >
                       {citySearching ? (
                         <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                          Запрос в реестр Новой Почты...
+                          Поиск города в базе Новой Почты...
                         </div>
                       ) : cityResults.length === 0 ? (
                         <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
@@ -896,7 +882,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   )}
               </div>
 
-              {/* 2. Имя и Фамилия получателя */}
+              {/* 2. Имя и Фамилия */}
               <div style={{ marginBottom: '8px' }}>
                 <input
                   type="text"
@@ -907,7 +893,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 />
               </div>
 
-              {/* 3. Телефон получателя */}
+              {/* 3. Телефон */}
               <div style={{ marginBottom: '8px' }}>
                 <input
                   type="tel"
@@ -918,7 +904,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 />
               </div>
 
-              {/* 4. Отделение НП или адрес */}
+              {/* 4. Отделение Новой Почты */}
               <div style={{ position: 'relative', marginBottom: '12px' }}>
                 <input
                   type="text"
@@ -1000,7 +986,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 )}
               </div>
 
-              {/* Подвал логистики */}
               <div
                 style={{
                   borderTop: `1px solid ${THEME.border}`,
@@ -1012,7 +997,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 }}
               >
                 <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                  Партия: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} мест)
+                  Всего: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} кор.)
                 </div>
                 <div
                   style={{
@@ -1023,13 +1008,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     flexShrink: 0,
                   }}
                 >
-                  {calcLoading ? 'Расчет тарифа...' : `Логистика ≈ ${Math.round(deliveryCost)}\u00A0₴`}
+                  {calcLoading ? 'Расчет доставки...' : `Доставка ≈ ${Math.round(deliveryCost)}\u00A0₴`}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* II. ОБЪЕДИНЕННЫЙ БЛОК ДИРЕКЦИИ */}
+          {/* II. ОТПРАВКА ЗАКАЗА И КОНТАКТЫ */}
           <ManagersContactCard
             itemsCount={items.length}
             onSendOrder={sendToManager}
