@@ -838,7 +838,7 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхняя шапка с крупным и заметным логотипом */}
+      {/* Верхняя шапка с логотипом */}
       <div
         style={{
           display: 'flex',
@@ -904,6 +904,30 @@ export function Materials({ onBack }: MaterialsProps) {
             ← На главную
           </button>
         )}
+      </div>
+
+      {/* Hero-баннер компании (public/baner.jpg) */}
+      <div
+        style={{
+          width: '100%',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          marginBottom: '20px',
+          border: `1px solid ${THEME.border}`,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+          position: 'relative',
+        }}
+      >
+        <img
+          src="/baner.jpg"
+          alt="Cardio Men's Footwear Banner"
+          style={{
+            width: '100%',
+            aspectRatio: '16 / 9',
+            objectFit: 'cover',
+            display: 'block',
+          }}
+        />
       </div>
 
       {/* Заголовок бренда */}
@@ -1080,7 +1104,7 @@ export function Materials({ onBack }: MaterialsProps) {
         <span>НАЙДЕНО: {filteredShoes.length}</span>
       </div>
 
-      {/* Табличная сетка каталога (с логотипом бренда на каждой карточке) */}
+      {/* Табличная сетка каталога */}
       <div
         style={{
           display: 'grid',
