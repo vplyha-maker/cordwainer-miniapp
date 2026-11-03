@@ -181,7 +181,7 @@ export function Materials({ onBack }: MaterialsProps) {
           fontFamily: THEME.sans,
         }}
       >
-        {/* Верхняя навигация с логотипом-штампом */}
+        {/* Верхняя навигация с логотипом */}
         <div
           style={{
             display: 'flex',
@@ -192,12 +192,12 @@ export function Materials({ onBack }: MaterialsProps) {
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img
               src="/logo.png"
               alt="Cardio"
               style={{
-                height: '20px',
+                height: '34px',
                 width: 'auto',
                 objectFit: 'contain',
                 mixBlendMode: 'multiply',
@@ -345,20 +345,31 @@ export function Materials({ onBack }: MaterialsProps) {
           <div
             style={{
               position: 'absolute',
-              top: '10px',
+              top: '12px',
               left: '12px',
-              fontSize: '9px',
-              letterSpacing: '1.5px',
-              color: THEME.inkLight,
-              textTransform: 'uppercase',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
-            CARDIO ORIGINAL
+            <img
+              src="/logo.png"
+              alt="Cardio"
+              style={{
+                height: '18px',
+                width: 'auto',
+                mixBlendMode: 'multiply',
+                opacity: 0.8,
+              }}
+            />
+            <span style={{ fontSize: '9px', letterSpacing: '1.5px', color: THEME.inkLight, textTransform: 'uppercase' }}>
+              ORIGINAL
+            </span>
           </div>
           <div
             style={{
               position: 'absolute',
-              top: '10px',
+              top: '12px',
               right: '12px',
               fontSize: '9px',
               letterSpacing: '1.5px',
@@ -827,38 +838,53 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхняя шапка с логотипом */}
+      {/* Верхняя шапка с крупным и заметным логотипом */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingBottom: '12px',
+          paddingBottom: '14px',
           marginBottom: '16px',
           borderBottom: `1px solid ${THEME.border}`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <img
             src="/logo.png"
             alt="Cardio Footwear Logo"
             style={{
-              height: '24px',
+              height: '38px',
               width: 'auto',
               objectFit: 'contain',
               mixBlendMode: 'multiply',
             }}
           />
-          <span
-            style={{
-              fontSize: '9px',
-              letterSpacing: '1.6px',
-              textTransform: 'uppercase',
-              color: THEME.inkMuted,
-            }}
-          >
-            ХАРЬКОВ • ОПТОВЫЙ КАТАЛОГ
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span
+              style={{
+                fontSize: '8px',
+                letterSpacing: '1.8px',
+                textTransform: 'uppercase',
+                color: THEME.inkMuted,
+                fontWeight: 600,
+              }}
+            >
+              ХАРЬКОВ
+            </span>
+            <span
+              style={{
+                fontSize: '9px',
+                letterSpacing: '1.2px',
+                textTransform: 'uppercase',
+                color: THEME.ink,
+                fontFamily: THEME.serif,
+                fontStyle: 'italic',
+              }}
+            >
+              Оптовый каталог
+            </span>
+          </div>
         </div>
 
         {onBack && (
@@ -867,7 +893,7 @@ export function Materials({ onBack }: MaterialsProps) {
             style={{
               background: 'transparent',
               border: `1px solid ${THEME.border}`,
-              padding: '4px 10px',
+              padding: '6px 12px',
               fontSize: '9px',
               letterSpacing: '1.2px',
               textTransform: 'uppercase',
@@ -1054,7 +1080,7 @@ export function Materials({ onBack }: MaterialsProps) {
         <span>НАЙДЕНО: {filteredShoes.length}</span>
       </div>
 
-      {/* Табличная сетка каталога */}
+      {/* Табличная сетка каталога (с логотипом бренда на каждой карточке) */}
       <div
         style={{
           display: 'grid',
@@ -1063,10 +1089,9 @@ export function Materials({ onBack }: MaterialsProps) {
           borderLeft: `1px solid ${THEME.border}`,
         }}
       >
-        {filteredShoes.map((shoe, index) => {
+        {filteredShoes.map((shoe) => {
           const variantsCount = cardioCatalog.filter((i) => i.modelNumber === shoe.modelNumber).length;
           const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
-          const cellIndex = String(index + 1).padStart(2, '0');
 
           return (
             <div
@@ -1093,14 +1118,21 @@ export function Materials({ onBack }: MaterialsProps) {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  fontSize: '9px',
-                  letterSpacing: '1px',
-                  color: THEME.inkLight,
-                  textTransform: 'uppercase',
                   marginBottom: '8px',
+                  minHeight: '20px',
                 }}
               >
-                <span>{cellIndex}</span>
+                <img
+                  src="/logo.png"
+                  alt="Cardio"
+                  style={{
+                    height: '16px',
+                    width: 'auto',
+                    objectFit: 'contain',
+                    mixBlendMode: 'multiply',
+                    opacity: 0.85,
+                  }}
+                />
                 {inCartPairs > 0 ? (
                   <span
                     style={{
@@ -1114,7 +1146,9 @@ export function Materials({ onBack }: MaterialsProps) {
                     В ЗАКАЗЕ: {inCartPairs} П.
                   </span>
                 ) : (
-                  <span>{shoe.category}</span>
+                  <span style={{ fontSize: '9px', color: THEME.inkLight, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                    {shoe.category}
+                  </span>
                 )}
               </div>
 
