@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Lang, FavoriteItem } from '../App'
+import { AdminPanel } from '../components/AdminPanel'
 
 type WelcomePageProps = {
   onStart?: () => void
@@ -132,7 +133,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
   }
 
   return (
-    <main className={`relative flex h-[100dvh] w-full flex-col justify-between overflow-hidden select-none ${cBg} ${cText}`}>
+    <main className={`relative flex h-[100dvh] w-full flex-col justify-between overflow-y-auto select-none ${cBg} ${cText}`}>
       {/* 1. ФОНОВАЯ ИЛЛЮСТРАЦИЯ ОБЛОЖКИ */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <img
@@ -146,7 +147,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
         <div className="absolute inset-0" style={vignetteStyle} />
       </div>
 
-      {/* 2. ШАПКА ОБЛОЖКИ (ИСПРАВЛЕННЫЙ КОМПАКТНЫЙ РЯД БЕЗ ПЕРЕНОСОВ) */}
+      {/* 2. ШАПКА ОБЛОЖКИ */}
       <header className="relative z-20 px-6 pt-5 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 whitespace-nowrap">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${isDark ? 'bg-[#C5A880]' : 'bg-[#141210]'}`} />
@@ -182,7 +183,12 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
         </div>
       </header>
 
-      {/* 3. НИЖНИЙ ЖУРНАЛЬНЫЙ БЛОК */}
+      {/* 3. АДМИН-ПАНЕЛЬ (появится только у вашего ID 8686072747) */}
+      <div className="relative z-20 px-6 my-2">
+        <AdminPanel />
+      </div>
+
+      {/* 4. НИЖНИЙ ЖУРНАЛЬНЫЙ БЛОК */}
       <section className="relative z-20 flex flex-col justify-end px-6 pb-9 sm:pb-12 mt-auto">
         {/* Приветствие */}
         <div className="flex items-center justify-between mb-2">
