@@ -36,168 +36,6 @@ export const MANAGERS_LIST: ManagerContact[] = [
   },
 ];
 
-// ============================================================================
-// ПЕРЕХВАТЧИК ВНЕШНЕГО МОСТА (?open_viber= и ?open_tel=)
-// Полностью блокирует рендер главной страницы Cordwainer и показывает
-// полноэкранную заставку CARDIO при переходе в Viber или Телефон
-// ============================================================================
-if (typeof window !== 'undefined') {
-  const params = new URLSearchParams(window.location.search);
-  const viberDigits = params.get('open_viber');
-  const telDigits = params.get('open_tel');
-  const mgrName = params.get('mgr_name') || 'Руководитель';
-  const mgrPhone = params.get('mgr_phone') || '';
-
-  if (viberDigits || telDigits) {
-    const cleanNum = (viberDigits || telDigits || '').replace(/\D/g, '');
-    const targetScheme = viberDigits
-      ? `viber://chat?number=%2B${cleanNum}`
-      : `tel:+${cleanNum}`;
-    const channelLabel = viberDigits ? 'VIBER DIRECT' : 'ТЕЛЕФОННАЯ ЛИНИЯ';
-
-    const renderBridgeSplash = () => {
-      document.title = 'CARDIO • Соединение...';
-      document.documentElement.style.backgroundColor = '#141312';
-      document.body.style.margin = '0';
-      document.body.style.backgroundColor = '#141312';
-      document.body.innerHTML = `
-        <style>
-          #root { display: none !important; }
-          @keyframes cardioPulse {
-            0%, 100% { opacity: 0.35; transform: scale(0.98); }
-            50% { opacity: 1; transform: scale(1.03); }
-          }
-          @keyframes cardioLine {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-        </style>
-        <div style="
-          position: fixed;
-          inset: 0;
-          background-color: #141312;
-          color: #F2EFE9;
-          font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 28px 22px;
-          box-sizing: border-box;
-          z-index: 999999;
-          text-align: center;
-        ">
-          <div style="
-            display: flex;
-            justify-content: space-between;
-            font-size: 9px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #8E8980;
-            border-bottom: 1px solid rgba(220,215,204,0.16);
-            padding-bottom: 14px;
-          ">
-            <span>CARDIO FOOTWEAR</span>
-            <span>${channelLabel}</span>
-          </div>
-
-          <div style="margin: auto 0; padding: 20px 0;">
-            <div style="
-              width: 64px;
-              height: 64px;
-              margin: 0 auto 22px auto;
-              border: 1px solid #DCD7CC;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-family: Georgia, serif;
-              font-size: 28px;
-              letter-spacing: 1px;
-              animation: cardioPulse 1.8s infinite ease-in-out;
-            ">C</div>
-
-            <div style="
-              font-size: 10px;
-              letter-spacing: 2.5px;
-              text-transform: uppercase;
-              color: #A8A298;
-              margin-bottom: 8px;
-            ">ПЕРЕНАПРАВЛЕНИЕ НА ЛИНИЮ</div>
-
-            <h1 style="
-              font-family: Georgia, 'Playfair Display', serif;
-              font-size: 38px;
-              font-weight: 400;
-              margin: 0 0 8px 0;
-              letter-spacing: 3px;
-              text-transform: uppercase;
-              color: #F2EFE9;
-            ">CARDIO</h1>
-
-            <div style="
-              font-family: Georgia, serif;
-              font-style: italic;
-              font-size: 17px;
-              color: #DCD7CC;
-              margin-bottom: 24px;
-            ">${mgrName} • ${mgrPhone || '+' + cleanNum}</div>
-
-            <div style="
-              width: 180px;
-              height: 1px;
-              background: rgba(220,215,204,0.2);
-              margin: 0 auto 24px auto;
-              overflow: hidden;
-              position: relative;
-            ">
-              <div style="
-                width: 100%;
-                height: 100%;
-                background: #F2EFE9;
-                animation: cardioLine 1.2s infinite ease-in-out;
-              "></div>
-            </div>
-
-            <a href="${targetScheme}" style="
-              display: inline-block;
-              padding: 13px 28px;
-              background-color: #F2EFE9;
-              color: #141312;
-              text-decoration: none;
-              font-size: 10px;
-              font-weight: 600;
-              letter-spacing: 1.8px;
-              text-transform: uppercase;
-            ">Открыть ${viberDigits ? 'Viber' : 'Телефон'} ↗</a>
-          </div>
-
-          <div style="
-            font-size: 9px;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: #6E6A63;
-            border-top: 1px solid rgba(220,215,204,0.16);
-            padding-top: 14px;
-          ">KHARKIV B2B SHOWROOM • DIRECT CONNECTION</div>
-        </div>
-      `;
-    };
-
-    if (document.body) {
-      renderBridgeSplash();
-    } else {
-      window.addEventListener('DOMContentLoaded', renderBridgeSplash);
-    }
-
-    // Немедленно запускаем протокол Viber или Телефона
-    setTimeout(() => {
-      window.location.replace(targetScheme);
-    }, 80);
-  }
-}
-
-// ============================================================================
-// АУДИО-ДВИЖОК (zakaz.mp3, nul.mp3, viber.mp3)
-// ============================================================================
 type SoundFile = 'zakaz.mp3' | 'nul.mp3' | 'viber.mp3';
 
 const audioCache: Record<string, HTMLAudioElement> = {};
@@ -216,7 +54,6 @@ export function preloadAppSounds() {
   });
 }
 
-// Мгновенная остановка музыки viber.mp3 при открытии Viber или сворачивании окна
 export function stopViberSound() {
   try {
     if (activeViberAudio) {
@@ -248,12 +85,12 @@ function playFallbackSynth(type: SoundFile) {
 
     if (type === 'zakaz.mp3' || type === 'viber.mp3') {
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime + 0.14);
-      gain.gain.setValueAtTime(0.22, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.45);
+      osc.stop(ctx.currentTime + 0.35);
     } else {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(380, ctx.currentTime);
@@ -273,18 +110,15 @@ export function playAppSound(fileName: SoundFile) {
     if (fileName === 'viber.mp3') {
       stopViberSound();
     }
-
     let audio = audioCache[fileName];
     if (!audio) {
       audio = new Audio(`/${fileName}`);
       audio.volume = 1.0;
       audioCache[fileName] = audio;
     }
-
     if (fileName === 'viber.mp3') {
       activeViberAudio = audio;
     }
-
     audio.currentTime = 0;
     const playPromise = audio.play();
     if (playPromise !== undefined) {
@@ -368,14 +202,8 @@ export function ManagersContactCard({
   const [pressedButtonKey, setPressedButtonKey] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
+  const [viberModalMgr, setViberModalMgr] = useState<ManagerContact | null>(null);
 
-  // Полноэкранная заставка CARDIO при переходе в Viber или Телефон
-  const [redirectSplash, setRedirectSplash] = useState<{
-    mgr: ManagerContact;
-    channel: 'viber' | 'tel';
-  } | null>(null);
-
-  // Защита от случайного нажатия детьми и кликерами
   const [confirmingManager, setConfirmingManager] = useState<ManagerContact | null>(null);
   const [guardTargetCode, setGuardTargetCode] = useState<number>(0);
   const [guardOptions, setGuardOptions] = useState<number[]>([]);
@@ -385,28 +213,25 @@ export function ManagersContactCard({
     preloadAppSounds();
   }, []);
 
-  // Как только открывается Viber (или телефон уходит в фоновый режим) — музыка viber.mp3 мгновенно выключается!
+  // Как только открывается Viber или Телефон — музыка viber.mp3 мгновенно замолкает
   useEffect(() => {
-    const handleAppLeave = () => {
+    const handleStopAudio = () => {
       if (document.hidden) {
         stopViberSound();
-        setRedirectSplash(null);
       }
     };
-
-    const handleWindowBlur = () => {
+    const handleBlur = () => {
       stopViberSound();
-      setRedirectSplash(null);
     };
 
-    document.addEventListener('visibilitychange', handleAppLeave);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('pagehide', handleWindowBlur);
+    document.addEventListener('visibilitychange', handleStopAudio);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('pagehide', handleBlur);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleAppLeave);
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('pagehide', handleWindowBlur);
+      document.removeEventListener('visibilitychange', handleStopAudio);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pagehide', handleBlur);
     };
   }, []);
 
@@ -482,58 +307,6 @@ export function ManagersContactCard({
     }
   };
 
-  // Полноэкранная заставка CARDIO + музыка viber.mp3 + запуск Viber / Телефона
-  const launchWithCardioSplash = (channel: 'viber' | 'tel', mgr: ManagerContact) => {
-    const key = `${channel}-${mgr.telegramId}`;
-    setPressedButtonKey(key);
-    setSelectedManagerId(mgr.telegramId);
-    triggerHaptic('heavy');
-    setTimeout(() => setPressedButtonKey(null), 180);
-
-    // Копируем номер на всякий случай в буфер
-    try {
-      navigator.clipboard?.writeText(mgr.phone).catch(() => {});
-    } catch {
-      // Ignore
-    }
-
-    // 1. Показываем полноэкранную профессиональную заставку CARDIO
-    setRedirectSplash({ mgr, channel });
-
-    // 2. Включаем музыку viber.mp3 из папки public
-    playAppSound('viber.mp3');
-
-    const cleanDigits = mgr.phone.replace(/\D/g, '');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tgWebApp = (window as any)?.Telegram?.WebApp;
-
-    // 3. Через 850 мс (когда пользователь увидел заставку Cardio и услышал вступление viber.mp3)
-    // запускаем открытие Viber / Телефона. Как только откроется Viber — музыка сразу исчезнет!
-    setTimeout(() => {
-      const paramName = channel === 'viber' ? 'open_viber' : 'open_tel';
-      const bridgeUrl =
-        `${window.location.origin}${window.location.pathname}` +
-        `?${paramName}=${cleanDigits}` +
-        `&mgr_name=${encodeURIComponent(mgr.name)}` +
-        `&mgr_phone=${encodeURIComponent(mgr.phoneDisplay)}`;
-
-      if (tgWebApp?.openLink) {
-        tgWebApp.openLink(bridgeUrl);
-      } else if (channel === 'viber') {
-        window.location.href = `viber://chat?number=%2B${cleanDigits}`;
-      } else {
-        window.location.href = `tel:+${cleanDigits}`;
-      }
-    }, 850);
-
-    // Страховочное закрытие заставки и остановка музыки через 3.5 секунды
-    setTimeout(() => {
-      stopViberSound();
-      setRedirectSplash(null);
-    }, 3500);
-  };
-
-  // Telegram — работает напрямую
   const handleTelegramClick = (mgr: ManagerContact) => {
     const key = `tg-${mgr.telegramId}`;
     setPressedButtonKey(key);
@@ -576,178 +349,6 @@ export function ManagersContactCard({
         color: THEME.ink,
       }}
     >
-      {/* ПОЛНОЭКРАННАЯ ПРОФЕССИОНАЛЬНАЯ ЗАСТАВКА CARDIO ОЖИДАНИЕ / ПЕРЕНАПРАВЛЕНИЕ */}
-      {redirectSplash && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: '#141312',
-            color: '#F2EFE9',
-            zIndex: 999999,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            padding: '28px 22px',
-            boxSizing: 'border-box',
-            textAlign: 'center',
-          }}
-        >
-          <style>{`
-            @keyframes cardioSplashPulse {
-              0%, 100% { opacity: 0.4; transform: scale(0.97); }
-              50% { opacity: 1; transform: scale(1.03); }
-            }
-            @keyframes cardioProgressSlide {
-              0% { transform: translateX(-100%); }
-              100% { transform: translateX(100%); }
-            }
-          `}</style>
-
-          {/* Верхний колонтитул заставки */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '9px',
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              color: '#8E8980',
-              borderBottom: '1px solid rgba(220,215,204,0.16)',
-              paddingBottom: '14px',
-            }}
-          >
-            <span>CARDIO FOOTWEAR</span>
-            <button
-              type="button"
-              onClick={() => {
-                stopViberSound();
-                setRedirectSplash(null);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#A8A298',
-                fontSize: '10px',
-                letterSpacing: '1px',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-              }}
-            >
-              ✕ Отмена
-            </button>
-          </div>
-
-          {/* Центральный блок бренда Cardio */}
-          <div style={{ margin: 'auto 0', padding: '20px 0' }}>
-            <div
-              style={{
-                width: '68px',
-                height: '68px',
-                margin: '0 auto 22px auto',
-                border: '1px solid #DCD7CC',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: THEME.serif,
-                fontSize: '30px',
-                letterSpacing: '1px',
-                animation: 'cardioSplashPulse 1.6s infinite ease-in-out',
-              }}
-            >
-              C
-            </div>
-
-            <div
-              style={{
-                fontSize: '10px',
-                letterSpacing: '2.5px',
-                textTransform: 'uppercase',
-                color: '#A8A298',
-                marginBottom: '8px',
-              }}
-            >
-              {redirectSplash.channel === 'viber'
-                ? 'ПЕРЕНАПРАВЛЕНИЕ В VIBER'
-                : 'СОЕДИНЕНИЕ С ТЕЛЕФОНОМ'}
-            </div>
-
-            <div
-              style={{
-                fontFamily: THEME.serif,
-                fontSize: '40px',
-                fontWeight: 400,
-                letterSpacing: '4px',
-                textTransform: 'uppercase',
-                color: '#F2EFE9',
-                marginBottom: '8px',
-              }}
-            >
-              CARDIO
-            </div>
-
-            <div
-              style={{
-                fontFamily: THEME.serif,
-                fontStyle: 'italic',
-                fontSize: '18px',
-                color: '#DCD7CC',
-                marginBottom: '6px',
-              }}
-            >
-              {redirectSplash.mgr.name} — {redirectSplash.mgr.role}
-            </div>
-
-            <div
-              style={{
-                fontSize: '13px',
-                letterSpacing: '1px',
-                color: '#A8A298',
-                marginBottom: '26px',
-              }}
-            >
-              {redirectSplash.mgr.phoneDisplay}
-            </div>
-
-            {/* Анимированная линия соединения */}
-            <div
-              style={{
-                width: '180px',
-                height: '1px',
-                backgroundColor: 'rgba(220,215,204,0.2)',
-                margin: '0 auto',
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: '#F2EFE9',
-                  animation: 'cardioProgressSlide 1.1s infinite ease-in-out',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Нижний колонтитул заставки */}
-          <div
-            style={{
-              fontSize: '9px',
-              letterSpacing: '1.6px',
-              textTransform: 'uppercase',
-              color: '#6E6A63',
-              borderTop: '1px solid rgba(220,215,204,0.16)',
-              paddingTop: '14px',
-            }}
-          >
-            KHARKIV B2B SHOWROOM • DIRECT LINE
-          </div>
-        </div>
-      )}
-
       {/* Шапка секции */}
       <div
         style={{
@@ -768,6 +369,95 @@ export function ManagersContactCard({
         </span>
         <span>ТЕЛ • VIBER • TG</span>
       </div>
+
+      {/* Черная карточка-подсказка при нажатии на Viber */}
+      {viberModalMgr && (
+        <div
+          style={{
+            backgroundColor: THEME.ink,
+            color: '#FFFFFF',
+            padding: '16px',
+            marginBottom: '12px',
+            border: `1px solid ${THEME.ink}`,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: '#A8A39A' }}>
+              ✓ НОМЕР СКОПИРОВАН • ВЫБЕРИТЕ VIBER В МЕНЮ НИЖЕ
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                stopViberSound();
+                setViberModalMgr(null);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                cursor: 'pointer',
+                padding: '2px 6px',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div style={{ fontFamily: THEME.serif, fontSize: '20px', marginBottom: '4px' }}>
+            {viberModalMgr.name}: {viberModalMgr.phoneDisplay}
+          </div>
+
+          <div style={{ fontSize: '11px', color: '#D0CCC4', lineHeight: 1.4, marginBottom: '12px' }}>
+            Выберите иконку Viber в появившемся меню телефона (номер также скопирован в буфер обмена):
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <a
+              href={`tel:${viberModalMgr.phone}`}
+              onClick={() => {
+                triggerHaptic('medium');
+                playAppSound('viber.mp3');
+              }}
+              style={{
+                padding: '10px 0',
+                backgroundColor: THEME.surface,
+                color: THEME.ink,
+                textDecoration: 'none',
+                textAlign: 'center',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+              }}
+            >
+              Открыть выбор ↗
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                stopViberSound();
+                const m = viberModalMgr;
+                setViberModalMgr(null);
+                handleTelegramClick(m);
+              }}
+              style={{
+                padding: '10px 0',
+                backgroundColor: 'transparent',
+                color: '#FFFFFF',
+                border: '1px solid #FFFFFF',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Написать в TG ↗
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Предупреждение, если не заполнены обязательные поля */}
       {onSendOrder && !isFormValid && (
@@ -1011,12 +701,17 @@ export function ManagersContactCard({
                   </button>
                 )}
 
-                {/* Кнопка ТЕЛ. с фирменной заставкой Cardio */}
-                <button
-                  type="button"
+                {/* Кнопка ТЕЛ. — открывает системное меню [Телефон / Viber] */}
+                <a
+                  href={`tel:${mgr.phone}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    launchWithCardioSplash('tel', mgr);
+                    const key = `tel-${mgr.telegramId}`;
+                    setPressedButtonKey(key);
+                    setSelectedManagerId(mgr.telegramId);
+                    triggerHaptic('medium');
+                    navigator.clipboard?.writeText(mgr.phone).catch(() => {});
+                    setTimeout(() => setPressedButtonKey(null), 180);
                   }}
                   style={{
                     display: 'flex',
@@ -1026,7 +721,7 @@ export function ManagersContactCard({
                     backgroundColor:
                       pressedButtonKey === `tel-${mgr.telegramId}` ? THEME.ink : 'transparent',
                     color: pressedButtonKey === `tel-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
-                    border: 'none',
+                    textDecoration: 'none',
                     borderRight: `1px solid ${THEME.border}`,
                     fontSize: '9px',
                     fontWeight: 600,
@@ -1037,14 +732,21 @@ export function ManagersContactCard({
                   }}
                 >
                   ТЕЛ. ↗
-                </button>
+                </a>
 
-                {/* Кнопка VIBER с полноэкранной заставкой Cardio и музыкой viber.mp3 */}
-                <button
-                  type="button"
+                {/* Кнопка VIBER — в 1 клик играет viber.mp3, копирует номер и вызывает нижнее меню [Телефон / Viber] */}
+                <a
+                  href={`tel:${mgr.phone}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    launchWithCardioSplash('viber', mgr);
+                    const key = `viber-${mgr.telegramId}`;
+                    setPressedButtonKey(key);
+                    setSelectedManagerId(mgr.telegramId);
+                    triggerHaptic('success');
+                    playAppSound('viber.mp3');
+                    navigator.clipboard?.writeText(mgr.phone).catch(() => {});
+                    setViberModalMgr(mgr);
+                    setTimeout(() => setPressedButtonKey(null), 180);
                   }}
                   style={{
                     display: 'flex',
@@ -1052,9 +754,17 @@ export function ManagersContactCard({
                     justifyContent: 'center',
                     padding: '11px 4px',
                     backgroundColor:
-                      pressedButtonKey === `viber-${mgr.telegramId}` ? THEME.ink : 'transparent',
-                    color: pressedButtonKey === `viber-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
-                    border: 'none',
+                      viberModalMgr?.telegramId === mgr.telegramId
+                        ? THEME.accentGreen
+                        : pressedButtonKey === `viber-${mgr.telegramId}`
+                        ? THEME.ink
+                        : 'transparent',
+                    color:
+                      viberModalMgr?.telegramId === mgr.telegramId ||
+                      pressedButtonKey === `viber-${mgr.telegramId}`
+                        ? '#FFFFFF'
+                        : THEME.ink,
+                    textDecoration: 'none',
                     borderRight: `1px solid ${THEME.border}`,
                     fontSize: '9px',
                     fontWeight: 600,
@@ -1065,7 +775,7 @@ export function ManagersContactCard({
                   }}
                 >
                   VIBER ↗
-                </button>
+                </a>
 
                 {/* Кнопка Telegram */}
                 <button
