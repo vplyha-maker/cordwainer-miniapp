@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export type ManagerContact = {
   index: string;
@@ -36,11 +36,54 @@ export const MANAGERS_LIST: ManagerContact[] = [
   },
 ];
 
+// Универсальный тактильный отклик (Telegram WebApp Haptics + HTML5 Vibration API)
+export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'medium') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tgHaptic = (window as any)?.Telegram?.WebApp?.HapticFeedback;
+    if (tgHaptic) {
+      if (type === 'success' || type === 'warning' || type === 'error') {
+        tgHaptic.notificationOccurred(type);
+      } else {
+        tgHaptic.impactOccurred(type);
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      if (type === 'error' || type === 'warning') {
+        navigator.vibrate([50, 40, 60]);
+      } else if (type === 'success') {
+        navigator.vibrate([35, 50, 80]);
+      } else if (type === 'heavy') {
+        navigator.vibrate(60);
+      } else {
+        navigator.vibrate(30);
+      }
+    }
+  } catch {
+    // Игнорируем, если устройство не поддерживает виброотклик
+  }
+}
+
+// Универсальное воспроизведение звука из папки public/ (/zakaz.mp3 или /nul.mp3)
+export function playAppSound(fileName: 'zakaz.mp3' | 'nul.mp3') {
+  try {
+    const audio = new Audio(`/${fileName}`);
+    audio.volume = 0.9;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  } catch {
+    // Игнорируем блокировку автовоспроизведения браузером
+  }
+}
+
 type ManagersContactCardProps = {
   itemsCount?: number;
-  onSendOrder?: (manager: ManagerContact) => Promise<void> | void;
+  onSendOrder?: (manager: ManagerContact) => Promise<boolean | void> | boolean | void;
   onCopyInvoice?: () => void;
   copied?: boolean;
+  isFormValid?: boolean;
+  missingFields?: string[];
+  onValidationFail?: () => void;
 };
 
 const THEME = {
@@ -51,6 +94,8 @@ const THEME = {
   inkMuted: '#6E6A63',
   inkLight: '#9A958C',
   border: '#DCD7CC',
+  accentGreen: '#1E4620',
+  danger: '#9E2A2B',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
@@ -60,17 +105,137 @@ export function ManagersContactCard({
   onSendOrder,
   onCopyInvoice,
   copied = false,
+  isFormValid = true,
+  missingFields = [],
+  onValidationFail,
 }: ManagersContactCardProps) {
+  // Какой менеджер сейчас выбран (по умолчанию 01 Борис, но перемещается при клике!)
+  const [selectedManagerId, setSelectedManagerId] = useState<string>(MANAGERS_LIST[0].telegramId);
+  const [pressedButtonKey, setPressedButtonKey] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
 
-  const handleSend = async (mgr: ManagerContact) => {
+  // Защита от детей и кликеров: проверочный код + антиспам-таймер
+  const [confirmingManager, setConfirmingManager] = useState<ManagerContact | null>(null);
+  const [guardTargetCode, setGuardTargetCode] = useState<number>(0);
+  const [guardOptions, setGuardOptions] = useState<number[]>([]);
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
+
+  // Генерация простого проверочного числа от детей/кликеров
+  const openSecurityGuard = (mgr: ManagerContact) => {
+    const correct = Math.floor(10 + Math.random() * 89);
+    let wrong1 = Math.floor(10 + Math.random() * 89);
+    let wrong2 = Math.floor(10 + Math.random() * 89);
+    while (wrong1 === correct) wrong1 = Math.floor(10 + Math.random() * 89);
+    while (wrong2 === correct || wrong2 === wrong1) wrong2 = Math.floor(10 + Math.random() * 89);
+
+    const shuffled = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
+    setGuardTargetCode(correct);
+    setGuardOptions(shuffled);
+    setConfirmingManager(mgr);
+  };
+
+  const handleInitialSendClick = (mgr: ManagerContact) => {
+    // Мгновенно перемещаем черный акцент на нажатого менеджера
+    setSelectedManagerId(mgr.telegramId);
+    setPressedButtonKey(`send-${mgr.telegramId}`);
+    setTimeout(() => setPressedButtonKey(null), 180);
+
     if (!onSendOrder || sendingId) return;
+
+    if (cooldownSeconds > 0) {
+      triggerHaptic('warning');
+      return;
+    }
+
+    // Если поля (Город, НП, Имя Фамилия, Телефон) не заполнены — не даем сформировать накладную
+    if (!isFormValid) {
+      triggerHaptic('error');
+      onValidationFail?.();
+      return;
+    }
+
+    triggerHaptic('medium');
+    openSecurityGuard(mgr);
+  };
+
+  const handleConfirmSecurityCode = async (chosenNumber: number) => {
+    if (!confirmingManager || !onSendOrder) return;
+
+    if (chosenNumber !== guardTargetCode) {
+      triggerHaptic('error');
+      setConfirmingManager(null);
+      return;
+    }
+
+    const targetMgr = confirmingManager;
+    setConfirmingManager(null);
+
     try {
-      setSendingId(mgr.telegramId);
-      await onSendOrder(mgr);
+      setSendingId(targetMgr.telegramId);
+      triggerHaptic('success');
+      playAppSound('zakaz.mp3');
+
+      const result = await onSendOrder(targetMgr);
+      if (result !== false) {
+        setSentSuccessId(targetMgr.telegramId);
+        setCooldownSeconds(30); // Блокировка от повторного спама на 30 секунд
+        setTimeout(() => setSentSuccessId(null), 5000);
+      }
     } finally {
       setSendingId(null);
     }
+  };
+
+  const handleMessengerAction = (
+    type: 'tel' | 'viber' | 'tg',
+    mgr: ManagerContact
+  ) => {
+    const key = `${type}-${mgr.telegramId}`;
+    setPressedButtonKey(key);
+    setSelectedManagerId(mgr.telegramId);
+    triggerHaptic('medium');
+    setTimeout(() => setPressedButtonKey(null), 180);
+
+    const cleanPhoneNoPlus = mgr.phone.replace(/\D/g, '');
+
+    if (type === 'tel') {
+      window.location.href = `tel:${mgr.phone}`;
+    } else if (type === 'viber') {
+      window.location.href = `viber://chat?number=%2B${cleanPhoneNoPlus}`;
+    } else if (type === 'tg') {
+      // Открываем Telegram по номеру телефона (+380...) или по ID пользователя
+      const tgUrl = `https://t.me/+${cleanPhoneNoPlus}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tgWebApp = (window as any)?.Telegram?.WebApp;
+      if (tgWebApp?.openTelegramLink) {
+        tgWebApp.openTelegramLink(tgUrl);
+      } else {
+        window.open(tgUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+  };
+
+  const handleCopyClick = () => {
+    setPressedButtonKey('copy-btn');
+    setTimeout(() => setPressedButtonKey(null), 180);
+
+    if (!isFormValid) {
+      triggerHaptic('error');
+      onValidationFail?.();
+      return;
+    }
+
+    triggerHaptic('success');
+    onCopyInvoice?.();
   };
 
   return (
@@ -99,8 +264,101 @@ export function ManagersContactCard({
             ? `II. ДИРЕКЦИЯ И ОТПРАВКА (${itemsCount || 0} МОД.)`
             : 'ДИРЕКЦИЯ МАНУФАКТУРЫ'}
         </span>
-        <span>DIRECT & TELEGRAM</span>
+        <span>DIRECT • VIBER • TG</span>
       </div>
+
+      {/* Предупреждение, если не заполнены обязательные поля */}
+      {onSendOrder && !isFormValid && (
+        <div
+          onClick={() => {
+            triggerHaptic('light');
+            onValidationFail?.();
+          }}
+          style={{
+            backgroundColor: '#F9ECEC',
+            border: `1px solid ${THEME.danger}`,
+            padding: '10px 12px',
+            marginBottom: '10px',
+            fontSize: '11px',
+            color: THEME.danger,
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <div>
+            <strong>Накладная заблокирована:</strong> заполните {missingFields.join(', ')}
+          </div>
+          <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', flexShrink: 0, textDecoration: 'underline' }}>
+            Заполнить ↑
+          </span>
+        </div>
+      )}
+
+      {/* Модальная вставка защиты от детей и автокликеров */}
+      {confirmingManager && (
+        <div
+          style={{
+            backgroundColor: THEME.ink,
+            color: '#FFFFFF',
+            padding: '16px',
+            marginBottom: '12px',
+            border: `1px solid ${THEME.ink}`,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#A8A39A' }}>
+              ЗАЩИТА ОТ СЛУЧАЙНОЙ ОТПРАВКИ
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setConfirmingManager(null);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#A8A39A',
+                fontSize: '11px',
+                cursor: 'pointer',
+                padding: '2px 4px',
+              }}
+            >
+              ✕ Отмена
+            </button>
+          </div>
+
+          <div style={{ fontFamily: THEME.serif, fontSize: '17px', marginBottom: '12px', lineHeight: 1.3 }}>
+            Отправить заказ руководителю <strong>{confirmingManager.name}</strong>? Для подтверждения нажмите код{' '}
+            <span style={{ textDecoration: 'underline', fontWeight: 700 }}>{guardTargetCode}</span>:
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            {guardOptions.map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => handleConfirmSecurityCode(num)}
+                style={{
+                  padding: '12px 0',
+                  backgroundColor: THEME.surface,
+                  color: THEME.ink,
+                  border: 'none',
+                  fontFamily: THEME.serif,
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {num}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Единый табличный реестр (Swiss Grid) */}
       <div
@@ -111,15 +369,35 @@ export function ManagersContactCard({
           backgroundColor: THEME.surface,
         }}
       >
-        {MANAGERS_LIST.map((mgr, idx) => {
-          const isPrimary = idx === 0;
+        {MANAGERS_LIST.map((mgr) => {
+          const isSelected = selectedManagerId === mgr.telegramId;
           const isSending = sendingId === mgr.telegramId;
+          const isSentSuccess = sentSuccessId === mgr.telegramId;
+          const isSendPressed = pressedButtonKey === `send-${mgr.telegramId}`;
+
+          // Цвет кнопки "Отправить заказ" теперь перемещается на выбранного менеджера
+          let sendBg = THEME.surfaceActive;
+          let sendColor = THEME.ink;
+
+          if (!isFormValid) {
+            sendBg = '#E6E2D8';
+            sendColor = '#8E8980';
+          } else if (isSentSuccess) {
+            sendBg = THEME.accentGreen;
+            sendColor = '#FFFFFF';
+          } else if (isSending || isSelected) {
+            sendBg = THEME.ink;
+            sendColor = '#FFFFFF';
+          }
 
           return (
             <div
               key={mgr.index}
+              onClick={() => setSelectedManagerId(mgr.telegramId)}
               style={{
                 borderBottom: `1px solid ${THEME.border}`,
+                backgroundColor: isSelected ? '#FBF9F5' : THEME.surface,
+                transition: 'background-color 0.15s ease',
               }}
             >
               {/* Верхняя строка: Индекс, Имя, Роль и Телефон */}
@@ -136,7 +414,8 @@ export function ManagersContactCard({
                   <span
                     style={{
                       fontSize: '9px',
-                      color: THEME.inkLight,
+                      color: isSelected ? THEME.ink : THEME.inkLight,
+                      fontWeight: isSelected ? 700 : 400,
                       letterSpacing: '1px',
                     }}
                   >
@@ -146,7 +425,7 @@ export function ManagersContactCard({
                     style={{
                       fontFamily: THEME.serif,
                       fontSize: '19px',
-                      fontWeight: 400,
+                      fontWeight: isSelected ? 600 : 400,
                       color: THEME.ink,
                       letterSpacing: '0.2px',
                     }}
@@ -181,11 +460,11 @@ export function ManagersContactCard({
                 </span>
               </div>
 
-              {/* Нижняя строка: 3 действия в одну линию (Отправить заказ | Тел. | Viber) */}
+              {/* Нижняя строка: 4 действия в одну линию (Отправить заказ | Тел. | Viber | TG) */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: onSendOrder ? '1.55fr 0.72fr 0.73fr' : '1fr 1fr',
+                  gridTemplateColumns: onSendOrder ? '1.45fr 0.52fr 0.55fr 0.48fr' : '1fr 1fr 1fr',
                   borderTop: `1px solid ${THEME.border}`,
                 }}
               >
@@ -193,103 +472,185 @@ export function ManagersContactCard({
                   <button
                     type="button"
                     disabled={isSending}
-                    onClick={() => handleSend(mgr)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleInitialSendClick(mgr);
+                    }}
                     style={{
-                      padding: '10px 12px',
-                      backgroundColor: isPrimary ? THEME.ink : THEME.surfaceActive,
-                      color: isPrimary ? '#FFFFFF' : THEME.ink,
+                      padding: '11px 10px',
+                      backgroundColor: sendBg,
+                      color: sendColor,
                       border: 'none',
                       borderRight: `1px solid ${THEME.border}`,
                       fontSize: '9px',
                       fontWeight: 600,
-                      letterSpacing: '1.2px',
+                      letterSpacing: '1px',
                       textTransform: 'uppercase',
                       cursor: isSending ? 'wait' : 'pointer',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       textAlign: 'left',
+                      transform: isSendPressed ? 'scale(0.97)' : 'scale(1)',
+                      transition: 'all 0.14s ease',
                     }}
                   >
-                    <span>{isSending ? 'Отправка...' : 'Отправить заказ'}</span>
-                    <span style={{ fontSize: '11px' }}>→</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isSending
+                        ? 'ОТПРАВКА...'
+                        : isSentSuccess
+                        ? '✓ ОТПРАВЛЕНО'
+                        : cooldownSeconds > 0
+                        ? `ПАУЗА ${cooldownSeconds}С`
+                        : 'ОТПРАВИТЬ ЗАКАЗ'}
+                    </span>
+                    <span style={{ fontSize: '11px', flexShrink: 0, marginLeft: '4px' }}>
+                      {isSentSuccess ? '✓' : '→'}
+                    </span>
                   </button>
                 )}
 
-                <a
-                  href={`tel:${mgr.phone}`}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMessengerAction('tel', mgr);
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '10px 6px',
-                    backgroundColor: 'transparent',
-                    color: THEME.ink,
-                    textDecoration: 'none',
-                    fontSize: '9px',
-                    fontWeight: 500,
-                    letterSpacing: '1.1px',
-                    textTransform: 'uppercase',
+                    padding: '11px 4px',
+                    backgroundColor:
+                      pressedButtonKey === `tel-${mgr.telegramId}` ? THEME.ink : 'transparent',
+                    color: pressedButtonKey === `tel-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
+                    border: 'none',
                     borderRight: `1px solid ${THEME.border}`,
+                    fontSize: '9px',
+                    fontWeight: 500,
+                    letterSpacing: '0.8px',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
                   }}
                 >
-                  Тел. ↗
-                </a>
+                  ТЕЛ. ↗
+                </button>
 
-                <a
-                  href={`viber://chat?number=${mgr.phone}`}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMessengerAction('viber', mgr);
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '10px 6px',
-                    backgroundColor: THEME.bg,
-                    color: THEME.ink,
-                    textDecoration: 'none',
+                    padding: '11px 4px',
+                    backgroundColor:
+                      pressedButtonKey === `viber-${mgr.telegramId}` ? THEME.ink : 'transparent',
+                    color: pressedButtonKey === `viber-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
+                    border: 'none',
+                    borderRight: `1px solid ${THEME.border}`,
                     fontSize: '9px',
                     fontWeight: 500,
-                    letterSpacing: '1.1px',
+                    letterSpacing: '0.8px',
                     textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
                   }}
                 >
-                  Viber ↗
-                </a>
+                  VIBER ↗
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMessengerAction('tg', mgr);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '11px 4px',
+                    backgroundColor:
+                      pressedButtonKey === `tg-${mgr.telegramId}` ? THEME.ink : THEME.bg,
+                    color: pressedButtonKey === `tg-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
+                    border: 'none',
+                    fontSize: '9px',
+                    fontWeight: 600,
+                    letterSpacing: '0.8px',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
+                  }}
+                >
+                  TG ↗
+                </button>
               </div>
             </div>
           );
         })}
+      </div>
 
-        {/* Кнопка копирования текста бордеро прямо в подвале таблицы */}
-        {onCopyInvoice && (
+      {/* ВЫДЕЛЕННАЯ ЗАМЕТНАЯ КНОПКА КОПИРОВАНИЯ НАКЛАДНОЙ */}
+      {onCopyInvoice && (
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '3px',
+            border: `1px solid ${THEME.ink}`,
+            backgroundColor: THEME.surface,
+          }}
+        >
           <button
             type="button"
-            onClick={onCopyInvoice}
+            onClick={handleCopyClick}
             style={{
               width: '100%',
-              padding: '11px 14px',
-              backgroundColor: THEME.bg,
-              color: THEME.inkMuted,
+              padding: '14px 16px',
+              backgroundColor: copied
+                ? THEME.accentGreen
+                : pressedButtonKey === 'copy-btn'
+                ? '#333333'
+                : THEME.ink,
+              color: '#FFFFFF',
               border: 'none',
-              borderBottom: `1px solid ${THEME.border}`,
-              fontSize: '9px',
-              letterSpacing: '1.4px',
+              fontSize: '10px',
+              letterSpacing: '1.5px',
               textTransform: 'uppercase',
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              transform: pressedButtonKey === 'copy-btn' ? 'scale(0.985)' : 'scale(1)',
+              transition: 'all 0.15s ease',
             }}
           >
             <span>
-              {copied ? '✓ Текстовая спецификация скопирована' : 'Скопировать текст накладной в буфер'}
+              {copied
+                ? '✓ ТЕКСТ НАКЛАДНОЙ СКОПИРОВАН В БУФЕР'
+                : 'СКОПИРОВАТЬ ТЕКСТ НАКЛАДНОЙ В БУФЕР'}
             </span>
-            <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '11px', textTransform: 'none', letterSpacing: 0 }}>
-              {copied ? 'Done' : 'Copy ↗'}
+            <span
+              style={{
+                fontFamily: THEME.serif,
+                fontStyle: 'italic',
+                fontSize: '13px',
+                textTransform: 'none',
+                letterSpacing: 0,
+                padding: '2px 8px',
+                border: '1px solid rgba(255,255,255,0.35)',
+              }}
+            >
+              {copied ? 'Copied ✓' : 'Copy ↗'}
             </span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Архивный колонтитул в самом низу */}
       <div
