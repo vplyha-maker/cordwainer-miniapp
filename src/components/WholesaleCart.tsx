@@ -10,9 +10,9 @@ type WholesaleCartProps = {
 };
 
 const MANAGERS = [
-  { label: 'Отправить заказ • Борис', telegramId: '8529254699' },
-  { label: 'Отправить заказ • Георгий', telegramId: '6034597342' },
-  { label: 'Отправить заказ • Test', telegramId: '8686072747' },
+  { label: 'Отправить заказ • Борис', telegramId: '8529254699', name: 'Борис' },
+  { label: 'Отправить заказ • Георгий', telegramId: '6034597342', name: 'Георгий' },
+  { label: 'Отправить заказ • Test', telegramId: '8686072747', name: 'Test' },
 ];
 
 const NP_API_KEY = '';
@@ -134,16 +134,21 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     );
   };
 
-    const sendToTelegramId = async (telegramId: string) => {
-    if (!telegramId) return;
+  const sendToManager = async (manager: { label: string; telegramId: string; name: string }) => {
+    if (!manager.telegramId) return;
     const text = buildInvoiceText();
 
     try {
-      const response = await fetch('/api/send-order', {
+      const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          telegramId: telegramId,
+          telegramId: manager.telegramId,
+          managerName: manager.name,
+          clientContact: clientContact,
+          branchOrComment: branchOrComment,
+          totalPairs: grandTotalPairs,
+          deliveryCost: deliveryCost,
           invoiceText: text,
         }),
       });
@@ -151,7 +156,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert('✓ Заказ успешно отправлен руководителю в Telegram!');
+        alert('✓ Заказ успешно отправлен руководителю и сохранен в базу!');
       } else {
         alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
       }
@@ -159,9 +164,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       alert('Ошибка соединения с сервером.');
     }
   };
-
-
-
 
   const copyInvoice = async () => {
     try {
@@ -474,7 +476,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               {MANAGERS.map((mgr, idx) => (
                 <button
                   key={idx}
-                  onClick={() => sendToTelegramId(mgr.telegramId)}
+                  onClick={() => sendToManager(mgr)}
                   style={{
                     width: '100%',
                     padding: '13px',
