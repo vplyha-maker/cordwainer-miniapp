@@ -18,10 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Инициализируем Neon Serverless клиент
     const sql = neon(connectionString);
 
-    // Вытаскиваем названия колонок из первого объекта
     const columns = Object.keys(rows[0]);
     let values: any[] = [];
     let placeholders: string[] = [];
@@ -42,7 +40,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       VALUES ${placeholders.join(', ')}
     `;
 
-    // Выполняем запрос через neon-клиент (передавая массив параметров вторым аргументом)
+    // Выполняем запрос, передавая values как массив в функцию sql
+    // @ts-ignore
     await sql(query, values);
 
     return res.status(200).json({ success: true, inserted: rows.length });
