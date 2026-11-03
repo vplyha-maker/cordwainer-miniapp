@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { type CartItem } from '../data/catalog';
+import { type CartItem, type SizeKey } from '../data/catalog';
 import {
   ManagersContactCard,
   type ManagerContact,
@@ -30,7 +30,17 @@ type WarehouseOption = {
   description: string;
 };
 
+type SavedRecipientData = {
+  selectedCity: CityOption;
+  cityQuery: string;
+  branchOrComment: string;
+  clientName: string;
+  clientPhone: string;
+};
+
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
+const RECIPIENT_STORAGE_KEY = 'cardio_b2b_recipient_v1';
+const SIZES_ORDER: SizeKey[] = [40, 41, 42, 43, 44, 45];
 
 const POPULAR_CITIES: CityOption[] = [
   { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
@@ -52,9 +62,22 @@ const THEME = {
   inkLight: '#9A958C',
   border: '#DCD7CC',
   danger: '#9E2A2B',
+  accentGreen: '#1E4620',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
+
+// Динамический пересчёт формулы ростовки при изменении числа коробов в накладной
+function getDynamicFormulaText(item: CartItem): string {
+  if (item.orderMode === 'sample') {
+    return `Тестовый образец (1 пара) — р. ${item.sampleSize}`;
+  }
+  const breakdown = SIZES_ORDER.filter((sz) => (item.sizeRun[sz] || 0) > 0)
+    .map((sz) => `${sz}р.(${(item.sizeRun[sz] || 0) * item.boxesCount})`)
+    .join(' • ');
+
+  return `Ростовок ×${item.boxesCount}: ${breakdown}`;
+}
 
 async function callNovaPoshta(
   modelName: string,
@@ -100,9 +123,24 @@ function buildSearchVariants(raw: string): string[] {
   return Array.from(variants);
 }
 
+function loadSavedRecipient(): SavedRecipientData | null {
+  try {
+    const raw = localStorage.getItem(RECIPIENT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as SavedRecipientData) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
-  const [selectedCity, setSelectedCity] = useState<CityOption>(POPULAR_CITIES[0]);
-  const [cityQuery, setCityQuery] = useState(POPULAR_CITIES[0].fullLabel);
+  const savedRecipient = loadSavedRecipient();
+
+  const [selectedCity, setSelectedCity] = useState<CityOption>(
+    savedRecipient?.selectedCity || POPULAR_CITIES[0]
+  );
+  const [cityQuery, setCityQuery] = useState(
+    savedRecipient?.cityQuery ?? POPULAR_CITIES[0].fullLabel
+  );
   const [cityResults, setCityResults] = useState<CityOption[]>([]);
   const [citySearching, setCitySearching] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -111,19 +149,53 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const [warehousesLoading, setWarehousesLoading] = useState(false);
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
 
-  const [branchOrComment, setBranchOrComment] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
+  const [branchOrComment, setBranchOrComment] = useState(savedRecipient?.branchOrComment || '');
+  const [clientName, setClientName] = useState(savedRecipient?.clientName || '');
+  const [clientPhone, setClientPhone] = useState(savedRecipient?.clientPhone || '');
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const [deliveryCost, setDeliveryCost] = useState<number>(0);
   const [calcLoading, setCalcLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [orderBanner, setOrderBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const logisticsRef = useRef<HTMLDivElement | null>(null);
+  const cityBoxRef = useRef<HTMLDivElement | null>(null);
+  const warehouseBoxRef = useRef<HTMLDivElement | null>(null);
+
+  // Сохраняем введённые реквизиты получателя, чтобы они не пропадали при возврате в каталог
+  useEffect(() => {
+    try {
+      const payload: SavedRecipientData = {
+        selectedCity,
+        cityQuery,
+        branchOrComment,
+        clientName,
+        clientPhone,
+      };
+      localStorage.setItem(RECIPIENT_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [selectedCity, cityQuery, branchOrComment, clientName, clientPhone]);
+
+  // Закрытие выпадающих списков по клику вне области (не мешает скроллу списка пальцем)
+  useEffect(() => {
+    const handlePointerDownOutside = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (cityBoxRef.current && !cityBoxRef.current.contains(target)) {
+        setShowCityDropdown(false);
+      }
+      if (warehouseBoxRef.current && !warehouseBoxRef.current.contains(target)) {
+        setShowWarehouseDropdown(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDownOutside);
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside);
+  }, []);
 
   const grandTotalPairs = items.reduce((sum, item) => sum + item.totalPairs, 0);
-  const grandTotalBoxes = Math.max(1, Math.ceil(grandTotalPairs / 8));
+  const grandTotalBoxes = useMemoOrCalcBoxes(items, grandTotalPairs);
 
   const isCityValid = cityQuery.trim().length >= 2;
   const isBranchValid = branchOrComment.trim().length >= 1;
@@ -339,7 +411,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   })();
 
   const handleSelectCity = (city: CityOption) => {
-    triggerHaptic('light');
+    triggerHaptic('medium');
     setSelectedCity(city);
     setCityQuery(city.fullLabel);
     setShowCityDropdown(false);
@@ -347,6 +419,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   };
 
   const handleValidationFail = () => {
+    triggerHaptic('error');
     setShowValidationErrors(true);
     logisticsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -364,9 +437,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
       const variantStr = item.shoe.variant ? ` ${item.shoe.variant}` : '';
+      const actualFormula = getDynamicFormulaText(item);
       return (
         `${idx + 1}. Модель № ${item.shoe.modelNumber}${variantStr} (${item.shoe.color})\n` +
-        `   • ${item.formulaText}\n` +
+        `   • ${actualFormula}\n` +
         `   • Итого по модели: ${item.totalPairs} пар`
       );
     });
@@ -393,6 +467,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       return false;
     }
 
+    setOrderBanner(null);
     const text = buildInvoiceText();
 
     try {
@@ -413,14 +488,26 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(`✓ Заказ успешно отправлен руководителю (${manager.name})!`);
+        triggerHaptic('success');
+        setOrderBanner({
+          type: 'success',
+          text: `✓ Заказ успешно отправлен руководителю (${manager.name})!`,
+        });
         return true;
       } else {
-        alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
+        triggerHaptic('error');
+        setOrderBanner({
+          type: 'error',
+          text: `Ошибка отправки: ${data.error || 'Не удалось отправить заказ'}`,
+        });
         return false;
       }
     } catch {
-      alert('Ошибка соединения с сервером.');
+      triggerHaptic('error');
+      setOrderBanner({
+        type: 'error',
+        text: 'Ошибка соединения с сервером. Скопируйте накладную или попробуйте снова.',
+      });
       return false;
     }
   };
@@ -432,10 +519,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     }
     try {
       await navigator.clipboard.writeText(buildInvoiceText());
+      triggerHaptic('success');
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback
+      triggerHaptic('error');
     }
   };
 
@@ -451,6 +539,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     caretColor: THEME.ink,
     colorScheme: 'light',
     outline: 'none',
+    borderRadius: 0,
   });
 
   return (
@@ -611,6 +700,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           >
             {items.map((item, idx) => {
               const isSample = item.orderMode === 'sample';
+              const canDecrease = item.boxesCount > 1;
+              const actualFormula = getDynamicFormulaText(item);
 
               return (
                 <div
@@ -626,21 +717,37 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     alignItems: 'center',
                   }}
                 >
-                  <img
-                    src={item.shoe.image}
-                    alt={item.shoe.modelNumber}
+                  {/* Увеличенная миниатюра с пропорцией 3:2 и кадрированием scale(1.14) */}
+                  <div
                     style={{
-                      width: '68px',
-                      height: '58px',
-                      objectFit: 'contain',
+                      width: '82px',
+                      aspectRatio: '3 / 2',
                       flexShrink: 0,
-                      mixBlendMode: 'multiply',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: THEME.bg,
+                      border: `1px solid ${THEME.border}`,
                     }}
-                  />
+                  >
+                    <img
+                      src={item.shoe.image}
+                      alt={item.shoe.modelNumber}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        mixBlendMode: 'multiply',
+                        filter: 'contrast(1.04)',
+                        transform: 'scale(1.14)',
+                      }}
+                    />
+                  </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <div style={{ fontSize: '16px', fontFamily: THEME.serif }}>
+                      <div style={{ fontSize: '17px', fontFamily: THEME.serif }}>
                         <span style={{ fontSize: '10px', color: THEME.inkLight, marginRight: '6px', fontFamily: THEME.sans }}>
                           0{idx + 1}
                         </span>
@@ -649,7 +756,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       <button
                         type="button"
                         onClick={() => {
-                          triggerHaptic('light');
+                          triggerHaptic('medium');
                           playAppSound('nul.mp3');
                           setTimeout(() => onRemove(item.uid), 120);
                         }}
@@ -657,9 +764,9 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          fontSize: '11px',
+                          fontSize: '12px',
                           color: THEME.inkLight,
-                          padding: '0 2px',
+                          padding: '2px 4px',
                         }}
                         title="Удалить позицию"
                       >
@@ -671,7 +778,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       {item.shoe.color} • {item.shoe.category}
                     </div>
                     <div style={{ fontSize: '11px', color: THEME.ink, marginTop: '5px', lineHeight: 1.35 }}>
-                      {item.formulaText}
+                      {actualFormula}
                     </div>
 
                     <div
@@ -696,23 +803,25 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           <button
                             type="button"
                             onClick={() => {
-                              triggerHaptic('light');
-                              onUpdateQuantity(item.uid, item.boxesCount - 1);
+                              if (canDecrease) {
+                                triggerHaptic('light');
+                                onUpdateQuantity(item.uid, item.boxesCount - 1);
+                              }
                             }}
                             style={{
-                              width: '24px',
-                              height: '24px',
+                              width: '26px',
+                              height: '26px',
                               border: 'none',
                               borderLeft: `1px solid ${THEME.border}`,
                               backgroundColor: THEME.surface,
-                              color: THEME.ink,
-                              cursor: 'pointer',
-                              fontSize: '12px',
+                              color: canDecrease ? THEME.ink : THEME.border,
+                              cursor: canDecrease ? 'pointer' : 'default',
+                              fontSize: '13px',
                             }}
                           >
                             −
                           </button>
-                          <span style={{ fontSize: '11px', fontWeight: 600, minWidth: '22px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, minWidth: '24px', textAlign: 'center' }}>
                             {item.boxesCount}
                           </span>
                           <button
@@ -722,14 +831,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                               onUpdateQuantity(item.uid, item.boxesCount + 1);
                             }}
                             style={{
-                              width: '24px',
-                              height: '24px',
+                              width: '26px',
+                              height: '26px',
                               border: 'none',
                               borderLeft: `1px solid ${THEME.border}`,
                               backgroundColor: THEME.surface,
                               color: THEME.ink,
                               cursor: 'pointer',
-                              fontSize: '12px',
+                              fontSize: '13px',
                             }}
                           >
                             +
@@ -767,6 +876,22 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 padding: '14px',
               }}
             >
+              {showValidationErrors && !isFormValid && (
+                <div
+                  style={{
+                    backgroundColor: '#FDF2F2',
+                    border: `1px solid ${THEME.danger}`,
+                    color: THEME.danger,
+                    padding: '8px 10px',
+                    fontSize: '11px',
+                    marginBottom: '12px',
+                    lineHeight: 1.35,
+                  }}
+                >
+                  Заполните обязательные поля: <strong>{missingFields.join(', ')}</strong>
+                </div>
+              )}
+
               <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '10px' }}>
                 Город доставки: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
               </div>
@@ -787,6 +912,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         color: isSelected ? '#FFFFFF' : THEME.ink,
                         cursor: 'pointer',
                         letterSpacing: '0.5px',
+                        fontWeight: isSelected ? 600 : 400,
                       }}
                     >
                       {city.name}
@@ -796,13 +922,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               </div>
 
               {/* 1. Город */}
-              <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   type="text"
                   placeholder="1. Населенный пункт (город) *"
                   value={cityQuery}
                   onFocus={() => setShowCityDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
                   onChange={(e) => {
                     setCityQuery(e.target.value);
                     setShowCityDropdown(true);
@@ -813,8 +938,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 {cityQuery.length > 0 && (
                   <button
                     type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
+                    onClick={() => {
+                      triggerHaptic('light');
                       setCityQuery('');
                       setCityResults([]);
                       setShowCityDropdown(true);
@@ -850,6 +975,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         border: `1px solid ${THEME.border}`,
                         maxHeight: '220px',
                         overflowY: 'auto',
+                        WebkitOverflowScrolling: 'touch',
                         boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
                       }}
                     >
@@ -865,9 +991,9 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         cityResults.map((c) => (
                           <div
                             key={c.ref}
-                            onMouseDown={() => handleSelectCity(c)}
+                            onClick={() => handleSelectCity(c)}
                             style={{
-                              padding: '9px 12px',
+                              padding: '10px 12px',
                               fontSize: '12px',
                               borderBottom: `1px solid ${THEME.border}`,
                               cursor: 'pointer',
@@ -905,7 +1031,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               </div>
 
               {/* 4. Отделение Новой Почты */}
-              <div style={{ position: 'relative', marginBottom: '12px' }}>
+              <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '12px' }}>
                 <input
                   type="text"
                   placeholder={
@@ -915,7 +1041,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   }
                   value={branchOrComment}
                   onFocus={() => setShowWarehouseDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowWarehouseDropdown(false), 200)}
                   onChange={(e) => {
                     setBranchOrComment(e.target.value);
                     setShowWarehouseDropdown(true);
@@ -926,8 +1051,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 {branchOrComment.length > 0 && (
                   <button
                     type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
+                    onClick={() => {
+                      triggerHaptic('light');
                       setBranchOrComment('');
                       setShowWarehouseDropdown(true);
                     }}
@@ -958,21 +1083,22 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       zIndex: 25,
                       backgroundColor: THEME.surface,
                       border: `1px solid ${THEME.border}`,
-                      maxHeight: '200px',
+                      maxHeight: '210px',
                       overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch',
                       boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
                     }}
                   >
                     {filteredWarehouses.map((w) => (
                       <div
                         key={w.ref}
-                        onMouseDown={() => {
+                        onClick={() => {
                           triggerHaptic('light');
                           setBranchOrComment(w.description);
                           setShowWarehouseDropdown(false);
                         }}
                         style={{
-                          padding: '8px 12px',
+                          padding: '9px 12px',
                           fontSize: '11px',
                           borderBottom: `1px solid ${THEME.border}`,
                           cursor: 'pointer',
@@ -1014,6 +1140,23 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             </div>
           </div>
 
+          {/* Статус отправки заказа руководителю */}
+          {orderBanner && (
+            <div
+              style={{
+                marginBottom: '16px',
+                padding: '12px 14px',
+                border: `1px solid ${orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger}`,
+                backgroundColor: orderBanner.type === 'success' ? '#EFF5F0' : '#FDF2F2',
+                color: orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger,
+                fontSize: '12px',
+                fontWeight: 600,
+              }}
+            >
+              {orderBanner.text}
+            </div>
+          )}
+
           {/* II. ОТПРАВКА ЗАКАЗА И КОНТАКТЫ */}
           <ManagersContactCard
             itemsCount={items.length}
@@ -1029,3 +1172,23 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     </div>
   );
 }
+
+// Подсчёт реального количества грузовых мест (коробов) по заказу
+function useMemoOrCalcBoxes(items: CartItem[], grandTotalPairs: number): number {
+  if (grandTotalPairs === 0) return 0;
+  let wholesaleBoxes = 0;
+  let samplePairs = 0;
+
+  for (const item of items) {
+    if (item.orderMode === 'sample') {
+      samplePairs += item.totalPairs;
+    } else {
+      wholesaleBoxes += item.boxesCount;
+    }
+  }
+
+  const sampleBoxes = samplePairs > 0 ? Math.ceil(samplePairs / 8) : 0;
+  return Math.max(1, wholesaleBoxes + sampleBoxes);
+}
+
+export default WholesaleCart;
