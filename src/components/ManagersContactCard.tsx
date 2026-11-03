@@ -6,8 +6,6 @@ export type ManagerContact = {
   role: string;
   phone: string;
   phoneDisplay: string;
-  viber: string;
-  telegramUsername?: string;
   telegramId: string;
   isTest?: boolean;
 };
@@ -39,7 +37,6 @@ const MANAGERS: ManagerContact[] = [
     role: 'Руководитель оптового отдела',
     phone: '+380974541511',
     phoneDisplay: '+38 (097) 454-15-11',
-    viber: 'viber://chat?number=%2B380974541511',
     telegramId: '8529254699',
   },
   {
@@ -48,7 +45,6 @@ const MANAGERS: ManagerContact[] = [
     role: 'Руководитель производства и продаж',
     phone: '+380677193716',
     phoneDisplay: '+38 (067) 719-37-16',
-    viber: 'viber://chat?number=%2B380677193716',
     telegramId: '6034597342',
   },
   {
@@ -57,7 +53,6 @@ const MANAGERS: ManagerContact[] = [
     role: 'Тестовый контур проверки заказов',
     phone: '+380000000000',
     phoneDisplay: 'Тестовый канал',
-    viber: '',
     telegramId: '8686072747',
     isTest: true,
   },
@@ -76,8 +71,6 @@ const THEME = {
   border: '#DCD7CC',
   accentGreen: '#1E4620',
   danger: '#9E2A2B',
-  viber: '#59267C',
-  telegram: '#1C6499',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
@@ -121,13 +114,13 @@ export function triggerHaptic(style: HapticStyle = 'light'): void {
       navigator.vibrate(patterns[style] || 15);
     }
   } catch {
-    // Игнорируем ограничения браузера, если вибрация недоступна
+    // Игнорируем ограничения окружения
   }
 }
 
-// 2. ЗВУКОВОЙ ДВИЖОК (предзагрузка в память и мгновенное воспроизведение)
+// 2. ЗВУКОВОЙ ДВИЖОК (только рабочие звуки заказа и удаления, без музыки ожидания Viber)
 const audioCache: Record<string, HTMLAudioElement> = {};
-const SOUND_FILES = ['zakaz.mp3', 'nul.mp3', 'viber.mp3'];
+const SOUND_FILES = ['zakaz.mp3', 'nul.mp3'];
 
 export function preloadAppSounds(): void {
   if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
@@ -165,7 +158,7 @@ export function playAppSound(fileName: string): void {
     const playPromise = audio.play();
     if (playPromise && typeof playPromise.catch === 'function') {
       playPromise.catch(() => {
-        // Автовоспроизведение может блокироваться до первого тапа
+        // Автовоспроизведение может блокироваться браузером до взаимодействия
       });
     }
   } catch {
@@ -200,15 +193,11 @@ export function ManagersContactCard({
   missingFields = [],
   onValidationFail,
 }: ManagersContactCardProps) {
-  // Двухшаговое подтверждение: ID менеджера, которому сейчас открыто подтверждение
   const [confirmingManagerId, setConfirmingManagerId] = useState<string | null>(null);
-  // ID менеджера, которому прямо сейчас уходит сетевой запрос
   const [sendingManagerId, setSendingManagerId] = useState<string | null>(null);
-  // Таймеры кулдауна (timestamp окончания блокировки для каждого менеджера)
   const [cooldowns, setCooldowns] = useState<Record<string, number>>(() => loadSavedCooldowns());
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
 
-  // Анти-кликер: скрытая ловушка для ботов (honeypot) и детектор спам-серий
   const [honeypotValue, setHoneypotValue] = useState('');
   const [spamBlockedUntil, setSpamBlockedUntil] = useState<number>(0);
   const clickTimestampsRef = useRef<number[]>([]);
@@ -218,7 +207,6 @@ export function ManagersContactCard({
     preloadAppSounds();
   }, []);
 
-  // Тик таймера каждую секунду, пока есть активные кулдауны или анти-спам блок
   useEffect(() => {
     const hasActiveCooldown =
       Object.values(cooldowns).some((exp) => exp > Date.now()) || spamBlockedUntil > Date.now();
@@ -232,7 +220,6 @@ export function ManagersContactCard({
     return () => clearInterval(interval);
   }, [cooldowns, spamBlockedUntil]);
 
-  // Сохранение кулдаунов в localStorage
   useEffect(() => {
     try {
       localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(cooldowns));
@@ -241,22 +228,18 @@ export function ManagersContactCard({
     }
   }, [cooldowns]);
 
-  // Сброс открытого подтверждения, если форма стала невалидной
   useEffect(() => {
     if (!isFormValid && confirmingManagerId) {
       setConfirmingManagerId(null);
     }
   }, [isFormValid, confirmingManagerId]);
 
-  // Проверка на автокликер и спам-частоту нажатий
   const checkAntiClicker = (e: React.MouseEvent): boolean => {
-    // 1. Блокируем синтетические клики из JS-скриптов
     if (!e.isTrusted) {
       triggerHaptic('error');
       return false;
     }
 
-    // 2. Если заполнено скрытое поле-ловушка
     if (honeypotValue.trim().length > 0) {
       triggerHaptic('error');
       return false;
@@ -268,14 +251,13 @@ export function ManagersContactCard({
       return false;
     }
 
-    // 3. Фильтруем клики за последние 3 секунды (не более 5 быстрых кликов подряд)
     const recentClicks = clickTimestampsRef.current.filter((t) => now - t < 3000);
     recentClicks.push(now);
     clickTimestampsRef.current = recentClicks;
 
     if (recentClicks.length > 5) {
       triggerHaptic('error');
-      setSpamBlockedUntil(now + 10000); // Блокировка на 10 секунд при спам-атаке
+      setSpamBlockedUntil(now + 10000);
       setNowTick(now);
       setConfirmingManagerId(null);
       return false;
@@ -284,7 +266,6 @@ export function ManagersContactCard({
     return true;
   };
 
-  // Шаг 1: Нажатие «Отправить заказ» (проверка валидности и открытие подтверждения)
   const handleInitiateSend = (e: React.MouseEvent, manager: ManagerContact) => {
     if (!checkAntiClicker(e)) return;
     if (isSendingRef.current || sendingManagerId) return;
@@ -305,12 +286,9 @@ export function ManagersContactCard({
     setConfirmingManagerId(manager.id);
   };
 
-  // Шаг 2: Окончательное подтверждение отправки заказа
   const handleConfirmSend = async (e: React.MouseEvent, manager: ManagerContact) => {
     if (!checkAntiClicker(e)) return;
     if (!onSendOrder) return;
-
-    // Синхронная защита от двойного клика
     if (isSendingRef.current || sendingManagerId) return;
 
     if (!isFormValid) {
@@ -349,7 +327,7 @@ export function ManagersContactCard({
 
   return (
     <div style={{ fontFamily: THEME.sans, color: THEME.ink }}>
-      {/* Скрытое поле-ловушка для ботов и автозаполнителей */}
+      {/* Скрытое поле-ловушка для ботов */}
       <input
         type="text"
         name="company_fax_bot_trap"
@@ -383,7 +361,6 @@ export function ManagersContactCard({
         <span>ПРЯМАЯ СВЯЗЬ</span>
       </div>
 
-      {/* Предупреждение при срабатывании защиты от автокликера */}
       {isSpamLocked && (
         <div
           style={{
@@ -400,7 +377,6 @@ export function ManagersContactCard({
         </div>
       )}
 
-      {/* Подсказка, если не все поля заполнены */}
       {onSendOrder && !isFormValid && missingFields.length > 0 && (
         <div
           onClick={() => {
@@ -423,7 +399,6 @@ export function ManagersContactCard({
         </div>
       )}
 
-      {/* Кнопка копирования текста накладной в буфер обмена */}
       {onCopyInvoice && itemsCount > 0 && (
         <button
           type="button"
@@ -455,7 +430,6 @@ export function ManagersContactCard({
         </button>
       )}
 
-      {/* Карточки руководителей */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {MANAGERS.map((manager) => {
           const cooldownRemaining = Math.max(
@@ -524,9 +498,9 @@ export function ManagersContactCard({
                 {manager.role}
               </div>
 
-              {/* Блок прямой отправки заказа в Telegram руководителю */}
+              {/* Кнопка отправки заказа в Telegram */}
               {onSendOrder && itemsCount > 0 && (
-                <div style={{ marginBottom: manager.isTest ? '0' : '10px' }}>
+                <div style={{ marginBottom: manager.isTest ? '0' : '8px' }}>
                   {isConfirmingThis && !isOnCooldown ? (
                     <div
                       style={{
@@ -557,12 +531,13 @@ export function ManagersContactCard({
                             border: 'none',
                             fontSize: '10px',
                             fontWeight: 600,
-                            letterSpacing: '1.1px',
+                            letterSpacing: '1px',
                             textTransform: 'uppercase',
                             cursor: isAnySending ? 'wait' : 'pointer',
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {isSendingThis ? 'Отправка заказа...' : '✓ Подтвердить отправку'}
+                          {isSendingThis ? 'Отправка...' : '✓ Подтвердить'}
                         </button>
                         <button
                           type="button"
@@ -594,15 +569,13 @@ export function ManagersContactCard({
                       onClick={(e) => handleInitiateSend(e, manager)}
                       style={{
                         width: '100%',
-                        padding: '12px 14px',
-                        backgroundColor: isOnCooldown
-                          ? THEME.surfaceActive
-                          : THEME.ink,
+                        padding: '13px 14px',
+                        backgroundColor: isOnCooldown ? THEME.surfaceActive : THEME.ink,
                         color: isOnCooldown ? THEME.accentGreen : '#FFFFFF',
                         border: `1px solid ${isOnCooldown ? THEME.accentGreen : THEME.ink}`,
                         fontSize: '10px',
                         fontWeight: 600,
-                        letterSpacing: '1.3px',
+                        letterSpacing: '1.1px',
                         textTransform: 'uppercase',
                         cursor:
                           isOnCooldown || isAnySending || isSpamLocked
@@ -611,10 +584,12 @@ export function ManagersContactCard({
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
+                        gap: '8px',
+                        whiteSpace: 'nowrap',
                         opacity: isAnySending && !isSendingThis ? 0.6 : 1,
                       }}
                     >
-                      <span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {isSendingThis
                           ? 'Отправка накладной...'
                           : isOnCooldown
@@ -626,58 +601,39 @@ export function ManagersContactCard({
                           fontFamily: isOnCooldown ? THEME.sans : THEME.serif,
                           fontStyle: isOnCooldown ? 'normal' : 'italic',
                           fontSize: isOnCooldown ? '10px' : '13px',
+                          flexShrink: 0,
                         }}
                       >
-                        {isOnCooldown ? `Повтор через ${cooldownRemaining}с` : 'Telegram →'}
+                        {isOnCooldown ? `Через ${cooldownRemaining}с` : 'Telegram →'}
                       </span>
                     </button>
                   )}
                 </div>
               )}
 
-              {/* Быстрые кнопки Позвонить / Viber для основных руководителей */}
+              {/* Полноширинная кнопка вызова (открывает системный выбор Телефон / Viber) */}
               {!manager.isTest && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <a
-                    href={`tel:${manager.phone}`}
-                    onClick={() => triggerHaptic('light')}
-                    style={{
-                      padding: '9px 8px',
-                      border: `1px solid ${THEME.border}`,
-                      backgroundColor: THEME.bg,
-                      color: THEME.ink,
-                      textDecoration: 'none',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      letterSpacing: '1px',
-                      textTransform: 'uppercase',
-                      textAlign: 'center',
-                    }}
-                  >
-                    Позвонить
-                  </a>
-                  <a
-                    href={manager.viber}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      playAppSound('viber.mp3');
-                    }}
-                    style={{
-                      padding: '9px 8px',
-                      border: `1px solid ${THEME.viber}`,
-                      backgroundColor: 'transparent',
-                      color: THEME.viber,
-                      textDecoration: 'none',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      letterSpacing: '1px',
-                      textTransform: 'uppercase',
-                      textAlign: 'center',
-                    }}
-                  >
-                    Написать в Viber
-                  </a>
-                </div>
+                <a
+                  href={`tel:${manager.phone}`}
+                  onClick={() => triggerHaptic('light')}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '10px 12px',
+                    border: `1px solid ${THEME.border}`,
+                    backgroundColor: THEME.bg,
+                    color: THEME.ink,
+                    textDecoration: 'none',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    letterSpacing: '1.2px',
+                    textTransform: 'uppercase',
+                    textAlign: 'center',
+                  }}
+                >
+                  Позвонить
+                </a>
               )}
             </div>
           );
