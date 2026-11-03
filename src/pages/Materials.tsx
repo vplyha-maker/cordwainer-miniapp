@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { cardioCatalog, type ShoeCategory, type ShoeItem, type CartItem, type SizeKey } from '../data/catalog';
 import { WholesaleCart } from '../components/WholesaleCart';
+import { triggerHaptic } from '../components/ManagersContactCard';
 
 type MaterialsProps = {
   onBack?: () => void;
@@ -84,6 +85,7 @@ export function Materials({ onBack }: MaterialsProps) {
   }, [cart]);
 
   const updateSizeCount = (size: SizeKey, delta: number) => {
+    triggerHaptic('light');
     setSizeRun((prev) => {
       const nextVal = Math.max(0, Math.min(10, (prev[size] || 0) + delta));
       return { ...prev, [size]: nextVal };
@@ -92,6 +94,8 @@ export function Materials({ onBack }: MaterialsProps) {
 
   const addCurrentShoeToCart = () => {
     if (!selectedShoe || totalPairs === 0) return;
+
+    triggerHaptic('success');
 
     const formulaText =
       orderMode === 'sample'
@@ -162,7 +166,7 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 2: ДОСЬЕ МОДЕЛИ (BESPOKE SPECIFICATION SHEET)
+  // ЭКРАН 2: КАРТОЧКА МОДЕЛИ
   if (selectedShoe) {
     const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
 
@@ -177,7 +181,7 @@ export function Materials({ onBack }: MaterialsProps) {
           fontFamily: THEME.sans,
         }}
       >
-        {/* Верхняя навигация досье */}
+        {/* Верхняя навигация */}
         <div
           style={{
             display: 'flex',
@@ -189,37 +193,43 @@ export function Materials({ onBack }: MaterialsProps) {
           }}
         >
           <button
-            onClick={() => setSelectedShoe(null)}
+            onClick={() => {
+              triggerHaptic('light');
+              setSelectedShoe(null);
+            }}
             style={{
               background: 'transparent',
               border: 'none',
               padding: '4px 0',
               fontSize: '10px',
-              letterSpacing: '1.5px',
+              letterSpacing: '1.4px',
               textTransform: 'uppercase',
               cursor: 'pointer',
               color: THEME.ink,
-              fontWeight: 500,
+              fontWeight: 600,
             }}
           >
-            ← В архив моделей
+            ← Назад в каталог
           </button>
 
           <button
-            onClick={() => setIsCartOpen(true)}
+            onClick={() => {
+              triggerHaptic('light');
+              setIsCartOpen(true);
+            }}
             style={{
               background: cart.length > 0 ? THEME.ink : 'transparent',
               border: `1px solid ${THEME.ink}`,
               padding: '7px 12px',
               fontSize: '10px',
-              letterSpacing: '1.2px',
+              letterSpacing: '1.1px',
               textTransform: 'uppercase',
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: 'pointer',
               color: cart.length > 0 ? '#FFFFFF' : THEME.ink,
             }}
           >
-            Бордеро ({cart.length} • {cartTotalPairs} п.)
+            Накладная ({cart.length} • {cartTotalPairs} п.)
           </button>
         </div>
 
@@ -232,7 +242,7 @@ export function Materials({ onBack }: MaterialsProps) {
               borderLeft: `3px solid ${THEME.ink}`,
               padding: '10px 14px',
               fontSize: '11px',
-              letterSpacing: '0.4px',
+              letterSpacing: '0.3px',
               marginBottom: '20px',
               display: 'flex',
               justifyContent: 'space-between',
@@ -240,9 +250,12 @@ export function Materials({ onBack }: MaterialsProps) {
               color: THEME.ink,
             }}
           >
-            <span>В текущей спецификации: <strong>{alreadyInCartPairs} пар</strong></span>
+            <span>Уже в вашей накладной: <strong>{alreadyInCartPairs} пар</strong></span>
             <span
-              onClick={() => setIsCartOpen(true)}
+              onClick={() => {
+                triggerHaptic('light');
+                setIsCartOpen(true);
+              }}
               style={{
                 fontSize: '10px',
                 textTransform: 'uppercase',
@@ -257,7 +270,7 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        {/* Заголовок и индекс модели */}
+        {/* Заголовок модели */}
         <div style={{ marginBottom: '16px' }}>
           <div
             style={{
@@ -266,13 +279,13 @@ export function Materials({ onBack }: MaterialsProps) {
               fontSize: '10px',
               color: THEME.inkMuted,
               textTransform: 'uppercase',
-              letterSpacing: '1.6px',
+              letterSpacing: '1.4px',
               marginBottom: '6px',
             }}
           >
-            <span>ДОСЬЕ СИЛУЭТА // {selectedShoe.category}</span>
+            <span>КАРТОЧКА МОДЕЛИ // {selectedShoe.category}</span>
             <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
-              Lot № {selectedShoe.modelNumber}
+              Арт. № {selectedShoe.modelNumber}
             </span>
           </div>
 
@@ -303,11 +316,11 @@ export function Materials({ onBack }: MaterialsProps) {
               marginTop: '4px',
             }}
           >
-            Исполнение: {selectedShoe.color}
+            Цвет: {selectedShoe.color}
           </div>
         </div>
 
-        {/* Экспозиция товара (без белого квадрата благодаря multiply) */}
+        {/* Фото товара */}
         <div
           style={{
             backgroundColor: THEME.surface,
@@ -328,7 +341,7 @@ export function Materials({ onBack }: MaterialsProps) {
               textTransform: 'uppercase',
             }}
           >
-            FIG. 01 — PROFILE
+            CARDIO ORIGINAL
           </div>
           <div
             style={{
@@ -341,7 +354,7 @@ export function Materials({ onBack }: MaterialsProps) {
               textTransform: 'uppercase',
             }}
           >
-            40—45 EUR
+            РАЗМЕРЫ 40—45
           </div>
 
           <img
@@ -390,7 +403,7 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Варианты исполнения (палитра модели) */}
+        {/* Варианты цвета */}
         {modelVariants.length > 1 && (
           <div style={{ marginBottom: '24px' }}>
             <div
@@ -399,12 +412,12 @@ export function Materials({ onBack }: MaterialsProps) {
                 justifyContent: 'space-between',
                 fontSize: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '1.4px',
+                letterSpacing: '1.3px',
                 color: THEME.inkMuted,
                 marginBottom: '10px',
               }}
             >
-              <span>I. ПАЛИТРА И КОЖИ</span>
+              <span>ДОСТУПНЫЕ ЦВЕТА МОДЕЛИ</span>
               <span>01—0{modelVariants.length}</span>
             </div>
             <div
@@ -420,7 +433,10 @@ export function Materials({ onBack }: MaterialsProps) {
                 return (
                   <div
                     key={v.id}
-                    onClick={() => setSelectedShoe(v)}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setSelectedShoe(v);
+                    }}
                     style={{
                       borderRight: `1px solid ${THEME.border}`,
                       borderBottom: `1px solid ${THEME.border}`,
@@ -471,7 +487,7 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        {/* II. КОНФИГУРАТОР ПАРТИИ */}
+        {/* ВЫБОР РОСТОВКИ И КОРОБОВ */}
         <div style={{ marginBottom: '24px' }}>
           <div
             style={{
@@ -479,16 +495,15 @@ export function Materials({ onBack }: MaterialsProps) {
               justifyContent: 'space-between',
               fontSize: '10px',
               textTransform: 'uppercase',
-              letterSpacing: '1.4px',
+              letterSpacing: '1.3px',
               color: THEME.inkMuted,
               marginBottom: '10px',
             }}
           >
-            <span>II. ФОРМАТ КОМПЛЕКТАЦИИ</span>
-            <span>B2B SPEC</span>
+            <span>ПАРАМЕТРЫ ЗАКАЗА</span>
+            <span>ОПТ / ОБРАЗЕЦ</span>
           </div>
 
-          {/* Переключатель Опт / Образец в виде табличных вкладок */}
           <div
             style={{
               display: 'grid',
@@ -498,7 +513,10 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           >
             <button
-              onClick={() => setOrderMode('wholesale')}
+              onClick={() => {
+                triggerHaptic('light');
+                setOrderMode('wholesale');
+              }}
               style={{
                 backgroundColor: orderMode === 'wholesale' ? THEME.ink : 'transparent',
                 color: orderMode === 'wholesale' ? '#FFFFFF' : THEME.ink,
@@ -514,7 +532,10 @@ export function Materials({ onBack }: MaterialsProps) {
               Оптовая ростовка
             </button>
             <button
-              onClick={() => setOrderMode('sample')}
+              onClick={() => {
+                triggerHaptic('light');
+                setOrderMode('sample');
+              }}
               style={{
                 backgroundColor: orderMode === 'sample' ? THEME.ink : 'transparent',
                 color: orderMode === 'sample' ? '#FFFFFF' : THEME.ink,
@@ -528,13 +549,12 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
-              Образец (1 пара)
+              Тестовый образец (1 п.)
             </button>
           </div>
 
           {orderMode === 'wholesale' ? (
             <>
-              {/* Пресеты ростовки */}
               <div
                 style={{
                   display: 'flex',
@@ -543,16 +563,19 @@ export function Materials({ onBack }: MaterialsProps) {
                   marginBottom: '10px',
                 }}
               >
-                <span style={{ fontSize: '11px', color: THEME.inkMuted, fontStyle: 'italic', fontFamily: THEME.serif }}>
-                  Матрица короба (пар на размер):
+                <span style={{ fontSize: '12px', color: THEME.inkMuted, fontStyle: 'italic', fontFamily: THEME.serif }}>
+                  Размерный ряд коробки (40–45):
                 </span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
-                    onClick={() => setSizeRun(STANDARD_8_RUN)}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setSizeRun(STANDARD_8_RUN);
+                    }}
                     style={{
                       background: THEME.surface,
                       border: `1px solid ${THEME.border}`,
-                      padding: '4px 8px',
+                      padding: '5px 8px',
                       fontSize: '9px',
                       letterSpacing: '0.8px',
                       textTransform: 'uppercase',
@@ -560,14 +583,17 @@ export function Materials({ onBack }: MaterialsProps) {
                       cursor: 'pointer',
                     }}
                   >
-                    Стандарт (8)
+                    8 пар (стандарт)
                   </button>
                   <button
-                    onClick={() => setSizeRun(EVEN_6_RUN)}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setSizeRun(EVEN_6_RUN);
+                    }}
                     style={{
                       background: THEME.surface,
                       border: `1px solid ${THEME.border}`,
-                      padding: '4px 8px',
+                      padding: '5px 8px',
                       fontSize: '9px',
                       letterSpacing: '0.8px',
                       textTransform: 'uppercase',
@@ -575,12 +601,11 @@ export function Materials({ onBack }: MaterialsProps) {
                       cursor: 'pointer',
                     }}
                   >
-                    Ровная (6)
+                    6 пар (ровная)
                   </button>
                 </div>
               </div>
 
-              {/* Архитектурная таблица размеров 40-45 в 6 колонок */}
               <div
                 style={{
                   display: 'grid',
@@ -619,7 +644,7 @@ export function Materials({ onBack }: MaterialsProps) {
                         background: 'none',
                         border: 'none',
                         padding: '6px 0',
-                        fontSize: '13px',
+                        fontSize: '14px',
                         cursor: 'pointer',
                         color: THEME.inkMuted,
                       }}
@@ -643,7 +668,7 @@ export function Materials({ onBack }: MaterialsProps) {
                         background: 'none',
                         border: 'none',
                         padding: '6px 0',
-                        fontSize: '13px',
+                        fontSize: '14px',
                         cursor: 'pointer',
                         color: THEME.inkMuted,
                       }}
@@ -654,7 +679,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 ))}
               </div>
 
-              {/* Множитель коробов */}
               <div
                 style={{
                   display: 'flex',
@@ -678,7 +702,10 @@ export function Materials({ onBack }: MaterialsProps) {
                   {[1, 2, 3, 5, 10].map((num, idx) => (
                     <button
                       key={num}
-                      onClick={() => setBoxesCount(num)}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setBoxesCount(num);
+                      }}
                       style={{
                         padding: '7px 12px',
                         border: 'none',
@@ -700,14 +727,14 @@ export function Materials({ onBack }: MaterialsProps) {
             <div>
               <div
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontFamily: THEME.serif,
                   fontStyle: 'italic',
                   color: THEME.inkMuted,
                   marginBottom: '10px',
                 }}
               >
-                Выберите размер тестовой пары для шоурума:
+                Выберите размер тестового образца:
               </div>
               <div
                 style={{
@@ -720,7 +747,10 @@ export function Materials({ onBack }: MaterialsProps) {
                 {SIZES.map((sz) => (
                   <button
                     key={sz}
-                    onClick={() => setSampleSize(sz)}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setSampleSize(sz);
+                    }}
                     style={{
                       padding: '14px 0',
                       border: 'none',
@@ -741,7 +771,7 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Кнопка добавления */}
+        {/* Кнопка добавления в накладную */}
         <button
           disabled={totalPairs === 0}
           onClick={addCurrentShoeToCart}
@@ -752,9 +782,9 @@ export function Materials({ onBack }: MaterialsProps) {
             color: '#FFFFFF',
             border: 'none',
             fontSize: '11px',
-            fontWeight: 500,
+            fontWeight: 600,
             textTransform: 'uppercase',
-            letterSpacing: '1.8px',
+            letterSpacing: '1.5px',
             cursor: totalPairs === 0 ? 'not-allowed' : 'pointer',
             display: 'flex',
             justifyContent: 'space-between',
@@ -763,9 +793,9 @@ export function Materials({ onBack }: MaterialsProps) {
           }}
         >
           <span>
-            {justAdded ? '✓ Занесено в бордеро' : 'Включить в спецификацию'}
+            {justAdded ? '✓ Добавлено в накладную' : 'Добавить в накладную'}
           </span>
-          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '14px', textTransform: 'none', letterSpacing: '0' }}>
+          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '15px', textTransform: 'none', letterSpacing: '0' }}>
             {totalPairs} пар →
           </span>
         </button>
@@ -773,7 +803,7 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 3: АРХИВНЫЙ КАТАЛОГ В СТИЛЕ CORDWAINER (SWISS EDITORIAL GRID)
+  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ
   return (
     <div
       style={{
@@ -785,7 +815,7 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхний колонтитул (как на скринах 3 и 4) */}
+      {/* Верхняя шапка */}
       <div
         style={{
           display: 'flex',
@@ -795,23 +825,20 @@ export function Materials({ onBack }: MaterialsProps) {
           marginBottom: '14px',
           borderBottom: `1px solid ${THEME.border}`,
           fontSize: '9px',
-          letterSpacing: '1.8px',
+          letterSpacing: '1.6px',
           textTransform: 'uppercase',
           color: THEME.inkMuted,
         }}
       >
-        <span>ВЫПУСК № 01 — ОПТОВЫЙ АРХИВ</span>
+        <span>ХАРЬКОВ • ОПТОВЫЙ КАТАЛОГ</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '11px' }}>
-            Vol. I
-          </span>
           {onBack && (
             <button
               onClick={onBack}
               style={{
                 background: 'transparent',
                 border: `1px solid ${THEME.border}`,
-                padding: '4px 9px',
+                padding: '4px 10px',
                 fontSize: '9px',
                 letterSpacing: '1.2px',
                 textTransform: 'uppercase',
@@ -819,26 +846,26 @@ export function Materials({ onBack }: MaterialsProps) {
                 color: THEME.ink,
               }}
             >
-              ← Индекс
+              ← На главную
             </button>
           )}
         </div>
       </div>
 
-      {/* Журнальный заголовок */}
+      {/* Заголовок бренда */}
       <div style={{ marginBottom: '18px' }}>
         <h1
           style={{
             fontFamily: THEME.serif,
-            fontSize: '42px',
+            fontSize: '40px',
             margin: '0',
             fontWeight: 400,
             letterSpacing: '0.5px',
-            lineHeight: 0.98,
+            lineHeight: 1,
             textTransform: 'uppercase',
           }}
         >
-          Cardio
+          Cardio Footwear
         </h1>
         <div
           style={{
@@ -849,11 +876,11 @@ export function Materials({ onBack }: MaterialsProps) {
             marginTop: '4px',
           }}
         >
-          The B2B Shoemaker’s Archive & Seasonal Line Sheet • Kharkiv
+          Оптовый шоурум и заказ моделей от производителя
         </div>
       </div>
 
-      {/* Поле поиска со встроенным курсивным префиксом Index. (как на скрине 3) */}
+      {/* Поле поиска */}
       <div
         style={{
           display: 'flex',
@@ -861,7 +888,7 @@ export function Materials({ onBack }: MaterialsProps) {
           backgroundColor: THEME.surface,
           border: `1px solid ${THEME.border}`,
           padding: '0 12px',
-          marginBottom: '20px',
+          marginBottom: '18px',
         }}
       >
         <span
@@ -874,11 +901,11 @@ export function Materials({ onBack }: MaterialsProps) {
             userSelect: 'none',
           }}
         >
-          Index.
+          Поиск:
         </span>
         <input
           type="text"
-          placeholder="Поиск по номеру колодки, артикулу или коже..."
+          placeholder="Номер модели или цвет..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
@@ -887,7 +914,7 @@ export function Materials({ onBack }: MaterialsProps) {
             border: 'none',
             backgroundColor: 'transparent',
             color: THEME.ink,
-            fontSize: '12px',
+            fontSize: '13px',
             outline: 'none',
           }}
         />
@@ -907,7 +934,7 @@ export function Materials({ onBack }: MaterialsProps) {
         )}
       </div>
 
-      {/* Рубрикатор категорий (в стиле 01 / МАТЕРИАЛЫ | 02 / СИЛУЭТЫ со скрина 4) */}
+      {/* Категории */}
       <div
         style={{
           display: 'grid',
@@ -922,35 +949,38 @@ export function Materials({ onBack }: MaterialsProps) {
           return (
             <button
               key={category}
-              onClick={() => setActiveCategory(category)}
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveCategory(category);
+              }}
               style={{
                 background: isActive ? THEME.ink : 'transparent',
                 color: isActive ? '#FFFFFF' : THEME.ink,
                 border: 'none',
                 borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
                 padding: '9px 4px',
-                fontSize: '9px',
+                fontSize: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
+                letterSpacing: '0.8px',
                 cursor: 'pointer',
                 fontWeight: isActive ? 600 : 400,
                 whiteSpace: 'nowrap',
               }}
             >
-              <span style={{ opacity: 0.55, marginRight: '3px' }}>0{idx + 1}</span> {category}
+              {category}
             </button>
           );
         })}
       </div>
 
-      {/* Фильтры спецификаций (Мех / Gore-Tex / Трактор) */}
+      {/* Сезонные фильтры */}
       <div
         style={{
           display: 'flex',
           gap: '6px',
           overflowX: 'auto',
-          paddingBottom: '14px',
-          marginBottom: '14px',
+          paddingBottom: '12px',
+          marginBottom: '12px',
         }}
       >
         {FEATURE_FILTERS.map((feat) => {
@@ -958,7 +988,10 @@ export function Materials({ onBack }: MaterialsProps) {
           return (
             <button
               key={feat}
-              onClick={() => setActiveFeature(feat)}
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveFeature(feat);
+              }}
               style={{
                 backgroundColor: isActive ? THEME.surfaceActive : 'transparent',
                 border: `1px solid ${isActive ? THEME.ink : THEME.border}`,
@@ -967,33 +1000,33 @@ export function Materials({ onBack }: MaterialsProps) {
                 color: isActive ? THEME.ink : THEME.inkMuted,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                letterSpacing: '0.6px',
+                letterSpacing: '0.5px',
               }}
             >
-              {feat === 'Все' ? 'Все спецификации' : feat}
+              {feat === 'Все' ? 'Все модели' : feat}
             </button>
           );
         })}
       </div>
 
-      {/* Заголовок секции перед сеткой (как «I. ЭКСПОЗИЦИЯ И ФАКТУРА 01—04» на скрине 3) */}
+      {/* Счетчик моделей */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           fontSize: '10px',
-          letterSpacing: '1.6px',
+          letterSpacing: '1.4px',
           textTransform: 'uppercase',
           color: THEME.inkMuted,
           marginBottom: '8px',
         }}
       >
-        <span>I. РЕЕСТР ДОСТУПНЫХ СИЛУЭТОВ</span>
-        <span>01—{String(filteredShoes.length).padStart(2, '0')}</span>
+        <span>КАТАЛОГ МОДЕЛЕЙ</span>
+        <span>НАЙДЕНО: {filteredShoes.length}</span>
       </div>
 
-      {/* Архитектурная табличная сетка без зазоров (Swiss Grid) */}
+      {/* Табличная сетка каталога */}
       <div
         style={{
           display: 'grid',
@@ -1010,7 +1043,10 @@ export function Materials({ onBack }: MaterialsProps) {
           return (
             <div
               key={shoe.id}
-              onClick={() => setSelectedShoe(shoe)}
+              onClick={() => {
+                triggerHaptic('light');
+                setSelectedShoe(shoe);
+              }}
               style={{
                 backgroundColor: inCartPairs > 0 ? '#EFECE4' : THEME.surface,
                 borderRight: `1px solid ${THEME.border}`,
@@ -1024,14 +1060,13 @@ export function Materials({ onBack }: MaterialsProps) {
                 boxSizing: 'border-box',
               }}
             >
-              {/* Верхняя мета-строка ячейки: 01 ... КАТЕГОРИЯ */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   fontSize: '9px',
-                  letterSpacing: '1.2px',
+                  letterSpacing: '1px',
                   color: THEME.inkLight,
                   textTransform: 'uppercase',
                   marginBottom: '8px',
@@ -1045,17 +1080,16 @@ export function Materials({ onBack }: MaterialsProps) {
                       color: '#FFFFFF',
                       padding: '2px 5px',
                       fontSize: '8px',
-                      letterSpacing: '0.8px',
+                      letterSpacing: '0.6px',
                     }}
                   >
-                    В БОРДЕРО: {inCartPairs} П.
+                    В ЗАКАЗЕ: {inCartPairs} П.
                   </span>
                 ) : (
                   <span>{shoe.category}</span>
                 )}
               </div>
 
-              {/* Фото обуви с mix-blend-mode: multiply (растворяет белый фон) */}
               <div
                 style={{
                   padding: '6px 4px',
@@ -1079,7 +1113,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 />
               </div>
 
-              {/* Нижний типографический блок карточки */}
               <div>
                 <div
                   style={{
@@ -1118,7 +1151,7 @@ export function Materials({ onBack }: MaterialsProps) {
                     fontSize: '10px',
                     color: THEME.inkMuted,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.8px',
+                    letterSpacing: '0.6px',
                     marginTop: '2px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -1137,12 +1170,12 @@ export function Materials({ onBack }: MaterialsProps) {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     fontSize: '9px',
-                    letterSpacing: '1px',
+                    letterSpacing: '0.8px',
                     textTransform: 'uppercase',
                   }}
                 >
                   <span style={{ color: THEME.inkLight }}>
-                    {variantsCount > 1 ? `${variantsCount} КОЖИ` : '40—45'}
+                    {variantsCount > 1 ? `${variantsCount} ЦВЕТА` : '40—45'}
                   </span>
                   <span
                     style={{
@@ -1150,7 +1183,7 @@ export function Materials({ onBack }: MaterialsProps) {
                       fontWeight: 600,
                     }}
                   >
-                    {inCartPairs > 0 ? 'Изменить →' : 'Досье →'}
+                    {inCartPairs > 0 ? 'Дозаказать →' : 'Выбрать →'}
                   </span>
                 </div>
               </div>
@@ -1159,7 +1192,7 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      {/* Нижняя фиксированная панель Бордеро */}
+      {/* Нижняя фиксированная панель накладной */}
       {cart.length > 0 && (
         <div
           style={{
@@ -1176,15 +1209,18 @@ export function Materials({ onBack }: MaterialsProps) {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '9px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#A09C94' }}>
-                СВОДНАЯ СПЕЦИФИКАЦИЯ
+              <div style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: '#A09C94' }}>
+                ВАШ ОПТОВЫЙ ЗАКАЗ
               </div>
               <div style={{ fontFamily: THEME.serif, fontSize: '16px', marginTop: '1px' }}>
-                {cart.length} мод. — <span style={{ fontStyle: 'italic' }}>{cartTotalPairs} пар</span>
+                Накладная: {cart.length} мод. (<span style={{ fontStyle: 'italic' }}>{cartTotalPairs} пар</span>)
               </div>
             </div>
             <button
-              onClick={() => setIsCartOpen(true)}
+              onClick={() => {
+                triggerHaptic('medium');
+                setIsCartOpen(true);
+              }}
               style={{
                 backgroundColor: THEME.surface,
                 color: THEME.ink,
@@ -1192,12 +1228,12 @@ export function Materials({ onBack }: MaterialsProps) {
                 padding: '10px 16px',
                 fontSize: '10px',
                 fontWeight: 600,
-                letterSpacing: '1.4px',
+                letterSpacing: '1.2px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
               }}
             >
-              Открыть бордеро →
+              Открыть накладную →
             </button>
           </div>
         </div>
