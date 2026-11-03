@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { type CartItem } from '../data/catalog';
 import { ManagersContactCard } from './ManagersContactCard';
 
-
 type WholesaleCartProps = {
   items: CartItem[];
   onUpdateQuantity: (uid: string, newBoxesCount: number) => void;
@@ -33,7 +32,6 @@ const MANAGERS = [
 
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
-// Быстрые кнопки популярных городов (с официальными Ref Новой Почты)
 const POPULAR_CITIES: CityOption[] = [
   { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
   { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
@@ -45,7 +43,6 @@ const POPULAR_CITIES: CityOption[] = [
   { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
 ];
 
-// Безопасный запрос к Новой Почте через серверный прокси /api/np
 async function callNovaPoshta(
   modelName: string,
   calledMethod: string,
@@ -71,7 +68,6 @@ async function callNovaPoshta(
   return null;
 }
 
-// Генерация вариантов написания (чтобы ввод «миколаив» или «николаев» находил в базе НП «Миколаїв»)
 function buildSearchVariants(raw: string): string[] {
   const clean = raw.trim();
   const lower = clean.toLowerCase();
@@ -115,7 +111,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // 1. Поиск любых населенных пунктов Украины через /api/np -> Новая Почта
   useEffect(() => {
     const trimmed = cityQuery.trim();
 
@@ -191,7 +186,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [cityQuery, selectedCity.fullLabel]);
 
-  // 2. Загрузка реальных отделений и почтоматов Новой Почты для выбранного города
   useEffect(() => {
     if (!selectedCity.ref) {
       setWarehouses([]);
@@ -233,7 +227,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [selectedCity]);
 
-  // 3. Расчет стоимости доставки через API Новой Почты
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
@@ -287,7 +280,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
 
-  // Фильтрация реальных отделений НП (точное совпадение номера всегда первым)
   const filteredWarehouses = (() => {
     const q = branchOrComment.trim().toLowerCase();
     if (!q) return warehouses.slice(0, 50);
@@ -392,12 +384,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     width: '100%',
     boxSizing: 'border-box',
     padding: '10px 34px 10px 12px',
-    border: '1px solid #BDBDBD',
-    fontSize: '15px',
+    border: '1px solid #D6D3CB',
+    fontSize: '14px',
     backgroundColor: '#FFFFFF',
-    color: '#111111',
-    WebkitTextFillColor: '#111111',
-    caretColor: '#111111',
+    color: '#1A1A1A',
+    WebkitTextFillColor: '#1A1A1A',
+    caretColor: '#1A1A1A',
     colorScheme: 'light',
     outline: 'none',
   };
@@ -419,19 +411,20 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         .wholesale-cart-light select,
         .wholesale-cart-light textarea {
           color-scheme: light !important;
-          color: #111111 !important;
-          -webkit-text-fill-color: #111111 !important;
-          caret-color: #111111 !important;
+          color: #1A1A1A !important;
+          -webkit-text-fill-color: #1A1A1A !important;
+          caret-color: #1A1A1A !important;
           background-color: #FFFFFF !important;
           opacity: 1 !important;
         }
         .wholesale-cart-light input::placeholder {
-          color: #777777 !important;
-          -webkit-text-fill-color: #777777 !important;
+          color: #888888 !important;
+          -webkit-text-fill-color: #888888 !important;
           opacity: 1 !important;
         }
       `}</style>
 
+      {/* Шапка корзины */}
       <div
         style={{
           display: 'flex',
@@ -446,15 +439,17 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           onClick={onClose}
           style={{
             background: '#FFFFFF',
-            border: '1px solid #CCC',
+            border: '1px solid #D6D3CB',
             padding: '8px 14px',
-            fontSize: '12px',
-            fontWeight: 600,
+            fontSize: '11px',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            fontWeight: 500,
             cursor: 'pointer',
             color: '#1A1A1A',
           }}
         >
-          ← Добавить еще модели
+          ← Каталог
         </button>
 
         {items.length > 0 && (
@@ -463,18 +458,19 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '12px',
-              color: '#B91C1C',
+              fontSize: '11px',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              color: '#888',
               cursor: 'pointer',
-              textDecoration: 'underline',
             }}
           >
-            Очистить всё
+            Очистить
           </button>
         )}
       </div>
 
-      <h1 style={{ fontFamily: 'serif', fontSize: '26px', margin: '0 0 14px 0', fontWeight: 600 }}>
+      <h1 style={{ fontFamily: 'serif', fontSize: '24px', margin: '0 0 16px 0', fontWeight: 500, letterSpacing: '0.5px' }}>
         Оптовая накладная ({items.length})
       </h1>
 
@@ -483,23 +479,25 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           style={{
             backgroundColor: '#FFFFFF',
             border: '1px solid #EAE8E3',
-            padding: '32px 16px',
+            padding: '40px 16px',
             textAlign: 'center',
           }}
         >
-          <p style={{ fontSize: '14px', color: '#666', margin: '0 0 16px 0' }}>
+          <p style={{ fontSize: '13px', color: '#666', margin: '0 0 16px 0', letterSpacing: '0.3px' }}>
             В вашем оптовом заказе пока нет выбранных моделей.
           </p>
           <button
             onClick={onClose}
             style={{
-              padding: '10px 18px',
+              padding: '12px 20px',
               backgroundColor: '#1A1A1A',
               color: '#FFFFFF',
               border: 'none',
-              fontSize: '12px',
+              fontSize: '11px',
+              letterSpacing: '1px',
               textTransform: 'uppercase',
               cursor: 'pointer',
+              fontWeight: 500,
             }}
           >
             Перейти в каталог
@@ -507,6 +505,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         </div>
       ) : (
         <>
+          {/* Список товаров */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             {items.map((item, idx) => {
               const isSample = item.orderMode === 'sample';
@@ -527,8 +526,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     src={item.shoe.image}
                     alt={item.shoe.modelNumber}
                     style={{
-                      width: '68px',
-                      height: '68px',
+                      width: '64px',
+                      height: '64px',
                       objectFit: 'contain',
                       border: '1px solid #F0EFEA',
                       flexShrink: 0,
@@ -536,13 +535,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '15px', fontWeight: 700, fontFamily: 'serif' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'serif', letterSpacing: '0.3px' }}>
                       {idx + 1}. Модель № {item.shoe.modelNumber} {item.shoe.variant || ''}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>
+                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
                       Цвет: <strong>{item.shoe.color}</strong> ({item.shoe.category})
                     </div>
-                    <div style={{ fontSize: '11px', color: '#333', marginTop: '4px', lineHeight: 1.35 }}>
+                    <div style={{ fontSize: '11px', color: '#444', marginTop: '4px', lineHeight: 1.35 }}>
                       {item.formulaText}
                     </div>
 
@@ -556,40 +555,42 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         paddingTop: '6px',
                       }}
                     >
-                      <span style={{ fontSize: '12px', fontWeight: 700 }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.3px' }}>
                         Итого: {item.totalPairs} пар
                       </span>
 
                       {!isSample && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '11px', color: '#666' }}>Ростовок:</span>
+                          <span style={{ fontSize: '10px', color: '#888' }}>Коробов:</span>
                           <button
                             onClick={() => onUpdateQuantity(item.uid, item.boxesCount - 1)}
                             style={{
-                              width: '24px',
-                              height: '24px',
-                              border: '1px solid #CCC',
+                              width: '22px',
+                              height: '22px',
+                              border: '1px solid #D6D3CB',
                               backgroundColor: '#FAF9F6',
                               color: '#1A1A1A',
                               cursor: 'pointer',
-                              fontWeight: 700,
+                              fontWeight: 600,
+                              fontSize: '12px',
                             }}
                           >
                             −
                           </button>
-                          <span style={{ fontSize: '13px', fontWeight: 700, minWidth: '16px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '16px', textAlign: 'center' }}>
                             {item.boxesCount}
                           </span>
                           <button
                             onClick={() => onUpdateQuantity(item.uid, item.boxesCount + 1)}
                             style={{
-                              width: '24px',
-                              height: '24px',
-                              border: '1px solid #CCC',
+                              width: '22px',
+                              height: '22px',
+                              border: '1px solid #D6D3CB',
                               backgroundColor: '#FAF9F6',
                               color: '#1A1A1A',
                               cursor: 'pointer',
-                              fontWeight: 700,
+                              fontWeight: 600,
+                              fontSize: '12px',
                             }}
                           >
                             +
@@ -602,13 +603,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   <button
                     onClick={() => onRemove(item.uid)}
                     style={{
-                      background: '#FAF9F6',
-                      border: '1px solid #DDD',
-                      width: '30px',
-                      height: '30px',
+                      background: 'transparent',
+                      border: 'none',
+                      width: '24px',
+                      height: '24px',
                       cursor: 'pointer',
-                      fontSize: '14px',
-                      color: '#555',
+                      fontSize: '13px',
+                      color: '#999',
                       flexShrink: 0,
                     }}
                     title="Удалить позицию"
@@ -620,24 +621,25 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             })}
           </div>
 
+          {/* Блок логистики */}
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E2DC',
+              border: '1px solid #E2DFD7',
               padding: '14px',
               marginBottom: '16px',
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '10px' }}>
-              📦 Логистика всей партии (из Харькова)
+            <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#777', marginBottom: '10px' }}>
+              Логистика отправки (Харьков)
             </div>
 
-            <div style={{ fontSize: '13px', color: '#222', marginBottom: '8px' }}>
-              Населенный пункт получателя: <strong>{selectedCity.fullLabel}</strong>
+            <div style={{ fontSize: '12px', color: '#333', marginBottom: '8px' }}>
+              Пункт назначения: <strong>{selectedCity.fullLabel}</strong>
             </div>
 
-            {/* Быстрые кнопки популярных городов */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+            {/* Быстрые города */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
               {POPULAR_CITIES.map((city) => {
                 const isSelected = selectedCity.ref === city.ref;
                 return (
@@ -646,13 +648,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     type="button"
                     onClick={() => handleSelectCity(city)}
                     style={{
-                      padding: '5px 9px',
+                      padding: '4px 8px',
                       fontSize: '11px',
-                      border: isSelected ? '1px solid #1A1A1A' : '1px solid #DDD',
+                      border: isSelected ? '1px solid #1A1A1A' : '1px solid #D6D3CB',
                       backgroundColor: isSelected ? '#1A1A1A' : '#FAF9F6',
-                      color: isSelected ? '#FFFFFF' : '#333',
+                      color: isSelected ? '#FFFFFF' : '#444',
                       cursor: 'pointer',
-                      fontWeight: isSelected ? 600 : 400,
+                      fontWeight: isSelected ? 500 : 400,
+                      letterSpacing: '0.3px',
                     }}
                   >
                     {city.name}
@@ -661,11 +664,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               })}
             </div>
 
-            {/* Поле живого поиска города через /api/np */}
-            <div style={{ position: 'relative', marginBottom: '10px' }}>
+            {/* Поиск города */}
+            <div style={{ position: 'relative', marginBottom: '8px' }}>
               <input
                 type="text"
-                placeholder="🔍 Введите город или село (поиск Новой Почты)..."
+                placeholder="Поиск населенного пункта..."
                 value={cityQuery}
                 onFocus={() => setShowCityDropdown(true)}
                 onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
@@ -692,8 +695,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    fontSize: '14px',
-                    color: '#777',
+                    fontSize: '13px',
+                    color: '#888',
                     cursor: 'pointer',
                     padding: '4px',
                   }}
@@ -714,19 +717,19 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       right: 0,
                       zIndex: 30,
                       backgroundColor: '#FFFFFF',
-                      border: '1px solid #1A1A1A',
-                      maxHeight: '240px',
+                      border: '1px solid #D6D3CB',
+                      maxHeight: '220px',
                       overflowY: 'auto',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                     }}
                   >
                     {citySearching ? (
-                      <div style={{ padding: '10px 12px', fontSize: '13px', color: '#444' }}>
+                      <div style={{ padding: '10px 12px', fontSize: '12px', color: '#666' }}>
                         Поиск в базе Новой Почты...
                       </div>
                     ) : cityResults.length === 0 ? (
-                      <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
-                        Населенный пункт не найден в базе НП
+                      <div style={{ padding: '10px 12px', fontSize: '12px', color: '#888' }}>
+                        Населенный пункт не найден
                       </div>
                     ) : (
                       cityResults.map((c) => (
@@ -734,11 +737,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           key={c.ref}
                           onMouseDown={() => handleSelectCity(c)}
                           style={{
-                            padding: '10px 12px',
-                            fontSize: '13px',
+                            padding: '9px 12px',
+                            fontSize: '12px',
                             borderBottom: '1px solid #F0EFEA',
                             cursor: 'pointer',
-                            color: '#111111',
+                            color: '#1A1A1A',
                             backgroundColor: '#FFFFFF',
                           }}
                         >
@@ -754,23 +757,21 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             <div style={{ marginBottom: '8px' }}>
               <input
                 type="text"
-                placeholder="Ваше Имя и Телефон (для накладной)..."
+                placeholder="Имя и Телефон получателя..."
                 value={clientContact}
                 onChange={(e) => setClientContact(e.target.value)}
                 style={inputStyle}
               />
             </div>
 
-            {/* Выбор реального отделения НП */}
-            <div style={{ position: 'relative', marginBottom: '12px' }}>
+            {/* Отделение НП */}
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
               <input
                 type="text"
                 placeholder={
                   warehousesLoading
-                    ? `Загрузка отделений НП (${selectedCity.uaName})...`
-                    : warehouses.length > 0
-                    ? `№ отделения или улица в ${selectedCity.uaName} (отделений: ${warehouses.length})...`
-                    : '№ отделения Новой Почты или комментарий...'
+                    ? 'Загрузка отделений...'
+                    : `№ отделения или адрес в ${selectedCity.uaName}...`
                 }
                 value={branchOrComment}
                 onFocus={() => setShowWarehouseDropdown(true)}
@@ -797,8 +798,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     transform: 'translateY(-50%)',
                     background: 'none',
                     border: 'none',
-                    fontSize: '14px',
-                    color: '#777',
+                    fontSize: '13px',
+                    color: '#888',
                     cursor: 'pointer',
                     padding: '4px',
                   }}
@@ -817,10 +818,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     right: 0,
                     zIndex: 25,
                     backgroundColor: '#FFFFFF',
-                    border: '1px solid #1A1A1A',
-                    maxHeight: '220px',
+                    border: '1px solid #D6D3CB',
+                    maxHeight: '200px',
                     overflowY: 'auto',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
                   }}
                 >
                   {filteredWarehouses.map((w) => (
@@ -831,11 +832,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         setShowWarehouseDropdown(false);
                       }}
                       style={{
-                        padding: '9px 12px',
-                        fontSize: '12px',
+                        padding: '8px 12px',
+                        fontSize: '11px',
                         borderBottom: '1px solid #F0EFEA',
                         cursor: 'pointer',
-                        color: '#111111',
+                        color: '#1A1A1A',
                         backgroundColor: '#FFFFFF',
                       }}
                     >
@@ -849,31 +850,32 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             <div
               style={{
                 borderTop: '1px solid #EAE8E3',
-                paddingTop: '10px',
+                paddingTop: '8px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
               }}
             >
-              <div style={{ fontSize: '13px', color: '#333' }}>
-                Всего: <strong>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} ящ.)
+              <div style={{ fontSize: '12px', color: '#555' }}>
+                Объем: <strong>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} кор.)
               </div>
-              <div style={{ fontSize: '16px', fontWeight: 700 }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.3px' }}>
                 {calcLoading ? 'Расчет...' : `Доставка ≈ ${deliveryCost} ₴`}
               </div>
             </div>
           </div>
 
+          {/* Премиальный блок отправки заказа */}
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              border: '1px solid #1A1A1A',
-              padding: '14px',
-              marginBottom: '32px',
+              border: '1px solid #E2DFD7',
+              padding: '16px',
+              marginBottom: '16px',
             }}
           >
-            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#555', marginBottom: '10px', fontWeight: 700 }}>
-              Отправить готовую накладную ({items.length} мод.):
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#777', marginBottom: '12px', fontWeight: 600 }}>
+              Передать заказ ({items.length} мод.):
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -883,17 +885,22 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   onClick={() => sendToManager(mgr)}
                   style={{
                     width: '100%',
-                    padding: '13px',
-                    backgroundColor: idx === 0 ? '#1A1A1A' : '#333333',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    padding: '12px 16px',
+                    backgroundColor: idx === 0 ? '#1A1A1A' : '#FFFFFF',
+                    color: idx === 0 ? '#FFFFFF' : '#1A1A1A',
+                    border: '1px solid #1A1A1A',
+                    fontSize: '11px',
+                    letterSpacing: '0.8px',
+                    fontWeight: 500,
                     textTransform: 'uppercase',
                     cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                   }}
                 >
-                  ✈️ {mgr.label}
+                  <span>{mgr.label}</span>
+                  <span style={{ fontSize: '13px' }}>→</span>
                 </button>
               ))}
 
@@ -902,20 +909,22 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 style={{
                   width: '100%',
                   padding: '10px',
-                  backgroundColor: '#FAF9F6',
-                  color: '#1A1A1A',
-                  border: '1px solid #CCC',
-                  fontSize: '12px',
-                  fontWeight: 600,
+                  backgroundColor: 'transparent',
+                  color: '#555',
+                  border: '1px dashed #D6D3CB',
+                  fontSize: '11px',
+                  letterSpacing: '0.5px',
+                  fontWeight: 500,
                   cursor: 'pointer',
+                  marginTop: '4px',
                 }}
               >
-                {copied ? '✓ Накладная скопирована!' : '📋 Скопировать накладную (для Viber / Telegram)'}
+                {copied ? '✓ Накладная скопирована в буфер' : '📋 Скопировать текст накладной'}
               </button>
             </div>
           </div>
 
-          {/* Блок прямой связи с руководством (внутри общего контейнера) */}
+          {/* Карточка прямой связи с руководством */}
           <ManagersContactCard />
         </>
       )}
