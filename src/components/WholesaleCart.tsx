@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { type CartItem } from '../data/catalog';
-import { ManagersContactCard, type ManagerContact } from './ManagersContactCard';
+import {
+  ManagersContactCard,
+  type ManagerContact,
+  triggerHaptic,
+  playAppSound,
+} from './ManagersContactCard';
 
 type WholesaleCartProps = {
   items: CartItem[];
@@ -45,6 +50,7 @@ const THEME = {
   inkMuted: '#6E6A63',
   inkLight: '#9A958C',
   border: '#DCD7CC',
+  danger: '#9E2A2B',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
@@ -104,14 +110,35 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const [warehousesLoading, setWarehousesLoading] = useState(false);
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
 
+  // Обязательные поля для формирования накладной
   const [branchOrComment, setBranchOrComment] = useState('');
-  const [clientContact, setClientContact] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
+
   const [deliveryCost, setDeliveryCost] = useState<number>(0);
   const [calcLoading, setCalcLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const logisticsRef = useRef<HTMLDivElement | null>(null);
+
   const grandTotalPairs = items.reduce((sum, item) => sum + item.totalPairs, 0);
   const grandTotalBoxes = Math.max(1, Math.ceil(grandTotalPairs / 8));
+
+  // Строгая проверка заполненности всех 4 реквизитов перед формированием накладной
+  const isCityValid = cityQuery.trim().length >= 2;
+  const isBranchValid = branchOrComment.trim().length >= 1;
+  const isNameValid = clientName.trim().length >= 3;
+  const phoneDigits = clientPhone.replace(/\D/g, '');
+  const isPhoneValid = phoneDigits.length >= 9;
+
+  const isFormValid = isCityValid && isBranchValid && isNameValid && isPhoneValid;
+
+  const missingFields: string[] = [];
+  if (!isCityValid) missingFields.push('город');
+  if (!isNameValid) missingFields.push('Имя и Фамилию');
+  if (!isPhoneValid) missingFields.push('телефон');
+  if (!isBranchValid) missingFields.push('№ отделения / адрес НП');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -312,11 +339,26 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   })();
 
   const handleSelectCity = (city: CityOption) => {
+    triggerHaptic('light');
     setSelectedCity(city);
     setCityQuery(city.fullLabel);
     setShowCityDropdown(false);
     setBranchOrComment('');
   };
+
+  const handleValidationFail = () => {
+    setShowValidationErrors(true);
+    logisticsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  // Аннулирование заказа со звуком nul.mp3 и вибрацией
+  const handleClearCart = () => {
+    triggerHaptic('warning');
+    playAppSound('nul.mp3');
+    onClear();
+  };
+
+  const combinedClientContact = `${clientName.trim()}, тел.: ${clientPhone.trim()}`;
 
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
@@ -328,9 +370,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       );
     });
 
-    const contactLine = clientContact.trim() ? `\n👤 Клиент: ${clientContact.trim()}` : '';
-    const branchLine = branchOrComment.trim() ? `\n📍 Отделение / Прим.: ${branchOrComment.trim()}` : '';
-
     return (
       `📦 ОПТОВЫЙ ЗАКАЗ • CARDIO (Харьков)\n` +
       `════════════════════\n` +
@@ -338,15 +377,21 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       `════════════════════\n` +
       `📊 Позиций в заказе: ${items.length}\n` +
       `👟 Общий объем: ${grandTotalPairs} пар (мест НП: ~${grandTotalBoxes})\n` +
-      `🚚 Доставка НП: ${selectedCity.fullLabel} (≈ ${Math.round(deliveryCost)} ₴)` +
-      `${contactLine}${branchLine}\n` +
+      `🚚 Доставка НП: ${cityQuery.trim()} (≈ ${Math.round(deliveryCost)} ₴)\n` +
+      `📍 Отделение / Адрес: ${branchOrComment.trim()}\n` +
+      `👤 Получатель: ${combinedClientContact}\n` +
       `════════════════════\n` +
       `Подтвердите наличие/сроки отшива и реквизиты.`
     );
   };
 
-  const sendToManager = async (manager: ManagerContact) => {
-    if (!manager.telegramId) return;
+  const sendToManager = async (manager: ManagerContact): Promise<boolean> => {
+    if (!manager.telegramId) return false;
+    if (!isFormValid) {
+      handleValidationFail();
+      return false;
+    }
+
     const text = buildInvoiceText();
 
     try {
@@ -356,8 +401,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         body: JSON.stringify({
           telegramId: manager.telegramId,
           managerName: manager.name,
-          clientContact: clientContact,
-          branchOrComment: branchOrComment,
+          clientContact: combinedClientContact,
+          branchOrComment: `${cityQuery.trim()} — ${branchOrComment.trim()}`,
           totalPairs: grandTotalPairs,
           deliveryCost: Math.round(deliveryCost),
           invoiceText: text,
@@ -367,38 +412,45 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert(`✓ Спецификация отправлена (${manager.name}) и сохранена в базу!`);
+        alert(`✓ Спецификация успешно отправлена руководителю (${manager.name})!`);
+        return true;
       } else {
         alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
+        return false;
       }
     } catch {
       alert('Ошибка соединения с сервером.');
+      return false;
     }
   };
 
   const copyInvoice = async () => {
+    if (!isFormValid) {
+      handleValidationFail();
+      return;
+    }
     try {
       await navigator.clipboard.writeText(buildInvoiceText());
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch {
       // Fallback
     }
   };
 
-  const inputStyle: React.CSSProperties = {
+  const getFieldStyle = (isValid: boolean): React.CSSProperties => ({
     width: '100%',
     boxSizing: 'border-box',
     padding: '10px 34px 10px 12px',
-    border: `1px solid ${THEME.border}`,
+    border: `1px solid ${showValidationErrors && !isValid ? THEME.danger : THEME.border}`,
     fontSize: '13px',
-    backgroundColor: THEME.surface,
+    backgroundColor: showValidationErrors && !isValid ? '#FDF6F6' : THEME.surface,
     color: THEME.ink,
     WebkitTextFillColor: THEME.ink,
     caretColor: THEME.ink,
     colorScheme: 'light',
     outline: 'none',
-  };
+  });
 
   return (
     <div
@@ -421,7 +473,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           color: #161514 !important;
           -webkit-text-fill-color: #161514 !important;
           caret-color: #161514 !important;
-          background-color: #F8F6F1 !important;
           opacity: 1 !important;
         }
         .wholesale-cart-light input::placeholder {
@@ -443,7 +494,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         }}
       >
         <button
-          onClick={onClose}
+          onClick={() => {
+            triggerHaptic('light');
+            onClose();
+          }}
           style={{
             background: 'transparent',
             border: 'none',
@@ -461,18 +515,20 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
         {items.length > 0 && (
           <button
-            onClick={onClear}
+            onClick={handleClearCart}
             style={{
               background: 'none',
-              border: 'none',
+              border: `1px solid ${THEME.border}`,
+              padding: '5px 10px',
               fontSize: '9px',
               letterSpacing: '1.2px',
               textTransform: 'uppercase',
-              color: THEME.inkMuted,
+              color: THEME.danger,
+              fontWeight: 600,
               cursor: 'pointer',
             }}
           >
-            Аннулировать список
+            ✕ Аннулировать список
           </button>
         )}
       </div>
@@ -523,7 +579,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             Спецификация пуста. Выберите силуэты в основном архиве.
           </p>
           <button
-            onClick={onClose}
+            onClick={() => {
+              triggerHaptic('light');
+              onClose();
+            }}
             style={{
               padding: '12px 24px',
               backgroundColor: THEME.ink,
@@ -586,7 +645,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         № {item.shoe.modelNumber} {item.shoe.variant || ''}
                       </div>
                       <button
-                        onClick={() => onRemove(item.uid)}
+                        onClick={() => {
+                          triggerHaptic('light');
+                          playAppSound('nul.mp3');
+                          onRemove(item.uid);
+                        }}
                         style={{
                           background: 'transparent',
                           border: 'none',
@@ -628,7 +691,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                             Коробов
                           </span>
                           <button
-                            onClick={() => onUpdateQuantity(item.uid, item.boxesCount - 1)}
+                            onClick={() => {
+                              triggerHaptic('light');
+                              onUpdateQuantity(item.uid, item.boxesCount - 1);
+                            }}
                             style={{
                               width: '24px',
                               height: '24px',
@@ -646,7 +712,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                             {item.boxesCount}
                           </span>
                           <button
-                            onClick={() => onUpdateQuantity(item.uid, item.boxesCount + 1)}
+                            onClick={() => {
+                              triggerHaptic('light');
+                              onUpdateQuantity(item.uid, item.boxesCount + 1);
+                            }}
                             style={{
                               width: '24px',
                               height: '24px',
@@ -669,8 +738,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             })}
           </div>
 
-          {/* I. БЛОК ЛОГИСТИКИ */}
-          <div style={{ marginBottom: '24px' }}>
+          {/* I. БЛОК ЛОГИСТИКИ И ОБЯЗАТЕЛЬНЫХ ПОЛЕЙ ПОЛУЧАТЕЛЯ */}
+          <div ref={logisticsRef} style={{ marginBottom: '24px' }}>
             <div
               style={{
                 display: 'flex',
@@ -682,14 +751,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 marginBottom: '8px',
               }}
             >
-              <span>I. ЛОГИСТИКА И ПОЛУЧАТЕЛЬ</span>
+              <span>I. ЛОГИСТИКА И ПОЛУЧАТЕЛЬ (ОБЯЗАТЕЛЬНО)</span>
               <span>НОВА ПОШТА</span>
             </div>
 
             <div
               style={{
                 backgroundColor: THEME.surface,
-                border: `1px solid ${THEME.border}`,
+                border: `1px solid ${showValidationErrors && !isFormValid ? THEME.danger : THEME.border}`,
                 padding: '14px',
               }}
             >
@@ -722,11 +791,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 })}
               </div>
 
-              {/* Поиск города */}
+              {/* 1. Поиск населенного пункта */}
               <div style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   type="text"
-                  placeholder="Поиск населенного пункта..."
+                  placeholder="1. Населенный пункт (город) *"
                   value={cityQuery}
                   onFocus={() => setShowCityDropdown(true)}
                   onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
@@ -734,7 +803,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     setCityQuery(e.target.value);
                     setShowCityDropdown(true);
                   }}
-                  style={inputStyle}
+                  style={getFieldStyle(isCityValid)}
                 />
 
                 {cityQuery.length > 0 && (
@@ -809,25 +878,36 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   )}
               </div>
 
-              {/* Контакт клиента */}
+              {/* 2. Имя и Фамилия получателя */}
               <div style={{ marginBottom: '8px' }}>
                 <input
                   type="text"
-                  placeholder="ФИО и телефон получателя..."
-                  value={clientContact}
-                  onChange={(e) => setClientContact(e.target.value)}
-                  style={inputStyle}
+                  placeholder="2. Имя и Фамилия получателя *"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  style={getFieldStyle(isNameValid)}
                 />
               </div>
 
-              {/* Отделение НП */}
+              {/* 3. Телефон получателя */}
+              <div style={{ marginBottom: '8px' }}>
+                <input
+                  type="tel"
+                  placeholder="3. Телефон получателя (+380...) *"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  style={getFieldStyle(isPhoneValid)}
+                />
+              </div>
+
+              {/* 4. Отделение НП или адрес */}
               <div style={{ position: 'relative', marginBottom: '12px' }}>
                 <input
                   type="text"
                   placeholder={
                     warehousesLoading
-                      ? 'Загрузка отделений...'
-                      : `№ отделения или адрес в ${selectedCity.uaName}...`
+                      ? 'Загрузка отделений НП...'
+                      : `4. № отделения НП или адрес в ${selectedCity.uaName} *`
                   }
                   value={branchOrComment}
                   onFocus={() => setShowWarehouseDropdown(true)}
@@ -836,7 +916,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     setBranchOrComment(e.target.value);
                     setShowWarehouseDropdown(true);
                   }}
-                  style={inputStyle}
+                  style={getFieldStyle(isBranchValid)}
                 />
 
                 {branchOrComment.length > 0 && (
@@ -883,6 +963,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       <div
                         key={w.ref}
                         onMouseDown={() => {
+                          triggerHaptic('light');
                           setBranchOrComment(w.description);
                           setShowWarehouseDropdown(false);
                         }}
@@ -901,6 +982,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 )}
               </div>
 
+              {/* Подвал логистики без разрыва строки на знаке гривны ₴ */}
               <div
                 style={{
                   borderTop: `1px solid ${THEME.border}`,
@@ -908,24 +990,36 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'baseline',
+                  gap: '8px',
                 }}
               >
                 <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
                   Партия: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} мест)
                 </div>
-                <div style={{ fontFamily: THEME.serif, fontSize: '16px', fontWeight: 600 }}>
-                  {calcLoading ? 'Расчет тарифа...' : `Логистика ≈ ${Math.round(deliveryCost)} ₴`}
+                <div
+                  style={{
+                    fontFamily: THEME.serif,
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {calcLoading ? 'Расчет тарифа...' : `Логистика ≈ ${Math.round(deliveryCost)}\u00A0₴`}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* II. ОБЪЕДИНЕННЫЙ БЛОК ДИРЕКЦИИ (ОТПРАВКА В TELEGRAM + ЗВОНОК + VIBER) */}
+          {/* II. ОБЪЕДИНЕННЫЙ БЛОК ДИРЕКЦИИ (ОТПРАВКА + ЗАЩИТА + ТЕЛ / VIBER / TG + КОПИРОВАНИЕ) */}
           <ManagersContactCard
             itemsCount={items.length}
             onSendOrder={sendToManager}
             onCopyInvoice={copyInvoice}
             copied={copied}
+            isFormValid={isFormValid}
+            missingFields={missingFields}
+            onValidationFail={handleValidationFail}
           />
         </>
       )}
