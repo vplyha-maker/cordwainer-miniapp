@@ -28,7 +28,8 @@ const MANAGERS = [
   { label: 'Отправить заказ • Test', telegramId: '8686072747', name: 'Test' },
 ];
 
-const NP_API_KEY = import.meta.env.VITE_NP_API_KEY || '';
+const NP_API_KEY = (import.meta as { env?: Record<string, string> }).env?.VITE_NP_API_KEY || '';
+
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
 const POPULAR_CITIES: CityOption[] = [
