@@ -135,19 +135,32 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   };
 
     const sendToTelegramId = (telegramId: string) => {
+      const sendToTelegramId = async (telegramId: string) => {
     if (!telegramId) return;
-    const text = encodeURIComponent(buildInvoiceText());
-    const url = `https://t.me/${telegramId}?text=${text}`;
+    const text = buildInvoiceText();
 
-    // Проверяем, открыто ли приложение внутри Telegram Mini App
-    // @ts-ignore
-    if (window.Telegram?.WebApp?.openTelegramLink) {
-      // @ts-ignore
-      window.Telegram.WebApp.openTelegramLink(url);
-    } else {
-      window.open(url, '_blank');
+    try {
+      const response = await fetch('/api/send-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: telegramId,
+          invoiceText: text,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert('✓ Заказ успешно отправлен руководителю в Telegram!');
+      } else {
+        alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
+      }
+    } catch (err) {
+      alert('Ошибка соединения с сервером.');
     }
   };
+
 
 
   const copyInvoice = async () => {
