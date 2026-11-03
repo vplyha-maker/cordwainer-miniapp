@@ -36,7 +36,86 @@ export const MANAGERS_LIST: ManagerContact[] = [
   },
 ];
 
-// Универсальный тактильный отклик (Telegram WebApp Haptics + HTML5 Vibration API)
+// Глобальный кэш предзагруженных аудиофайлов, чтобы они не удалялись сборщиком мусора при перерисовке React
+const audioCache: Record<string, HTMLAudioElement> = {};
+
+export function preloadAppSounds() {
+  if (typeof window === 'undefined') return;
+  (['zakaz.mp3', 'nul.mp3'] as const).forEach((file) => {
+    if (!audioCache[file]) {
+      const audio = new Audio(`/${file}`);
+      audio.preload = 'auto';
+      audio.volume = 1.0;
+      audio.load();
+      audioCache[file] = audio;
+    }
+  });
+}
+
+// Резервный синтезатор звука (сработает, если браузер не нашел mp3-файл или заблокировал его)
+function playFallbackSynth(type: 'zakaz.mp3' | 'nul.mp3') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === 'zakaz.mp3') {
+      // Двойной восходящий сигнал успешного заказа
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.12); // E5
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } else {
+      // Нисходящий звук аннулирования / сброса
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(380, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.26);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.26);
+    }
+  } catch {
+    // Игнорируем
+  }
+}
+
+// Надежное воспроизведение звука из кэша с проверкой обоих путей (/nul.mp3 и /sounds/nul.mp3)
+export function playAppSound(fileName: 'zakaz.mp3' | 'nul.mp3') {
+  try {
+    let audio = audioCache[fileName];
+    if (!audio) {
+      audio = new Audio(`/${fileName}`);
+      audio.volume = 1.0;
+      audioCache[fileName] = audio;
+    }
+    audio.currentTime = 0;
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Пробуем альтернативный путь или включаем синтезатор
+        const altAudio = new Audio(`/sounds/${fileName}`);
+        altAudio.volume = 1.0;
+        altAudio.play().catch(() => {
+          playFallbackSynth(fileName);
+        });
+      });
+    }
+  } catch {
+    playFallbackSynth(fileName);
+  }
+}
+
+// Тактильный отклик (Telegram WebApp Haptics + Вибрация телефона)
 export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' = 'medium') {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,19 +139,7 @@ export function triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'success' | '
       }
     }
   } catch {
-    // Игнорируем, если устройство не поддерживает виброотклик
-  }
-}
-
-// Универсальное воспроизведение звука из папки public/ (/zakaz.mp3 или /nul.mp3)
-export function playAppSound(fileName: 'zakaz.mp3' | 'nul.mp3') {
-  try {
-    const audio = new Audio(`/${fileName}`);
-    audio.volume = 0.9;
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
-  } catch {
-    // Игнорируем блокировку автовоспроизведения браузером
+    // Игнорируем
   }
 }
 
@@ -109,17 +176,22 @@ export function ManagersContactCard({
   missingFields = [],
   onValidationFail,
 }: ManagersContactCardProps) {
-  // Какой менеджер сейчас выбран (по умолчанию 01 Борис, но перемещается при клике!)
   const [selectedManagerId, setSelectedManagerId] = useState<string>(MANAGERS_LIST[0].telegramId);
   const [pressedButtonKey, setPressedButtonKey] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
+  const [statusToast, setStatusToast] = useState<string | null>(null);
 
-  // Защита от детей и кликеров: проверочный код + антиспам-таймер
+  // Защита от детей и кликеров
   const [confirmingManager, setConfirmingManager] = useState<ManagerContact | null>(null);
   const [guardTargetCode, setGuardTargetCode] = useState<number>(0);
   const [guardOptions, setGuardOptions] = useState<number[]>([]);
   const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+  // Предзагружаем звуки сразу при монтировании
+  useEffect(() => {
+    preloadAppSounds();
+  }, []);
 
   useEffect(() => {
     if (cooldownSeconds <= 0) return;
@@ -129,7 +201,11 @@ export function ManagersContactCard({
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
 
-  // Генерация простого проверочного числа от детей/кликеров
+  const showToast = (msg: string) => {
+    setStatusToast(msg);
+    setTimeout(() => setStatusToast(null), 3500);
+  };
+
   const openSecurityGuard = (mgr: ManagerContact) => {
     const correct = Math.floor(10 + Math.random() * 89);
     let wrong1 = Math.floor(10 + Math.random() * 89);
@@ -144,7 +220,6 @@ export function ManagersContactCard({
   };
 
   const handleInitialSendClick = (mgr: ManagerContact) => {
-    // Мгновенно перемещаем черный акцент на нажатого менеджера
     setSelectedManagerId(mgr.telegramId);
     setPressedButtonKey(`send-${mgr.telegramId}`);
     setTimeout(() => setPressedButtonKey(null), 180);
@@ -156,7 +231,6 @@ export function ManagersContactCard({
       return;
     }
 
-    // Если поля (Город, НП, Имя Фамилия, Телефон) не заполнены — не даем сформировать накладную
     if (!isFormValid) {
       triggerHaptic('error');
       onValidationFail?.();
@@ -172,7 +246,9 @@ export function ManagersContactCard({
 
     if (chosenNumber !== guardTargetCode) {
       triggerHaptic('error');
+      playAppSound('nul.mp3');
       setConfirmingManager(null);
+      showToast('Неверный защитный код. Отправка отменена.');
       return;
     }
 
@@ -187,7 +263,7 @@ export function ManagersContactCard({
       const result = await onSendOrder(targetMgr);
       if (result !== false) {
         setSentSuccessId(targetMgr.telegramId);
-        setCooldownSeconds(30); // Блокировка от повторного спама на 30 секунд
+        setCooldownSeconds(30);
         setTimeout(() => setSentSuccessId(null), 5000);
       }
     } finally {
@@ -195,7 +271,8 @@ export function ManagersContactCard({
     }
   };
 
-  const handleMessengerAction = (
+  // Безопасный запуск Тел / Viber / Telegram без падения WebView в ошибку ERR_UNKNOWN_URL_SCHEME
+  const handleMessengerAction = async (
     type: 'tel' | 'viber' | 'tg',
     mgr: ManagerContact
   ) => {
@@ -205,17 +282,39 @@ export function ManagersContactCard({
     triggerHaptic('medium');
     setTimeout(() => setPressedButtonKey(null), 180);
 
-    const cleanPhoneNoPlus = mgr.phone.replace(/\D/g, '');
+    const cleanDigits = mgr.phone.replace(/\D/g, '');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tgWebApp = (window as any)?.Telegram?.WebApp;
+
+    // Всегда страхуем пользователя копированием номера в буфер обмена
+    try {
+      await navigator.clipboard.writeText(mgr.phone);
+    } catch {
+      // Игнорируем
+    }
 
     if (type === 'tel') {
-      window.location.href = `tel:${mgr.phone}`;
+      showToast(`📞 Номер ${mgr.name} (${mgr.phoneDisplay}) скопирован • Вызов...`);
+      // Если открыто внутри Telegram Mini App, открываем внешний мост звонка, чтобы не ронять WebView
+      const bridgeUrl = `${window.location.origin}${window.location.pathname}?open_tel=${cleanDigits}`;
+      if (tgWebApp?.openLink) {
+        tgWebApp.openLink(bridgeUrl);
+      } else {
+        window.open(`tel:+${cleanDigits}`, '_top');
+      }
     } else if (type === 'viber') {
-      window.location.href = `viber://chat?number=%2B${cleanPhoneNoPlus}`;
+      showToast(`💬 Номер ${mgr.name} скопирован • Открываем Viber...`);
+      // Открываем через системный браузер телефона (Telegram.WebApp.openLink принимает только https://),
+      // а системный браузер сам запускает приложение Viber без ошибки ERR_UNKNOWN_URL_SCHEME
+      const bridgeUrl = `${window.location.origin}${window.location.pathname}?open_viber=${cleanDigits}`;
+      if (tgWebApp?.openLink) {
+        tgWebApp.openLink(bridgeUrl);
+      } else {
+        window.open(`viber://chat?number=%2B${cleanDigits}`, '_blank');
+      }
     } else if (type === 'tg') {
-      // Открываем Telegram по номеру телефона (+380...) или по ID пользователя
-      const tgUrl = `https://t.me/+${cleanPhoneNoPlus}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tgWebApp = (window as any)?.Telegram?.WebApp;
+      showToast(`✈️ Открываем чат Telegram (${mgr.name})...`);
+      const tgUrl = `https://t.me/+${cleanDigits}`;
       if (tgWebApp?.openTelegramLink) {
         tgWebApp.openTelegramLink(tgUrl);
       } else {
@@ -235,6 +334,7 @@ export function ManagersContactCard({
     }
 
     triggerHaptic('success');
+    playAppSound('zakaz.mp3');
     onCopyInvoice?.();
   };
 
@@ -266,6 +366,22 @@ export function ManagersContactCard({
         </span>
         <span>DIRECT • VIBER • TG</span>
       </div>
+
+      {/* Всплывающее уведомление о вызове / копировании номера */}
+      {statusToast && (
+        <div
+          style={{
+            backgroundColor: THEME.ink,
+            color: '#FFFFFF',
+            padding: '10px 12px',
+            marginBottom: '10px',
+            fontSize: '11px',
+            letterSpacing: '0.4px',
+          }}
+        >
+          {statusToast}
+        </div>
+      )}
 
       {/* Предупреждение, если не заполнены обязательные поля */}
       {onSendOrder && !isFormValid && (
@@ -375,7 +491,6 @@ export function ManagersContactCard({
           const isSentSuccess = sentSuccessId === mgr.telegramId;
           const isSendPressed = pressedButtonKey === `send-${mgr.telegramId}`;
 
-          // Цвет кнопки "Отправить заказ" теперь перемещается на выбранного менеджера
           let sendBg = THEME.surfaceActive;
           let sendColor = THEME.ink;
 
