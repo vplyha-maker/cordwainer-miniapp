@@ -5,6 +5,7 @@ import {
   type ManagerContact,
   triggerHaptic,
   playAppSound,
+  preloadAppSounds,
 } from './ManagersContactCard';
 
 type WholesaleCartProps = {
@@ -54,6 +55,18 @@ const THEME = {
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
+
+// Автоматический перехватчик при открытии во внешнем браузере (?open_viber=380... или ?open_tel=380...)
+if (typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search);
+  const viberNum = params.get('open_viber');
+  const telNum = params.get('open_tel');
+  if (viberNum) {
+    window.location.replace(`viber://chat?number=%2B${viberNum.replace(/\D/g, '')}`);
+  } else if (telNum) {
+    window.location.replace(`tel:+${telNum.replace(/\D/g, '')}`);
+  }
+}
 
 async function callNovaPoshta(
   modelName: string,
@@ -110,7 +123,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const [warehousesLoading, setWarehousesLoading] = useState(false);
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
 
-  // Обязательные поля для формирования накладной
   const [branchOrComment, setBranchOrComment] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -125,7 +137,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const grandTotalPairs = items.reduce((sum, item) => sum + item.totalPairs, 0);
   const grandTotalBoxes = Math.max(1, Math.ceil(grandTotalPairs / 8));
 
-  // Строгая проверка заполненности всех 4 реквизитов перед формированием накладной
   const isCityValid = cityQuery.trim().length >= 2;
   const isBranchValid = branchOrComment.trim().length >= 1;
   const isNameValid = clientName.trim().length >= 3;
@@ -142,6 +153,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    preloadAppSounds();
   }, []);
 
   useEffect(() => {
@@ -351,11 +363,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     logisticsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  // Аннулирование заказа со звуком nul.mp3 и вибрацией
+  // Аннулирование со звуком nul.mp3 и паузой 150мс, чтобы звук не обрывался при размонтировании списка
   const handleClearCart = () => {
     triggerHaptic('warning');
     playAppSound('nul.mp3');
-    onClear();
+    setTimeout(() => {
+      onClear();
+    }, 150);
   };
 
   const combinedClientContact = `${clientName.trim()}, тел.: ${clientPhone.trim()}`;
@@ -515,11 +529,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
         {items.length > 0 && (
           <button
+            type="button"
             onClick={handleClearCart}
             style={{
-              background: 'none',
-              border: `1px solid ${THEME.border}`,
-              padding: '5px 10px',
+              background: THEME.surface,
+              border: `1px solid ${THEME.danger}`,
+              padding: '6px 10px',
               fontSize: '9px',
               letterSpacing: '1.2px',
               textTransform: 'uppercase',
@@ -645,10 +660,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         № {item.shoe.modelNumber} {item.shoe.variant || ''}
                       </div>
                       <button
+                        type="button"
                         onClick={() => {
                           triggerHaptic('light');
                           playAppSound('nul.mp3');
-                          onRemove(item.uid);
+                          setTimeout(() => onRemove(item.uid), 120);
                         }}
                         style={{
                           background: 'transparent',
@@ -691,6 +707,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                             Коробов
                           </span>
                           <button
+                            type="button"
                             onClick={() => {
                               triggerHaptic('light');
                               onUpdateQuantity(item.uid, item.boxesCount - 1);
@@ -712,6 +729,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                             {item.boxesCount}
                           </span>
                           <button
+                            type="button"
                             onClick={() => {
                               triggerHaptic('light');
                               onUpdateQuantity(item.uid, item.boxesCount + 1);
@@ -982,7 +1000,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 )}
               </div>
 
-              {/* Подвал логистики без разрыва строки на знаке гривны ₴ */}
+              {/* Подвал логистики */}
               <div
                 style={{
                   borderTop: `1px solid ${THEME.border}`,
@@ -1011,7 +1029,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             </div>
           </div>
 
-          {/* II. ОБЪЕДИНЕННЫЙ БЛОК ДИРЕКЦИИ (ОТПРАВКА + ЗАЩИТА + ТЕЛ / VIBER / TG + КОПИРОВАНИЕ) */}
+          {/* II. ОБЪЕДИНЕННЫЙ БЛОК ДИРЕКЦИИ */}
           <ManagersContactCard
             itemsCount={items.length}
             onSendOrder={sendToManager}
