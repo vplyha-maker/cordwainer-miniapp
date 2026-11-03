@@ -148,7 +148,7 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 2: СТРАНИЦА МОДЕЛИ
+  // ЭКРАН 2: СТРАНИЦА МОДЕЛИ (LOOKBOOK DETAIL)
   if (selectedShoe) {
     const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
 
@@ -157,10 +157,10 @@ export function Materials({ onBack }: MaterialsProps) {
         style={{
           backgroundColor: '#F7F6F2',
           minHeight: '100vh',
-          padding: '16px 16px 90px 16px',
+          padding: '24px 20px 100px 20px',
           color: '#1A1A1A',
           boxSizing: 'border-box',
-          overflowX: 'hidden',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         }}
       >
         <div
@@ -168,94 +168,96 @@ export function Materials({ onBack }: MaterialsProps) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '16px',
-            paddingBottom: '12px',
-            borderBottom: '1px solid #E2DFD7',
+            marginBottom: '24px',
           }}
         >
           <button
             onClick={() => setSelectedShoe(null)}
             style={{
-              background: '#FFFFFF',
-              border: '1px solid #CCC',
-              padding: '8px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
+              background: 'transparent',
+              border: 'none',
+              padding: '0',
+              fontSize: '11px',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
               cursor: 'pointer',
-              color: '#1A1A1A',
+              color: '#555',
+              fontWeight: 500,
             }}
           >
-            ← В каталог
+            ← Назад в каталог
           </button>
 
           <button
             onClick={() => setIsCartOpen(true)}
             style={{
-              background: '#1A1A1A',
-              color: '#FFFFFF',
-              border: 'none',
-              padding: '8px 12px',
-              fontSize: '12px',
-              fontWeight: 600,
+              background: 'transparent',
+              border: '1px solid #1A1A1A',
+              padding: '8px 14px',
+              fontSize: '11px',
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              fontWeight: 500,
               cursor: 'pointer',
+              color: '#1A1A1A',
             }}
           >
-            🛒 Накладная ({cart.length} мод. • {cartTotalPairs} п.)
+            Накладная ({cart.length} • {cartTotalPairs} п.)
           </button>
         </div>
 
         {alreadyInCartPairs > 0 && (
           <div
             style={{
-              backgroundColor: '#DCFCE7',
-              border: '1px solid #86EFAC',
-              color: '#14532D',
-              padding: '8px 12px',
-              fontSize: '12px',
-              fontWeight: 600,
-              marginBottom: '12px',
+              backgroundColor: '#EFECE6',
+              borderLeft: '2px solid #1A1A1A',
+              padding: '10px 14px',
+              fontSize: '11px',
+              letterSpacing: '0.5px',
+              marginBottom: '20px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              color: '#333',
             }}
           >
-            <span>✓ Эта модель уже в заказе ({alreadyInCartPairs} пар)</span>
+            <span>Модель уже добавлена в заказ ({alreadyInCartPairs} пар)</span>
             <span
               onClick={() => setIsCartOpen(true)}
-              style={{ textDecoration: 'underline', cursor: 'pointer' }}
+              style={{ textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
             >
-              Посмотреть
+              Смотреть
             </span>
           </div>
         )}
 
-        <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase' }}>
-            {selectedShoe.category} • Цвет: <strong>{selectedShoe.color}</strong>
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px' }}>
+            {selectedShoe.category} / {selectedShoe.color}
           </div>
-          <h1 style={{ fontFamily: 'serif', fontSize: '28px', margin: '4px 0 0 0', fontWeight: 600 }}>
+          <h1 style={{ fontFamily: 'serif', fontSize: '32px', margin: '0', fontWeight: 400, letterSpacing: '0.5px' }}>
             Модель № {selectedShoe.modelNumber} {selectedShoe.variant || ''}
           </h1>
           {selectedShoe.features.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
               {selectedShoe.features.map((feat) => (
                 <span
                   key={feat}
-                  style={{ fontSize: '11px', backgroundColor: '#E8E6DF', padding: '3px 8px', fontWeight: 500 }}
+                  style={{ fontSize: '10px', color: '#666', letterSpacing: '0.5px', textTransform: 'uppercase' }}
                 >
-                  {feat}
+                  [{feat}]
                 </span>
               ))}
             </div>
           )}
         </div>
 
+        {/* Большое фото товара в стиле люкс */}
         <div
           style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #EAE8E3',
-            padding: '16px',
-            marginBottom: '16px',
+            backgroundColor: '#FAF9F6',
+            padding: '24px',
+            marginBottom: '24px',
             textAlign: 'center',
           }}
         >
@@ -264,7 +266,7 @@ export function Materials({ onBack }: MaterialsProps) {
             alt={`Модель ${selectedShoe.modelNumber}`}
             style={{
               width: '100%',
-              maxWidth: '340px',
+              maxWidth: '380px',
               aspectRatio: '1 / 1',
               objectFit: 'contain',
               display: 'block',
@@ -274,18 +276,11 @@ export function Materials({ onBack }: MaterialsProps) {
         </div>
 
         {modelVariants.length > 1 && (
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #EAE8E3',
-              padding: '12px',
-              marginBottom: '16px',
-            }}
-          >
-            <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
-              Исполнения модели № {selectedShoe.modelNumber} ({modelVariants.length}):
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: '#888', marginBottom: '10px' }}>
+              Доступные варианты исполнения:
             </div>
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
               {modelVariants.map((v) => {
                 const isCurrent = v.id === selectedShoe.id;
                 return (
@@ -293,27 +288,18 @@ export function Materials({ onBack }: MaterialsProps) {
                     key={v.id}
                     onClick={() => setSelectedShoe(v)}
                     style={{
-                      border: isCurrent ? '2px solid #1A1A1A' : '1px solid #DDD',
-                      padding: '6px',
-                      width: '72px',
+                      borderBottom: isCurrent ? '2px solid #1A1A1A' : '1px solid transparent',
+                      paddingBottom: '6px',
+                      width: '64px',
                       flexShrink: 0,
                       cursor: 'pointer',
                       textAlign: 'center',
-                      backgroundColor: isCurrent ? '#FAF9F6' : '#FFF',
+                      opacity: isCurrent ? 1 : 0.6,
                     }}
                   >
                     <img src={v.image} alt={v.color} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'contain' }} />
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        marginTop: '4px',
-                        fontWeight: isCurrent ? 700 : 400,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {v.variant ? `${v.variant} ` : ''}{v.color}
+                    <div style={{ fontSize: '10px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {v.color}
                     </div>
                   </div>
                 );
@@ -322,133 +308,88 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+        {/* Переключатель режимов заказа */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', borderBottom: '1px solid #E2DFD7', paddingBottom: '12px' }}>
           <button
             onClick={() => setOrderMode('wholesale')}
             style={{
-              padding: '11px',
-              fontSize: '13px',
-              fontWeight: 600,
-              border: '1px solid #1A1A1A',
-              backgroundColor: orderMode === 'wholesale' ? '#1A1A1A' : '#FFF',
-              color: orderMode === 'wholesale' ? '#FFF' : '#1A1A1A',
+              background: 'transparent',
+              border: 'none',
+              padding: '0',
+              fontSize: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              fontWeight: orderMode === 'wholesale' ? 600 : 400,
+              color: orderMode === 'wholesale' ? '#1A1A1A' : '#888',
               cursor: 'pointer',
             }}
           >
-            Опт (Ростовка)
+            Оптовая ростовка
           </button>
           <button
             onClick={() => setOrderMode('sample')}
             style={{
-              padding: '11px',
-              fontSize: '13px',
-              fontWeight: 600,
-              border: '1px solid #1A1A1A',
-              backgroundColor: orderMode === 'sample' ? '#1A1A1A' : '#FFF',
-              color: orderMode === 'sample' ? '#FFF' : '#1A1A1A',
+              background: 'transparent',
+              border: 'none',
+              padding: '0',
+              fontSize: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              fontWeight: orderMode === 'sample' ? 600 : 400,
+              color: orderMode === 'sample' ? '#1A1A1A' : '#888',
               cursor: 'pointer',
             }}
           >
-            Образец (1 пара)
+            Тестовый образец (1 пара)
           </button>
         </div>
 
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E5E2DC',
-            padding: '14px',
-            marginBottom: '16px',
-          }}
-        >
+        <div style={{ marginBottom: '24px' }}>
           {orderMode === 'wholesale' ? (
             <>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  marginBottom: '12px',
-                }}
-              >
-                <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' }}>
-                  📏 Размерная сетка ящика (40–45)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#666' }}>
+                  Размерный ряд коробки (40–45)
                 </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     onClick={() => setSizeRun(STANDARD_8_RUN)}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 10px',
-                      border: '1px solid #CCC',
-                      backgroundColor: '#F7F6F2',
-                      cursor: 'pointer',
-                      color: '#1A1A1A',
-                    }}
+                    style={{ background: 'none', border: 'none', fontSize: '10px', color: '#555', cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    Стандарт 8 пар
+                    8 пар
                   </button>
                   <button
                     onClick={() => setSizeRun(EVEN_6_RUN)}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 10px',
-                      border: '1px solid #CCC',
-                      backgroundColor: '#F7F6F2',
-                      cursor: 'pointer',
-                      color: '#1A1A1A',
-                    }}
+                    style={{ background: 'none', border: 'none', fontSize: '10px', color: '#555', cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    Ровный 6 пар
+                    6 пар
                   </button>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
                 {SIZES.map((sz) => (
                   <div
                     key={sz}
                     style={{
-                      border: '1px solid #DDD',
-                      backgroundColor: '#FAF9F6',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E5E2DC',
+                      padding: '10px 8px',
                       textAlign: 'center',
-                      padding: '8px 6px',
                     }}
                   >
-                    <div style={{ fontSize: '12px', color: '#555', marginBottom: '6px', fontWeight: 600 }}>
-                      Размер {sz}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                    <div style={{ fontSize: '11px', color: '#777', marginBottom: '6px' }}>{sz} р.</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <button
                         onClick={() => updateSizeCount(sz, -1)}
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          border: '1px solid #CCC',
-                          background: '#FFFFFF',
-                          cursor: 'pointer',
-                          fontSize: '15px',
-                          fontWeight: 600,
-                          color: '#1A1A1A',
-                        }}
+                        style={{ background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer', color: '#666', padding: '0 4px' }}
                       >
                         −
                       </button>
-                      <span style={{ fontSize: '15px', fontWeight: 700 }}>{sizeRun[sz]}</span>
+                      <span style={{ fontSize: '14px', fontWeight: 600 }}>{sizeRun[sz]}</span>
                       <button
                         onClick={() => updateSizeCount(sz, 1)}
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          border: '1px solid #CCC',
-                          background: '#FFFFFF',
-                          cursor: 'pointer',
-                          fontSize: '15px',
-                          fontWeight: 600,
-                          color: '#1A1A1A',
-                        }}
+                        style={{ background: 'none', border: 'none', fontSize: '14px', cursor: 'pointer', color: '#666', padding: '0 4px' }}
                       >
                         +
                       </button>
@@ -457,24 +398,24 @@ export function Materials({ onBack }: MaterialsProps) {
                 ))}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#444' }}>Количество ростовок:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#666' }}>Количество коробов:</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {[1, 2, 3, 5, 10].map((num) => (
                     <button
                       key={num}
                       onClick={() => setBoxesCount(num)}
                       style={{
-                        padding: '6px 12px',
-                        border: boxesCount === num ? '1px solid #1A1A1A' : '1px solid #CCC',
-                        backgroundColor: boxesCount === num ? '#1A1A1A' : '#FFF',
-                        color: boxesCount === num ? '#FFF' : '#1A1A1A',
-                        fontSize: '13px',
-                        fontWeight: 600,
+                        padding: '6px 10px',
+                        border: boxesCount === num ? '1px solid #1A1A1A' : '1px solid #D6D3CB',
+                        backgroundColor: boxesCount === num ? '#1A1A1A' : '#FFFFFF',
+                        color: boxesCount === num ? '#FFFFFF' : '#1A1A1A',
+                        fontSize: '11px',
+                        fontWeight: 500,
                         cursor: 'pointer',
                       }}
                     >
-                      ×{num}
+                      {num}
                     </button>
                   ))}
                 </div>
@@ -482,8 +423,8 @@ export function Materials({ onBack }: MaterialsProps) {
             </>
           ) : (
             <div>
-              <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '10px' }}>
-                📏 Выберите размер тестового образца:
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.8px', color: '#666', marginBottom: '10px' }}>
+                Выберите размер образца:
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                 {SIZES.map((sz) => (
@@ -492,15 +433,15 @@ export function Materials({ onBack }: MaterialsProps) {
                     onClick={() => setSampleSize(sz)}
                     style={{
                       padding: '10px 0',
-                      border: sampleSize === sz ? '2px solid #1A1A1A' : '1px solid #CCC',
-                      backgroundColor: sampleSize === sz ? '#1A1A1A' : '#FFF',
-                      color: sampleSize === sz ? '#FFF' : '#1A1A1A',
-                      fontSize: '14px',
-                      fontWeight: 600,
+                      border: sampleSize === sz ? '1px solid #1A1A1A' : '1px solid #D6D3CB',
+                      backgroundColor: sampleSize === sz ? '#1A1A1A' : '#FFFFFF',
+                      color: sampleSize === sz ? '#FFFFFF' : '#1A1A1A',
+                      fontSize: '12px',
+                      fontWeight: 500,
                       cursor: 'pointer',
                     }}
                   >
-                    р. {sz}
+                    {sz} р.
                   </button>
                 ))}
               </div>
@@ -513,54 +454,45 @@ export function Materials({ onBack }: MaterialsProps) {
           onClick={addCurrentShoeToCart}
           style={{
             width: '100%',
-            padding: '15px',
+            padding: '14px',
             backgroundColor: justAdded ? '#15803D' : '#1A1A1A',
             color: '#FFFFFF',
             border: 'none',
-            fontSize: '13px',
-            fontWeight: 700,
+            fontSize: '11px',
+            fontWeight: 500,
             textTransform: 'uppercase',
-            letterSpacing: '0.6px',
+            letterSpacing: '1px',
             cursor: totalPairs === 0 ? 'not-allowed' : 'pointer',
             marginBottom: '10px',
+            transition: 'background-color 0.2s ease',
           }}
         >
           {justAdded
-            ? `✓ Добавлено в накладную (+${totalPairs} пар)!`
-            : `➕ Добавить в общий заказ (${totalPairs} пар)`}
+            ? `✓ Добавлено в накладную (${totalPairs} пар)`
+            : `Добавить в накладную — ${totalPairs} пар`}
         </button>
-
-        {cart.length > 0 && (
-          <button
-            onClick={() => setIsCartOpen(true)}
-            style={{
-              width: '100%',
-              padding: '13px',
-              backgroundColor: '#FFFFFF',
-              color: '#1A1A1A',
-              border: '2px solid #1A1A1A',
-              fontSize: '13px',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-            }}
-          >
-            🛒 Открыть сводную накладную ({cart.length} поз. • {cartTotalPairs} пар) →
-          </button>
-        )}
       </div>
     );
   }
 
-  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ
+  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ (LOOKBOOK GRID)
   return (
-    <div style={{ backgroundColor: '#F7F6F2', minHeight: '100vh', padding: '16px 16px 135px 16px', color: '#1A1A1A' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+    <div
+      style={{
+        backgroundColor: '#F7F6F2',
+        minHeight: '100vh',
+        padding: '20px 16px 120px 16px',
+        color: '#1A1A1A',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      {/* Шапка */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
-          <span style={{ fontSize: '10px', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#777' }}>
-            Харьков • B2B Каталог производства
+          <span style={{ fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', color: '#888' }}>
+            Харьков • B2B Showroom
           </span>
-          <h1 style={{ fontFamily: 'serif', fontSize: '26px', margin: '2px 0 0 0', fontWeight: 500 }}>
+          <h1 style={{ fontFamily: 'serif', fontSize: '28px', margin: '2px 0 0 0', fontWeight: 400, letterSpacing: '0.5px' }}>
             Cardio Footwear
           </h1>
         </div>
@@ -568,10 +500,10 @@ export function Materials({ onBack }: MaterialsProps) {
           <button
             onClick={onBack}
             style={{
-              background: 'none',
-              border: '1px solid #CCC',
+              background: 'transparent',
+              border: '1px solid #D6D3CB',
               padding: '6px 12px',
-              fontSize: '11px',
+              fontSize: '10px',
               letterSpacing: '1px',
               textTransform: 'uppercase',
               cursor: 'pointer',
@@ -583,25 +515,27 @@ export function Materials({ onBack }: MaterialsProps) {
         )}
       </div>
 
+      {/* Поиск */}
       <input
         type="text"
-        placeholder="Поиск по номеру модели (227, 20, 70...) или цвету..."
+        placeholder="Поиск по номеру модели или цвету..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         style={{
           width: '100%',
           boxSizing: 'border-box',
-          padding: '10px 12px',
-          marginBottom: '10px',
-          border: '1px solid #DDD',
-          backgroundColor: '#FFF',
+          padding: '11px 14px',
+          marginBottom: '16px',
+          border: '1px solid #D6D3CB',
+          backgroundColor: '#FFFFFF',
           color: '#1A1A1A',
           fontSize: '13px',
           outline: 'none',
         }}
       />
 
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+      {/* Категории (минималистичные вкладки) */}
+      <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '8px', borderBottom: '1px solid #E2DFD7' }}>
         {CATEGORIES.map((category) => {
           const isActive = activeCategory === category;
           return (
@@ -609,13 +543,17 @@ export function Materials({ onBack }: MaterialsProps) {
               key={category}
               onClick={() => setActiveCategory(category)}
               style={{
-                padding: '7px 14px',
-                border: isActive ? '1px solid #1A1A1A' : '1px solid #DDD',
-                backgroundColor: isActive ? '#1A1A1A' : '#FFF',
-                color: isActive ? '#FFF' : '#1A1A1A',
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 0',
                 fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
                 cursor: 'pointer',
+                color: isActive ? '#1A1A1A' : '#888',
+                fontWeight: isActive ? 600 : 400,
                 whiteSpace: 'nowrap',
+                borderBottom: isActive ? '2px solid #1A1A1A' : '2px solid transparent',
               }}
             >
               {category}
@@ -624,7 +562,8 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
-      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '12px' }}>
+      {/* Сезонные фильтры */}
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '16px', marginBottom: '20px' }}>
         {FEATURE_FILTERS.map((feat) => {
           const isActive = activeFeature === feat;
           return (
@@ -632,26 +571,29 @@ export function Materials({ onBack }: MaterialsProps) {
               key={feat}
               onClick={() => setActiveFeature(feat)}
               style={{
-                padding: '4px 10px',
-                border: isActive ? '1px solid #8B6F47' : '1px solid #E2DFD7',
-                backgroundColor: isActive ? '#EFECE6' : 'transparent',
-                color: '#333',
+                background: 'transparent',
+                border: 'none',
+                padding: '2px 0',
                 fontSize: '11px',
+                color: isActive ? '#1A1A1A' : '#777',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
+                textDecoration: isActive ? 'underline' : 'none',
+                letterSpacing: '0.5px',
               }}
             >
-              {feat === 'Все' ? 'Все сезоны' : feat}
+              {feat === 'Все' ? 'Все модели' : feat}
             </button>
           );
         })}
       </div>
 
+      {/* Сетка товаров (без тяжелых карточек и рамок) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))',
-          gap: '12px',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '24px 16px',
         }}
       >
         {filteredShoes.map((shoe) => {
@@ -663,103 +605,94 @@ export function Materials({ onBack }: MaterialsProps) {
               key={shoe.id}
               onClick={() => setSelectedShoe(shoe)}
               style={{
-                backgroundColor: '#FFFFFF',
-                border: inCartPairs > 0 ? '2px solid #15803D' : '1px solid #EAE8E3',
-                padding: '10px',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
                 cursor: 'pointer',
+                position: 'relative',
               }}
             >
-              {inCartPairs > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '8px',
-                    backgroundColor: '#15803D',
-                    color: '#FFFFFF',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    zIndex: 2,
-                  }}
-                >
-                  ✓ В заказе: {inCartPairs} п.
-                </span>
-              )}
-
-              {shoe.variant && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    backgroundColor: '#F7F6F2',
-                    border: '1px solid #DDD',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    fontWeight: 600,
-                  }}
-                >
-                  {shoe.variant}
-                </span>
-              )}
-
-              <img
-                src={shoe.image}
-                alt={`Модель ${shoe.modelNumber}`}
-                loading="lazy"
+              <div
                 style={{
-                  width: '100%',
-                  aspectRatio: '1 / 1',
-                  objectFit: 'contain',
+                  backgroundColor: '#FAF9F6',
+                  padding: '12px',
                   marginBottom: '10px',
+                  position: 'relative',
                 }}
-              />
+              >
+                {inCartPairs > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      left: '8px',
+                      backgroundColor: '#1A1A1A',
+                      color: '#FFFFFF',
+                      padding: '2px 6px',
+                      fontSize: '9px',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    В заказе: {inCartPairs}п.
+                  </span>
+                )}
+
+                {shoe.variant && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      color: '#666',
+                      fontSize: '10px',
+                      letterSpacing: '0.5px',
+                    }}
+                  >
+                    {shoe.variant}
+                  </span>
+                )}
+
+                <img
+                  src={shoe.image}
+                  alt={`Модель ${shoe.modelNumber}`}
+                  loading="lazy"
+                  style={{
+                    width: '100%',
+                    aspectRatio: '1 / 1',
+                    objectFit: 'contain',
+                  }}
+                />
+              </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <span style={{ fontFamily: 'serif', fontSize: '17px', fontWeight: 600 }}>
+                  <span style={{ fontFamily: 'serif', fontSize: '16px', fontWeight: 500, letterSpacing: '0.3px' }}>
                     № {shoe.modelNumber}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#777' }}>{shoe.category}</span>
+                  <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    {shoe.category}
+                  </span>
                 </div>
 
-                <div style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>
-                  Цвет: <strong>{shoe.color}</strong>
+                <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>
+                  {shoe.color}
                 </div>
-
-                {shoe.features.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-                    {shoe.features.map((feat) => (
-                      <span
-                        key={feat}
-                        style={{ fontSize: '10px', backgroundColor: '#F0EFEA', padding: '2px 6px', color: '#333' }}
-                      >
-                        {feat}
-                      </span>
-                    ))}
-                  </div>
-                )}
 
                 <div
                   style={{
-                    marginTop: '10px',
-                    paddingTop: '8px',
-                    borderTop: '1px solid #F0EFEA',
+                    marginTop: '6px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    fontSize: '11px',
-                    color: '#555',
+                    fontSize: '10px',
+                    color: '#888',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
                   }}
                 >
-                  <span>{variantsCount > 1 ? `Вариантов: ${variantsCount}` : '40–45 разм.'}</span>
-                  <span style={{ fontWeight: 600, color: inCartPairs > 0 ? '#15803D' : '#1A1A1A' }}>
-                    {inCartPairs > 0 ? '+ Дозаказать' : 'Выбрать →'}
+                  <span>{variantsCount > 1 ? `${variantsCount} варианта` : '40–45'}</span>
+                  <span style={{ color: inCartPairs > 0 ? '#15803D' : '#1A1A1A', fontWeight: 500 }}>
+                    {inCartPairs > 0 ? 'Дозаказать →' : 'Выбрать →'}
                   </span>
                 </div>
               </div>
@@ -768,6 +701,7 @@ export function Materials({ onBack }: MaterialsProps) {
         })}
       </div>
 
+      {/* Фиксированная нижняя панель корзины */}
       {cart.length > 0 && (
         <div
           style={{
@@ -777,52 +711,14 @@ export function Materials({ onBack }: MaterialsProps) {
             right: 0,
             backgroundColor: '#1A1A1A',
             color: '#FFFFFF',
-            padding: '10px 14px',
+            padding: '12px 16px',
             zIndex: 900,
-            boxShadow: '0 -4px 16px rgba(0,0,0,0.22)',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              gap: '6px',
-              overflowX: 'auto',
-              paddingBottom: '8px',
-              marginBottom: '8px',
-              borderBottom: '1px solid #333',
-            }}
-          >
-            {cart.map((item) => (
-              <div
-                key={item.uid}
-                onClick={() => setIsCartOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: '#2B2B2B',
-                  padding: '3px 8px 3px 4px',
-                  flexShrink: 0,
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                }}
-              >
-                <img
-                  src={item.shoe.image}
-                  alt={item.shoe.modelNumber}
-                  style={{ width: '22px', height: '22px', objectFit: 'contain', backgroundColor: '#FFF' }}
-                />
-                <span>
-                  №{item.shoe.modelNumber}: <strong>{item.totalPairs}п.</strong> (
-                  {item.orderMode === 'sample' ? 'обр.' : `×${item.boxesCount}`})
-                </span>
-              </div>
-            ))}
-          </div>
-
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '13px' }}>
-              🛒 Итого: <strong>{cart.length} поз.</strong> ({cartTotalPairs} пар)
+            <div style={{ fontSize: '12px', letterSpacing: '0.5px' }}>
+              Накладная: <strong>{cart.length} мод.</strong> ({cartTotalPairs} пар)
             </div>
             <button
               onClick={() => setIsCartOpen(true)}
@@ -830,14 +726,15 @@ export function Materials({ onBack }: MaterialsProps) {
                 backgroundColor: '#FFFFFF',
                 color: '#1A1A1A',
                 border: 'none',
-                padding: '8px 14px',
-                fontSize: '12px',
-                fontWeight: 700,
+                padding: '8px 16px',
+                fontSize: '11px',
+                fontWeight: 600,
+                letterSpacing: '1px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
               }}
             >
-              Открыть накладную →
+              Сводная накладная →
             </button>
           </div>
         </div>
