@@ -9,6 +9,19 @@ type WholesaleCartProps = {
   onClose: () => void;
 };
 
+type CityOption = {
+  name: string;
+  fullLabel: string;
+  ref: string;
+  zoneMultiplier: number;
+};
+
+type WarehouseOption = {
+  ref: string;
+  number: string;
+  description: string;
+};
+
 const MANAGERS = [
   { label: 'Отправить заказ • Борис', telegramId: '8529254699', name: 'Борис' },
   { label: 'Отправить заказ • Георгий', telegramId: '6034597342', name: 'Георгий' },
@@ -16,22 +29,30 @@ const MANAGERS = [
 ];
 
 const NP_API_KEY = import.meta.env.VITE_NP_API_KEY || '';
-
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
-const RECIPIENT_CITIES = [
-  { name: 'Киев', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
-  { name: 'Днепр', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
-  { name: 'Одесса', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Львов', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Полтава', ref: 'db5c8892-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.85 },
-  { name: 'Запорожье', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
-  { name: 'Винница', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Харьков (по городу)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.7 },
+const POPULAR_CITIES: CityOption[] = [
+  { name: 'Киев', fullLabel: 'г. Киев', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
+  { name: 'Днепр', fullLabel: 'г. Днепр', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
+  { name: 'Одесса', fullLabel: 'г. Одесса', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
+  { name: 'Львов', fullLabel: 'г. Львов', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
+  { name: 'Харьков', fullLabel: 'г. Харьков', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.7 },
+  { name: 'Полтава', fullLabel: 'г. Полтава', ref: 'db5c8892-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.85 },
+  { name: 'Запорожье', fullLabel: 'г. Запорожье', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
+  { name: 'Винница', fullLabel: 'г. Винница', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
 ];
 
 export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
-  const [selectedCity, setSelectedCity] = useState(RECIPIENT_CITIES[0]);
+  const [selectedCity, setSelectedCity] = useState<CityOption>(POPULAR_CITIES[0]);
+  const [cityQuery, setCityQuery] = useState('');
+  const [cityResults, setCityResults] = useState<CityOption[]>([]);
+  const [citySearching, setCitySearching] = useState(false);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  const [warehousesLoading, setWarehousesLoading] = useState(false);
+  const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
+
   const [branchOrComment, setBranchOrComment] = useState('');
   const [clientContact, setClientContact] = useState('');
   const [deliveryCost, setDeliveryCost] = useState<number>(0);
@@ -45,6 +66,122 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Живой поиск любого города Украины через API Новой Почты
+  useEffect(() => {
+    const trimmed = cityQuery.trim();
+    if (trimmed.length < 2) {
+      setCityResults([]);
+      return;
+    }
+
+    if (!NP_API_KEY) {
+      const localFiltered = POPULAR_CITIES.filter((c) =>
+        c.name.toLowerCase().includes(trimmed.toLowerCase())
+      );
+      setCityResults(localFiltered);
+      return;
+    }
+
+    let cancelled = false;
+    setCitySearching(true);
+
+    const timer = setTimeout(() => {
+      fetch('https://api.novaposhta.ua/v2.0/json/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: NP_API_KEY,
+          modelName: 'Address',
+          calledMethod: 'searchSettlements',
+          methodProperties: {
+            CityName: trimmed,
+            Limit: '25',
+            Page: '1',
+          },
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          const addresses = data?.data?.[0]?.Addresses;
+          if (Array.isArray(addresses) && addresses.length > 0) {
+            const mapped: CityOption[] = addresses
+              .filter((addr: Record<string, string>) => Boolean(addr.DeliveryCity))
+              .map((addr: Record<string, string>) => ({
+                name: addr.MainDescription || addr.Present,
+                fullLabel: addr.Present || addr.MainDescription,
+                ref: addr.DeliveryCity,
+                zoneMultiplier: 1,
+              }));
+            setCityResults(mapped);
+          } else {
+            setCityResults([]);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setCityResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setCitySearching(false);
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [cityQuery]);
+
+  // Автоматическая подгрузка отделений выбранного города
+  useEffect(() => {
+    if (!NP_API_KEY || !selectedCity.ref) {
+      setWarehouses([]);
+      return;
+    }
+
+    let cancelled = false;
+    setWarehousesLoading(true);
+
+    fetch('https://api.novaposhta.ua/v2.0/json/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: NP_API_KEY,
+        modelName: 'Address',
+        calledMethod: 'getWarehouses',
+        methodProperties: {
+          CityRef: selectedCity.ref,
+          Limit: '500',
+        },
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.success && Array.isArray(data.data)) {
+          const list: WarehouseOption[] = data.data.map((w: Record<string, string>) => ({
+            ref: w.Ref,
+            number: w.Number || '',
+            description: w.DescriptionRu || w.Description || '',
+          }));
+          setWarehouses(list);
+        } else {
+          setWarehouses([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setWarehouses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setWarehousesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCity.ref]);
+
+  // Расчет стоимости доставки через API Новой Почты
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
@@ -108,6 +245,24 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
 
+  const filteredWarehouses = warehouses
+    .filter((w) => {
+      const q = branchOrComment.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        w.number.toLowerCase().includes(q) ||
+        w.description.toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 30);
+
+  const handleSelectCity = (city: CityOption) => {
+    setSelectedCity(city);
+    setCityQuery('');
+    setShowCityDropdown(false);
+    setBranchOrComment('');
+  };
+
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
       const variantStr = item.shoe.variant ? ` ${item.shoe.variant}` : '';
@@ -128,7 +283,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       `════════════════════\n` +
       `📊 Позиций в заказе: ${items.length}\n` +
       `👟 Общий объем: ${grandTotalPairs} пар (мест НП: ~${grandTotalBoxes})\n` +
-      `🚚 Доставка НП: г. ${selectedCity.name} (≈ ${deliveryCost} ₴)` +
+      `🚚 Доставка НП: ${selectedCity.fullLabel} (≈ ${deliveryCost} ₴)` +
       `${contactLine}${branchLine}\n` +
       `════════════════════\n` +
       `Подтвердите наличие/сроки отшива и реквизиты.`
@@ -161,7 +316,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       } else {
         alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
       }
-    } catch (err) {
+    } catch {
       alert('Ошибка соединения с сервером.');
     }
   };
@@ -380,35 +535,107 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               marginBottom: '16px',
             }}
           >
-            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '10px' }}>
               📦 Логистика всей партии (из Харькова)
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', color: '#444', minWidth: '105px' }}>Город НП:</span>
-              <select
-                value={selectedCity.name}
-                onChange={(e) => {
-                  const found = RECIPIENT_CITIES.find((c) => c.name === e.target.value);
-                  if (found) setSelectedCity(found);
-                }}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  border: '1px solid #CCC',
-                  backgroundColor: '#FAF9F6',
-                  color: '#1A1A1A',
-                  fontSize: '13px',
-                }}
-              >
-                {RECIPIENT_CITIES.map((city) => (
-                  <option key={city.name} value={city.name}>
-                    {city.name}
-                  </option>
-                ))}
-              </select>
+            {/* Текущий выбранный город */}
+            <div style={{ fontSize: '12px', color: '#444', marginBottom: '6px' }}>
+              Населенный пункт получателя: <strong>{selectedCity.fullLabel}</strong>
             </div>
 
+            {/* Быстрые кнопки популярных городов */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+              {POPULAR_CITIES.map((city) => {
+                const isSelected = selectedCity.ref === city.ref && selectedCity.name === city.name;
+                return (
+                  <button
+                    key={city.name}
+                    type="button"
+                    onClick={() => handleSelectCity(city)}
+                    style={{
+                      padding: '5px 9px',
+                      fontSize: '11px',
+                      border: isSelected ? '1px solid #1A1A1A' : '1px solid #DDD',
+                      backgroundColor: isSelected ? '#1A1A1A' : '#FAF9F6',
+                      color: isSelected ? '#FFFFFF' : '#333',
+                      cursor: 'pointer',
+                      fontWeight: isSelected ? 600 : 400,
+                    }}
+                  >
+                    {city.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Живой поиск любого города Украины */}
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
+              <input
+                type="text"
+                placeholder="🔍 Или введите любой другой город / ПГТ Украины..."
+                value={cityQuery}
+                onFocus={() => setShowCityDropdown(true)}
+                onChange={(e) => {
+                  setCityQuery(e.target.value);
+                  setShowCityDropdown(true);
+                }}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '9px 10px',
+                  border: '1px solid #CCC',
+                  fontSize: '13px',
+                  backgroundColor: '#FAF9F6',
+                  color: '#1A1A1A',
+                }}
+              />
+
+              {showCityDropdown && cityQuery.trim().length >= 2 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 30,
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #1A1A1A',
+                    maxHeight: '210px',
+                    overflowY: 'auto',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  {citySearching ? (
+                    <div style={{ padding: '10px', fontSize: '12px', color: '#666' }}>
+                      Поиск в базе Новой Почты...
+                    </div>
+                  ) : cityResults.length === 0 ? (
+                    <div style={{ padding: '10px', fontSize: '12px', color: '#666' }}>
+                      Населенный пункт не найден (попробуйте написать на укр. или рус.)
+                    </div>
+                  ) : (
+                    cityResults.map((c, i) => (
+                      <div
+                        key={`${c.ref}-${i}`}
+                        onClick={() => handleSelectCity(c)}
+                        style={{
+                          padding: '9px 10px',
+                          fontSize: '12px',
+                          borderBottom: '1px solid #F0EFEA',
+                          cursor: 'pointer',
+                          color: '#1A1A1A',
+                        }}
+                      >
+                        {c.fullLabel}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Контакт клиента */}
             <input
               type="text"
               placeholder="Ваше Имя и Телефон (для накладной)..."
@@ -426,22 +653,71 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               }}
             />
 
-            <input
-              type="text"
-              placeholder="№ отделения Новой Почты или комментарий..."
-              value={branchOrComment}
-              onChange={(e) => setBranchOrComment(e.target.value)}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '9px 10px',
-                marginBottom: '12px',
-                border: '1px solid #DDD',
-                fontSize: '13px',
-                backgroundColor: '#FAF9F6',
-                color: '#1A1A1A',
-              }}
-            />
+            {/* Выбор отделения НП или свой комментарий */}
+            <div style={{ position: 'relative', marginBottom: '12px' }}>
+              <input
+                type="text"
+                placeholder={
+                  warehousesLoading
+                    ? 'Загрузка отделений Новой Почты...'
+                    : warehouses.length > 0
+                    ? `№ отделения НП в г. ${selectedCity.name} (найдено: ${warehouses.length}) или комментарий...`
+                    : '№ отделения Новой Почты или комментарий...'
+                }
+                value={branchOrComment}
+                onFocus={() => setShowWarehouseDropdown(true)}
+                onBlur={() => setTimeout(() => setShowWarehouseDropdown(false), 200)}
+                onChange={(e) => {
+                  setBranchOrComment(e.target.value);
+                  setShowWarehouseDropdown(true);
+                }}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '9px 10px',
+                  border: '1px solid #DDD',
+                  fontSize: '13px',
+                  backgroundColor: '#FAF9F6',
+                  color: '#1A1A1A',
+                }}
+              />
+
+              {showWarehouseDropdown && filteredWarehouses.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 25,
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #1A1A1A',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  }}
+                >
+                  {filteredWarehouses.map((w) => (
+                    <div
+                      key={w.ref}
+                      onMouseDown={() => {
+                        setBranchOrComment(w.description);
+                        setShowWarehouseDropdown(false);
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        fontSize: '12px',
+                        borderBottom: '1px solid #F0EFEA',
+                        cursor: 'pointer',
+                        color: '#1A1A1A',
+                      }}
+                    >
+                      {w.description}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div
               style={{
