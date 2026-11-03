@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
 import { type CartItem } from '../data/catalog';
 
-declare global {
-  interface ImportMeta {
-    readonly env: Record<string, string | undefined>;
-  }
-}
-
 type WholesaleCartProps = {
   items: CartItem[];
   onUpdateQuantity: (uid: string, newBoxesCount: number) => void;
@@ -35,13 +29,9 @@ const MANAGERS = [
   { label: 'Отправить заказ • Test', telegramId: '8686072747', name: 'Test' },
 ];
 
-// Реальные ключи API Новой Почты из бизнес-кабинета
-const NP_API_KEYS = 
-].filter((k): k is string => Boolean(k && k.trim()));
-
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
-// Только быстрые кнопки под шапкой (с официальными Ref Новой Почты)
+// Быстрые кнопки популярных городов (с официальными Ref Новой Почты)
 const POPULAR_CITIES: CityOption[] = [
   { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
   { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
@@ -53,31 +43,28 @@ const POPULAR_CITIES: CityOption[] = [
   { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
 ];
 
-// Универсальный запрос к API Новой Почты с автоматическим перебором ключей при ошибке
+// Безопасный запрос к Новой Почте через серверный прокси /api/np
 async function callNovaPoshta(
   modelName: string,
   calledMethod: string,
   methodProperties: Record<string, unknown>
 ) {
-  for (const apiKey of NP_API_KEYS) {
-    try {
-      const res = await fetch('https://api.novaposhta.ua/v2.0/json/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey,
-          modelName,
-          calledMethod,
-          methodProperties,
-        }),
-      });
-      const data = await res.json();
-      if (data?.success) {
-        return data;
-      }
-    } catch {
-      // Переход к следующему ключу при сетевой ошибке
+  try {
+    const res = await fetch('/api/np', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        modelName,
+        calledMethod,
+        methodProperties,
+      }),
+    });
+    const data = await res.json();
+    if (data?.success) {
+      return data;
     }
+  } catch {
+    // Ошибка соединения
   }
   return null;
 }
@@ -88,9 +75,7 @@ function buildSearchVariants(raw: string): string[] {
   const lower = clean.toLowerCase();
   const variants = new Set<string>([clean]);
 
-  // Если ввели через «ив» (миколаив, киив, чернигив, львив, харкив)
   if (lower.includes('аив') || lower.includes('яив') || lower.includes('иив')) {
-    variants.add(clean.replace(/ив/gi, 'їв').replace(/иїв/gi, 'іївка'));
     variants.add(clean.replace(/([аяиії])ив/gi, '$1їв'));
   }
   if (lower.includes('и')) {
@@ -128,11 +113,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // 1. Поиск любых населенных пунктов Украины напрямую через API Новой Почты
+  // 1. Поиск любых населенных пунктов Украины через /api/np -> Новая Почта
   useEffect(() => {
     const trimmed = cityQuery.trim();
 
-    // Если в поле сейчас стоит уже выбранный город или пусто — не спамим запросами
     if (trimmed.length < 1 || trimmed === selectedCity.fullLabel) {
       setCityResults([]);
       setCitySearching(false);
@@ -301,7 +285,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
 
-  // Фильтрация реальных отделений НП (при вводе «12» сначала идет отделение №12, затем 120-е и совпадения по улице)
+  // Фильтрация реальных отделений НП (точное совпадение номера всегда первым)
   const filteredWarehouses = (() => {
     const q = branchOrComment.trim().toLowerCase();
     if (!q) return warehouses.slice(0, 50);
@@ -675,7 +659,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               })}
             </div>
 
-            {/* Поле живого поиска города через API Новой Почты */}
+            {/* Поле живого поиска города через /api/np */}
             <div style={{ position: 'relative', marginBottom: '10px' }}>
               <input
                 type="text"
