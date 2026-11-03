@@ -181,7 +181,7 @@ export function Materials({ onBack }: MaterialsProps) {
           fontFamily: THEME.sans,
         }}
       >
-        {/* Верхняя навигация */}
+        {/* Верхняя навигация с логотипом-штампом */}
         <div
           style={{
             display: 'flex',
@@ -192,25 +192,37 @@ export function Materials({ onBack }: MaterialsProps) {
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <button
-            onClick={() => {
-              triggerHaptic('light');
-              setSelectedShoe(null);
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '4px 0',
-              fontSize: '10px',
-              letterSpacing: '1.4px',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              color: THEME.ink,
-              fontWeight: 600,
-            }}
-          >
-            ← Назад в каталог
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img
+              src="/logo.png"
+              alt="Cardio"
+              style={{
+                height: '20px',
+                width: 'auto',
+                objectFit: 'contain',
+                mixBlendMode: 'multiply',
+              }}
+            />
+            <button
+              onClick={() => {
+                triggerHaptic('light');
+                setSelectedShoe(null);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 0',
+                fontSize: '10px',
+                letterSpacing: '1.4px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                color: THEME.ink,
+                fontWeight: 600,
+              }}
+            >
+              ← Каталог
+            </button>
+          </div>
 
           <button
             onClick={() => {
@@ -815,41 +827,57 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхняя шапка */}
+      {/* Верхняя шапка с логотипом */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingBottom: '10px',
-          marginBottom: '14px',
+          paddingBottom: '12px',
+          marginBottom: '16px',
           borderBottom: `1px solid ${THEME.border}`,
-          fontSize: '9px',
-          letterSpacing: '1.6px',
-          textTransform: 'uppercase',
-          color: THEME.inkMuted,
         }}
       >
-        <span>ХАРЬКОВ • ОПТОВЫЙ КАТАЛОГ</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {onBack && (
-            <button
-              onClick={onBack}
-              style={{
-                background: 'transparent',
-                border: `1px solid ${THEME.border}`,
-                padding: '4px 10px',
-                fontSize: '9px',
-                letterSpacing: '1.2px',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                color: THEME.ink,
-              }}
-            >
-              ← На главную
-            </button>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img
+            src="/logo.png"
+            alt="Cardio Footwear Logo"
+            style={{
+              height: '24px',
+              width: 'auto',
+              objectFit: 'contain',
+              mixBlendMode: 'multiply',
+            }}
+          />
+          <span
+            style={{
+              fontSize: '9px',
+              letterSpacing: '1.6px',
+              textTransform: 'uppercase',
+              color: THEME.inkMuted,
+            }}
+          >
+            ХАРЬКОВ • ОПТОВЫЙ КАТАЛОГ
+          </span>
         </div>
+
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${THEME.border}`,
+              padding: '4px 10px',
+              fontSize: '9px',
+              letterSpacing: '1.2px',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              color: THEME.ink,
+            }}
+          >
+            ← На главную
+          </button>
+        )}
       </div>
 
       {/* Заголовок бренда */}
