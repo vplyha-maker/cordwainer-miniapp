@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export type ManagerContact = {
   index: string;
@@ -57,7 +57,6 @@ export function preloadAppSounds() {
   });
 }
 
-// Мгновенная остановка музыки viber.mp3 при переходе в Viber
 export function stopViberSound() {
   try {
     if (activeViberAudio) {
@@ -109,7 +108,7 @@ function playFallbackSynth(type: SoundFile) {
   }
 }
 
-export function playAppSound(fileName: SoundFile) {
+export function playAppSound(fileName: SoundFile, onEndedCallback?: () => void) {
   try {
     if (fileName === 'viber.mp3') {
       stopViberSound();
@@ -126,6 +125,15 @@ export function playAppSound(fileName: SoundFile) {
       activeViberAudio = audio;
     }
 
+    if (onEndedCallback) {
+      audio.onended = () => {
+        audio.onended = null;
+        onEndedCallback();
+      };
+    } else {
+      audio.onended = null;
+    }
+
     audio.currentTime = 0;
     const playPromise = audio.play();
     if (playPromise !== undefined) {
@@ -134,6 +142,12 @@ export function playAppSound(fileName: SoundFile) {
         altAudio.volume = 1.0;
         if (fileName === 'viber.mp3') {
           activeViberAudio = altAudio;
+        }
+        if (onEndedCallback) {
+          altAudio.onended = () => {
+            altAudio.onended = null;
+            onEndedCallback();
+          };
         }
         altAudio.play().catch(() => {
           playFallbackSynth(fileName);
@@ -210,11 +224,14 @@ export function ManagersContactCard({
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentSuccessId, setSentSuccessId] = useState<string | null>(null);
 
-  // Полноэкранная заставка CARDIO (без вызова сайта!)
+  // Состояние полноэкранной заставки CARDIO
   const [redirectSplash, setRedirectSplash] = useState<{
     mgr: ManagerContact;
-    channel: 'viber' | 'tel';
+    stage: 'playing_music' | 'picker_open';
   } | null>(null);
+
+  const viberTimerRef = useRef<number | null>(null);
+  const hiddenTelLinkRef = useRef<HTMLAnchorElement | null>(null);
 
   // Защита от случайного нажатия детьми и кликерами
   const [confirmingManager, setConfirmingManager] = useState<ManagerContact | null>(null);
@@ -226,26 +243,22 @@ export function ManagersContactCard({
     preloadAppSounds();
   }, []);
 
-  // Как только открывается Viber или окно выбора перекрывает приложение — музыка viber.mp3 выключается
+  // Когда открывается сам Viber (приложение уходит в фон), гасим звук и закрываем заставку
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
         stopViberSound();
+        if (viberTimerRef.current) {
+          window.clearTimeout(viberTimerRef.current);
+          viberTimerRef.current = null;
+        }
         setRedirectSplash(null);
       }
     };
 
-    const handlePageHide = () => {
-      stopViberSound();
-      setRedirectSplash(null);
-    };
-
     document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('pagehide', handlePageHide);
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('pagehide', handlePageHide);
     };
   }, []);
 
@@ -256,6 +269,59 @@ export function ManagersContactCard({
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
+
+  const closeSplashAndStopMusic = () => {
+    stopViberSound();
+    if (viberTimerRef.current) {
+      window.clearTimeout(viberTimerRef.current);
+      viberTimerRef.current = null;
+    }
+    setRedirectSplash(null);
+  };
+
+  // ШАГ 1 -> ШАГ 2 -> ШАГ 3 для кнопки VIBER:
+  // 1. Включается заставка CARDIO и играет viber.mp3
+  // 2. Музыка прекращается -> появляется системная плашка с выбором [Телефон / Viber]
+  // 3. При нажатии на Viber открывается Viber
+  const handleViberSequence = (mgr: ManagerContact) => {
+    const key = `viber-${mgr.telegramId}`;
+    setPressedButtonKey(key);
+    setSelectedManagerId(mgr.telegramId);
+    triggerHaptic('heavy');
+    setTimeout(() => setPressedButtonKey(null), 180);
+
+    if (viberTimerRef.current) {
+      window.clearTimeout(viberTimerRef.current);
+      viberTimerRef.current = null;
+    }
+
+    // Шаг 1: Открываем заставку CARDIO и запускаем музыку viber.mp3
+    setRedirectSplash({ mgr, stage: 'playing_music' });
+
+    let pickerTriggered = false;
+    const triggerSystemPicker = () => {
+      if (pickerTriggered) return;
+      pickerTriggered = true;
+
+      // Шаг 2: Останавливаем музыку и вызываем системную плашку выбора [Телефон / Viber]
+      stopViberSound();
+      setRedirectSplash((prev) => (prev ? { ...prev, stage: 'picker_open' } : null));
+
+      if (hiddenTelLinkRef.current) {
+        hiddenTelLinkRef.current.href = `tel:${mgr.phone}`;
+        hiddenTelLinkRef.current.click();
+      } else {
+        window.location.href = `tel:${mgr.phone}`;
+      }
+    };
+
+    playAppSound('viber.mp3', triggerSystemPicker);
+
+    // Если аудиофайл длиннее 1.8 сек — аккуратно останавливаем музыку через 1.8 сек и открываем плашку выбора
+    viberTimerRef.current = window.setTimeout(() => {
+      triggerSystemPicker();
+    }, 1800);
+  };
 
   const openSecurityGuard = (mgr: ManagerContact) => {
     const correct = Math.floor(10 + Math.random() * 89);
@@ -364,13 +430,14 @@ export function ManagersContactCard({
         color: THEME.ink,
       }}
     >
-      {/* ПОЛНОЭКРАННАЯ ПРОФЕССИОНАЛЬНАЯ ЗАСТАВКА CARDIO (БЕЗ ЗАГРУЗКИ САЙТА!) */}
+      {/* Скрытая системная ссылка для вызова плашки [Телефон / Viber] после проигрывания музыки */}
+      <a ref={hiddenTelLinkRef} href="tel:" style={{ display: 'none' }} aria-hidden="true">
+        call
+      </a>
+
+      {/* ПОЛНОЭКРАННАЯ ПРОФЕССИОНАЛЬНАЯ ЗАСТАВКА CARDIO */}
       {redirectSplash && (
         <div
-          onClick={() => {
-            stopViberSound();
-            setRedirectSplash(null);
-          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -414,15 +481,11 @@ export function ManagersContactCard({
             <span>CARDIO FOOTWEAR • ХАРЬКОВ</span>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                stopViberSound();
-                setRedirectSplash(null);
-              }}
+              onClick={closeSplashAndStopMusic}
               style={{
                 background: 'none',
                 border: '1px solid rgba(220,215,204,0.3)',
-                padding: '4px 10px',
+                padding: '5px 12px',
                 color: '#F2EFE9',
                 fontSize: '9px',
                 letterSpacing: '1px',
@@ -434,7 +497,7 @@ export function ManagersContactCard({
             </button>
           </div>
 
-          {/* Центральный блок (расположен в верхней части, прямо над системным меню Телефон / Viber) */}
+          {/* Центральный блок (остается на экране, пока открыта нижняя плашка выбора Viber) */}
           <div style={{ paddingTop: '10px' }}>
             <div
               style={{
@@ -463,9 +526,9 @@ export function ManagersContactCard({
                 marginBottom: '6px',
               }}
             >
-              {redirectSplash.channel === 'viber'
-                ? 'ВЫБЕРИТЕ VIBER В МЕНЮ НИЖЕ'
-                : 'ВЫЗОВ АБОНЕНТА'}
+              {redirectSplash.stage === 'playing_music'
+                ? 'СОЕДИНЕНИЕ С ЛИНИЕЙ VIBER...'
+                : 'ВЫБЕРИТЕ VIBER В МЕНЮ НИЖЕ'}
             </div>
 
             <div
@@ -512,7 +575,7 @@ export function ManagersContactCard({
                 width: '180px',
                 height: '1px',
                 backgroundColor: 'rgba(220,215,204,0.2)',
-                margin: '0 auto 14px auto',
+                margin: '0 auto 18px auto',
                 overflow: 'hidden',
                 position: 'relative',
               }}
@@ -527,9 +590,25 @@ export function ManagersContactCard({
               />
             </div>
 
-            <div style={{ fontSize: '11px', color: '#A8A298' }}>
-              ✓ Номер скопирован в буфер обмена
-            </div>
+            {/* Страховочная кнопка, если пользователь случайно смахнул системную плашку */}
+            {redirectSplash.stage === 'picker_open' && (
+              <a
+                href={`tel:${redirectSplash.mgr.phone}`}
+                onClick={() => stopViberSound()}
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 22px',
+                  border: '1px solid rgba(220,215,204,0.35)',
+                  color: '#F2EFE9',
+                  textDecoration: 'none',
+                  fontSize: '9px',
+                  letterSpacing: '1.5px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Открыть выбор приложения ↗
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -797,7 +876,7 @@ export function ManagersContactCard({
                   </button>
                 )}
 
-                {/* Кнопка ТЕЛ. — прямая системная ссылка tel: (без открытия сайта и туфельки) */}
+                {/* Кнопка ТЕЛ. — сразу открывает телефонный вызов */}
                 <a
                   href={`tel:${mgr.phone}`}
                   onClick={(e) => {
@@ -806,7 +885,6 @@ export function ManagersContactCard({
                     setPressedButtonKey(key);
                     setSelectedManagerId(mgr.telegramId);
                     triggerHaptic('medium');
-                    navigator.clipboard?.writeText(mgr.phone).catch(() => {});
                     setTimeout(() => setPressedButtonKey(null), 180);
                   }}
                   style={{
@@ -830,27 +908,12 @@ export function ManagersContactCard({
                   ТЕЛ. ↗
                 </a>
 
-                {/* Кнопка VIBER — прямая ссылка tel: + полноэкранная заставка CARDIO + музыка viber.mp3 */}
-                <a
-                  href={`tel:${mgr.phone}`}
+                {/* Кнопка VIBER: Заставка + Музыка -> Стоп музыки + Плашка выбора -> Viber */}
+                <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const key = `viber-${mgr.telegramId}`;
-                    setPressedButtonKey(key);
-                    setSelectedManagerId(mgr.telegramId);
-                    triggerHaptic('heavy');
-                    navigator.clipboard?.writeText(mgr.phone).catch(() => {});
-
-                    // Включаем заставку CARDIO и музыку viber.mp3
-                    setRedirectSplash({ mgr, channel: 'viber' });
-                    playAppSound('viber.mp3');
-
-                    setTimeout(() => setPressedButtonKey(null), 180);
-                    // Автоматически гасим заставку и музыку через 4 секунды, если пользователь остался в окне
-                    setTimeout(() => {
-                      stopViberSound();
-                      setRedirectSplash(null);
-                    }, 4000);
+                    handleViberSequence(mgr);
                   }}
                   style={{
                     display: 'flex',
@@ -860,7 +923,7 @@ export function ManagersContactCard({
                     backgroundColor:
                       pressedButtonKey === `viber-${mgr.telegramId}` ? THEME.ink : 'transparent',
                     color: pressedButtonKey === `viber-${mgr.telegramId}` ? '#FFFFFF' : THEME.ink,
-                    textDecoration: 'none',
+                    border: 'none',
                     borderRight: `1px solid ${THEME.border}`,
                     fontSize: '9px',
                     fontWeight: 600,
@@ -871,7 +934,7 @@ export function ManagersContactCard({
                   }}
                 >
                   VIBER ↗
-                </a>
+                </button>
 
                 {/* Кнопка Telegram */}
                 <button
@@ -980,4 +1043,3 @@ export function ManagersContactCard({
     </div>
   );
 }
-
