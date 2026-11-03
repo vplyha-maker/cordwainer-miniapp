@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { type CartItem } from '../data/catalog';
-import { ManagersContactCard } from './ManagersContactCard';
+import { ManagersContactCard, type ManagerContact } from './ManagersContactCard';
 
 type WholesaleCartProps = {
   items: CartItem[];
@@ -23,12 +23,6 @@ type WarehouseOption = {
   number: string;
   description: string;
 };
-
-const MANAGERS = [
-  { label: 'Передать спецификацию • Борис', telegramId: '8529254699', name: 'Борис' },
-  { label: 'Передать спецификацию • Георгий', telegramId: '6034597342', name: 'Георгий' },
-  { label: 'Передать спецификацию • Test', telegramId: '8686072747', name: 'Test' },
-];
 
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
 
@@ -351,7 +345,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     );
   };
 
-  const sendToManager = async (manager: { label: string; telegramId: string; name: string }) => {
+  const sendToManager = async (manager: ManagerContact) => {
     if (!manager.telegramId) return;
     const text = buildInvoiceText();
 
@@ -373,7 +367,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       const data = await response.json();
 
       if (response.ok && data.success) {
-        alert('✓ Заказ успешно отправлен руководителю и сохранен в базу!');
+        alert(`✓ Спецификация отправлена (${manager.name}) и сохранена в базу!`);
       } else {
         alert(`Ошибка отправки: ${data.error || 'Не удалось отправить'}`);
       }
@@ -675,327 +669,264 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             })}
           </div>
 
-          {/* II. БЛОК ЛОГИСТИКИ */}
-          <div
-            style={{
-              backgroundColor: THEME.surface,
-              border: `1px solid ${THEME.border}`,
-              padding: '16px',
-              marginBottom: '20px',
-            }}
-          >
+          {/* I. БЛОК ЛОГИСТИКИ */}
+          <div style={{ marginBottom: '24px' }}>
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 fontSize: '10px',
                 textTransform: 'uppercase',
-                letterSpacing: '1.4px',
+                letterSpacing: '1.6px',
                 color: THEME.inkMuted,
-                marginBottom: '12px',
+                marginBottom: '8px',
               }}
             >
               <span>I. ЛОГИСТИКА И ПОЛУЧАТЕЛЬ</span>
               <span>НОВА ПОШТА</span>
             </div>
 
-            <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '10px' }}>
-              Направление: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
-            </div>
+            <div
+              style={{
+                backgroundColor: THEME.surface,
+                border: `1px solid ${THEME.border}`,
+                padding: '14px',
+              }}
+            >
+              <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '10px' }}>
+                Направление: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
+              </div>
 
-            {/* Быстрые города */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
-              {POPULAR_CITIES.map((city) => {
-                const isSelected = selectedCity.ref === city.ref;
-                return (
-                  <button
-                    key={city.ref}
-                    type="button"
-                    onClick={() => handleSelectCity(city)}
-                    style={{
-                      padding: '5px 9px',
-                      fontSize: '10px',
-                      border: `1px solid ${isSelected ? THEME.ink : THEME.border}`,
-                      backgroundColor: isSelected ? THEME.ink : THEME.bg,
-                      color: isSelected ? '#FFFFFF' : THEME.ink,
-                      cursor: 'pointer',
-                      letterSpacing: '0.5px',
-                    }}
-                  >
-                    {city.name}
-                  </button>
-                );
-              })}
-            </div>
+              {/* Быстрые города */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
+                {POPULAR_CITIES.map((city) => {
+                  const isSelected = selectedCity.ref === city.ref;
+                  return (
+                    <button
+                      key={city.ref}
+                      type="button"
+                      onClick={() => handleSelectCity(city)}
+                      style={{
+                        padding: '5px 9px',
+                        fontSize: '10px',
+                        border: `1px solid ${isSelected ? THEME.ink : THEME.border}`,
+                        backgroundColor: isSelected ? THEME.ink : THEME.bg,
+                        color: isSelected ? '#FFFFFF' : THEME.ink,
+                        cursor: 'pointer',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      {city.name}
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Поиск города */}
-            <div style={{ position: 'relative', marginBottom: '8px' }}>
-              <input
-                type="text"
-                placeholder="Поиск населенного пункта..."
-                value={cityQuery}
-                onFocus={() => setShowCityDropdown(true)}
-                onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
-                onChange={(e) => {
-                  setCityQuery(e.target.value);
-                  setShowCityDropdown(true);
-                }}
-                style={inputStyle}
-              />
-
-              {cityQuery.length > 0 && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setCityQuery('');
-                    setCityResults([]);
+              {/* Поиск города */}
+              <div style={{ position: 'relative', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Поиск населенного пункта..."
+                  value={cityQuery}
+                  onFocus={() => setShowCityDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
+                  onChange={(e) => {
+                    setCityQuery(e.target.value);
                     setShowCityDropdown(true);
                   }}
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '12px',
-                    color: THEME.inkMuted,
-                    cursor: 'pointer',
-                    padding: '4px',
-                  }}
-                >
-                  ✕
-                </button>
-              )}
+                  style={inputStyle}
+                />
 
-              {showCityDropdown &&
-                cityQuery.trim().length >= 1 &&
-                cityQuery.trim() !== selectedCity.fullLabel && (
+                {cityQuery.length > 0 && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setCityQuery('');
+                      setCityResults([]);
+                      setShowCityDropdown(true);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '12px',
+                      color: THEME.inkMuted,
+                      cursor: 'pointer',
+                      padding: '4px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+
+                {showCityDropdown &&
+                  cityQuery.trim().length >= 1 &&
+                  cityQuery.trim() !== selectedCity.fullLabel && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 30,
+                        backgroundColor: THEME.surface,
+                        border: `1px solid ${THEME.border}`,
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+                      }}
+                    >
+                      {citySearching ? (
+                        <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
+                          Запрос в реестр Новой Почты...
+                        </div>
+                      ) : cityResults.length === 0 ? (
+                        <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
+                          Населенный пункт не найден
+                        </div>
+                      ) : (
+                        cityResults.map((c) => (
+                          <div
+                            key={c.ref}
+                            onMouseDown={() => handleSelectCity(c)}
+                            style={{
+                              padding: '9px 12px',
+                              fontSize: '12px',
+                              borderBottom: `1px solid ${THEME.border}`,
+                              cursor: 'pointer',
+                              color: THEME.ink,
+                            }}
+                          >
+                            {c.fullLabel}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+              </div>
+
+              {/* Контакт клиента */}
+              <div style={{ marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="ФИО и телефон получателя..."
+                  value={clientContact}
+                  onChange={(e) => setClientContact(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+
+              {/* Отделение НП */}
+              <div style={{ position: 'relative', marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  placeholder={
+                    warehousesLoading
+                      ? 'Загрузка отделений...'
+                      : `№ отделения или адрес в ${selectedCity.uaName}...`
+                  }
+                  value={branchOrComment}
+                  onFocus={() => setShowWarehouseDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowWarehouseDropdown(false), 200)}
+                  onChange={(e) => {
+                    setBranchOrComment(e.target.value);
+                    setShowWarehouseDropdown(true);
+                  }}
+                  style={inputStyle}
+                />
+
+                {branchOrComment.length > 0 && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setBranchOrComment('');
+                      setShowWarehouseDropdown(true);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '12px',
+                      color: THEME.inkMuted,
+                      cursor: 'pointer',
+                      padding: '4px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+
+                {showWarehouseDropdown && filteredWarehouses.length > 0 && (
                   <div
                     style={{
                       position: 'absolute',
                       top: '100%',
                       left: 0,
                       right: 0,
-                      zIndex: 30,
+                      zIndex: 25,
                       backgroundColor: THEME.surface,
                       border: `1px solid ${THEME.border}`,
-                      maxHeight: '220px',
+                      maxHeight: '200px',
                       overflowY: 'auto',
                       boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
                     }}
                   >
-                    {citySearching ? (
-                      <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                        Запрос в реестр Новой Почты...
+                    {filteredWarehouses.map((w) => (
+                      <div
+                        key={w.ref}
+                        onMouseDown={() => {
+                          setBranchOrComment(w.description);
+                          setShowWarehouseDropdown(false);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '11px',
+                          borderBottom: `1px solid ${THEME.border}`,
+                          cursor: 'pointer',
+                          color: THEME.ink,
+                        }}
+                      >
+                        {w.description}
                       </div>
-                    ) : cityResults.length === 0 ? (
-                      <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                        Населенный пункт не найден
-                      </div>
-                    ) : (
-                      cityResults.map((c) => (
-                        <div
-                          key={c.ref}
-                          onMouseDown={() => handleSelectCity(c)}
-                          style={{
-                            padding: '9px 12px',
-                            fontSize: '12px',
-                            borderBottom: `1px solid ${THEME.border}`,
-                            cursor: 'pointer',
-                            color: THEME.ink,
-                          }}
-                        >
-                          {c.fullLabel}
-                        </div>
-                      ))
-                    )}
+                    ))}
                   </div>
                 )}
-            </div>
-
-            {/* Контакт клиента */}
-            <div style={{ marginBottom: '8px' }}>
-              <input
-                type="text"
-                placeholder="ФИО и телефон получателя..."
-                value={clientContact}
-                onChange={(e) => setClientContact(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-
-            {/* Отделение НП */}
-            <div style={{ position: 'relative', marginBottom: '12px' }}>
-              <input
-                type="text"
-                placeholder={
-                  warehousesLoading
-                    ? 'Загрузка отделений...'
-                    : `№ отделения или адрес в ${selectedCity.uaName}...`
-                }
-                value={branchOrComment}
-                onFocus={() => setShowWarehouseDropdown(true)}
-                onBlur={() => setTimeout(() => setShowWarehouseDropdown(false), 200)}
-                onChange={(e) => {
-                  setBranchOrComment(e.target.value);
-                  setShowWarehouseDropdown(true);
-                }}
-                style={inputStyle}
-              />
-
-              {branchOrComment.length > 0 && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setBranchOrComment('');
-                    setShowWarehouseDropdown(true);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '12px',
-                    color: THEME.inkMuted,
-                    cursor: 'pointer',
-                    padding: '4px',
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-
-              {showWarehouseDropdown && filteredWarehouses.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 25,
-                    backgroundColor: THEME.surface,
-                    border: `1px solid ${THEME.border}`,
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
-                  }}
-                >
-                  {filteredWarehouses.map((w) => (
-                    <div
-                      key={w.ref}
-                      onMouseDown={() => {
-                        setBranchOrComment(w.description);
-                        setShowWarehouseDropdown(false);
-                      }}
-                      style={{
-                        padding: '8px 12px',
-                        fontSize: '11px',
-                        borderBottom: `1px solid ${THEME.border}`,
-                        cursor: 'pointer',
-                        color: THEME.ink,
-                      }}
-                    >
-                      {w.description}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                borderTop: `1px solid ${THEME.border}`,
-                paddingTop: '10px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-              }}
-            >
-              <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                Партия: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} мест)
               </div>
-              <div style={{ fontFamily: THEME.serif, fontSize: '16px', fontWeight: 600 }}>
-                {calcLoading ? 'Расчет тарифа...' : `Логистика ≈ ${Math.round(deliveryCost)} ₴`}
-              </div>
-            </div>
-          </div>
 
-          {/* Блок отправки в отдел производства */}
-          <div
-            style={{
-              backgroundColor: THEME.surface,
-              border: `1px solid ${THEME.border}`,
-              padding: '16px',
-              marginBottom: '18px',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '1.4px',
-                color: THEME.inkMuted,
-                marginBottom: '12px',
-              }}
-            >
-              <span>II. УТВЕРЖДЕНИЕ И ОТПРАВКА</span>
-              <span>DIRECT</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {MANAGERS.map((mgr, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => sendToManager(mgr)}
-                  style={{
-                    width: '100%',
-                    padding: '13px 16px',
-                    backgroundColor: idx === 0 ? THEME.ink : 'transparent',
-                    color: idx === 0 ? '#FFFFFF' : THEME.ink,
-                    border: `1px solid ${THEME.ink}`,
-                    fontSize: '10px',
-                    letterSpacing: '1.3px',
-                    fontWeight: 500,
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span>{mgr.label}</span>
-                  <span>→</span>
-                </button>
-              ))}
-
-              <button
-                onClick={copyInvoice}
+              <div
                 style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: 'transparent',
-                  color: THEME.inkMuted,
-                  border: `1px dashed ${THEME.border}`,
-                  fontSize: '10px',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  marginTop: '4px',
+                  borderTop: `1px solid ${THEME.border}`,
+                  paddingTop: '10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
                 }}
               >
-                {copied ? '✓ Текст спецификации скопирован' : 'Скопировать бордеро в буфер'}
-              </button>
+                <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  Партия: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} мест)
+                </div>
+                <div style={{ fontFamily: THEME.serif, fontSize: '16px', fontWeight: 600 }}>
+                  {calcLoading ? 'Расчет тарифа...' : `Логистика ≈ ${Math.round(deliveryCost)} ₴`}
+                </div>
+              </div>
             </div>
           </div>
 
-          <ManagersContactCard />
+          {/* II. ОБЪЕДИНЕННЫЙ БЛОК ДИРЕКЦИИ (ОТПРАВКА В TELEGRAM + ЗВОНОК + VIBER) */}
+          <ManagersContactCard
+            itemsCount={items.length}
+            onSendOrder={sendToManager}
+            onCopyInvoice={copyInvoice}
+            copied={copied}
+          />
         </>
       )}
     </div>
