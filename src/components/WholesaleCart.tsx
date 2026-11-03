@@ -36,10 +36,7 @@ const MANAGERS = [
 ];
 
 // Реальные ключи API Новой Почты из бизнес-кабинета
-const NP_API_KEYS = [
-  import.meta.env.VITE_NP_API_KEY,
-  'cd6a2ad00e721a0ce6d246522c082905',
-  '93d600bbcf03232f807cabc2ca757407',
+const NP_API_KEYS = 
 ].filter((k): k is string => Boolean(k && k.trim()));
 
 const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
