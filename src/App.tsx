@@ -20,6 +20,8 @@ import { SettingsPage } from './pages/SettingsPage'
 import SneakerIndex from './pages/SneakerIndex'
 import Materials from './pages/Materials'
 import AdminUpload from './pages/AdminUpload'
+import { AdminPanel } from './components/AdminPanel'
+
 
 import {
   getSavedPerfMode,
