@@ -17,7 +17,7 @@ const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1,
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
 
-// Безопасный URL для файла со скобками в public/logo(1).mp4
+// Безопасный URL для файла со скобками в public/logo(1).mp4 (БЕЗ фото-постера!)
 const HERO_VIDEO_SRC = '/logo%281%29.mp4';
 const FOOTER_BANNER_SRC = '/baner.jpg';
 
@@ -195,6 +195,7 @@ export function Materials({ onBack }: MaterialsProps) {
   const [selectedShoe, setSelectedShoe] = useState<ShoeItem | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Рефы для ВЕРХНЕГО ВИДЕО-ПАРАЛЛАКСА (Under-Scroll Stage)
   const heroVideoRef = useRef<HTMLVideoElement>(null);
@@ -218,32 +219,65 @@ export function Materials({ onBack }: MaterialsProps) {
     }
   }, []);
 
-  // Надежный автозапуск видео в Telegram WebView (iOS / Android)
+  // Надежный автозапуск видео специально для iOS iPhone (Safari + Telegram WebKit) и Android
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
     const videoEl = heroVideoRef.current;
     if (!videoEl) return;
 
+    // Жесткая установка HTML-атрибутов для iOS WebKit (обход особенности React)
     videoEl.muted = true;
     videoEl.defaultMuted = true;
     videoEl.playsInline = true;
+    videoEl.setAttribute('muted', '');
+    videoEl.setAttribute('playsinline', '');
+    videoEl.setAttribute('webkit-playsinline', '');
+    videoEl.setAttribute('autoplay', '');
+
+    if (videoEl.readyState >= 2) {
+      setIsVideoReady(true);
+    }
 
     const tryPlay = () => {
-      if (videoEl.paused) {
-        videoEl.play().catch(() => {});
+      if (!videoEl) return;
+      videoEl.muted = true;
+      const playPromise = videoEl.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsVideoReady(true);
+          })
+          .catch(() => {
+            // Если iOS в режиме энергосбережения заблокировал старт до касания, показываем 1-й кадр
+            setIsVideoReady(true);
+          });
       }
     };
 
     tryPlay();
+
+    // Подстраховка для iOS при первом касании экрана или возврате во вкладку
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        tryPlay();
+      }
+    };
+
     window.addEventListener('touchstart', tryPlay, { passive: true, once: true });
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Страховочный таймер, чтобы видео всегда было видимо даже из кэша iOS
+    const fallbackTimer = window.setTimeout(() => setIsVideoReady(true), 150);
 
     return () => {
+      window.clearTimeout(fallbackTimer);
       window.removeEventListener('touchstart', tryPlay);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [selectedShoe, isCartOpen]);
 
-  // Единый 60FPS аппаратный цикл для верхнего видео и нижнего баннера
+  // Единый 60FPS цикл для верхнего видео и нижнего баннера (с защитой от iOS rubber-band)
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
@@ -252,6 +286,7 @@ export function Materials({ onBack }: MaterialsProps) {
 
     const applyDualParallax = () => {
       const viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
+      const pageScrollY = window.scrollY ?? window.pageYOffset ?? 0;
 
       // ======================================================================
       // 1. ВЕРХНИЙ HERO ВИДЕО-БАННЕР (уходит под каталог при скролле вниз)
@@ -261,13 +296,19 @@ export function Materials({ onBack }: MaterialsProps) {
       if (topAnchor && topStage) {
         const rect = topAnchor.getBoundingClientRect();
 
-        if (initialBannerTopRef.current === null || rect.top > initialBannerTopRef.current) {
-          initialBannerTopRef.current = rect.top;
+        // Фиксируем базовую точку только один раз без искажения от резинового скролла iOS (pageScrollY < 0)
+        if (initialBannerTopRef.current === null) {
+          initialBannerTopRef.current = rect.top + Math.max(0, pageScrollY);
         }
 
-        const scrolled = Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
+        // На iOS при оттягивании экрана вниз (overscroll) scrolled строго равен 0
+        const rawScrolled =
+          pageScrollY > 0
+            ? pageScrollY
+            : Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
+
         const maxScroll = 320;
-        const clamped = Math.min(maxScroll, scrolled);
+        const clamped = Math.max(0, Math.min(maxScroll, rawScrolled));
         const progress = clamped / maxScroll; // 0 -> 1
 
         const translateY = clamped * 0.55;
@@ -296,12 +337,10 @@ export function Materials({ onBack }: MaterialsProps) {
         const fRect = botAnchor.getBoundingClientRect();
         const revealSpan = Math.max(260, fRect.height + 110);
 
-        // 0 = баннер только показался снизу экрана, 1 = полностью раскрылся
         const visiblePx = viewportH - fRect.top;
         const fProgress = Math.max(0, Math.min(1, visiblePx / revealSpan));
-        const inv = 1 - fProgress; // 1 -> 0 по мере раскрытия
+        const inv = 1 - fProgress;
 
-        // Эффект подъема шторки: баннер догоняет скролл снизу вверх и расправляет перспективу
         const fTranslateY = -inv * 62;
         const fScale = 0.92 + fProgress * 0.08;
         const fRotateX = -inv * 9;
@@ -315,7 +354,6 @@ export function Materials({ onBack }: MaterialsProps) {
         }
 
         if (footerShadowRef.current) {
-          // Тень от полотна каталога постепенно рассеивается при полном открытии
           footerShadowRef.current.style.opacity = `${inv * 0.58}`;
         }
       }
@@ -1330,7 +1368,7 @@ export function Materials({ onBack }: MaterialsProps) {
       </div>
 
       {/* ==================================================================== */}
-      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР public/logo(1).mp4 С 3D UNDER-SCROLL    */}
+      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР public/logo(1).mp4 БЕЗ ВСПЫШКИ ФОТО     */}
       {/* ==================================================================== */}
       <div
         ref={bannerAnchorRef}
@@ -1350,9 +1388,12 @@ export function Materials({ onBack }: MaterialsProps) {
             border: `1px solid ${THEME.border}`,
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
             position: 'relative',
-            backgroundColor: '#161514',
+            backgroundColor: '#121212',
             transformOrigin: 'center bottom',
             willChange: 'transform',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           }}
         >
           {/* Тонкая редакционная шапка поверх видео в стиле Lookbook */}
@@ -1376,6 +1417,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 textTransform: 'uppercase',
                 color: '#F8F6F1',
                 backgroundColor: 'rgba(22, 21, 20, 0.62)',
+                WebkitBackdropFilter: 'blur(4px)',
                 backdropFilter: 'blur(4px)',
                 padding: '3px 7px',
                 border: '1px solid rgba(255, 255, 255, 0.16)',
@@ -1390,6 +1432,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 textTransform: 'uppercase',
                 color: '#F8F6F1',
                 backgroundColor: 'rgba(22, 21, 20, 0.62)',
+                WebkitBackdropFilter: 'blur(4px)',
                 backdropFilter: 'blur(4px)',
                 padding: '3px 7px',
                 border: '1px solid rgba(255, 255, 255, 0.16)',
@@ -1402,18 +1445,22 @@ export function Materials({ onBack }: MaterialsProps) {
           <video
             ref={heroVideoRef}
             src={HERO_VIDEO_SRC}
-            poster={FOOTER_BANNER_SRC}
             autoPlay
             loop
             muted
             playsInline
             preload="auto"
+            onLoadedData={() => setIsVideoReady(true)}
+            onCanPlay={() => setIsVideoReady(true)}
+            onPlay={() => setIsVideoReady(true)}
             style={{
               width: '100%',
               aspectRatio: '16 / 9',
               objectFit: 'cover',
               display: 'block',
-              backgroundColor: '#161514',
+              backgroundColor: '#121212',
+              opacity: isVideoReady ? 1 : 0,
+              transition: 'opacity 0.22s ease-out',
             }}
           />
 
@@ -1573,6 +1620,7 @@ export function Materials({ onBack }: MaterialsProps) {
             overflowX: 'auto',
             paddingBottom: '12px',
             marginBottom: '12px',
+            WebkitOverflowScrolling: 'touch',
           }}
         >
           {FEATURE_FILTERS.map((feat) => {
@@ -1882,7 +1930,6 @@ export function Materials({ onBack }: MaterialsProps) {
           zIndex: 1,
         }}
       >
-        {/* Editorial-подпись перед финальным постером */}
         <div
           style={{
             display: 'flex',
@@ -1913,9 +1960,11 @@ export function Materials({ onBack }: MaterialsProps) {
             backgroundColor: '#161514',
             transformOrigin: 'center top',
             willChange: 'transform',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           }}
         >
-          {/* Полный кадр /baner.jpg 16:9 без обрезки краев */}
           <img
             src={FOOTER_BANNER_SRC}
             alt="Cardio Men's Footwear Campaign Banner"
@@ -1928,7 +1977,6 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           />
 
-          {/* Встречный солнечный блик при раскрытии нижнего баннера */}
           <div
             ref={footerGlareRef}
             style={{
@@ -1947,7 +1995,6 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           />
 
-          {/* Тень кулисы, которая рассеивается по мере скролла до самого низа */}
           <div
             ref={footerShadowRef}
             style={{
@@ -1961,7 +2008,6 @@ export function Materials({ onBack }: MaterialsProps) {
           />
         </div>
 
-        {/* Нижний колонтитул с быстрым возвратом наверх или переходом к накладной */}
         <div
           style={{
             marginTop: '14px',
