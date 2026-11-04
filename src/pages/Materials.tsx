@@ -17,6 +17,10 @@ const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1,
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
 
+// Безопасный URL для файла со скобками в public/logo(1).mp4
+const HERO_VIDEO_SRC = '/logo%281%29.mp4';
+const FOOTER_BANNER_SRC = '/baner.jpg';
+
 const THEME = {
   bg: '#F2EFE9',
   surface: '#F8F6F1',
@@ -64,7 +68,6 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
     const now = ctx.currentTime;
 
     if (level === 'light') {
-      // Короткий сухой механический тик (как колесико выбора размера)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
@@ -79,7 +82,6 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
       osc.start(now);
       osc.stop(now + 0.015);
     } else if (level === 'medium') {
-      // Плотный двойной тактильный щелчок тумблера (8 пар / 6 пар, смена сетки, короба)
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'sine';
@@ -94,7 +96,6 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
       osc1.start(now);
       osc1.stop(now + 0.025);
 
-      // Второй высокочастотный микро-щелчок фиксации
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = 'triangle';
@@ -109,7 +110,6 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
       osc2.start(now + 0.004);
       osc2.stop(now + 0.017);
     } else if (level === 'success') {
-      // Двухтональный аккорд подтверждения при добавлении в накладную
       [523.25, 783.99].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -132,17 +132,14 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
 }
 
 function fireHaptic(level: 'light' | 'medium' | 'success') {
-  // 1. Звуковой микро-импульс Taptic
   playTapticClick(level);
 
-  // 2. Вызов внешней функции (для совместимости)
   try {
     triggerHaptic(level);
   } catch {
     // Ignore
   }
 
-  // 3. Нативный мост Telegram WebApp (усиленные профили для Android/iOS)
   try {
     const tgHaptic = (
       window as unknown as {
@@ -174,7 +171,6 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
     // Ignore
   }
 
-  // 4. Прямой аппаратный вызов вибрации Android (БЕЗ раннего return!)
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       if (level === 'light') {
@@ -200,12 +196,19 @@ export function Materials({ onBack }: MaterialsProps) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
-  // Рефы для настоящего аппаратного 60FPS параллакса без обрезки краев баннера
+  // Рефы для ВЕРХНЕГО ВИДЕО-ПАРАЛЛАКСА (Under-Scroll Stage)
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
   const bannerAnchorRef = useRef<HTMLDivElement>(null);
   const bannerStageRef = useRef<HTMLDivElement>(null);
   const bannerGlareRef = useRef<HTMLDivElement>(null);
   const bannerShadowRef = useRef<HTMLDivElement>(null);
   const initialBannerTopRef = useRef<number | null>(null);
+
+  // Рефы для НИЖНЕГО КАМПЕЙН-ПАРАЛЛАКСА (Curtain Reveal Finale)
+  const footerAnchorRef = useRef<HTMLDivElement>(null);
+  const footerStageRef = useRef<HTMLDivElement>(null);
+  const footerGlareRef = useRef<HTMLDivElement>(null);
+  const footerShadowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -215,56 +218,115 @@ export function Materials({ onBack }: MaterialsProps) {
     }
   }, []);
 
+  // Надежный автозапуск видео в Telegram WebView (iOS / Android)
+  useEffect(() => {
+    if (selectedShoe || isCartOpen) return;
+
+    const videoEl = heroVideoRef.current;
+    if (!videoEl) return;
+
+    videoEl.muted = true;
+    videoEl.defaultMuted = true;
+    videoEl.playsInline = true;
+
+    const tryPlay = () => {
+      if (videoEl.paused) {
+        videoEl.play().catch(() => {});
+      }
+    };
+
+    tryPlay();
+    window.addEventListener('touchstart', tryPlay, { passive: true, once: true });
+
+    return () => {
+      window.removeEventListener('touchstart', tryPlay);
+    };
+  }, [selectedShoe, isCartOpen]);
+
+  // Единый 60FPS аппаратный цикл для верхнего видео и нижнего баннера
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
     initialBannerTopRef.current = null;
     let rafId = 0;
 
-    const applyParallax = () => {
-      const anchor = bannerAnchorRef.current;
-      const stage = bannerStageRef.current;
-      if (!anchor || !stage) return;
+    const applyDualParallax = () => {
+      const viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
 
-      const rect = anchor.getBoundingClientRect();
+      // ======================================================================
+      // 1. ВЕРХНИЙ HERO ВИДЕО-БАННЕР (уходит под каталог при скролле вниз)
+      // ======================================================================
+      const topAnchor = bannerAnchorRef.current;
+      const topStage = bannerStageRef.current;
+      if (topAnchor && topStage) {
+        const rect = topAnchor.getBoundingClientRect();
 
-      // Запоминаем исходную верхнюю точку баннера при открытии страницы
-      if (initialBannerTopRef.current === null || rect.top > initialBannerTopRef.current) {
-        initialBannerTopRef.current = rect.top;
+        if (initialBannerTopRef.current === null || rect.top > initialBannerTopRef.current) {
+          initialBannerTopRef.current = rect.top;
+        }
+
+        const scrolled = Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
+        const maxScroll = 320;
+        const clamped = Math.min(maxScroll, scrolled);
+        const progress = clamped / maxScroll; // 0 -> 1
+
+        const translateY = clamped * 0.55;
+        const scale = 1 - progress * 0.065;
+        const rotateX = progress * 8;
+
+        topStage.style.transform = `perspective(900px) translate3d(0, ${translateY.toFixed(1)}px, 0) scale(${scale.toFixed(4)}) rotateX(${rotateX.toFixed(2)}deg)`;
+
+        if (bannerGlareRef.current) {
+          const glareShift = -45 + progress * 110;
+          bannerGlareRef.current.style.transform = `translate3d(${glareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
+          bannerGlareRef.current.style.opacity = `${0.14 + progress * 0.44}`;
+        }
+
+        if (bannerShadowRef.current) {
+          bannerShadowRef.current.style.opacity = `${progress * 0.48}`;
+        }
       }
 
-      // Точное расстояние прокрутки с самого 1-го пикселя движения пальца
-      const scrolled = Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
-      const maxScroll = 320;
-      const clamped = Math.min(maxScroll, scrolled);
-      const progress = clamped / maxScroll; // от 0 до 1
+      // ======================================================================
+      // 2. НИЖНИЙ ФИНАЛЬНЫЙ БАННЕР /baner.jpg (выезжает из-под кулисы каталога)
+      // ======================================================================
+      const botAnchor = footerAnchorRef.current;
+      const botStage = footerStageRef.current;
+      if (botAnchor && botStage) {
+        const fRect = botAnchor.getBoundingClientRect();
+        const revealSpan = Math.max(260, fRect.height + 110);
 
-      // 1. Баннер смещается вниз со скоростью 55% от скролла и плавно уходит вглубь под полотно каталога
-      const translateY = clamped * 0.55;
-      const scale = 1 - progress * 0.065;
-      const rotateX = progress * 8;
+        // 0 = баннер только показался снизу экрана, 1 = полностью раскрылся
+        const visiblePx = viewportH - fRect.top;
+        const fProgress = Math.max(0, Math.min(1, visiblePx / revealSpan));
+        const inv = 1 - fProgress; // 1 -> 0 по мере раскрытия
 
-      stage.style.transform = `perspective(900px) translate3d(0, ${translateY.toFixed(1)}px, 0) scale(${scale.toFixed(4)}) rotateX(${rotateX.toFixed(2)}deg)`;
+        // Эффект подъема шторки: баннер догоняет скролл снизу вверх и расправляет перспективу
+        const fTranslateY = -inv * 62;
+        const fScale = 0.92 + fProgress * 0.08;
+        const fRotateX = -inv * 9;
 
-      // 2. Солнечный блик скользит по кроссовку и горам при скролле
-      if (bannerGlareRef.current) {
-        const glareShift = -45 + progress * 110;
-        bannerGlareRef.current.style.transform = `translate3d(${glareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
-        bannerGlareRef.current.style.opacity = `${0.15 + progress * 0.45}`;
-      }
+        botStage.style.transform = `perspective(900px) translate3d(0, ${fTranslateY.toFixed(1)}px, 0) scale(${fScale.toFixed(4)}) rotateX(${fRotateX.toFixed(2)}deg)`;
 
-      // 3. Глубокая тень затенения по мере наезда каталога поверх баннера
-      if (bannerShadowRef.current) {
-        bannerShadowRef.current.style.opacity = `${progress * 0.42}`;
+        if (footerGlareRef.current) {
+          const fGlareShift = -55 + fProgress * 115;
+          footerGlareRef.current.style.transform = `translate3d(${fGlareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
+          footerGlareRef.current.style.opacity = `${0.1 + fProgress * 0.42}`;
+        }
+
+        if (footerShadowRef.current) {
+          // Тень от полотна каталога постепенно рассеивается при полном открытии
+          footerShadowRef.current.style.opacity = `${inv * 0.58}`;
+        }
       }
     };
 
     const onScrollOrTouch = () => {
       cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(applyParallax);
+      rafId = requestAnimationFrame(applyDualParallax);
     };
 
-    applyParallax();
+    applyDualParallax();
 
     window.addEventListener('scroll', onScrollOrTouch, { passive: true, capture: true });
     document.addEventListener('scroll', onScrollOrTouch, { passive: true, capture: true });
@@ -278,7 +340,7 @@ export function Materials({ onBack }: MaterialsProps) {
       window.removeEventListener('touchmove', onScrollOrTouch);
       window.removeEventListener('resize', onScrollOrTouch);
     };
-  }, [selectedShoe, isCartOpen]);
+  }, [selectedShoe, isCartOpen, activeCategory, activeFeature, searchQuery, gridMode]);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -336,7 +398,6 @@ export function Materials({ onBack }: MaterialsProps) {
     return map;
   }, [cart]);
 
-  // Изменение количества пар размера: срабатывает только при реальном изменении значения
   const updateSizeCount = (size: SizeKey, delta: number) => {
     const currentVal = sizeRun[size] || 0;
     const nextVal = Math.max(0, Math.min(10, currentVal + delta));
@@ -454,7 +515,6 @@ export function Materials({ onBack }: MaterialsProps) {
           fontFamily: THEME.sans,
         }}
       >
-        {/* Верхняя навигация с логотипом */}
         <div
           style={{
             display: 'flex',
@@ -518,7 +578,6 @@ export function Materials({ onBack }: MaterialsProps) {
           </button>
         </div>
 
-        {/* Индикатор наличия в заказе */}
         {alreadyInCartPairs > 0 && (
           <div
             style={{
@@ -557,7 +616,6 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        {/* Заголовок модели */}
         <div style={{ marginBottom: '16px' }}>
           <div
             style={{
@@ -607,7 +665,6 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         </div>
 
-        {/* Фото товара (увеличенное, пропорция под силуэт обуви, без дубля логотипа) */}
         <div
           style={{
             backgroundColor: THEME.surface,
@@ -690,7 +747,6 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Варианты цвета */}
         {modelVariants.length > 1 && (
           <div style={{ marginBottom: '24px' }}>
             <div
@@ -780,7 +836,6 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        {/* ВЫБОР РОСТОВКИ И КОРОБОВ */}
         <div style={{ marginBottom: '24px' }}>
           <div
             style={{
@@ -852,7 +907,6 @@ export function Materials({ onBack }: MaterialsProps) {
 
           {orderMode === 'wholesale' ? (
             <>
-              {/* Шапка комплектации с автоматическим статусом "Своя (X пар)" */}
               <div
                 style={{
                   display: 'flex',
@@ -884,7 +938,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 </span>
               </div>
 
-              {/* Информативные карточки пресетов ростовки (8 пар / 6 пар) */}
               <div
                 style={{
                   display: 'grid',
@@ -980,7 +1033,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 </button>
               </div>
 
-              {/* Таблица размеров с подсветкой удвоенных размеров (2 и более пар) в шапке */}
               <div
                 style={{
                   display: 'grid',
@@ -1062,7 +1114,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 })}
               </div>
 
-              {/* Выбор количества коробов */}
               <div
                 style={{
                   display: 'flex',
@@ -1155,7 +1206,6 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Кнопка добавления в накладную */}
         <button
           disabled={totalPairs === 0}
           onClick={addCurrentShoeToCart}
@@ -1193,7 +1243,7 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ
+  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ С ДВОЙНЫМ ПАРАЛЛАКСОМ (ВИДЕО СВЕРХУ + БАННЕР В ФИНАЛЕ)
   return (
     <div
       style={{
@@ -1205,7 +1255,7 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхняя шапка с единственным логотипом */}
+      {/* Верхняя шапка с логотипом */}
       <div
         style={{
           display: 'flex',
@@ -1279,7 +1329,9 @@ export function Materials({ onBack }: MaterialsProps) {
         )}
       </div>
 
-      {/* HERO-БАННЕР С НАСТОЯЩИМ 3D UNDER-SCROLL ПАРАЛЛАКСОМ И СОЛНЕЧНЫМ БЛИКОМ (100% БЕЗ ОБРЕЗКИ КРАЕВ) */}
+      {/* ==================================================================== */}
+      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР public/logo(1).mp4 С 3D UNDER-SCROLL    */}
+      {/* ==================================================================== */}
       <div
         ref={bannerAnchorRef}
         style={{
@@ -1296,26 +1348,76 @@ export function Materials({ onBack }: MaterialsProps) {
             borderRadius: '4px',
             overflow: 'hidden',
             border: `1px solid ${THEME.border}`,
-            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
             position: 'relative',
             backgroundColor: '#161514',
             transformOrigin: 'center bottom',
             willChange: 'transform',
           }}
         >
-          {/* Полный кадр /baner.jpg 16:9 без срезания букв CARDIO и SHOP NOW */}
-          <img
-            src="/baner.jpg"
-            alt="Cardio Men's Footwear Banner"
+          {/* Тонкая редакционная шапка поверх видео в стиле Lookbook */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '12px',
+              right: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              zIndex: 3,
+              pointerEvents: 'none',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '8px',
+                letterSpacing: '1.6px',
+                textTransform: 'uppercase',
+                color: '#F8F6F1',
+                backgroundColor: 'rgba(22, 21, 20, 0.62)',
+                backdropFilter: 'blur(4px)',
+                padding: '3px 7px',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+              }}
+            >
+              ● MOTION LOOKBOOK
+            </span>
+            <span
+              style={{
+                fontSize: '8px',
+                letterSpacing: '1.4px',
+                textTransform: 'uppercase',
+                color: '#F8F6F1',
+                backgroundColor: 'rgba(22, 21, 20, 0.62)',
+                backdropFilter: 'blur(4px)',
+                padding: '3px 7px',
+                border: '1px solid rgba(255, 255, 255, 0.16)',
+              }}
+            >
+              CARDIO // 40—45
+            </span>
+          </div>
+
+          <video
+            ref={heroVideoRef}
+            src={HERO_VIDEO_SRC}
+            poster={FOOTER_BANNER_SRC}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
             style={{
               width: '100%',
               aspectRatio: '16 / 9',
-              objectFit: 'contain',
+              objectFit: 'cover',
               display: 'block',
+              backgroundColor: '#161514',
             }}
           />
 
-          {/* Динамический солнечный блик, скользящий по кроссовку и горам при скролле */}
+          {/* Скользящий солнечный блик по видео при скролле */}
           <div
             ref={bannerGlareRef}
             style={{
@@ -1325,38 +1427,45 @@ export function Materials({ onBack }: MaterialsProps) {
               width: '65%',
               height: '100%',
               background:
-                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.38) 50%, rgba(255,255,255,0) 100%)',
+                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.36) 50%, rgba(255,255,255,0) 100%)',
               mixBlendMode: 'overlay',
               pointerEvents: 'none',
-              opacity: 0.15,
+              opacity: 0.14,
               transform: 'translate3d(-45%, 0, 0) skewX(-22deg)',
               willChange: 'transform, opacity',
+              zIndex: 2,
             }}
           />
 
-          {/* Глубинное затемнение при уходе баннера под полотно каталога */}
+          {/* Глубинное затенение, когда каталог наезжает поверх видео */}
           <div
             ref={bannerShadowRef}
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(180deg, rgba(22,21,20,0.05) 0%, rgba(22,21,20,0.65) 100%)',
+              background: 'linear-gradient(180deg, rgba(22,21,20,0.06) 0%, rgba(22,21,20,0.72) 100%)',
               pointerEvents: 'none',
               opacity: 0,
               willChange: 'opacity',
+              zIndex: 2,
             }}
           />
         </div>
       </div>
 
-      {/* ПОЛОТНО КАТАЛОГА (плавно накатывает поверх параллакс-баннера при скролле) */}
+      {/* ==================================================================== */}
+      {/* ОСНОВНОЕ ПОЛОТНО КАТАЛОГА (скользит поверх верхнего и нижнего блока) */}
+      {/* ==================================================================== */}
       <div
         style={{
           position: 'relative',
           zIndex: 5,
           backgroundColor: THEME.bg,
           paddingTop: '4px',
-          boxShadow: '0 -12px 20px -8px rgba(242, 239, 233, 0.98)',
+          paddingBottom: '22px',
+          boxShadow:
+            '0 -12px 20px -8px rgba(242, 239, 233, 0.98), 0 18px 28px -10px rgba(22, 21, 20, 0.16)',
+          borderBottom: `1px solid ${THEME.border}`,
         }}
       >
         {/* Поле поиска */}
@@ -1492,7 +1601,7 @@ export function Materials({ onBack }: MaterialsProps) {
           })}
         </div>
 
-        {/* Счетчик моделей + Переключатель вида сетки (2 КОЛ. / КРУПНО) */}
+        {/* Счетчик моделей + Переключатель вида сетки */}
         <div
           style={{
             display: 'flex',
@@ -1758,6 +1867,164 @@ export function Materials({ onBack }: MaterialsProps) {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* ==================================================================== */}
+      {/* НИЖНЯЯ КУЛИСА: ФИНАЛЬНЫЙ БАННЕР public/baner.jpg С ПАРАЛЛАКС-ВЫЕЗДОМ */}
+      {/* ==================================================================== */}
+      <div
+        ref={footerAnchorRef}
+        style={{
+          width: '100%',
+          marginTop: '24px',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {/* Editorial-подпись перед финальным постером */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '9px',
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase',
+            color: THEME.inkMuted,
+            marginBottom: '10px',
+          }}
+        >
+          <span>ФИНАЛ ЭКСПОЗИЦИИ // CARDIO B2B</span>
+          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
+            Прямой опт от фабрики
+          </span>
+        </div>
+
+        <div
+          ref={footerStageRef}
+          style={{
+            width: '100%',
+            borderRadius: '4px',
+            overflow: 'hidden',
+            border: `1px solid ${THEME.border}`,
+            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.12)',
+            position: 'relative',
+            backgroundColor: '#161514',
+            transformOrigin: 'center top',
+            willChange: 'transform',
+          }}
+        >
+          {/* Полный кадр /baner.jpg 16:9 без обрезки краев */}
+          <img
+            src={FOOTER_BANNER_SRC}
+            alt="Cardio Men's Footwear Campaign Banner"
+            loading="lazy"
+            style={{
+              width: '100%',
+              aspectRatio: '16 / 9',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+
+          {/* Встречный солнечный блик при раскрытии нижнего баннера */}
+          <div
+            ref={footerGlareRef}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '65%',
+              height: '100%',
+              background:
+                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.38) 50%, rgba(255,255,255,0) 100%)',
+              mixBlendMode: 'overlay',
+              pointerEvents: 'none',
+              opacity: 0.15,
+              transform: 'translate3d(-55%, 0, 0) skewX(-22deg)',
+              willChange: 'transform, opacity',
+            }}
+          />
+
+          {/* Тень кулисы, которая рассеивается по мере скролла до самого низа */}
+          <div
+            ref={footerShadowRef}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(22,21,20,0.65) 0%, rgba(22,21,20,0.05) 100%)',
+              pointerEvents: 'none',
+              opacity: 0.4,
+              willChange: 'opacity',
+            }}
+          />
+        </div>
+
+        {/* Нижний колонтитул с быстрым возвратом наверх или переходом к накладной */}
+        <div
+          style={{
+            marginTop: '14px',
+            paddingTop: '12px',
+            borderTop: `1px solid ${THEME.border}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <button
+            onClick={() => {
+              fireHaptic('light');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            style={{
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.border}`,
+              padding: '9px 14px',
+              fontSize: '9px',
+              letterSpacing: '1.3px',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              color: THEME.ink,
+              cursor: 'pointer',
+            }}
+          >
+            ↑ В начало каталога
+          </button>
+
+          {cart.length > 0 ? (
+            <button
+              onClick={() => {
+                fireHaptic('medium');
+                setIsCartOpen(true);
+              }}
+              style={{
+                backgroundColor: THEME.ink,
+                border: `1px solid ${THEME.ink}`,
+                padding: '9px 14px',
+                fontSize: '9px',
+                letterSpacing: '1.3px',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                color: '#FFFFFF',
+                cursor: 'pointer',
+              }}
+            >
+              Оформить ({cartTotalPairs} п.) →
+            </button>
+          ) : (
+            <span
+              style={{
+                fontFamily: THEME.serif,
+                fontStyle: 'italic',
+                fontSize: '12px',
+                color: THEME.inkMuted,
+              }}
+            >
+              Выберите модель для заказа
+            </span>
+          )}
         </div>
       </div>
 
