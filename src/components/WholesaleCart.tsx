@@ -36,11 +36,19 @@ type SavedRecipientData = {
   branchOrComment: string;
   clientName: string;
   clientPhone: string;
+  orderComment?: string;
 };
 
-const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626'; // Харьков (Отправитель)
 const RECIPIENT_STORAGE_KEY = 'cardio_b2b_recipient_v1';
+const INVOICE_META_STORAGE_KEY = 'cardio_b2b_invoice_meta_v1';
 const SIZES_ORDER: SizeKey[] = [40, 41, 42, 43, 44, 45];
+
+// Действующие коды мобильных и городских операторов Украины
+const VALID_UA_OPERATOR_CODES = new Set([
+  '039', '050', '063', '066', '067', '068',
+  '073', '075', '077', '089', '091', '092',
+  '093', '094', '095', '096', '097', '098', '099',
+]);
 
 const POPULAR_CITIES: CityOption[] = [
   { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', area: 'Київська' },
@@ -66,6 +74,131 @@ const THEME = {
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
+
+type InvoiceMeta = {
+  invoiceNumber: string;
+  dateFormatted: string;
+};
+
+/**
+ * Генерация уникального номера накладной без БД: CRD-ДДММГГ-XXXX
+ * Фиксируется в sessionStorage на время работы с текущей накладной.
+ */
+function getOrCreateInvoiceMeta(forceNew = false): InvoiceMeta {
+  if (!forceNew) {
+    try {
+      const saved = sessionStorage.getItem(INVOICE_META_STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved) as InvoiceMeta;
+      }
+    } catch {
+      // Игнорируем ошибки доступа к хранилищу
+    }
+  }
+
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const fullYear = now.getFullYear();
+
+  // Комбинация секунд с начала суток и случайного числа исключает дубли без БД
+  const secondsToday = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const timePart = String(secondsToday % 100).padStart(2, '0');
+  const randomPart = String(Math.floor(10 + Math.random() * 90));
+
+  const meta: InvoiceMeta = {
+    invoiceNumber: `CRD-${dd}${mm}${yy}-${timePart}${randomPart}`,
+    dateFormatted: `${dd}.${mm}.${fullYear}`,
+  };
+
+  try {
+    sessionStorage.setItem(INVOICE_META_STORAGE_KEY, JSON.stringify(meta));
+  } catch {
+    // Игнорируем ошибки доступа к хранилищу
+  }
+
+  return meta;
+}
+
+/**
+ * Извлекает 10 локальных цифр украинского номера (формата 0XX XXXXXXX)
+ */
+function extractLocalPhoneDigits(raw: string): string {
+  let digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+
+  if (digits.startsWith('380')) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('38')) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('80')) {
+    digits = digits.slice(1);
+  } else if (!digits.startsWith('0')) {
+    // Если пользователь сразу вводит код без нуля (например, 67...)
+    digits = '0' + digits;
+  }
+
+  return digits.slice(0, 10);
+}
+
+/**
+ * Форматирует телефон в вид +38 (0XX) XXX-XX-XX без блокировки клавиши Backspace
+ */
+function formatUkrainePhone(raw: string): string {
+  const digits = extractLocalPhoneDigits(raw);
+  if (!digits) return '';
+
+  let result = '+38 (' + digits.slice(0, 3);
+  if (digits.length > 3) {
+    result += ') ' + digits.slice(3, 6);
+  }
+  if (digits.length > 6) {
+    result += '-' + digits.slice(6, 8);
+  }
+  if (digits.length > 8) {
+    result += '-' + digits.slice(8, 10);
+  }
+  return result;
+}
+
+/**
+ * Строгая валидация украинского номера телефона
+ */
+function validateUkrainePhone(raw: string): { isValid: boolean; errorHint: string | null } {
+  const digits = extractLocalPhoneDigits(raw);
+
+  if (digits.length === 0) {
+    return { isValid: false, errorHint: null };
+  }
+
+  if (digits.length >= 3) {
+    const operatorCode = digits.slice(0, 3);
+    if (!VALID_UA_OPERATOR_CODES.has(operatorCode)) {
+      return {
+        isValid: false,
+        errorHint: `Некорректный код оператора (${operatorCode}). Пример: 067, 050, 063, 097`,
+      };
+    }
+  }
+
+  if (digits.length < 10) {
+    return {
+      isValid: false,
+      errorHint: 'Введите номер полностью (10 цифр, например: 067 123-45-67)',
+    };
+  }
+
+  const subscriberPart = digits.slice(3);
+  if (/^(\d)\1{6}$/.test(subscriberPart)) {
+    return {
+      isValid: false,
+      errorHint: 'Укажите действующий номер телефона получателя',
+    };
+  }
+
+  return { isValid: true, errorHint: null };
+}
 
 function getDynamicFormulaText(item: CartItem): string {
   if (item.orderMode === 'sample') {
@@ -134,6 +267,8 @@ function loadSavedRecipient(): SavedRecipientData | null {
 export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
   const savedRecipient = loadSavedRecipient();
 
+  const [invoiceMeta, setInvoiceMeta] = useState<InvoiceMeta>(() => getOrCreateInvoiceMeta(false));
+
   const [selectedCity, setSelectedCity] = useState<CityOption>(
     savedRecipient?.selectedCity || POPULAR_CITIES[0]
   );
@@ -150,11 +285,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
   const [branchOrComment, setBranchOrComment] = useState(savedRecipient?.branchOrComment || '');
   const [clientName, setClientName] = useState(savedRecipient?.clientName || '');
-  const [clientPhone, setClientPhone] = useState(savedRecipient?.clientPhone || '');
+  const [clientPhone, setClientPhone] = useState(() =>
+    savedRecipient?.clientPhone ? formatUkrainePhone(savedRecipient.clientPhone) : ''
+  );
+  const [orderComment, setOrderComment] = useState(savedRecipient?.orderComment || '');
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
-  const [deliveryCost, setDeliveryCost] = useState<number>(0);
-  const [calcLoading, setCalcLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [orderBanner, setOrderBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -170,12 +306,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         branchOrComment,
         clientName,
         clientPhone,
+        orderComment,
       };
       localStorage.setItem(RECIPIENT_STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Ignore storage errors
     }
-  }, [selectedCity, cityQuery, branchOrComment, clientName, clientPhone]);
+  }, [selectedCity, cityQuery, branchOrComment, clientName, clientPhone, orderComment]);
 
   useEffect(() => {
     const handlePointerDownOutside = (e: PointerEvent) => {
@@ -195,18 +332,19 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const grandTotalBoxes = useMemoOrCalcBoxes(items, grandTotalPairs);
 
   const isCityValid = cityQuery.trim().length >= 2;
-  const isBranchValid = branchOrComment.trim().length >= 1;
-  const isNameValid = clientName.trim().length >= 3;
-  const phoneDigits = clientPhone.replace(/\D/g, '');
-  const isPhoneValid = phoneDigits.length >= 9;
+  const isBranchValid = branchOrComment.trim().length >= 2;
+  const isNameValid = clientName.trim().length >= 3 && !/^(.)\1+$/.test(clientName.trim().toLowerCase());
+  const phoneValidation = validateUkrainePhone(clientPhone);
+  const isPhoneValid = phoneValidation.isValid;
 
+  // Поле orderComment необязательное, поэтому не участвует в блокировке отправки
   const isFormValid = isCityValid && isBranchValid && isNameValid && isPhoneValid;
 
   const missingFields: string[] = [];
-  if (!isCityValid) missingFields.push('город');
+  if (!isCityValid) missingFields.push('населенный пункт');
   if (!isNameValid) missingFields.push('Имя и Фамилию');
-  if (!isPhoneValid) missingFields.push('телефон');
-  if (!isBranchValid) missingFields.push('№ отделения / адрес НП');
+  if (!isPhoneValid) missingFields.push('корректный телефон');
+  if (!isBranchValid) missingFields.push('№ отделения / адрес доставки');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -329,61 +467,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [selectedCity]);
 
-  // Реальный расчет стоимости доставки через API Новой Почты (без статических заглушек)
-  useEffect(() => {
-    if (grandTotalPairs === 0) {
-      setDeliveryCost(0);
-      return;
-    }
-
-    if (!selectedCity.ref) {
-      setDeliveryCost(0);
-      return;
-    }
-
-    let cancelled = false;
-    setCalcLoading(true);
-
-    const totalWeight = Math.max(3, Number((grandTotalPairs * 1.8).toFixed(1)));
-    const declaredCost = grandTotalPairs * 1500;
-
-    callNovaPoshta('InternetDocument', 'getDocumentPrice', {
-      CitySender: KHARKIV_CITY_REF,
-      CityRecipient: selectedCity.ref,
-      Weight: String(totalWeight),
-      ServiceType: 'WarehouseWarehouse',
-      Cost: String(declaredCost),
-      CargoType: 'Parcel',
-      SeatsAmount: String(grandTotalBoxes),
-      PayerType: 'Recipient',
-      PaymentMethod: 'Cash',
-    })
-      .then((data) => {
-        if (cancelled) return;
-        const priceVal = data?.data?.[0]?.Cost;
-        if (priceVal !== undefined && priceVal !== null && Number(priceVal) > 0) {
-          setDeliveryCost(Math.round(Number(priceVal)));
-        } else {
-          console.error('NP Price calculation error response:', data);
-          setDeliveryCost(0);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDeliveryCost(0);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setCalcLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
-
   const filteredWarehouses = (() => {
     const q = branchOrComment.trim().toLowerCase();
     if (!q) return warehouses.slice(0, 50);
@@ -426,6 +509,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const handleClearCart = () => {
     triggerHaptic('warning');
     playAppSound('nul.mp3');
+    setInvoiceMeta(getOrCreateInvoiceMeta(true));
     setTimeout(() => {
       onClear();
     }, 150);
@@ -444,16 +528,21 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       );
     });
 
+    const trimmedComment = orderComment.trim();
+    const commentBlock = trimmedComment ? `💬 Комментарий: ${trimmedComment}\n` : '';
+
     return (
-      `📦 ОПТОВЫЙ ЗАКАЗ • CARDIO (Харьков)\n` +
+      `📦 ОПТОВАЯ НАКЛАДНАЯ № ${invoiceMeta.invoiceNumber}\n` +
+      `📅 Дата: ${invoiceMeta.dateFormatted} • CARDIO (Харьков)\n` +
       `════════════════════\n` +
       `${lines.join('\n\n')}\n` +
       `════════════════════\n` +
       `📊 Позиций в заказе: ${items.length}\n` +
-      `👟 Общий объем: ${grandTotalPairs} пар (мест НП: ~${grandTotalBoxes})\n` +
-      `🚚 Доставка НП: ${cityQuery.trim()} (≈ ${Math.round(deliveryCost)} ₴)\n` +
+      `👟 Общий объем: ${grandTotalPairs} пар (мест: ~${grandTotalBoxes})\n` +
+      `🏙 Населенный пункт: ${cityQuery.trim()}\n` +
       `📍 Отделение / Адрес: ${branchOrComment.trim()}\n` +
       `👤 Получатель: ${combinedClientContact}\n` +
+      commentBlock +
       `════════════════════\n` +
       `Подтвердите наличие/сроки отшива и реквизиты.`
     );
@@ -468,18 +557,23 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
     setOrderBanner(null);
     const text = buildInvoiceText();
+    const trimmedComment = orderComment.trim();
 
     try {
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          invoiceNumber: invoiceMeta.invoiceNumber,
           telegramId: manager.telegramId,
           managerName: manager.name,
           clientContact: combinedClientContact,
-          branchOrComment: `${cityQuery.trim()} — ${branchOrComment.trim()}`,
+          branchOrComment: trimmedComment
+            ? `${cityQuery.trim()} — ${branchOrComment.trim()} (Комментарий: ${trimmedComment})`
+            : `${cityQuery.trim()} — ${branchOrComment.trim()}`,
+          orderComment: trimmedComment,
           totalPairs: grandTotalPairs,
-          deliveryCost: Math.round(deliveryCost),
+          deliveryCost: 0,
           invoiceText: text,
         }),
       });
@@ -490,7 +584,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         triggerHaptic('success');
         setOrderBanner({
           type: 'success',
-          text: `✓ Заказ успешно отправлен руководителю (${manager.name})!`,
+          text: `✓ Накладная № ${invoiceMeta.invoiceNumber} успешно отправлена руководителю (${manager.name})!`,
         });
         return true;
       } else {
@@ -539,6 +633,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     colorScheme: 'light',
     outline: 'none',
     borderRadius: 0,
+    fontFamily: THEME.sans,
   });
 
   return (
@@ -564,7 +659,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           caret-color: #161514 !important;
           opacity: 1 !important;
         }
-        .wholesale-cart-light input::placeholder {
+        .wholesale-cart-light input::placeholder,
+        .wholesale-cart-light textarea::placeholder {
           color: #8C877E !important;
           -webkit-text-fill-color: #8C877E !important;
           opacity: 1 !important;
@@ -626,6 +722,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       <div style={{ marginBottom: '20px' }}>
         <div
           style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '6px',
             fontSize: '9px',
             letterSpacing: '1.6px',
             textTransform: 'uppercase',
@@ -633,7 +734,21 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             marginBottom: '4px',
           }}
         >
-          CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ
+          <span>CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ</span>
+          {items.length > 0 && (
+            <span
+              style={{
+                backgroundColor: THEME.surface,
+                border: `1px solid ${THEME.border}`,
+                padding: '3px 7px',
+                color: THEME.ink,
+                fontWeight: 600,
+                letterSpacing: '1px',
+              }}
+            >
+              № {invoiceMeta.invoiceNumber} от {invoiceMeta.dateFormatted}
+            </span>
+          )}
         </div>
         <h1
           style={{
@@ -850,7 +965,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             })}
           </div>
 
-          {/* I. ДАННЫЕ ДОСТАВКИ И ПОЛУЧАТЕЛЯ */}
+          {/* I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА */}
           <div ref={logisticsRef} style={{ marginBottom: '24px' }}>
             <div
               style={{
@@ -864,7 +979,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               }}
             >
               <span>I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА</span>
-              <span>НОВА ПОШТА</span>
+              <span>РЕКВИЗИТЫ ОТГРУЗКИ</span>
             </div>
 
             <div
@@ -890,8 +1005,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 </div>
               )}
 
-              <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '10px' }}>
-                Город доставки: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
+              <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '6px' }}>
+                Населенный пункт: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
+              </div>
+              <div style={{ fontSize: '11px', color: THEME.inkMuted, marginBottom: '10px', lineHeight: 1.35 }}>
+                Выберите город из быстрого списка или начните вводить название любого города, пгт или села:
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
@@ -919,11 +1037,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 })}
               </div>
 
-              {/* 1. Город */}
+              {/* 1. Город / Село */}
               <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   type="text"
-                  placeholder="1. Населенный пункт (город) *"
+                  placeholder="1. Начните вводить город, пгт или село *"
                   value={cityQuery}
                   onFocus={() => setShowCityDropdown(true)}
                   onChange={(e) => {
@@ -979,11 +1097,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     >
                       {citySearching ? (
                         <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                          Поиск города в базе Новой Почты...
+                          Поиск населенного пункта...
                         </div>
                       ) : cityResults.length === 0 ? (
                         <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                          Населенный пункт не найден
+                          Населенный пункт не найден. Проверьте написание
                         </div>
                       ) : (
                         cityResults.map((c) => (
@@ -1017,25 +1135,63 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 />
               </div>
 
-              {/* 3. Телефон */}
+              {/* 3. Телефон с автоформатированием и проверкой кода оператора */}
               <div style={{ marginBottom: '8px' }}>
-                <input
-                  type="tel"
-                  placeholder="3. Телефон получателя (+380...) *"
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                  style={getFieldStyle(isPhoneValid)}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="3. Телефон получателя: +38 (0XX) XXX-XX-XX *"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
+                    style={getFieldStyle(isPhoneValid)}
+                  />
+                  {clientPhone.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setClientPhone('');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '12px',
+                        color: THEME.inkMuted,
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {phoneValidation.errorHint && (showValidationErrors || clientPhone.length >= 7) && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      color: THEME.danger,
+                      marginTop: '4px',
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {phoneValidation.errorHint}
+                  </div>
+                )}
               </div>
 
-              {/* 4. Отделение Новой Почты */}
-              <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '12px' }}>
+              {/* 4. Отделение или адрес доставки */}
+              <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   type="text"
                   placeholder={
                     warehousesLoading
-                      ? 'Загрузка отделений НП...'
-                      : `4. № отделения НП или адрес в ${selectedCity.uaName} *`
+                      ? 'Загрузка доступных отделений...'
+                      : `4. Выберите отделение или введите адрес (${selectedCity.uaName}) *`
                   }
                   value={branchOrComment}
                   onFocus={() => setShowWarehouseDropdown(true)}
@@ -1110,6 +1266,44 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 )}
               </div>
 
+              {/* 5. Необязательный комментарий к заказу */}
+              <div style={{ position: 'relative', marginBottom: '12px' }}>
+                <textarea
+                  rows={2}
+                  placeholder="5. Комментарий к заказу (необязательно — пожелания по отправке, упаковке или срокам)"
+                  value={orderComment}
+                  onChange={(e) => setOrderComment(e.target.value)}
+                  style={{
+                    ...getFieldStyle(true),
+                    resize: 'vertical',
+                    minHeight: '54px',
+                    lineHeight: 1.4,
+                  }}
+                />
+                {orderComment.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setOrderComment('');
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '10px',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '12px',
+                      color: THEME.inkMuted,
+                      cursor: 'pointer',
+                      padding: '4px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
               <div
                 style={{
                   borderTop: `1px solid ${THEME.border}`,
@@ -1121,7 +1315,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 }}
               >
                 <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                  Всего: <strong style={{ color: THEME.ink }}>{grandTotalPairs} пар</strong> (~{grandTotalBoxes} кор.)
+                  Всего к отгрузке:
                 </div>
                 <div
                   style={{
@@ -1132,7 +1326,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     flexShrink: 0,
                   }}
                 >
-                  {calcLoading ? 'Расчет доставки...' : `Доставка ≈ ${Math.round(deliveryCost)}\u00A0₴`}
+                  {grandTotalPairs} пар <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>(~{grandTotalBoxes} кор.)</span>
                 </div>
               </div>
             </div>
