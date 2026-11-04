@@ -35,7 +35,7 @@ const THEME = {
 };
 
 // ============================================================================
-// ИСПРАВЛЕННЫЙ ТАКТИЛЬНО-АКУСТИЧЕСКИЙ ДВИЖОК ДЛЯ ANDROID И iOS (БЕЗ ОТМЕНЫ ИМПУЛЬСА)
+// ТАКТИЛЬНО-АКУСТИЧЕСКИЙ ДВИЖОК ДЛЯ ANDROID И iOS
 // ============================================================================
 let sharedAudioCtx: AudioContext | null = null;
 
@@ -67,7 +67,6 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
     const now = ctx.currentTime;
 
     if (level === 'light') {
-      // Усиленный плотный щелчок (28 мс), хорошо слышимый и ощутимый на динамиках Android и iPhone
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'triangle';
@@ -151,9 +150,6 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
   const isAndroid =
     typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 
-  // 1. Одиночный неконфликтующий вызов Telegram HapticFeedback
-  // На Android 'light' и 'selectionChanged' слишком слабы или гасят друг друга,
-  // поэтому на Android передаем 'heavy' / 'rigid'.
   try {
     const tgHaptic = (
       window as unknown as {
@@ -186,7 +182,6 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
     // Ignore
   }
 
-  // 2. Прямой вызов системного вибромотора Android (без дублирования с другими функциями)
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       if (level === 'light') {
@@ -213,7 +208,7 @@ export function Materials({ onBack }: MaterialsProps) {
   const [justAdded, setJustAdded] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  // Рефы для ВЕРХНЕГО ВИДЕО-ПАРАЛЛАКСА (Under-Scroll Stage)
+  // Рефы для ВЕРХНЕГО ВИДЕО-ПАРАЛЛАКСА
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const bannerAnchorRef = useRef<HTMLDivElement>(null);
   const bannerStageRef = useRef<HTMLDivElement>(null);
@@ -221,13 +216,12 @@ export function Materials({ onBack }: MaterialsProps) {
   const bannerShadowRef = useRef<HTMLDivElement>(null);
   const initialBannerTopRef = useRef<number | null>(null);
 
-  // Рефы для НИЖНЕГО КАМПЕЙН-ПАРАЛЛАКСА (Curtain Reveal Finale)
+  // Рефы для НИЖНЕГО КАМПЕЙН-ПАРАЛЛАКСА
   const footerAnchorRef = useRef<HTMLDivElement>(null);
   const footerStageRef = useRef<HTMLDivElement>(null);
   const footerGlareRef = useRef<HTMLDivElement>(null);
   const footerShadowRef = useRef<HTMLDivElement>(null);
 
-  // Инициализация Telegram WebApp и разблокировка AudioContext при первом касании
   useEffect(() => {
     try {
       (window as unknown as { Telegram?: { WebApp?: { ready?: () => void } } }).Telegram?.WebApp?.ready?.();
@@ -246,7 +240,6 @@ export function Materials({ onBack }: MaterialsProps) {
     };
   }, []);
 
-  // Надежный автозапуск видео для iOS и Android
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
@@ -300,7 +293,6 @@ export function Materials({ onBack }: MaterialsProps) {
     };
   }, [selectedShoe, isCartOpen]);
 
-  // Единый 60FPS цикл для верхнего видео и нижнего баннера
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
@@ -311,7 +303,6 @@ export function Materials({ onBack }: MaterialsProps) {
       const viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
       const pageScrollY = window.scrollY ?? window.pageYOffset ?? 0;
 
-      // 1. ВЕРХНИЙ HERO ВИДЕО-БАННЕР
       const topAnchor = bannerAnchorRef.current;
       const topStage = bannerStageRef.current;
       if (topAnchor && topStage) {
@@ -347,7 +338,6 @@ export function Materials({ onBack }: MaterialsProps) {
         }
       }
 
-      // 2. НИЖНИЙ ФИНАЛЬНЫЙ БАННЕР /baner.jpg
       const botAnchor = footerAnchorRef.current;
       const botStage = footerStageRef.current;
       if (botAnchor && botStage) {
@@ -419,7 +409,6 @@ export function Materials({ onBack }: MaterialsProps) {
   const [sampleSize, setSampleSize] = useState<SizeKey>(42);
   const [boxesCount, setBoxesCount] = useState<number>(1);
 
-  // Мгновенный сброс скролла (без behavior: 'smooth'), чтобы не сбивался GPU-слой изображения
   useEffect(() => {
     if (selectedShoe) {
       window.scrollTo(0, 0);
@@ -558,7 +547,7 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 2: КАРТОЧКА МОДЕЛИ
+  // ЭКРАН 2: КАРТОЧКА МОДЕЛИ (ВЫБОР РАЗМЕРОВ И РОСТОВОК)
   if (selectedShoe) {
     const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
 
@@ -567,81 +556,93 @@ export function Materials({ onBack }: MaterialsProps) {
         style={{
           backgroundColor: THEME.bg,
           minHeight: '100vh',
-          padding: '16px 16px 110px 16px',
+          padding: '14px 16px 110px 16px',
           color: THEME.ink,
           boxSizing: 'border-box',
           fontFamily: THEME.sans,
         }}
       >
-        {/* Шапка карточки модели с увеличенным логотипом */}
+        {/* ИСПРАВЛЕННАЯ ШАПКА КАРТОЧКИ МОДЕЛИ: Четкая кнопка "← Назад в каталог" */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingBottom: '14px',
-            marginBottom: '20px',
+            gap: '8px',
+            paddingBottom: '12px',
+            marginBottom: '18px',
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <img
               src="/logo.png"
               alt="Cardio"
-              style={{
-                height: '46px',
-                width: 'auto',
-                objectFit: 'contain',
-                mixBlendMode: 'multiply',
-                display: 'block',
-              }}
-            />
-            <div
-              style={{
-                width: '1px',
-                height: '28px',
-                backgroundColor: THEME.border,
-              }}
-            />
-            <button
               onClick={() => {
                 fireHaptic('light');
                 setSelectedShoe(null);
               }}
               style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '6px 2px',
-                fontSize: '11px',
-                letterSpacing: '1.4px',
+                height: '36px',
+                width: 'auto',
+                objectFit: 'contain',
+                mixBlendMode: 'multiply',
+                display: 'block',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                fireHaptic('light');
+                setSelectedShoe(null);
+              }}
+              style={{
+                backgroundColor: THEME.surface,
+                border: `1px solid ${THEME.ink}`,
+                padding: '8px 11px',
+                fontSize: '10px',
+                letterSpacing: '0.9px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 color: THEME.ink,
                 fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                touchAction: 'manipulation',
               }}
             >
-              ← Каталог
+              <span>←</span>
+              <span>Назад в каталог</span>
             </button>
           </div>
 
           <button
+            type="button"
             onClick={() => {
               fireHaptic('medium');
               setIsCartOpen(true);
             }}
             style={{
-              background: cart.length > 0 ? THEME.ink : 'transparent',
+              backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
               border: `1px solid ${THEME.ink}`,
-              padding: '8px 12px',
+              padding: '8px 10px',
               fontSize: '10px',
-              letterSpacing: '1.1px',
+              letterSpacing: '0.8px',
               textTransform: 'uppercase',
               fontWeight: 600,
               cursor: 'pointer',
               color: cart.length > 0 ? '#FFFFFF' : THEME.ink,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              touchAction: 'manipulation',
             }}
           >
-            Накладная ({cart.length} • {cartTotalPairs} п.)
+            Накладная ({cartTotalPairs} п.)
           </button>
         </div>
 
@@ -654,7 +655,7 @@ export function Materials({ onBack }: MaterialsProps) {
               padding: '10px 14px',
               fontSize: '11px',
               letterSpacing: '0.3px',
-              marginBottom: '20px',
+              marginBottom: '18px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -683,7 +684,7 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: '14px' }}>
           <div
             style={{
               display: 'flex',
@@ -704,11 +705,11 @@ export function Materials({ onBack }: MaterialsProps) {
           <h1
             style={{
               fontFamily: THEME.serif,
-              fontSize: '36px',
+              fontSize: '34px',
               margin: '0',
               fontWeight: 400,
               letterSpacing: '-0.3px',
-              lineHeight: 1.05,
+              lineHeight: 1.08,
             }}
           >
             Модель № {selectedShoe.modelNumber}
@@ -732,25 +733,24 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         </div>
 
-        {/* Блок фотографии модели — изолированный контейнер с явным фоном THEME.surface без filter */}
+        {/* ИСПРАВЛЕННАЯ ВИТРИНА МОДЕЛИ: Четкое разделение шапки и фото + фиксированная высота */}
         <div
           style={{
             backgroundColor: THEME.surface,
             border: `1px solid ${THEME.border}`,
-            padding: '14px 12px',
             marginBottom: '20px',
-            position: 'relative',
-            overflow: 'hidden',
+            boxSizing: 'border-box',
           }}
         >
+          {/* Отделенная верхняя тех-строка (обувь никогда на нее не залезет) */}
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px',
-              position: 'relative',
-              zIndex: 2,
+              padding: '9px 14px',
+              borderBottom: `1px solid ${THEME.border}`,
+              backgroundColor: THEME.surface,
             }}
           >
             <span style={{ fontSize: '9px', letterSpacing: '1.5px', color: THEME.inkLight, textTransform: 'uppercase' }}>
@@ -761,26 +761,34 @@ export function Materials({ onBack }: MaterialsProps) {
             </span>
           </div>
 
+          {/* Изолированный бокс фиксированной высоты 220px для идеальной центровки обуви */}
           <div
             style={{
               width: '100%',
-              aspectRatio: '16 / 10',
+              height: '220px',
+              padding: '14px 20px',
+              boxSizing: 'border-box',
               backgroundColor: THEME.surface,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               overflow: 'hidden',
-              position: 'relative',
-              zIndex: 1,
             }}
           >
             <img
               src={selectedShoe.image}
               alt={`Модель ${selectedShoe.modelNumber}`}
               style={{
-                width: '100%',
-                height: '100%',
+                maxWidth: '100%',
+                maxHeight: '192px',
+                width: 'auto',
+                height: 'auto',
                 objectFit: 'contain',
+                objectPosition: 'center center',
                 display: 'block',
+                margin: '0 auto',
                 mixBlendMode: 'multiply',
-                transform: 'scale(1.08)',
+                transform: 'none',
               }}
             />
           </div>
@@ -791,11 +799,9 @@ export function Materials({ onBack }: MaterialsProps) {
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: '6px',
-                marginTop: '12px',
-                paddingTop: '12px',
+                padding: '10px 14px',
                 borderTop: `1px solid ${THEME.border}`,
-                position: 'relative',
-                zIndex: 2,
+                backgroundColor: THEME.surface,
               }}
             >
               {selectedShoe.features.map((feat) => (
@@ -818,6 +824,7 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
+        {/* Миниатюры других цветов модели */}
         {modelVariants.length > 1 && (
           <div style={{ marginBottom: '24px' }}>
             <div
@@ -861,7 +868,7 @@ export function Materials({ onBack }: MaterialsProps) {
                       padding: '8px',
                       cursor: 'pointer',
                       textAlign: 'center',
-                      position: 'relative',
+                      boxSizing: 'border-box',
                     }}
                   >
                     <div
@@ -870,7 +877,7 @@ export function Materials({ onBack }: MaterialsProps) {
                         color: isCurrent ? THEME.ink : THEME.inkLight,
                         fontWeight: isCurrent ? 600 : 400,
                         textAlign: 'left',
-                        marginBottom: '2px',
+                        marginBottom: '4px',
                       }}
                     >
                       0{i + 1} {isCurrent ? '✓' : ''}
@@ -878,7 +885,12 @@ export function Materials({ onBack }: MaterialsProps) {
                     <div
                       style={{
                         width: '100%',
-                        aspectRatio: '3 / 2',
+                        height: '96px',
+                        padding: '4px',
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         overflow: 'hidden',
                         backgroundColor: cellBg,
                       }}
@@ -887,12 +899,15 @@ export function Materials({ onBack }: MaterialsProps) {
                         src={v.image}
                         alt={v.color}
                         style={{
-                          width: '100%',
-                          height: '100%',
+                          maxWidth: '100%',
+                          maxHeight: '86px',
+                          width: 'auto',
+                          height: 'auto',
                           objectFit: 'contain',
                           display: 'block',
+                          margin: '0 auto',
                           mixBlendMode: 'multiply',
-                          transform: 'scale(1.1)',
+                          transform: 'none',
                         }}
                       />
                     </div>
@@ -941,6 +956,7 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           >
             <button
+              type="button"
               onClick={() => {
                 if (orderMode !== 'wholesale') {
                   fireHaptic('medium');
@@ -962,6 +978,7 @@ export function Materials({ onBack }: MaterialsProps) {
               Оптовая ростовка
             </button>
             <button
+              type="button"
               onClick={() => {
                 if (orderMode !== 'sample') {
                   fireHaptic('medium');
@@ -1027,6 +1044,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 }}
               >
                 <button
+                  type="button"
                   onClick={() => {
                     fireHaptic('medium');
                     setSizeRun({ ...STANDARD_8_RUN });
@@ -1070,6 +1088,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => {
                     fireHaptic('medium');
                     setSizeRun({ ...EVEN_6_RUN });
@@ -1335,25 +1354,26 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ С ОБНОВЛЕННОЙ ШАПКОЙ И ОТКРЫТЫМ ВИДЕО-БАННЕРОМ
+  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ
   return (
     <div
       style={{
         backgroundColor: THEME.bg,
         minHeight: '100vh',
-        padding: '16px 16px 120px 16px',
+        padding: '14px 16px 120px 16px',
         color: THEME.ink,
         fontFamily: THEME.sans,
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхняя дизайнерская шапка: крупный логотип + CARDIO / KHARKIV • CATALOG 2026 */}
+      {/* ИСПРАВЛЕННАЯ ШАПКА НА ГЛАВНОЙ КАТАЛОГА: Без наезда кнопки на слово CARDIO */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingBottom: '14px',
+          gap: '10px',
+          paddingBottom: '12px',
           marginBottom: '14px',
           borderBottom: `1px solid ${THEME.border}`,
           position: 'relative',
@@ -1361,47 +1381,51 @@ export function Materials({ onBack }: MaterialsProps) {
           backgroundColor: THEME.bg,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
           <img
             src="/logo.png"
             alt="Cardio Footwear Logo"
             style={{
-              height: '56px',
+              height: '46px',
               width: 'auto',
               objectFit: 'contain',
               mixBlendMode: 'multiply',
               display: 'block',
+              flexShrink: 0,
             }}
           />
           <div
             style={{
               width: '1px',
-              height: '36px',
+              height: '32px',
               backgroundColor: THEME.border,
+              flexShrink: 0,
             }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
             <span
               style={{
                 fontFamily: THEME.serif,
-                fontSize: '22px',
+                fontSize: '18px',
                 fontWeight: 600,
-                letterSpacing: '3.6px',
+                letterSpacing: '2.2px',
                 textTransform: 'uppercase',
                 color: THEME.ink,
                 lineHeight: 1,
+                whiteSpace: 'nowrap',
               }}
             >
               CARDIO
             </span>
             <span
               style={{
-                fontSize: '9px',
-                letterSpacing: '2.1px',
+                fontSize: '8.5px',
+                letterSpacing: '1.3px',
                 textTransform: 'uppercase',
                 color: THEME.inkMuted,
                 fontWeight: 500,
-                lineHeight: 1.1,
+                lineHeight: 1.15,
+                whiteSpace: 'nowrap',
               }}
             >
               KHARKIV • CATALOG 2026
@@ -1411,30 +1435,32 @@ export function Materials({ onBack }: MaterialsProps) {
 
         {onBack && (
           <button
+            type="button"
             onClick={() => {
               fireHaptic('light');
               onBack();
             }}
             style={{
-              background: 'transparent',
-              border: `1px solid ${THEME.border}`,
-              padding: '7px 12px',
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.borderStrong}`,
+              padding: '7px 10px',
               fontSize: '9px',
-              letterSpacing: '1.2px',
+              letterSpacing: '0.9px',
               textTransform: 'uppercase',
+              fontWeight: 600,
               cursor: 'pointer',
               color: THEME.ink,
               whiteSpace: 'nowrap',
+              flexShrink: 0,
+              touchAction: 'manipulation',
             }}
           >
-            ← На главную
+            ← Главная
           </button>
         )}
       </div>
 
-      {/* ==================================================================== */}
-      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР БЕЗ ПЕРЕКРЫТИЯ 3D-ЛОГОТИПА               */}
-      {/* ==================================================================== */}
+      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР */}
       <div
         ref={bannerAnchorRef}
         style={{
@@ -1444,7 +1470,6 @@ export function Materials({ onBack }: MaterialsProps) {
           zIndex: 1,
         }}
       >
-        {/* Редакционная строка вынесена НАД видео, чтобы не перекрывать верх 3D-логотипа */}
         <div
           style={{
             display: 'flex',
@@ -1517,7 +1542,6 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           />
 
-          {/* Скользящий солнечный блик по видео при скролле */}
           <div
             ref={bannerGlareRef}
             style={{
@@ -1537,7 +1561,6 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           />
 
-          {/* Глубинное затенение, когда каталог наезжает поверх видео */}
           <div
             ref={bannerShadowRef}
             style={{
@@ -1553,9 +1576,7 @@ export function Materials({ onBack }: MaterialsProps) {
         </div>
       </div>
 
-      {/* ==================================================================== */}
-      {/* ОСНОВНОЕ ПОЛОТНО КАТАЛОГА                                            */}
-      {/* ==================================================================== */}
+      {/* ОСНОВНОЕ ПОЛОТНО КАТАЛОГА */}
       <div
         style={{
           position: 'relative',
@@ -1568,7 +1589,6 @@ export function Materials({ onBack }: MaterialsProps) {
           borderBottom: `1px solid ${THEME.border}`,
         }}
       >
-        {/* Поле поиска */}
         <div
           style={{
             display: 'flex',
@@ -1608,6 +1628,7 @@ export function Materials({ onBack }: MaterialsProps) {
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => {
                 fireHaptic('light');
                 setSearchQuery('');
@@ -1626,7 +1647,6 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Категории */}
         <div
           style={{
             display: 'grid',
@@ -1640,6 +1660,7 @@ export function Materials({ onBack }: MaterialsProps) {
             const isActive = activeCategory === category;
             return (
               <button
+                type="button"
                 key={category}
                 onClick={() => {
                   fireHaptic('light');
@@ -1665,7 +1686,6 @@ export function Materials({ onBack }: MaterialsProps) {
           })}
         </div>
 
-        {/* Сезонные фильтры */}
         <div
           style={{
             display: 'flex',
@@ -1680,6 +1700,7 @@ export function Materials({ onBack }: MaterialsProps) {
             const isActive = activeFeature === feat;
             return (
               <button
+                type="button"
                 key={feat}
                 onClick={() => {
                   fireHaptic('light');
@@ -1702,7 +1723,6 @@ export function Materials({ onBack }: MaterialsProps) {
           })}
         </div>
 
-        {/* Счетчик моделей + Переключатель вида сетки */}
         <div
           style={{
             display: 'flex',
@@ -1719,6 +1739,7 @@ export function Materials({ onBack }: MaterialsProps) {
 
           <div style={{ display: 'flex', border: `1px solid ${THEME.border}` }}>
             <button
+              type="button"
               onClick={() => {
                 if (gridMode !== '2col') {
                   fireHaptic('medium');
@@ -1740,6 +1761,7 @@ export function Materials({ onBack }: MaterialsProps) {
               2 КОЛ.
             </button>
             <button
+              type="button"
               onClick={() => {
                 if (gridMode !== 'large') {
                   fireHaptic('medium');
@@ -1764,7 +1786,7 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         </div>
 
-        {/* Сетка каталога */}
+        {/* Сетка каталога с жестко центрированными контейнерами фото */}
         <div
           style={{
             display: 'grid',
@@ -1790,7 +1812,7 @@ export function Materials({ onBack }: MaterialsProps) {
                   backgroundColor: cardBg,
                   borderRight: `1px solid ${THEME.border}`,
                   borderBottom: `1px solid ${THEME.border}`,
-                  padding: isLarge ? '14px' : '8px',
+                  padding: isLarge ? '14px' : '10px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -1804,7 +1826,7 @@ export function Materials({ onBack }: MaterialsProps) {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '4px',
+                    marginBottom: '6px',
                     minHeight: '16px',
                   }}
                 >
@@ -1848,11 +1870,15 @@ export function Materials({ onBack }: MaterialsProps) {
                 <div
                   style={{
                     width: '100%',
-                    aspectRatio: isLarge ? '16 / 10' : '3 / 2',
+                    height: isLarge ? '200px' : '125px',
+                    padding: '6px',
+                    boxSizing: 'border-box',
                     marginBottom: '8px',
                     overflow: 'hidden',
                     backgroundColor: cardBg,
-                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
                   <img
@@ -1860,12 +1886,15 @@ export function Materials({ onBack }: MaterialsProps) {
                     alt={`Модель ${shoe.modelNumber}`}
                     loading="lazy"
                     style={{
-                      width: '100%',
-                      height: '100%',
+                      maxWidth: '100%',
+                      maxHeight: isLarge ? '184px' : '112px',
+                      width: 'auto',
+                      height: 'auto',
                       objectFit: 'contain',
                       display: 'block',
+                      margin: '0 auto',
                       mixBlendMode: 'multiply',
-                      transform: 'scale(1.1)',
+                      transform: 'none',
                     }}
                   />
                 </div>
@@ -1971,9 +2000,7 @@ export function Materials({ onBack }: MaterialsProps) {
         </div>
       </div>
 
-      {/* ==================================================================== */}
-      {/* НИЖНЯЯ КУЛИСА: ФИНАЛЬНЫЙ БАННЕР public/baner.jpg С ПАРАЛЛАКС-ВЫЕЗДОМ */}
-      {/* ==================================================================== */}
+      {/* НИЖНЯЯ КУЛИСА: ФИНАЛЬНЫЙ БАННЕР public/baner.jpg */}
       <div
         ref={footerAnchorRef}
         style={{
@@ -2073,6 +2100,7 @@ export function Materials({ onBack }: MaterialsProps) {
           }}
         >
           <button
+            type="button"
             onClick={() => {
               fireHaptic('light');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2094,6 +2122,7 @@ export function Materials({ onBack }: MaterialsProps) {
 
           {cart.length > 0 ? (
             <button
+              type="button"
               onClick={() => {
                 fireHaptic('medium');
                 setIsCartOpen(true);
@@ -2152,6 +2181,7 @@ export function Materials({ onBack }: MaterialsProps) {
               </div>
             </div>
             <button
+              type="button"
               onClick={() => {
                 fireHaptic('medium');
                 setIsCartOpen(true);
