@@ -21,7 +21,6 @@ type CityOption = {
   uaName: string;
   fullLabel: string;
   ref: string;
-  zoneMultiplier: number;
 };
 
 type WarehouseOption = {
@@ -43,14 +42,14 @@ const RECIPIENT_STORAGE_KEY = 'cardio_b2b_recipient_v1';
 const SIZES_ORDER: SizeKey[] = [40, 41, 42, 43, 44, 45];
 
 const POPULAR_CITIES: CityOption[] = [
-  { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', zoneMultiplier: 1 },
-  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.9 },
-  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
-  { name: 'Львов', uaName: 'Львів', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.1 },
-  { name: 'Харьков', uaName: 'Харків', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.7 },
-  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.85 },
-  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', zoneMultiplier: 0.95 },
-  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', zoneMultiplier: 1.05 },
+  { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626' },
+  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626' },
+  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626' },
+  { name: 'Львов', uaName: 'Львів', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626' },
+  { name: 'Харьков', uaName: 'Харків', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626' },
+  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626' },
+  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626' },
+  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626' },
 ];
 
 const THEME = {
@@ -67,7 +66,6 @@ const THEME = {
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
 
-// Динамический пересчёт формулы ростовки при изменении числа коробов в накладной
 function getDynamicFormulaText(item: CartItem): string {
   if (item.orderMode === 'sample') {
     return `Тестовый образец (1 пара) — р. ${item.sampleSize}`;
@@ -163,7 +161,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const cityBoxRef = useRef<HTMLDivElement | null>(null);
   const warehouseBoxRef = useRef<HTMLDivElement | null>(null);
 
-  // Сохраняем введённые реквизиты получателя, чтобы они не пропадали при возврате в каталог
   useEffect(() => {
     try {
       const payload: SavedRecipientData = {
@@ -179,7 +176,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     }
   }, [selectedCity, cityQuery, branchOrComment, clientName, clientPhone]);
 
-  // Закрытие выпадающих списков по клику вне области (не мешает скроллу списка пальцем)
   useEffect(() => {
     const handlePointerDownOutside = (e: PointerEvent) => {
       const target = e.target as Node;
@@ -261,7 +257,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 uaName: ua,
                 fullLabel,
                 ref,
-                zoneMultiplier: 1,
               });
             }
           }
@@ -340,12 +335,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
     const totalWeight = Math.max(2, Math.round(grandTotalPairs * 1.9));
 
+    // Автономный расчет на случай отсутствия сети с привязкой к весу и объему
     const calculateFallback = () => {
-      if (grandTotalPairs === 1) {
-        return Math.round(95 * selectedCity.zoneMultiplier);
-      }
-      const base = 140 + (grandTotalPairs - 1) * 13;
-      return Math.round(base * selectedCity.zoneMultiplier);
+      const basePrice = 90 + grandTotalBoxes * 110;
+      return basePrice;
     };
 
     if (!selectedCity.ref) {
@@ -717,7 +710,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     alignItems: 'center',
                   }}
                 >
-                  {/* Увеличенная миниатюра с пропорцией 3:2 и кадрированием scale(1.14) */}
                   <div
                     style={{
                       width: '82px',
@@ -1140,7 +1132,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             </div>
           </div>
 
-          {/* Статус отправки заказа руководителю */}
           {orderBanner && (
             <div
               style={{
@@ -1157,7 +1148,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             </div>
           )}
 
-          {/* II. ОТПРАВКА ЗАКАЗА И КОНТАКТЫ */}
           <ManagersContactCard
             itemsCount={items.length}
             onSendOrder={sendToManager}
@@ -1173,7 +1163,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   );
 }
 
-// Подсчёт реального количества грузовых мест (коробов) по заказу
 function useMemoOrCalcBoxes(items: CartItem[], grandTotalPairs: number): number {
   if (grandTotalPairs === 0) return 0;
   let wholesaleBoxes = 0;
