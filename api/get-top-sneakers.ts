@@ -22,7 +22,6 @@ export default async function handler(req: any, res: any) {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 40))
   const offset = (page - 1) * limit
 
-  // ВОТ ОН - ПРАВИЛЬНЫЙ МАССИВ ДЛЯ БЭКЕНДА
   const KNOWN_BRANDS = [
     'nike', 'jordan', 'adidas', 'yeezy', 'new balance', 'asics', 'converse', 
     'vans', 'puma', 'reebok', 'saucony', 'mizuno', 'salomon', 'hoka', 
@@ -39,39 +38,85 @@ export default async function handler(req: any, res: any) {
   const isBrandSearch = KNOWN_BRANDS.includes(query)
 
   try {
-    const metaRes = await sql`SELECT count(*) as total, max(created_at) as last_update FROM sneakers`
-    const globalTotal = parseInt(metaRes[0].total, 10)
-    const dbLastUpdate = metaRes[0].last_update 
+    // Получаем дату последнего обновления базы один раз
+    const metaRes = await sql`SELECT max(created_at) as last_update FROM sneakers`
+    const dbLastUpdate = metaRes[0]?.last_update || null
 
     let rows: any[] = []
+    let totalCount = 0
 
     if (!query || query === 'all') {
       if (gender === 'all') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       } else if (gender === 'men') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('men', 'unisex') ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE gender IN ('men', 'unisex')`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('men', 'unisex') ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       } else if (gender === 'women') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('women', 'unisex') ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE gender IN ('women', 'unisex')`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('women', 'unisex') ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       }
     }
-    
     else if (isBrandSearch) {
       if (gender === 'all') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'})`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       } else if (gender === 'men') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('men', 'unisex') AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE gender IN ('men', 'unisex') AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'})`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('men', 'unisex') AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       } else if (gender === 'women') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('women', 'unisex') AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE gender IN ('women', 'unisex') AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'})`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('women', 'unisex') AND (LOWER(brand) = ${query} OR LOWER(brand) LIKE ${query + ' %'} OR LOWER(brand) LIKE ${'% ' + query} OR LOWER(brand) LIKE ${'% ' + query + ' %'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       }
     }
-
     else {
+      // Общий текстовый поиск по названию или бренду
+      const searchPattern = '%' + query + '%'
       if (gender === 'all') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE LOWER(brand) LIKE ${'%' + query + '%'} OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query}) OR LOWER(name) LIKE ${'%' + query + '%'} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE LOWER(brand) LIKE ${searchPattern} OR LOWER(name) LIKE ${searchPattern}`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE LOWER(brand) LIKE ${searchPattern} OR LOWER(name) LIKE ${searchPattern} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       } else if (gender === 'men') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('men', 'unisex') AND (LOWER(brand) LIKE ${'%' + query + '%'} OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query}) OR LOWER(name) LIKE ${'%' + query + '%'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE gender IN ('men', 'unisex') AND (LOWER(brand) LIKE ${searchPattern} OR LOWER(name) LIKE ${searchPattern})`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('men', 'unisex') AND (LOWER(brand) LIKE ${searchPattern} OR LOWER(name) LIKE ${searchPattern}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       } else if (gender === 'women') {
-        rows = await sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('women', 'unisex') AND (LOWER(brand) LIKE ${'%' + query + '%'} OR to_tsvector('english', name) @@ plainto_tsquery('english', ${query}) OR LOWER(name) LIKE ${'%' + query + '%'}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        const [countRes, dataRes] = await Promise.all([
+          sql`SELECT count(*) as total FROM sneakers WHERE gender IN ('women', 'unisex') AND (LOWER(brand) LIKE ${searchPattern} OR LOWER(name) LIKE ${searchPattern})`,
+          sql`SELECT id, brand, name, gender, retail_price, image_url, release_year, sku FROM sneakers WHERE gender IN ('women', 'unisex') AND (LOWER(brand) LIKE ${searchPattern} OR LOWER(name) LIKE ${searchPattern}) ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`
+        ])
+        totalCount = parseInt(countRes[0].total, 10)
+        rows = dataRes
       }
     }
 
@@ -96,7 +141,7 @@ export default async function handler(req: any, res: any) {
       results,
       page,
       limit,
-      total: globalTotal, 
+      total: totalCount, // Теперь возвращается честное число найденных по фильтру записей
       lastUpdate: dbLastUpdate,
       count: results.length
     })
