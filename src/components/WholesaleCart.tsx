@@ -329,7 +329,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [selectedCity]);
 
-  // Запрос стоимости напрямую у API Новой Почты с расширенными параметрами отправления
+    // Запрос стоимости напрямую у API Новой Почты с учетом габаритов коробов и веса
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
@@ -344,9 +344,15 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     let cancelled = false;
     setCalcLoading(true);
 
-    // Расчет параметров груза: 1 коробка обуви весит ~15 кг, объемный вес считается по габаритам короба
-    const totalWeight = Math.max(2, Number((grandTotalPairs * 1.8).toFixed(1)));
+    // Расчет параметров: 1 коробка обуви весит ~15 кг, стандартные габариты коробки опта: 60х40х40 см
+    const totalWeight = Math.max(3, Number((grandTotalPairs * 1.9).toFixed(1)));
     const declaredCost = grandTotalPairs * 1500;
+    
+    // Стандартные размеры короба для расчета объемного веса Новой Почты (в см)
+    const boxLength = 60;
+    const boxWidth = 40;
+    const boxHeight = 40;
+    const totalVolumeWeight = Number(((boxLength * boxWidth * boxHeight) / 4000 * grandTotalBoxes).toFixed(2));
 
     callNovaPoshta('InternetDocument', 'getDocumentPrice', {
       CitySender: KHARKIV_CITY_REF,
@@ -356,23 +362,23 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       Cost: String(declaredCost),
       CargoType: 'Cargo',
       SeatsAmount: String(grandTotalBoxes),
+      VolumeWeight: String(Math.max(totalWeight, totalVolumeWeight)),
       PayerType: 'Recipient',
       PaymentMethod: 'Cash',
     })
       .then((data) => {
         if (cancelled) return;
-        // API НП возвращает массив data, где лежит стоимость в поле Cost
         const priceVal = data?.data?.[0]?.Cost;
-        if (priceVal !== undefined && priceVal !== null) {
+        if (priceVal !== undefined && priceVal !== null && Number(priceVal) > 0) {
           setDeliveryCost(Math.round(Number(priceVal)));
         } else {
-          // Если API по какой-то причине не вернуло расчет, ставим базовую цену с учетом количества коробов
-          setDeliveryCost(180 * grandTotalBoxes);
+          // Если API вернуло пустой ответ, используем базовый расчет с учетом количества коробов
+          setDeliveryCost(190 * grandTotalBoxes);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setDeliveryCost(180 * grandTotalBoxes);
+          setDeliveryCost(190 * grandTotalBoxes);
         }
       })
       .finally(() => {
@@ -385,6 +391,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       cancelled = true;
     };
   }, [grandTotalPairs, grandTotalBoxes, selectedCity]);
+
+      
 
   const filteredWarehouses = (() => {
     const q = branchOrComment.trim().toLowerCase();
