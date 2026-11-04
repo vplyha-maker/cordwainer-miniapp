@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { cardioCatalog, type ShoeCategory, type ShoeItem, type CartItem, type SizeKey } from '../data/catalog';
 import { WholesaleCart } from '../components/WholesaleCart';
-import { triggerHaptic } from '../components/ManagersContactCard';
 
 type MaterialsProps = {
   onBack?: () => void;
@@ -17,7 +16,7 @@ const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1,
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
 
-// Безопасный URL для файла со скобками в public/logo(1).mp4 (БЕЗ фото-постера!)
+// Безопасный URL для файла со скобками в public/logo(1).mp4
 const HERO_VIDEO_SRC = '/logo%281%29.mp4';
 const FOOTER_BANNER_SRC = '/baner.jpg';
 
@@ -36,7 +35,7 @@ const THEME = {
 };
 
 // ============================================================================
-// УСИЛЕННЫЙ ТАКТИЛЬНО-АКУСТИЧЕСКИЙ ДВИЖОК (TG Haptic + Android Vibrate + Taptic Audio)
+// ИСПРАВЛЕННЫЙ ТАКТИЛЬНО-АКУСТИЧЕСКИЙ ДВИЖОК ДЛЯ ANDROID И iOS (БЕЗ ОТМЕНЫ ИМПУЛЬСА)
 // ============================================================================
 let sharedAudioCtx: AudioContext | null = null;
 
@@ -68,47 +67,62 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
     const now = ctx.currentTime;
 
     if (level === 'light') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(190, now);
-      osc.frequency.exponentialRampToValueAtTime(55, now + 0.014);
-
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.014);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.015);
-    } else if (level === 'medium') {
+      // Усиленный плотный щелчок (28 мс), хорошо слышимый и ощутимый на динамиках Android и iPhone
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(145, now);
-      osc1.frequency.exponentialRampToValueAtTime(42, now + 0.024);
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(240, now);
+      osc1.frequency.exponentialRampToValueAtTime(58, now + 0.026);
 
-      gain1.gain.setValueAtTime(0.32, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.024);
+      gain1.gain.setValueAtTime(0.38, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.026);
 
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
       osc1.start(now);
-      osc1.stop(now + 0.025);
+      osc1.stop(now + 0.028);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(520, now);
+      osc2.frequency.exponentialRampToValueAtTime(140, now + 0.012);
+
+      gain2.gain.setValueAtTime(0.18, now);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
+
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now);
+      osc2.stop(now + 0.014);
+    } else if (level === 'medium') {
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(155, now);
+      osc1.frequency.exponentialRampToValueAtTime(44, now + 0.032);
+
+      gain1.gain.setValueAtTime(0.45, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.032);
+
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.034);
 
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(680, now + 0.004);
-      osc2.frequency.exponentialRampToValueAtTime(180, now + 0.016);
+      osc2.frequency.setValueAtTime(720, now + 0.004);
+      osc2.frequency.exponentialRampToValueAtTime(190, now + 0.02);
 
-      gain2.gain.setValueAtTime(0.14, now + 0.004);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
+      gain2.gain.setValueAtTime(0.22, now + 0.004);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
 
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
       osc2.start(now + 0.004);
-      osc2.stop(now + 0.017);
+      osc2.stop(now + 0.022);
     } else if (level === 'success') {
       [523.25, 783.99].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
@@ -117,29 +131,29 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, start);
 
-        gain.gain.setValueAtTime(0.22, start);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.09);
+        gain.gain.setValueAtTime(0.3, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.095);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(start);
-        osc.stop(start + 0.095);
+        osc.stop(start + 0.1);
       });
     }
   } catch {
-    // Игнорируем ограничения аудиоконтекста
+    // Ignore audio context restrictions
   }
 }
 
 function fireHaptic(level: 'light' | 'medium' | 'success') {
   playTapticClick(level);
 
-  try {
-    triggerHaptic(level);
-  } catch {
-    // Ignore
-  }
+  const isAndroid =
+    typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 
+  // 1. Одиночный неконфликтующий вызов Telegram HapticFeedback
+  // На Android 'light' и 'selectionChanged' слишком слабы или гасят друг друга,
+  // поэтому на Android передаем 'heavy' / 'rigid'.
   try {
     const tgHaptic = (
       window as unknown as {
@@ -157,28 +171,30 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
 
     if (tgHaptic) {
       if (level === 'light') {
-        tgHaptic.selectionChanged?.();
-        tgHaptic.impactOccurred?.('medium');
+        if (isAndroid) {
+          tgHaptic.impactOccurred?.('heavy');
+        } else {
+          tgHaptic.impactOccurred?.('medium');
+        }
       } else if (level === 'medium') {
         tgHaptic.impactOccurred?.('heavy');
-        setTimeout(() => tgHaptic.impactOccurred?.('rigid'), 40);
       } else if (level === 'success') {
         tgHaptic.notificationOccurred?.('success');
-        tgHaptic.impactOccurred?.('heavy');
       }
     }
   } catch {
     // Ignore
   }
 
+  // 2. Прямой вызов системного вибромотора Android (без дублирования с другими функциями)
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       if (level === 'light') {
-        navigator.vibrate(28);
+        navigator.vibrate(45);
       } else if (level === 'medium') {
-        navigator.vibrate([45, 25, 65]);
+        navigator.vibrate(65);
       } else if (level === 'success') {
-        navigator.vibrate([40, 35, 85]);
+        navigator.vibrate([45, 35, 90]);
       }
     }
   } catch {
@@ -211,22 +227,32 @@ export function Materials({ onBack }: MaterialsProps) {
   const footerGlareRef = useRef<HTMLDivElement>(null);
   const footerShadowRef = useRef<HTMLDivElement>(null);
 
+  // Инициализация Telegram WebApp и разблокировка AudioContext при первом касании
   useEffect(() => {
     try {
       (window as unknown as { Telegram?: { WebApp?: { ready?: () => void } } }).Telegram?.WebApp?.ready?.();
     } catch {
       // Ignore
     }
+
+    const unlockAudio = () => {
+      getAudioContext();
+    };
+    window.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
   }, []);
 
-  // Надежный автозапуск видео специально для iOS iPhone (Safari + Telegram WebKit) и Android
+  // Надежный автозапуск видео для iOS и Android
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
     const videoEl = heroVideoRef.current;
     if (!videoEl) return;
 
-    // Жесткая установка HTML-атрибутов для iOS WebKit (обход особенности React)
     videoEl.muted = true;
     videoEl.defaultMuted = true;
     videoEl.playsInline = true;
@@ -249,7 +275,6 @@ export function Materials({ onBack }: MaterialsProps) {
             setIsVideoReady(true);
           })
           .catch(() => {
-            // Если iOS в режиме энергосбережения заблокировал старт до касания, показываем 1-й кадр
             setIsVideoReady(true);
           });
       }
@@ -257,7 +282,6 @@ export function Materials({ onBack }: MaterialsProps) {
 
     tryPlay();
 
-    // Подстраховка для iOS при первом касании экрана или возврате во вкладку
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         tryPlay();
@@ -267,7 +291,6 @@ export function Materials({ onBack }: MaterialsProps) {
     window.addEventListener('touchstart', tryPlay, { passive: true, once: true });
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    // Страховочный таймер, чтобы видео всегда было видимо даже из кэша iOS
     const fallbackTimer = window.setTimeout(() => setIsVideoReady(true), 150);
 
     return () => {
@@ -277,7 +300,7 @@ export function Materials({ onBack }: MaterialsProps) {
     };
   }, [selectedShoe, isCartOpen]);
 
-  // Единый 60FPS цикл для верхнего видео и нижнего баннера (с защитой от iOS rubber-band)
+  // Единый 60FPS цикл для верхнего видео и нижнего баннера
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
 
@@ -288,20 +311,16 @@ export function Materials({ onBack }: MaterialsProps) {
       const viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
       const pageScrollY = window.scrollY ?? window.pageYOffset ?? 0;
 
-      // ======================================================================
-      // 1. ВЕРХНИЙ HERO ВИДЕО-БАННЕР (уходит под каталог при скролле вниз)
-      // ======================================================================
+      // 1. ВЕРХНИЙ HERO ВИДЕО-БАННЕР
       const topAnchor = bannerAnchorRef.current;
       const topStage = bannerStageRef.current;
       if (topAnchor && topStage) {
         const rect = topAnchor.getBoundingClientRect();
 
-        // Фиксируем базовую точку только один раз без искажения от резинового скролла iOS (pageScrollY < 0)
         if (initialBannerTopRef.current === null) {
           initialBannerTopRef.current = rect.top + Math.max(0, pageScrollY);
         }
 
-        // На iOS при оттягивании экрана вниз (overscroll) scrolled строго равен 0
         const rawScrolled =
           pageScrollY > 0
             ? pageScrollY
@@ -309,7 +328,7 @@ export function Materials({ onBack }: MaterialsProps) {
 
         const maxScroll = 320;
         const clamped = Math.max(0, Math.min(maxScroll, rawScrolled));
-        const progress = clamped / maxScroll; // 0 -> 1
+        const progress = clamped / maxScroll;
 
         const translateY = clamped * 0.55;
         const scale = 1 - progress * 0.065;
@@ -328,9 +347,7 @@ export function Materials({ onBack }: MaterialsProps) {
         }
       }
 
-      // ======================================================================
-      // 2. НИЖНИЙ ФИНАЛЬНЫЙ БАННЕР /baner.jpg (выезжает из-под кулисы каталога)
-      // ======================================================================
+      // 2. НИЖНИЙ ФИНАЛЬНЫЙ БАННЕР /baner.jpg
       const botAnchor = footerAnchorRef.current;
       const botStage = footerStageRef.current;
       if (botAnchor && botStage) {
@@ -402,9 +419,12 @@ export function Materials({ onBack }: MaterialsProps) {
   const [sampleSize, setSampleSize] = useState<SizeKey>(42);
   const [boxesCount, setBoxesCount] = useState<number>(1);
 
+  // Мгновенный сброс скролла (без behavior: 'smooth'), чтобы не сбивался GPU-слой изображения
   useEffect(() => {
     if (selectedShoe) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
       setJustAdded(false);
     }
   }, [selectedShoe]);
@@ -547,12 +567,13 @@ export function Materials({ onBack }: MaterialsProps) {
         style={{
           backgroundColor: THEME.bg,
           minHeight: '100vh',
-          padding: '20px 16px 110px 16px',
+          padding: '16px 16px 110px 16px',
           color: THEME.ink,
           boxSizing: 'border-box',
           fontFamily: THEME.sans,
         }}
       >
+        {/* Шапка карточки модели с увеличенным логотипом */}
         <div
           style={{
             display: 'flex',
@@ -568,10 +589,18 @@ export function Materials({ onBack }: MaterialsProps) {
               src="/logo.png"
               alt="Cardio"
               style={{
-                height: '34px',
+                height: '46px',
                 width: 'auto',
                 objectFit: 'contain',
                 mixBlendMode: 'multiply',
+                display: 'block',
+              }}
+            />
+            <div
+              style={{
+                width: '1px',
+                height: '28px',
+                backgroundColor: THEME.border,
               }}
             />
             <button
@@ -582,8 +611,8 @@ export function Materials({ onBack }: MaterialsProps) {
               style={{
                 background: 'transparent',
                 border: 'none',
-                padding: '4px 0',
-                fontSize: '10px',
+                padding: '6px 2px',
+                fontSize: '11px',
                 letterSpacing: '1.4px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
@@ -603,7 +632,7 @@ export function Materials({ onBack }: MaterialsProps) {
             style={{
               background: cart.length > 0 ? THEME.ink : 'transparent',
               border: `1px solid ${THEME.ink}`,
-              padding: '7px 12px',
+              padding: '8px 12px',
               fontSize: '10px',
               letterSpacing: '1.1px',
               textTransform: 'uppercase',
@@ -703,13 +732,15 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         </div>
 
+        {/* Блок фотографии модели — изолированный контейнер с явным фоном THEME.surface без filter */}
         <div
           style={{
             backgroundColor: THEME.surface,
             border: `1px solid ${THEME.border}`,
-            padding: '16px 12px',
+            padding: '14px 12px',
             marginBottom: '20px',
             position: 'relative',
+            overflow: 'hidden',
           }}
         >
           <div
@@ -717,7 +748,9 @@ export function Materials({ onBack }: MaterialsProps) {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '4px',
+              marginBottom: '8px',
+              position: 'relative',
+              zIndex: 2,
             }}
           >
             <span style={{ fontSize: '9px', letterSpacing: '1.5px', color: THEME.inkLight, textTransform: 'uppercase' }}>
@@ -731,10 +764,11 @@ export function Materials({ onBack }: MaterialsProps) {
           <div
             style={{
               width: '100%',
+              aspectRatio: '16 / 10',
+              backgroundColor: THEME.surface,
               overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             <img
@@ -742,14 +776,11 @@ export function Materials({ onBack }: MaterialsProps) {
               alt={`Модель ${selectedShoe.modelNumber}`}
               style={{
                 width: '100%',
-                maxWidth: '400px',
-                aspectRatio: '16 / 10',
+                height: '100%',
                 objectFit: 'contain',
                 display: 'block',
-                margin: '0 auto',
                 mixBlendMode: 'multiply',
-                filter: 'contrast(1.04)',
-                transform: 'scale(1.14)',
+                transform: 'scale(1.08)',
               }}
             />
           </div>
@@ -763,6 +794,8 @@ export function Materials({ onBack }: MaterialsProps) {
                 marginTop: '12px',
                 paddingTop: '12px',
                 borderTop: `1px solid ${THEME.border}`,
+                position: 'relative',
+                zIndex: 2,
               }}
             >
               {selectedShoe.features.map((feat) => (
@@ -811,6 +844,7 @@ export function Materials({ onBack }: MaterialsProps) {
             >
               {modelVariants.map((v, i) => {
                 const isCurrent = v.id === selectedShoe.id;
+                const cellBg = isCurrent ? THEME.surfaceActive : THEME.surface;
                 return (
                   <div
                     key={v.id}
@@ -823,7 +857,7 @@ export function Materials({ onBack }: MaterialsProps) {
                     style={{
                       borderRight: `1px solid ${THEME.border}`,
                       borderBottom: `1px solid ${THEME.border}`,
-                      backgroundColor: isCurrent ? THEME.surfaceActive : THEME.surface,
+                      backgroundColor: cellBg,
                       padding: '8px',
                       cursor: 'pointer',
                       textAlign: 'center',
@@ -841,16 +875,24 @@ export function Materials({ onBack }: MaterialsProps) {
                     >
                       0{i + 1} {isCurrent ? '✓' : ''}
                     </div>
-                    <div style={{ overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '3 / 2',
+                        overflow: 'hidden',
+                        backgroundColor: cellBg,
+                      }}
+                    >
                       <img
                         src={v.image}
                         alt={v.color}
                         style={{
                           width: '100%',
-                          aspectRatio: '3 / 2',
+                          height: '100%',
                           objectFit: 'contain',
+                          display: 'block',
                           mixBlendMode: 'multiply',
-                          transform: 'scale(1.14)',
+                          transform: 'scale(1.1)',
                         }}
                       />
                     </div>
@@ -1111,14 +1153,17 @@ export function Materials({ onBack }: MaterialsProps) {
                         {sz}
                       </div>
                       <button
+                        type="button"
                         onClick={() => updateSizeCount(sz, 1)}
                         style={{
                           background: 'none',
                           border: 'none',
-                          padding: '7px 0',
-                          fontSize: '15px',
+                          padding: '8px 0',
+                          fontSize: '16px',
                           cursor: count >= 10 ? 'default' : 'pointer',
                           color: count >= 10 ? THEME.border : THEME.ink,
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
                         }}
                       >
                         +
@@ -1135,14 +1180,17 @@ export function Materials({ onBack }: MaterialsProps) {
                         {count}
                       </div>
                       <button
+                        type="button"
                         onClick={() => updateSizeCount(sz, -1)}
                         style={{
                           background: 'none',
                           border: 'none',
-                          padding: '7px 0',
-                          fontSize: '15px',
+                          padding: '8px 0',
+                          fontSize: '16px',
                           cursor: count <= 0 ? 'default' : 'pointer',
                           color: count <= 0 ? THEME.border : THEME.ink,
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
                         }}
                       >
                         −
@@ -1174,9 +1222,10 @@ export function Materials({ onBack }: MaterialsProps) {
                 <div style={{ display: 'flex', border: `1px solid ${THEME.border}` }}>
                   {[1, 2, 3, 5, 10].map((num, idx) => (
                     <button
+                      type="button"
                       key={num}
                       onClick={() => {
-                        fireHaptic('medium');
+                        fireHaptic('light');
                         setBoxesCount(num);
                       }}
                       style={{
@@ -1188,6 +1237,7 @@ export function Materials({ onBack }: MaterialsProps) {
                         fontSize: '11px',
                         fontWeight: 600,
                         cursor: 'pointer',
+                        touchAction: 'manipulation',
                       }}
                     >
                       {num}
@@ -1219,6 +1269,7 @@ export function Materials({ onBack }: MaterialsProps) {
               >
                 {SIZES.map((sz) => (
                   <button
+                    type="button"
                     key={sz}
                     onClick={() => {
                       fireHaptic('light');
@@ -1231,9 +1282,11 @@ export function Materials({ onBack }: MaterialsProps) {
                       borderBottom: `1px solid ${THEME.border}`,
                       backgroundColor: sampleSize === sz ? THEME.ink : THEME.surface,
                       color: sampleSize === sz ? '#FFFFFF' : THEME.ink,
-                      fontSize: '12px',
+                      fontSize: '13px',
                       fontFamily: THEME.serif,
                       cursor: 'pointer',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
                     }}
                   >
                     {sz}
@@ -1245,6 +1298,7 @@ export function Materials({ onBack }: MaterialsProps) {
         </div>
 
         <button
+          type="button"
           disabled={totalPairs === 0}
           onClick={addCurrentShoeToCart}
           style={{
@@ -1281,66 +1335,76 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ С ДВОЙНЫМ ПАРАЛЛАКСОМ (ВИДЕО СВЕРХУ + БАННЕР В ФИНАЛЕ)
+  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ С ОБНОВЛЕННОЙ ШАПКОЙ И ОТКРЫТЫМ ВИДЕО-БАННЕРОМ
   return (
     <div
       style={{
         backgroundColor: THEME.bg,
         minHeight: '100vh',
-        padding: '18px 16px 120px 16px',
+        padding: '16px 16px 120px 16px',
         color: THEME.ink,
         fontFamily: THEME.sans,
         boxSizing: 'border-box',
       }}
     >
-      {/* Верхняя шапка с логотипом */}
+      {/* Верхняя дизайнерская шапка: крупный логотип + CARDIO / KHARKIV • CATALOG 2026 */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           paddingBottom: '14px',
-          marginBottom: '16px',
+          marginBottom: '14px',
           borderBottom: `1px solid ${THEME.border}`,
           position: 'relative',
           zIndex: 6,
           backgroundColor: THEME.bg,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <img
             src="/logo.png"
             alt="Cardio Footwear Logo"
             style={{
-              height: '38px',
+              height: '56px',
               width: 'auto',
               objectFit: 'contain',
               mixBlendMode: 'multiply',
+              display: 'block',
             }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{
+              width: '1px',
+              height: '36px',
+              backgroundColor: THEME.border,
+            }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span
               style={{
-                fontSize: '8px',
-                letterSpacing: '1.8px',
-                textTransform: 'uppercase',
-                color: THEME.inkMuted,
+                fontFamily: THEME.serif,
+                fontSize: '22px',
                 fontWeight: 600,
+                letterSpacing: '3.6px',
+                textTransform: 'uppercase',
+                color: THEME.ink,
+                lineHeight: 1,
               }}
             >
-              ХАРЬКОВ
+              CARDIO
             </span>
             <span
               style={{
                 fontSize: '9px',
-                letterSpacing: '1.2px',
+                letterSpacing: '2.1px',
                 textTransform: 'uppercase',
-                color: THEME.ink,
-                fontFamily: THEME.serif,
-                fontStyle: 'italic',
+                color: THEME.inkMuted,
+                fontWeight: 500,
+                lineHeight: 1.1,
               }}
             >
-              Оптовый каталог
+              KHARKIV • CATALOG 2026
             </span>
           </div>
         </div>
@@ -1354,12 +1418,13 @@ export function Materials({ onBack }: MaterialsProps) {
             style={{
               background: 'transparent',
               border: `1px solid ${THEME.border}`,
-              padding: '6px 12px',
+              padding: '7px 12px',
               fontSize: '9px',
               letterSpacing: '1.2px',
               textTransform: 'uppercase',
               cursor: 'pointer',
               color: THEME.ink,
+              whiteSpace: 'nowrap',
             }}
           >
             ← На главную
@@ -1368,7 +1433,7 @@ export function Materials({ onBack }: MaterialsProps) {
       </div>
 
       {/* ==================================================================== */}
-      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР public/logo(1).mp4 БЕЗ ВСПЫШКИ ФОТО     */}
+      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР БЕЗ ПЕРЕКРЫТИЯ 3D-ЛОГОТИПА               */}
       {/* ==================================================================== */}
       <div
         ref={bannerAnchorRef}
@@ -1379,6 +1444,40 @@ export function Materials({ onBack }: MaterialsProps) {
           zIndex: 1,
         }}
       >
+        {/* Редакционная строка вынесена НАД видео, чтобы не перекрывать верх 3D-логотипа */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '6px',
+            padding: '0 2px',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '8px',
+              letterSpacing: '1.6px',
+              textTransform: 'uppercase',
+              color: THEME.inkMuted,
+              fontWeight: 600,
+            }}
+          >
+            ● MOTION LOOKBOOK
+          </span>
+          <span
+            style={{
+              fontSize: '8px',
+              letterSpacing: '1.5px',
+              textTransform: 'uppercase',
+              color: THEME.inkMuted,
+              fontWeight: 600,
+            }}
+          >
+            CARDIO // 40—45
+          </span>
+        </div>
+
         <div
           ref={bannerStageRef}
           style={{
@@ -1396,52 +1495,6 @@ export function Materials({ onBack }: MaterialsProps) {
             WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           }}
         >
-          {/* Тонкая редакционная шапка поверх видео в стиле Lookbook */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '10px',
-              left: '12px',
-              right: '12px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              zIndex: 3,
-              pointerEvents: 'none',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '8px',
-                letterSpacing: '1.6px',
-                textTransform: 'uppercase',
-                color: '#F8F6F1',
-                backgroundColor: 'rgba(22, 21, 20, 0.62)',
-                WebkitBackdropFilter: 'blur(4px)',
-                backdropFilter: 'blur(4px)',
-                padding: '3px 7px',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-              }}
-            >
-              ● MOTION LOOKBOOK
-            </span>
-            <span
-              style={{
-                fontSize: '8px',
-                letterSpacing: '1.4px',
-                textTransform: 'uppercase',
-                color: '#F8F6F1',
-                backgroundColor: 'rgba(22, 21, 20, 0.62)',
-                WebkitBackdropFilter: 'blur(4px)',
-                backdropFilter: 'blur(4px)',
-                padding: '3px 7px',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-              }}
-            >
-              CARDIO // 40—45
-            </span>
-          </div>
-
           <video
             ref={heroVideoRef}
             src={HERO_VIDEO_SRC}
@@ -1501,7 +1554,7 @@ export function Materials({ onBack }: MaterialsProps) {
       </div>
 
       {/* ==================================================================== */}
-      {/* ОСНОВНОЕ ПОЛОТНО КАТАЛОГА (скользит поверх верхнего и нижнего блока) */}
+      {/* ОСНОВНОЕ ПОЛОТНО КАТАЛОГА                                            */}
       {/* ==================================================================== */}
       <div
         style={{
@@ -1724,6 +1777,7 @@ export function Materials({ onBack }: MaterialsProps) {
             const variantsCount = cardioCatalog.filter((i) => i.modelNumber === shoe.modelNumber).length;
             const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
             const isLarge = gridMode === 'large';
+            const cardBg = inCartPairs > 0 ? '#EFECE4' : THEME.surface;
 
             return (
               <div
@@ -1733,7 +1787,7 @@ export function Materials({ onBack }: MaterialsProps) {
                   setSelectedShoe(shoe);
                 }}
                 style={{
-                  backgroundColor: inCartPairs > 0 ? '#EFECE4' : THEME.surface,
+                  backgroundColor: cardBg,
                   borderRight: `1px solid ${THEME.border}`,
                   borderBottom: `1px solid ${THEME.border}`,
                   padding: isLarge ? '14px' : '8px',
@@ -1793,12 +1847,12 @@ export function Materials({ onBack }: MaterialsProps) {
 
                 <div
                   style={{
-                    padding: 0,
+                    width: '100%',
+                    aspectRatio: isLarge ? '16 / 10' : '3 / 2',
                     marginBottom: '8px',
                     overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    backgroundColor: cardBg,
+                    position: 'relative',
                   }}
                 >
                   <img
@@ -1807,12 +1861,11 @@ export function Materials({ onBack }: MaterialsProps) {
                     loading="lazy"
                     style={{
                       width: '100%',
-                      aspectRatio: isLarge ? '16 / 10' : '3 / 2',
+                      height: '100%',
                       objectFit: 'contain',
                       display: 'block',
                       mixBlendMode: 'multiply',
-                      filter: 'contrast(1.04)',
-                      transform: 'scale(1.14)',
+                      transform: 'scale(1.1)',
                     }}
                   />
                 </div>
