@@ -562,19 +562,19 @@ export function Materials({ onBack }: MaterialsProps) {
           fontFamily: THEME.sans,
         }}
       >
-        {/* ИСПРАВЛЕННАЯ ШАПКА КАРТОЧКИ МОДЕЛИ: Четкая кнопка "← Назад в каталог" */}
+        {/* ИСПРАВЛЕННАЯ ШАПКА КАРТОЧКИ: Абсолютно разделенные кнопки без наложения */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '8px',
+            gap: '12px',
             paddingBottom: '12px',
-            marginBottom: '18px',
+            marginBottom: '20px',
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexShrink: 1 }}>
             <img
               src="/logo.png"
               alt="Cardio"
@@ -601,23 +601,23 @@ export function Materials({ onBack }: MaterialsProps) {
               style={{
                 backgroundColor: THEME.surface,
                 border: `1px solid ${THEME.ink}`,
-                padding: '8px 11px',
+                padding: '8px 10px',
                 fontSize: '10px',
-                letterSpacing: '0.9px',
+                letterSpacing: '0.8px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 color: THEME.ink,
                 fontWeight: 600,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
                 touchAction: 'manipulation',
               }}
             >
               <span>←</span>
-              <span>Назад в каталог</span>
+              <span>Каталог</span>
             </button>
           </div>
 
@@ -630,7 +630,7 @@ export function Materials({ onBack }: MaterialsProps) {
             style={{
               backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
               border: `1px solid ${THEME.ink}`,
-              padding: '8px 10px',
+              padding: '8px 12px',
               fontSize: '10px',
               letterSpacing: '0.8px',
               textTransform: 'uppercase',
@@ -684,7 +684,8 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         )}
 
-        <div style={{ marginBottom: '14px' }}>
+        {/* Увеличенный отступ снизу у текстового блока, чтобы название цвета не заходило на фото */}
+        <div style={{ marginBottom: '22px' }}>
           <div
             style={{
               display: 'flex',
@@ -706,7 +707,7 @@ export function Materials({ onBack }: MaterialsProps) {
             style={{
               fontFamily: THEME.serif,
               fontSize: '34px',
-              margin: '0',
+              margin: '0 0 4px 0',
               fontWeight: 400,
               letterSpacing: '-0.3px',
               lineHeight: 1.08,
@@ -726,14 +727,13 @@ export function Materials({ onBack }: MaterialsProps) {
               fontStyle: 'italic',
               fontSize: '15px',
               color: THEME.inkMuted,
-              marginTop: '4px',
             }}
           >
             Цвет: {selectedShoe.color}
           </div>
         </div>
 
-        {/* ИСПРАВЛЕННАЯ ВИТРИНА МОДЕЛИ: Четкое разделение шапки и фото + фиксированная высота */}
+        {/* ВИТРИНА МОДЕЛИ */}
         <div
           style={{
             backgroundColor: THEME.surface,
@@ -742,7 +742,6 @@ export function Materials({ onBack }: MaterialsProps) {
             boxSizing: 'border-box',
           }}
         >
-          {/* Отделенная верхняя тех-строка (обувь никогда на нее не залезет) */}
           <div
             style={{
               display: 'flex',
@@ -761,7 +760,6 @@ export function Materials({ onBack }: MaterialsProps) {
             </span>
           </div>
 
-          {/* Изолированный бокс фиксированной высоты 220px для идеальной центровки обуви */}
           <div
             style={{
               width: '100%',
@@ -824,7 +822,7 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Миниатюры других цветов модели */}
+        {/* Миниатюры цветов */}
         {modelVariants.length > 1 && (
           <div style={{ marginBottom: '24px' }}>
             <div
@@ -1366,7 +1364,7 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* ИСПРАВЛЕННАЯ ШАПКА НА ГЛАВНОЙ КАТАЛОГА: Без наезда кнопки на слово CARDIO */}
+      {/* Шапка главного каталога */}
       <div
         style={{
           display: 'flex',
@@ -1786,7 +1784,7 @@ export function Materials({ onBack }: MaterialsProps) {
           </div>
         </div>
 
-        {/* Сетка каталога с жестко центрированными контейнерами фото */}
+        {/* Сетка каталога */}
         <div
           style={{
             display: 'grid',
@@ -2000,7 +1998,7 @@ export function Materials({ onBack }: MaterialsProps) {
         </div>
       </div>
 
-      {/* НИЖНЯЯ КУЛИСА: ФИНАЛЬНЫЙ БАННЕР public/baner.jpg */}
+      {/* НИЖНЯЯ КУЛИСА: ФИНАЛЬНЫЙ БАННЕР */}
       <div
         ref={footerAnchorRef}
         style={{
