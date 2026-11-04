@@ -37,6 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const data = await npResponse.json();
+    if (!data.success) {
+      console.error('NovaPoshta API Error:', data.errors);
+    }
     return res.status(200).json(data);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message || 'NP proxy error' });
