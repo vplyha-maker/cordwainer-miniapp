@@ -329,44 +329,24 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [selectedCity]);
 
-  // Запрос актуальной стоимости доставки из API Новой Почты с фоллбеком по зонам
+  // Запрос стоимости напрямую у API Новой Почты с расширенными параметрами отправления
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
       return;
     }
 
-    const totalWeight = Math.max(3, Math.round(grandTotalPairs * 1.9)); // ~1.9 кг на 1 пару обуви в коробе
-    const declaredCost = grandTotalPairs * 1500; // Оценочная стоимость
-
-    // Умный автономный расчет с учетом географических зон Украины (если API недоступно)
-    const calculateSmartFallback = () => {
-      let regionalMultiplier = 1.0; // По умолчанию центр
-      const label = (selectedCity.fullLabel || '').toLowerCase();
-      
-      if (label.includes('львівськ') || label.includes('тернопільськ') || label.includes('івано-франківськ') || label.includes('закарпатськ') || label.includes('волинськ') || label.includes('рівненськ') || label.includes('чернівецьк')) {
-        regionalMultiplier = 1.22; // Западная Украина (дальше от Харькова)
-      } else if (label.includes('одеськ') || label.includes('миколаївськ') || label.includes('херсонськ') || label.includes('запорізьк')) {
-        regionalMultiplier = 1.15; // Юг
-      } else if (label.includes('харківськ')) {
-        regionalMultiplier = 0.85; // Область отправки
-      }
-
-      const base = 120 + grandTotalBoxes * 145;
-      return Math.round(base * regionalMultiplier);
-    };
-
-    if (!selectedCity.ref || selectedCity.ref === KHARKIV_CITY_REF) {
-      if (selectedCity.ref === KHARKIV_CITY_REF) {
-        setDeliveryCost(Math.round(95 + grandTotalBoxes * 110));
-      } else {
-        setDeliveryCost(calculateSmartFallback());
-      }
+    if (!selectedCity.ref) {
+      setDeliveryCost(160 * grandTotalBoxes);
       return;
     }
 
     let cancelled = false;
     setCalcLoading(true);
+
+    // Расчет параметров груза: 1 коробка обуви весит ~15 кг, объемный вес считается по габаритам короба
+    const totalWeight = Math.max(2, Number((grandTotalPairs * 1.8).toFixed(1)));
+    const declaredCost = grandTotalPairs * 1500;
 
     callNovaPoshta('InternetDocument', 'getDocumentPrice', {
       CitySender: KHARKIV_CITY_REF,
@@ -376,20 +356,29 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       Cost: String(declaredCost),
       CargoType: 'Cargo',
       SeatsAmount: String(grandTotalBoxes),
+      PayerType: 'Recipient',
+      PaymentMethod: 'Cash',
     })
       .then((data) => {
         if (cancelled) return;
-        if (data?.data?.[0]?.Cost) {
-          setDeliveryCost(Math.round(Number(data.data[0].Cost)));
+        // API НП возвращает массив data, где лежит стоимость в поле Cost
+        const priceVal = data?.data?.[0]?.Cost;
+        if (priceVal !== undefined && priceVal !== null) {
+          setDeliveryCost(Math.round(Number(priceVal)));
         } else {
-          setDeliveryCost(calculateSmartFallback());
+          // Если API по какой-то причине не вернуло расчет, ставим базовую цену с учетом количества коробов
+          setDeliveryCost(180 * grandTotalBoxes);
         }
       })
       .catch(() => {
-        if (!cancelled) setDeliveryCost(calculateSmartFallback());
+        if (!cancelled) {
+          setDeliveryCost(180 * grandTotalBoxes);
+        }
       })
       .finally(() => {
-        if (!cancelled) setCalcLoading(false);
+        if (!cancelled) {
+          setCalcLoading(false);
+        }
       });
 
     return () => {
