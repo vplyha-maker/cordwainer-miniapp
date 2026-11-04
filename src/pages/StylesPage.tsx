@@ -18,6 +18,8 @@ type StyleSlide = {
   hideWatermark?: boolean
 }
 
+const PRO_STORAGE_KEY = 'cordwainer_pro_videos_unlocked'
+
 const getDeviceId = () => {
   if (typeof window === 'undefined') return 'unknown'
   const tg = (window as any).Telegram?.WebApp
@@ -31,9 +33,19 @@ const getDeviceId = () => {
   return deviceId
 }
 
+/**
+ * Точная проверка: запущено ли приложение реально внутри Telegram WebView,
+ * а не просто открыто в Safari с подключенным скриптом telegram-web-app.js
+ */
+const isRunningInTelegram = (): boolean => {
+  if (typeof window === 'undefined') return false
+  const tg = (window as any).Telegram?.WebApp
+  return Boolean(tg?.initData && tg.initData.length > 0)
+}
+
 const showTelegramAlert = (message: string) => {
   const tg = (window as any).Telegram?.WebApp
-  if (tg?.showAlert) {
+  if (isRunningInTelegram() && tg?.showAlert) {
     tg.showAlert(message)
   } else {
     alert(message)
@@ -56,14 +68,16 @@ const UI_TEXT = {
     up: 'Наверх',
     down: 'Вернуться',
     moreStyles: '+ ещё 8 фасонов',
-    errTgOnly: 'Откройте приложение внутри Telegram для оформления доступа.',
+    loadingVideo: 'Загрузка кадра...',
+    errTgOnly: 'Оплата через Telegram Stars доступна внутри приложения Telegram.',
     errPayment: 'Оплата была отменена или не завершена.',
     errServer: 'Ошибка соединения',
     paywall: {
       tag: 'ЗАКРЫТАЯ КОЛЛЕКЦИЯ • 12 ФАСОНОВ',
       title: 'Полный\nЛукбук',
       desc: 'Вы посмотрели 3 из 15 фасонов. Разблокируйте полный доступ ко всей видео-энциклопедии обуви навсегда.',
-      btn: 'ОТКРЫТЬ ВСЕ 15 ФАСОНОВ • 1 ⭐️',
+      priceNote: 'Разовый платеж (10 ⭐️ за фасон) • Доступ навсегда',
+      btn: 'ОТКРЫТЬ ВСЕ 15 ФАСОНОВ • 150 ⭐️',
       loading: 'ПОДГОТОВКА СЧЕТА...',
     },
   },
@@ -75,14 +89,16 @@ const UI_TEXT = {
     up: 'Вгору',
     down: 'Повернутися',
     moreStyles: '+ ще 8 фасонів',
-    errTgOnly: 'Відкрийте додаток у Telegram для оформлення доступу.',
+    loadingVideo: 'Завантаження кадру...',
+    errTgOnly: 'Оплата через Telegram Stars доступна всередині додатку Telegram.',
     errPayment: 'Оплату було скасовано або не завершено.',
     errServer: 'Помилка з’єднання',
     paywall: {
       tag: 'ЗАКРИТА КОЛЕКЦІЯ • 12 ФАСОНІВ',
       title: 'Повний\nЛукбук',
       desc: 'Ви переглянули 3 з 15 фасонів. Розблокуйте повний доступ до всієї відео-енциклопедії взуття назавжди.',
-      btn: 'ВІДКРИТИ ВСІ 15 ФАСОНІВ • 1 ⭐️',
+      priceNote: 'Разовий платіж (10 ⭐️ за фасон) • Доступ назавжди',
+      btn: 'ВІДКРИТИ ВСІ 15 ФАСОНІВ • 150 ⭐️',
       loading: 'ПІДГОТОВКА РАХУНКУ...',
     },
   },
@@ -94,14 +110,16 @@ const UI_TEXT = {
     up: 'Nach oben',
     down: 'Zurück',
     moreStyles: '+ 8 weitere Stile',
-    errTgOnly: 'Bitte öffnen Sie die App in Telegram.',
+    loadingVideo: 'Video wird geladen...',
+    errTgOnly: 'Zahlung mit Telegram Stars ist nur in der Telegram-App verfügbar.',
     errPayment: 'Zahlung wurde abgebrochen.',
     errServer: 'Verbindungsfehler',
     paywall: {
       tag: 'EXKLUSIVE KOLLEKTION • 12 STILE',
       title: 'Volles\nLookbook',
       desc: 'Sie haben 3 von 15 Stilen gesehen. Schalten Sie den dauerhaften Zugang zur gesamten Video-Enzyklopädie frei.',
-      btn: 'ALLE 15 STILE FREISCHALTEN • 1 ⭐️',
+      priceNote: 'Einmalige Zahlung (10 ⭐️ pro Stil) • Dauerhafter Zugang',
+      btn: 'ALLE 15 STILE FREISCHALTEN • 150 ⭐️',
       loading: 'WIRD GELADEN...',
     },
   },
@@ -287,10 +305,12 @@ type SlideItemProps = {
   index: number
   totalCount: number
   isActive: boolean
-  isPreloaded: boolean
+  shouldLoadVideo: boolean
+  shouldKeepInMemory: boolean
   isMuted: boolean
   onToggleMute: () => void
   onShowToast: (msg: string) => void
+  onActiveVideoReady: (index: number) => void
 }
 
 const smoothEase: [number, number, number, number] = [0.25, 1, 0.5, 1]
@@ -301,10 +321,12 @@ function SlideItem({
   index,
   totalCount,
   isActive,
-  isPreloaded,
+  shouldLoadVideo,
+  shouldKeepInMemory,
   isMuted,
   onToggleMute,
   onShowToast,
+  onActiveVideoReady,
 }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hasFetchedLikesRef = useRef(false)
@@ -321,11 +343,12 @@ function SlideItem({
   const tg = (window as any).Telegram?.WebApp
   const t = UI_TEXT[lang]
 
+  // Отложенная загрузка лайков: не конкурируем с первым кадром видео на старте
   useEffect(() => {
-    if (!isPreloaded || hasFetchedLikesRef.current) return
+    if (!shouldLoadVideo || hasFetchedLikesRef.current) return
     let mounted = true
 
-    const fetchLikes = async () => {
+    const timer = window.setTimeout(async () => {
       try {
         const res = await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`)
         if (res.ok && mounted) {
@@ -335,24 +358,34 @@ function SlideItem({
           hasFetchedLikesRef.current = true
         }
       } catch {}
-    }
-    fetchLikes()
+    }, isActive ? 350 : 800)
+
     return () => {
       mounted = false
+      window.clearTimeout(timer)
     }
-  }, [slide.id, userId, isPreloaded])
+  }, [slide.id, userId, shouldLoadVideo, isActive])
 
+  // Управление буфером по паттерну TikTok / YouTube Shorts:
+  // Загружаем строго по очереди, но НЕ удаляем уже скачанный буфер у соседних 3 слайдов
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
 
-    if (isPreloaded) {
-      if (video.getAttribute('src') !== slide.video) {
+    // Якорь #t=0.001 заставляет Safari на iOS моментально декодировать 1-й кадр как постер
+    const targetSrc = slide.poster ? slide.video : `${slide.video}#t=0.001`
+
+    if (shouldLoadVideo) {
+      if (video.getAttribute('src') !== targetSrc) {
         setIsVideoLoaded(false)
-        video.setAttribute('src', slide.video)
+        video.setAttribute('src', targetSrc)
+        video.preload = isActive ? 'auto' : 'metadata'
         video.load()
+      } else if (isActive && video.preload !== 'auto') {
+        video.preload = 'auto'
       }
-    } else {
+    } else if (!shouldKeepInMemory) {
+      // Освобождаем память только если слайд ушел далеко (дальше 3 экранов)
       if (video.getAttribute('src')) {
         video.pause()
         video.removeAttribute('src')
@@ -360,7 +393,7 @@ function SlideItem({
         setIsVideoLoaded(false)
       }
     }
-  }, [isPreloaded, slide.video])
+  }, [shouldLoadVideo, shouldKeepInMemory, isActive, slide.video, slide.poster])
 
   useEffect(() => {
     const video = videoRef.current
@@ -369,14 +402,31 @@ function SlideItem({
     if (isActive) {
       setIsPaused(false)
       const p = video.play()
-      if (p) p.catch(() => {})
+      if (p) {
+        p.catch(() => {
+          // Если Safari заблокировал автоплей со звуком, форсируем muted-старт
+          video.muted = true
+          video.play().catch(() => {})
+        })
+      }
     } else {
       video.pause()
-      video.currentTime = 0
+      if (video.readyState >= 1) {
+        try {
+          video.currentTime = 0.001
+        } catch {}
+      }
       setIsPaused(false)
       setIsDescOpen(false)
     }
   }, [isActive])
+
+  const handleVideoReady = () => {
+    setIsVideoLoaded(true)
+    if (isActive) {
+      onActiveVideoReady(index)
+    }
+  }
 
   const triggerLikeRequest = useCallback(
     async (forceLike = false) => {
@@ -405,7 +455,6 @@ function SlideItem({
   )
 
   const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Если открыта карточка описания, одиночный тап по видео просто закрывает её, освобождая кадр
     if (isDescOpen) {
       setIsDescOpen(false)
       if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged()
@@ -455,7 +504,7 @@ function SlideItem({
     const url = 'https://www.cordwaine.app'
 
     try {
-      if (tg?.initData) {
+      if (isRunningInTelegram()) {
         tg.openTelegramLink(
           `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
         )
@@ -477,6 +526,18 @@ function SlideItem({
 
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#050505]">
+      {/* Элегантный High-Fashion Skeleton при холодном старте после очистки кэша */}
+      {!isVideoLoaded && !slide.poster && (
+        <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-b from-[#0d0d0d] via-[#151412] to-[#080808] animate-pulse">
+          <div className="flex flex-col items-center gap-2 opacity-40">
+            <div className="w-5 h-5 rounded-full border border-white/40 border-t-white animate-spin" />
+            <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/70">
+              {t.loadingVideo}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Видео / Изображение */}
       <div className="absolute inset-0 bg-[#050505]">
         {slide.video ? (
@@ -485,14 +546,17 @@ function SlideItem({
             preload="none"
             loop
             playsInline
+            // @ts-ignore — поддержка старых версий WebKit на iOS
+            webkit-playsinline="true"
             muted={isMuted}
             poster={slide.poster}
-            onLoadedData={() => setIsVideoLoaded(true)}
-            onPlaying={() => setIsVideoLoaded(true)}
+            onLoadedData={handleVideoReady}
+            onCanPlay={handleVideoReady}
+            onPlaying={handleVideoReady}
             className={`
               w-full h-full object-cover
-              transition-opacity duration-500 ease-out
-              ${isActive && (isVideoLoaded || slide.poster) ? 'opacity-100' : 'opacity-0'}
+              transition-opacity duration-300 ease-out
+              ${isVideoLoaded || slide.poster ? 'opacity-100' : 'opacity-0'}
               ${slide.hideWatermark ? 'scale-[1.08]' : ''}
             `}
           />
@@ -549,22 +613,25 @@ function SlideItem({
         )}
       </AnimatePresence>
 
-      {/* Деликатные градиенты: внизу только легкая 20%-я дымка, не затемняющая обувь */}
-      <div className="absolute top-0 left-0 right-0 h-[32%] bg-gradient-to-b from-black/75 via-black/25 to-transparent z-10 pointer-events-none" />
+      {/* Деликатные градиенты */}
+      <div className="absolute top-0 left-0 right-0 h-[34%] bg-gradient-to-b from-black/75 via-black/25 to-transparent z-10 pointer-events-none" />
       <div
         className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t z-10 pointer-events-none transition-all duration-500 ${
           isDescOpen
             ? 'h-[50%] from-black/90 via-black/60 to-transparent'
-            : 'h-[20%] from-black/60 via-black/20 to-transparent'
+            : 'h-[22%] from-black/65 via-black/25 to-transparent'
         }`}
       />
 
-      {/* Верхний редакционный блок: поднят выше, чтобы не перекрывать центр кадра */}
+      {/* Верхний редакционный блок с учетом safe-area-inset-top на iPhone */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
         transition={{ duration: 0.7, ease: smoothEase, delay: 0.08 }}
-        className="absolute top-[68px] left-6 right-6 z-20 flex items-start justify-between pointer-events-none"
+        style={{
+          top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 60px)',
+        }}
+        className="absolute left-6 right-6 z-20 flex items-start justify-between pointer-events-none"
       >
         <div>
           <p className="text-[9px] font-sans uppercase tracking-[0.38em] text-white/75 mb-1.5 drop-shadow">
@@ -582,14 +649,16 @@ function SlideItem({
         </div>
       </motion.div>
 
-      {/* Нижний компактный лукбук-док (освобождает 90% высоты видео) */}
+      {/* Нижний компактный лукбук-док с учетом safe-area-inset-bottom */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 12 }}
         transition={{ duration: 0.7, ease: smoothEase, delay: 0.15 }}
-        className="absolute bottom-5 left-6 right-6 z-20 flex flex-col pointer-events-none"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+        }}
+        className="absolute left-6 right-6 z-20 flex flex-col pointer-events-none"
       >
-        {/* Выдвижная карточка с полным текстом (открывается только по запросу) */}
         <AnimatePresence>
           {isDescOpen && (
             <motion.div
@@ -615,12 +684,9 @@ function SlideItem({
           )}
         </AnimatePresence>
 
-        {/* Тонкая редакционная линия */}
         <div className="w-full h-px bg-white/20 mb-3" />
 
-        {/* Нижний ряд: Тизер описания слева + 3 чистые иконки справа */}
         <div className="flex items-center justify-between gap-3 pointer-events-auto">
-          {/* Кнопка-тизер в 1 строку */}
           <button
             onClick={toggleDesc}
             className="flex-1 min-w-0 text-left group py-0.5 pr-2 active:opacity-70 transition-opacity"
@@ -638,9 +704,7 @@ function SlideItem({
             </p>
           </button>
 
-          {/* Горизонтальный ряд иконок без лишних текстовых подписей */}
           <div className="flex items-center gap-2.5 shrink-0">
-            {/* Звук */}
             <button
               onClick={onToggleMute}
               className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90"
@@ -659,7 +723,6 @@ function SlideItem({
               )}
             </button>
 
-            {/* Лайк (с аккуратным счетчиком внутри капсулы, если есть лайки) */}
             <button
               onClick={() => triggerLikeRequest(false)}
               className={`
@@ -689,7 +752,6 @@ function SlideItem({
               )}
             </button>
 
-            {/* Поделиться */}
             <button
               onClick={handleShare}
               className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90"
@@ -720,12 +782,18 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
   const [isMuted, setIsMuted] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
+  // Флаг готовности активного видео: разрешает предзагрузку следующего ролика только когда текущий уже готов
+  const [readySlideIndex, setReadySlideIndex] = useState<number>(-1)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  const [isProPurchased, setIsProPurchased] = useState(false)
+  // Мгновенное чтение статуса покупки из localStorage + синхронизация с сервером
+  const [isProPurchased, setIsProPurchased] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(PRO_STORAGE_KEY) === 'true'
+  })
   const [isPurchasing, setIsPurchasing] = useState(false)
 
   const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
@@ -737,15 +805,22 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     setTimeout(() => setToastMessage(null), 2400)
   }, [])
 
+  const handleActiveVideoReady = useCallback((idx: number) => {
+    setReadySlideIndex((prev) => (prev === idx ? prev : idx))
+  }, [])
+
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
-    const userId = tg?.initDataUnsafe?.user?.id
+    const userId = tg?.initDataUnsafe?.user?.id || getDeviceId()
     if (!userId) return
 
     fetch(`/api/check-purchase?userId=${userId}&productId=pro_videos`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.purchased) setIsProPurchased(true)
+        if (data.purchased) {
+          setIsProPurchased(true)
+          localStorage.setItem(PRO_STORAGE_KEY, 'true')
+        }
       })
       .catch((err) => console.error('Ошибка проверки:', err))
   }, [])
@@ -831,29 +906,48 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     return () => observer.disconnect()
   }, [isProPurchased])
 
+  // Навигация Назад + поддержка клавиши Escape на десктопе
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onBack()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
     const tg = (window as any).Telegram?.WebApp
-    if (!tg) return
+    if (isRunningInTelegram() && tg) {
+      tg.ready()
+      tg.expand?.()
+      tg.disableVerticalSwipes?.()
 
-    tg.ready()
-    tg.expand?.()
-    tg.disableVerticalSwipes?.()
-
-    if (tg.BackButton) {
-      tg.BackButton.show()
-      tg.BackButton.onClick(onBack)
-      return () => {
-        tg.BackButton.offClick(onBack)
-        tg.BackButton.hide()
+      if (tg.BackButton) {
+        tg.BackButton.show()
+        tg.BackButton.onClick(onBack)
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown)
+          tg.BackButton.offClick(onBack)
+          tg.BackButton.hide()
+        }
       }
     }
+
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onBack])
+
+  const handleBackPress = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.stopPropagation()
+      const tg = (window as any).Telegram?.WebApp
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+      onBack()
+    },
+    [onBack]
+  )
 
   const handleProClick = async () => {
     const tg = (window as any).Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
 
-    if (!userId) {
+    if (!isRunningInTelegram() || !userId) {
       showTelegramAlert(t.errTgOnly)
       return
     }
@@ -865,7 +959,11 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       const response = await fetch('/api/create-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, productId: 'pro_videos' }),
+        body: JSON.stringify({
+          userId,
+          productId: 'pro_videos',
+          amountStars: 150, // Рекомендуемая цена: 150 Telegram Stars (10 ⭐️ за каждый из 15 фасонов)
+        }),
       })
 
       const data = await response.json()
@@ -874,6 +972,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       tg.openInvoice(data.invoiceLink, (status: string) => {
         if (status === 'paid') {
           if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success')
+          localStorage.setItem(PRO_STORAGE_KEY, 'true')
           setIsProPurchased(true)
           setActiveIndex(3)
         } else if (status === 'failed') {
@@ -925,19 +1024,28 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         }
       `}</style>
 
-      {/* Компактный верхний хедер с минимальным отступом от системной шапки Telegram */}
-      <header className="absolute top-0 left-0 right-0 z-[100] px-6 pt-4 pb-2 flex justify-between items-center pointer-events-none">
+      {/* Верхний хедер с гарантированным отступом от статус-бара / челки iPhone в Safari и PWA */}
+      <header
+        style={{
+          paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 10px)',
+        }}
+        className="fixed top-0 left-0 right-0 z-[200] px-6 pb-2 flex justify-between items-center pointer-events-none"
+      >
         <button
-          onClick={onBack}
-          className="pointer-events-auto flex items-center gap-1.5 py-1.5 px-3 -ml-1 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-[9px] font-sans uppercase tracking-[0.2em] text-white/85 active:scale-95 transition-transform"
+          type="button"
+          onClick={handleBackPress}
+          style={{ touchAction: 'manipulation' }}
+          className="pointer-events-auto cursor-pointer min-h-[38px] min-w-[84px] flex items-center justify-center gap-2 py-2 px-3.5 -ml-1 rounded-full bg-black/55 backdrop-blur-xl border border-white/25 text-[10px] font-sans uppercase tracking-[0.2em] text-white shadow-[0_4px_16px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
         >
-          <span>←</span>
+          <span className="text-xs leading-none">←</span>
           <span>{t.back}</span>
         </button>
 
         <button
+          type="button"
           onClick={handleSmartScroll}
-          className={`pointer-events-auto flex items-center gap-1.5 py-1.5 px-3 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-[9px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] transition-all duration-500 active:scale-95 ${
+          style={{ touchAction: 'manipulation' }}
+          className={`pointer-events-auto cursor-pointer min-h-[38px] flex items-center gap-1.5 py-2 px-3.5 rounded-full bg-black/55 backdrop-blur-xl border border-white/25 text-[10px] font-sans uppercase tracking-[0.2em] text-[#F4F0E8] shadow-[0_4px_16px_rgba(0,0,0,0.5)] transition-all duration-500 active:scale-95 ${
             buttonMode !== 'hidden'
               ? 'opacity-100 translate-y-0'
               : 'opacity-0 -translate-y-3 pointer-events-none'
@@ -968,7 +1076,10 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-[120] px-4 py-2 rounded-full bg-white text-black text-[10px] font-sans uppercase tracking-[0.2em] shadow-xl pointer-events-none"
+            style={{
+              top: 'calc(max(env(safe-area-inset-top, 0px), 16px) + 56px)',
+            }}
+            className="fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2 rounded-full bg-white text-black text-[10px] font-sans uppercase tracking-[0.2em] shadow-xl pointer-events-none"
           >
             {toastMessage}
           </motion.div>
@@ -981,8 +1092,17 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         className="snap-container h-full w-full overflow-y-scroll snap-y snap-mandatory"
       >
         {visibleStyles.map((slide, index) => {
-          const isPreloaded = Math.abs(activeIndex - index) <= 1
           const isActive = activeIndex === index
+          // Строгая очередь по принципу TikTok / Shorts:
+          // 1) Активный слайд грузится всегда немедленно.
+          // 2) Следующий слайд (activeIndex + 1) начинает грузиться ТОЛЬКО когда активный уже готов (readySlideIndex === activeIndex).
+          const isNextSlideReadyToPreload =
+            index === activeIndex + 1 && readySlideIndex === activeIndex
+          const isPrevSlide = index === activeIndex - 1
+
+          const shouldLoadVideo = isActive || isNextSlideReadyToPreload || isPrevSlide
+          // Держим в памяти 3 соседних слайда, чтобы при возврате назад не качать заново
+          const shouldKeepInMemory = Math.abs(activeIndex - index) <= 3
 
           return (
             <div
@@ -999,10 +1119,12 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 index={index}
                 totalCount={STYLES_DATA.length}
                 isActive={isActive}
-                isPreloaded={isPreloaded}
+                shouldLoadVideo={shouldLoadVideo}
+                shouldKeepInMemory={shouldKeepInMemory}
                 isMuted={isMuted}
                 onToggleMute={handleToggleMute}
                 onShowToast={showToast}
+                onActiveVideoReady={handleActiveVideoReady}
               />
             </div>
           )
@@ -1015,15 +1137,20 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
               slideRefs.current[visibleStyles.length] = el
             }}
             data-index={visibleStyles.length}
-            className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6 pb-10"
+            style={{
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 36px)',
+            }}
+            className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6"
           >
-            {STYLES_DATA[3]?.video && (
+            {/* Фоновое видео пейволла грузится ТОЛЬКО когда пользователь долистал до 3-го слайда (activeIndex >= 2) */}
+            {STYLES_DATA[3]?.video && activeIndex >= 2 && (
               <video
-                src={STYLES_DATA[3].video}
+                src={`${STYLES_DATA[3].video}#t=0.001`}
                 autoPlay
                 loop
                 muted
                 playsInline
+                preload="metadata"
                 className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-35 pointer-events-none"
               />
             )}
@@ -1055,7 +1182,7 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 {t.paywall.desc}
               </p>
 
-              <div className="flex flex-wrap gap-1.5 mb-8">
+              <div className="flex flex-wrap gap-1.5 mb-6">
                 {lockedPreviewTitles.map((title) => (
                   <span
                     key={title}
@@ -1069,9 +1196,15 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 </span>
               </div>
 
+              <p className="text-[9px] font-sans uppercase tracking-[0.2em] text-white/50 mb-2.5">
+                {t.paywall.priceNote}
+              </p>
+
               <button
+                type="button"
                 onClick={handleProClick}
                 disabled={isPurchasing}
+                style={{ touchAction: 'manipulation' }}
                 className="paywall-btn group relative flex items-center justify-between w-full h-[56px] px-6 border text-[#F4F0E8] hover:bg-white/10 active:scale-[0.98] transition-all outline-none bg-black/50 backdrop-blur-md cursor-pointer"
               >
                 {isPurchasing ? (
