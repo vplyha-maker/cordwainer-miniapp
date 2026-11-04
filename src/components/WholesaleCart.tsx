@@ -135,7 +135,6 @@ function extractLocalPhoneDigits(raw: string): string {
   } else if (digits.startsWith('80')) {
     digits = digits.slice(1);
   } else if (!digits.startsWith('0')) {
-    // Если пользователь сразу вводит код без нуля (например, 67...)
     digits = '0' + digits;
   }
 
@@ -337,7 +336,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const phoneValidation = validateUkrainePhone(clientPhone);
   const isPhoneValid = phoneValidation.isValid;
 
-  // Поле orderComment необязательное, поэтому не участвует в блокировке отправки
   const isFormValid = isCityValid && isBranchValid && isNameValid && isPhoneValid;
 
   const missingFields: string[] = [];
@@ -664,6 +662,23 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
           color: #8C877E !important;
           -webkit-text-fill-color: #8C877E !important;
           opacity: 1 !important;
+        }
+        /* Исправление обрезки имен (БОР... / ГЕО...) на кнопках отправки в ManagersContactCard */
+        .managers-contact-scope button {
+          padding-left: 10px !important;
+          padding-right: 10px !important;
+          gap: 6px !important;
+        }
+        .managers-contact-scope button span {
+          overflow: visible !important;
+          text-overflow: clip !important;
+          max-width: none !important;
+          white-space: nowrap !important;
+        }
+        .managers-contact-scope button span:first-child {
+          letter-spacing: 0.65px !important;
+          font-size: 9.5px !important;
+          flex-shrink: 0 !important;
         }
       `}</style>
 
@@ -1348,15 +1363,17 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             </div>
           )}
 
-          <ManagersContactCard
-            itemsCount={items.length}
-            onSendOrder={sendToManager}
-            onCopyInvoice={copyInvoice}
-            copied={copied}
-            isFormValid={isFormValid}
-            missingFields={missingFields}
-            onValidationFail={handleValidationFail}
-          />
+          <div className="managers-contact-scope">
+            <ManagersContactCard
+              itemsCount={items.length}
+              onSendOrder={sendToManager}
+              onCopyInvoice={copyInvoice}
+              copied={copied}
+              isFormValid={isFormValid}
+              missingFields={missingFields}
+              onValidationFail={handleValidationFail}
+            />
+          </div>
         </>
       )}
     </div>
