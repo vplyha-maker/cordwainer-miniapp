@@ -19,7 +19,6 @@ import { SalaryCalcPage } from './pages/salary'
 import { SettingsPage } from './pages/SettingsPage'
 import SneakerIndex from './pages/SneakerIndex'
 import Materials from './pages/Materials'
-import AdminUpload from './pages/AdminUpload'
 import {
   getSavedPerfMode,
   savePerfMode,
@@ -52,7 +51,6 @@ export type Screen =
   | 'settings'
   | 'sneakers'
   | 'materials'
-  | 'admin-upload'
 
 export type Lang = 'ru' | 'uk' | 'de'
 export type FavoriteType = 'blog' | 'article'
@@ -105,7 +103,6 @@ export function applyImmediateMutedTheme(isDark: boolean) {
   root.style.setProperty('--pigment-lead-white', '#F5F1EA')
   root.style.setProperty('--pigment-bone-black', '#1C1816')
 
-  // Синхронизируем цвет системной подложки с реальным фоном страниц (#F2EFE9 / #0A0A0A)
   const bg = isDark ? '#0A0A0A' : '#F2EFE9'
   root.style.backgroundColor = bg
   if (document.body) {
@@ -130,7 +127,6 @@ function getInitialScreen(): Screen {
   try {
     const path = window.location.pathname.replace(/\/+$/, '') || '/'
     if (path === '/forward-ortho-converter') return 'seo-width'
-    if (path === '/AdminUpload') return 'admin-upload'
   } catch {}
   return 'welcome'
 }
@@ -139,7 +135,6 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(getInitialScreen)
   const [prevMainScreen, setPrevMainScreen] = useState<Screen>('welcome') 
 
-  // Отключаем кастомный SmoothScroll на мобильных WebView, чтобы не ломать GPU-тайлы
   const [isMobileWebView] = useState(() => {
     if (typeof window === 'undefined') return true
     return (
@@ -392,7 +387,6 @@ export default function App() {
         {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
         {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
         {screen === 'materials' && <Materials key="materials" onBack={() => setScreen('home')} />}
-        {screen === 'admin-upload' && <AdminUpload key="admin-upload" />}
 
         {screen === 'settings' && (
           <SettingsPage
