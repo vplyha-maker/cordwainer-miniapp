@@ -21,6 +21,7 @@ type CityOption = {
   uaName: string;
   fullLabel: string;
   ref: string;
+  area?: string;
 };
 
 type WarehouseOption = {
@@ -37,19 +38,19 @@ type SavedRecipientData = {
   clientPhone: string;
 };
 
-const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626';
+const KHARKIV_CITY_REF = 'db5c88e0-391c-11dd-90d9-001a92567626'; // Харьков (Отправитель)
 const RECIPIENT_STORAGE_KEY = 'cardio_b2b_recipient_v1';
 const SIZES_ORDER: SizeKey[] = [40, 41, 42, 43, 44, 45];
 
 const POPULAR_CITIES: CityOption[] = [
-  { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626' },
-  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626' },
-  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626' },
-  { name: 'Львов', uaName: 'Львів', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626' },
-  { name: 'Харьков', uaName: 'Харків', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626' },
-  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626' },
-  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626' },
-  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626' },
+  { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', area: 'Київська' },
+  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', area: 'Дніпропетровська' },
+  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', area: 'Одеська' },
+  { name: 'Львов', uaName: 'Львів', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', area: 'Львівська' },
+  { name: 'Харьков', uaName: 'Харків', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', area: 'Харківська' },
+  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626', area: 'Полтавська' },
+  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', area: 'Запорізька' },
+  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', area: 'Вінницька' },
 ];
 
 const THEME = {
@@ -257,6 +258,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 uaName: ua,
                 fullLabel,
                 ref,
+                area,
               });
             }
           }
@@ -327,22 +329,39 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
   }, [selectedCity]);
 
+  // Запрос актуальной стоимости доставки из API Новой Почты с фоллбеком по зонам
   useEffect(() => {
     if (grandTotalPairs === 0) {
       setDeliveryCost(0);
       return;
     }
 
-    const totalWeight = Math.max(2, Math.round(grandTotalPairs * 1.9));
+    const totalWeight = Math.max(3, Math.round(grandTotalPairs * 1.9)); // ~1.9 кг на 1 пару обуви в коробе
+    const declaredCost = grandTotalPairs * 1500; // Оценочная стоимость
 
-    // Автономный расчет на случай отсутствия сети с привязкой к весу и объему
-    const calculateFallback = () => {
-      const basePrice = 90 + grandTotalBoxes * 110;
-      return basePrice;
+    // Умный автономный расчет с учетом географических зон Украины (если API недоступно)
+    const calculateSmartFallback = () => {
+      let regionalMultiplier = 1.0; // По умолчанию центр
+      const label = (selectedCity.fullLabel || '').toLowerCase();
+      
+      if (label.includes('львівськ') || label.includes('тернопільськ') || label.includes('івано-франківськ') || label.includes('закарпатськ') || label.includes('волинськ') || label.includes('рівненськ') || label.includes('чернівецьк')) {
+        regionalMultiplier = 1.22; // Западная Украина (дальше от Харькова)
+      } else if (label.includes('одеськ') || label.includes('миколаївськ') || label.includes('херсонськ') || label.includes('запорізьк')) {
+        regionalMultiplier = 1.15; // Юг
+      } else if (label.includes('харківськ')) {
+        regionalMultiplier = 0.85; // Область отправки
+      }
+
+      const base = 120 + grandTotalBoxes * 145;
+      return Math.round(base * regionalMultiplier);
     };
 
-    if (!selectedCity.ref) {
-      setDeliveryCost(calculateFallback());
+    if (!selectedCity.ref || selectedCity.ref === KHARKIV_CITY_REF) {
+      if (selectedCity.ref === KHARKIV_CITY_REF) {
+        setDeliveryCost(Math.round(95 + grandTotalBoxes * 110));
+      } else {
+        setDeliveryCost(calculateSmartFallback());
+      }
       return;
     }
 
@@ -354,7 +373,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       CityRecipient: selectedCity.ref,
       Weight: String(totalWeight),
       ServiceType: 'WarehouseWarehouse',
-      Cost: String(grandTotalPairs * 1500),
+      Cost: String(declaredCost),
       CargoType: 'Cargo',
       SeatsAmount: String(grandTotalBoxes),
     })
@@ -363,11 +382,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         if (data?.data?.[0]?.Cost) {
           setDeliveryCost(Math.round(Number(data.data[0].Cost)));
         } else {
-          setDeliveryCost(calculateFallback());
+          setDeliveryCost(calculateSmartFallback());
         }
       })
       .catch(() => {
-        if (!cancelled) setDeliveryCost(calculateFallback());
+        if (!cancelled) setDeliveryCost(calculateSmartFallback());
       })
       .finally(() => {
         if (!cancelled) setCalcLoading(false);
