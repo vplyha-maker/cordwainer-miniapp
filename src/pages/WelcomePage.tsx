@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import type { Lang, FavoriteItem } from '../App'
-import { AdminPanel } from '../components/AdminPanel'
 
 type WelcomePageProps = {
   onStart?: () => void
@@ -183,12 +182,7 @@ export function WelcomePage({ onStart, onOpenBlog, lang, setLang }: WelcomePageP
         </div>
       </header>
 
-      {/* 3. АДМИН-ПАНЕЛЬ (появится только у вашего ID 8686072747) */}
-      <div className="relative z-20 px-6 my-2">
-        <AdminPanel />
-      </div>
-
-      {/* 4. НИЖНИЙ ЖУРНАЛЬНЫЙ БЛОК */}
+      {/* 3. НИЖНИЙ ЖУРНАЛЬНЫЙ БЛОК */}
       <section className="relative z-20 flex flex-col justify-end px-6 pb-9 sm:pb-12 mt-auto">
         {/* Приветствие */}
         <div className="flex items-center justify-between mb-2">
