@@ -322,7 +322,9 @@ export default function App() {
           <WelcomePage
             key="welcome"
             onStart={() => setScreen('home')}
-            onOpenBlog={() => setScreen('blog')}
+            onOpenMaterials={() => setScreen('materials')}
+            onOpenStyles={() => setScreen('styles')}
+            onOpenCalc={() => setScreen('size-calc')}
             lang={lang}
             setLang={handleSetLang}
             favorites={favorites}
