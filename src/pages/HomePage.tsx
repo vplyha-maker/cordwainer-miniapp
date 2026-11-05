@@ -144,19 +144,22 @@ export function HomePage({
       heroTag: 'ВИДЕО-ЛУКБУК • 15 СИЛУЭТОВ',
       heroTitle: 'Анатомия\nФормы',
       heroCta: 'Смотреть лукбук',
-      search: 'Поиск по материалам, колодкам, статьям...',
+      search: 'Поиск: коллекция Cardio, силуэты, статьи...',
       clear: 'Сброс',
-      learning: 'I. ЭКСПОЗИЦИЯ И ФАКТУРА',
+      learning: 'I. ДОМ ОБУВИ И ЭКСПОЗИЦИЯ',
       tools: 'II. ИНСТРУМЕНТАРИЙ И АРХИВ',
       system: 'III. СИСТЕМА И КОЛЛЕКЦИЯ',
-      materials: 'Материалы',
-      materialsSub: 'Кожа, замша, подошвы',
+      materials: 'Cardio',
+      materialsSub: 'Мужская обувь • Производство и опт',
+      cardioBadge: 'MAISON CARDIO // MEN’S FOOTWEAR',
+      cardioDesc: 'Авторское производство мужской обуви. Сезонный лукбук, колодки и прямой оптовый заказ.',
+      cardioCta: 'Открыть коллекцию дома',
       colors: 'Цвета',
       colorsSub: 'Патина и колористика',
       styles: 'Силуэты',
       stylesSub: '15 культовых фасонов',
       sneakers: 'Footwear Index',
-      sneakersSub: 'Каталог и релизы',
+      sneakersSub: 'Каталог и мировые релизы',
       calc: 'Калькуляторы',
       calcSub: `${CALCULATORS_COUNT} точных модулей`,
       blog: 'Архив статей',
@@ -185,19 +188,22 @@ export function HomePage({
       heroTag: 'ВІДЕО-ЛУКБУК • 15 СИЛУЕТІВ',
       heroTitle: 'Анатомія\nФорми',
       heroCta: 'Дивитися лукбук',
-      search: 'Пошук за матеріалами, колодками, статтями...',
+      search: 'Пошук: колекція Cardio, силуети, статті...',
       clear: 'Скинути',
-      learning: 'I. ЕКСПОЗИЦІЯ ТА ФАКТУРА',
+      learning: 'I. ДІМ ВЗУТТЯ ТА ЕКСПОЗИЦІЯ',
       tools: 'II. ІНСТРУМЕНТАРІЙ ТА АРХІВ',
       system: 'III. СИСТЕМА ТА КОЛЕКЦІЯ',
-      materials: 'Матеріали',
-      materialsSub: 'Шкіра, замша, підошви',
+      materials: 'Cardio',
+      materialsSub: 'Чоловіче взуття • Виробництво та гурт',
+      cardioBadge: 'MAISON CARDIO // MEN’S FOOTWEAR',
+      cardioDesc: 'Авторське виробництво чоловічого взуття. Сезонний лукбук, колодки та пряме гуртове замовлення.',
+      cardioCta: 'Відкрити колекцію дому',
       colors: 'Кольори',
       colorsSub: 'Патина та колористика',
       styles: 'Силуети',
       stylesSub: '15 культових фасонів',
       sneakers: 'Footwear Index',
-      sneakersSub: 'Каталог та релізи',
+      sneakersSub: 'Каталог та світові релізи',
       calc: 'Калькулятори',
       calcSub: `${CALCULATORS_COUNT} точних модулів`,
       blog: 'Архів статей',
@@ -226,13 +232,16 @@ export function HomePage({
       heroTag: 'VIDEO-LOOKBOOK • 15 SILHOUETTEN',
       heroTitle: 'Anatomie\nder Form',
       heroCta: 'Lookbook öffnen',
-      search: 'Materialien, Leisten, Artikel suchen...',
+      search: 'Suche: Cardio Kollektion, Silhouetten, Artikel...',
       clear: 'Löschen',
-      learning: 'I. EXPOSITION & TEXTUR',
+      learning: 'I. SCHUHHAUS & EXPOSITION',
       tools: 'II. WERKZEUGE & ARCHIV',
       system: 'III. SYSTEM & SAMMLUNG',
-      materials: 'Materialien',
-      materialsSub: 'Leder, Wildleder, Sohlen',
+      materials: 'Cardio',
+      materialsSub: 'Herrenschuhe • Manufaktur & Großhandel',
+      cardioBadge: 'MAISON CARDIO // MEN’S FOOTWEAR',
+      cardioDesc: 'Herrenschuh-Manufaktur. Saisonales Lookbook, Leisten und direkte B2B-Bestellung.',
+      cardioCta: 'Kollektion öffnen',
       colors: 'Farben',
       colorsSub: 'Patina & Farblehre',
       styles: 'Silhouetten',
@@ -264,7 +273,7 @@ export function HomePage({
   }[safeLang]
 
   const LEARNING: MenuItem[] = [
-    { id: 'materials', roman: '01', tag: 'ATELIER', title: t.materials, subtitle: t.materialsSub, action: onOpenMaterials },
+    { id: 'materials', roman: '01', tag: 'MAISON', title: t.materials, subtitle: t.materialsSub, action: onOpenMaterials },
     { id: 'colors', roman: '02', tag: 'PALETTE', title: t.colors, subtitle: t.colorsSub, action: onOpenColors },
     { id: 'styles', roman: '03', tag: 'LOOKBOOK', title: t.styles, subtitle: t.stylesSub, action: onOpenStyles },
     { id: 'sneakers', roman: '04', tag: 'CATALOG', title: t.sneakers, subtitle: t.sneakersSub, action: onOpenSneakers },
@@ -329,30 +338,41 @@ export function HomePage({
   const palette = isDark
     ? {
         text: '#F4F0E8',
-        textMuted: 'rgba(244, 240, 232, 0.45)',
-        textSubtle: 'rgba(244, 240, 232, 0.28)',
+        textMuted: 'rgba(244, 240, 232, 0.52)',
+        textSubtle: 'rgba(244, 240, 232, 0.32)',
         line: 'rgba(244, 240, 232, 0.14)',
-        lineStrong: 'rgba(244, 240, 232, 0.32)',
-        surface: 'rgba(255, 255, 255, 0.02)',
+        lineStrong: 'rgba(244, 240, 232, 0.34)',
+        surface: 'rgba(255, 255, 255, 0.025)',
+        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(30,80,162,0.08) 100%)',
+        logoPlateBg: '#F6F4EF',
+        logoPlateBorder: 'rgba(244, 240, 232, 0.25)',
         bg: '#080808',
         noiseOpacity: 0.035,
         noiseBlend: 'screen' as const,
         accentRed: '#991B1B',
+        accentCobalt: '#3B82F6',
       }
     : {
         text: '#181615',
-        textMuted: 'rgba(24, 22, 21, 0.5)',
-        textSubtle: 'rgba(24, 22, 21, 0.32)',
+        textMuted: 'rgba(24, 22, 21, 0.56)',
+        textSubtle: 'rgba(24, 22, 21, 0.36)',
         line: 'rgba(24, 22, 21, 0.12)',
         lineStrong: 'rgba(24, 22, 21, 0.28)',
         surface: 'rgba(24, 22, 21, 0.025)',
+        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.65) 0%, rgba(28,78,158,0.05) 100%)',
+        logoPlateBg: '#FAF8F5',
+        logoPlateBorder: 'rgba(24, 22, 21, 0.16)',
         bg: '#F4F1EA',
         noiseOpacity: 0.05,
         noiseBlend: 'multiply' as const,
         accentRed: '#881313',
+        accentCobalt: '#1D4ED8',
       }
 
   const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
+
+  const gridItems = LEARNING.slice(1, 3) // 02 Цвета, 03 Силуэты
+  const catalogItem = LEARNING[3] // 04 Footwear Index
 
   return (
     <div
@@ -399,7 +419,7 @@ export function HomePage({
               className="text-[9px] font-sans uppercase tracking-[0.32em]"
               style={{ color: palette.textMuted }}
             >
-              EST. MMXXVI
+              CORDWAINER × CARDIO
             </span>
           )}
 
@@ -434,17 +454,17 @@ export function HomePage({
           animate="show"
           variants={containerVariants}
         >
-          {/* Журнальная шапка (Masthead) вместо слова "Меню" */}
+          {/* Журнальная шапка (Masthead) */}
           <motion.div variants={itemVariants} className="pt-7 pb-6">
             <div className="flex items-center justify-between mb-3">
               <span
-                className="text-[8px] font-sans uppercase tracking-[0.35em]"
+                className="text-[8px] font-sans uppercase tracking-[0.32em]"
                 style={{ color: palette.textMuted }}
               >
                 {t.issue}
               </span>
               <span
-                className="text-[8px] font-serif italic"
+                className="text-[9px] font-serif italic"
                 style={{ color: palette.textMuted }}
               >
                 Vol. I
@@ -538,53 +558,52 @@ export function HomePage({
             </div>
           ) : (
             <>
-              {/* HERO LOOKBOOK BANNER — С исправленным кадром и крупным планом обуви */}
-{onOpenStyles && (
-  <motion.div variants={itemVariants} className="mb-12">
-    <button
-      onClick={onOpenStyles}
-      className="group relative w-full h-[250px] overflow-hidden border outline-none bg-[#0A0A0A] text-left cursor-pointer block"
-      style={{ borderColor: palette.line }}
-    >
-      <video
-        src="/Fason/Topsaed.mp4" /* Заменено на лоферы или другой файл с крупным планом */
-        poster="/Fason/posters/Topsaed.jpg"
-        autoPlay
-        loop
-        muted
-        playsInline
-        /* Используем object-center и scale, чтобы обувь была в фокусе */
-        className="absolute inset-0 w-full h-full object-cover object-center opacity-85 scale-100 transition-transform duration-700 ease-out group-hover:scale-105"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/20" />
+              {/* HERO LOOKBOOK BANNER */}
+              {onOpenStyles && (
+                <motion.div variants={itemVariants} className="mb-12">
+                  <button
+                    onClick={onOpenStyles}
+                    className="group relative w-full h-[240px] overflow-hidden border outline-none bg-[#0A0A0A] text-left cursor-pointer block"
+                    style={{ borderColor: palette.line }}
+                  >
+                    <video
+                      src="/Fason/Topsaed.mp4"
+                      poster="/Fason/posters/Topsaed.jpg"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover object-center opacity-85 scale-100 transition-transform duration-700 ease-out group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/20" />
 
-      <div className="relative z-10 h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4F0E8]">
-        <div className="flex items-center justify-between">
-          <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
-            {t.heroTag}
-          </span>
-          <span className="text-[9px] font-sans tracking-[0.25em] text-white/60">
-            01 / 15
-          </span>
-        </div>
+                    <div className="relative z-10 h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4F0E8]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
+                          {t.heroTag}
+                        </span>
+                        <span className="text-[9px] font-sans tracking-[0.25em] text-white/60">
+                          01 / 15
+                        </span>
+                      </div>
 
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="font-serif text-3xl sm:text-4xl leading-[1.02] tracking-tight whitespace-pre-line drop-shadow-md">
-              {t.heroTitle}
-            </h2>
-          </div>
-          <div className="flex items-center gap-2 pb-1 text-[9px] font-sans uppercase tracking-[0.25em] text-white/90 border-b border-white/40 shrink-0">
-            <span>{t.heroCta}</span>
-            <span>↗</span>
-          </div>
-        </div>
-      </div>
-    </button>
-  </motion.div>
-)}
+                      <div className="flex items-end justify-between gap-4">
+                        <div>
+                          <h2 className="font-serif text-3xl sm:text-4xl leading-[1.02] tracking-tight whitespace-pre-line drop-shadow-md">
+                            {t.heroTitle}
+                          </h2>
+                        </div>
+                        <div className="flex items-center gap-2 pb-1 text-[9px] font-sans uppercase tracking-[0.25em] text-white/90 border-b border-white/40 shrink-0">
+                          <span>{t.heroCta}</span>
+                          <span>↗</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                </motion.div>
+              )}
 
-              {/* СЕКЦИЯ I: 2-колоночная редакционная сетка (Lookbook Grid) */}
+              {/* СЕКЦИЯ I: ФЛАГМАНСКИЙ ДОМ CARDIO + ЭКСПОЗИЦИЯ */}
               <motion.div variants={itemVariants} className="mb-12">
                 <div
                   className="flex items-center justify-between pb-2.5 mb-0 border-b"
@@ -605,58 +624,239 @@ export function HomePage({
                 </div>
 
                 <div
-                  className="grid grid-cols-2 border-l border-r"
+                  className="border-l border-r"
                   style={{ borderColor: palette.line }}
                 >
-                  {LEARNING.map((item, idx) => (
+                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO (Во всю ширину с логотипом /logo.png) */}
+                  <button
+                    type="button"
+                    onClick={onOpenMaterials}
+                    disabled={!onOpenMaterials}
+                    className={`group relative w-full p-5 sm:p-6 text-left outline-none border-b transition-all block overflow-hidden ${
+                      onOpenMaterials
+                        ? 'cursor-pointer active:opacity-75'
+                        : 'opacity-40 cursor-default'
+                    }`}
+                    style={{
+                      borderColor: palette.line,
+                      background: palette.cardioSurface,
+                    }}
+                  >
+                    {/* Верхняя индексная строка карточки Cardio */}
+                    <div className="flex items-center justify-between w-full mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                          style={{ color: palette.textMuted }}
+                        >
+                          01
+                        </span>
+                        <span
+                          className="inline-block w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: palette.accentCobalt }}
+                        />
+                        <span
+                          className="text-[8px] font-sans uppercase tracking-[0.28em] font-medium"
+                          style={{ color: palette.text }}
+                        >
+                          {t.cardioBadge}
+                        </span>
+                      </div>
+
+                      <span
+                        className="text-[7.5px] font-sans uppercase tracking-[0.26em] px-2 py-0.5 border"
+                        style={{
+                          borderColor: palette.lineStrong,
+                          color: palette.textMuted,
+                        }}
+                      >
+                        BESPOKE & B2B
+                      </span>
+                    </div>
+
+                    {/* Основное тело карточки: Типографика + Архитектурный медальон с /logo.png */}
+                    <div className="flex items-center justify-between gap-4 my-1">
+                      <div className="flex-1 min-w-0 pr-1">
+                        <div className="flex items-baseline gap-2.5 mb-1.5">
+                          <h3
+                            className="font-serif text-[32px] sm:text-[38px] leading-[0.95] tracking-[0.02em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
+                            style={{ color: palette.text }}
+                          >
+                            Cardio
+                          </h3>
+                          <span
+                            className="font-serif italic text-[12px]"
+                            style={{ color: palette.textMuted }}
+                          >
+                            Atelier
+                          </span>
+                        </div>
+
+                        <p
+                          className="text-[11.5px] font-sans font-light leading-[1.45] mb-3 max-w-[270px]"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {t.cardioDesc}
+                        </p>
+                      </div>
+
+                      {/* Пасху-медальон для /logo.png (растворяет белый фон через multiply) */}
+                      <div
+                        className="relative shrink-0 w-[92px] h-[72px] sm:w-[108px] sm:h-[82px] flex items-center justify-center p-2 border transition-transform duration-500 group-hover:scale-[1.03]"
+                        style={{
+                          backgroundColor: palette.logoPlateBg,
+                          borderColor: palette.logoPlateBorder,
+                          boxShadow: isDark
+                            ? '0 8px 24px rgba(0, 0, 0, 0.45)'
+                            : '0 6px 18px rgba(24, 22, 21, 0.05)',
+                        }}
+                      >
+                        {/* Внутренняя тонкая рамка паспарту */}
+                        <div
+                          className="pointer-events-none absolute inset-[3px] border"
+                          style={{ borderColor: 'rgba(24, 22, 21, 0.08)' }}
+                        />
+                        <img
+                          src="/logo.png"
+                          alt="Cardio Men's Footwear Emblem"
+                          className="relative z-10 w-full h-full object-contain"
+                          style={{
+                            mixBlendMode: 'multiply',
+                            filter: 'contrast(1.06)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Нижняя плашка действия */}
+                    <div
+                      className="mt-3 pt-3 border-t flex items-center justify-between"
+                      style={{ borderColor: palette.line }}
+                    >
+                      <span
+                        className="text-[8.5px] font-sans uppercase tracking-[0.2em]"
+                        style={{ color: palette.textMuted }}
+                      >
+                        {t.materialsSub}
+                      </span>
+                      <span
+                        className="text-[9px] font-sans uppercase tracking-[0.24em] font-medium flex items-center gap-1.5"
+                        style={{ color: palette.text }}
+                      >
+                        <span>{t.cardioCta}</span>
+                        <span className="transition-transform duration-300 group-hover:translate-x-0.5">
+                          ↗
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* 02 & 03. ДВУХКОЛОНОЧНЫЙ РЯД: ЦВЕТА И СИЛУЭТЫ (Без обрезки троеточием) */}
+                  <div className="grid grid-cols-2">
+                    {gridItems.map((item, idx) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={item.action}
+                        disabled={!item.action}
+                        className={`group relative p-4 sm:p-5 min-h-[128px] flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
+                          idx === 0 ? 'border-r' : ''
+                        } ${
+                          item.action
+                            ? 'cursor-pointer active:opacity-50'
+                            : 'opacity-40 cursor-default'
+                        }`}
+                        style={{ borderColor: palette.line }}
+                      >
+                        <div className="flex items-center justify-between w-full mb-3">
+                          <span
+                            className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                            style={{ color: palette.textMuted }}
+                          >
+                            {item.roman}
+                          </span>
+                          <span
+                            className="text-[7px] font-sans uppercase tracking-[0.24em]"
+                            style={{ color: palette.textSubtle }}
+                          >
+                            {item.tag}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div
+                            className="font-serif text-[22px] sm:text-[25px] leading-[1.08] tracking-tight mb-1.5 transition-transform group-hover:translate-x-0.5"
+                            style={{ color: palette.text }}
+                          >
+                            {item.title}
+                          </div>
+                          <div
+                            className="text-[8.5px] font-sans uppercase tracking-[0.12em] leading-[1.35]"
+                            style={{ color: palette.textMuted }}
+                          >
+                            {item.subtitle}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX */}
+                  {catalogItem && (
                     <button
-                      key={item.id}
-                      onClick={item.action}
-                      disabled={!item.action}
-                      className={`group relative p-4 sm:p-5 min-h-[132px] flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
-                        idx % 2 === 0 ? 'border-r' : ''
-                      } ${
-                        item.action
+                      type="button"
+                      onClick={catalogItem.action}
+                      disabled={!catalogItem.action}
+                      className={`group w-full p-4 sm:p-5 flex items-center justify-between text-left bg-transparent outline-none border-b transition-colors ${
+                        catalogItem.action
                           ? 'cursor-pointer active:opacity-50'
                           : 'opacity-40 cursor-default'
                       }`}
                       style={{ borderColor: palette.line }}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <span
-                          className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
-                          style={{ color: palette.textMuted }}
-                        >
-                          {item.roman}
-                        </span>
-                        <span
-                          className="text-[7px] font-sans uppercase tracking-[0.28em]"
-                          style={{ color: palette.textSubtle }}
-                        >
-                          {item.tag}
-                        </span>
-                      </div>
-
-                      <div className="my-2">
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-1">
+                          <span
+                            className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                            style={{ color: palette.textMuted }}
+                          >
+                            {catalogItem.roman}
+                          </span>
+                          <span
+                            className="text-[7px] font-sans uppercase tracking-[0.28em]"
+                            style={{ color: palette.textSubtle }}
+                          >
+                            {catalogItem.tag}
+                          </span>
+                        </div>
                         <div
-                          className="font-serif text-[22px] sm:text-[25px] leading-[1.08] tracking-tight mb-1.5 transition-transform group-hover:translate-x-0.5"
+                          className="font-serif text-[23px] sm:text-[25px] leading-tight tracking-tight transition-transform group-hover:translate-x-0.5"
                           style={{ color: palette.text }}
                         >
-                          {item.title}
-                        </div>
-                        <div
-                          className="text-[9px] font-sans uppercase tracking-[0.14em] leading-snug line-clamp-1"
-                          style={{ color: palette.textMuted }}
-                        >
-                          {item.subtitle}
+                          {catalogItem.title}
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-2.5 pl-3 shrink-0">
+                        <span
+                          className="text-[8.5px] font-sans uppercase tracking-[0.16em]"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {catalogItem.subtitle}
+                        </span>
+                        <span
+                          className="text-[10px]"
+                          style={{ color: palette.textSubtle }}
+                        >
+                          ↗
+                        </span>
+                      </div>
                     </button>
-                  ))}
+                  )}
                 </div>
               </motion.div>
 
-              {/* СЕКЦИЯ II: Инструментарий (Чистый индекс с выравниванием в одну линию) */}
+              {/* СЕКЦИЯ II: Инструментарий (Исправлена обрезка длинных заголовков) */}
               <motion.div variants={itemVariants} className="mb-12">
                 <div
                   className="flex items-center justify-between pb-2.5 border-b"
@@ -682,14 +882,14 @@ export function HomePage({
                       key={item.id}
                       onClick={item.action}
                       disabled={!item.action}
-                      className={`group flex items-center justify-between py-4 border-b outline-none bg-transparent text-left transition-opacity ${
+                      className={`group flex items-baseline justify-between gap-3 py-4 border-b outline-none bg-transparent text-left transition-opacity ${
                         item.action
                           ? 'cursor-pointer active:opacity-50'
                           : 'opacity-40 cursor-default'
                       }`}
                       style={{ borderColor: palette.line }}
                     >
-                      <div className="flex items-baseline gap-3.5 min-w-0 pr-3">
+                      <div className="flex items-baseline gap-3 min-w-0">
                         <span
                           className="text-[9px] font-sans tracking-[0.22em] tabular-nums shrink-0"
                           style={{ color: palette.textMuted }}
@@ -697,7 +897,7 @@ export function HomePage({
                           {item.roman}
                         </span>
                         <span
-                          className="font-serif text-[24px] leading-none tracking-tight truncate transition-transform group-hover:translate-x-1"
+                          className="font-serif text-[21px] sm:text-[24px] leading-snug tracking-tight transition-transform group-hover:translate-x-1"
                           style={{ color: palette.text }}
                         >
                           {item.title}
@@ -710,9 +910,9 @@ export function HomePage({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className="text-[8px] font-sans uppercase tracking-[0.22em]"
+                          className="text-[8px] font-sans uppercase tracking-[0.16em]"
                           style={{ color: palette.textMuted }}
                         >
                           {item.subtitle}
@@ -729,7 +929,7 @@ export function HomePage({
                 </div>
               </motion.div>
 
-              {/* СЕКЦИЯ III: Система + Архив + Меценатство (компактная журнальная сетка вместо пустых коробок) */}
+              {/* СЕКЦИЯ III: Система + Архив + Меценатство */}
               <motion.div variants={itemVariants} className="mb-14">
                 <div
                   className="flex items-center justify-between pb-2.5 border-b"
@@ -784,7 +984,7 @@ export function HomePage({
                         {item.title}
                       </div>
                       <div
-                        className="text-[8px] font-sans uppercase tracking-[0.2em]"
+                        className="text-[8px] font-sans uppercase tracking-[0.16em]"
                         style={{ color: palette.textMuted }}
                       >
                         {item.subtitle}
@@ -793,7 +993,7 @@ export function HomePage({
                   ))}
                 </div>
 
-                {/* Личный архив (Сохраненное) — строгие прямоугольные портретные срезы вместо кружков */}
+                {/* Личный архив (Сохраненное) */}
                 <button
                   onClick={() => {
                     if (articleFavorites.length === 1) onOpenArticle?.(articleFavorites[0].id)
@@ -847,7 +1047,7 @@ export function HomePage({
                   )}
                 </button>
 
-                {/* Меценатство / Поддержать проект — элегантная издательская строка */}
+                {/* Меценатство / Поддержать проект */}
                 <button
                   onClick={handleSupportClick}
                   className="group w-full flex items-center justify-between py-4 px-4 border-l border-r border-b outline-none bg-transparent cursor-pointer active:opacity-50 transition-opacity"
@@ -902,7 +1102,7 @@ export function HomePage({
                     className="mt-4 text-[8px] font-sans uppercase tracking-[0.45em]"
                     style={{ color: palette.textSubtle }}
                   >
-                    CORDWAINER ATELIER • MMXXVI
+                    CORDWAINER × CARDIO • MMXXVI
                   </p>
                 </div>
               </motion.div>
