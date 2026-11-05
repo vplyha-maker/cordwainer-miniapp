@@ -81,6 +81,80 @@ type InvoiceMeta = {
 };
 
 /**
+ * Увеличенная мобильная кнопка очистки поля (44x44px область касания для iOS/Android)
+ */
+function ClearFieldButton({
+  onClear,
+  isTextarea = false,
+  ariaLabel = 'Очистить поле',
+}: {
+  onClear: () => void;
+  isTextarea?: boolean;
+  ariaLabel?: string;
+}) {
+  const handleTrigger = (e: React.PointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    triggerHaptic('light');
+    onClear();
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onPointerDown={handleTrigger}
+      onClick={(e) => {
+        // Fallback для клавиатурной навигации (если не сработал pointerdown)
+        if (e.detail === 0) {
+          handleTrigger(e);
+        }
+      }}
+      style={{
+        position: 'absolute',
+        right: '1px',
+        top: '1px',
+        bottom: isTextarea ? 'auto' : '1px',
+        height: isTextarea ? '42px' : undefined,
+        width: '44px',
+        zIndex: 10,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        margin: 0,
+        cursor: 'pointer',
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+        userSelect: 'none',
+      }}
+    >
+      <span
+        style={{
+          width: '22px',
+          height: '22px',
+          borderRadius: '50%',
+          backgroundColor: THEME.surfaceActive,
+          border: `1px solid ${THEME.border}`,
+          color: THEME.ink,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '11px',
+          lineHeight: 1,
+          fontWeight: 600,
+          pointerEvents: 'none',
+        }}
+      >
+        ✕
+      </span>
+    </button>
+  );
+}
+
+/**
  * Генерация уникального номера накладной без БД: CRD-ДДММГГ-XXXX
  * Фиксируется в sessionStorage на время работы с текущей накладной.
  */
@@ -296,6 +370,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const logisticsRef = useRef<HTMLDivElement | null>(null);
   const cityBoxRef = useRef<HTMLDivElement | null>(null);
   const warehouseBoxRef = useRef<HTMLDivElement | null>(null);
+
+  const cityInputRef = useRef<HTMLInputElement | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const warehouseInputRef = useRef<HTMLInputElement | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     try {
@@ -621,7 +701,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const getFieldStyle = (isValid: boolean): React.CSSProperties => ({
     width: '100%',
     boxSizing: 'border-box',
-    padding: '10px 34px 10px 12px',
+    padding: '11px 46px 11px 12px',
     border: `1px solid ${showValidationErrors && !isValid ? THEME.danger : THEME.border}`,
     fontSize: '13px',
     backgroundColor: showValidationErrors && !isValid ? '#FDF6F6' : THEME.surface,
@@ -874,7 +954,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '17px', fontFamily: THEME.serif }}>
                         <span style={{ fontSize: '10px', color: THEME.inkLight, marginRight: '6px', fontFamily: THEME.sans }}>
                           0{idx + 1}
@@ -892,9 +972,15 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          fontSize: '12px',
+                          fontSize: '13px',
                           color: THEME.inkLight,
-                          padding: '2px 4px',
+                          width: '36px',
+                          height: '36px',
+                          margin: '-8px -8px -8px 0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          touchAction: 'manipulation',
                         }}
                         title="Удалить позицию"
                       >
@@ -937,19 +1023,20 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                               }
                             }}
                             style={{
-                              width: '26px',
-                              height: '26px',
+                              width: '28px',
+                              height: '28px',
                               border: 'none',
                               borderLeft: `1px solid ${THEME.border}`,
                               backgroundColor: THEME.surface,
                               color: canDecrease ? THEME.ink : THEME.border,
                               cursor: canDecrease ? 'pointer' : 'default',
-                              fontSize: '13px',
+                              fontSize: '14px',
+                              touchAction: 'manipulation',
                             }}
                           >
                             −
                           </button>
-                          <span style={{ fontSize: '11px', fontWeight: 600, minWidth: '24px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, minWidth: '26px', textAlign: 'center' }}>
                             {item.boxesCount}
                           </span>
                           <button
@@ -959,14 +1046,15 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                               onUpdateQuantity(item.uid, item.boxesCount + 1);
                             }}
                             style={{
-                              width: '26px',
-                              height: '26px',
+                              width: '28px',
+                              height: '28px',
                               border: 'none',
                               borderLeft: `1px solid ${THEME.border}`,
                               backgroundColor: THEME.surface,
                               color: THEME.ink,
                               cursor: 'pointer',
-                              fontSize: '13px',
+                              fontSize: '14px',
+                              touchAction: 'manipulation',
                             }}
                           >
                             +
@@ -1036,7 +1124,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       type="button"
                       onClick={() => handleSelectCity(city)}
                       style={{
-                        padding: '5px 9px',
+                        padding: '6px 10px',
                         fontSize: '10px',
                         border: `1px solid ${isSelected ? THEME.ink : THEME.border}`,
                         backgroundColor: isSelected ? THEME.ink : THEME.bg,
@@ -1044,6 +1132,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         cursor: 'pointer',
                         letterSpacing: '0.5px',
                         fontWeight: isSelected ? 600 : 400,
+                        touchAction: 'manipulation',
                       }}
                     >
                       {city.name}
@@ -1055,6 +1144,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               {/* 1. Город / Село */}
               <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
+                  ref={cityInputRef}
                   type="text"
                   placeholder="1. Начните вводить город, пгт или село *"
                   value={cityQuery}
@@ -1067,29 +1157,15 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 />
 
                 {cityQuery.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
+                  <ClearFieldButton
+                    ariaLabel="Очистить город"
+                    onClear={() => {
                       setCityQuery('');
                       setCityResults([]);
                       setShowCityDropdown(true);
+                      cityInputRef.current?.focus();
                     }}
-                    style={{
-                      position: 'absolute',
-                      right: '8px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '12px',
-                      color: THEME.inkMuted,
-                      cursor: 'pointer',
-                      padding: '4px',
-                    }}
-                  >
-                    ✕
-                  </button>
+                  />
                 )}
 
                 {showCityDropdown &&
@@ -1124,7 +1200,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                             key={c.ref}
                             onClick={() => handleSelectCity(c)}
                             style={{
-                              padding: '10px 12px',
+                              padding: '11px 12px',
                               fontSize: '12px',
                               borderBottom: `1px solid ${THEME.border}`,
                               cursor: 'pointer',
@@ -1140,20 +1216,31 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               </div>
 
               {/* 2. Имя и Фамилия */}
-              <div style={{ marginBottom: '8px' }}>
+              <div style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
+                  ref={nameInputRef}
                   type="text"
                   placeholder="2. Имя и Фамилия получателя *"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   style={getFieldStyle(isNameValid)}
                 />
+                {clientName.length > 0 && (
+                  <ClearFieldButton
+                    ariaLabel="Очистить имя"
+                    onClear={() => {
+                      setClientName('');
+                      nameInputRef.current?.focus();
+                    }}
+                  />
+                )}
               </div>
 
               {/* 3. Телефон с автоформатированием и проверкой кода оператора */}
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ position: 'relative' }}>
                   <input
+                    ref={phoneInputRef}
                     type="tel"
                     inputMode="tel"
                     placeholder="3. Телефон получателя: +38 (0XX) XXX-XX-XX *"
@@ -1162,27 +1249,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     style={getFieldStyle(isPhoneValid)}
                   />
                   {clientPhone.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light');
+                    <ClearFieldButton
+                      ariaLabel="Очистить телефон"
+                      onClear={() => {
                         setClientPhone('');
+                        phoneInputRef.current?.focus();
                       }}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '12px',
-                        color: THEME.inkMuted,
-                        cursor: 'pointer',
-                        padding: '4px',
-                      }}
-                    >
-                      ✕
-                    </button>
+                    />
                   )}
                 </div>
                 {phoneValidation.errorHint && (showValidationErrors || clientPhone.length >= 7) && (
@@ -1202,6 +1275,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               {/* 4. Отделение или адрес доставки */}
               <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
+                  ref={warehouseInputRef}
                   type="text"
                   placeholder={
                     warehousesLoading
@@ -1218,28 +1292,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 />
 
                 {branchOrComment.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
+                  <ClearFieldButton
+                    ariaLabel="Очистить отделение"
+                    onClear={() => {
                       setBranchOrComment('');
                       setShowWarehouseDropdown(true);
+                      warehouseInputRef.current?.focus();
                     }}
-                    style={{
-                      position: 'absolute',
-                      right: '8px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '12px',
-                      color: THEME.inkMuted,
-                      cursor: 'pointer',
-                      padding: '4px',
-                    }}
-                  >
-                    ✕
-                  </button>
+                  />
                 )}
 
                 {showWarehouseDropdown && filteredWarehouses.length > 0 && (
@@ -1267,7 +1327,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           setShowWarehouseDropdown(false);
                         }}
                         style={{
-                          padding: '9px 12px',
+                          padding: '10px 12px',
                           fontSize: '11px',
                           borderBottom: `1px solid ${THEME.border}`,
                           cursor: 'pointer',
@@ -1284,6 +1344,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               {/* 5. Необязательный комментарий к заказу */}
               <div style={{ position: 'relative', marginBottom: '12px' }}>
                 <textarea
+                  ref={commentInputRef}
                   rows={2}
                   placeholder="5. Комментарий к заказу (необязательно — пожелания по отправке, упаковке или срокам)"
                   value={orderComment}
@@ -1296,26 +1357,14 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   }}
                 />
                 {orderComment.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
+                  <ClearFieldButton
+                    isTextarea
+                    ariaLabel="Очистить комментарий"
+                    onClear={() => {
                       setOrderComment('');
+                      commentInputRef.current?.focus();
                     }}
-                    style={{
-                      position: 'absolute',
-                      right: '8px',
-                      top: '10px',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '12px',
-                      color: THEME.inkMuted,
-                      cursor: 'pointer',
-                      padding: '4px',
-                    }}
-                  >
-                    ✕
-                  </button>
+                  />
                 )}
               </div>
 
