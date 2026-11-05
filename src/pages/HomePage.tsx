@@ -151,9 +151,9 @@ export function HomePage({
       system: 'III. СИСТЕМА И КОЛЛЕКЦИЯ',
       materials: 'Cardio',
       materialsSub: 'Мужская обувь • Производство и опт',
-      cardioBadge: 'MAISON CARDIO // MEN’S FOOTWEAR',
+      cardioBadge: 'MAISON CARDIO • MEN’S SHOES',
       cardioDesc: 'Авторское производство мужской обуви. Сезонный лукбук, колодки и прямой оптовый заказ.',
-      cardioCta: 'Открыть коллекцию дома',
+      cardioCta: 'Открыть коллекцию',
       colors: 'Цвета',
       colorsSub: 'Патина и колористика',
       styles: 'Силуэты',
@@ -195,9 +195,9 @@ export function HomePage({
       system: 'III. СИСТЕМА ТА КОЛЕКЦІЯ',
       materials: 'Cardio',
       materialsSub: 'Чоловіче взуття • Виробництво та гурт',
-      cardioBadge: 'MAISON CARDIO // MEN’S FOOTWEAR',
+      cardioBadge: 'MAISON CARDIO • MEN’S SHOES',
       cardioDesc: 'Авторське виробництво чоловічого взуття. Сезонний лукбук, колодки та пряме гуртове замовлення.',
-      cardioCta: 'Відкрити колекцію дому',
+      cardioCta: 'Відкрити колекцію',
       colors: 'Кольори',
       colorsSub: 'Патина та колористика',
       styles: 'Силуети',
@@ -238,8 +238,8 @@ export function HomePage({
       tools: 'II. WERKZEUGE & ARCHIV',
       system: 'III. SYSTEM & SAMMLUNG',
       materials: 'Cardio',
-      materialsSub: 'Herrenschuhe • Manufaktur & Großhandel',
-      cardioBadge: 'MAISON CARDIO // MEN’S FOOTWEAR',
+      materialsSub: 'Herrenschuhe • Manufaktur & B2B',
+      cardioBadge: 'MAISON CARDIO • MEN’S SHOES',
       cardioDesc: 'Herrenschuh-Manufaktur. Saisonales Lookbook, Leisten und direkte B2B-Bestellung.',
       cardioCta: 'Kollektion öffnen',
       colors: 'Farben',
@@ -339,13 +339,11 @@ export function HomePage({
     ? {
         text: '#F4F0E8',
         textMuted: 'rgba(244, 240, 232, 0.52)',
-        textSubtle: 'rgba(244, 240, 232, 0.32)',
+        textSubtle: 'rgba(244, 240, 232, 0.34)',
         line: 'rgba(244, 240, 232, 0.14)',
         lineStrong: 'rgba(244, 240, 232, 0.34)',
         surface: 'rgba(255, 255, 255, 0.025)',
-        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(30,80,162,0.08) 100%)',
-        logoPlateBg: '#F6F4EF',
-        logoPlateBorder: 'rgba(244, 240, 232, 0.25)',
+        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(30,80,162,0.09) 100%)',
         bg: '#080808',
         noiseOpacity: 0.035,
         noiseBlend: 'screen' as const,
@@ -355,13 +353,11 @@ export function HomePage({
     : {
         text: '#181615',
         textMuted: 'rgba(24, 22, 21, 0.56)',
-        textSubtle: 'rgba(24, 22, 21, 0.36)',
+        textSubtle: 'rgba(24, 22, 21, 0.38)',
         line: 'rgba(24, 22, 21, 0.12)',
         lineStrong: 'rgba(24, 22, 21, 0.28)',
         surface: 'rgba(24, 22, 21, 0.025)',
-        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.65) 0%, rgba(28,78,158,0.05) 100%)',
-        logoPlateBg: '#FAF8F5',
-        logoPlateBorder: 'rgba(24, 22, 21, 0.16)',
+        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(29,78,216,0.045) 100%)',
         bg: '#F4F1EA',
         noiseOpacity: 0.05,
         noiseBlend: 'multiply' as const,
@@ -627,7 +623,7 @@ export function HomePage({
                   className="border-l border-r"
                   style={{ borderColor: palette.line }}
                 >
-                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO (Во всю ширину с логотипом /logo.png) */}
+                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO */}
                   <button
                     type="button"
                     onClick={onOpenMaterials}
@@ -642,21 +638,21 @@ export function HomePage({
                       background: palette.cardioSurface,
                     }}
                   >
-                    {/* Верхняя индексная строка карточки Cardio */}
-                    <div className="flex items-center justify-between w-full mb-4">
-                      <div className="flex items-center gap-2.5">
+                    {/* Верхняя индексная строка — строго в одну линию без переносов */}
+                    <div className="flex items-center justify-between gap-2 w-full mb-4">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                          className="text-[9px] font-sans tracking-[0.22em] tabular-nums shrink-0"
                           style={{ color: palette.textMuted }}
                         >
                           01
                         </span>
                         <span
-                          className="inline-block w-1.5 h-1.5 rounded-full"
+                          className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ backgroundColor: palette.accentCobalt }}
                         />
                         <span
-                          className="text-[8px] font-sans uppercase tracking-[0.28em] font-medium"
+                          className="text-[8px] font-sans uppercase tracking-[0.22em] font-medium truncate"
                           style={{ color: palette.text }}
                         >
                           {t.cardioBadge}
@@ -664,28 +660,28 @@ export function HomePage({
                       </div>
 
                       <span
-                        className="text-[7.5px] font-sans uppercase tracking-[0.26em] px-2 py-0.5 border"
+                        className="text-[7.5px] font-sans uppercase tracking-[0.2em] px-2 py-0.5 border whitespace-nowrap shrink-0"
                         style={{
                           borderColor: palette.lineStrong,
                           color: palette.textMuted,
                         }}
                       >
-                        BESPOKE & B2B
+                        BESPOKE • B2B
                       </span>
                     </div>
 
-                    {/* Основное тело карточки: Типографика + Архитектурный медальон с /logo.png */}
-                    <div className="flex items-center justify-between gap-4 my-1">
+                    {/* Основное тело карточки: Типографика + Крупная эмблема /logo.png прямо на бумаге */}
+                    <div className="flex items-center justify-between gap-3 my-1">
                       <div className="flex-1 min-w-0 pr-1">
-                        <div className="flex items-baseline gap-2.5 mb-1.5">
+                        <div className="flex items-baseline gap-2 mb-1.5">
                           <h3
-                            className="font-serif text-[32px] sm:text-[38px] leading-[0.95] tracking-[0.02em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
+                            className="font-serif text-[34px] sm:text-[40px] leading-[0.92] tracking-[0.02em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
                             style={{ color: palette.text }}
                           >
                             Cardio
                           </h3>
                           <span
-                            className="font-serif italic text-[12px]"
+                            className="font-serif italic text-[13px]"
                             style={{ color: palette.textMuted }}
                           >
                             Atelier
@@ -693,55 +689,48 @@ export function HomePage({
                         </div>
 
                         <p
-                          className="text-[11.5px] font-sans font-light leading-[1.45] mb-3 max-w-[270px]"
+                          className="text-[11.5px] font-sans font-light leading-[1.45] max-w-[240px]"
                           style={{ color: palette.textMuted }}
                         >
                           {t.cardioDesc}
                         </p>
                       </div>
 
-                      {/* Пасху-медальон для /logo.png (растворяет белый фон через multiply) */}
+                      {/* Эмблема без лишней квадратной рамки — увеличена в 1.8 раза, чтобы срезать белые поля исходника */}
                       <div
-                        className="relative shrink-0 w-[92px] h-[72px] sm:w-[108px] sm:h-[82px] flex items-center justify-center p-2 border transition-transform duration-500 group-hover:scale-[1.03]"
-                        style={{
-                          backgroundColor: palette.logoPlateBg,
-                          borderColor: palette.logoPlateBorder,
-                          boxShadow: isDark
-                            ? '0 8px 24px rgba(0, 0, 0, 0.45)'
-                            : '0 6px 18px rgba(24, 22, 21, 0.05)',
-                        }}
+                        className={`relative shrink-0 w-[108px] h-[76px] sm:w-[124px] sm:h-[86px] flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105 ${
+                          isDark ? 'rounded-sm bg-[#F4F1EA]/95 px-2' : ''
+                        }`}
                       >
-                        {/* Внутренняя тонкая рамка паспарту */}
-                        <div
-                          className="pointer-events-none absolute inset-[3px] border"
-                          style={{ borderColor: 'rgba(24, 22, 21, 0.08)' }}
-                        />
                         <img
                           src="/logo.png"
                           alt="Cardio Men's Footwear Emblem"
-                          className="relative z-10 w-full h-full object-contain"
+                          className="w-full h-full object-contain scale-[1.85]"
                           style={{
                             mixBlendMode: 'multiply',
-                            filter: 'contrast(1.06)',
+                            filter: 'contrast(1.08)',
                           }}
                         />
                       </div>
                     </div>
 
-                    {/* Нижняя плашка действия */}
+                    {/* Нижняя плашка — строго в одну линию */}
                     <div
-                      className="mt-3 pt-3 border-t flex items-center justify-between"
+                      className="mt-4 pt-3 border-t flex items-center justify-between gap-2"
                       style={{ borderColor: palette.line }}
                     >
                       <span
-                        className="text-[8.5px] font-sans uppercase tracking-[0.2em]"
+                        className="text-[8px] font-sans uppercase tracking-[0.16em] truncate"
                         style={{ color: palette.textMuted }}
                       >
                         {t.materialsSub}
                       </span>
                       <span
-                        className="text-[9px] font-sans uppercase tracking-[0.24em] font-medium flex items-center gap-1.5"
-                        style={{ color: palette.text }}
+                        className="text-[8.5px] font-sans uppercase tracking-[0.22em] font-medium flex items-center gap-1.5 whitespace-nowrap shrink-0 border-b pb-0.5"
+                        style={{
+                          color: palette.text,
+                          borderColor: palette.lineStrong,
+                        }}
                       >
                         <span>{t.cardioCta}</span>
                         <span className="transition-transform duration-300 group-hover:translate-x-0.5">
@@ -751,7 +740,7 @@ export function HomePage({
                     </div>
                   </button>
 
-                  {/* 02 & 03. ДВУХКОЛОНОЧНЫЙ РЯД: ЦВЕТА И СИЛУЭТЫ (Без обрезки троеточием) */}
+                  {/* 02 & 03. ДВУХКОЛОНОЧНЫЙ РЯД: ЦВЕТА И СИЛУЭТЫ */}
                   <div className="grid grid-cols-2">
                     {gridItems.map((item, idx) => (
                       <button
@@ -759,7 +748,7 @@ export function HomePage({
                         type="button"
                         onClick={item.action}
                         disabled={!item.action}
-                        className={`group relative p-4 sm:p-5 min-h-[128px] flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
+                        className={`group relative p-4 sm:p-5 min-h-[126px] flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
                           idx === 0 ? 'border-r' : ''
                         } ${
                           item.action
@@ -801,62 +790,63 @@ export function HomePage({
                     ))}
                   </div>
 
-                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX */}
+                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX (Заголовок в одну строку) */}
                   {catalogItem && (
                     <button
                       type="button"
                       onClick={catalogItem.action}
                       disabled={!catalogItem.action}
-                      className={`group w-full p-4 sm:p-5 flex items-center justify-between text-left bg-transparent outline-none border-b transition-colors ${
+                      className={`group w-full p-4 sm:p-5 flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
                         catalogItem.action
                           ? 'cursor-pointer active:opacity-50'
                           : 'opacity-40 cursor-default'
                       }`}
                       style={{ borderColor: palette.line }}
                     >
-                      <div>
-                        <div className="flex items-center gap-2.5 mb-1">
-                          <span
-                            className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
-                            style={{ color: palette.textMuted }}
-                          >
-                            {catalogItem.roman}
-                          </span>
-                          <span
-                            className="text-[7px] font-sans uppercase tracking-[0.28em]"
-                            style={{ color: palette.textSubtle }}
-                          >
-                            {catalogItem.tag}
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between w-full mb-2">
+                        <span
+                          className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                          style={{ color: palette.textMuted }}
+                        >
+                          {catalogItem.roman}
+                        </span>
+                        <span
+                          className="text-[7px] font-sans uppercase tracking-[0.28em]"
+                          style={{ color: palette.textSubtle }}
+                        >
+                          {catalogItem.tag}
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline justify-between gap-3 w-full">
                         <div
-                          className="font-serif text-[23px] sm:text-[25px] leading-tight tracking-tight transition-transform group-hover:translate-x-0.5"
+                          className="font-serif text-[23px] sm:text-[26px] leading-none tracking-tight whitespace-nowrap transition-transform group-hover:translate-x-0.5"
                           style={{ color: palette.text }}
                         >
                           {catalogItem.title}
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2.5 pl-3 shrink-0">
-                        <span
-                          className="text-[8.5px] font-sans uppercase tracking-[0.16em]"
-                          style={{ color: palette.textMuted }}
-                        >
-                          {catalogItem.subtitle}
-                        </span>
-                        <span
-                          className="text-[10px]"
-                          style={{ color: palette.textSubtle }}
-                        >
-                          ↗
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className="text-[8.5px] font-sans uppercase tracking-[0.15em]"
+                            style={{ color: palette.textMuted }}
+                          >
+                            {catalogItem.subtitle}
+                          </span>
+                          <span
+                            className="text-[10px]"
+                            style={{ color: palette.textSubtle }}
+                          >
+                            ↗
+                          </span>
+                        </div>
                       </div>
                     </button>
                   )}
                 </div>
               </motion.div>
 
-              {/* СЕКЦИЯ II: Инструментарий (Исправлена обрезка длинных заголовков) */}
+              {/* СЕКЦИЯ II: Инструментарий */}
               <motion.div variants={itemVariants} className="mb-12">
                 <div
                   className="flex items-center justify-between pb-2.5 border-b"
