@@ -7,9 +7,11 @@ import {
   playAppSound,
   preloadAppSounds,
 } from './ManagersContactCard';
+import type { Lang } from '../App';
 
 type WholesaleCartProps = {
   items: CartItem[];
+  lang: Lang;
   onUpdateQuantity: (uid: string, newBoxesCount: number) => void;
   onRemove: (uid: string) => void;
   onClear: () => void;
@@ -43,7 +45,6 @@ const RECIPIENT_STORAGE_KEY = 'cardio_b2b_recipient_v1';
 const INVOICE_META_STORAGE_KEY = 'cardio_b2b_invoice_meta_v1';
 const SIZES_ORDER: SizeKey[] = [40, 41, 42, 43, 44, 45];
 
-// Действующие коды мобильных и городских операторов Украины
 const VALID_UA_OPERATOR_CODES = new Set([
   '039', '050', '063', '066', '067', '068',
   '073', '075', '077', '089', '091', '092',
@@ -80,9 +81,6 @@ type InvoiceMeta = {
   dateFormatted: string;
 };
 
-/**
- * Увеличенная мобильная кнопка очистки поля (44x44px область касания для iOS/Android)
- */
 function ClearFieldButton({
   onClear,
   isTextarea = false,
@@ -105,10 +103,7 @@ function ClearFieldButton({
       aria-label={ariaLabel}
       onPointerDown={handleTrigger}
       onClick={(e) => {
-        // Fallback для клавиатурной навигации (если не сработал pointerdown)
-        if (e.detail === 0) {
-          handleTrigger(e);
-        }
+        if (e.detail === 0) handleTrigger(e);
       }}
       style={{
         position: 'absolute',
@@ -154,29 +149,18 @@ function ClearFieldButton({
   );
 }
 
-/**
- * Генерация уникального номера накладной без БД: CRD-ДДММГГ-XXXX
- * Фиксируется в sessionStorage на время работы с текущей накладной.
- */
 function getOrCreateInvoiceMeta(forceNew = false): InvoiceMeta {
   if (!forceNew) {
     try {
       const saved = sessionStorage.getItem(INVOICE_META_STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved) as InvoiceMeta;
-      }
-    } catch {
-      // Игнорируем ошибки доступа к хранилищу
-    }
+      if (saved) return JSON.parse(saved) as InvoiceMeta;
+    } catch {}
   }
-
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const yy = String(now.getFullYear()).slice(-2);
   const fullYear = now.getFullYear();
-
-  // Комбинация секунд с начала суток и случайного числа исключает дубли без БД
   const secondsToday = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
   const timePart = String(secondsToday % 100).padStart(2, '0');
   const randomPart = String(Math.floor(10 + Math.random() * 90));
@@ -188,124 +172,97 @@ function getOrCreateInvoiceMeta(forceNew = false): InvoiceMeta {
 
   try {
     sessionStorage.setItem(INVOICE_META_STORAGE_KEY, JSON.stringify(meta));
-  } catch {
-    // Игнорируем ошибки доступа к хранилищу
-  }
-
+  } catch {}
   return meta;
 }
 
-/**
- * Извлекает 10 локальных цифр украинского номера (формата 0XX XXXXXXX)
- */
 function extractLocalPhoneDigits(raw: string): string {
   let digits = raw.replace(/\D/g, '');
   if (!digits) return '';
-
-  if (digits.startsWith('380')) {
-    digits = digits.slice(2);
-  } else if (digits.startsWith('38')) {
-    digits = digits.slice(2);
-  } else if (digits.startsWith('80')) {
-    digits = digits.slice(1);
-  } else if (!digits.startsWith('0')) {
-    digits = '0' + digits;
-  }
-
+  if (digits.startsWith('380')) digits = digits.slice(2);
+  else if (digits.startsWith('38')) digits = digits.slice(2);
+  else if (digits.startsWith('80')) digits = digits.slice(1);
+  else if (!digits.startsWith('0')) digits = '0' + digits;
   return digits.slice(0, 10);
 }
 
-/**
- * Форматирует телефон в вид +38 (0XX) XXX-XX-XX без блокировки клавиши Backspace
- */
 function formatUkrainePhone(raw: string): string {
   const digits = extractLocalPhoneDigits(raw);
   if (!digits) return '';
-
   let result = '+38 (' + digits.slice(0, 3);
-  if (digits.length > 3) {
-    result += ') ' + digits.slice(3, 6);
-  }
-  if (digits.length > 6) {
-    result += '-' + digits.slice(6, 8);
-  }
-  if (digits.length > 8) {
-    result += '-' + digits.slice(8, 10);
-  }
+  if (digits.length > 3) result += ') ' + digits.slice(3, 6);
+  if (digits.length > 6) result += '-' + digits.slice(6, 8);
+  if (digits.length > 8) result += '-' + digits.slice(8, 10);
   return result;
 }
 
-/**
- * Строгая валидация украинского номера телефона
- */
-function validateUkrainePhone(raw: string): { isValid: boolean; errorHint: string | null } {
+function validateUkrainePhone(raw: string, lang: Lang): { isValid: boolean; errorHint: string | null } {
   const digits = extractLocalPhoneDigits(raw);
-
-  if (digits.length === 0) {
-    return { isValid: false, errorHint: null };
-  }
+  if (digits.length === 0) return { isValid: false, errorHint: null };
 
   if (digits.length >= 3) {
     const operatorCode = digits.slice(0, 3);
     if (!VALID_UA_OPERATOR_CODES.has(operatorCode)) {
-      return {
-        isValid: false,
-        errorHint: `Некорректный код оператора (${operatorCode}). Пример: 067, 050, 063, 097`,
+      const hints: Record<Lang, string> = {
+        ru: `Некорректный код оператора (${operatorCode}). Пример: 067, 050, 063, 097`,
+        uk: `Некоректний код оператора (${operatorCode}). Приклад: 067, 050, 063, 097`,
+        de: `Ungültiger Betreibercode (${operatorCode}). Bsp.: 067, 050, 063, 097`,
       };
+      return { isValid: false, errorHint: hints[lang] || hints.ru };
     }
   }
 
   if (digits.length < 10) {
-    return {
-      isValid: false,
-      errorHint: 'Введите номер полностью (10 цифр, например: 067 123-45-67)',
+    const hints: Record<Lang, string> = {
+      ru: 'Введите номер полностью (10 цифр, например: 067 123-45-67)',
+      uk: 'Введіть номер повністю (10 цифр, наприклад: 067 123-45-67)',
+      de: 'Nummer vollständig eingeben (10 Ziffern, Bsp.: 067 123-45-67)',
     };
+    return { isValid: false, errorHint: hints[lang] || hints.ru };
   }
 
   const subscriberPart = digits.slice(3);
   if (/^(\d)\1{6}$/.test(subscriberPart)) {
-    return {
-      isValid: false,
-      errorHint: 'Укажите действующий номер телефона получателя',
+    const hints: Record<Lang, string> = {
+      ru: 'Укажите действующий номер телефона получателя',
+      uk: 'Вкажіть діючий номер телефону отримувача',
+      de: 'Geben Sie eine gültige Empfängernummer an',
     };
+    return { isValid: false, errorHint: hints[lang] || hints.ru };
   }
 
   return { isValid: true, errorHint: null };
 }
 
-function getDynamicFormulaText(item: CartItem): string {
+function getDynamicFormulaText(item: CartItem, lang: Lang): string {
   if (item.orderMode === 'sample') {
-    return `Тестовый образец (1 пара) — р. ${item.sampleSize}`;
+    return lang === 'de' 
+      ? `Testmuster (1 Paar) — Gr. ${item.sampleSize}`
+      : lang === 'uk'
+      ? `Тестовий зразок (1 пара) — р. ${item.sampleSize}`
+      : `Тестовый образец (1 пара) — р. ${item.sampleSize}`;
   }
   const breakdown = SIZES_ORDER.filter((sz) => (item.sizeRun[sz] || 0) > 0)
     .map((sz) => `${sz}р.(${(item.sizeRun[sz] || 0) * item.boxesCount})`)
     .join(' • ');
 
-  return `Ростовок ×${item.boxesCount}: ${breakdown}`;
+  return lang === 'de'
+    ? `Kisten ×${item.boxesCount}: ${breakdown}`
+    : lang === 'uk'
+    ? `Ростовок ×${item.boxesCount}: ${breakdown}`
+    : `Ростовок ×${item.boxesCount}: ${breakdown}`;
 }
 
-async function callNovaPoshta(
-  modelName: string,
-  calledMethod: string,
-  methodProperties: Record<string, unknown>
-) {
+async function callNovaPoshta(modelName: string, calledMethod: string, methodProperties: Record<string, unknown>) {
   try {
     const res = await fetch('/api/np', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        modelName,
-        calledMethod,
-        methodProperties,
-      }),
+      body: JSON.stringify({ modelName, calledMethod, methodProperties }),
     });
     const data = await res.json();
-    if (data?.success) {
-      return data;
-    }
-  } catch {
-    // Ошибка соединения
-  }
+    if (data?.success) return data;
+  } catch {}
   return null;
 }
 
@@ -313,7 +270,6 @@ function buildSearchVariants(raw: string): string[] {
   const clean = raw.trim();
   const lower = clean.toLowerCase();
   const variants = new Set<string>([clean]);
-
   if (lower.includes('аив') || lower.includes('яив') || lower.includes('иив')) {
     variants.add(clean.replace(/([аяиії])ив/gi, '$1їв'));
   }
@@ -321,10 +277,7 @@ function buildSearchVariants(raw: string): string[] {
     variants.add(clean.replace(/и/gi, 'і'));
     variants.add(clean.replace(/ив$/i, 'їв'));
   }
-  if (lower.startsWith('никола')) {
-    variants.add('Миколаїв');
-  }
-
+  if (lower.startsWith('никола')) variants.add('Миколаїв');
   return Array.from(variants);
 }
 
@@ -337,17 +290,89 @@ function loadSavedRecipient(): SavedRecipientData | null {
   }
 }
 
-export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
-  const savedRecipient = loadSavedRecipient();
+export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
+  const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
 
+  const t = {
+    ru: {
+      back: '← Назад в каталог',
+      clearCart: '✕ Очистить накладную',
+      headerSub: 'CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ',
+      title: (count: number) => `Оптовая накладная (${count})`,
+      emptyText: 'В вашей накладной пока нет выбранных моделей.',
+      goToCatalog: 'Перейти в каталог →',
+      totalPairsLabel: 'Итого:',
+      boxesLabel: 'Коробов',
+      sectionLogistics: 'I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА',
+      sectionShipping: 'РЕКВИЗИТЫ ОТГРУЗКИ',
+      fillRequired: 'Заполните обязательные поля:',
+      cityPrompt: 'Населенный пункт:',
+      citySub: 'Выберите город из быстрого списка или начните вводить название любого города, пгт или села:',
+      cityPlaceholder: '1. Начните вводить город, пгт или село *',
+      namePlaceholder: '2. Имя и Фамилия получателя *',
+      phonePlaceholder: '3. Телефон получателя: +38 (0XX) XXX-XX-XX *',
+      warehouseLoading: 'Загрузка доступных отделений...',
+      warehousePlaceholder: (city: string) => `4. Выберите отделение или введите адрес (${city}) *`,
+      commentPlaceholder: '5. Комментарий к заказу (необязательно — пожелания по отправке, упаковке или срокам)',
+      totalToShip: 'Всего к отгрузке:',
+      boxesSuffix: (b: number) => `(~${b} кор.)`,
+      deleteTitle: 'Удалить позицию',
+    },
+    uk: {
+      back: '← Назад у каталог',
+      clearCart: '✕ Очистити накладну',
+      headerSub: 'CARDIO FOOTWEAR // ГУРТОВЕ ЗАМОВЛЕННЯ',
+      title: (count: number) => `Гуртова накладна (${count})`,
+      emptyText: 'У вашій накладній поки немає обраних моделей.',
+      goToCatalog: 'Перейти до каталогу →',
+      totalPairsLabel: 'Разом:',
+      boxesLabel: 'Коробів',
+      sectionLogistics: 'I. ДАНІ ОТРИМУВАЧА ТА ДОСТАВКА',
+      sectionShipping: 'РЕКВІЗИТИ ВІДПРАВКИ',
+      fillRequired: 'Заповніть обов’язкові поля:',
+      cityPrompt: 'Населений пункт:',
+      citySub: 'Виберіть місто зі швидкого списку або почніть вводити назву будь-якого міста, смт чи села:',
+      cityPlaceholder: '1. Почніть вводити місто, смт чи село *',
+      namePlaceholder: '2. Ім’я та Прізвище отримувача *',
+      phonePlaceholder: '3. Телефон отримувача: +38 (0XX) XXX-XX-XX *',
+      warehouseLoading: 'Завантаження доступних відділень...',
+      warehousePlaceholder: (city: string) => `4. Виберіть відділення або введіть адресу (${city}) *`,
+      commentPlaceholder: '5. Коментар до замовлення (необов’язково — побажання щодо відправки, упаковки чи термінів)',
+      totalToShip: 'Всього до відвантаження:',
+      boxesSuffix: (b: number) => `(~${b} кор.)`,
+      deleteTitle: 'Видалити позицію',
+    },
+    de: {
+      back: '← Zurück zum Katalog',
+      clearCart: '✕ Rechnung leeren',
+      headerSub: 'CARDIO FOOTWEAR // GROSSHANDELSBESTELLUNG',
+      title: (count: number) => `Großhandelsrechnung (${count})`,
+      emptyText: 'Ihre Rechnung enthält noch keine Modelle.',
+      goToCatalog: 'Zum Katalog →',
+      totalPairsLabel: 'Gesamt:',
+      boxesLabel: 'Kisten',
+      sectionLogistics: 'I. EMPFÄNGERDATEN & VERSAND',
+      sectionShipping: 'VERSANDDETAILS',
+      fillRequired: 'Bitte füllen Sie Pflichtfelder aus:',
+      cityPrompt: 'Ortschaft:',
+      citySub: 'Wählen Sie eine Stadt aus oder geben Sie den Namen ein:',
+      cityPlaceholder: '1. Stadt, Gemeinde oder Dorf eingeben *',
+      namePlaceholder: '2. Vor- und Nachname des Empfängers *',
+      phonePlaceholder: '3. Telefon: +38 (0XX) XXX-XX-XX *',
+      warehouseLoading: 'Filialen werden geladen...',
+      warehousePlaceholder: (city: string) => `4. Filiale wählen oder Adresse eingeben (${city}) *`,
+      commentPlaceholder: '5. Kommentar zur Bestellung (optional — Wünsche zu Versand oder Verpackung)',
+      totalToShip: 'Gesamtmenge:',
+      boxesSuffix: (b: number) => `(~${b} Kist.)`,
+      deleteTitle: 'Position löschen',
+    },
+  }[safeLang];
+
+  const savedRecipient = loadSavedRecipient();
   const [invoiceMeta, setInvoiceMeta] = useState<InvoiceMeta>(() => getOrCreateInvoiceMeta(false));
 
-  const [selectedCity, setSelectedCity] = useState<CityOption>(
-    savedRecipient?.selectedCity || POPULAR_CITIES[0]
-  );
-  const [cityQuery, setCityQuery] = useState(
-    savedRecipient?.cityQuery ?? POPULAR_CITIES[0].fullLabel
-  );
+  const [selectedCity, setSelectedCity] = useState<CityOption>(savedRecipient?.selectedCity || POPULAR_CITIES[0]);
+  const [cityQuery, setCityQuery] = useState(savedRecipient?.cityQuery ?? POPULAR_CITIES[0].fullLabel);
   const [cityResults, setCityResults] = useState<CityOption[]>([]);
   const [citySearching, setCitySearching] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -358,9 +383,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
   const [branchOrComment, setBranchOrComment] = useState(savedRecipient?.branchOrComment || '');
   const [clientName, setClientName] = useState(savedRecipient?.clientName || '');
-  const [clientPhone, setClientPhone] = useState(() =>
-    savedRecipient?.clientPhone ? formatUkrainePhone(savedRecipient.clientPhone) : ''
-  );
+  const [clientPhone, setClientPhone] = useState(() => savedRecipient?.clientPhone ? formatUkrainePhone(savedRecipient.clientPhone) : '');
   const [orderComment, setOrderComment] = useState(savedRecipient?.orderComment || '');
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
@@ -379,29 +402,16 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
   useEffect(() => {
     try {
-      const payload: SavedRecipientData = {
-        selectedCity,
-        cityQuery,
-        branchOrComment,
-        clientName,
-        clientPhone,
-        orderComment,
-      };
+      const payload: SavedRecipientData = { selectedCity, cityQuery, branchOrComment, clientName, clientPhone, orderComment };
       localStorage.setItem(RECIPIENT_STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      // Ignore storage errors
-    }
+    } catch {}
   }, [selectedCity, cityQuery, branchOrComment, clientName, clientPhone, orderComment]);
 
   useEffect(() => {
     const handlePointerDownOutside = (e: PointerEvent) => {
       const target = e.target as Node;
-      if (cityBoxRef.current && !cityBoxRef.current.contains(target)) {
-        setShowCityDropdown(false);
-      }
-      if (warehouseBoxRef.current && !warehouseBoxRef.current.contains(target)) {
-        setShowWarehouseDropdown(false);
-      }
+      if (cityBoxRef.current && !cityBoxRef.current.contains(target)) setShowCityDropdown(false);
+      if (warehouseBoxRef.current && !warehouseBoxRef.current.contains(target)) setShowWarehouseDropdown(false);
     };
     document.addEventListener('pointerdown', handlePointerDownOutside);
     return () => document.removeEventListener('pointerdown', handlePointerDownOutside);
@@ -413,16 +423,16 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const isCityValid = cityQuery.trim().length >= 2;
   const isBranchValid = branchOrComment.trim().length >= 2;
   const isNameValid = clientName.trim().length >= 3 && !/^(.)\1+$/.test(clientName.trim().toLowerCase());
-  const phoneValidation = validateUkrainePhone(clientPhone);
+  const phoneValidation = validateUkrainePhone(clientPhone, safeLang);
   const isPhoneValid = phoneValidation.isValid;
 
   const isFormValid = isCityValid && isBranchValid && isNameValid && isPhoneValid;
 
   const missingFields: string[] = [];
-  if (!isCityValid) missingFields.push('населенный пункт');
-  if (!isNameValid) missingFields.push('Имя и Фамилию');
-  if (!isPhoneValid) missingFields.push('корректный телефон');
-  if (!isBranchValid) missingFields.push('№ отделения / адрес доставки');
+  if (!isCityValid) missingFields.push(safeLang === 'de' ? 'Ortschaft' : safeLang === 'uk' ? 'населений пункт' : 'населенный пункт');
+  if (!isNameValid) missingFields.push(safeLang === 'de' ? 'Name' : safeLang === 'uk' ? 'Ім’я та Прізвище' : 'Имя и Фамилию');
+  if (!isPhoneValid) missingFields.push(safeLang === 'de' ? 'Telefon' : safeLang === 'uk' ? 'коректний телефон' : 'корректный телефон');
+  if (!isBranchValid) missingFields.push(safeLang === 'de' ? 'Filiale / Adresse' : safeLang === 'uk' ? '№ відділення / адреса' : '№ отделения / адрес доставки');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -431,7 +441,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
   useEffect(() => {
     const trimmed = cityQuery.trim();
-
     if (trimmed.length < 1 || trimmed === selectedCity.fullLabel) {
       setCityResults([]);
       setCitySearching(false);
@@ -448,11 +457,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         const seenRefs = new Set<string>();
 
         for (const queryStr of searchVariants) {
-          const dataCities = await callNovaPoshta('Address', 'getCities', {
-            FindByString: queryStr,
-            Limit: '50',
-          });
-
+          const dataCities = await callNovaPoshta('Address', 'getCities', { FindByString: queryStr, Limit: '50' });
           if (cancelled) return;
 
           if (Array.isArray(dataCities?.data)) {
@@ -469,32 +474,17 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               const namePart = ru && ru.toLowerCase() !== ua.toLowerCase() ? `${ua} / ${ru}` : ua;
               const fullLabel = area ? `${type} ${namePart} (${area} обл.)` : `${type} ${namePart}`;
 
-              collected.push({
-                name: ru || ua,
-                uaName: ua,
-                fullLabel,
-                ref,
-                area,
-              });
+              collected.push({ name: ru || ua, uaName: ua, fullLabel, ref, area });
             }
           }
-
-          if (collected.length > 0) {
-            break;
-          }
+          if (collected.length > 0) break;
         }
 
-        if (!cancelled) {
-          setCityResults(collected);
-        }
+        if (!cancelled) setCityResults(collected);
       } catch {
-        if (!cancelled) {
-          setCityResults([]);
-        }
+        if (!cancelled) setCityResults([]);
       } finally {
-        if (!cancelled) {
-          setCitySearching(false);
-        }
+        if (!cancelled) setCitySearching(false);
       }
     }, 250);
 
@@ -509,18 +499,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       setWarehouses([]);
       return;
     }
-
     let cancelled = false;
     setWarehousesLoading(true);
 
     const loadWarehouses = async () => {
       try {
-        const dataWh = await callNovaPoshta('Address', 'getWarehouses', {
-          CityRef: selectedCity.ref,
-        });
-
+        const dataWh = await callNovaPoshta('Address', 'getWarehouses', { CityRef: selectedCity.ref });
         if (cancelled) return;
-
         if (Array.isArray(dataWh?.data)) {
           const list: WarehouseOption[] = dataWh.data.map((w: Record<string, string>) => ({
             ref: w.Ref,
@@ -539,7 +524,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     };
 
     loadWarehouses();
-
     return () => {
       cancelled = true;
     };
@@ -557,16 +541,10 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     for (const w of warehouses) {
       const num = w.number.toLowerCase();
       const desc = w.description.toLowerCase();
-
-      if (digits && num === digits) {
-        exactNum.push(w);
-      } else if (digits && num.startsWith(digits)) {
-        startsNum.push(w);
-      } else if (num.includes(q) || desc.includes(q)) {
-        byText.push(w);
-      }
+      if (digits && num === digits) exactNum.push(w);
+      else if (digits && num.startsWith(digits)) startsNum.push(w);
+      else if (num.includes(q) || desc.includes(q)) byText.push(w);
     }
-
     return [...exactNum, ...startsNum, ...byText].slice(0, 50);
   })();
 
@@ -588,9 +566,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
     triggerHaptic('warning');
     playAppSound('nul.mp3');
     setInvoiceMeta(getOrCreateInvoiceMeta(true));
-    setTimeout(() => {
-      onClear();
-    }, 150);
+    setTimeout(() => onClear(), 150);
   };
 
   const combinedClientContact = `${clientName.trim()}, тел.: ${clientPhone.trim()}`;
@@ -598,7 +574,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
       const variantStr = item.shoe.variant ? ` ${item.shoe.variant}` : '';
-      const actualFormula = getDynamicFormulaText(item);
+      const actualFormula = getDynamicFormulaText(item, safeLang);
       return (
         `${idx + 1}. Модель № ${item.shoe.modelNumber}${variantStr} (${item.shoe.color})\n` +
         `   • ${actualFormula}\n` +
@@ -657,7 +633,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
       });
 
       const data = await response.json();
-
       if (response.ok && data.success) {
         triggerHaptic('success');
         setOrderBanner({
@@ -667,18 +642,12 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         return true;
       } else {
         triggerHaptic('error');
-        setOrderBanner({
-          type: 'error',
-          text: `Ошибка отправки: ${data.error || 'Не удалось отправить заказ'}`,
-        });
+        setOrderBanner({ type: 'error', text: `Ошибка отправки: ${data.error || 'Не удалось отправить заказ'}` });
         return false;
       }
     } catch {
       triggerHaptic('error');
-      setOrderBanner({
-        type: 'error',
-        text: 'Ошибка соединения с сервером. Скопируйте накладную или попробуйте снова.',
-      });
+      setOrderBanner({ type: 'error', text: 'Ошибка соединения с сервером.' });
       return false;
     }
   };
@@ -727,42 +696,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
         boxSizing: 'border-box',
       }}
     >
-      <style>{`
-        .wholesale-cart-light input,
-        .wholesale-cart-light select,
-        .wholesale-cart-light textarea {
-          color-scheme: light !important;
-          color: #161514 !important;
-          -webkit-text-fill-color: #161514 !important;
-          caret-color: #161514 !important;
-          opacity: 1 !important;
-        }
-        .wholesale-cart-light input::placeholder,
-        .wholesale-cart-light textarea::placeholder {
-          color: #8C877E !important;
-          -webkit-text-fill-color: #8C877E !important;
-          opacity: 1 !important;
-        }
-        /* Исправление обрезки имен (БОР... / ГЕО...) на кнопках отправки в ManagersContactCard */
-        .managers-contact-scope button {
-          padding-left: 10px !important;
-          padding-right: 10px !important;
-          gap: 6px !important;
-        }
-        .managers-contact-scope button span {
-          overflow: visible !important;
-          text-overflow: clip !important;
-          max-width: none !important;
-          white-space: nowrap !important;
-        }
-        .managers-contact-scope button span:first-child {
-          letter-spacing: 0.65px !important;
-          font-size: 9.5px !important;
-          flex-shrink: 0 !important;
-        }
-      `}</style>
-
-      {/* Верхняя шапка накладной */}
       <div
         style={{
           display: 'flex',
@@ -790,7 +723,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             color: THEME.ink,
           }}
         >
-          ← Назад в каталог
+          {t.back}
         </button>
 
         {items.length > 0 && (
@@ -809,7 +742,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               cursor: 'pointer',
             }}
           >
-            ✕ Очистить накладную
+            {t.clearCart}
           </button>
         )}
       </div>
@@ -829,7 +762,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             marginBottom: '4px',
           }}
         >
-          <span>CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ</span>
+          <span>{t.headerSub}</span>
           {items.length > 0 && (
             <span
               style={{
@@ -854,7 +787,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             letterSpacing: '0.2px',
           }}
         >
-          Оптовая накладная ({items.length})
+          {t.title(items.length)}
         </h1>
       </div>
 
@@ -876,7 +809,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               margin: '0 0 20px 0',
             }}
           >
-            В вашей накладной пока нет выбранных моделей.
+            {t.emptyText}
           </p>
           <button
             onClick={() => {
@@ -895,22 +828,16 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
               fontWeight: 500,
             }}
           >
-            Перейти в каталог →
+            {t.goToCatalog}
           </button>
         </div>
       ) : (
         <>
-          {/* Список выбранных моделей */}
-          <div
-            style={{
-              borderTop: `1px solid ${THEME.border}`,
-              marginBottom: '24px',
-            }}
-          >
+          <div style={{ borderTop: `1px solid ${THEME.border}`, marginBottom: '24px' }}>
             {items.map((item, idx) => {
               const isSample = item.orderMode === 'sample';
               const canDecrease = item.boxesCount > 1;
-              const actualFormula = getDynamicFormulaText(item);
+              const actualFormula = getDynamicFormulaText(item, safeLang);
 
               return (
                 <div
@@ -982,7 +909,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                           justifyContent: 'center',
                           touchAction: 'manipulation',
                         }}
-                        title="Удалить позицию"
+                        title={t.deleteTitle}
                       >
                         ✕
                       </button>
@@ -1006,13 +933,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                       }}
                     >
                       <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '14px' }}>
-                        Итого: <strong>{item.totalPairs} пар</strong>
+                        {t.totalPairsLabel} <strong>{item.totalPairs} пар</strong>
                       </span>
 
                       {!isSample && (
                         <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${THEME.border}`, backgroundColor: THEME.bg }}>
                           <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.8px', color: THEME.inkMuted, padding: '0 8px' }}>
-                            Коробов
+                            {t.boxesLabel}
                           </span>
                           <button
                             type="button"
@@ -1068,7 +995,6 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
             })}
           </div>
 
-          {/* I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА */}
           <div ref={logisticsRef} style={{ marginBottom: '24px' }}>
             <div
               style={{
@@ -1081,8 +1007,8 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 marginBottom: '8px',
               }}
             >
-              <span>I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА</span>
-              <span>РЕКВИЗИТЫ ОТГРУЗКИ</span>
+              <span>{t.sectionLogistics}</span>
+              <span>{t.sectionShipping}</span>
             </div>
 
             <div
@@ -1104,15 +1030,15 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     lineHeight: 1.35,
                   }}
                 >
-                  Заполните обязательные поля: <strong>{missingFields.join(', ')}</strong>
+                  {t.fillRequired} <strong>{missingFields.join(', ')}</strong>
                 </div>
               )}
 
               <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '6px' }}>
-                Населенный пункт: <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
+                {t.cityPrompt} <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
               </div>
               <div style={{ fontSize: '11px', color: THEME.inkMuted, marginBottom: '10px', lineHeight: 1.35 }}>
-                Выберите город из быстрого списка или начните вводить название любого города, пгт или села:
+                {t.citySub}
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
@@ -1135,18 +1061,17 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                         touchAction: 'manipulation',
                       }}
                     >
-                      {city.name}
+                      {safeLang === 'uk' ? city.uaName : city.name}
                     </button>
                   );
                 })}
               </div>
 
-              {/* 1. Город / Село */}
               <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   ref={cityInputRef}
                   type="text"
-                  placeholder="1. Начните вводить город, пгт или село *"
+                  placeholder={t.cityPlaceholder}
                   value={cityQuery}
                   onFocus={() => setShowCityDropdown(true)}
                   onChange={(e) => {
@@ -1168,59 +1093,56 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   />
                 )}
 
-                {showCityDropdown &&
-                  cityQuery.trim().length >= 1 &&
-                  cityQuery.trim() !== selectedCity.fullLabel && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        zIndex: 30,
-                        backgroundColor: THEME.surface,
-                        border: `1px solid ${THEME.border}`,
-                        maxHeight: '220px',
-                        overflowY: 'auto',
-                        WebkitOverflowScrolling: 'touch',
-                        boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      {citySearching ? (
-                        <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                          Поиск населенного пункта...
+                {showCityDropdown && cityQuery.trim().length >= 1 && cityQuery.trim() !== selectedCity.fullLabel && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 30,
+                      backgroundColor: THEME.surface,
+                      border: `1px solid ${THEME.border}`,
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      WebkitOverflowScrolling: 'touch',
+                      boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+                    }}
+                  >
+                    {citySearching ? (
+                      <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
+                        Поиск...
+                      </div>
+                    ) : cityResults.length === 0 ? (
+                      <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
+                        Не найдено / Nicht gefunden
+                      </div>
+                    ) : (
+                      cityResults.map((c) => (
+                        <div
+                          key={c.ref}
+                          onClick={() => handleSelectCity(c)}
+                          style={{
+                            padding: '11px 12px',
+                            fontSize: '12px',
+                            borderBottom: `1px solid ${THEME.border}`,
+                            cursor: 'pointer',
+                            color: THEME.ink,
+                          }}
+                        >
+                          {c.fullLabel}
                         </div>
-                      ) : cityResults.length === 0 ? (
-                        <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                          Населенный пункт не найден. Проверьте написание
-                        </div>
-                      ) : (
-                        cityResults.map((c) => (
-                          <div
-                            key={c.ref}
-                            onClick={() => handleSelectCity(c)}
-                            style={{
-                              padding: '11px 12px',
-                              fontSize: '12px',
-                              borderBottom: `1px solid ${THEME.border}`,
-                              cursor: 'pointer',
-                              color: THEME.ink,
-                            }}
-                          >
-                            {c.fullLabel}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* 2. Имя и Фамилия */}
               <div style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   ref={nameInputRef}
                   type="text"
-                  placeholder="2. Имя и Фамилия получателя *"
+                  placeholder={t.namePlaceholder}
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   style={getFieldStyle(isNameValid)}
@@ -1236,14 +1158,13 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 )}
               </div>
 
-              {/* 3. Телефон с автоформатированием и проверкой кода оператора */}
               <div style={{ marginBottom: '8px' }}>
                 <div style={{ position: 'relative' }}>
                   <input
                     ref={phoneInputRef}
                     type="tel"
                     inputMode="tel"
-                    placeholder="3. Телефон получателя: +38 (0XX) XXX-XX-XX *"
+                    placeholder={t.phonePlaceholder}
                     value={clientPhone}
                     onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
                     style={getFieldStyle(isPhoneValid)}
@@ -1259,28 +1180,20 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                   )}
                 </div>
                 {phoneValidation.errorHint && (showValidationErrors || clientPhone.length >= 7) && (
-                  <div
-                    style={{
-                      fontSize: '10px',
-                      color: THEME.danger,
-                      marginTop: '4px',
-                      lineHeight: 1.3,
-                    }}
-                  >
+                  <div style={{ fontSize: '10px', color: THEME.danger, marginTop: '4px', lineHeight: 1.3 }}>
                     {phoneValidation.errorHint}
                   </div>
                 )}
               </div>
 
-              {/* 4. Отделение или адрес доставки */}
               <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <input
                   ref={warehouseInputRef}
                   type="text"
                   placeholder={
                     warehousesLoading
-                      ? 'Загрузка доступных отделений...'
-                      : `4. Выберите отделение или введите адрес (${selectedCity.uaName}) *`
+                      ? t.warehouseLoading
+                      : t.warehousePlaceholder(selectedCity.uaName)
                   }
                   value={branchOrComment}
                   onFocus={() => setShowWarehouseDropdown(true)}
@@ -1341,12 +1254,11 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 )}
               </div>
 
-              {/* 5. Необязательный комментарий к заказу */}
               <div style={{ position: 'relative', marginBottom: '12px' }}>
                 <textarea
                   ref={commentInputRef}
                   rows={2}
-                  placeholder="5. Комментарий к заказу (необязательно — пожелания по отправке, упаковке или срокам)"
+                  placeholder={t.commentPlaceholder}
                   value={orderComment}
                   onChange={(e) => setOrderComment(e.target.value)}
                   style={{
@@ -1379,7 +1291,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                 }}
               >
                 <div style={{ fontSize: '11px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                  Всего к отгрузке:
+                  {t.totalToShip}
                 </div>
                 <div
                   style={{
@@ -1390,7 +1302,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
                     flexShrink: 0,
                   }}
                 >
-                  {grandTotalPairs} пар <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>(~{grandTotalBoxes} кор.)</span>
+                  {grandTotalPairs} пар <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>{t.boxesSuffix(grandTotalBoxes)}</span>
                 </div>
               </div>
             </div>
@@ -1414,6 +1326,7 @@ export function WholesaleCart({ items, onUpdateQuantity, onRemove, onClear, onCl
 
           <div className="managers-contact-scope">
             <ManagersContactCard
+              lang={safeLang}
               itemsCount={items.length}
               onSendOrder={sendToManager}
               onCopyInvoice={copyInvoice}
@@ -1435,11 +1348,8 @@ function useMemoOrCalcBoxes(items: CartItem[], grandTotalPairs: number): number 
   let samplePairs = 0;
 
   for (const item of items) {
-    if (item.orderMode === 'sample') {
-      samplePairs += item.totalPairs;
-    } else {
-      wholesaleBoxes += item.boxesCount;
-    }
+    if (item.orderMode === 'sample') samplePairs += item.totalPairs;
+    else wholesaleBoxes += item.boxesCount;
   }
 
   const sampleBoxes = samplePairs > 0 ? Math.ceil(samplePairs / 8) : 0;
