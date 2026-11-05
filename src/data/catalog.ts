@@ -22,6 +22,72 @@ export interface CartItem {
   formulaText: string;
 }
 
+// Словари для перевода категорий обуви
+const CATEGORY_TRANSLATIONS: Record<ShoeCategory, Record<string, string>> = {
+  'Ботинки': {
+    ru: 'Ботинки',
+    uk: 'Черевики',
+    de: 'Stiefel',
+  },
+  'Кроссовки': {
+    ru: 'Кроссовки',
+    uk: 'Кросівки',
+    de: 'Sneaker',
+  },
+  'Туфли': {
+    ru: 'Туфли',
+    uk: 'Туфлі',
+    de: 'Schuhe',
+  },
+};
+
+// Словари для перевода цветов
+const COLOR_TRANSLATIONS: Record<string, Record<string, string>> = {
+  'Белый': { ru: 'Белый', uk: 'Білий', de: 'Weiß' },
+  'Черный': { ru: 'Черный', uk: 'Чорний', de: 'Schwarz' },
+  'Коричневый': { ru: 'Коричневый', uk: 'Коричневий', de: 'Braun' },
+  'Олива': { ru: 'Олива', uk: 'Олива', de: 'Olive' },
+  'Песок': { ru: 'Песок', uk: 'Пісочний', de: 'Sand' },
+  'Серый': { ru: 'Серый', uk: 'Сірий', de: 'Grau' },
+  'Зеленый': { ru: 'Зеленый', uk: 'Зелений', de: 'Grün' },
+  'Черно-белый': { ru: 'Черно-белый', uk: 'Чорно-білий', de: 'Schwarz-Weiß' },
+  'Синий': { ru: 'Синий', uk: 'Синій', de: 'Blau' },
+  'Рыжий': { ru: 'Рыжий', uk: 'Рудий', de: 'Rotbraun' },
+  'Бежевый': { ru: 'Бежевый', uk: 'Бежевий', de: 'Beige' },
+  'Бордовый': { ru: 'Бордовый', uk: 'Бордовий', de: 'Bordeaux' },
+};
+
+// Словари для перевода особенностей (features)
+const FEATURE_TRANSLATIONS: Record<string, Record<string, string>> = {
+  'Мех': { ru: 'Мех', uk: 'Хутро', de: 'Futter' },
+  'Gore-Tex': { ru: 'Gore-Tex', uk: 'Gore-Tex', de: 'Gore-Tex' },
+  'Подошва трактор': { ru: 'Подошва трактор', uk: 'Підошва трактор', de: 'Traktionssohle' },
+  'Подошва бело-черная': { ru: 'Подошва бело-черная', uk: 'Підошва біло-чорна', de: 'Sohle weiß-schwarz' },
+  'Подошва черная': { ru: 'Подошва черная', uk: 'Підошва чорна', de: 'Sohle schwarz' },
+  'Подошва белая': { ru: 'Подошва белая', uk: 'Підошва біла', de: 'Sohle weiß' },
+};
+
+/**
+ * Вспомогательная функция для перевода категории обуви
+ */
+export function getLocalizedCategory(category: ShoeCategory, lang: string = 'ru'): string {
+  return CATEGORY_TRANSLATIONS[category]?.[lang] || category;
+}
+
+/**
+ * Вспомогательная функция для перевода цвета обуви
+ */
+export function getLocalizedColor(color: string, lang: string = 'ru'): string {
+  return COLOR_TRANSLATIONS[color]?.[lang] || color;
+}
+
+/**
+ * Вспомогательная функция для перевода особенностей обуви
+ */
+export function getLocalizedFeature(feature: string, lang: string = 'ru'): string {
+  return FEATURE_TRANSLATIONS[feature]?.[lang] || feature;
+}
+
 export const cardioCatalog: ShoeItem[] = [
   // Модель 223
   { id: '223', modelNumber: '223', category: 'Кроссовки', color: 'Белый', features: ['Мех', 'Gore-Tex'], image: '/catalog/223.jpg' },
