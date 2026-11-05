@@ -1,5 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { cardioCatalog, type ShoeCategory, type ShoeItem, type CartItem, type SizeKey } from '../data/catalog';
+import { 
+  cardioCatalog, 
+  getLocalizedCategory, 
+  getLocalizedColor, 
+  getLocalizedFeature, 
+  type ShoeCategory, 
+  type ShoeItem, 
+  type CartItem, 
+  type SizeKey 
+} from '../data/catalog';
 import { WholesaleCart } from '../components/WholesaleCart';
 import type { Lang } from '../App';
 
@@ -193,7 +202,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       boxesCountLabel: 'Кількість коробів:',
       samplePrompt: 'Виберіть розмір тестового зразка:',
       addedSuccess: '✓ Додано до накладної',
-      addToCart: 'Додати до накладнаї',
+      addToCart: 'Додати до накладної',
       mainPageBtn: '← Головна',
       searchPlaceholder: 'Номер моделі або колір...',
       searchLabel: 'Пошук:',
@@ -245,7 +254,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       found: (n: number) => `GEFUNDEN: ${n}`,
       grid2Col: '2 SPALTEN',
       gridLarge: 'GROSS',
-      inCartBadge: (p: number) => ` IM WAGEN: ${p} P.`,
+      inCartBadge: (p: number) => `IM WAGEN: ${p} P.`,
       chooseBtn: 'Auswählen →',
       reorderBtn: 'Nachbestellen →',
       topToBeginning: '↑ Zum Anfang',
@@ -548,6 +557,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
 
   if (selectedShoe) {
     const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
+    const translatedSelectedColor = getLocalizedColor(selectedShoe.color, safeLang);
 
     return (
       <div
@@ -693,7 +703,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               marginBottom: '6px',
             }}
           >
-            <span>{t.cardTitle} // {selectedShoe.category}</span>
+            <span>{t.cardTitle} // {getLocalizedCategory(selectedShoe.category, safeLang)}</span>
             <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
               Арт. № {selectedShoe.modelNumber}
             </span>
@@ -725,7 +735,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               color: THEME.inkMuted,
             }}
           >
-            {t.colorLabel} {selectedShoe.color}
+            {t.colorLabel} {translatedSelectedColor}
           </div>
         </div>
 
@@ -809,7 +819,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                     backgroundColor: THEME.bg,
                   }}
                 >
-                  {feat}
+                  {getLocalizedFeature(feat, safeLang)}
                 </span>
               ))}
             </div>
@@ -843,6 +853,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               {modelVariants.map((v, i) => {
                 const isCurrent = v.id === selectedShoe.id;
                 const cellBg = isCurrent ? THEME.surfaceActive : THEME.surface;
+                const translatedVariantColor = getLocalizedColor(v.color, safeLang);
                 return (
                   <div
                     key={v.id}
@@ -912,7 +923,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {v.color}
+                      {translatedVariantColor}
                     </div>
                   </div>
                 );
@@ -1735,6 +1746,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
             const isLarge = gridMode === 'large';
             const cardBg = inCartPairs > 0 ? '#EFECE4' : THEME.surface;
+            const translatedColor = getLocalizedColor(shoe.color, safeLang);
+            const translatedCategory = getLocalizedCategory(shoe.category, safeLang);
 
             return (
               <div
@@ -1766,7 +1779,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   }}
                 >
                   <span style={{ fontSize: isLarge ? '10px' : '8px', color: THEME.inkLight, textTransform: 'uppercase' }}>
-                    {shoe.category}
+                    {translatedCategory}
                   </span>
 
                   {inCartPairs > 0 ? (
@@ -1775,7 +1788,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                     </span>
                   ) : (
                     <span style={{ fontSize: isLarge ? '10px' : '8px', color: THEME.inkLight }}>
-                      {variantsCount > 1 ? `${variantsCount} ЦВ.` : '40—45'}
+                      {variantsCount > 1 ? t.colorsCountLabel(variantsCount) : '40—45'}
                     </span>
                   )}
                 </div>
@@ -1824,7 +1837,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   </div>
 
                   <div style={{ fontSize: isLarge ? '11px' : '10px', color: THEME.inkMuted, textTransform: 'uppercase', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {shoe.color}
+                    {translatedColor}
                   </div>
 
                   <div
@@ -1841,7 +1854,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                     }}
                   >
                     <span style={{ color: THEME.inkLight }}>
-                      {variantsCount > 1 ? `${variantsCount} ЦВЕТА` : '40—45'}
+                      {variantsCount > 1 ? t.colorsCountLabel(variantsCount) : '40—45'}
                     </span>
                     <span style={{ color: inCartPairs > 0 ? THEME.accentGreen : THEME.ink, fontWeight: 600 }}>
                       {inCartPairs > 0 ? t.reorderBtn : t.chooseBtn}
