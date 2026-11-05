@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { cardioCatalog, type ShoeCategory, type ShoeItem, type CartItem, type SizeKey } from '../data/catalog';
 import { WholesaleCart } from '../components/WholesaleCart';
+import type { Lang } from '../App';
 
 type MaterialsProps = {
   onBack?: () => void;
+  lang?: Lang;
 };
 
 const CATEGORIES: ('Все' | ShoeCategory)[] = ['Все', 'Ботинки', 'Кроссовки', 'Туфли'];
@@ -16,7 +18,6 @@ const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1,
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
 
-// Безопасный URL для файла со скобками в public/logo(1).mp4
 const HERO_VIDEO_SRC = '/logo%281%29.mp4';
 const FOOTER_BANNER_SRC = '/baner.jpg';
 
@@ -34,9 +35,6 @@ const THEME = {
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
 
-// ============================================================================
-// ТАКТИЛЬНО-АКУСТИЧЕСКИЙ ДВИЖОК ДЛЯ ANDROID И iOS
-// ============================================================================
 let sharedAudioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext | null {
@@ -46,9 +44,7 @@ function getAudioContext(): AudioContext | null {
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        sharedAudioCtx = new AudioCtx();
-      }
+      if (AudioCtx) sharedAudioCtx = new AudioCtx();
     }
     if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
       sharedAudioCtx.resume().catch(() => {});
@@ -62,66 +58,32 @@ function getAudioContext(): AudioContext | null {
 function playTapticClick(level: 'light' | 'medium' | 'success') {
   const ctx = getAudioContext();
   if (!ctx) return;
-
   try {
     const now = ctx.currentTime;
-
     if (level === 'light') {
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'triangle';
       osc1.frequency.setValueAtTime(240, now);
       osc1.frequency.exponentialRampToValueAtTime(58, now + 0.026);
-
       gain1.gain.setValueAtTime(0.38, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.026);
-
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
       osc1.start(now);
       osc1.stop(now + 0.028);
-
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(520, now);
-      osc2.frequency.exponentialRampToValueAtTime(140, now + 0.012);
-
-      gain2.gain.setValueAtTime(0.18, now);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
-
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now);
-      osc2.stop(now + 0.014);
     } else if (level === 'medium') {
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(155, now);
       osc1.frequency.exponentialRampToValueAtTime(44, now + 0.032);
-
       gain1.gain.setValueAtTime(0.45, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.032);
-
       osc1.connect(gain1);
       gain1.connect(ctx.destination);
       osc1.start(now);
       osc1.stop(now + 0.034);
-
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(720, now + 0.004);
-      osc2.frequency.exponentialRampToValueAtTime(190, now + 0.02);
-
-      gain2.gain.setValueAtTime(0.22, now + 0.004);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.004);
-      osc2.stop(now + 0.022);
     } else if (level === 'success') {
       [523.25, 783.99].forEach((freq, idx) => {
         const osc = ctx.createOscillator();
@@ -129,27 +91,19 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
         const start = now + idx * 0.055;
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, start);
-
         gain.gain.setValueAtTime(0.3, start);
         gain.gain.exponentialRampToValueAtTime(0.001, start + 0.095);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(start);
         osc.stop(start + 0.1);
       });
     }
-  } catch {
-    // Ignore audio context restrictions
-  }
+  } catch {}
 }
 
 function fireHaptic(level: 'light' | 'medium' | 'success') {
   playTapticClick(level);
-
-  const isAndroid =
-    typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
-
   try {
     const tgHaptic = (
       window as unknown as {
@@ -158,7 +112,6 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
             HapticFeedback?: {
               impactOccurred?: (s: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
               notificationOccurred?: (t: 'error' | 'success' | 'warning') => void;
-              selectionChanged?: () => void;
             };
           };
         };
@@ -166,38 +119,154 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
     ).Telegram?.WebApp?.HapticFeedback;
 
     if (tgHaptic) {
-      if (level === 'light') {
-        if (isAndroid) {
-          tgHaptic.impactOccurred?.('heavy');
-        } else {
-          tgHaptic.impactOccurred?.('medium');
-        }
-      } else if (level === 'medium') {
-        tgHaptic.impactOccurred?.('heavy');
-      } else if (level === 'success') {
-        tgHaptic.notificationOccurred?.('success');
-      }
+      if (level === 'light') tgHaptic.impactOccurred?.('medium');
+      else if (level === 'medium') tgHaptic.impactOccurred?.('heavy');
+      else if (level === 'success') tgHaptic.notificationOccurred?.('success');
     }
-  } catch {
-    // Ignore
-  }
-
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      if (level === 'light') {
-        navigator.vibrate(45);
-      } else if (level === 'medium') {
-        navigator.vibrate(65);
-      } else if (level === 'success') {
-        navigator.vibrate([45, 35, 90]);
-      }
-    }
-  } catch {
-    // Ignore
-  }
+  } catch {}
 }
 
-export function Materials({ onBack }: MaterialsProps) {
+export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
+  const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
+
+  const t = {
+    ru: {
+      catalogBtn: 'Каталог',
+      invoiceBtn: (p: number) => `Накладная (${p} п.)`,
+      alreadyInCart: (p: number) => `Уже в вашей накладной: ${p} пар`,
+      openWord: 'Открыть →',
+      cardTitle: 'КАРТОЧКА МОДЕЛИ',
+      colorLabel: 'Цвет:',
+      availableColors: 'ДОСТУПНЫЕ ЦВЕТА МОДЕЛИ',
+      orderParams: 'ПАРАМЕТРЫ ЗАКАЗА',
+      wholesaleRun: 'Оптовая ростовка',
+      sampleRun: 'Тестовый образец (1 п.)',
+      standard8: '8 пар • Стандарт',
+      standard8Desc: '42 и 43 р. — по 2 пары',
+      even6: '6 пар • Ровная',
+      even6Desc: '40–45 р. — все по 1 паре',
+      boxesCountLabel: 'Количество коробов:',
+      samplePrompt: 'Выберите размер тестового образца:',
+      addedSuccess: '✓ Добавлено в накладную',
+      addToCart: 'Добавить в накладную',
+      mainPageBtn: '← Главная',
+      searchPlaceholder: 'Номер модели или цвет...',
+      searchLabel: 'Поиск:',
+      found: (n: number) => `НАЙДЕНО: ${n}`,
+      grid2Col: '2 КОЛ.',
+      gridLarge: 'КРУПНО',
+      inCartBadge: (p: number) => `В ЗАКАЗЕ: ${p} П.`,
+      chooseBtn: 'Выбрать →',
+      reorderBtn: 'Дозаказать →',
+      topToBeginning: '↑ В начало каталога',
+      checkoutBtn: (p: number) => `Оформить (${p} п.) →`,
+      chooseModelPrompt: 'Выберите модель для заказа',
+      bottomOrderTitle: 'ВАШ ОПТОВЫЙ ЗАКАЗ',
+      bottomInvoiceText: (m: number, p: number) => `Накладная: ${m} мод. (${p} пар)`,
+      openInvoiceBtn: 'Открыть накладную →',
+      footerSub: 'ФИНАЛ ЭКСПОЗИЦИИ // CARDIO B2B',
+      footerNote: 'Прямой опт от фабрики',
+      catAll: 'Все',
+      catBoots: 'Ботинки',
+      catSneakers: 'Кроссовки',
+      catShoes: 'Туфли',
+      featAll: 'Все модели',
+      featFur: 'Мех',
+      featGore: 'Gore-Tex',
+      featSole: 'Подошва трактор',
+    },
+    uk: {
+      catalogBtn: 'Каталог',
+      invoiceBtn: (p: number) => `Накладна (${p} п.)`,
+      alreadyInCart: (p: number) => `Вже у вашій накладній: ${p} пар`,
+      openWord: 'Відкрити →',
+      cardTitle: 'КАРТКА МОДЕЛІ',
+      colorLabel: 'Колір:',
+      availableColors: 'ДОСТУПНІ КОЛЬОРИ МОДЕЛІ',
+      orderParams: 'ПАРАМЕТРИ ЗАМОВЛЕННЯ',
+      wholesaleRun: 'Гуртова ростовка',
+      sampleRun: 'Тестовий зразок (1 п.)',
+      standard8: '8 пар • Стандарт',
+      standard8Desc: '42 і 43 р. — по 2 пари',
+      even6: '6 пар • Рівна',
+      even6Desc: '40–45 р. — всі по 1 парі',
+      boxesCountLabel: 'Кількість коробів:',
+      samplePrompt: 'Виберіть розмір тестового зразка:',
+      addedSuccess: '✓ Додано до накладної',
+      addToCart: 'Додати до накладнаї',
+      mainPageBtn: '← Головна',
+      searchPlaceholder: 'Номер моделі або колір...',
+      searchLabel: 'Пошук:',
+      found: (n: number) => `ЗНАЙДЕНО: ${n}`,
+      grid2Col: '2 КОЛ.',
+      gridLarge: 'ВЕЛИКО',
+      inCartBadge: (p: number) => `У ЗАМОВЛЕННІ: ${p} П.`,
+      chooseBtn: 'Вибрати →',
+      reorderBtn: 'Дозамовити →',
+      topToBeginning: '↑ На початок каталогу',
+      checkoutBtn: (p: number) => `Оформити (${p} п.) →`,
+      chooseModelPrompt: 'Виберіть модель для замовлення',
+      bottomOrderTitle: 'ВАШЕ ГУРТОВЕ ЗАМОВЛЕННЯ',
+      bottomInvoiceText: (m: number, p: number) => `Накладна: ${m} мод. (${p} пар)`,
+      openInvoiceBtn: 'Відкрити накладну →',
+      footerSub: 'ФІНАЛ ЕКСПОЗИЦІЇ // CARDIO B2B',
+      footerNote: 'Прямий гурт від фабрики',
+      catAll: 'Всі',
+      catBoots: 'Черевики',
+      catSneakers: 'Кросівки',
+      catShoes: 'Туфлі',
+      featAll: 'Всі моделі',
+      featFur: 'Хутро',
+      featGore: 'Gore-Tex',
+      featSole: 'Підошва трактор',
+    },
+    de: {
+      catalogBtn: 'Katalog',
+      invoiceBtn: (p: number) => `Rechnung (${p} P.)`,
+      alreadyInCart: (p: number) => `Bereits auf der Rechnung: ${p} Paar`,
+      openWord: 'Öffnen →',
+      cardTitle: 'MODELLKARTE',
+      colorLabel: 'Farbe:',
+      availableColors: 'VERFÜGBARE FARBEN',
+      orderParams: 'BESTELLPARAMETER',
+      wholesaleRun: 'Großhandelsserie',
+      sampleRun: 'Testmuster (1 P.)',
+      standard8: '8 Paar • Standard',
+      standard8Desc: 'Gr. 42 & 43 — je 2 Paar',
+      even6: '6 Paar • Gleich',
+      even6Desc: 'Gr. 40–45 — je 1 Paar',
+      boxesCountLabel: 'Anzahl Kisten:',
+      samplePrompt: 'Testmuster-Größe wählen:',
+      addedSuccess: '✓ Zur Rechnung hinzugefügt',
+      addToCart: 'Zur Rechnung hinzufügen',
+      mainPageBtn: '← Startseite',
+      searchPlaceholder: 'Modellnummer oder Farbe...',
+      searchLabel: 'Suche:',
+      found: (n: number) => `GEFUNDEN: ${n}`,
+      grid2Col: '2 SPALTEN',
+      gridLarge: 'GROSS',
+      inCartBadge: (p: number) => ` IM WAGEN: ${p} P.`,
+      chooseBtn: 'Auswählen →',
+      reorderBtn: 'Nachbestellen →',
+      topToBeginning: '↑ Zum Anfang',
+      checkoutBtn: (p: number) => `Bestellen (${p} P.) →`,
+      chooseModelPrompt: 'Modell für Bestellung wählen',
+      bottomOrderTitle: 'IHRE GROSSHANDELSBESTELLUNG',
+      bottomInvoiceText: (m: number, p: number) => `Rechnung: ${m} Mod. (${p} Paar)`,
+      openInvoiceBtn: 'Rechnung öffnen →',
+      footerSub: 'FINALE DER EXPOSITION // CARDIO B2B',
+      footerNote: 'Direkter Großhandel ab Werk',
+      catAll: 'Alle',
+      catBoots: 'Stiefel',
+      catSneakers: 'Sneaker',
+      catShoes: 'Schuhe',
+      featAll: 'Alle Modelle',
+      featFur: 'Futter',
+      featGore: 'Gore-Tex',
+      featSole: 'Traktionssohle',
+    },
+  }[safeLang];
+
   const [activeCategory, setActiveCategory] = useState<'Все' | ShoeCategory>('Все');
   const [activeFeature, setActiveFeature] = useState<string>('Все');
   const [searchQuery, setSearchQuery] = useState('');
@@ -208,7 +277,6 @@ export function Materials({ onBack }: MaterialsProps) {
   const [justAdded, setJustAdded] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  // Рефы для ВЕРХНЕГО ВИДЕО-ПАРАЛЛАКСА
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const bannerAnchorRef = useRef<HTMLDivElement>(null);
   const bannerStageRef = useRef<HTMLDivElement>(null);
@@ -216,7 +284,6 @@ export function Materials({ onBack }: MaterialsProps) {
   const bannerShadowRef = useRef<HTMLDivElement>(null);
   const initialBannerTopRef = useRef<number | null>(null);
 
-  // Рефы для НИЖНЕГО КАМПЕЙН-ПАРАЛЛАКСА
   const footerAnchorRef = useRef<HTMLDivElement>(null);
   const footerStageRef = useRef<HTMLDivElement>(null);
   const footerGlareRef = useRef<HTMLDivElement>(null);
@@ -225,13 +292,9 @@ export function Materials({ onBack }: MaterialsProps) {
   useEffect(() => {
     try {
       (window as unknown as { Telegram?: { WebApp?: { ready?: () => void } } }).Telegram?.WebApp?.ready?.();
-    } catch {
-      // Ignore
-    }
+    } catch {}
 
-    const unlockAudio = () => {
-      getAudioContext();
-    };
+    const unlockAudio = () => { getAudioContext(); };
     window.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
     window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
     return () => {
@@ -242,81 +305,43 @@ export function Materials({ onBack }: MaterialsProps) {
 
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
-
     const videoEl = heroVideoRef.current;
     if (!videoEl) return;
 
     videoEl.muted = true;
     videoEl.defaultMuted = true;
     videoEl.playsInline = true;
-    videoEl.setAttribute('muted', '');
-    videoEl.setAttribute('playsinline', '');
-    videoEl.setAttribute('webkit-playsinline', '');
-    videoEl.setAttribute('autoplay', '');
 
-    if (videoEl.readyState >= 2) {
-      setIsVideoReady(true);
-    }
+    if (videoEl.readyState >= 2) setIsVideoReady(true);
 
     const tryPlay = () => {
       if (!videoEl) return;
       videoEl.muted = true;
-      const playPromise = videoEl.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsVideoReady(true);
-          })
-          .catch(() => {
-            setIsVideoReady(true);
-          });
-      }
+      videoEl.play().then(() => setIsVideoReady(true)).catch(() => setIsVideoReady(true));
     };
 
     tryPlay();
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        tryPlay();
-      }
-    };
-
-    window.addEventListener('touchstart', tryPlay, { passive: true, once: true });
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
     const fallbackTimer = window.setTimeout(() => setIsVideoReady(true), 150);
-
-    return () => {
-      window.clearTimeout(fallbackTimer);
-      window.removeEventListener('touchstart', tryPlay);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
+    return () => window.clearTimeout(fallbackTimer);
   }, [selectedShoe, isCartOpen]);
 
   useEffect(() => {
     if (selectedShoe || isCartOpen) return;
-
     initialBannerTopRef.current = null;
     let rafId = 0;
 
     const applyDualParallax = () => {
-      const viewportH = window.innerHeight || document.documentElement.clientHeight || 800;
-      const pageScrollY = window.scrollY ?? window.pageYOffset ?? 0;
+      const viewportH = window.innerHeight || 800;
+      const pageScrollY = window.scrollY ?? 0;
 
       const topAnchor = bannerAnchorRef.current;
       const topStage = bannerStageRef.current;
       if (topAnchor && topStage) {
         const rect = topAnchor.getBoundingClientRect();
-
         if (initialBannerTopRef.current === null) {
           initialBannerTopRef.current = rect.top + Math.max(0, pageScrollY);
         }
-
-        const rawScrolled =
-          pageScrollY > 0
-            ? pageScrollY
-            : Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
-
+        const rawScrolled = pageScrollY > 0 ? pageScrollY : Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
         const maxScroll = 320;
         const clamped = Math.max(0, Math.min(maxScroll, rawScrolled));
         const progress = clamped / maxScroll;
@@ -332,7 +357,6 @@ export function Materials({ onBack }: MaterialsProps) {
           bannerGlareRef.current.style.transform = `translate3d(${glareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
           bannerGlareRef.current.style.opacity = `${0.14 + progress * 0.44}`;
         }
-
         if (bannerShadowRef.current) {
           bannerShadowRef.current.style.opacity = `${progress * 0.48}`;
         }
@@ -343,7 +367,6 @@ export function Materials({ onBack }: MaterialsProps) {
       if (botAnchor && botStage) {
         const fRect = botAnchor.getBoundingClientRect();
         const revealSpan = Math.max(260, fRect.height + 110);
-
         const visiblePx = viewportH - fRect.top;
         const fProgress = Math.max(0, Math.min(1, visiblePx / revealSpan));
         const inv = 1 - fProgress;
@@ -359,7 +382,6 @@ export function Materials({ onBack }: MaterialsProps) {
           footerGlareRef.current.style.transform = `translate3d(${fGlareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
           footerGlareRef.current.style.opacity = `${0.1 + fProgress * 0.42}`;
         }
-
         if (footerShadowRef.current) {
           footerShadowRef.current.style.opacity = `${inv * 0.58}`;
         }
@@ -372,16 +394,13 @@ export function Materials({ onBack }: MaterialsProps) {
     };
 
     applyDualParallax();
-
     window.addEventListener('scroll', onScrollOrTouch, { passive: true, capture: true });
-    document.addEventListener('scroll', onScrollOrTouch, { passive: true, capture: true });
     window.addEventListener('touchmove', onScrollOrTouch, { passive: true });
     window.addEventListener('resize', onScrollOrTouch, { passive: true });
 
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', onScrollOrTouch, { capture: true });
-      document.removeEventListener('scroll', onScrollOrTouch, { capture: true });
       window.removeEventListener('touchmove', onScrollOrTouch);
       window.removeEventListener('resize', onScrollOrTouch);
     };
@@ -399,9 +418,7 @@ export function Materials({ onBack }: MaterialsProps) {
   useEffect(() => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-    } catch {
-      // Ignore storage errors
-    }
+    } catch {}
   }, [cart]);
 
   const [orderMode, setOrderMode] = useState<'sample' | 'wholesale'>('wholesale');
@@ -418,20 +435,9 @@ export function Materials({ onBack }: MaterialsProps) {
     }
   }, [selectedShoe]);
 
-  const pairsPerBox = useMemo(() => {
-    return SIZES.reduce((sum, sz) => sum + (sizeRun[sz] || 0), 0);
-  }, [sizeRun]);
-
-  const isStandard8 = useMemo(
-    () => SIZES.every((sz) => sizeRun[sz] === STANDARD_8_RUN[sz]),
-    [sizeRun]
-  );
-
-  const isEven6 = useMemo(
-    () => SIZES.every((sz) => sizeRun[sz] === EVEN_6_RUN[sz]),
-    [sizeRun]
-  );
-
+  const pairsPerBox = useMemo(() => SIZES.reduce((sum, sz) => sum + (sizeRun[sz] || 0), 0), [sizeRun]);
+  const isStandard8 = useMemo(() => SIZES.every((sz) => sizeRun[sz] === STANDARD_8_RUN[sz]), [sizeRun]);
+  const isEven6 = useMemo(() => SIZES.every((sz) => sizeRun[sz] === EVEN_6_RUN[sz]), [sizeRun]);
   const isCustomRun = !isStandard8 && !isEven6;
 
   const totalPairs = orderMode === 'sample' ? 1 : pairsPerBox * boxesCount;
@@ -448,7 +454,6 @@ export function Materials({ onBack }: MaterialsProps) {
   const updateSizeCount = (size: SizeKey, delta: number) => {
     const currentVal = sizeRun[size] || 0;
     const nextVal = Math.max(0, Math.min(10, currentVal + delta));
-
     if (nextVal !== currentVal) {
       fireHaptic('light');
       setSizeRun((prev) => ({ ...prev, [size]: nextVal }));
@@ -457,12 +462,11 @@ export function Materials({ onBack }: MaterialsProps) {
 
   const addCurrentShoeToCart = () => {
     if (!selectedShoe || totalPairs === 0) return;
-
     fireHaptic('success');
 
     const formulaText =
       orderMode === 'sample'
-        ? `Тестовый образец (1 пара) — р. ${sampleSize}`
+        ? `${t.sampleRun} — р. ${sampleSize}`
         : `Ростовок ×${boxesCount}: ` +
           SIZES.filter((sz) => sizeRun[sz] > 0)
             .map((sz) => `${sz}р.(${sizeRun[sz] * boxesCount})`)
@@ -502,11 +506,11 @@ export function Materials({ onBack }: MaterialsProps) {
     return cardioCatalog.filter((item) => item.modelNumber === selectedShoe.modelNumber);
   }, [selectedShoe]);
 
-  // ЭКРАН 1: ОПТОВАЯ НАКЛАДНАЯ (КОРЗИНА)
   if (isCartOpen) {
     return (
       <WholesaleCart
         items={cart}
+        lang={safeLang}
         onUpdateQuantity={(uid, newBoxes) => {
           if (newBoxes < 1) return;
           fireHaptic('medium');
@@ -522,12 +526,7 @@ export function Materials({ onBack }: MaterialsProps) {
                     SIZES.filter((sz) => item.sizeRun[sz] > 0)
                       .map((sz) => `${sz}р.(${item.sizeRun[sz] * newBoxes})`)
                       .join(' • ');
-              return {
-                ...item,
-                boxesCount: newBoxes,
-                totalPairs: newTotalPairs,
-                formulaText: updatedFormula,
-              };
+              return { ...item, boxesCount: newBoxes, totalPairs: newTotalPairs, formulaText: updatedFormula };
             })
           );
         }}
@@ -547,7 +546,6 @@ export function Materials({ onBack }: MaterialsProps) {
     );
   }
 
-  // ЭКРАН 2: КАРТОЧКА МОДЕЛИ (ВЫБОР РАЗМЕРОВ И РОСТОВОК)
   if (selectedShoe) {
     const alreadyInCartPairs = pairsInCartByShoeId[selectedShoe.id] || 0;
 
@@ -562,7 +560,6 @@ export function Materials({ onBack }: MaterialsProps) {
           fontFamily: THEME.sans,
         }}
       >
-        {/* ИСПРАВЛЕННАЯ ШАПКА КАРТОЧКИ: Абсолютно разделенные кнопки без наложения */}
         <div
           style={{
             display: 'flex',
@@ -617,7 +614,7 @@ export function Materials({ onBack }: MaterialsProps) {
               }}
             >
               <span>←</span>
-              <span>Каталог</span>
+              <span>{t.catalogBtn}</span>
             </button>
           </div>
 
@@ -642,7 +639,7 @@ export function Materials({ onBack }: MaterialsProps) {
               touchAction: 'manipulation',
             }}
           >
-            Накладная ({cartTotalPairs} п.)
+            {t.invoiceBtn(cartTotalPairs)}
           </button>
         </div>
 
@@ -663,7 +660,7 @@ export function Materials({ onBack }: MaterialsProps) {
             }}
           >
             <span>
-              Уже в вашей накладной: <strong>{alreadyInCartPairs} пар</strong>
+              {t.alreadyInCart(alreadyInCartPairs)}
             </span>
             <span
               onClick={() => {
@@ -679,12 +676,11 @@ export function Materials({ onBack }: MaterialsProps) {
                 fontWeight: 600,
               }}
             >
-              Открыть →
+              {t.openWord}
             </span>
           </div>
         )}
 
-        {/* Увеличенный отступ снизу у текстового блока, чтобы название цвета не заходило на фото */}
         <div style={{ marginBottom: '22px' }}>
           <div
             style={{
@@ -697,7 +693,7 @@ export function Materials({ onBack }: MaterialsProps) {
               marginBottom: '6px',
             }}
           >
-            <span>КАРТОЧКА МОДЕЛИ // {selectedShoe.category}</span>
+            <span>{t.cardTitle} // {selectedShoe.category}</span>
             <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
               Арт. № {selectedShoe.modelNumber}
             </span>
@@ -729,11 +725,10 @@ export function Materials({ onBack }: MaterialsProps) {
               color: THEME.inkMuted,
             }}
           >
-            Цвет: {selectedShoe.color}
+            {t.colorLabel} {selectedShoe.color}
           </div>
         </div>
 
-        {/* ВИТРИНА МОДЕЛИ */}
         <div
           style={{
             backgroundColor: THEME.surface,
@@ -756,7 +751,7 @@ export function Materials({ onBack }: MaterialsProps) {
               CARDIO ORIGINAL
             </span>
             <span style={{ fontSize: '9px', letterSpacing: '1.5px', color: THEME.inkLight, textTransform: 'uppercase' }}>
-              РАЗМЕРЫ 40—45
+              40—45
             </span>
           </div>
 
@@ -786,7 +781,6 @@ export function Materials({ onBack }: MaterialsProps) {
                 display: 'block',
                 margin: '0 auto',
                 mixBlendMode: 'multiply',
-                transform: 'none',
               }}
             />
           </div>
@@ -822,7 +816,6 @@ export function Materials({ onBack }: MaterialsProps) {
           )}
         </div>
 
-        {/* Миниатюры цветов */}
         {modelVariants.length > 1 && (
           <div style={{ marginBottom: '24px' }}>
             <div
@@ -836,7 +829,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 marginBottom: '10px',
               }}
             >
-              <span>ДОСТУПНЫЕ ЦВЕТА МОДЕЛИ</span>
+              <span>{t.availableColors}</span>
               <span>01—0{modelVariants.length}</span>
             </div>
             <div
@@ -905,7 +898,6 @@ export function Materials({ onBack }: MaterialsProps) {
                           display: 'block',
                           margin: '0 auto',
                           mixBlendMode: 'multiply',
-                          transform: 'none',
                         }}
                       />
                     </div>
@@ -941,8 +933,8 @@ export function Materials({ onBack }: MaterialsProps) {
               marginBottom: '10px',
             }}
           >
-            <span>ПАРАМЕТРЫ ЗАКАЗА</span>
-            <span>ОПТ / ОБРАЗЕЦ</span>
+            <span>{t.orderParams}</span>
+            <span>B2B</span>
           </div>
 
           <div
@@ -973,7 +965,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
-              Оптовая ростовка
+              {t.wholesaleRun}
             </button>
             <button
               type="button"
@@ -996,7 +988,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
-              Тестовый образец (1 п.)
+              {t.sampleRun}
             </button>
           </div>
 
@@ -1011,7 +1003,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 }}
               >
                 <span style={{ fontSize: '12px', color: THEME.inkMuted, fontStyle: 'italic', fontFamily: THEME.serif }}>
-                  Комплектация короба (40–45):
+                  {safeLang === 'de' ? 'Kisteninhalt (40–45):' : safeLang === 'uk' ? 'Комплектація короба (40–45):' : 'Комплектация короба (40–45):'}
                 </span>
                 <span
                   style={{
@@ -1026,10 +1018,10 @@ export function Materials({ onBack }: MaterialsProps) {
                   }}
                 >
                   {isStandard8
-                    ? 'Стандарт (8 пар)'
+                    ? (safeLang === 'de' ? 'Standard (8 P.)' : safeLang === 'uk' ? 'Стандарт (8 пар)' : 'Стандарт (8 пар)')
                     : isEven6
-                    ? 'Ровная (6 пар)'
-                    : `Своя (${pairsPerBox} пар)`}
+                    ? (safeLang === 'de' ? 'Gleich (6 P.)' : safeLang === 'uk' ? 'Рівна (6 пар)' : 'Ровная (6 пар)')
+                    : (safeLang === 'de' ? `Eigen (${pairsPerBox} P.)` : safeLang === 'uk' ? `Своя (${pairsPerBox} пар)` : `Своя (${pairsPerBox} пар)`)}
                 </span>
               </div>
 
@@ -1070,7 +1062,7 @@ export function Materials({ onBack }: MaterialsProps) {
                       textTransform: 'uppercase',
                     }}
                   >
-                    <span>8 пар • Стандарт</span>
+                    <span>{t.standard8}</span>
                     {isStandard8 && <span>✓</span>}
                   </div>
                   <div
@@ -1081,7 +1073,7 @@ export function Materials({ onBack }: MaterialsProps) {
                       fontStyle: 'italic',
                     }}
                   >
-                    42 и 43 р. — по 2 пары
+                    {t.standard8Desc}
                   </div>
                 </button>
 
@@ -1114,7 +1106,7 @@ export function Materials({ onBack }: MaterialsProps) {
                       textTransform: 'uppercase',
                     }}
                   >
-                    <span>6 пар • Ровная</span>
+                    <span>{t.even6}</span>
                     {isEven6 && <span>✓</span>}
                   </div>
                   <div
@@ -1125,7 +1117,7 @@ export function Materials({ onBack }: MaterialsProps) {
                       fontStyle: 'italic',
                     }}
                   >
-                    40–45 р. — все по 1 паре
+                    {t.even6Desc}
                   </div>
                 </button>
               </div>
@@ -1163,8 +1155,6 @@ export function Materials({ onBack }: MaterialsProps) {
                           fontWeight: isDoubled ? 600 : 400,
                           padding: '6px 0',
                           borderBottom: `1px solid ${THEME.border}`,
-                          letterSpacing: '0.5px',
-                          transition: 'background-color 0.15s ease',
                         }}
                       >
                         {sz}
@@ -1177,10 +1167,7 @@ export function Materials({ onBack }: MaterialsProps) {
                           border: 'none',
                           padding: '8px 0',
                           fontSize: '16px',
-                          cursor: count >= 10 ? 'default' : 'pointer',
-                          color: count >= 10 ? THEME.border : THEME.ink,
-                          touchAction: 'manipulation',
-                          WebkitTapHighlightColor: 'transparent',
+                          cursor: 'pointer',
                         }}
                       >
                         +
@@ -1204,10 +1191,7 @@ export function Materials({ onBack }: MaterialsProps) {
                           border: 'none',
                           padding: '8px 0',
                           fontSize: '16px',
-                          cursor: count <= 0 ? 'default' : 'pointer',
-                          color: count <= 0 ? THEME.border : THEME.ink,
-                          touchAction: 'manipulation',
-                          WebkitTapHighlightColor: 'transparent',
+                          cursor: 'pointer',
                         }}
                       >
                         −
@@ -1234,7 +1218,7 @@ export function Materials({ onBack }: MaterialsProps) {
                     color: THEME.inkMuted,
                   }}
                 >
-                  Количество коробов:
+                  {t.boxesCountLabel}
                 </span>
                 <div style={{ display: 'flex', border: `1px solid ${THEME.border}` }}>
                   {[1, 2, 3, 5, 10].map((num, idx) => (
@@ -1254,7 +1238,6 @@ export function Materials({ onBack }: MaterialsProps) {
                         fontSize: '11px',
                         fontWeight: 600,
                         cursor: 'pointer',
-                        touchAction: 'manipulation',
                       }}
                     >
                       {num}
@@ -1274,7 +1257,7 @@ export function Materials({ onBack }: MaterialsProps) {
                   marginBottom: '10px',
                 }}
               >
-                Выберите размер тестового образца:
+                {t.samplePrompt}
               </div>
               <div
                 style={{
@@ -1302,8 +1285,6 @@ export function Materials({ onBack }: MaterialsProps) {
                       fontSize: '13px',
                       fontFamily: THEME.serif,
                       cursor: 'pointer',
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
                     }}
                   >
                     {sz}
@@ -1335,7 +1316,7 @@ export function Materials({ onBack }: MaterialsProps) {
             transition: 'background-color 0.2s ease',
           }}
         >
-          <span>{justAdded ? '✓ Добавлено в накладную' : 'Добавить в накладную'}</span>
+          <span>{justAdded ? t.addedSuccess : t.addToCart}</span>
           <span
             style={{
               fontFamily: THEME.serif,
@@ -1345,14 +1326,27 @@ export function Materials({ onBack }: MaterialsProps) {
               letterSpacing: '0',
             }}
           >
-            {totalPairs} пар →
+            {totalPairs} {safeLang === 'de' ? 'Paar' : 'пар'} →
           </span>
         </button>
       </div>
     );
   }
 
-  // ЭКРАН 3: ОСНОВНОЙ КАТАЛОГ
+  const categoryLabels: Record<string, string> = {
+    'Все': t.catAll,
+    'Ботинки': t.catBoots,
+    'Кроссовки': t.catSneakers,
+    'Туфли': t.catShoes,
+  };
+
+  const featureLabels: Record<string, string> = {
+    'Все': t.featAll,
+    'Мех': t.featFur,
+    'Gore-Tex': t.featGore,
+    'Подошва трактор': t.featSole,
+  };
+
   return (
     <div
       style={{
@@ -1364,7 +1358,6 @@ export function Materials({ onBack }: MaterialsProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Шапка главного каталога */}
       <div
         style={{
           display: 'flex',
@@ -1392,14 +1385,7 @@ export function Materials({ onBack }: MaterialsProps) {
               flexShrink: 0,
             }}
           />
-          <div
-            style={{
-              width: '1px',
-              height: '32px',
-              backgroundColor: THEME.border,
-              flexShrink: 0,
-            }}
-          />
+          <div style={{ width: '1px', height: '32px', backgroundColor: THEME.border, flexShrink: 0 }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
             <span
               style={{
@@ -1426,7 +1412,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 whiteSpace: 'nowrap',
               }}
             >
-              KHARKIV • CATALOG 2026
+              KHARKIV • 2026
             </span>
           </div>
         </div>
@@ -1453,20 +1439,14 @@ export function Materials({ onBack }: MaterialsProps) {
               touchAction: 'manipulation',
             }}
           >
-            ← Главная
+            {t.mainPageBtn}
           </button>
         )}
       </div>
 
-      {/* ВЕРХНЯЯ КУЛИСА: ВИДЕО-БАННЕР */}
       <div
         ref={bannerAnchorRef}
-        style={{
-          width: '100%',
-          marginBottom: '20px',
-          position: 'relative',
-          zIndex: 1,
-        }}
+        style={{ width: '100%', marginBottom: '20px', position: 'relative', zIndex: 1 }}
       >
         <div
           style={{
@@ -1477,26 +1457,10 @@ export function Materials({ onBack }: MaterialsProps) {
             padding: '0 2px',
           }}
         >
-          <span
-            style={{
-              fontSize: '8px',
-              letterSpacing: '1.6px',
-              textTransform: 'uppercase',
-              color: THEME.inkMuted,
-              fontWeight: 600,
-            }}
-          >
+          <span style={{ fontSize: '8px', letterSpacing: '1.6px', textTransform: 'uppercase', color: THEME.inkMuted, fontWeight: 600 }}>
             ● MOTION LOOKBOOK
           </span>
-          <span
-            style={{
-              fontSize: '8px',
-              letterSpacing: '1.5px',
-              textTransform: 'uppercase',
-              color: THEME.inkMuted,
-              fontWeight: 600,
-            }}
-          >
+          <span style={{ fontSize: '8px', letterSpacing: '1.5px', textTransform: 'uppercase', color: THEME.inkMuted, fontWeight: 600 }}>
             CARDIO // 40—45
           </span>
         </div>
@@ -1513,9 +1477,6 @@ export function Materials({ onBack }: MaterialsProps) {
             backgroundColor: '#121212',
             transformOrigin: 'center bottom',
             willChange: 'transform',
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           }}
         >
           <video
@@ -1526,9 +1487,6 @@ export function Materials({ onBack }: MaterialsProps) {
             muted
             playsInline
             preload="auto"
-            onLoadedData={() => setIsVideoReady(true)}
-            onCanPlay={() => setIsVideoReady(true)}
-            onPlay={() => setIsVideoReady(true)}
             style={{
               width: '100%',
               aspectRatio: '16 / 9',
@@ -1539,7 +1497,6 @@ export function Materials({ onBack }: MaterialsProps) {
               transition: 'opacity 0.22s ease-out',
             }}
           />
-
           <div
             ref={bannerGlareRef}
             style={{
@@ -1548,17 +1505,14 @@ export function Materials({ onBack }: MaterialsProps) {
               left: 0,
               width: '65%',
               height: '100%',
-              background:
-                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.36) 50%, rgba(255,255,255,0) 100%)',
+              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.36) 50%, rgba(255,255,255,0) 100%)',
               mixBlendMode: 'overlay',
               pointerEvents: 'none',
               opacity: 0.14,
               transform: 'translate3d(-45%, 0, 0) skewX(-22deg)',
-              willChange: 'transform, opacity',
               zIndex: 2,
             }}
           />
-
           <div
             ref={bannerShadowRef}
             style={{
@@ -1567,14 +1521,12 @@ export function Materials({ onBack }: MaterialsProps) {
               background: 'linear-gradient(180deg, rgba(22,21,20,0.06) 0%, rgba(22,21,20,0.72) 100%)',
               pointerEvents: 'none',
               opacity: 0,
-              willChange: 'opacity',
               zIndex: 2,
             }}
           />
         </div>
       </div>
 
-      {/* ОСНОВНОЕ ПОЛОТНО КАТАЛОГА */}
       <div
         style={{
           position: 'relative',
@@ -1582,8 +1534,6 @@ export function Materials({ onBack }: MaterialsProps) {
           backgroundColor: THEME.bg,
           paddingTop: '4px',
           paddingBottom: '22px',
-          boxShadow:
-            '0 -12px 20px -8px rgba(242, 239, 233, 0.98), 0 18px 28px -10px rgba(22, 21, 20, 0.16)',
           borderBottom: `1px solid ${THEME.border}`,
         }}
       >
@@ -1607,11 +1557,11 @@ export function Materials({ onBack }: MaterialsProps) {
               userSelect: 'none',
             }}
           >
-            Поиск:
+            {t.searchLabel}
           </span>
           <input
             type="text"
-            placeholder="Номер модели или цвет..."
+            placeholder={t.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -1631,14 +1581,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 fireHaptic('light');
                 setSearchQuery('');
               }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: THEME.inkMuted,
-                cursor: 'pointer',
-                fontSize: '12px',
-                padding: '4px',
-              }}
+              style={{ background: 'none', border: 'none', color: THEME.inkMuted, cursor: 'pointer', fontSize: '12px', padding: '4px' }}
             >
               ✕
             </button>
@@ -1678,7 +1621,7 @@ export function Materials({ onBack }: MaterialsProps) {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {category}
+                {categoryLabels[category] || category}
               </button>
             );
           })}
@@ -1712,10 +1655,9 @@ export function Materials({ onBack }: MaterialsProps) {
                   color: isActive ? THEME.ink : THEME.inkMuted,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  letterSpacing: '0.5px',
                 }}
               >
-                {feat === 'Все' ? 'Все модели' : feat}
+                {featureLabels[feat] || feat}
               </button>
             );
           })}
@@ -1733,7 +1675,7 @@ export function Materials({ onBack }: MaterialsProps) {
             marginBottom: '10px',
           }}
         >
-          <span>НАЙДЕНО: {filteredShoes.length}</span>
+          <span>{t.found(filteredShoes.length)}</span>
 
           <div style={{ display: 'flex', border: `1px solid ${THEME.border}` }}>
             <button
@@ -1751,12 +1693,10 @@ export function Materials({ onBack }: MaterialsProps) {
                 padding: '5px 9px',
                 fontSize: '9px',
                 fontWeight: 600,
-                letterSpacing: '0.9px',
-                textTransform: 'uppercase',
                 cursor: 'pointer',
               }}
             >
-              2 КОЛ.
+              {t.grid2Col}
             </button>
             <button
               type="button"
@@ -1774,17 +1714,14 @@ export function Materials({ onBack }: MaterialsProps) {
                 padding: '5px 9px',
                 fontSize: '9px',
                 fontWeight: 600,
-                letterSpacing: '0.9px',
-                textTransform: 'uppercase',
                 cursor: 'pointer',
               }}
             >
-              КРУПНО
+              {t.gridLarge}
             </button>
           </div>
         </div>
 
-        {/* Сетка каталога */}
         <div
           style={{
             display: 'grid',
@@ -1828,38 +1765,16 @@ export function Materials({ onBack }: MaterialsProps) {
                     minHeight: '16px',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: isLarge ? '10px' : '8px',
-                      color: THEME.inkLight,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.8px',
-                    }}
-                  >
+                  <span style={{ fontSize: isLarge ? '10px' : '8px', color: THEME.inkLight, textTransform: 'uppercase' }}>
                     {shoe.category}
                   </span>
 
                   {inCartPairs > 0 ? (
-                    <span
-                      style={{
-                        backgroundColor: THEME.ink,
-                        color: '#FFFFFF',
-                        padding: '2px 5px',
-                        fontSize: '8px',
-                        letterSpacing: '0.6px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      В ЗАКАЗЕ: {inCartPairs} П.
+                    <span style={{ backgroundColor: THEME.ink, color: '#FFFFFF', padding: '2px 5px', fontSize: '8px', fontWeight: 600 }}>
+                      {t.inCartBadge(inCartPairs)}
                     </span>
                   ) : (
-                    <span
-                      style={{
-                        fontSize: isLarge ? '10px' : '8px',
-                        color: THEME.inkLight,
-                        letterSpacing: '0.6px',
-                      }}
-                    >
+                    <span style={{ fontSize: isLarge ? '10px' : '8px', color: THEME.inkLight }}>
                       {variantsCount > 1 ? `${variantsCount} ЦВ.` : '40—45'}
                     </span>
                   )}
@@ -1892,79 +1807,25 @@ export function Materials({ onBack }: MaterialsProps) {
                       display: 'block',
                       margin: '0 auto',
                       mixBlendMode: 'multiply',
-                      transform: 'none',
                     }}
                   />
                 </div>
 
                 <div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'baseline',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: THEME.serif,
-                        fontSize: isLarge ? '26px' : '19px',
-                        fontWeight: 400,
-                        color: THEME.ink,
-                        letterSpacing: '0.2px',
-                      }}
-                    >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontFamily: THEME.serif, fontSize: isLarge ? '26px' : '19px', fontWeight: 400, color: THEME.ink }}>
                       № {shoe.modelNumber}
                     </span>
                     {shoe.variant && (
-                      <span
-                        style={{
-                          fontFamily: THEME.serif,
-                          fontStyle: 'italic',
-                          fontSize: isLarge ? '13px' : '11px',
-                          color: THEME.inkMuted,
-                        }}
-                      >
+                      <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: isLarge ? '13px' : '11px', color: THEME.inkMuted }}>
                         {shoe.variant}
                       </span>
                     )}
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: isLarge ? '11px' : '10px',
-                      color: THEME.inkMuted,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.6px',
-                      marginTop: '2px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
+                  <div style={{ fontSize: isLarge ? '11px' : '10px', color: THEME.inkMuted, textTransform: 'uppercase', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {shoe.color}
                   </div>
-
-                  {isLarge && shoe.features.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '8px' }}>
-                      {shoe.features.map((f) => (
-                        <span
-                          key={f}
-                          style={{
-                            fontSize: '8px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.7px',
-                            padding: '2px 6px',
-                            border: `1px solid ${THEME.border}`,
-                            color: THEME.inkMuted,
-                            backgroundColor: THEME.bg,
-                          }}
-                        >
-                          {f}
-                        </span>
-                      ))}
-                    </div>
-                  )}
 
                   <div
                     style={{
@@ -1980,15 +1841,10 @@ export function Materials({ onBack }: MaterialsProps) {
                     }}
                   >
                     <span style={{ color: THEME.inkLight }}>
-                      {variantsCount > 1 ? `${variantsCount} ЦВЕТА` : 'РОСТОВКА 40—45'}
+                      {variantsCount > 1 ? `${variantsCount} ЦВЕТА` : '40—45'}
                     </span>
-                    <span
-                      style={{
-                        color: inCartPairs > 0 ? THEME.accentGreen : THEME.ink,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {inCartPairs > 0 ? 'Дозаказать →' : 'Выбрать →'}
+                    <span style={{ color: inCartPairs > 0 ? THEME.accentGreen : THEME.ink, fontWeight: 600 }}>
+                      {inCartPairs > 0 ? t.reorderBtn : t.chooseBtn}
                     </span>
                   </div>
                 </div>
@@ -1998,16 +1854,7 @@ export function Materials({ onBack }: MaterialsProps) {
         </div>
       </div>
 
-      {/* НИЖНЯЯ КУЛИСА: ФИНАЛЬНЫЙ БАННЕР */}
-      <div
-        ref={footerAnchorRef}
-        style={{
-          width: '100%',
-          marginTop: '24px',
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
+      <div ref={footerAnchorRef} style={{ width: '100%', marginTop: '24px', position: 'relative', zIndex: 1 }}>
         <div
           style={{
             display: 'flex',
@@ -2020,9 +1867,9 @@ export function Materials({ onBack }: MaterialsProps) {
             marginBottom: '10px',
           }}
         >
-          <span>ФИНАЛ ЭКСПОЗИЦИИ // CARDIO B2B</span>
+          <span>{t.footerSub}</span>
           <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
-            Прямой опт от фабрики
+            {t.footerNote}
           </span>
         </div>
 
@@ -2038,51 +1885,13 @@ export function Materials({ onBack }: MaterialsProps) {
             backgroundColor: '#161514',
             transformOrigin: 'center top',
             willChange: 'transform',
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           }}
         >
           <img
             src={FOOTER_BANNER_SRC}
-            alt="Cardio Men's Footwear Campaign Banner"
+            alt="Cardio Campaign"
             loading="lazy"
-            style={{
-              width: '100%',
-              aspectRatio: '16 / 9',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-
-          <div
-            ref={footerGlareRef}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '65%',
-              height: '100%',
-              background:
-                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.38) 50%, rgba(255,255,255,0) 100%)',
-              mixBlendMode: 'overlay',
-              pointerEvents: 'none',
-              opacity: 0.15,
-              transform: 'translate3d(-55%, 0, 0) skewX(-22deg)',
-              willChange: 'transform, opacity',
-            }}
-          />
-
-          <div
-            ref={footerShadowRef}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(180deg, rgba(22,21,20,0.65) 0%, rgba(22,21,20,0.05) 100%)',
-              pointerEvents: 'none',
-              opacity: 0.4,
-              willChange: 'opacity',
-            }}
+            style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'contain', display: 'block' }}
           />
         </div>
 
@@ -2115,7 +1924,7 @@ export function Materials({ onBack }: MaterialsProps) {
               cursor: 'pointer',
             }}
           >
-            ↑ В начало каталога
+            {t.topToBeginning}
           </button>
 
           {cart.length > 0 ? (
@@ -2137,24 +1946,16 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
-              Оформить ({cartTotalPairs} п.) →
+              {t.checkoutBtn(cartTotalPairs)}
             </button>
           ) : (
-            <span
-              style={{
-                fontFamily: THEME.serif,
-                fontStyle: 'italic',
-                fontSize: '12px',
-                color: THEME.inkMuted,
-              }}
-            >
-              Выберите модель для заказа
+            <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '12px', color: THEME.inkMuted }}>
+              {t.chooseModelPrompt}
             </span>
           )}
         </div>
       </div>
 
-      {/* Нижняя фиксированная панель накладной */}
       {cart.length > 0 && (
         <div
           style={{
@@ -2172,10 +1973,10 @@ export function Materials({ onBack }: MaterialsProps) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: '#A09C94' }}>
-                ВАШ ОПТОВЫЙ ЗАКАЗ
+                {t.bottomOrderTitle}
               </div>
               <div style={{ fontFamily: THEME.serif, fontSize: '16px', marginTop: '1px' }}>
-                Накладная: {cart.length} мод. (<span style={{ fontStyle: 'italic' }}>{cartTotalPairs} пар</span>)
+                {t.bottomInvoiceText(cart.length, cartTotalPairs)}
               </div>
             </div>
             <button
@@ -2196,7 +1997,7 @@ export function Materials({ onBack }: MaterialsProps) {
                 cursor: 'pointer',
               }}
             >
-              Открыть накладную →
+              {t.openInvoiceBtn}
             </button>
           </div>
         </div>
