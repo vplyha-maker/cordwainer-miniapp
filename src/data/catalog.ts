@@ -68,21 +68,21 @@ const FEATURE_TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 /**
- * Вспомогательная функция для перевода категории обуви
+ * Локализация категории обуви
  */
 export function getLocalizedCategory(category: ShoeCategory, lang: string = 'ru'): string {
   return CATEGORY_TRANSLATIONS[category]?.[lang] || category;
 }
 
 /**
- * Вспомогательная функция для перевода цвета обуви
+ * Локализация цвета обуви
  */
 export function getLocalizedColor(color: string, lang: string = 'ru'): string {
   return COLOR_TRANSLATIONS[color]?.[lang] || color;
 }
 
 /**
- * Вспомогательная функция для перевода особенностей обуви
+ * Локализация особенностей обуви
  */
 export function getLocalizedFeature(feature: string, lang: string = 'ru'): string {
   return FEATURE_TRANSLATIONS[feature]?.[lang] || feature;
