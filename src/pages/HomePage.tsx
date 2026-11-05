@@ -628,7 +628,7 @@ export function HomePage({
                     type="button"
                     onClick={onOpenMaterials}
                     disabled={!onOpenMaterials}
-                    className={`group relative w-full p-5 sm:p-6 text-left outline-none border-b transition-all block overflow-hidden ${
+                    className={`group relative w-full p-4 sm:p-6 text-left outline-none border-b transition-all block overflow-hidden ${
                       onOpenMaterials
                         ? 'cursor-pointer active:opacity-75'
                         : 'opacity-40 cursor-default'
@@ -638,11 +638,11 @@ export function HomePage({
                       background: palette.cardioSurface,
                     }}
                   >
-                    {/* Верхняя индексная строка — строго в одну линию без переносов */}
-                    <div className="flex items-center justify-between gap-2 w-full mb-4">
-                      <div className="flex items-center gap-2 min-w-0">
+                    {/* Верхняя индексная строка — с защитой от переполнения */}
+                    <div className="flex items-center justify-between gap-2 w-full mb-3 overflow-hidden">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span
-                          className="text-[9px] font-sans tracking-[0.22em] tabular-nums shrink-0"
+                          className="text-[8px] font-sans tracking-[0.2em] tabular-nums shrink-0"
                           style={{ color: palette.textMuted }}
                         >
                           01
@@ -652,7 +652,7 @@ export function HomePage({
                           style={{ backgroundColor: palette.accentCobalt }}
                         />
                         <span
-                          className="text-[8px] font-sans uppercase tracking-[0.22em] font-medium truncate"
+                          className="text-[7.5px] font-sans uppercase tracking-[0.15em] font-medium truncate"
                           style={{ color: palette.text }}
                         >
                           {t.cardioBadge}
@@ -660,7 +660,7 @@ export function HomePage({
                       </div>
 
                       <span
-                        className="text-[7.5px] font-sans uppercase tracking-[0.2em] px-2 py-0.5 border whitespace-nowrap shrink-0"
+                        className="text-[7px] font-sans uppercase tracking-[0.15em] px-1.5 py-0.5 border whitespace-nowrap shrink-0"
                         style={{
                           borderColor: palette.lineStrong,
                           color: palette.textMuted,
@@ -670,18 +670,18 @@ export function HomePage({
                       </span>
                     </div>
 
-                    {/* Основное тело карточки: Типографика + Крупная эмблема /logo.png прямо на бумаге */}
+                    {/* Основное тело карточки: Типографика + Эмблема с оптимальными размерами */}
                     <div className="flex items-center justify-between gap-3 my-1">
                       <div className="flex-1 min-w-0 pr-1">
                         <div className="flex items-baseline gap-2 mb-1.5">
                           <h3
-                            className="font-serif text-[34px] sm:text-[40px] leading-[0.92] tracking-[0.02em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
+                            className="font-serif text-[32px] sm:text-[40px] leading-[0.92] tracking-[0.02em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
                             style={{ color: palette.text }}
                           >
                             Cardio
                           </h3>
                           <span
-                            className="font-serif italic text-[13px]"
+                            className="font-serif italic text-[12px]"
                             style={{ color: palette.textMuted }}
                           >
                             Atelier
@@ -689,23 +689,23 @@ export function HomePage({
                         </div>
 
                         <p
-                          className="text-[11.5px] font-sans font-light leading-[1.45] max-w-[240px]"
+                          className="text-[11px] font-sans font-light leading-[1.4] max-w-[220px]"
                           style={{ color: palette.textMuted }}
                         >
                           {t.cardioDesc}
                         </p>
                       </div>
 
-                      {/* Эмблема без лишней квадратной рамки — увеличена в 1.8 раза, чтобы срезать белые поля исходника */}
+                      {/* Аккуратный размер логотипа */}
                       <div
-                        className={`relative shrink-0 w-[108px] h-[76px] sm:w-[124px] sm:h-[86px] flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105 ${
+                        className={`relative shrink-0 w-[88px] h-[64px] sm:w-[110px] sm:h-[78px] flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105 ${
                           isDark ? 'rounded-sm bg-[#F4F1EA]/95 px-2' : ''
                         }`}
                       >
                         <img
                           src="/logo.png"
                           alt="Cardio Men's Footwear Emblem"
-                          className="w-full h-full object-contain scale-[1.85]"
+                          className="w-full h-full object-contain scale-[1.4]"
                           style={{
                             mixBlendMode: 'multiply',
                             filter: 'contrast(1.08)',
@@ -714,19 +714,19 @@ export function HomePage({
                       </div>
                     </div>
 
-                    {/* Нижняя плашка — строго в одну линию */}
+                    {/* Нижняя плашка — строго с truncate */}
                     <div
-                      className="mt-4 pt-3 border-t flex items-center justify-between gap-2"
+                      className="mt-3 pt-2.5 border-t flex items-center justify-between gap-2 overflow-hidden"
                       style={{ borderColor: palette.line }}
                     >
                       <span
-                        className="text-[8px] font-sans uppercase tracking-[0.16em] truncate"
+                        className="text-[7.5px] font-sans uppercase tracking-[0.12em] truncate min-w-0 flex-1"
                         style={{ color: palette.textMuted }}
                       >
                         {t.materialsSub}
                       </span>
                       <span
-                        className="text-[8.5px] font-sans uppercase tracking-[0.22em] font-medium flex items-center gap-1.5 whitespace-nowrap shrink-0 border-b pb-0.5"
+                        className="text-[8px] font-sans uppercase tracking-[0.18em] font-medium flex items-center gap-1 whitespace-nowrap shrink-0 border-b pb-0.5"
                         style={{
                           color: palette.text,
                           borderColor: palette.lineStrong,
@@ -790,13 +790,13 @@ export function HomePage({
                     ))}
                   </div>
 
-                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX (Заголовок в одну строку) */}
+                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX (С защитой от переполнения и вылезания за границы) */}
                   {catalogItem && (
                     <button
                       type="button"
                       onClick={catalogItem.action}
                       disabled={!catalogItem.action}
-                      className={`group w-full p-4 sm:p-5 flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors ${
+                      className={`group w-full p-4 sm:p-5 flex flex-col justify-between text-left bg-transparent outline-none border-b transition-colors overflow-hidden ${
                         catalogItem.action
                           ? 'cursor-pointer active:opacity-50'
                           : 'opacity-40 cursor-default'
@@ -818,23 +818,23 @@ export function HomePage({
                         </span>
                       </div>
 
-                      <div className="flex items-baseline justify-between gap-3 w-full">
+                      <div className="flex items-baseline justify-between gap-2 w-full overflow-hidden">
                         <div
-                          className="font-serif text-[23px] sm:text-[26px] leading-none tracking-tight whitespace-nowrap transition-transform group-hover:translate-x-0.5"
+                          className="font-serif text-[20px] sm:text-[26px] leading-none tracking-tight whitespace-nowrap transition-transform group-hover:translate-x-0.5 shrink-0"
                           style={{ color: palette.text }}
                         >
                           {catalogItem.title}
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 min-w-0 shrink">
                           <span
-                            className="text-[8.5px] font-sans uppercase tracking-[0.15em]"
+                            className="text-[7.5px] sm:text-[8.5px] font-sans uppercase tracking-[0.12em] truncate"
                             style={{ color: palette.textMuted }}
                           >
                             {catalogItem.subtitle}
                           </span>
                           <span
-                            className="text-[10px]"
+                            className="text-[10px] shrink-0"
                             style={{ color: palette.textSubtle }}
                           >
                             ↗
