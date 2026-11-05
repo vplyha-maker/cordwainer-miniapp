@@ -1,4 +1,4 @@
-import { useEffect, useState, CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { motion } from 'framer-motion'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
@@ -31,6 +31,172 @@ type MenuItem = {
   tag: string
   action?: () => void
   dot?: boolean
+}
+
+/**
+ * Автоматически убирает белый фон вокруг 3D-логотипа и обрезает лишние пустые поля,
+ * чтобы эмблема отображалась целиком и без белого квадрата в темной теме.
+ */
+function useTransparentLogo(src: string): string {
+  const [processedSrc, setProcessedSrc] = useState<string>(src)
+
+  useEffect(() => {
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+
+    img.onload = () => {
+      if (cancelled) return
+      try {
+        const w = img.naturalWidth
+        const h = img.naturalHeight
+        if (!w || !h) return
+
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        ctx.drawImage(img, 0, 0)
+        const imgData = ctx.getImageData(0, 0, w, h)
+        const data = imgData.data
+        const total = w * h
+
+        const isBg = new Uint8Array(total)
+        const queue = new Int32Array(total)
+        let head = 0
+        let tail = 0
+
+        const isWhiteLike = (idx: number) => {
+          const p = idx * 4
+          if (data[p + 3] < 20) return true
+          const r = data[p]
+          const g = data[p + 1]
+          const b = data[p + 2]
+          const minC = Math.min(r, g, b)
+          const maxC = Math.max(r, g, b)
+          return minC >= 224 && maxC - minC <= 28
+        }
+
+        const pushIfBg = (x: number, y: number) => {
+          const idx = y * w + x
+          if (!isBg[idx] && isWhiteLike(idx)) {
+            isBg[idx] = 1
+            queue[tail++] = idx
+          }
+        }
+
+        for (let x = 0; x < w; x++) {
+          pushIfBg(x, 0)
+          pushIfBg(x, h - 1)
+        }
+        for (let y = 0; y < h; y++) {
+          pushIfBg(0, y)
+          pushIfBg(w - 1, y)
+        }
+
+        while (head < tail) {
+          const curr = queue[head++]
+          const cx = curr % w
+          const cy = (curr - cx) / w
+
+          if (cx > 0) pushIfBg(cx - 1, cy)
+          if (cx < w - 1) pushIfBg(cx + 1, cy)
+          if (cy > 0) pushIfBg(cx, cy - 1)
+          if (cy < h - 1) pushIfBg(cx, cy + 1)
+        }
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x
+            const p = idx * 4
+            if (isBg[idx]) {
+              data[p + 3] = 0
+              continue
+            }
+
+            let nearBg = false
+            for (let dy = -2; dy <= 2 && !nearBg; dy++) {
+              const ny = y + dy
+              if (ny < 0 || ny >= h) continue
+              for (let dx = -2; dx <= 2; dx++) {
+                const nx = x + dx
+                if (nx < 0 || nx >= w) continue
+                if (isBg[ny * w + nx]) {
+                  nearBg = true
+                  break
+                }
+              }
+            }
+
+            if (nearBg) {
+              const r = data[p]
+              const g = data[p + 1]
+              const b = data[p + 2]
+              const minC = Math.min(r, g, b)
+              const maxC = Math.max(r, g, b)
+              if (minC > 165 && maxC - minC < 35) {
+                const alphaRatio = Math.max(0, Math.min(1, (240 - minC) / 75))
+                data[p + 3] = Math.round(data[p + 3] * alphaRatio)
+                if (alphaRatio > 0.05) {
+                  data[p] = Math.max(0, Math.min(255, Math.round((r - 255 * (1 - alphaRatio)) / alphaRatio)))
+                  data[p + 1] = Math.max(0, Math.min(255, Math.round((g - 255 * (1 - alphaRatio)) / alphaRatio)))
+                  data[p + 2] = Math.max(0, Math.min(255, Math.round((b - 255 * (1 - alphaRatio)) / alphaRatio)))
+                }
+              }
+            }
+          }
+        }
+
+        let minX = w
+        let minY = h
+        let maxX = 0
+        let maxY = 0
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (data[(y * w + x) * 4 + 3] > 20) {
+              if (x < minX) minX = x
+              if (x > maxX) maxX = x
+              if (y < minY) minY = y
+              if (y > maxY) maxY = y
+            }
+          }
+        }
+
+        ctx.putImageData(imgData, 0, 0)
+
+        if (maxX > minX && maxY > minY) {
+          const pad = Math.round(Math.max(w, h) * 0.025)
+          const sx = Math.max(0, minX - pad)
+          const sy = Math.max(0, minY - pad)
+          const sw = Math.min(w - sx, maxX - minX + 1 + pad * 2)
+          const sh = Math.min(h - sy, maxY - minY + 1 + pad * 2)
+
+          const cropped = document.createElement('canvas')
+          cropped.width = sw
+          cropped.height = sh
+          const cCtx = cropped.getContext('2d')
+          if (cCtx) {
+            cCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh)
+            setProcessedSrc(cropped.toDataURL('image/png'))
+            return
+          }
+        }
+
+        setProcessedSrc(canvas.toDataURL('image/png'))
+      } catch {
+        // Fallback to original image if canvas manipulation is blocked
+      }
+    }
+
+    img.src = src
+    return () => {
+      cancelled = true
+    }
+  }, [src])
+
+  return processedSrc
 }
 
 function glossaryLabel(count: number, lang: Lang): string {
@@ -81,7 +247,11 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] } },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] as const },
+  },
 }
 
 export function HomePage({
@@ -102,6 +272,7 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const transparentLogoSrc = useTransparentLogo('/logo.png')
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
@@ -638,7 +809,7 @@ export function HomePage({
                       background: palette.cardioSurface,
                     }}
                   >
-                    {/* Верхняя индексная строка — с защитой от переполнения */}
+                    {/* Верхняя индексная строка */}
                     <div className="flex items-center justify-between gap-2 w-full mb-3 overflow-hidden">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span
@@ -652,7 +823,7 @@ export function HomePage({
                           style={{ backgroundColor: palette.accentCobalt }}
                         />
                         <span
-                          className="text-[7.5px] font-sans uppercase tracking-[0.15em] font-medium truncate"
+                          className="text-[7.5px] font-sans uppercase tracking-[0.14em] font-medium truncate"
                           style={{ color: palette.text }}
                         >
                           {t.cardioBadge}
@@ -670,8 +841,8 @@ export function HomePage({
                       </span>
                     </div>
 
-                    {/* Основное тело карточки: Типографика + Эмблема с оптимальными размерами */}
-                    <div className="flex items-center justify-between gap-3 my-1">
+                    {/* Основное тело карточки: Типографика + полная 3D-эмблема без белого квадрата и без обрезки */}
+                    <div className="flex items-center justify-between gap-3 my-1.5">
                       <div className="flex-1 min-w-0 pr-1">
                         <div className="flex items-baseline gap-2 mb-1.5">
                           <h3
@@ -696,37 +867,34 @@ export function HomePage({
                         </p>
                       </div>
 
-                      {/* Аккуратный размер логотипа */}
-                      <div
-                        className={`relative shrink-0 w-[88px] h-[64px] sm:w-[110px] sm:h-[78px] flex items-center justify-center overflow-hidden transition-transform duration-500 group-hover:scale-105 ${
-                          isDark ? 'rounded-sm bg-[#F4F1EA]/95 px-2' : ''
-                        }`}
-                      >
+                      {/* Контейнер логотипа: без белого квадрата в темной теме и без обрезания краев */}
+                      <div className="relative shrink-0 w-[112px] h-[68px] sm:w-[136px] sm:h-[82px] flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
                         <img
-                          src="/logo.png"
+                          src={transparentLogoSrc}
                           alt="Cardio Men's Footwear Emblem"
-                          className="w-full h-full object-contain scale-[1.4]"
+                          className="w-full h-full object-contain"
                           style={{
-                            mixBlendMode: 'multiply',
-                            filter: 'contrast(1.08)',
+                            filter: isDark
+                              ? 'drop-shadow(0 4px 12px rgba(59, 130, 246, 0.18)) contrast(1.06)'
+                              : 'contrast(1.06)',
                           }}
                         />
                       </div>
                     </div>
 
-                    {/* Нижняя плашка — строго с truncate */}
+                    {/* Нижняя плашка */}
                     <div
                       className="mt-3 pt-2.5 border-t flex items-center justify-between gap-2 overflow-hidden"
                       style={{ borderColor: palette.line }}
                     >
                       <span
-                        className="text-[7.5px] font-sans uppercase tracking-[0.12em] truncate min-w-0 flex-1"
+                        className="text-[7.5px] font-sans uppercase tracking-[0.1em] truncate min-w-0 flex-1"
                         style={{ color: palette.textMuted }}
                       >
                         {t.materialsSub}
                       </span>
                       <span
-                        className="text-[8px] font-sans uppercase tracking-[0.18em] font-medium flex items-center gap-1 whitespace-nowrap shrink-0 border-b pb-0.5"
+                        className="text-[8px] font-sans uppercase tracking-[0.16em] font-medium flex items-center gap-1 whitespace-nowrap shrink-0 border-b pb-0.5"
                         style={{
                           color: palette.text,
                           borderColor: palette.lineStrong,
@@ -790,7 +958,7 @@ export function HomePage({
                     ))}
                   </div>
 
-                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX (С защитой от переполнения и вылезания за границы) */}
+                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX (Подзаголовок под заголовком, без вылезания за края) */}
                   {catalogItem && (
                     <button
                       type="button"
@@ -803,7 +971,7 @@ export function HomePage({
                       }`}
                       style={{ borderColor: palette.line }}
                     >
-                      <div className="flex items-center justify-between w-full mb-2">
+                      <div className="flex items-center justify-between w-full mb-2.5">
                         <span
                           className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
                           style={{ color: palette.textMuted }}
@@ -818,28 +986,28 @@ export function HomePage({
                         </span>
                       </div>
 
-                      <div className="flex items-baseline justify-between gap-2 w-full overflow-hidden">
-                        <div
-                          className="font-serif text-[20px] sm:text-[26px] leading-none tracking-tight whitespace-nowrap transition-transform group-hover:translate-x-0.5 shrink-0"
-                          style={{ color: palette.text }}
-                        >
-                          {catalogItem.title}
-                        </div>
-
-                        <div className="flex items-center gap-1.5 min-w-0 shrink">
-                          <span
-                            className="text-[7.5px] sm:text-[8.5px] font-sans uppercase tracking-[0.12em] truncate"
+                      <div className="flex items-end justify-between gap-3 w-full">
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className="font-serif text-[22px] sm:text-[26px] leading-[1.08] tracking-tight mb-1.5 transition-transform group-hover:translate-x-0.5"
+                            style={{ color: palette.text }}
+                          >
+                            {catalogItem.title}
+                          </div>
+                          <div
+                            className="text-[8.5px] font-sans uppercase tracking-[0.12em] leading-[1.35] break-words"
                             style={{ color: palette.textMuted }}
                           >
                             {catalogItem.subtitle}
-                          </span>
-                          <span
-                            className="text-[10px] shrink-0"
-                            style={{ color: palette.textSubtle }}
-                          >
-                            ↗
-                          </span>
+                          </div>
                         </div>
+
+                        <span
+                          className="text-[11px] shrink-0 pb-0.5 transition-transform duration-300 group-hover:translate-x-0.5"
+                          style={{ color: palette.textSubtle }}
+                        >
+                          ↗
+                        </span>
                       </div>
                     </button>
                   )}
