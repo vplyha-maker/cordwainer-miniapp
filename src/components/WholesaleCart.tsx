@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
+  type CSSProperties,
+} from 'react';
 import { type CartItem, type SizeKey } from '../data/catalog';
 import {
   ManagersContactCard,
@@ -22,6 +29,8 @@ type CityOption = {
   uaName: string;
   deName: string;
   fullLabel: string;
+  fullLabelRu?: string;
+  fullLabelDe?: string;
   ref: string;
   area?: string;
 };
@@ -52,15 +61,155 @@ const VALID_UA_OPERATOR_CODES = new Set([
 ]);
 
 const POPULAR_CITIES: CityOption[] = [
-  { name: 'Киев', uaName: 'Київ', deName: 'Kyjiw', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', area: 'Київська' },
-  { name: 'Днепр', uaName: 'Дніпро', deName: 'Dnipro', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', area: 'Дніпропетровська' },
-  { name: 'Одесса', uaName: 'Одеса', deName: 'Odessa', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', area: 'Одеська' },
-  { name: 'Львов', uaName: 'Львів', deName: 'Lwiw', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', area: 'Львівська' },
-  { name: 'Харьков', uaName: 'Харків', deName: 'Charkiw', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', area: 'Харківська' },
-  { name: 'Полтава', uaName: 'Полтава', deName: 'Poltawa', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626', area: 'Полтавська' },
-  { name: 'Запорожье', uaName: 'Запоріжжя', deName: 'Saporischschja', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', area: 'Запорізька' },
-  { name: 'Винница', uaName: 'Вінниця', deName: 'Winnyzja', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', area: 'Вінницька' },
+  {
+    name: 'Киев',
+    uaName: 'Київ',
+    deName: 'Kyjiw',
+    fullLabel: 'м. Київ (Київська обл.)',
+    fullLabelRu: 'г. Киев (Киевская обл.)',
+    fullLabelDe: 'Kyjiw (Oblast Kyjiw)',
+    ref: '8d5a980d-391c-11dd-90d9-001a92567626',
+    area: 'Київська',
+  },
+  {
+    name: 'Днепр',
+    uaName: 'Дніпро',
+    deName: 'Dnipro',
+    fullLabel: 'м. Дніпро (Дніпропетровська обл.)',
+    fullLabelRu: 'г. Днепр (Днепропетровская обл.)',
+    fullLabelDe: 'Dnipro (Oblast Dnipropetrowsk)',
+    ref: 'db5c88f0-391c-11dd-90d9-001a92567626',
+    area: 'Дніпропетровська',
+  },
+  {
+    name: 'Одесса',
+    uaName: 'Одеса',
+    deName: 'Odessa',
+    fullLabel: 'м. Одеса (Одеська обл.)',
+    fullLabelRu: 'г. Одесса (Одесская обл.)',
+    fullLabelDe: 'Odessa (Oblast Odessa)',
+    ref: 'db5c88d0-391c-11dd-90d9-001a92567626',
+    area: 'Одеська',
+  },
+  {
+    name: 'Львов',
+    uaName: 'Львів',
+    deName: 'Lwiw',
+    fullLabel: 'м. Львів (Львівська обл.)',
+    fullLabelRu: 'г. Львов (Львовская обл.)',
+    fullLabelDe: 'Lwiw (Oblast Lwiw)',
+    ref: 'db5c88f5-391c-11dd-90d9-001a92567626',
+    area: 'Львівська',
+  },
+  {
+    name: 'Харьков',
+    uaName: 'Харків',
+    deName: 'Charkiw',
+    fullLabel: 'м. Харків (Харківська обл.)',
+    fullLabelRu: 'г. Харьков (Харьковская обл.)',
+    fullLabelDe: 'Charkiw (Oblast Charkiw)',
+    ref: 'db5c88e0-391c-11dd-90d9-001a92567626',
+    area: 'Харківська',
+  },
+  {
+    name: 'Полтава',
+    uaName: 'Полтава',
+    deName: 'Poltawa',
+    fullLabel: 'м. Полтава (Полтавська обл.)',
+    fullLabelRu: 'г. Полтава (Полтавская обл.)',
+    fullLabelDe: 'Poltawa (Oblast Poltawa)',
+    ref: 'db5c8892-391c-11dd-90d9-001a92567626',
+    area: 'Полтавська',
+  },
+  {
+    name: 'Запорожье',
+    uaName: 'Запоріжжя',
+    deName: 'Saporischschja',
+    fullLabel: 'м. Запоріжжя (Запорізька обл.)',
+    fullLabelRu: 'г. Запорожье (Запорожская обл.)',
+    fullLabelDe: 'Saporischschja (Oblast Saporischschja)',
+    ref: 'db5c88c6-391c-11dd-90d9-001a92567626',
+    area: 'Запорізька',
+  },
+  {
+    name: 'Винница',
+    uaName: 'Вінниця',
+    deName: 'Winnyzja',
+    fullLabel: 'м. Вінниця (Вінницька обл.)',
+    fullLabelRu: 'г. Винница (Винницкая обл.)',
+    fullLabelDe: 'Winnyzja (Oblast Winnyzja)',
+    ref: 'db5c88de-391c-11dd-90d9-001a92567626',
+    area: 'Вінницька',
+  },
 ];
+
+/**
+ * Словарь для автоматического перевода цветов и категорий обуви из catalog.ts
+ */
+const SHOE_TERMS_MAP: Record<string, { uk: string; de: string }> = {
+  // Цвета
+  'черный': { uk: 'Чорний', de: 'Schwarz' },
+  'чёрный': { uk: 'Чорний', de: 'Schwarz' },
+  'белый': { uk: 'Білий', de: 'Weiß' },
+  'коричневый': { uk: 'Коричневий', de: 'Braun' },
+  'темно-коричневый': { uk: 'Темно-коричневий', de: 'Dunkelbraun' },
+  'светло-коричневый': { uk: 'Світло-коричневий', de: 'Hellbraun' },
+  'синий': { uk: 'Синій', de: 'Blau' },
+  'темно-синий': { uk: 'Темно-синій', de: 'Dunkelblau' },
+  'серый': { uk: 'Сірий', de: 'Grau' },
+  'бежевый': { uk: 'Бежевий', de: 'Beige' },
+  'рыжий': { uk: 'Рудий', de: 'Cognac' },
+  'коньяк': { uk: 'Коньяк', de: 'Cognac' },
+  'бордовый': { uk: 'Бордовий', de: 'Bordeaux' },
+  'зеленый': { uk: 'Зелений', de: 'Grün' },
+  'хаки': { uk: 'Хакі', de: 'Khaki' },
+  'оливковый': { uk: 'Оливковий', de: 'Oliv' },
+  'комбинированный': { uk: 'Комбінований', de: 'Kombiniert' },
+  // Материалы / Варианты
+  'кожа': { uk: 'Шкіра', de: 'Leder' },
+  'замша': { uk: 'Замша', de: 'Wildleder' },
+  'нубук': { uk: 'Нубук', de: 'Nubuk' },
+  'текстиль': { uk: 'Текстиль', de: 'Textil' },
+  'сетка': { uk: 'Сітка', de: 'Mesh' },
+  'перфорация': { uk: 'Перфорація', de: 'Perforiert' },
+  // Категории и сезоны
+  'кроссовки': { uk: 'Кросівки', de: 'Sneaker' },
+  'кеды': { uk: 'Кеди', de: 'Sneaker' },
+  'туфли': { uk: 'Туфлі', de: 'Halbschuhe' },
+  'ботинки': { uk: 'Черевики', de: 'Stiefel' },
+  'лоферы': { uk: 'Лофери', de: 'Loafer' },
+  'мокасины': { uk: 'Мокасини', de: 'Mokassins' },
+  'слипоны': { uk: 'Сліпони', de: 'Slipper' },
+  'топсайдеры': { uk: 'Топсайдери', de: 'Bootsschuhe' },
+  'дерби': { uk: 'Дербі', de: 'Derby' },
+  'оксфорды': { uk: 'Оксфорди', de: 'Oxford' },
+  'челси': { uk: 'Челсі', de: 'Chelsea Boots' },
+  'сандалии': { uk: 'Сандалі', de: 'Sandalen' },
+  'классика': { uk: 'Класика', de: 'Klassik' },
+  'комфорт': { uk: 'Комфорт', de: 'Komfort' },
+  'спорт': { uk: 'Спорт', de: 'Sport' },
+  'повседневные': { uk: 'Повсякденні', de: 'Casual' },
+  'весна-осень': { uk: 'Весна-Осінь', de: 'Frühling-Herbst' },
+  'лето': { uk: 'Літо', de: 'Sommer' },
+  'зима': { uk: 'Зима', de: 'Winter' },
+  'демисезон': { uk: 'Демісезон', de: 'Übergang' },
+};
+
+function translateCatalogText(raw: string | undefined, lang: Lang): string {
+  if (!raw) return '';
+  if (lang === 'ru') return raw;
+  const trimmed = raw.trim();
+  const direct = SHOE_TERMS_MAP[trimmed.toLowerCase()];
+  if (direct) return direct[lang];
+
+  return trimmed
+    .split(/(\s*[•/,+()-]\s*)/)
+    .map((part) => {
+      const lookup = SHOE_TERMS_MAP[part.trim().toLowerCase()];
+      return lookup ? lookup[lang] : part;
+    })
+    .join('');
+}
 
 const THEME = {
   bg: '#F2EFE9',
@@ -81,6 +230,43 @@ type InvoiceMeta = {
   dateFormatted: string;
 };
 
+function resolveActiveLang(propLang?: Lang): Lang {
+  if (propLang && ['ru', 'uk', 'de'].includes(propLang)) {
+    return propLang;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('app_lang');
+      if (saved === 'ru' || saved === 'uk' || saved === 'de') return saved;
+      if (saved === 'ua') return 'uk';
+    } catch {}
+  }
+  return 'ru';
+}
+
+function getCityFullLabel(city: CityOption, lang: Lang): string {
+  const preset = POPULAR_CITIES.find((c) => c.ref === city.ref);
+  const target = preset || city;
+  if (lang === 'de') return target.fullLabelDe || target.deName || target.fullLabel;
+  if (lang === 'ru') return target.fullLabelRu || target.fullLabel;
+  return target.fullLabel;
+}
+
+function isMatchingCityLabel(query: string, city: CityOption): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return false;
+  const preset = POPULAR_CITIES.find((c) => c.ref === city.ref);
+  const candidates = [
+    city.fullLabel,
+    city.fullLabelRu,
+    city.fullLabelDe,
+    preset?.fullLabel,
+    preset?.fullLabelRu,
+    preset?.fullLabelDe,
+  ].filter(Boolean) as string[];
+  return candidates.some((label) => label.toLowerCase() === q);
+}
+
 function ClearFieldButton({
   onClear,
   isTextarea = false,
@@ -90,7 +276,7 @@ function ClearFieldButton({
   isTextarea?: boolean;
   ariaLabel?: string;
 }) {
-  const handleTrigger = (e: React.PointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
+  const handleTrigger = (e: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     triggerHaptic('light');
@@ -287,14 +473,22 @@ function buildSearchVariants(raw: string): string[] {
 function loadSavedRecipient(): SavedRecipientData | null {
   try {
     const raw = localStorage.getItem(RECIPIENT_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as SavedRecipientData) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SavedRecipientData;
+    if (parsed?.selectedCity?.ref) {
+      const matchedPopular = POPULAR_CITIES.find((c) => c.ref === parsed.selectedCity.ref);
+      if (matchedPopular) {
+        parsed.selectedCity = matchedPopular;
+      }
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
-  const safeLang: Lang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
+  const safeLang: Lang = resolveActiveLang(lang);
 
   const t = {
     ru: {
@@ -305,6 +499,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       title: (count: number) => `Оптовая накладная (${count})`,
       emptyText: 'В вашей накладной пока нет выбранных моделей.',
       goToCatalog: 'Перейти в каталог →',
+      modelPrefix: '№',
       totalPairsLabel: 'Итого:',
       pairsUnit: 'пар',
       boxesLabel: 'Коробов',
@@ -353,11 +548,12 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       title: (count: number) => `Гуртова накладна (${count})`,
       emptyText: 'У вашій накладній поки немає обраних моделей.',
       goToCatalog: 'Перейти до каталогу →',
+      modelPrefix: '№',
       totalPairsLabel: 'Разом:',
       pairsUnit: 'пар',
       boxesLabel: 'Коробів',
       sectionLogistics: 'I. ДАНІ ОТРИМУВАЧА ТА ДОСТАВКА',
-      sectionShipping: 'РЕКВІЗИТИ ВІДПРАВКИ',
+      sectionShipping: 'РЕКВІЗИТИ ВІДВАНТАЖЕННЯ',
       fillRequired: 'Заповніть обов’язкові поля:',
       cityPrompt: 'Населений пункт:',
       citySub: 'Виберіть місто зі швидкого списку або почніть вводити назву будь-якого міста, смт чи села:',
@@ -378,7 +574,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       clearWarehouseAria: 'Очистити відділення',
       clearCommentAria: 'Очистити коментар',
       orderSentSuccess: (num: string, mgr: string) => `✓ Накладну № ${num} успішно надіслано керівнику (${mgr})!`,
-      orderSendError: (err?: string) => `Помилка відправки: ${err || 'Не вдалося надіслати замовлення'}`,
+      orderSendError: (err?: string) => `Помилка надсилання: ${err || 'Не вдалося надіслати замовлення'}`,
       orderNetworkError: 'Помилка з’єднання з сервером.',
       invHeader: (num: string) => `📦 ГУРТОВА НАКЛАДНА № ${num}`,
       invDate: (date: string) => `📅 Дата: ${date} • CARDIO (Харків)`,
@@ -401,6 +597,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       title: (count: number) => `Großhandelsrechnung (${count})`,
       emptyText: 'Ihre Rechnung enthält noch keine Modelle.',
       goToCatalog: 'Zum Katalog →',
+      modelPrefix: 'Nr.',
       totalPairsLabel: 'Gesamt:',
       pairsUnit: 'Paar',
       boxesLabel: 'Kisten',
@@ -446,8 +643,14 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
   const savedRecipient = loadSavedRecipient();
   const [invoiceMeta, setInvoiceMeta] = useState<InvoiceMeta>(() => getOrCreateInvoiceMeta(false));
 
-  const [selectedCity, setSelectedCity] = useState<CityOption>(savedRecipient?.selectedCity || POPULAR_CITIES[0]);
-  const [cityQuery, setCityQuery] = useState(savedRecipient?.cityQuery ?? POPULAR_CITIES[0].fullLabel);
+  const initialCity = savedRecipient?.selectedCity || POPULAR_CITIES[0];
+  const [selectedCity, setSelectedCity] = useState<CityOption>(initialCity);
+  const [cityQuery, setCityQuery] = useState(() => {
+    if (savedRecipient?.cityQuery && !isMatchingCityLabel(savedRecipient.cityQuery, initialCity)) {
+      return savedRecipient.cityQuery;
+    }
+    return getCityFullLabel(initialCity, safeLang);
+  });
   const [cityResults, setCityResults] = useState<CityOption[]>([]);
   const [citySearching, setCitySearching] = useState(false);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -458,7 +661,9 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
 
   const [branchOrComment, setBranchOrComment] = useState(savedRecipient?.branchOrComment || '');
   const [clientName, setClientName] = useState(savedRecipient?.clientName || '');
-  const [clientPhone, setClientPhone] = useState(() => savedRecipient?.clientPhone ? formatUkrainePhone(savedRecipient.clientPhone) : '');
+  const [clientPhone, setClientPhone] = useState(() =>
+    savedRecipient?.clientPhone ? formatUkrainePhone(savedRecipient.clientPhone) : ''
+  );
   const [orderComment, setOrderComment] = useState(savedRecipient?.orderComment || '');
   const [showValidationErrors, setShowValidationErrors] = useState(false);
 
@@ -475,9 +680,26 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
   const warehouseInputRef = useRef<HTMLInputElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // При смене языка автоматически обновляем подпись выбранного города в поле ввода
+  useEffect(() => {
+    setCityQuery((prev) => {
+      if (isMatchingCityLabel(prev, selectedCity)) {
+        return getCityFullLabel(selectedCity, safeLang);
+      }
+      return prev;
+    });
+  }, [safeLang, selectedCity]);
+
   useEffect(() => {
     try {
-      const payload: SavedRecipientData = { selectedCity, cityQuery, branchOrComment, clientName, clientPhone, orderComment };
+      const payload: SavedRecipientData = {
+        selectedCity,
+        cityQuery,
+        branchOrComment,
+        clientName,
+        clientPhone,
+        orderComment,
+      };
       localStorage.setItem(RECIPIENT_STORAGE_KEY, JSON.stringify(payload));
     } catch {}
   }, [selectedCity, cityQuery, branchOrComment, clientName, clientPhone, orderComment]);
@@ -516,7 +738,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
 
   useEffect(() => {
     const trimmed = cityQuery.trim();
-    if (trimmed.length < 1 || trimmed === selectedCity.fullLabel) {
+    if (trimmed.length < 1 || isMatchingCityLabel(trimmed, selectedCity)) {
       setCityResults([]);
       setCitySearching(false);
       return;
@@ -567,7 +789,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [cityQuery, selectedCity.fullLabel]);
+  }, [cityQuery, selectedCity]);
 
   useEffect(() => {
     if (!selectedCity.ref) {
@@ -585,7 +807,10 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
           const list: WarehouseOption[] = dataWh.data.map((w: Record<string, string>) => ({
             ref: w.Ref,
             number: String(w.Number || ''),
-            description: w.Description || w.DescriptionRu || '',
+            description:
+              safeLang === 'ru'
+                ? w.DescriptionRu || w.Description || ''
+                : w.Description || w.DescriptionRu || '',
           }));
           setWarehouses(list);
         } else {
@@ -602,7 +827,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
     return () => {
       cancelled = true;
     };
-  }, [selectedCity]);
+  }, [selectedCity, safeLang]);
 
   const filteredWarehouses = (() => {
     const q = branchOrComment.trim().toLowerCase();
@@ -632,7 +857,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
   const handleSelectCity = (city: CityOption) => {
     triggerHaptic('medium');
     setSelectedCity(city);
-    setCityQuery(city.fullLabel);
+    setCityQuery(getCityFullLabel(city, safeLang));
     setShowCityDropdown(false);
     setBranchOrComment('');
   };
@@ -654,10 +879,11 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
 
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
-      const variantStr = item.shoe.variant ? ` ${item.shoe.variant}` : '';
+      const variantStr = item.shoe.variant ? ` ${translateCatalogText(item.shoe.variant, safeLang)}` : '';
+      const colorStr = translateCatalogText(item.shoe.color, safeLang);
       const actualFormula = getDynamicFormulaText(item, safeLang);
       return (
-        `${t.invModel(idx + 1, item.shoe.modelNumber, variantStr, item.shoe.color)}\n` +
+        `${t.invModel(idx + 1, item.shoe.modelNumber, variantStr, colorStr)}\n` +
         `   • ${actualFormula}\n` +
         `   • ${t.invModelTotal(item.totalPairs)}`
       );
@@ -748,7 +974,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
     }
   };
 
-  const getFieldStyle = (isValid: boolean): React.CSSProperties => ({
+  const getFieldStyle = (isValid: boolean): CSSProperties => ({
     width: '100%',
     boxSizing: 'border-box',
     padding: '11px 46px 11px 12px',
@@ -919,6 +1145,9 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
               const isSample = item.orderMode === 'sample';
               const canDecrease = item.boxesCount > 1;
               const actualFormula = getDynamicFormulaText(item, safeLang);
+              const localizedColor = translateCatalogText(item.shoe.color, safeLang);
+              const localizedCategory = translateCatalogText(item.shoe.category, safeLang);
+              const localizedVariant = translateCatalogText(item.shoe.variant, safeLang);
 
               return (
                 <div
@@ -967,7 +1196,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                         <span style={{ fontSize: '10px', color: THEME.inkLight, marginRight: '6px', fontFamily: THEME.sans }}>
                           0{idx + 1}
                         </span>
-                        № {item.shoe.modelNumber} {item.shoe.variant || ''}
+                        {t.modelPrefix} {item.shoe.modelNumber} {localizedVariant}
                       </div>
                       <button
                         type="button"
@@ -997,7 +1226,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                     </div>
 
                     <div style={{ fontSize: '10px', color: THEME.inkMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: '2px' }}>
-                      {item.shoe.color} • {item.shoe.category}
+                      {localizedColor} • {localizedCategory}
                     </div>
                     <div style={{ fontSize: '11px', color: THEME.ink, marginTop: '5px', lineHeight: 1.35 }}>
                       {actualFormula}
@@ -1116,7 +1345,10 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
               )}
 
               <div style={{ fontSize: '12px', color: THEME.ink, marginBottom: '6px' }}>
-                {t.cityPrompt} <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>{selectedCity.fullLabel}</strong>
+                {t.cityPrompt}{' '}
+                <strong style={{ fontFamily: THEME.serif, fontSize: '14px' }}>
+                  {getCityFullLabel(selectedCity, safeLang)}
+                </strong>
               </div>
               <div style={{ fontSize: '11px', color: THEME.inkMuted, marginBottom: '10px', lineHeight: 1.35 }}>
                 {t.citySub}
@@ -1174,7 +1406,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                   />
                 )}
 
-                {showCityDropdown && cityQuery.trim().length >= 1 && cityQuery.trim() !== selectedCity.fullLabel && (
+                {showCityDropdown && cityQuery.trim().length >= 1 && !isMatchingCityLabel(cityQuery, selectedCity) && (
                   <div
                     style={{
                       position: 'absolute',
@@ -1383,7 +1615,10 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                     flexShrink: 0,
                   }}
                 >
-                  {grandTotalPairs} {t.pairsUnit} <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>{t.boxesSuffix(grandTotalBoxes)}</span>
+                  {grandTotalPairs} {t.pairsUnit}{' '}
+                  <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>
+                    {t.boxesSuffix(grandTotalBoxes)}
+                  </span>
                 </div>
               </div>
             </div>
