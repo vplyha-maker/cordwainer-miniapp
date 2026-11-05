@@ -3,8 +3,8 @@ import type { Lang } from '../App';
 
 export type ManagerContact = {
   id: string;
-  name: string;
-  role: string;
+  name: Record<Lang, string>;
+  role: Record<Lang, string>;
   phone: string;
   phoneDisplay: string;
   telegramId: string;
@@ -14,7 +14,7 @@ export type ManagerContact = {
 type ManagersContactCardProps = {
   lang?: Lang;
   itemsCount?: number;
-  onSendOrder?: (manager: ManagerContact) => Promise<boolean>;
+  onSendOrder?: (manager: { id: string; name: string; role: string; phone: string; telegramId: string; isTest?: boolean }) => Promise<boolean>;
   onCopyInvoice?: () => void;
   copied?: boolean;
   isFormValid?: boolean;
@@ -35,24 +35,48 @@ export type HapticStyle =
 const MANAGERS: ManagerContact[] = [
   {
     id: 'boris',
-    name: 'Борис',
-    role: 'Руководитель оптового отдела',
+    name: {
+      ru: 'Борис',
+      uk: 'Борис',
+      de: 'Boris',
+    },
+    role: {
+      ru: 'Руководитель оптового отдела',
+      uk: 'Керівник гуртового відділу',
+      de: 'Leiter der Großhandelsabteilung',
+    },
     phone: '+380974541511',
     phoneDisplay: '+38 (097) 454-15-11',
     telegramId: '8529254699',
   },
   {
     id: 'georgiy',
-    name: 'Георгий',
-    role: 'Руководитель производства и продаж',
+    name: {
+      ru: 'Георгий',
+      uk: 'Георгій',
+      de: 'Georgiy',
+    },
+    role: {
+      ru: 'Руководитель производства и продаж',
+      uk: 'Керівник виробництва та продажів',
+      de: 'Leiter Produktion & Vertrieb',
+    },
     phone: '+380677193716',
     phoneDisplay: '+38 (067) 719-37-16',
     telegramId: '6034597342',
   },
   {
     id: 'test',
-    name: 'Test',
-    role: 'Тестовый контур проверки заказов',
+    name: {
+      ru: 'Test',
+      uk: 'Test',
+      de: 'Test',
+    },
+    role: {
+      ru: 'Тестовый контур проверки заказов',
+      uk: 'Тестовий контур перевірки замовлень',
+      de: 'Testumgebung für Bestellungen',
+    },
     phone: '+380000000000',
     phoneDisplay: 'Тестовый канал',
     telegramId: '8686072747',
@@ -329,7 +353,16 @@ export function ManagersContactCard({
     triggerHaptic('medium');
 
     try {
-      const ok = await onSendOrder(manager);
+      const localizedManager = {
+        id: manager.id,
+        name: manager.name[safeLang] || manager.name.ru,
+        role: manager.role[safeLang] || manager.role.ru,
+        phone: manager.phone,
+        telegramId: manager.telegramId,
+        isTest: manager.isTest,
+      };
+
+      const ok = await onSendOrder(localizedManager);
       if (ok) {
         playAppSound('zakaz.mp3');
         triggerHaptic('success');
@@ -468,6 +501,9 @@ export function ManagersContactCard({
           const isConfirmingThis = confirmingManagerId === manager.id;
           const isAnySending = Boolean(sendingManagerId);
 
+          const localizedName = manager.name[safeLang] || manager.name.ru;
+          const localizedRole = manager.role[safeLang] || manager.role.ru;
+
           return (
             <div
               key={manager.id}
@@ -495,7 +531,7 @@ export function ManagersContactCard({
                     color: THEME.ink,
                   }}
                 >
-                  {manager.name}
+                  {localizedName}
                 </div>
                 {!manager.isTest && (
                   <a
@@ -523,7 +559,7 @@ export function ManagersContactCard({
                   marginBottom: '12px',
                 }}
               >
-                {manager.role}
+                {localizedRole}
               </div>
 
               {onSendOrder && itemsCount > 0 && (
@@ -545,7 +581,7 @@ export function ManagersContactCard({
                           lineHeight: 1.4,
                         }}
                       >
-                        {t.confirmQ(itemsCount, manager.name)}
+                        {t.confirmQ(itemsCount, localizedName)}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <button
@@ -626,8 +662,8 @@ export function ManagersContactCard({
                         {isSendingThis
                           ? t.sendingText
                           : isOnCooldown
-                          ? t.sentText(manager.name)
-                          : t.sendBtn(manager.name)}
+                          ? t.sentText(localizedName)
+                          : t.sendBtn(localizedName)}
                       </span>
                       <span
                         style={{
