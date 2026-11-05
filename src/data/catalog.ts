@@ -22,8 +22,21 @@ export interface CartItem {
   formulaText: string;
 }
 
+function resolveCatalogLang(lang?: string): 'ru' | 'uk' | 'de' {
+  if (lang === 'ru' || lang === 'uk' || lang === 'de') return lang;
+  if (lang === 'ua') return 'uk';
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('app_lang');
+      if (saved === 'ru' || saved === 'uk' || saved === 'de') return saved;
+      if (saved === 'ua') return 'uk';
+    } catch {}
+  }
+  return 'ru';
+}
+
 // Словари для перевода категорий обуви
-const CATEGORY_TRANSLATIONS: Record<ShoeCategory, Record<string, string>> = {
+const CATEGORY_TRANSLATIONS: Record<ShoeCategory, Record<'ru' | 'uk' | 'de', string>> = {
   'Ботинки': {
     ru: 'Ботинки',
     uk: 'Черевики',
@@ -37,17 +50,20 @@ const CATEGORY_TRANSLATIONS: Record<ShoeCategory, Record<string, string>> = {
   'Туфли': {
     ru: 'Туфли',
     uk: 'Туфлі',
-    de: 'Schuhe',
+    de: 'Halbschuhe',
   },
 };
 
 // Словари для перевода цветов
-const COLOR_TRANSLATIONS: Record<string, Record<string, string>> = {
+const COLOR_TRANSLATIONS: Record<string, Record<'ru' | 'uk' | 'de', string>> = {
   'Белый': { ru: 'Белый', uk: 'Білий', de: 'Weiß' },
   'Черный': { ru: 'Черный', uk: 'Чорний', de: 'Schwarz' },
+  'Чёрный': { ru: 'Черный', uk: 'Чорний', de: 'Schwarz' },
   'Коричневый': { ru: 'Коричневый', uk: 'Коричневий', de: 'Braun' },
-  'Олива': { ru: 'Олива', uk: 'Олива', de: 'Olive' },
+  'Олива': { ru: 'Олива', uk: 'Олива', de: 'Oliv' },
+  'Оливковый': { ru: 'Оливковый', uk: 'Оливковий', de: 'Oliv' },
   'Песок': { ru: 'Песок', uk: 'Пісочний', de: 'Sand' },
+  'Песочный': { ru: 'Песочный', uk: 'Пісочний', de: 'Sand' },
   'Серый': { ru: 'Серый', uk: 'Сірий', de: 'Grau' },
   'Зеленый': { ru: 'Зеленый', uk: 'Зелений', de: 'Grün' },
   'Черно-белый': { ru: 'Черно-белый', uk: 'Чорно-білий', de: 'Schwarz-Weiß' },
@@ -58,10 +74,10 @@ const COLOR_TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 // Словари для перевода особенностей (features)
-const FEATURE_TRANSLATIONS: Record<string, Record<string, string>> = {
-  'Мех': { ru: 'Мех', uk: 'Хутро', de: 'Futter' },
+const FEATURE_TRANSLATIONS: Record<string, Record<'ru' | 'uk' | 'de', string>> = {
+  'Мех': { ru: 'Мех', uk: 'Хутро', de: 'Pelzfutter' },
   'Gore-Tex': { ru: 'Gore-Tex', uk: 'Gore-Tex', de: 'Gore-Tex' },
-  'Подошва трактор': { ru: 'Подошва трактор', uk: 'Підошва трактор', de: 'Traktionssohle' },
+  'Подошва трактор': { ru: 'Подошва трактор', uk: 'Підошва трактор', de: 'Profilsohle' },
   'Подошва бело-черная': { ru: 'Подошва бело-черная', uk: 'Підошва біло-чорна', de: 'Sohle weiß-schwarz' },
   'Подошва черная': { ru: 'Подошва черная', uk: 'Підошва чорна', de: 'Sohle schwarz' },
   'Подошва белая': { ru: 'Подошва белая', uk: 'Підошва біла', de: 'Sohle weiß' },
@@ -70,22 +86,41 @@ const FEATURE_TRANSLATIONS: Record<string, Record<string, string>> = {
 /**
  * Локализация категории обуви
  */
-export function getLocalizedCategory(category: ShoeCategory, lang: string = 'ru'): string {
-  return CATEGORY_TRANSLATIONS[category]?.[lang] || category;
+export function getLocalizedCategory(category: ShoeCategory, lang?: string): string {
+  const activeLang = resolveCatalogLang(lang);
+  return CATEGORY_TRANSLATIONS[category]?.[activeLang] || category;
 }
 
 /**
  * Локализация цвета обуви
  */
-export function getLocalizedColor(color: string, lang: string = 'ru'): string {
-  return COLOR_TRANSLATIONS[color]?.[lang] || color;
+export function getLocalizedColor(color: string, lang?: string): string {
+  if (!color) return '';
+  const activeLang = resolveCatalogLang(lang);
+  const trimmed = color.trim();
+  if (COLOR_TRANSLATIONS[trimmed]) {
+    return COLOR_TRANSLATIONS[trimmed][activeLang];
+  }
+  const foundKey = Object.keys(COLOR_TRANSLATIONS).find(
+    (k) => k.toLowerCase() === trimmed.toLowerCase()
+  );
+  return foundKey ? COLOR_TRANSLATIONS[foundKey][activeLang] : color;
 }
 
 /**
  * Локализация особенностей обуви
  */
-export function getLocalizedFeature(feature: string, lang: string = 'ru'): string {
-  return FEATURE_TRANSLATIONS[feature]?.[lang] || feature;
+export function getLocalizedFeature(feature: string, lang?: string): string {
+  if (!feature) return '';
+  const activeLang = resolveCatalogLang(lang);
+  const trimmed = feature.trim();
+  if (FEATURE_TRANSLATIONS[trimmed]) {
+    return FEATURE_TRANSLATIONS[trimmed][activeLang];
+  }
+  const foundKey = Object.keys(FEATURE_TRANSLATIONS).find(
+    (k) => k.toLowerCase() === trimmed.toLowerCase()
+  );
+  return foundKey ? FEATURE_TRANSLATIONS[foundKey][activeLang] : feature;
 }
 
 export const cardioCatalog: ShoeItem[] = [
@@ -135,7 +170,7 @@ export const cardioCatalog: ShoeItem[] = [
   // Модель 43
   { id: '43', modelNumber: '43', variant: '#1', category: 'Кроссовки', color: 'Белый', features: [], image: '/catalog/43.jpg' },
   { id: '43-2', modelNumber: '43', variant: '#2', category: 'Кроссовки', color: 'Белый', features: [], image: '/catalog/43(2).jpg' },
-  { id: '43-3', modelNumber: '43', category: 'Кроссовки', color: 'Черный', features: [], image: '/catalog/43(3).jpg' },
+  { id: '43-3', modelNumber: '43', variant: '#3', category: 'Кроссовки', color: 'Черный', features: [], image: '/catalog/43(3).jpg' },
 
   // Модель 227
   { id: '227', modelNumber: '227', category: 'Ботинки', color: 'Черно-белый', features: [], image: '/catalog/227.jpg' },
@@ -155,5 +190,4 @@ export const cardioCatalog: ShoeItem[] = [
   { id: '26', modelNumber: '26', category: 'Туфли', color: 'Олива', features: [], image: '/catalog/26.jpg' },
   { id: '44', modelNumber: '44', category: 'Туфли', color: 'Черный', features: [], image: '/catalog/44.jpg' },
   { id: '20', modelNumber: '20', category: 'Кроссовки', color: 'Черный', features: [], image: '/catalog/20.jpg' },
-  { id: '210', modelNumber: '210', category: 'Ботинки', color: 'Черный', features: [], image: '/catalog/210.jpg' },
-];
+  { id: '210', modelNumber: '2
