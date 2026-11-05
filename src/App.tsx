@@ -388,7 +388,9 @@ export default function App() {
         {screen === 'prices' && <PricesPage key="prices" onBack={() => setScreen('home')} lang={lang} />}
         {screen === 'seo-width' && <ForwardOrthoSEOPage key="seo-width" lang={lang} setLang={handleSetLang} onBack={() => { try { window.history.replaceState(null, '', '/') } catch {}; setScreen('home') }} />}
         {screen === 'sneakers' && <SneakerIndex key="sneakers" onBack={() => setScreen('home')} />}
-        {screen === 'materials' && <Materials key="materials" onBack={() => setScreen('home')} />}
+        
+        {/* Передаем lang={lang} в Materials */}
+        {screen === 'materials' && <Materials key="materials" lang={lang} onBack={() => setScreen('home')} />}
 
         {screen === 'settings' && (
           <SettingsPage
