@@ -1326,7 +1326,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               letterSpacing: '0',
             }}
           >
-            {totalPairs} {safeLang === 'de' ? 'Paar' : 'пар'} →
+            {totalPairs} {safeLang === 'de' ? 'Paar' : safeLang === 'uk' ? 'пар' : 'пар'} →
           </span>
         </button>
       </div>
