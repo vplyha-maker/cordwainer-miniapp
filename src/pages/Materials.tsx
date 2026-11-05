@@ -183,6 +183,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       featFur: 'Мех',
       featGore: 'Gore-Tex',
       featSole: 'Подошва трактор',
+      colorsCountLabel: (c: number) => `${c} ЦВЕТА`,
     },
     uk: {
       catalogBtn: 'Каталог',
@@ -228,6 +229,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       featFur: 'Хутро',
       featGore: 'Gore-Tex',
       featSole: 'Підошва трактор',
+      colorsCountLabel: (c: number) => `${c} КОЛЬОРИ`,
     },
     de: {
       catalogBtn: 'Katalog',
@@ -273,6 +275,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       featFur: 'Futter',
       featGore: 'Gore-Tex',
       featSole: 'Traktionssohle',
+      colorsCountLabel: (c: number) => `${c} FARBEN`,
     },
   }[safeLang];
 
