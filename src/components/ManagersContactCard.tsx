@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import type { Lang } from '../App';
 
 export type ManagerContact = {
@@ -14,7 +14,14 @@ export type ManagerContact = {
 type ManagersContactCardProps = {
   lang?: Lang;
   itemsCount?: number;
-  onSendOrder?: (manager: { id: string; name: string; role: string; phone: string; telegramId: string; isTest?: boolean }) => Promise<boolean>;
+  onSendOrder?: (manager: {
+    id: string;
+    name: string;
+    role: string;
+    phone: string;
+    telegramId: string;
+    isTest?: boolean;
+  }) => Promise<boolean>;
   onCopyInvoice?: () => void;
   copied?: boolean;
   isFormValid?: boolean;
@@ -68,8 +75,8 @@ const MANAGERS: ManagerContact[] = [
   {
     id: 'test',
     name: {
-      ru: 'Test',
-      uk: 'Test',
+      ru: 'Тест',
+      uk: 'Тест',
       de: 'Test',
     },
     role: {
@@ -78,7 +85,7 @@ const MANAGERS: ManagerContact[] = [
       de: 'Testumgebung für Bestellungen',
     },
     phone: '+380000000000',
-    phoneDisplay: 'Тестовый канал',
+    phoneDisplay: 'Test Channel',
     telegramId: '8686072747',
     isTest: true,
   },
@@ -194,8 +201,22 @@ function loadSavedCooldowns(): Record<string, number> {
   }
 }
 
+function resolveActiveLang(propLang?: Lang): Lang {
+  if (propLang && ['ru', 'uk', 'de'].includes(propLang)) {
+    return propLang;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('app_lang');
+      if (saved === 'ru' || saved === 'uk' || saved === 'de') return saved;
+      if (saved === 'ua') return 'uk';
+    } catch {}
+  }
+  return 'ru';
+}
+
 export function ManagersContactCard({
-  lang = 'ru',
+  lang,
   itemsCount = 0,
   onSendOrder,
   onCopyInvoice,
@@ -204,7 +225,7 @@ export function ManagersContactCard({
   missingFields = [],
   onValidationFail,
 }: ManagersContactCardProps) {
-  const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
+  const safeLang: Lang = resolveActiveLang(lang);
 
   const t = {
     ru: {
@@ -215,7 +236,8 @@ export function ManagersContactCard({
       fillFields: 'Для отправки заказа укажите:',
       copyBtn: 'Скопировать текст накладной',
       copiedBtn: '✓ Текст накладной скопирован',
-      confirmQ: (count: number, name: string) => `Отправить оптовый заказ (${count} мод.) руководителю (${name})?`,
+      confirmQ: (count: number, name: string) =>
+        `Отправить оптовый заказ (${count} мод.) руководителю (${name})?`,
       confirmBtn: '✓ Подтвердить',
       cancelBtn: 'Отмена',
       sendingText: 'Отправка накладной...',
@@ -223,40 +245,45 @@ export function ManagersContactCard({
       sendBtn: (name: string) => `Отправить заказ • ${name}`,
       inSec: (sec: number) => `Через ${sec}с`,
       callBtn: 'Позвонить',
+      testBadge: 'Тестовый канал',
     },
     uk: {
-      sectionTitle: 'II. ВІДПРАВКА ЗАМОВЛЕННЯ ТА КОНТАКТИ',
-      directContact: 'ПРЯМИЙ ЗВ\'ЯЗОК',
+      sectionTitle: 'II. НАДСИЛАННЯ ЗАМОВЛЕННЯ ТА КОНТАКТИ',
+      directContact: "ПРЯМИЙ ЗВ'ЯЗОК",
       spamLock: 'Зафіксовано завелику частоту натискань. Зачекайте',
       sec: 'сек.',
-      fillFields: 'Для відправки замовлення вкажіть:',
+      fillFields: 'Для надсилання замовлення вкажіть:',
       copyBtn: 'Скопіювати текст накладної',
       copiedBtn: '✓ Текст накладної скопійовано',
-      confirmQ: (count: number, name: string) => `Надіслати гуртове замовлення (${count} мод.) керівнику (${name})?`,
+      confirmQ: (count: number, name: string) =>
+        `Надіслати гуртове замовлення (${count} мод.) керівнику (${name})?`,
       confirmBtn: '✓ Підтвердити',
       cancelBtn: 'Скасувати',
-      sendingText: 'Відправка накладної...',
+      sendingText: 'Надсилання накладної...',
       sentText: (name: string) => `✓ Замовлення надіслано (${name})`,
       sendBtn: (name: string) => `Надіслати замовлення • ${name}`,
       inSec: (sec: number) => `Через ${sec}с`,
       callBtn: 'Зателефонувати',
+      testBadge: 'Тестовий канал',
     },
     de: {
       sectionTitle: 'II. BESTELLUNG SENDEN & KONTAKTE',
       directContact: 'DIREKTER KONTAKT',
-      spamLock: 'Zu viele Klicks. Bitte warten Sie',
+      spamLock: 'Zu hohe Klickfrequenz. Bitte warten Sie',
       sec: 'Sek.',
       fillFields: 'Bitte füllen Sie folgende Felder aus:',
       copyBtn: 'Rechnungstext kopieren',
       copiedBtn: '✓ Rechnungstext kopiert',
-      confirmQ: (count: number, name: string) => `Großbestellung (${count} Mod.) an Leiter (${name}) senden?`,
+      confirmQ: (count: number, name: string) =>
+        `Großhandelsbestellung (${count} Mod.) an ${name} senden?`,
       confirmBtn: '✓ Bestätigen',
       cancelBtn: 'Abbrechen',
-      sendingText: 'Wird gesendet...',
-      sentText: (name: string) => `✓ Bestellt (${name})`,
+      sendingText: 'Rechnung wird gesendet...',
+      sentText: (name: string) => `✓ Bestellung gesendet (${name})`,
       sendBtn: (name: string) => `Bestellung senden • ${name}`,
       inSec: (sec: number) => `In ${sec}s`,
       callBtn: 'Anrufen',
+      testBadge: 'Testkanal',
     },
   }[safeLang];
 
@@ -298,7 +325,7 @@ export function ManagersContactCard({
     }
   }, [isFormValid, confirmingManagerId]);
 
-  const checkAntiClicker = (e: React.MouseEvent): boolean => {
+  const checkAntiClicker = (e: MouseEvent): boolean => {
     if (!e.isTrusted || honeypotValue.trim().length > 0) return false;
     const now = Date.now();
     if (spamBlockedUntil > now) return false;
@@ -316,7 +343,7 @@ export function ManagersContactCard({
     return true;
   };
 
-  const handleInitiateSend = (e: React.MouseEvent, manager: ManagerContact) => {
+  const handleInitiateSend = (e: MouseEvent, manager: ManagerContact) => {
     if (!checkAntiClicker(e)) return;
     if (isSendingRef.current || sendingManagerId) return;
 
@@ -336,7 +363,7 @@ export function ManagersContactCard({
     setConfirmingManagerId(manager.id);
   };
 
-  const handleConfirmSend = async (e: React.MouseEvent, manager: ManagerContact) => {
+  const handleConfirmSend = async (e: MouseEvent, manager: ManagerContact) => {
     if (!checkAntiClicker(e)) return;
     if (!onSendOrder) return;
     if (isSendingRef.current || sendingManagerId) return;
@@ -408,6 +435,7 @@ export function ManagersContactCard({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
+          gap: '8px',
           fontSize: '10px',
           textTransform: 'uppercase',
           letterSpacing: '1.4px',
@@ -418,7 +446,7 @@ export function ManagersContactCard({
         }}
       >
         <span>{t.sectionTitle}</span>
-        <span>{t.directContact}</span>
+        <span style={{ flexShrink: 0 }}>{t.directContact}</span>
       </div>
 
       {isSpamLocked && (
@@ -520,6 +548,7 @@ export function ManagersContactCard({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'baseline',
+                  gap: '8px',
                   marginBottom: '4px',
                 }}
               >
@@ -533,7 +562,20 @@ export function ManagersContactCard({
                 >
                   {localizedName}
                 </div>
-                {!manager.isTest && (
+                {manager.isTest ? (
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.8px',
+                      color: THEME.inkMuted,
+                      border: `1px solid ${THEME.border}`,
+                      padding: '2px 6px',
+                    }}
+                  >
+                    {t.testBadge}
+                  </span>
+                ) : (
                   <a
                     href={`tel:${manager.phone}`}
                     onClick={() => triggerHaptic('light')}
@@ -543,6 +585,7 @@ export function ManagersContactCard({
                       textDecoration: 'none',
                       fontWeight: 600,
                       letterSpacing: '0.6px',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {manager.phoneDisplay}
@@ -599,6 +642,8 @@ export function ManagersContactCard({
                             textTransform: 'uppercase',
                             cursor: isAnySending ? 'wait' : 'pointer',
                             whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                           }}
                         >
                           {isSendingThis ? t.sendingText : t.confirmBtn}
@@ -644,9 +689,10 @@ export function ManagersContactCard({
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '8px',
                         opacity: isAnySending && !isSendingThis ? 0.6 : 1,
                         transition: 'all 0.2s ease',
+                        overflow: 'hidden',
                       }}
                     >
                       <span
@@ -656,7 +702,11 @@ export function ManagersContactCard({
                           letterSpacing: '0.65px',
                           textTransform: 'uppercase',
                           whiteSpace: 'nowrap',
-                          flexShrink: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          minWidth: 0,
+                          flex: 1,
+                          textAlign: 'left',
                         }}
                       >
                         {isSendingThis
