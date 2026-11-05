@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { type CartItem, type SizeKey } from '../data/catalog';
 import {
   ManagersContactCard,
-  type ManagerContact,
   triggerHaptic,
   playAppSound,
   preloadAppSounds,
@@ -21,6 +20,7 @@ type WholesaleCartProps = {
 type CityOption = {
   name: string;
   uaName: string;
+  deName: string;
   fullLabel: string;
   ref: string;
   area?: string;
@@ -52,14 +52,14 @@ const VALID_UA_OPERATOR_CODES = new Set([
 ]);
 
 const POPULAR_CITIES: CityOption[] = [
-  { name: 'Киев', uaName: 'Київ', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', area: 'Київська' },
-  { name: 'Днепр', uaName: 'Дніпро', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', area: 'Дніпропетровська' },
-  { name: 'Одесса', uaName: 'Одеса', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', area: 'Одеська' },
-  { name: 'Львов', uaName: 'Львів', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', area: 'Львівська' },
-  { name: 'Харьков', uaName: 'Харків', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', area: 'Харківська' },
-  { name: 'Полтава', uaName: 'Полтава', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626', area: 'Полтавська' },
-  { name: 'Запорожье', uaName: 'Запоріжжя', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', area: 'Запорізька' },
-  { name: 'Винница', uaName: 'Вінниця', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', area: 'Вінницька' },
+  { name: 'Киев', uaName: 'Київ', deName: 'Kyjiw', fullLabel: 'м. Київ (Київська обл.)', ref: '8d5a980d-391c-11dd-90d9-001a92567626', area: 'Київська' },
+  { name: 'Днепр', uaName: 'Дніпро', deName: 'Dnipro', fullLabel: 'м. Дніпро (Дніпропетровська обл.)', ref: 'db5c88f0-391c-11dd-90d9-001a92567626', area: 'Дніпропетровська' },
+  { name: 'Одесса', uaName: 'Одеса', deName: 'Odessa', fullLabel: 'м. Одеса (Одеська обл.)', ref: 'db5c88d0-391c-11dd-90d9-001a92567626', area: 'Одеська' },
+  { name: 'Львов', uaName: 'Львів', deName: 'Lwiw', fullLabel: 'м. Львів (Львівська обл.)', ref: 'db5c88f5-391c-11dd-90d9-001a92567626', area: 'Львівська' },
+  { name: 'Харьков', uaName: 'Харків', deName: 'Charkiw', fullLabel: 'м. Харків (Харківська обл.)', ref: 'db5c88e0-391c-11dd-90d9-001a92567626', area: 'Харківська' },
+  { name: 'Полтава', uaName: 'Полтава', deName: 'Poltawa', fullLabel: 'м. Полтава (Полтавська обл.)', ref: 'db5c8892-391c-11dd-90d9-001a92567626', area: 'Полтавська' },
+  { name: 'Запорожье', uaName: 'Запоріжжя', deName: 'Saporischschja', fullLabel: 'м. Запоріжжя (Запорізька обл.)', ref: 'db5c88c6-391c-11dd-90d9-001a92567626', area: 'Запорізька' },
+  { name: 'Винница', uaName: 'Вінниця', deName: 'Winnyzja', fullLabel: 'м. Вінниця (Вінницька обл.)', ref: 'db5c88de-391c-11dd-90d9-001a92567626', area: 'Вінницька' },
 ];
 
 const THEME = {
@@ -84,7 +84,7 @@ type InvoiceMeta = {
 function ClearFieldButton({
   onClear,
   isTextarea = false,
-  ariaLabel = 'Очистить поле',
+  ariaLabel = 'Clear',
 }: {
   onClear: () => void;
   isTextarea?: boolean;
@@ -236,14 +236,17 @@ function validateUkrainePhone(raw: string, lang: Lang): { isValid: boolean; erro
 
 function getDynamicFormulaText(item: CartItem, lang: Lang): string {
   if (item.orderMode === 'sample') {
-    return lang === 'de' 
+    return lang === 'de'
       ? `Testmuster (1 Paar) — Gr. ${item.sampleSize}`
       : lang === 'uk'
       ? `Тестовий зразок (1 пара) — р. ${item.sampleSize}`
       : `Тестовый образец (1 пара) — р. ${item.sampleSize}`;
   }
   const breakdown = SIZES_ORDER.filter((sz) => (item.sizeRun[sz] || 0) > 0)
-    .map((sz) => `${sz}р.(${(item.sizeRun[sz] || 0) * item.boxesCount})`)
+    .map((sz) => {
+      const count = (item.sizeRun[sz] || 0) * item.boxesCount;
+      return lang === 'de' ? `Gr.${sz}(${count})` : `${sz}р.(${count})`;
+    })
     .join(' • ');
 
   return lang === 'de'
@@ -291,17 +294,19 @@ function loadSavedRecipient(): SavedRecipientData | null {
 }
 
 export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
-  const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
+  const safeLang: Lang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
 
   const t = {
     ru: {
       back: '← Назад в каталог',
       clearCart: '✕ Очистить накладную',
       headerSub: 'CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ',
+      invoiceBadge: (num: string, date: string) => `№ ${num} от ${date}`,
       title: (count: number) => `Оптовая накладная (${count})`,
       emptyText: 'В вашей накладной пока нет выбранных моделей.',
       goToCatalog: 'Перейти в каталог →',
       totalPairsLabel: 'Итого:',
+      pairsUnit: 'пар',
       boxesLabel: 'Коробов',
       sectionLogistics: 'I. ДАННЫЕ ПОЛУЧАТЕЛЯ И ДОСТАВКА',
       sectionShipping: 'РЕКВИЗИТЫ ОТГРУЗКИ',
@@ -309,6 +314,8 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       cityPrompt: 'Населенный пункт:',
       citySub: 'Выберите город из быстрого списка или начните вводить название любого города, пгт или села:',
       cityPlaceholder: '1. Начните вводить город, пгт или село *',
+      citySearchingText: 'Поиск...',
+      cityNotFound: 'Не найдено',
       namePlaceholder: '2. Имя и Фамилия получателя *',
       phonePlaceholder: '3. Телефон получателя: +38 (0XX) XXX-XX-XX *',
       warehouseLoading: 'Загрузка доступных отделений...',
@@ -317,15 +324,37 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       totalToShip: 'Всего к отгрузке:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
       deleteTitle: 'Удалить позицию',
+      clearCityAria: 'Очистить город',
+      clearNameAria: 'Очистить имя',
+      clearPhoneAria: 'Очистить телефон',
+      clearWarehouseAria: 'Очистить отделение',
+      clearCommentAria: 'Очистить комментарий',
+      orderSentSuccess: (num: string, mgr: string) => `✓ Накладная № ${num} успешно отправлена руководителю (${mgr})!`,
+      orderSendError: (err?: string) => `Ошибка отправки: ${err || 'Не удалось отправить заказ'}`,
+      orderNetworkError: 'Ошибка соединения с сервером.',
+      invHeader: (num: string) => `📦 ОПТОВАЯ НАКЛАДНАЯ № ${num}`,
+      invDate: (date: string) => `📅 Дата: ${date} • CARDIO (Харьков)`,
+      invModel: (idx: number, model: string, variant: string, color: string) => `${idx}. Модель № ${model}${variant} (${color})`,
+      invModelTotal: (pairs: number) => `Итого по модели: ${pairs} пар`,
+      invPositions: (count: number) => `📊 Позиций в заказе: ${count}`,
+      invVolume: (pairs: number, boxes: number) => `👟 Общий объем: ${pairs} пар (мест: ~${boxes})`,
+      invCity: (city: string) => `🏙 Населенный пункт: ${city}`,
+      invBranch: (branch: string) => `📍 Отделение / Адрес: ${branch}`,
+      invRecipient: (contact: string) => `👤 Получатель: ${contact}`,
+      invComment: (comment: string) => `💬 Комментарий: ${comment}\n`,
+      invFooter: 'Подтвердите наличие/сроки отшива и реквизиты.',
+      phoneLabelShort: 'тел.',
     },
     uk: {
       back: '← Назад у каталог',
       clearCart: '✕ Очистити накладну',
       headerSub: 'CARDIO FOOTWEAR // ГУРТОВЕ ЗАМОВЛЕННЯ',
+      invoiceBadge: (num: string, date: string) => `№ ${num} від ${date}`,
       title: (count: number) => `Гуртова накладна (${count})`,
       emptyText: 'У вашій накладній поки немає обраних моделей.',
       goToCatalog: 'Перейти до каталогу →',
       totalPairsLabel: 'Разом:',
+      pairsUnit: 'пар',
       boxesLabel: 'Коробів',
       sectionLogistics: 'I. ДАНІ ОТРИМУВАЧА ТА ДОСТАВКА',
       sectionShipping: 'РЕКВІЗИТИ ВІДПРАВКИ',
@@ -333,6 +362,8 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       cityPrompt: 'Населений пункт:',
       citySub: 'Виберіть місто зі швидкого списку або почніть вводити назву будь-якого міста, смт чи села:',
       cityPlaceholder: '1. Почніть вводити місто, смт чи село *',
+      citySearchingText: 'Пошук...',
+      cityNotFound: 'Не знайдено',
       namePlaceholder: '2. Ім’я та Прізвище отримувача *',
       phonePlaceholder: '3. Телефон отримувача: +38 (0XX) XXX-XX-XX *',
       warehouseLoading: 'Завантаження доступних відділень...',
@@ -341,15 +372,37 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       totalToShip: 'Всього до відвантаження:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
       deleteTitle: 'Видалити позицію',
+      clearCityAria: 'Очистити місто',
+      clearNameAria: 'Очистити ім’я',
+      clearPhoneAria: 'Очистити телефон',
+      clearWarehouseAria: 'Очистити відділення',
+      clearCommentAria: 'Очистити коментар',
+      orderSentSuccess: (num: string, mgr: string) => `✓ Накладну № ${num} успішно надіслано керівнику (${mgr})!`,
+      orderSendError: (err?: string) => `Помилка відправки: ${err || 'Не вдалося надіслати замовлення'}`,
+      orderNetworkError: 'Помилка з’єднання з сервером.',
+      invHeader: (num: string) => `📦 ГУРТОВА НАКЛАДНА № ${num}`,
+      invDate: (date: string) => `📅 Дата: ${date} • CARDIO (Харків)`,
+      invModel: (idx: number, model: string, variant: string, color: string) => `${idx}. Модель № ${model}${variant} (${color})`,
+      invModelTotal: (pairs: number) => `Разом по моделі: ${pairs} пар`,
+      invPositions: (count: number) => `📊 Позицій у замовленні: ${count}`,
+      invVolume: (pairs: number, boxes: number) => `👟 Загальний обсяг: ${pairs} пар (місць: ~${boxes})`,
+      invCity: (city: string) => `🏙 Населений пункт: ${city}`,
+      invBranch: (branch: string) => `📍 Відділення / Адреса: ${branch}`,
+      invRecipient: (contact: string) => `👤 Отримувач: ${contact}`,
+      invComment: (comment: string) => `💬 Коментар: ${comment}\n`,
+      invFooter: 'Підтвердіть наявність/терміни відшиву та реквізити.',
+      phoneLabelShort: 'тел.',
     },
     de: {
       back: '← Zurück zum Katalog',
       clearCart: '✕ Rechnung leeren',
       headerSub: 'CARDIO FOOTWEAR // GROSSHANDELSBESTELLUNG',
+      invoiceBadge: (num: string, date: string) => `Nr. ${num} vom ${date}`,
       title: (count: number) => `Großhandelsrechnung (${count})`,
       emptyText: 'Ihre Rechnung enthält noch keine Modelle.',
       goToCatalog: 'Zum Katalog →',
       totalPairsLabel: 'Gesamt:',
+      pairsUnit: 'Paar',
       boxesLabel: 'Kisten',
       sectionLogistics: 'I. EMPFÄNGERDATEN & VERSAND',
       sectionShipping: 'VERSANDDETAILS',
@@ -357,6 +410,8 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       cityPrompt: 'Ortschaft:',
       citySub: 'Wählen Sie eine Stadt aus oder geben Sie den Namen ein:',
       cityPlaceholder: '1. Stadt, Gemeinde oder Dorf eingeben *',
+      citySearchingText: 'Suche...',
+      cityNotFound: 'Nicht gefunden',
       namePlaceholder: '2. Vor- und Nachname des Empfängers *',
       phonePlaceholder: '3. Telefon: +38 (0XX) XXX-XX-XX *',
       warehouseLoading: 'Filialen werden geladen...',
@@ -365,6 +420,26 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
       totalToShip: 'Gesamtmenge:',
       boxesSuffix: (b: number) => `(~${b} Kist.)`,
       deleteTitle: 'Position löschen',
+      clearCityAria: 'Stadt löschen',
+      clearNameAria: 'Name löschen',
+      clearPhoneAria: 'Telefon löschen',
+      clearWarehouseAria: 'Filiale löschen',
+      clearCommentAria: 'Kommentar löschen',
+      orderSentSuccess: (num: string, mgr: string) => `✓ Rechnung Nr. ${num} erfolgreich an ${mgr} gesendet!`,
+      orderSendError: (err?: string) => `Sendefehler: ${err || 'Bestellung konnte nicht gesendet werden'}`,
+      orderNetworkError: 'Verbindungsfehler zum Server.',
+      invHeader: (num: string) => `📦 GROSSHANDELSRECHNUNG Nr. ${num}`,
+      invDate: (date: string) => `📅 Datum: ${date} • CARDIO (Charkiw)`,
+      invModel: (idx: number, model: string, variant: string, color: string) => `${idx}. Modell Nr. ${model}${variant} (${color})`,
+      invModelTotal: (pairs: number) => `Gesamt pro Modell: ${pairs} Paar`,
+      invPositions: (count: number) => `📊 Positionen: ${count}`,
+      invVolume: (pairs: number, boxes: number) => `👟 Gesamtmenge: ${pairs} Paar (Kisten: ~${boxes})`,
+      invCity: (city: string) => `🏙 Ortschaft: ${city}`,
+      invBranch: (branch: string) => `📍 Filiale / Adresse: ${branch}`,
+      invRecipient: (contact: string) => `👤 Empfänger: ${contact}`,
+      invComment: (comment: string) => `💬 Kommentar: ${comment}\n`,
+      invFooter: 'Bitte Verfügbarkeit/Lieferzeit und Zahlungsdaten bestätigen.',
+      phoneLabelShort: 'Tel.',
     },
   }[safeLang];
 
@@ -474,7 +549,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
               const namePart = ru && ru.toLowerCase() !== ua.toLowerCase() ? `${ua} / ${ru}` : ua;
               const fullLabel = area ? `${type} ${namePart} (${area} обл.)` : `${type} ${namePart}`;
 
-              collected.push({ name: ru || ua, uaName: ua, fullLabel, ref, area });
+              collected.push({ name: ru || ua, uaName: ua, deName: ua, fullLabel, ref, area });
             }
           }
           if (collected.length > 0) break;
@@ -548,6 +623,12 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
     return [...exactNum, ...startsNum, ...byText].slice(0, 50);
   })();
 
+  const getLocalizedCityName = (city: CityOption) => {
+    if (safeLang === 'uk') return city.uaName;
+    if (safeLang === 'de') return city.deName || city.uaName;
+    return city.name;
+  };
+
   const handleSelectCity = (city: CityOption) => {
     triggerHaptic('medium');
     setSelectedCity(city);
@@ -569,40 +650,40 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
     setTimeout(() => onClear(), 150);
   };
 
-  const combinedClientContact = `${clientName.trim()}, тел.: ${clientPhone.trim()}`;
+  const combinedClientContact = `${clientName.trim()}, ${t.phoneLabelShort}: ${clientPhone.trim()}`;
 
   const buildInvoiceText = () => {
     const lines = items.map((item, idx) => {
       const variantStr = item.shoe.variant ? ` ${item.shoe.variant}` : '';
       const actualFormula = getDynamicFormulaText(item, safeLang);
       return (
-        `${idx + 1}. Модель № ${item.shoe.modelNumber}${variantStr} (${item.shoe.color})\n` +
+        `${t.invModel(idx + 1, item.shoe.modelNumber, variantStr, item.shoe.color)}\n` +
         `   • ${actualFormula}\n` +
-        `   • Итого по модели: ${item.totalPairs} пар`
+        `   • ${t.invModelTotal(item.totalPairs)}`
       );
     });
 
     const trimmedComment = orderComment.trim();
-    const commentBlock = trimmedComment ? `💬 Комментарий: ${trimmedComment}\n` : '';
+    const commentBlock = trimmedComment ? t.invComment(trimmedComment) : '';
 
     return (
-      `📦 ОПТОВАЯ НАКЛАДНАЯ № ${invoiceMeta.invoiceNumber}\n` +
-      `📅 Дата: ${invoiceMeta.dateFormatted} • CARDIO (Харьков)\n` +
+      `${t.invHeader(invoiceMeta.invoiceNumber)}\n` +
+      `${t.invDate(invoiceMeta.dateFormatted)}\n` +
       `════════════════════\n` +
       `${lines.join('\n\n')}\n` +
       `════════════════════\n` +
-      `📊 Позиций в заказе: ${items.length}\n` +
-      `👟 Общий объем: ${grandTotalPairs} пар (мест: ~${grandTotalBoxes})\n` +
-      `🏙 Населенный пункт: ${cityQuery.trim()}\n` +
-      `📍 Отделение / Адрес: ${branchOrComment.trim()}\n` +
-      `👤 Получатель: ${combinedClientContact}\n` +
+      `${t.invPositions(items.length)}\n` +
+      `${t.invVolume(grandTotalPairs, grandTotalBoxes)}\n` +
+      `${t.invCity(cityQuery.trim())}\n` +
+      `${t.invBranch(branchOrComment.trim())}\n` +
+      `${t.invRecipient(combinedClientContact)}\n` +
       commentBlock +
       `════════════════════\n` +
-      `Подтвердите наличие/сроки отшива и реквизиты.`
+      `${t.invFooter}`
     );
   };
 
-  const sendToManager = async (manager: ManagerContact): Promise<boolean> => {
+  const sendToManager = async (manager: { name: string; telegramId?: string }): Promise<boolean> => {
     if (!manager.telegramId) return false;
     if (!isFormValid) {
       handleValidationFail();
@@ -623,7 +704,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
           managerName: manager.name,
           clientContact: combinedClientContact,
           branchOrComment: trimmedComment
-            ? `${cityQuery.trim()} — ${branchOrComment.trim()} (Комментарий: ${trimmedComment})`
+            ? `${cityQuery.trim()} — ${branchOrComment.trim()} (${trimmedComment})`
             : `${cityQuery.trim()} — ${branchOrComment.trim()}`,
           orderComment: trimmedComment,
           totalPairs: grandTotalPairs,
@@ -637,17 +718,17 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
         triggerHaptic('success');
         setOrderBanner({
           type: 'success',
-          text: `✓ Накладная № ${invoiceMeta.invoiceNumber} успешно отправлена руководителю (${manager.name})!`,
+          text: t.orderSentSuccess(invoiceMeta.invoiceNumber, manager.name),
         });
         return true;
       } else {
         triggerHaptic('error');
-        setOrderBanner({ type: 'error', text: `Ошибка отправки: ${data.error || 'Не удалось отправить заказ'}` });
+        setOrderBanner({ type: 'error', text: t.orderSendError(data.error) });
         return false;
       }
     } catch {
       triggerHaptic('error');
-      setOrderBanner({ type: 'error', text: 'Ошибка соединения с сервером.' });
+      setOrderBanner({ type: 'error', text: t.orderNetworkError });
       return false;
     }
   };
@@ -774,7 +855,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 letterSpacing: '1px',
               }}
             >
-              № {invoiceMeta.invoiceNumber} от {invoiceMeta.dateFormatted}
+              {t.invoiceBadge(invoiceMeta.invoiceNumber, invoiceMeta.dateFormatted)}
             </span>
           )}
         </div>
@@ -933,7 +1014,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                       }}
                     >
                       <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '14px' }}>
-                        {t.totalPairsLabel} <strong>{item.totalPairs} пар</strong>
+                        {t.totalPairsLabel} <strong>{item.totalPairs} {t.pairsUnit}</strong>
                       </span>
 
                       {!isSample && (
@@ -1061,7 +1142,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                         touchAction: 'manipulation',
                       }}
                     >
-                      {safeLang === 'uk' ? city.uaName : city.name}
+                      {getLocalizedCityName(city)}
                     </button>
                   );
                 })}
@@ -1083,7 +1164,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
 
                 {cityQuery.length > 0 && (
                   <ClearFieldButton
-                    ariaLabel="Очистить город"
+                    ariaLabel={t.clearCityAria}
                     onClear={() => {
                       setCityQuery('');
                       setCityResults([]);
@@ -1111,11 +1192,11 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                   >
                     {citySearching ? (
                       <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                        Поиск...
+                        {t.citySearchingText}
                       </div>
                     ) : cityResults.length === 0 ? (
                       <div style={{ padding: '10px 12px', fontSize: '12px', color: THEME.inkMuted }}>
-                        Не найдено / Nicht gefunden
+                        {t.cityNotFound}
                       </div>
                     ) : (
                       cityResults.map((c) => (
@@ -1149,7 +1230,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 />
                 {clientName.length > 0 && (
                   <ClearFieldButton
-                    ariaLabel="Очистить имя"
+                    ariaLabel={t.clearNameAria}
                     onClear={() => {
                       setClientName('');
                       nameInputRef.current?.focus();
@@ -1171,7 +1252,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                   />
                   {clientPhone.length > 0 && (
                     <ClearFieldButton
-                      ariaLabel="Очистить телефон"
+                      ariaLabel={t.clearPhoneAria}
                       onClear={() => {
                         setClientPhone('');
                         phoneInputRef.current?.focus();
@@ -1193,7 +1274,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                   placeholder={
                     warehousesLoading
                       ? t.warehouseLoading
-                      : t.warehousePlaceholder(selectedCity.uaName)
+                      : t.warehousePlaceholder(getLocalizedCityName(selectedCity))
                   }
                   value={branchOrComment}
                   onFocus={() => setShowWarehouseDropdown(true)}
@@ -1206,7 +1287,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
 
                 {branchOrComment.length > 0 && (
                   <ClearFieldButton
-                    ariaLabel="Очистить отделение"
+                    ariaLabel={t.clearWarehouseAria}
                     onClear={() => {
                       setBranchOrComment('');
                       setShowWarehouseDropdown(true);
@@ -1271,7 +1352,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 {orderComment.length > 0 && (
                   <ClearFieldButton
                     isTextarea
-                    ariaLabel="Очистить комментарий"
+                    ariaLabel={t.clearCommentAria}
                     onClear={() => {
                       setOrderComment('');
                       commentInputRef.current?.focus();
@@ -1302,7 +1383,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                     flexShrink: 0,
                   }}
                 >
-                  {grandTotalPairs} пар <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>{t.boxesSuffix(grandTotalBoxes)}</span>
+                  {grandTotalPairs} {t.pairsUnit} <span style={{ fontSize: '12px', fontWeight: 400, color: THEME.inkMuted }}>{t.boxesSuffix(grandTotalBoxes)}</span>
                 </div>
               </div>
             </div>
