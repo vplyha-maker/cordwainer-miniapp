@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef, type CSSProperties } from 'react'
-import { motion } from 'framer-motion'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
 import { CALCULATORS_COUNT } from './CalcMenuPage'
@@ -237,23 +236,6 @@ const getDisplayTitle = (item: any, lang: Lang): string => {
   return '...'
 }
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.07, delayChildren: 0.05 },
-  },
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] as const },
-  },
-}
-
 export function HomePage({
   onBack,
   onOpenBlog,
@@ -272,8 +254,8 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [isVideoReady, setIsVideoReady] = useState(false)
   const heroVideoRef = useRef<HTMLVideoElement | null>(null)
+  const heroCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const transparentLogoSrc = useTransparentLogo('/logo.png')
 
   const [isDark, setIsDark] = useState(() => {
@@ -312,47 +294,85 @@ export function HomePage({
     }
   }, [lang, setLang])
 
-  // Надежный запуск и удержание видео в WebView при смене темы и скролле
+  /**
+   * Аппаратно-независимая отрисовка видео через <canvas>.
+   * Полностью устраняет баг Android WebView, когда <video> пропадает после остановки скролла.
+   */
   useEffect(() => {
     if (searchQuery.trim() !== '') return
     const videoEl = heroVideoRef.current
-    if (!videoEl) return
+    const canvasEl = heroCanvasRef.current
+    if (!videoEl || !canvasEl) return
+
+    let rafId = 0
+    let isCancelled = false
 
     videoEl.muted = true
     videoEl.defaultMuted = true
     videoEl.playsInline = true
 
-    if (videoEl.readyState >= 2) {
-      setIsVideoReady(true)
+    const ctx = canvasEl.getContext('2d', { alpha: false })
+
+    const renderFrame = () => {
+      if (isCancelled) return
+
+      if (ctx && videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+        const rect = canvasEl.getBoundingClientRect()
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        const targetW = Math.max(1, Math.round(rect.width * dpr))
+        const targetH = Math.max(1, Math.round(rect.height * dpr))
+
+        if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
+          canvasEl.width = targetW
+          canvasEl.height = targetH
+        }
+
+        const vw = videoEl.videoWidth
+        const vh = videoEl.videoHeight
+        const scale = Math.max(targetW / vw, targetH / vh)
+        const sw = targetW / scale
+        const sh = targetH / scale
+        const sx = (vw - sw) * 0.5
+        const sy = (vh - sh) * 0.5
+
+        try {
+          ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetW, targetH)
+        } catch {}
+      }
+
+      rafId = window.requestAnimationFrame(renderFrame)
     }
 
     const ensurePlay = () => {
-      if (!videoEl) return
+      if (!videoEl || isCancelled) return
       videoEl.muted = true
       if (videoEl.paused) {
-        videoEl
-          .play()
-          .then(() => setIsVideoReady(true))
-          .catch(() => setIsVideoReady(true))
-      } else {
-        setIsVideoReady(true)
+        videoEl.play().catch(() => {})
       }
     }
 
     ensurePlay()
-    const timerId = window.setTimeout(ensurePlay, 180)
+    rafId = window.requestAnimationFrame(renderFrame)
+
+    const timer1 = window.setTimeout(ensurePlay, 150)
+    const timer2 = window.setTimeout(ensurePlay, 500)
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') ensurePlay()
     }
 
     document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('touchstart', ensurePlay, { passive: true, once: true })
+    window.addEventListener('touchstart', ensurePlay, { passive: true })
+    window.addEventListener('scroll', ensurePlay, { passive: true })
 
     return () => {
-      window.clearTimeout(timerId)
+      isCancelled = true
+      window.cancelAnimationFrame(rafId)
+      window.clearTimeout(timer1)
+      window.clearTimeout(timer2)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('touchstart', ensurePlay)
+      window.removeEventListener('scroll', ensurePlay)
     }
   }, [isDark, searchQuery])
 
@@ -576,7 +596,6 @@ export function HomePage({
         cardioSurface:
           'linear-gradient(135deg, rgba(244, 239, 230, 0.04) 0%, rgba(197, 168, 128, 0.05) 55%, rgba(37, 99, 235, 0.07) 100%)',
         bg: '#0A0A0A',
-        noiseOpacity: 0.022,
         accentRed: '#991B1B',
         accentBronze: '#C5A880',
       }
@@ -590,33 +609,21 @@ export function HomePage({
         cardioSurface:
           'linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(234, 230, 223, 0.55) 65%, rgba(122, 92, 56, 0.06) 100%)',
         bg: '#F2EFE9',
-        noiseOpacity: 0.035,
         accentRed: '#881313',
         accentBronze: '#7A5C38',
       }
-
-  const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
 
   const gridItems = LEARNING.slice(1, 3) // 02 Цвета, 03 Силуэты
   const catalogItem = LEARNING[3] // 04 Footwear Index
 
   return (
     <div
-      className="relative min-h-[100dvh] w-full overflow-x-hidden transition-colors duration-500 select-none"
+      className="relative min-h-[100dvh] w-full overflow-x-hidden select-none"
       style={{
         background: palette.bg,
         color: palette.text,
       }}
     >
-      {/* Текстура журнальной бумаги без mix-blend-mode */}
-      <div
-        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-500"
-        style={{
-          backgroundImage: noiseBg,
-          opacity: palette.noiseOpacity,
-        }}
-      />
-
       <style>{`
         * {
           -webkit-tap-highlight-color: transparent !important;
@@ -673,14 +680,9 @@ export function HomePage({
           </div>
         </header>
 
-        <motion.div
-          className="pb-20"
-          initial="hidden"
-          animate="show"
-          variants={containerVariants}
-        >
+        <div className="pb-20">
           {/* Журнальная шапка (Masthead) */}
-          <motion.div variants={itemVariants} className="pt-7 pb-6">
+          <div className="pt-7 pb-6">
             <div className="flex items-center justify-between mb-3">
               <span
                 className="text-[8.5px] font-sans uppercase tracking-[0.28em]"
@@ -702,10 +704,10 @@ export function HomePage({
             >
               Cordwainer
             </h1>
-          </motion.div>
+          </div>
 
           {/* Редакционная строка поиска */}
-          <motion.div variants={itemVariants} className="mb-8">
+          <div className="mb-8">
             <div
               className="relative flex items-center py-2.5 px-3.5 border transition-colors"
               style={{
@@ -737,7 +739,7 @@ export function HomePage({
                 </button>
               )}
             </div>
-          </motion.div>
+          </div>
 
           {query ? (
             /* Выдача поиска */
@@ -783,9 +785,9 @@ export function HomePage({
             </div>
           ) : (
             <>
-              {/* HERO LOOKBOOK BANNER */}
+              {/* HERO LOOKBOOK BANNER (Видео + синхронный Canvas-дублер для Android WebView) */}
               {onOpenStyles && (
-                <motion.div variants={itemVariants} className="mb-12">
+                <div className="mb-12">
                   <div
                     role="button"
                     tabIndex={0}
@@ -797,13 +799,9 @@ export function HomePage({
                       }
                     }}
                     className="group relative w-full h-[240px] overflow-hidden border outline-none bg-[#101010] text-left cursor-pointer block"
-                    style={{
-                      borderColor: palette.line,
-                      isolation: 'isolate',
-                      transform: 'translateZ(0)',
-                      WebkitTransform: 'translateZ(0)',
-                    }}
+                    style={{ borderColor: palette.line }}
                   >
+                    {/* Нативное видео (держим видимым для декодера без CSS-трансформаций) */}
                     <video
                       ref={heroVideoRef}
                       src="/Fason/Topsaed.mp4"
@@ -812,32 +810,31 @@ export function HomePage({
                       muted
                       playsInline
                       preload="auto"
-                      onLoadedData={() => setIsVideoReady(true)}
-                      onPlaying={() => setIsVideoReady(true)}
                       className="absolute inset-0 w-full h-full object-cover object-center block pointer-events-none"
-                      style={{
-                        opacity: isVideoReady ? 1 : 0,
-                        transition: 'opacity 0.25s ease-out',
-                        transform: 'translate3d(0, 0, 0)',
-                        WebkitTransform: 'translate3d(0, 0, 0)',
-                        backfaceVisibility: 'hidden',
-                        WebkitBackfaceVisibility: 'hidden',
-                        willChange: 'transform, opacity',
-                        zIndex: 1,
-                      }}
+                      style={{ zIndex: 1 }}
                     />
+
+                    {/* Canvas-дублер: гарантирует стабильную картинку даже при сбросе видеослоя в WebView */}
+                    <canvas
+                      ref={heroCanvasRef}
+                      className="absolute inset-0 w-full h-full block pointer-events-none"
+                      style={{ zIndex: 2 }}
+                    />
+
+                    {/* Градиентная виньетка */}
                     <div
                       className="absolute inset-0 pointer-events-none"
                       style={{
                         background:
                           'linear-gradient(to top, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.34) 52%, rgba(10,10,10,0.20) 100%)',
-                        zIndex: 2,
+                        zIndex: 3,
                       }}
                     />
 
+                    {/* Типографика поверх видео */}
                     <div
                       className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]"
-                      style={{ zIndex: 3 }}
+                      style={{ zIndex: 4 }}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[8px] font-sans uppercase tracking-[0.32em] text-[#F4EFE6]/80">
@@ -861,11 +858,11 @@ export function HomePage({
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               )}
 
               {/* СЕКЦИЯ I: ФЛАГМАНСКИЙ ДОМ CARDIO + ЭКСПОЗИЦИЯ */}
-              <motion.div variants={itemVariants} className="mb-12">
+              <div className="mb-12">
                 <div
                   className="flex items-center justify-between pb-2.5 mb-0 border-b"
                   style={{ borderColor: palette.lineStrong }}
@@ -888,7 +885,7 @@ export function HomePage({
                   className="border-l border-r"
                   style={{ borderColor: palette.line }}
                 >
-                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO (без обрезаний с многоточиями) */}
+                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO */}
                   <button
                     type="button"
                     onClick={onOpenMaterials}
@@ -903,7 +900,6 @@ export function HomePage({
                       background: palette.cardioSurface,
                     }}
                   >
-                    {/* Верхняя индексная строка: помещается целиком на любом экране */}
                     <div className="flex items-center justify-between gap-2 w-full mb-3.5">
                       <div className="flex items-center gap-2 min-w-0">
                         <span
@@ -935,7 +931,6 @@ export function HomePage({
                       </span>
                     </div>
 
-                    {/* Основное тело карточки */}
                     <div className="flex items-center justify-between gap-3 my-1.5">
                       <div className="flex-1 min-w-0 pr-1">
                         <div className="flex items-baseline gap-2.5 mb-1.5">
@@ -961,7 +956,6 @@ export function HomePage({
                         </p>
                       </div>
 
-                      {/* 3D-эмблема без белого фона */}
                       <div className="relative shrink-0 w-[114px] h-[70px] sm:w-[136px] sm:h-[82px] flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
                         <img
                           src={transparentLogoSrc}
@@ -976,7 +970,6 @@ export function HomePage({
                       </div>
                     </div>
 
-                    {/* Нижняя плашка: без обрезания текста */}
                     <div
                       className="mt-3.5 pt-2.5 border-t flex items-center justify-between gap-3"
                       style={{ borderColor: palette.line }}
@@ -1106,10 +1099,10 @@ export function HomePage({
                     </button>
                   )}
                 </div>
-              </motion.div>
+              </div>
 
               {/* СЕКЦИЯ II: Инструментарий */}
-              <motion.div variants={itemVariants} className="mb-12">
+              <div className="mb-12">
                 <div
                   className="flex items-center justify-between pb-2.5 border-b"
                   style={{ borderColor: palette.lineStrong }}
@@ -1179,10 +1172,10 @@ export function HomePage({
                     </button>
                   ))}
                 </div>
-              </motion.div>
+              </div>
 
               {/* СЕКЦИЯ III: Система + Архив + Меценатство */}
-              <motion.div variants={itemVariants} className="mb-14">
+              <div className="mb-14">
                 <div
                   className="flex items-center justify-between pb-2.5 border-b"
                   style={{ borderColor: palette.lineStrong }}
@@ -1335,10 +1328,10 @@ export function HomePage({
                     TRIBUTE ↗
                   </span>
                 </button>
-              </motion.div>
+              </div>
 
               {/* Редакционный колофон (Footer) */}
-              <motion.div variants={itemVariants} className="pt-2 pb-6">
+              <div className="pt-2 pb-6">
                 <div className="flex flex-col items-center text-center px-4">
                   <div
                     className="w-px h-8 mb-5"
@@ -1357,10 +1350,10 @@ export function HomePage({
                     CORDWAINER × CARDIO • MMXXVI
                   </p>
                 </div>
-              </motion.div>
+              </div>
             </>
           )}
-        </motion.div>
+        </div>
       </div>
     </div>
   )
