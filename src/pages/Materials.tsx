@@ -291,13 +291,12 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
 
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const bannerAnchorRef = useRef<HTMLDivElement>(null);
-  const bannerStageRef = useRef<HTMLDivElement>(null);
   const bannerGlareRef = useRef<HTMLDivElement>(null);
   const bannerShadowRef = useRef<HTMLDivElement>(null);
   const initialBannerTopRef = useRef<number | null>(null);
 
   const footerAnchorRef = useRef<HTMLDivElement>(null);
-  const footerStageRef = useRef<HTMLDivElement>(null);
+  const footerImgRef = useRef<HTMLImageElement>(null);
   const footerGlareRef = useRef<HTMLDivElement>(null);
   const footerShadowRef = useRef<HTMLDivElement>(null);
 
@@ -347,8 +346,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       const pageScrollY = window.scrollY ?? 0;
 
       const topAnchor = bannerAnchorRef.current;
-      const topStage = bannerStageRef.current;
-      if (topAnchor && topStage) {
+      const topVideo = heroVideoRef.current;
+      if (topAnchor && topVideo) {
         const rect = topAnchor.getBoundingClientRect();
         if (initialBannerTopRef.current === null) {
           initialBannerTopRef.current = rect.top + Math.max(0, pageScrollY);
@@ -358,44 +357,42 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
         const clamped = Math.max(0, Math.min(maxScroll, rawScrolled));
         const progress = clamped / maxScroll;
 
-        const translateY = clamped * 0.55;
-        const scale = 1 - progress * 0.065;
-        const rotateX = progress * 8;
+        const translateY = progress * 22;
+        const scale = 1.08 - progress * 0.08;
 
-        topStage.style.transform = `perspective(900px) translate3d(0, ${translateY.toFixed(1)}px, 0) scale(${scale.toFixed(4)}) rotateX(${rotateX.toFixed(2)}deg)`;
+        topVideo.style.transform = `translateY(${translateY.toFixed(1)}px) scale(${scale.toFixed(4)})`;
 
         if (bannerGlareRef.current) {
           const glareShift = -45 + progress * 110;
-          bannerGlareRef.current.style.transform = `translate3d(${glareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
-          bannerGlareRef.current.style.opacity = `${0.14 + progress * 0.44}`;
+          bannerGlareRef.current.style.transform = `translateX(${glareShift.toFixed(1)}%) skewX(-22deg)`;
+          bannerGlareRef.current.style.opacity = `${0.14 + progress * 0.38}`;
         }
         if (bannerShadowRef.current) {
-          bannerShadowRef.current.style.opacity = `${progress * 0.48}`;
+          bannerShadowRef.current.style.opacity = `${progress * 0.42}`;
         }
       }
 
       const botAnchor = footerAnchorRef.current;
-      const botStage = footerStageRef.current;
-      if (botAnchor && botStage) {
+      const botImg = footerImgRef.current;
+      if (botAnchor && botImg) {
         const fRect = botAnchor.getBoundingClientRect();
-        const revealSpan = Math.max(260, fRect.height + 110);
+        const revealSpan = Math.max(240, fRect.height + 90);
         const visiblePx = viewportH - fRect.top;
         const fProgress = Math.max(0, Math.min(1, visiblePx / revealSpan));
         const inv = 1 - fProgress;
 
-        const fTranslateY = -inv * 62;
-        const fScale = 0.92 + fProgress * 0.08;
-        const fRotateX = -inv * 9;
+        const fTranslateY = -inv * 18;
+        const fScale = 1 + inv * 0.1;
 
-        botStage.style.transform = `perspective(900px) translate3d(0, ${fTranslateY.toFixed(1)}px, 0) scale(${fScale.toFixed(4)}) rotateX(${fRotateX.toFixed(2)}deg)`;
+        botImg.style.transform = `translateY(${fTranslateY.toFixed(1)}px) scale(${fScale.toFixed(4)})`;
 
         if (footerGlareRef.current) {
           const fGlareShift = -55 + fProgress * 115;
-          footerGlareRef.current.style.transform = `translate3d(${fGlareShift.toFixed(1)}%, 0, 0) skewX(-22deg)`;
-          footerGlareRef.current.style.opacity = `${0.1 + fProgress * 0.42}`;
+          footerGlareRef.current.style.transform = `translateX(${fGlareShift.toFixed(1)}%) skewX(-22deg)`;
+          footerGlareRef.current.style.opacity = `${0.1 + fProgress * 0.36}`;
         }
         if (footerShadowRef.current) {
-          footerShadowRef.current.style.opacity = `${inv * 0.58}`;
+          footerShadowRef.current.style.opacity = `${inv * 0.45}`;
         }
       }
     };
@@ -1469,6 +1466,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             alignItems: 'center',
             marginBottom: '6px',
             padding: '0 2px',
+            position: 'relative',
+            zIndex: 3,
           }}
         >
           <span style={{ fontSize: '8px', letterSpacing: '1.6px', textTransform: 'uppercase', color: THEME.inkMuted, fontWeight: 600 }}>
@@ -1480,17 +1479,13 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
         </div>
 
         <div
-          ref={bannerStageRef}
           style={{
             width: '100%',
             borderRadius: '4px',
             overflow: 'hidden',
             border: `1px solid ${THEME.border}`,
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
             position: 'relative',
             backgroundColor: '#121212',
-            transformOrigin: 'center bottom',
-            willChange: 'transform',
           }}
         >
           <video
@@ -1509,6 +1504,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               backgroundColor: '#121212',
               opacity: isVideoReady ? 1 : 0,
               transition: 'opacity 0.22s ease-out',
+              transformOrigin: 'center center',
             }}
           />
           <div
@@ -1523,7 +1519,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               mixBlendMode: 'overlay',
               pointerEvents: 'none',
               opacity: 0.14,
-              transform: 'translate3d(-45%, 0, 0) skewX(-22deg)',
+              transform: 'translateX(-45%) skewX(-22deg)',
               zIndex: 2,
             }}
           />
@@ -1532,7 +1528,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(180deg, rgba(22,21,20,0.06) 0%, rgba(22,21,20,0.72) 100%)',
+              background: 'linear-gradient(180deg, rgba(22,21,20,0.06) 0%, rgba(22,21,20,0.68) 100%)',
               pointerEvents: 'none',
               opacity: 0,
               zIndex: 2,
@@ -1870,44 +1866,97 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
         </div>
       </div>
 
-      <div ref={footerAnchorRef} style={{ width: '100%', marginTop: '24px', position: 'relative', zIndex: 1 }}>
+      <div
+        ref={footerAnchorRef}
+        style={{
+          width: '100%',
+          marginTop: '24px',
+          position: 'relative',
+          zIndex: 2,
+          backgroundColor: THEME.bg,
+        }}
+      >
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: 'baseline',
+            gap: '12px',
             fontSize: '9px',
-            letterSpacing: '1.5px',
+            letterSpacing: '1.3px',
             textTransform: 'uppercase',
             color: THEME.inkMuted,
             marginBottom: '10px',
+            position: 'relative',
+            zIndex: 3,
           }}
         >
           <span>{t.footerSub}</span>
-          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
+          <span
+            style={{
+              fontFamily: THEME.serif,
+              fontStyle: 'italic',
+              textTransform: 'none',
+              fontSize: '12px',
+              textAlign: 'right',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
             {t.footerNote}
           </span>
         </div>
 
         <div
-          ref={footerStageRef}
           style={{
             width: '100%',
             borderRadius: '4px',
             overflow: 'hidden',
             border: `1px solid ${THEME.border}`,
-            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.12)',
             position: 'relative',
             backgroundColor: '#161514',
-            transformOrigin: 'center top',
-            willChange: 'transform',
+            zIndex: 1,
           }}
         >
           <img
+            ref={footerImgRef}
             src={FOOTER_BANNER_SRC}
             alt="Cardio Campaign"
             loading="lazy"
-            style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'contain', display: 'block' }}
+            style={{
+              width: '100%',
+              aspectRatio: '16 / 9',
+              objectFit: 'cover',
+              display: 'block',
+              transformOrigin: 'center center',
+            }}
+          />
+          <div
+            ref={footerGlareRef}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '65%',
+              height: '100%',
+              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.34) 50%, rgba(255,255,255,0) 100%)',
+              mixBlendMode: 'overlay',
+              pointerEvents: 'none',
+              opacity: 0.12,
+              transform: 'translateX(-55%) skewX(-22deg)',
+              zIndex: 2,
+            }}
+          />
+          <div
+            ref={footerShadowRef}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(22,21,20,0.45) 0%, rgba(22,21,20,0.05) 100%)',
+              pointerEvents: 'none',
+              opacity: 0,
+              zIndex: 2,
+            }}
           />
         </div>
 
@@ -1919,7 +1968,9 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '10px',
+            gap: '12px',
+            position: 'relative',
+            zIndex: 3,
           }}
         >
           <button
@@ -1931,13 +1982,15 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             style={{
               backgroundColor: THEME.surface,
               border: `1px solid ${THEME.border}`,
-              padding: '9px 14px',
+              padding: '9px 12px',
               fontSize: '9px',
-              letterSpacing: '1.3px',
+              letterSpacing: '1.1px',
               textTransform: 'uppercase',
               fontWeight: 600,
               color: THEME.ink,
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             {t.topToBeginning}
@@ -1955,17 +2008,27 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 border: `1px solid ${THEME.ink}`,
                 padding: '9px 14px',
                 fontSize: '9px',
-                letterSpacing: '1.3px',
+                letterSpacing: '1.2px',
                 textTransform: 'uppercase',
                 fontWeight: 600,
                 color: '#FFFFFF',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               {t.checkoutBtn(cartTotalPairs)}
             </button>
           ) : (
-            <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '12px', color: THEME.inkMuted }}>
+            <span
+              style={{
+                fontFamily: THEME.serif,
+                fontStyle: 'italic',
+                fontSize: '12px',
+                color: THEME.inkMuted,
+                textAlign: 'right',
+              }}
+            >
               {t.chooseModelPrompt}
             </span>
           )}
