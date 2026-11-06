@@ -254,8 +254,8 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const heroContainerRef = useRef<HTMLDivElement | null>(null)
   const heroVideoRef = useRef<HTMLVideoElement | null>(null)
-  const heroCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const transparentLogoSrc = useTransparentLogo('/logo.png')
 
   const [isDark, setIsDark] = useState(() => {
@@ -295,84 +295,76 @@ export function HomePage({
   }, [lang, setLang])
 
   /**
-   * Аппаратно-независимая отрисовка видео через <canvas>.
-   * Полностью устраняет баг Android WebView, когда <video> пропадает после остановки скролла.
+   * Контроль видимости видео при скролле в Android WebView.
+   * Штатная пауза за пределами экрана и принудительный play() при возвращении
+   * гарантируют, что WebView заново подключает видеодекодер при каждом скролле вверх.
    */
   useEffect(() => {
     if (searchQuery.trim() !== '') return
     const videoEl = heroVideoRef.current
-    const canvasEl = heroCanvasRef.current
-    if (!videoEl || !canvasEl) return
+    const containerEl = heroContainerRef.current
+    if (!videoEl || !containerEl) return
 
-    let rafId = 0
-    let isCancelled = false
+    let isVisible = true
 
     videoEl.muted = true
     videoEl.defaultMuted = true
     videoEl.playsInline = true
 
-    const ctx = canvasEl.getContext('2d', { alpha: false })
-
-    const renderFrame = () => {
-      if (isCancelled) return
-
-      if (ctx && videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-        const rect = canvasEl.getBoundingClientRect()
-        const dpr = Math.min(window.devicePixelRatio || 1, 2)
-        const targetW = Math.max(1, Math.round(rect.width * dpr))
-        const targetH = Math.max(1, Math.round(rect.height * dpr))
-
-        if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
-          canvasEl.width = targetW
-          canvasEl.height = targetH
-        }
-
-        const vw = videoEl.videoWidth
-        const vh = videoEl.videoHeight
-        const scale = Math.max(targetW / vw, targetH / vh)
-        const sw = targetW / scale
-        const sh = targetH / scale
-        const sx = (vw - sw) * 0.5
-        const sy = (vh - sh) * 0.5
-
-        try {
-          ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetW, targetH)
-        } catch {}
-      }
-
-      rafId = window.requestAnimationFrame(renderFrame)
-    }
-
-    const ensurePlay = () => {
-      if (!videoEl || isCancelled) return
+    const wakeUpVideo = () => {
+      if (!videoEl || !isVisible) return
       videoEl.muted = true
-      if (videoEl.paused) {
-        videoEl.play().catch(() => {})
+      const playPromise = videoEl.play()
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {})
       }
     }
 
-    ensurePlay()
-    rafId = window.requestAnimationFrame(renderFrame)
+    wakeUpVideo()
+    const initTimer = window.setTimeout(wakeUpVideo, 150)
 
-    const timer1 = window.setTimeout(ensurePlay, 150)
-    const timer2 = window.setTimeout(ensurePlay, 500)
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        isVisible = entry.isIntersecting
 
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') ensurePlay()
+        if (entry.isIntersecting) {
+          wakeUpVideo()
+        } else {
+          // Штатная пауза до того, как WebView принудительно сбросит текстуру за экраном
+          try {
+            if (!videoEl.paused) {
+              videoEl.pause()
+            }
+          } catch {}
+        }
+      },
+      { threshold: 0.01 }
+    )
+
+    io.observe(containerEl)
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isVisible) {
+        wakeUpVideo()
+      }
     }
 
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('touchstart', ensurePlay, { passive: true })
-    window.addEventListener('scroll', ensurePlay, { passive: true })
+    const onTouch = () => {
+      if (isVisible && videoEl.paused) {
+        wakeUpVideo()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('touchstart', onTouch, { passive: true })
 
     return () => {
-      isCancelled = true
-      window.cancelAnimationFrame(rafId)
-      window.clearTimeout(timer1)
-      window.clearTimeout(timer2)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('touchstart', ensurePlay)
-      window.removeEventListener('scroll', ensurePlay)
+      window.clearTimeout(initTimer)
+      io.disconnect()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('touchstart', onTouch)
     }
   }, [isDark, searchQuery])
 
@@ -785,9 +777,9 @@ export function HomePage({
             </div>
           ) : (
             <>
-              {/* HERO LOOKBOOK BANNER (Видео + синхронный Canvas-дублер для Android WebView) */}
+              {/* HERO LOOKBOOK BANNER */}
               {onOpenStyles && (
-                <div className="mb-12">
+                <div className="mb-12" ref={heroContainerRef}>
                   <div
                     role="button"
                     tabIndex={0}
@@ -798,10 +790,12 @@ export function HomePage({
                         onOpenStyles()
                       }
                     }}
-                    className="group relative w-full h-[240px] overflow-hidden border outline-none bg-[#101010] text-left cursor-pointer block"
-                    style={{ borderColor: palette.line }}
+                    className="group relative w-full h-[240px] overflow-hidden border outline-none text-left cursor-pointer block"
+                    style={{
+                      borderColor: palette.line,
+                      backgroundColor: '#141210',
+                    }}
                   >
-                    {/* Нативное видео (держим видимым для декодера без CSS-трансформаций) */}
                     <video
                       ref={heroVideoRef}
                       src="/Fason/Topsaed.mp4"
@@ -811,14 +805,6 @@ export function HomePage({
                       playsInline
                       preload="auto"
                       className="absolute inset-0 w-full h-full object-cover object-center block pointer-events-none"
-                      style={{ zIndex: 1 }}
-                    />
-
-                    {/* Canvas-дублер: гарантирует стабильную картинку даже при сбросе видеослоя в WebView */}
-                    <canvas
-                      ref={heroCanvasRef}
-                      className="absolute inset-0 w-full h-full block pointer-events-none"
-                      style={{ zIndex: 2 }}
                     />
 
                     {/* Градиентная виньетка */}
@@ -826,16 +812,12 @@ export function HomePage({
                       className="absolute inset-0 pointer-events-none"
                       style={{
                         background:
-                          'linear-gradient(to top, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.34) 52%, rgba(10,10,10,0.20) 100%)',
-                        zIndex: 3,
+                          'linear-gradient(to top, rgba(10,10,10,0.86) 0%, rgba(10,10,10,0.32) 52%, rgba(10,10,10,0.18) 100%)',
                       }}
                     />
 
                     {/* Типографика поверх видео */}
-                    <div
-                      className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]"
-                      style={{ zIndex: 4 }}
-                    >
+                    <div className="relative z-10 h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]">
                       <div className="flex items-center justify-between">
                         <span className="text-[8px] font-sans uppercase tracking-[0.32em] text-[#F4EFE6]/80">
                           {t.heroTag}
