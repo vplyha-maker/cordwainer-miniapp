@@ -32,6 +32,21 @@ type MenuItem = {
   dot?: boolean
 }
 
+const HERO_FRAME_CACHE_KEY = 'cordwainer_hero_frame_v1'
+let memoryCachedHeroFrame: string | null = null
+
+function getInitialHeroPoster(): string | null {
+  if (memoryCachedHeroFrame) return memoryCachedHeroFrame
+  try {
+    const saved = sessionStorage.getItem(HERO_FRAME_CACHE_KEY)
+    if (saved) {
+      memoryCachedHeroFrame = saved
+      return saved
+    }
+  } catch {}
+  return null
+}
+
 /**
  * Автоматически убирает белый фон вокруг 3D-логотипа и обрезает лишние пустые поля,
  * чтобы эмблема отображалась целиком и без белого квадрата в темной теме.
@@ -254,8 +269,12 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [posterSrc, setPosterSrc] = useState<string | null>(getInitialHeroPoster)
+  const [hasCanvasFrame, setHasCanvasFrame] = useState(false)
+
   const heroContainerRef = useRef<HTMLDivElement | null>(null)
   const heroVideoRef = useRef<HTMLVideoElement | null>(null)
+  const heroCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const transparentLogoSrc = useTransparentLogo('/logo.png')
 
   const [isDark, setIsDark] = useState(() => {
@@ -295,49 +314,132 @@ export function HomePage({
   }, [lang, setLang])
 
   /**
-   * Контроль видимости видео при скролле в Android WebView.
-   * Штатная пауза за пределами экрана и принудительный play() при возвращении
-   * гарантируют, что WebView заново подключает видеодекодер при каждом скролле вверх.
+   * Стабильный гибридный рендерер для Android WebView:
+   * 1. Рисует кадры на <canvas> ТОЛЬКО тогда, когда декодер реально продвинул currentTime вперед.
+   *    Это гарантирует, что при уходе баннера за экран последний четкий кадр остается на холсте навсегда.
+   * 2. Держит <video> поверх <canvas> с opacity: 0.01, чтобы Chromium никогда не считал видео перекрытым
+   *    и не отключал декодер при возврате из скролла.
    */
   useEffect(() => {
     if (searchQuery.trim() !== '') return
-    const videoEl = heroVideoRef.current
     const containerEl = heroContainerRef.current
-    if (!videoEl || !containerEl) return
+    const videoEl = heroVideoRef.current
+    const canvasEl = heroCanvasRef.current
+    if (!containerEl || !videoEl || !canvasEl) return
 
-    let isVisible = true
+    let rafId = 0
+    let isCancelled = false
+    let isInViewport = true
+    let lastDrawnTime = -1
+    let lastWatchdogTime = -1
+    let hasSavedPoster = Boolean(memoryCachedHeroFrame)
 
     videoEl.muted = true
     videoEl.defaultMuted = true
     videoEl.playsInline = true
 
-    const wakeUpVideo = () => {
-      if (!videoEl || !isVisible) return
+    const ctx = canvasEl.getContext('2d')
+
+    const drawVideoFrame = () => {
+      if (isCancelled || !ctx) return
+
+      if (
+        isInViewport &&
+        videoEl.readyState >= 2 &&
+        videoEl.videoWidth > 0 &&
+        videoEl.videoHeight > 0 &&
+        !videoEl.seeking &&
+        videoEl.currentTime > 0.03 &&
+        videoEl.currentTime !== lastDrawnTime
+      ) {
+        const cw = canvasEl.clientWidth || 360
+        const ch = canvasEl.clientHeight || 240
+        const dpr = Math.min(window.devicePixelRatio || 1, 2)
+        const targetW = Math.max(1, Math.round(cw * dpr))
+        const targetH = Math.max(1, Math.round(ch * dpr))
+
+        if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
+          canvasEl.width = targetW
+          canvasEl.height = targetH
+        }
+
+        const vw = videoEl.videoWidth
+        const vh = videoEl.videoHeight
+        const scale = Math.max(targetW / vw, targetH / vh)
+        const sw = targetW / scale
+        const sh = targetH / scale
+        const sx = (vw - sw) * 0.5
+        const sy = (vh - sh) * 0.5
+
+        try {
+          ctx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetW, targetH)
+          lastDrawnTime = videoEl.currentTime
+          setHasCanvasFrame(true)
+
+          // Сохраняем первый реальный кадр в кэш, чтобы никогда не было черного квадрата при загрузке
+          if (!hasSavedPoster && videoEl.currentTime > 0.08) {
+            hasSavedPoster = true
+            try {
+              const dataUrl = canvasEl.toDataURL('image/jpeg', 0.8)
+              if (dataUrl && dataUrl.length > 100) {
+                memoryCachedHeroFrame = dataUrl
+                setPosterSrc(dataUrl)
+                sessionStorage.setItem(HERO_FRAME_CACHE_KEY, dataUrl)
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+
+      rafId = window.requestAnimationFrame(drawVideoFrame)
+    }
+
+    const forceWakeUpDecoder = () => {
+      if (isCancelled || !videoEl || !isInViewport) return
       videoEl.muted = true
-      const playPromise = videoEl.play()
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {})
+      if (videoEl.paused || videoEl.ended) {
+        videoEl.play().catch(() => {})
       }
     }
 
-    wakeUpVideo()
-    const initTimer = window.setTimeout(wakeUpVideo, 150)
+    const kickStalledDecoder = () => {
+      if (isCancelled || !videoEl || !isInViewport) return
+      videoEl.muted = true
+      try {
+        if (videoEl.paused || videoEl.ended) {
+          videoEl.play().catch(() => {})
+        } else {
+          // Если WebView заморозил декодер при скролле без смены флага paused:
+          const cur = videoEl.currentTime
+          videoEl.pause()
+          if (cur > 0.05) {
+            videoEl.currentTime = cur
+          }
+          videoEl.play().catch(() => {})
+        }
+      } catch {}
+    }
+
+    forceWakeUpDecoder()
+    rafId = window.requestAnimationFrame(drawVideoFrame)
+
+    // Сторожевой таймер: если баннер на экране, но кадры заморожены WebView — будим декодер
+    const watchdogId = window.setInterval(() => {
+      if (!isInViewport || isCancelled || !videoEl) return
+      const cur = videoEl.currentTime
+      if (videoEl.readyState >= 2 && Math.abs(cur - lastWatchdogTime) < 0.01) {
+        kickStalledDecoder()
+      }
+      lastWatchdogTime = cur
+    }, 450)
 
     const io = new IntersectionObserver(
       (entries) => {
         const entry = entries[0]
         if (!entry) return
-        isVisible = entry.isIntersecting
-
+        isInViewport = entry.isIntersecting
         if (entry.isIntersecting) {
-          wakeUpVideo()
-        } else {
-          // Штатная пауза до того, как WebView принудительно сбросит текстуру за экраном
-          try {
-            if (!videoEl.paused) {
-              videoEl.pause()
-            }
-          } catch {}
+          forceWakeUpDecoder()
         }
       },
       { threshold: 0.01 }
@@ -345,26 +447,22 @@ export function HomePage({
 
     io.observe(containerEl)
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isVisible) {
-        wakeUpVideo()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        forceWakeUpDecoder()
       }
     }
 
-    const onTouch = () => {
-      if (isVisible && videoEl.paused) {
-        wakeUpVideo()
-      }
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('touchstart', onTouch, { passive: true })
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('touchstart', forceWakeUpDecoder, { passive: true })
 
     return () => {
-      window.clearTimeout(initTimer)
+      isCancelled = true
+      window.cancelAnimationFrame(rafId)
+      window.clearInterval(watchdogId)
       io.disconnect()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('touchstart', onTouch)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('touchstart', forceWakeUpDecoder)
     }
   }, [isDark, searchQuery])
 
@@ -793,9 +891,31 @@ export function HomePage({
                     className="group relative w-full h-[240px] overflow-hidden border outline-none text-left cursor-pointer block"
                     style={{
                       borderColor: palette.line,
-                      backgroundColor: '#141210',
+                      background: 'linear-gradient(135deg, #26201B 0%, #171412 100%)',
                     }}
                   >
+                    {/* Слой 0: Мгновенный кэшированный кадр (убирает черный квадрат при загрузке и скролле) */}
+                    {posterSrc && (
+                      <img
+                        src={posterSrc}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover object-center block pointer-events-none"
+                        style={{ zIndex: 0 }}
+                      />
+                    )}
+
+                    {/* Слой 1: Canvas, который удерживает последний отрисованный кадр и никогда не сбрасывается */}
+                    <canvas
+                      ref={heroCanvasRef}
+                      className="absolute inset-0 w-full h-full block pointer-events-none"
+                      style={{
+                        zIndex: 1,
+                        opacity: hasCanvasFrame ? 1 : 0,
+                        transition: 'opacity 0.2s ease-out',
+                      }}
+                    />
+
+                    {/* Слой 2: Видео поверх Canvas с 1% прозрачности — не перекрыто для декодера Chromium, но не дает черного экрана */}
                     <video
                       ref={heroVideoRef}
                       src="/Fason/Topsaed.mp4"
@@ -805,19 +925,27 @@ export function HomePage({
                       playsInline
                       preload="auto"
                       className="absolute inset-0 w-full h-full object-cover object-center block pointer-events-none"
+                      style={{
+                        zIndex: 2,
+                        opacity: 0.01,
+                      }}
                     />
 
-                    {/* Градиентная виньетка */}
+                    {/* Слой 3: Градиентная виньетка */}
                     <div
                       className="absolute inset-0 pointer-events-none"
                       style={{
                         background:
                           'linear-gradient(to top, rgba(10,10,10,0.86) 0%, rgba(10,10,10,0.32) 52%, rgba(10,10,10,0.18) 100%)',
+                        zIndex: 3,
                       }}
                     />
 
-                    {/* Типографика поверх видео */}
-                    <div className="relative z-10 h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]">
+                    {/* Слой 4: Типографика поверх видео */}
+                    <div
+                      className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]"
+                      style={{ zIndex: 4 }}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-[8px] font-sans uppercase tracking-[0.32em] text-[#F4EFE6]/80">
                           {t.heroTag}
