@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { motion } from 'framer-motion'
 import { BLOG_ARTICLES } from '../data/blog'
 import { GLOSSARY_TERMS } from '../data/glossary'
@@ -272,6 +272,8 @@ export function HomePage({
   onChangeTab,
 }: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const [isVideoReady, setIsVideoReady] = useState(false)
+  const heroVideoRef = useRef<HTMLVideoElement | null>(null)
   const transparentLogoSrc = useTransparentLogo('/logo.png')
 
   const [isDark, setIsDark] = useState(() => {
@@ -300,6 +302,50 @@ export function HomePage({
       setLang(savedLang)
     }
   }, [lang, setLang])
+
+  // Надежный запуск и удержание видео в WebView при смене темы и скролле
+  useEffect(() => {
+    if (searchQuery.trim() !== '') return
+    const videoEl = heroVideoRef.current
+    if (!videoEl) return
+
+    videoEl.muted = true
+    videoEl.defaultMuted = true
+    videoEl.playsInline = true
+
+    if (videoEl.readyState >= 2) {
+      setIsVideoReady(true)
+    }
+
+    const ensurePlay = () => {
+      if (!videoEl) return
+      videoEl.muted = true
+      if (videoEl.paused) {
+        videoEl
+          .play()
+          .then(() => setIsVideoReady(true))
+          .catch(() => setIsVideoReady(true))
+      } else {
+        setIsVideoReady(true)
+      }
+    }
+
+    ensurePlay()
+    const timerId = window.setTimeout(ensurePlay, 180)
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') ensurePlay()
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('touchstart', ensurePlay, { passive: true, once: true })
+
+    return () => {
+      window.clearTimeout(timerId)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('touchstart', ensurePlay)
+    }
+  }, [isDark, searchQuery])
 
   const handleLangChange = (newLang: Lang) => {
     localStorage.setItem('app_lang', newLang)
@@ -516,8 +562,7 @@ export function HomePage({
         surface: 'rgba(255, 255, 255, 0.025)',
         cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(30,80,162,0.09) 100%)',
         bg: '#080808',
-        noiseOpacity: 0.035,
-        noiseBlend: 'screen' as const,
+        noiseOpacity: 0.022,
         accentRed: '#991B1B',
         accentCobalt: '#3B82F6',
       }
@@ -530,8 +575,7 @@ export function HomePage({
         surface: 'rgba(24, 22, 21, 0.025)',
         cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(29,78,216,0.045) 100%)',
         bg: '#F4F1EA',
-        noiseOpacity: 0.05,
-        noiseBlend: 'multiply' as const,
+        noiseOpacity: 0.04,
         accentRed: '#881313',
         accentCobalt: '#1D4ED8',
       }
@@ -549,13 +593,12 @@ export function HomePage({
         color: palette.text,
       }}
     >
-      {/* Текстура журнальной бумаги */}
+      {/* Текстура журнальной бумаги без mix-blend-mode: screen, чтобы не блокировать GPU-слой <video> в темной теме */}
       <div
         className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-500"
         style={{
           backgroundImage: noiseBg,
           opacity: palette.noiseOpacity,
-          mixBlendMode: palette.noiseBlend,
         }}
       />
 
@@ -728,23 +771,59 @@ export function HomePage({
               {/* HERO LOOKBOOK BANNER */}
               {onOpenStyles && (
                 <motion.div variants={itemVariants} className="mb-12">
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={onOpenStyles}
-                    className="group relative w-full h-[240px] overflow-hidden border outline-none bg-[#0A0A0A] text-left cursor-pointer block"
-                    style={{ borderColor: palette.line }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onOpenStyles()
+                      }
+                    }}
+                    className="group relative w-full h-[240px] overflow-hidden border outline-none bg-[#101010] text-left cursor-pointer block"
+                    style={{
+                      borderColor: palette.line,
+                      isolation: 'isolate',
+                      transform: 'translateZ(0)',
+                      WebkitTransform: 'translateZ(0)',
+                    }}
                   >
                     <video
+                      ref={heroVideoRef}
                       src="/Fason/Topsaed.mp4"
-                      poster="/Fason/posters/Topsaed.jpg"
                       autoPlay
                       loop
                       muted
                       playsInline
-                      className="absolute inset-0 w-full h-full object-cover object-center opacity-85 scale-100 transition-transform duration-700 ease-out group-hover:scale-105"
+                      preload="auto"
+                      onLoadedData={() => setIsVideoReady(true)}
+                      onPlaying={() => setIsVideoReady(true)}
+                      className="absolute inset-0 w-full h-full object-cover object-center block pointer-events-none"
+                      style={{
+                        opacity: isVideoReady ? 1 : 0,
+                        transition: 'opacity 0.25s ease-out',
+                        transform: 'translate3d(0, 0, 0)',
+                        WebkitTransform: 'translate3d(0, 0, 0)',
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                        willChange: 'transform, opacity',
+                        zIndex: 1,
+                      }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/20" />
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background:
+                          'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.34) 50%, rgba(0,0,0,0.22) 100%)',
+                        zIndex: 2,
+                      }}
+                    />
 
-                    <div className="relative z-10 h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4F0E8]">
+                    <div
+                      className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4F0E8]"
+                      style={{ zIndex: 3 }}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
                           {t.heroTag}
@@ -766,7 +845,7 @@ export function HomePage({
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </motion.div>
               )}
 
@@ -958,7 +1037,7 @@ export function HomePage({
                     ))}
                   </div>
 
-                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX (Подзаголовок под заголовком, без вылезания за края) */}
+                  {/* 04. ПОЛНОШИРИННАЯ СТРОКА КАТАЛОГА: FOOTWEAR INDEX */}
                   {catalogItem && (
                     <button
                       type="button"
