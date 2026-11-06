@@ -273,8 +273,9 @@ export function HomePage({
   const [hasCanvasFrame, setHasCanvasFrame] = useState(false)
 
   const heroContainerRef = useRef<HTMLDivElement | null>(null)
-  const heroVideoRef = useRef<HTMLVideoElement | null>(null)
   const heroCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  // video больше НЕ в JSX — создаём сами
+  const heroVideoRef = useRef<HTMLVideoElement | null>(null)
   const transparentLogoSrc = useTransparentLogo('/logo.png')
 
   const [isDark, setIsDark] = useState(() => {
@@ -290,6 +291,10 @@ export function HomePage({
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    try {
+      window.Telegram?.WebApp?.disableVerticalSwipes?.()
+    } catch {}
+
     const checkTheme = () => {
       const dark = document.documentElement.classList.contains('dark')
       setIsDark(dark)
@@ -314,44 +319,69 @@ export function HomePage({
   }, [lang, setLang])
 
   /**
-   * Стабильный гибридный рендерер для Android WebView:
-   * 1. Рисует кадры на <canvas> ТОЛЬКО тогда, когда декодер реально продвинул currentTime вперед.
-   *    Это гарантирует, что при уходе баннера за экран последний четкий кадр остается на холсте навсегда.
-   * 2. Держит <video> поверх <canvas> с opacity: 0.01, чтобы Chromium никогда не считал видео перекрытым
-   *    и не отключал декодер при возврате из скролла.
+   * Стабильный гибридный рендерер для Android WebView + iOS WKWebView:
+   * - video живёт вне скроллящегося контейнера (fixed 1×1 / opacity ~0),
+   *   поэтому Chromium/WebKit не паузит декодер при уходе баннера за экран.
+   * - canvas хранит последний хороший кадр навсегда.
+   * - poster (sessionStorage + memory) убирает чёрный/серый квадрат при старте и после скролла.
    */
   useEffect(() => {
     if (searchQuery.trim() !== '') return
+
     const containerEl = heroContainerRef.current
-    const videoEl = heroVideoRef.current
     const canvasEl = heroCanvasRef.current
-    if (!containerEl || !videoEl || !canvasEl) return
+    if (!containerEl || !canvasEl) return
+
+    // Создаём video один раз и держим вне scroll-контейнера
+    let videoEl = heroVideoRef.current
+    if (!videoEl) {
+      videoEl = document.createElement('video')
+      videoEl.src = '/Fason/Topsaed.mp4'
+      videoEl.muted = true
+      videoEl.defaultMuted = true
+      videoEl.playsInline = true
+      videoEl.setAttribute('playsinline', '')
+      videoEl.setAttribute('webkit-playsinline', '')
+      videoEl.loop = true
+      videoEl.preload = 'auto'
+      videoEl.setAttribute('muted', '')
+      // Критично: всегда "в viewport" для политики autoplay + decoder
+      Object.assign(videoEl.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '1px',
+        height: '1px',
+        opacity: '0.01',
+        pointerEvents: 'none',
+        zIndex: '-1',
+      })
+      document.body.appendChild(videoEl)
+      heroVideoRef.current = videoEl
+    }
 
     let rafId = 0
+    let rvfcId: number | null = null
     let isCancelled = false
     let isInViewport = true
     let lastDrawnTime = -1
     let lastWatchdogTime = -1
     let hasSavedPoster = Boolean(memoryCachedHeroFrame)
 
-    videoEl.muted = true
-    videoEl.defaultMuted = true
-    videoEl.playsInline = true
+    const ctx = canvasEl.getContext('2d', { alpha: false })
 
-    const ctx = canvasEl.getContext('2d')
+    const drawFrame = () => {
+      if (isCancelled || !ctx || !videoEl) return
 
-    const drawVideoFrame = () => {
-      if (isCancelled || !ctx) return
-
-      if (
-        isInViewport &&
+      const canDraw =
         videoEl.readyState >= 2 &&
         videoEl.videoWidth > 0 &&
         videoEl.videoHeight > 0 &&
         !videoEl.seeking &&
         videoEl.currentTime > 0.03 &&
         videoEl.currentTime !== lastDrawnTime
-      ) {
+
+      if (canDraw) {
         const cw = canvasEl.clientWidth || 360
         const ch = canvasEl.clientHeight || 240
         const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -376,11 +406,11 @@ export function HomePage({
           lastDrawnTime = videoEl.currentTime
           setHasCanvasFrame(true)
 
-          // Сохраняем первый реальный кадр в кэш, чтобы никогда не было черного квадрата при загрузке
+          // Первый реальный кадр → poster (убирает чёрный квадрат навсегда)
           if (!hasSavedPoster && videoEl.currentTime > 0.08) {
             hasSavedPoster = true
             try {
-              const dataUrl = canvasEl.toDataURL('image/jpeg', 0.8)
+              const dataUrl = canvasEl.toDataURL('image/jpeg', 0.82)
               if (dataUrl && dataUrl.length > 100) {
                 memoryCachedHeroFrame = dataUrl
                 setPosterSrc(dataUrl)
@@ -388,14 +418,28 @@ export function HomePage({
               }
             } catch {}
           }
-        } catch {}
+        } catch {
+          // ignore draw errors (редко при seek)
+        }
       }
+    }
 
-      rafId = window.requestAnimationFrame(drawVideoFrame)
+    const tick = () => {
+      drawFrame()
+      rafId = window.requestAnimationFrame(tick)
+    }
+
+    // Более точный путь, если браузер поддерживает
+    const useRvfc = typeof videoEl.requestVideoFrameCallback === 'function'
+    const onRvfc = () => {
+      drawFrame()
+      if (!isCancelled && videoEl) {
+        rvfcId = videoEl.requestVideoFrameCallback(onRvfc)
+      }
     }
 
     const forceWakeUpDecoder = () => {
-      if (isCancelled || !videoEl || !isInViewport) return
+      if (isCancelled || !videoEl) return
       videoEl.muted = true
       if (videoEl.paused || videoEl.ended) {
         videoEl.play().catch(() => {})
@@ -403,17 +447,18 @@ export function HomePage({
     }
 
     const kickStalledDecoder = () => {
-      if (isCancelled || !videoEl || !isInViewport) return
+      if (isCancelled || !videoEl) return
       videoEl.muted = true
       try {
+        const cur = videoEl.currentTime
         if (videoEl.paused || videoEl.ended) {
           videoEl.play().catch(() => {})
         } else {
-          // Если WebView заморозил декодер при скролле без смены флага paused:
-          const cur = videoEl.currentTime
+          // WebView иногда «замораживает» декодер без смены paused
           videoEl.pause()
           if (cur > 0.05) {
-            videoEl.currentTime = cur
+            // крошечный seek будит pipeline
+            videoEl.currentTime = Math.max(0, cur - 0.001)
           }
           videoEl.play().catch(() => {})
         }
@@ -421,17 +466,27 @@ export function HomePage({
     }
 
     forceWakeUpDecoder()
-    rafId = window.requestAnimationFrame(drawVideoFrame)
 
-    // Сторожевой таймер: если баннер на экране, но кадры заморожены WebView — будим декодер
+    if (useRvfc) {
+      rvfcId = videoEl.requestVideoFrameCallback(onRvfc)
+    } else {
+      rafId = window.requestAnimationFrame(tick)
+    }
+
+    // Сторожевой таймер
     const watchdogId = window.setInterval(() => {
-      if (!isInViewport || isCancelled || !videoEl) return
+      if (isCancelled || !videoEl) return
+      // Даже если баннер не в viewport — video fixed, декодер должен жить.
+      // Но если кадры замерли — будим.
       const cur = videoEl.currentTime
-      if (videoEl.readyState >= 2 && Math.abs(cur - lastWatchdogTime) < 0.01) {
+      if (videoEl.readyState >= 2 && Math.abs(cur - lastWatchdogTime) < 0.015) {
         kickStalledDecoder()
       }
       lastWatchdogTime = cur
-    }, 450)
+
+      // На всякий случай поддерживаем play
+      if (videoEl.paused) forceWakeUpDecoder()
+    }, 400)
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -444,7 +499,6 @@ export function HomePage({
       },
       { threshold: 0.01 }
     )
-
     io.observe(containerEl)
 
     const onVisibility = () => {
@@ -452,19 +506,40 @@ export function HomePage({
         forceWakeUpDecoder()
       }
     }
-
     document.addEventListener('visibilitychange', onVisibility)
+    // Лёгкий kick от касания (Telegram WebApp часто «засыпает» media)
     window.addEventListener('touchstart', forceWakeUpDecoder, { passive: true })
 
     return () => {
       isCancelled = true
       window.cancelAnimationFrame(rafId)
+      if (rvfcId != null && videoEl?.cancelVideoFrameCallback) {
+        try {
+          videoEl.cancelVideoFrameCallback(rvfcId)
+        } catch {}
+      }
       window.clearInterval(watchdogId)
       io.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('touchstart', forceWakeUpDecoder)
     }
   }, [isDark, searchQuery])
+
+  // Очистка фонового video из body при полном размонтировании HomePage
+  useEffect(() => {
+    return () => {
+      const videoEl = heroVideoRef.current
+      if (videoEl) {
+        try {
+          videoEl.pause()
+        } catch {}
+        if (videoEl.parentNode) {
+          videoEl.parentNode.removeChild(videoEl)
+        }
+        heroVideoRef.current = null
+      }
+    }
+  }, [])
 
   const handleLangChange = (newLang: Lang) => {
     localStorage.setItem('app_lang', newLang)
@@ -894,7 +969,7 @@ export function HomePage({
                       background: 'linear-gradient(135deg, #26201B 0%, #171412 100%)',
                     }}
                   >
-                    {/* Слой 0: Мгновенный кэшированный кадр (убирает черный квадрат при загрузке и скролле) */}
+                    {/* Слой 0: кэшированный кадр (мгновенно, без чёрного квадрата) */}
                     {posterSrc && (
                       <img
                         src={posterSrc}
@@ -904,7 +979,7 @@ export function HomePage({
                       />
                     )}
 
-                    {/* Слой 1: Canvas, который удерживает последний отрисованный кадр и никогда не сбрасывается */}
+                    {/* Слой 1: Canvas — последний отрисованный кадр живёт здесь навсегда */}
                     <canvas
                       ref={heroCanvasRef}
                       className="absolute inset-0 w-full h-full block pointer-events-none"
@@ -915,23 +990,9 @@ export function HomePage({
                       }}
                     />
 
-                    {/* Слой 2: Видео поверх Canvas с 1% прозрачности — не перекрыто для декодера Chromium, но не дает черного экрана */}
-                    <video
-                      ref={heroVideoRef}
-                      src="/Fason/Topsaed.mp4"
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      preload="auto"
-                      className="absolute inset-0 w-full h-full object-cover object-center block pointer-events-none"
-                      style={{
-                        zIndex: 2,
-                        opacity: 0.01,
-                      }}
-                    />
+                    {/* Видео БОЛЬШЕ НЕ РЕНДЕРИМ здесь — оно fixed на body */}
 
-                    {/* Слой 3: Градиентная виньетка */}
+                    {/* Слой 3: виньетка */}
                     <div
                       className="absolute inset-0 pointer-events-none"
                       style={{
@@ -941,7 +1002,7 @@ export function HomePage({
                       }}
                     />
 
-                    {/* Слой 4: Типографика поверх видео */}
+                    {/* Слой 4: типографика */}
                     <div
                       className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]"
                       style={{ zIndex: 4 }}
