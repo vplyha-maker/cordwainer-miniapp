@@ -186,7 +186,7 @@ function useTransparentLogo(src: string): string {
 
         setProcessedSrc(canvas.toDataURL('image/png'))
       } catch {
-        // Fallback to original image if canvas manipulation is blocked
+        // Fallback to original image
       }
     }
 
@@ -289,7 +289,16 @@ export function HomePage({
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    const checkTheme = () => {
+      const dark = document.documentElement.classList.contains('dark')
+      setIsDark(dark)
+      try {
+        const bgHex = dark ? '#0A0A0A' : '#F2EFE9'
+        window.Telegram?.WebApp?.setHeaderColor?.(bgHex)
+        window.Telegram?.WebApp?.setBackgroundColor?.(bgHex)
+      } catch {}
+    }
+    checkTheme()
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => observer.disconnect()
@@ -349,6 +358,7 @@ export function HomePage({
 
   const handleLangChange = (newLang: Lang) => {
     localStorage.setItem('app_lang', newLang)
+    localStorage.setItem('cordwainer_lang', newLang)
     setLang(newLang)
   }
 
@@ -367,9 +377,10 @@ export function HomePage({
       tools: 'II. ИНСТРУМЕНТАРИЙ И АРХИВ',
       system: 'III. СИСТЕМА И КОЛЛЕКЦИЯ',
       materials: 'Cardio',
-      materialsSub: 'Мужская обувь • Производство и опт',
-      cardioBadge: 'MAISON CARDIO • MEN’S SHOES',
-      cardioDesc: 'Авторское производство мужской обуви. Сезонный лукбук, колодки и прямой оптовый заказ.',
+      materialsSub: 'Производство • Опт',
+      cardioBadge: 'MAISON CARDIO',
+      cardioDesc:
+        'Авторское производство мужской обуви. Сезонный лукбук, колодки и прямой оптовый заказ.',
       cardioCta: 'Открыть коллекцию',
       colors: 'Цвета',
       colorsSub: 'Патина и колористика',
@@ -411,9 +422,10 @@ export function HomePage({
       tools: 'II. ІНСТРУМЕНТАРІЙ ТА АРХІВ',
       system: 'III. СИСТЕМА ТА КОЛЕКЦІЯ',
       materials: 'Cardio',
-      materialsSub: 'Чоловіче взуття • Виробництво та гурт',
-      cardioBadge: 'MAISON CARDIO • MEN’S SHOES',
-      cardioDesc: 'Авторське виробництво чоловічого взуття. Сезонний лукбук, колодки та пряме гуртове замовлення.',
+      materialsSub: 'Виробництво • Гурт',
+      cardioBadge: 'MAISON CARDIO',
+      cardioDesc:
+        'Авторське виробництво чоловічого взуття. Сезонний лукбук, колодки та пряме гуртове замовлення.',
       cardioCta: 'Відкрити колекцію',
       colors: 'Кольори',
       colorsSub: 'Патина та колористика',
@@ -455,9 +467,10 @@ export function HomePage({
       tools: 'II. WERKZEUGE & ARCHIV',
       system: 'III. SYSTEM & SAMMLUNG',
       materials: 'Cardio',
-      materialsSub: 'Herrenschuhe • Manufaktur & B2B',
-      cardioBadge: 'MAISON CARDIO • MEN’S SHOES',
-      cardioDesc: 'Herrenschuh-Manufaktur. Saisonales Lookbook, Leisten und direkte B2B-Bestellung.',
+      materialsSub: 'Manufaktur • B2B',
+      cardioBadge: 'MAISON CARDIO',
+      cardioDesc:
+        'Herrenschuh-Manufaktur. Saisonales Lookbook, Leisten und direkte B2B-Bestellung.',
       cardioCta: 'Kollektion öffnen',
       colors: 'Farben',
       colorsSub: 'Patina & Farblehre',
@@ -554,30 +567,32 @@ export function HomePage({
 
   const palette = isDark
     ? {
-        text: '#F4F0E8',
-        textMuted: 'rgba(244, 240, 232, 0.52)',
-        textSubtle: 'rgba(244, 240, 232, 0.34)',
-        line: 'rgba(244, 240, 232, 0.14)',
-        lineStrong: 'rgba(244, 240, 232, 0.34)',
-        surface: 'rgba(255, 255, 255, 0.025)',
-        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(30,80,162,0.09) 100%)',
-        bg: '#080808',
+        text: '#F4EFE6',
+        textMuted: 'rgba(244, 239, 230, 0.56)',
+        textSubtle: 'rgba(244, 239, 230, 0.36)',
+        line: 'rgba(244, 239, 230, 0.13)',
+        lineStrong: 'rgba(244, 239, 230, 0.32)',
+        surface: 'rgba(244, 239, 230, 0.025)',
+        cardioSurface:
+          'linear-gradient(135deg, rgba(244, 239, 230, 0.04) 0%, rgba(197, 168, 128, 0.05) 55%, rgba(37, 99, 235, 0.07) 100%)',
+        bg: '#0A0A0A',
         noiseOpacity: 0.022,
         accentRed: '#991B1B',
-        accentCobalt: '#3B82F6',
+        accentBronze: '#C5A880',
       }
     : {
-        text: '#181615',
-        textMuted: 'rgba(24, 22, 21, 0.56)',
-        textSubtle: 'rgba(24, 22, 21, 0.38)',
-        line: 'rgba(24, 22, 21, 0.12)',
-        lineStrong: 'rgba(24, 22, 21, 0.28)',
-        surface: 'rgba(24, 22, 21, 0.025)',
-        cardioSurface: 'linear-gradient(135deg, rgba(255,255,255,0.45) 0%, rgba(29,78,216,0.045) 100%)',
-        bg: '#F4F1EA',
-        noiseOpacity: 0.04,
+        text: '#161412',
+        textMuted: 'rgba(22, 20, 18, 0.58)',
+        textSubtle: 'rgba(22, 20, 18, 0.40)',
+        line: 'rgba(22, 20, 18, 0.12)',
+        lineStrong: 'rgba(22, 20, 18, 0.28)',
+        surface: 'rgba(22, 20, 18, 0.025)',
+        cardioSurface:
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.62) 0%, rgba(234, 230, 223, 0.55) 65%, rgba(122, 92, 56, 0.06) 100%)',
+        bg: '#F2EFE9',
+        noiseOpacity: 0.035,
         accentRed: '#881313',
-        accentCobalt: '#1D4ED8',
+        accentBronze: '#7A5C38',
       }
 
   const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E")`
@@ -593,7 +608,7 @@ export function HomePage({
         color: palette.text,
       }}
     >
-      {/* Текстура журнальной бумаги без mix-blend-mode: screen, чтобы не блокировать GPU-слой <video> в темной теме */}
+      {/* Текстура журнальной бумаги без mix-blend-mode */}
       <div
         className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-500"
         style={{
@@ -626,27 +641,27 @@ export function HomePage({
             </button>
           ) : (
             <span
-              className="text-[9px] font-sans uppercase tracking-[0.32em]"
+              className="text-[9px] font-sans uppercase tracking-[0.3em]"
               style={{ color: palette.textMuted }}
             >
               CORDWAINER × CARDIO
             </span>
           )}
 
-          {/* Переключатель языков со слэшами */}
+          {/* Переключатель языков со слэшами (единый код UA) */}
           <div className="flex items-center gap-3">
             {(['ru', 'uk', 'de'] as Lang[]).map((l, i) => (
               <div key={l} className="flex items-center gap-3">
                 <button
                   onClick={() => handleLangChange(l)}
-                  className="text-[9px] font-sans uppercase tracking-[0.28em] outline-none border-0 bg-transparent cursor-pointer transition-all"
+                  className="text-[9px] font-mono uppercase tracking-[0.24em] outline-none border-0 bg-transparent cursor-pointer transition-all"
                   style={{
                     color: safeLang === l ? palette.text : palette.textSubtle,
                     borderBottom: safeLang === l ? `1px solid ${palette.text}` : '1px solid transparent',
                     paddingBottom: '2px',
                   }}
                 >
-                  {l === 'uk' ? 'UKR' : l}
+                  {l === 'uk' ? 'UA' : l.toUpperCase()}
                 </button>
                 {i < 2 && (
                   <span className="text-[8px]" style={{ color: palette.line }}>
@@ -668,13 +683,13 @@ export function HomePage({
           <motion.div variants={itemVariants} className="pt-7 pb-6">
             <div className="flex items-center justify-between mb-3">
               <span
-                className="text-[8px] font-sans uppercase tracking-[0.32em]"
+                className="text-[8.5px] font-sans uppercase tracking-[0.28em]"
                 style={{ color: palette.textMuted }}
               >
                 {t.issue}
               </span>
               <span
-                className="text-[9px] font-serif italic"
+                className="text-[11px] font-serif italic"
                 style={{ color: palette.textMuted }}
               >
                 Vol. I
@@ -682,7 +697,7 @@ export function HomePage({
             </div>
 
             <h1
-              className="font-serif text-[13.5vw] min-[440px]:text-[62px] leading-[0.86] tracking-[-0.03em] uppercase font-normal"
+              className="font-serif text-[13.5vw] min-[440px]:text-[62px] leading-[0.86] tracking-[-0.025em] uppercase font-normal"
               style={{ color: palette.text }}
             >
               Cordwainer
@@ -699,7 +714,7 @@ export function HomePage({
               }}
             >
               <span
-                className="text-[10px] font-serif italic mr-3 shrink-0"
+                className="text-[11px] font-serif italic mr-3 shrink-0"
                 style={{ color: palette.textMuted }}
               >
                 Index.
@@ -815,31 +830,31 @@ export function HomePage({
                       className="absolute inset-0 pointer-events-none"
                       style={{
                         background:
-                          'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.34) 50%, rgba(0,0,0,0.22) 100%)',
+                          'linear-gradient(to top, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.34) 52%, rgba(10,10,10,0.20) 100%)',
                         zIndex: 2,
                       }}
                     />
 
                     <div
-                      className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4F0E8]"
+                      className="relative h-full p-5 sm:p-6 flex flex-col justify-between text-[#F4EFE6]"
                       style={{ zIndex: 3 }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[8px] font-sans uppercase tracking-[0.35em] text-white/80">
+                        <span className="text-[8px] font-sans uppercase tracking-[0.32em] text-[#F4EFE6]/80">
                           {t.heroTag}
                         </span>
-                        <span className="text-[9px] font-sans tracking-[0.25em] text-white/60">
+                        <span className="text-[9px] font-mono tracking-[0.22em] text-[#F4EFE6]/65">
                           01 / 15
                         </span>
                       </div>
 
                       <div className="flex items-end justify-between gap-4">
                         <div>
-                          <h2 className="font-serif text-3xl sm:text-4xl leading-[1.02] tracking-tight whitespace-pre-line drop-shadow-md">
+                          <h2 className="font-serif font-normal text-[32px] sm:text-[38px] leading-[1.02] tracking-[-0.015em] whitespace-pre-line drop-shadow-sm">
                             {t.heroTitle}
                           </h2>
                         </div>
-                        <div className="flex items-center gap-2 pb-1 text-[9px] font-sans uppercase tracking-[0.25em] text-white/90 border-b border-white/40 shrink-0">
+                        <div className="flex items-center gap-1.5 pb-1 text-[9px] font-sans uppercase tracking-[0.22em] text-[#F4EFE6]/90 border-b border-[#F4EFE6]/40 shrink-0">
                           <span>{t.heroCta}</span>
                           <span>↗</span>
                         </div>
@@ -856,13 +871,13 @@ export function HomePage({
                   style={{ borderColor: palette.lineStrong }}
                 >
                   <span
-                    className="text-[9px] font-sans uppercase tracking-[0.32em]"
+                    className="text-[9px] font-sans font-medium uppercase tracking-[0.28em]"
                     style={{ color: palette.text }}
                   >
                     {t.learning}
                   </span>
                   <span
-                    className="text-[8px] font-sans tracking-[0.25em]"
+                    className="text-[8.5px] font-mono tracking-[0.22em]"
                     style={{ color: palette.textMuted }}
                   >
                     01—04
@@ -873,7 +888,7 @@ export function HomePage({
                   className="border-l border-r"
                   style={{ borderColor: palette.line }}
                 >
-                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO */}
+                  {/* 01. ФЛАГМАНСКАЯ МОНОГРАФИЯ: CARDIO (без обрезаний с многоточиями) */}
                   <button
                     type="button"
                     onClick={onOpenMaterials}
@@ -888,21 +903,21 @@ export function HomePage({
                       background: palette.cardioSurface,
                     }}
                   >
-                    {/* Верхняя индексная строка */}
-                    <div className="flex items-center justify-between gap-2 w-full mb-3 overflow-hidden">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {/* Верхняя индексная строка: помещается целиком на любом экране */}
+                    <div className="flex items-center justify-between gap-2 w-full mb-3.5">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className="text-[8px] font-sans tracking-[0.2em] tabular-nums shrink-0"
+                          className="text-[8.5px] font-mono tracking-[0.2em] tabular-nums shrink-0"
                           style={{ color: palette.textMuted }}
                         >
                           01
                         </span>
                         <span
                           className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: palette.accentCobalt }}
+                          style={{ backgroundColor: palette.accentBronze }}
                         />
                         <span
-                          className="text-[7.5px] font-sans uppercase tracking-[0.14em] font-medium truncate"
+                          className="text-[8px] font-sans uppercase tracking-[0.22em] font-medium whitespace-nowrap"
                           style={{ color: palette.text }}
                         >
                           {t.cardioBadge}
@@ -910,7 +925,7 @@ export function HomePage({
                       </div>
 
                       <span
-                        className="text-[7px] font-sans uppercase tracking-[0.15em] px-1.5 py-0.5 border whitespace-nowrap shrink-0"
+                        className="text-[7px] font-mono uppercase tracking-[0.16em] px-2 py-0.5 border whitespace-nowrap shrink-0"
                         style={{
                           borderColor: palette.lineStrong,
                           color: palette.textMuted,
@@ -920,60 +935,60 @@ export function HomePage({
                       </span>
                     </div>
 
-                    {/* Основное тело карточки: Типографика + полная 3D-эмблема без белого квадрата и без обрезки */}
+                    {/* Основное тело карточки */}
                     <div className="flex items-center justify-between gap-3 my-1.5">
                       <div className="flex-1 min-w-0 pr-1">
-                        <div className="flex items-baseline gap-2 mb-1.5">
+                        <div className="flex items-baseline gap-2.5 mb-1.5">
                           <h3
-                            className="font-serif text-[32px] sm:text-[40px] leading-[0.92] tracking-[0.02em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
+                            className="font-serif text-[33px] sm:text-[40px] leading-[0.92] tracking-[0.01em] uppercase font-normal transition-transform duration-300 group-hover:translate-x-0.5"
                             style={{ color: palette.text }}
                           >
                             Cardio
                           </h3>
                           <span
-                            className="font-serif italic text-[12px]"
-                            style={{ color: palette.textMuted }}
+                            className="font-serif italic text-[13px]"
+                            style={{ color: palette.accentBronze }}
                           >
                             Atelier
                           </span>
                         </div>
 
                         <p
-                          className="text-[11px] font-sans font-light leading-[1.4] max-w-[220px]"
+                          className="text-[11.5px] font-sans font-light leading-[1.45] max-w-[230px]"
                           style={{ color: palette.textMuted }}
                         >
                           {t.cardioDesc}
                         </p>
                       </div>
 
-                      {/* Контейнер логотипа: без белого квадрата в темной теме и без обрезания краев */}
-                      <div className="relative shrink-0 w-[112px] h-[68px] sm:w-[136px] sm:h-[82px] flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+                      {/* 3D-эмблема без белого фона */}
+                      <div className="relative shrink-0 w-[114px] h-[70px] sm:w-[136px] sm:h-[82px] flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
                         <img
                           src={transparentLogoSrc}
                           alt="Cardio Men's Footwear Emblem"
                           className="w-full h-full object-contain"
                           style={{
                             filter: isDark
-                              ? 'drop-shadow(0 4px 12px rgba(59, 130, 246, 0.18)) contrast(1.06)'
-                              : 'contrast(1.06)',
+                              ? 'drop-shadow(0 6px 14px rgba(59, 130, 246, 0.22)) contrast(1.06)'
+                              : 'drop-shadow(0 4px 10px rgba(22, 20, 18, 0.10)) contrast(1.05)',
                           }}
                         />
                       </div>
                     </div>
 
-                    {/* Нижняя плашка */}
+                    {/* Нижняя плашка: без обрезания текста */}
                     <div
-                      className="mt-3 pt-2.5 border-t flex items-center justify-between gap-2 overflow-hidden"
+                      className="mt-3.5 pt-2.5 border-t flex items-center justify-between gap-3"
                       style={{ borderColor: palette.line }}
                     >
                       <span
-                        className="text-[7.5px] font-sans uppercase tracking-[0.1em] truncate min-w-0 flex-1"
+                        className="text-[8px] font-sans uppercase tracking-[0.16em] whitespace-nowrap"
                         style={{ color: palette.textMuted }}
                       >
                         {t.materialsSub}
                       </span>
                       <span
-                        className="text-[8px] font-sans uppercase tracking-[0.16em] font-medium flex items-center gap-1 whitespace-nowrap shrink-0 border-b pb-0.5"
+                        className="text-[8px] font-sans uppercase tracking-[0.18em] font-medium flex items-center gap-1 whitespace-nowrap shrink-0 border-b pb-0.5"
                         style={{
                           color: palette.text,
                           borderColor: palette.lineStrong,
@@ -1006,13 +1021,13 @@ export function HomePage({
                       >
                         <div className="flex items-center justify-between w-full mb-3">
                           <span
-                            className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                            className="text-[8.5px] font-mono tracking-[0.22em] tabular-nums"
                             style={{ color: palette.textMuted }}
                           >
                             {item.roman}
                           </span>
                           <span
-                            className="text-[7px] font-sans uppercase tracking-[0.24em]"
+                            className="text-[7px] font-mono uppercase tracking-[0.22em]"
                             style={{ color: palette.textSubtle }}
                           >
                             {item.tag}
@@ -1021,13 +1036,13 @@ export function HomePage({
 
                         <div>
                           <div
-                            className="font-serif text-[22px] sm:text-[25px] leading-[1.08] tracking-tight mb-1.5 transition-transform group-hover:translate-x-0.5"
+                            className="font-serif text-[23px] sm:text-[26px] leading-[1.06] tracking-[-0.01em] mb-1.5 transition-transform group-hover:translate-x-0.5"
                             style={{ color: palette.text }}
                           >
                             {item.title}
                           </div>
                           <div
-                            className="text-[8.5px] font-sans uppercase tracking-[0.12em] leading-[1.35]"
+                            className="text-[8.5px] font-sans uppercase tracking-[0.14em] leading-[1.35]"
                             style={{ color: palette.textMuted }}
                           >
                             {item.subtitle}
@@ -1052,13 +1067,13 @@ export function HomePage({
                     >
                       <div className="flex items-center justify-between w-full mb-2.5">
                         <span
-                          className="text-[9px] font-sans tracking-[0.25em] tabular-nums"
+                          className="text-[8.5px] font-mono tracking-[0.22em] tabular-nums"
                           style={{ color: palette.textMuted }}
                         >
                           {catalogItem.roman}
                         </span>
                         <span
-                          className="text-[7px] font-sans uppercase tracking-[0.28em]"
+                          className="text-[7px] font-mono uppercase tracking-[0.24em]"
                           style={{ color: palette.textSubtle }}
                         >
                           {catalogItem.tag}
@@ -1068,13 +1083,13 @@ export function HomePage({
                       <div className="flex items-end justify-between gap-3 w-full">
                         <div className="min-w-0 flex-1">
                           <div
-                            className="font-serif text-[22px] sm:text-[26px] leading-[1.08] tracking-tight mb-1.5 transition-transform group-hover:translate-x-0.5"
+                            className="font-serif text-[23px] sm:text-[27px] leading-[1.06] tracking-[-0.01em] mb-1.5 transition-transform group-hover:translate-x-0.5"
                             style={{ color: palette.text }}
                           >
                             {catalogItem.title}
                           </div>
                           <div
-                            className="text-[8.5px] font-sans uppercase tracking-[0.12em] leading-[1.35] break-words"
+                            className="text-[8.5px] font-sans uppercase tracking-[0.14em] leading-[1.35] break-words"
                             style={{ color: palette.textMuted }}
                           >
                             {catalogItem.subtitle}
@@ -1100,13 +1115,13 @@ export function HomePage({
                   style={{ borderColor: palette.lineStrong }}
                 >
                   <span
-                    className="text-[9px] font-sans uppercase tracking-[0.32em]"
+                    className="text-[9px] font-sans font-medium uppercase tracking-[0.28em]"
                     style={{ color: palette.text }}
                   >
                     {t.tools}
                   </span>
                   <span
-                    className="text-[8px] font-sans tracking-[0.25em]"
+                    className="text-[8.5px] font-mono tracking-[0.22em]"
                     style={{ color: palette.textMuted }}
                   >
                     05—08
@@ -1128,13 +1143,13 @@ export function HomePage({
                     >
                       <div className="flex items-baseline gap-3 min-w-0">
                         <span
-                          className="text-[9px] font-sans tracking-[0.22em] tabular-nums shrink-0"
+                          className="text-[8.5px] font-mono tracking-[0.22em] tabular-nums shrink-0"
                           style={{ color: palette.textMuted }}
                         >
                           {item.roman}
                         </span>
                         <span
-                          className="font-serif text-[21px] sm:text-[24px] leading-snug tracking-tight transition-transform group-hover:translate-x-1"
+                          className="font-serif text-[22px] sm:text-[25px] leading-snug tracking-[-0.01em] transition-transform group-hover:translate-x-1"
                           style={{ color: palette.text }}
                         >
                           {item.title}
@@ -1173,13 +1188,13 @@ export function HomePage({
                   style={{ borderColor: palette.lineStrong }}
                 >
                   <span
-                    className="text-[9px] font-sans uppercase tracking-[0.32em]"
+                    className="text-[9px] font-sans font-medium uppercase tracking-[0.28em]"
                     style={{ color: palette.text }}
                   >
                     {t.system}
                   </span>
                   <span
-                    className="text-[8px] font-sans tracking-[0.25em]"
+                    className="text-[8.5px] font-mono tracking-[0.22em]"
                     style={{ color: palette.textMuted }}
                   >
                     09—12
@@ -1202,7 +1217,7 @@ export function HomePage({
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span
-                          className="text-[8px] font-sans tracking-[0.25em]"
+                          className="text-[8px] font-mono tracking-[0.22em]"
                           style={{ color: palette.textMuted }}
                         >
                           {item.roman}
@@ -1215,7 +1230,7 @@ export function HomePage({
                         </span>
                       </div>
                       <div
-                        className="font-serif text-[20px] leading-tight mb-1"
+                        className="font-serif text-[21px] leading-tight mb-1"
                         style={{ color: palette.text }}
                       >
                         {item.title}
@@ -1242,20 +1257,20 @@ export function HomePage({
                   <div className="text-left">
                     <div className="flex items-center gap-2.5 mb-1">
                       <span
-                        className="text-[8px] font-sans tracking-[0.25em]"
+                        className="text-[8px] font-mono tracking-[0.22em]"
                         style={{ color: palette.textMuted }}
                       >
                         11
                       </span>
                       <span
-                        className="font-serif text-[20px] leading-none"
+                        className="font-serif text-[21px] leading-none"
                         style={{ color: palette.text }}
                       >
                         {t.favorites}
                       </span>
                     </div>
                     <div
-                      className="text-[8px] font-sans uppercase tracking-[0.22em] pl-5"
+                      className="text-[8px] font-sans uppercase tracking-[0.2em] pl-5"
                       style={{ color: palette.textMuted }}
                     >
                       {t.favoritesSub}
@@ -1293,20 +1308,20 @@ export function HomePage({
                   <div className="text-left">
                     <div className="flex items-center gap-2.5 mb-1">
                       <span
-                        className="text-[8px] font-sans tracking-[0.25em]"
+                        className="text-[8px] font-mono tracking-[0.22em]"
                         style={{ color: palette.textMuted }}
                       >
                         12
                       </span>
                       <span
-                        className="font-serif text-[20px] leading-none"
+                        className="font-serif text-[21px] leading-none"
                         style={{ color: palette.text }}
                       >
                         {t.supportTitle}
                       </span>
                     </div>
                     <div
-                      className="text-[8px] font-sans uppercase tracking-[0.22em] pl-5"
+                      className="text-[8px] font-sans uppercase tracking-[0.2em] pl-5"
                       style={{ color: palette.textMuted }}
                     >
                       {t.supportDesc}
@@ -1314,7 +1329,7 @@ export function HomePage({
                   </div>
 
                   <span
-                    className="text-[9px] font-sans uppercase tracking-[0.25em] border px-2.5 py-1 transition-colors"
+                    className="text-[8.5px] font-mono uppercase tracking-[0.22em] border px-2.5 py-1 transition-colors"
                     style={{ borderColor: palette.lineStrong, color: palette.text }}
                   >
                     TRIBUTE ↗
@@ -1336,7 +1351,7 @@ export function HomePage({
                     {t.quote}
                   </p>
                   <p
-                    className="mt-4 text-[8px] font-sans uppercase tracking-[0.45em]"
+                    className="mt-4 text-[8px] font-mono uppercase tracking-[0.42em]"
                     style={{ color: palette.textSubtle }}
                   >
                     CORDWAINER × CARDIO • MMXXVI
