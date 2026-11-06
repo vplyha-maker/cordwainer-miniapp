@@ -16,7 +16,6 @@ function getTelegramFirstName(): string {
   try {
     const name = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name
     if (typeof name === 'string') {
-      // Удаляем любые эмодзи и спецсимволы, оставляя только буквы, пробелы и дефис
       const cleaned = name.replace(/[^\p{L}\s-]/gu, '').trim()
       if (cleaned.length > 0 && cleaned.length < 32) return cleaned
     }
@@ -56,7 +55,15 @@ export function WelcomePage({
   })
 
   useEffect(() => {
-    const checkTheme = () => setIsDark(document.documentElement.classList.contains('dark'))
+    const checkTheme = () => {
+      const dark = document.documentElement.classList.contains('dark')
+      setIsDark(dark)
+      try {
+        const bgHex = dark ? '#0A0A0A' : '#F2EFE9'
+        window.Telegram?.WebApp?.setHeaderColor?.(bgHex)
+        window.Telegram?.WebApp?.setBackgroundColor?.(bgHex)
+      } catch {}
+    }
     checkTheme()
 
     const observer = new MutationObserver(checkTheme)
@@ -127,15 +134,15 @@ export function WelcomePage({
     : t.hello
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
-  const cText = isDark ? 'text-[#F4EFE6]' : 'text-[#141210]'
-  const cMuted = isDark ? 'text-[#F4EFE6]/60' : 'text-[#141210]/60'
-  const cBorder = isDark ? 'border-[#F4EFE6]/15' : 'border-[#141210]/15'
+  const cText = isDark ? 'text-[#F4EFE6]' : 'text-[#161412]'
+  const cMuted = isDark ? 'text-[#F4EFE6]/65' : 'text-[#161412]/65'
+  const cBorder = isDark ? 'border-[#F4EFE6]/16' : 'border-[#161412]/15'
   const cAccent = isDark ? 'text-[#C5A880]' : 'text-[#7A5C38]'
 
   const vignetteStyle: React.CSSProperties = {
     background: isDark
-      ? 'linear-gradient(to top, #0A0A0A 0%, rgba(10,10,10,0.94) 34%, rgba(10,10,10,0.38) 65%, rgba(10,10,10,0.12) 100%)'
-      : 'linear-gradient(to top, #F2EFE9 0%, rgba(242,239,233,0.95) 32%, rgba(242,239,233,0.3) 62%, rgba(242,239,233,0.0) 100%)',
+      ? 'linear-gradient(to bottom, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.08) 22%, rgba(10,10,10,0.38) 56%, rgba(10,10,10,0.94) 74%, #0A0A0A 100%)'
+      : 'linear-gradient(to bottom, rgba(242,239,233,0.55) 0%, rgba(242,239,233,0.04) 22%, rgba(242,239,233,0.32) 56%, rgba(242,239,233,0.95) 74%, #F2EFE9 100%)',
   }
 
   const chapters = [
@@ -154,8 +161,8 @@ export function WelcomePage({
           src="/hero-cover.webp"
           alt="Cordwainer Lookbook Cover"
           fetchPriority="high"
-          className={`h-full w-full object-cover object-[center_top] ${
-            isDark ? 'opacity-75' : 'opacity-95'
+          className={`h-full w-full object-cover object-[center_top] transition-opacity duration-500 ${
+            isDark ? 'opacity-80 contrast-[1.04]' : 'opacity-95'
           }`}
         />
         <div className="absolute inset-0" style={vignetteStyle} />
@@ -166,10 +173,10 @@ export function WelcomePage({
         <div className="flex items-center gap-2.5 whitespace-nowrap">
           <span
             className={`inline-block w-1.5 h-1.5 rounded-full ${
-              isDark ? 'bg-[#C5A880]' : 'bg-[#141210]'
+              isDark ? 'bg-[#C5A880]' : 'bg-[#7A5C38]'
             }`}
           />
-          <span className="font-mono text-[9px] uppercase tracking-[0.28em]">
+          <span className="font-mono text-[9px] uppercase tracking-[0.26em]">
             ISSUE N° 01 // ARCHIVE
           </span>
         </div>
@@ -177,7 +184,7 @@ export function WelcomePage({
         {/* Переключатель языков */}
         <div
           className={`flex items-center border ${cBorder} p-0.5 backdrop-blur-md ${
-            isDark ? 'bg-black/35' : 'bg-[#F2EFE9]/70'
+            isDark ? 'bg-[#0A0A0A]/45' : 'bg-[#F2EFE9]/75'
           }`}
         >
           {(['ru', 'uk', 'de'] as Lang[]).map((l) => {
@@ -188,13 +195,15 @@ export function WelcomePage({
                 type="button"
                 onClick={() => {
                   haptic('light')
+                  localStorage.setItem('app_lang', l)
+                  localStorage.setItem('cordwainer_lang', l)
                   setLang(l)
                 }}
-                className={`px-2 py-1 text-[8px] font-mono uppercase tracking-[0.22em] border-0 outline-none cursor-pointer transition-all ${
+                className={`px-2 py-1 text-[8px] font-mono uppercase tracking-[0.2em] border-0 outline-none cursor-pointer transition-all ${
                   active
                     ? isDark
-                      ? 'bg-[#F4EFE6] text-[#0A0A0A] font-semibold'
-                      : 'bg-[#141210] text-[#F2EFE9] font-semibold'
+                      ? 'bg-[#F4EFE6] text-[#0A0A0A] font-medium'
+                      : 'bg-[#161412] text-[#F2EFE9] font-medium'
                     : `bg-transparent ${cMuted} hover:opacity-100`
                 }`}
               >
@@ -207,44 +216,43 @@ export function WelcomePage({
 
       {/* 3. НИЖНИЙ РЕДАКЦИОННЫЙ БЛОК */}
       <section className="relative z-20 flex flex-col justify-end px-6 pb-8 sm:pb-12 mt-auto">
-        {/* Приветствие в стиле модного дома (без эмодзи) */}
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2.5">
             <span
               className={`inline-block w-4 h-[1px] ${
-                isDark ? 'bg-[#C5A880]/70' : 'bg-[#7A5C38]/70'
+                isDark ? 'bg-[#C5A880]/80' : 'bg-[#7A5C38]/80'
               }`}
             />
-            <span className={`font-mono text-[8.5px] uppercase tracking-[0.3em] ${cAccent}`}>
+            <span className={`font-mono text-[8.5px] uppercase tracking-[0.28em] ${cAccent}`}>
               {greetingText}
             </span>
           </div>
-          <span className={`font-serif italic text-[11px] tracking-wide ${cMuted}`}>
+          <span className={`font-serif italic text-[11.5px] tracking-wide ${cMuted}`}>
             Vol. I — IV
           </span>
         </div>
 
         {/* Надзаголовок */}
         <p
-          className={`text-[9px] font-sans font-medium uppercase tracking-[0.3em] mb-1 ${cMuted}`}
+          className={`text-[9px] font-sans font-medium uppercase tracking-[0.28em] mb-1.5 ${cMuted}`}
         >
           {t.tagline}
         </p>
 
         {/* Главный титул */}
-        <h1 className="font-serif font-normal text-[14.5vw] min-[390px]:text-[58px] sm:text-[66px] leading-[0.86] tracking-[-0.035em] mb-2">
+        <h1 className="font-serif font-normal text-[14.5vw] min-[390px]:text-[58px] sm:text-[66px] leading-[0.88] tracking-[-0.025em] mb-2">
           Cordwainer
         </h1>
 
-        <p className={`font-serif italic text-[13.5px] tracking-[0.01em] mb-5 ${cAccent}`}>
+        <p className={`font-serif italic text-[14px] tracking-[0.015em] mb-5 ${cAccent}`}>
           {t.subhead}
         </p>
 
-        {/* ИНТЕРАКТИВНЫЙ ИНДЕКС РАЗДЕЛОВ (01 Cadio / 02 Силуэты / 03 Расчёты) */}
+        {/* ИНТЕРАКТИВНЫЙ ИНДЕКС РАЗДЕЛОВ */}
         <nav
           aria-label="Lookbook chapters"
           className={`grid grid-cols-3 border-y ${cBorder} divide-x ${
-            isDark ? 'divide-[#F4EFE6]/15' : 'divide-[#141210]/15'
+            isDark ? 'divide-[#F4EFE6]/16' : 'divide-[#161412]/15'
           } mb-5 backdrop-blur-[2px]`}
         >
           {chapters.map((item) => (
@@ -255,7 +263,7 @@ export function WelcomePage({
                 haptic('light')
                 item.onClick?.()
               }}
-              className={`group flex flex-col items-start justify-between py-3 px-2.5 first:pl-0 last:pr-0 bg-transparent border-0 outline-none cursor-pointer text-left transition-opacity active:opacity-60`}
+              className="group flex flex-col items-start justify-between py-3 px-3 first:pl-0 last:pr-0 bg-transparent border-0 outline-none cursor-pointer text-left transition-opacity active:opacity-60"
             >
               <div className="w-full flex items-center justify-between mb-1">
                 <span className={`font-mono text-[8px] tracking-[0.22em] ${cAccent}`}>
@@ -267,7 +275,7 @@ export function WelcomePage({
                   ↗
                 </span>
               </div>
-              <span className="font-sans text-[9.5px] font-medium uppercase tracking-[0.2em] truncate w-full">
+              <span className="font-sans text-[9.5px] font-medium uppercase tracking-[0.18em] truncate w-full">
                 {item.label}
               </span>
             </button>
@@ -277,13 +285,13 @@ export function WelcomePage({
         {/* Редакционное описание */}
         <p
           className={`mb-6 max-w-[340px] text-[12.5px] font-sans font-light leading-[1.65] ${
-            isDark ? 'text-[#F4EFE6]/80' : 'text-[#141210]/80'
+            isDark ? 'text-[#F4EFE6]/82' : 'text-[#161412]/82'
           }`}
         >
           {t.value}
         </p>
 
-        {/* ГЛАВНАЯ КНОПКА (Во всю ширину, без кнопки «Журнал») */}
+        {/* ГЛАВНАЯ КНОПКА */}
         <button
           type="button"
           onClick={() => {
@@ -292,8 +300,8 @@ export function WelcomePage({
           }}
           className={`w-full py-4 px-6 flex items-center justify-between text-[10px] font-sans font-medium uppercase tracking-[0.28em] border transition-all active:scale-[0.985] cursor-pointer outline-none ${
             isDark
-              ? 'bg-[#F4EFE6] text-[#0A0A0A] border-[#F4EFE6] hover:bg-[#F4EFE6]/90'
-              : 'bg-[#141210] text-[#F2EFE9] border-[#141210] hover:bg-[#141210]/90'
+              ? 'bg-[#F4EFE6] text-[#0A0A0A] border-[#F4EFE6] hover:bg-[#F4EFE6]/92'
+              : 'bg-[#161412] text-[#F2EFE9] border-[#161412] hover:bg-[#161412]/92'
           }`}
         >
           <span>{t.start}</span>
