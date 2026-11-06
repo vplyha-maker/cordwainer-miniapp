@@ -1,60 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* ===== LIGHT: Editorial Warm Alabaster + Sapphire ===== */
+  /* ===== LIGHT: Editorial Warm Alabaster + Bronze & Sapphire ===== */
   --color-bg: #F2EFE9;
   --color-surface: #EAE6DF;
   --color-surface-2: #E2DDD5;
-  --color-ink: #1C1816;
+  --color-ink: #161412;
   --color-ink-soft: #4A443F;
   --color-muted: #78716C;
-  
-  --color-accent: #2563EB;    
-  --color-accent-soft: #DBEAFE;
-  
-  --color-border: rgba(28, 24, 22, 0.12);
-  --color-danger: #EF4444;
-  --color-success: #10B981;
-  
-  --color-bronze: #8C6D46;
-  --color-dock: #EAE6DF;
-  --color-dock-border: rgba(28, 24, 22, 0.12);
-  --color-glass: rgba(242, 239, 233, 0.88);
-  --color-glass-border: rgba(28, 24, 22, 0.08);
 
-  --font-display: "Playfair Display", "Times New Roman", serif;
+  --color-accent: #1E40AF;
+  --color-accent-soft: #DBEAFE;
+
+  --color-border: rgba(22, 20, 18, 0.12);
+  --color-danger: #B91C1C;
+  --color-success: #047857;
+
+  --color-bronze: #7A5C38;
+  --color-dock: #EAE6DF;
+  --color-dock-border: rgba(22, 20, 18, 0.12);
+  --color-glass: rgba(242, 239, 233, 0.88);
+  --color-glass-border: rgba(22, 20, 18, 0.08);
+
+  /* Нативная привязка для классов font-serif, font-sans, font-mono в Tailwind v4 */
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --radius-card: 1.25rem;
   --radius-dock: 1.5rem;
-  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.04);
-  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.08);
+  --shadow-soft: 0 4px 20px -4px rgb(22 20 18 / 0.05);
+  --shadow-card: 0 8px 32px -8px rgb(22 20 18 / 0.09);
 }
 
 .dark {
-  /* ===== DARK: Deep Obsidian + Sapphire ===== */
+  /* ===== DARK: Deep Obsidian + Champagne Bronze & Sapphire ===== */
   --color-bg: #0A0A0A;
-  --color-surface: #141415;
-  --color-surface-2: #27272A;
-  --color-ink: #F4F0E8;
+  --color-surface: #121213;
+  --color-surface-2: #1E1E21;
+  --color-ink: #F4EFE6;
   --color-ink-soft: #A1A1AA;
   --color-muted: #71717A;
-  
-  --color-accent: #3B82F6;    
+
+  --color-accent: #3B82F6;
   --color-accent-soft: #1E3A8A;
-  
-  --color-border: rgba(244, 240, 232, 0.12);
+
+  --color-border: rgba(244, 239, 230, 0.13);
   --color-danger: #F87171;
   --color-success: #34D399;
-  
-  --color-bronze: #C5A880;
-  --color-dock: #141415;
-  --color-dock-border: #27272A;
-  --color-glass: rgba(20, 20, 21, 0.85);
-  --color-glass-border: rgba(255, 255, 255, 0.08);
 
-  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.5);
-  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.8);
+  --color-bronze: #C5A880;
+  --color-dock: #121213;
+  --color-dock-border: rgba(244, 239, 230, 0.12);
+  --color-glass: rgba(18, 18, 19, 0.86);
+  --color-glass-border: rgba(244, 239, 230, 0.08);
+
+  --shadow-soft: 0 4px 20px -4px rgb(0 0 0 / 0.55);
+  --shadow-card: 0 8px 32px -8px rgb(0 0 0 / 0.82);
 }
 
 @layer base {
@@ -71,27 +76,18 @@
   }
 
   body {
-    font-family: var(--font-body);
+    font-family: var(--font-sans);
     background-color: var(--color-bg);
     color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
   }
 
   .focus-visible:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 1.5px solid var(--color-bronze);
     outline-offset: 2px;
     border-radius: inherit;
-  }
-
-  @media (pointer: fine) {
-    body {
-      cursor: none;
-    }
-    
-    a, button, [role="button"], input, select, textarea {
-      cursor: none !important;
-    }
   }
 }
 
@@ -114,9 +110,9 @@
 
   .leather-dock {
     background: var(--color-dock);
-    border: 1.5px solid var(--color-dock-border);
+    border: 1px solid var(--color-dock-border);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
       0 8px 24px -6px rgba(0, 0, 0, 0.35);
   }
 
@@ -188,7 +184,6 @@
    PERF FAST MODE & ANDROID WEBVIEW GPU BUG FIX
    ========================================================= */
 
-/* Лечим белые прямоугольники вокруг текста на всех страницах в Android WebView */
 .stagger-item {
   opacity: 1 !important;
   animation: none !important;
@@ -236,13 +231,13 @@ html.perf-fast body {
   }
 
   body {
-    background: #09090B;
+    background: color-mix(in srgb, var(--color-bg) 92%, #000000);
   }
 
   .app-shell {
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.06),
-      0 24px 80px rgba(0, 0, 0, 0.55);
+      0 0 0 1px var(--color-border),
+      0 24px 80px rgba(0, 0, 0, 0.35);
   }
 }
 
