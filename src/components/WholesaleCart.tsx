@@ -145,11 +145,7 @@ const POPULAR_CITIES: CityOption[] = [
   },
 ];
 
-/**
- * Словарь для автоматического перевода цветов и категорий обуви из catalog.ts
- */
 const SHOE_TERMS_MAP: Record<string, { uk: string; de: string }> = {
-  // Цвета
   'черный': { uk: 'Чорний', de: 'Schwarz' },
   'чёрный': { uk: 'Чорний', de: 'Schwarz' },
   'белый': { uk: 'Білий', de: 'Weiß' },
@@ -167,14 +163,12 @@ const SHOE_TERMS_MAP: Record<string, { uk: string; de: string }> = {
   'хаки': { uk: 'Хакі', de: 'Khaki' },
   'оливковый': { uk: 'Оливковий', de: 'Oliv' },
   'комбинированный': { uk: 'Комбінований', de: 'Kombiniert' },
-  // Материалы / Варианты
   'кожа': { uk: 'Шкіра', de: 'Leder' },
   'замша': { uk: 'Замша', de: 'Wildleder' },
   'нубук': { uk: 'Нубук', de: 'Nubuk' },
   'текстиль': { uk: 'Текстиль', de: 'Textil' },
   'сетка': { uk: 'Сітка', de: 'Mesh' },
   'перфорация': { uk: 'Перфорація', de: 'Perforiert' },
-  // Категории и сезоны
   'кроссовки': { uk: 'Кросівки', de: 'Sneaker' },
   'кеды': { uk: 'Кеди', de: 'Sneaker' },
   'туфли': { uk: 'Туфлі', de: 'Halbschuhe' },
@@ -379,20 +373,21 @@ function ClearFieldButton({
         if (e.detail === 0) handleTrigger(e);
       }}
       style={{
-        position: 'absolute',
-        right: '1px',
-        top: '1px',
-        bottom: isTextarea ? 'auto' : '1px',
-        height: isTextarea ? '42px' : undefined,
-        width: '44px',
-        zIndex: 10,
+        position: 'static',
+        flexShrink: 0,
+        alignSelf: isTextarea ? 'flex-start' : 'center',
+        width: '38px',
+        height: '38px',
+        marginTop: isTextarea ? '4px' : '0',
+        marginRight: '2px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background: 'transparent',
+        backgroundColor: 'transparent',
         border: 'none',
+        boxShadow: 'none',
         padding: 0,
-        margin: 0,
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
@@ -811,7 +806,6 @@ export function WholesaleCart({
   const warehouseInputRef = useRef<HTMLInputElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // При смене языка автоматически обновляем подпись выбранного города в поле ввода
   useEffect(() => {
     setCityQuery((prev) => {
       if (isMatchingCityLabel(prev, selectedCity)) {
@@ -1105,13 +1099,25 @@ export function WholesaleCart({
     }
   };
 
-  const getFieldStyle = (isValid: boolean): CSSProperties => ({
+  const getFieldWrapperStyle = (isValid: boolean, isTextarea = false): CSSProperties => ({
+    display: 'flex',
+    alignItems: isTextarea ? 'flex-start' : 'center',
     width: '100%',
     boxSizing: 'border-box',
-    padding: '11px 46px 11px 12px',
     border: `1px solid ${showValidationErrors && !isValid ? THEME.danger : THEME.border}`,
-    fontSize: '13px',
     backgroundColor: showValidationErrors && !isValid ? THEME.dangerFieldBg : THEME.surface,
+    transition: 'background-color 0.2s ease, border-color 0.2s ease',
+  });
+
+  const getInnerInputStyle = (): CSSProperties => ({
+    flex: '1 1 auto',
+    minWidth: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    padding: '11px 8px 11px 12px',
+    border: 'none',
+    fontSize: '13px',
+    backgroundColor: 'transparent',
     color: THEME.ink,
     WebkitTextFillColor: THEME.ink,
     caretColor: THEME.ink,
@@ -1119,7 +1125,6 @@ export function WholesaleCart({
     outline: 'none',
     borderRadius: 0,
     fontFamily: THEME.sans,
-    transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
   });
 
   return (
@@ -1513,32 +1518,35 @@ export function WholesaleCart({
                 })}
               </div>
 
+              {/* 1. Город */}
               <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
-                <input
-                  ref={cityInputRef}
-                  type="text"
-                  placeholder={t.cityPlaceholder}
-                  value={cityQuery}
-                  onFocus={() => setShowCityDropdown(true)}
-                  onChange={(e) => {
-                    setCityQuery(e.target.value);
-                    setShowCityDropdown(true);
-                  }}
-                  style={getFieldStyle(isCityValid)}
-                />
-
-                {cityQuery.length > 0 && (
-                  <ClearFieldButton
-                    ariaLabel={t.clearCityAria}
-                    themePalette={THEME}
-                    onClear={() => {
-                      setCityQuery('');
-                      setCityResults([]);
+                <div style={getFieldWrapperStyle(isCityValid)}>
+                  <input
+                    ref={cityInputRef}
+                    type="text"
+                    placeholder={t.cityPlaceholder}
+                    value={cityQuery}
+                    onFocus={() => setShowCityDropdown(true)}
+                    onChange={(e) => {
+                      setCityQuery(e.target.value);
                       setShowCityDropdown(true);
-                      cityInputRef.current?.focus();
                     }}
+                    style={getInnerInputStyle()}
                   />
-                )}
+
+                  {cityQuery.length > 0 && (
+                    <ClearFieldButton
+                      ariaLabel={t.clearCityAria}
+                      themePalette={THEME}
+                      onClear={() => {
+                        setCityQuery('');
+                        setCityResults([]);
+                        setShowCityDropdown(true);
+                        cityInputRef.current?.focus();
+                      }}
+                    />
+                  )}
+                </div>
 
                 {showCityDropdown && cityQuery.trim().length >= 1 && !isMatchingCityLabel(cityQuery, selectedCity) && (
                   <div
@@ -1587,29 +1595,33 @@ export function WholesaleCart({
                 )}
               </div>
 
-              <div style={{ position: 'relative', marginBottom: '8px' }}>
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  placeholder={t.namePlaceholder}
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  style={getFieldStyle(isNameValid)}
-                />
-                {clientName.length > 0 && (
-                  <ClearFieldButton
-                    ariaLabel={t.clearNameAria}
-                    themePalette={THEME}
-                    onClear={() => {
-                      setClientName('');
-                      nameInputRef.current?.focus();
-                    }}
+              {/* 2. Имя и Фамилия */}
+              <div style={{ marginBottom: '8px' }}>
+                <div style={getFieldWrapperStyle(isNameValid)}>
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    placeholder={t.namePlaceholder}
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    style={getInnerInputStyle()}
                   />
-                )}
+                  {clientName.length > 0 && (
+                    <ClearFieldButton
+                      ariaLabel={t.clearNameAria}
+                      themePalette={THEME}
+                      onClear={() => {
+                        setClientName('');
+                        nameInputRef.current?.focus();
+                      }}
+                    />
+                  )}
+                </div>
               </div>
 
+              {/* 3. Телефон */}
               <div style={{ marginBottom: '8px' }}>
-                <div style={{ position: 'relative' }}>
+                <div style={getFieldWrapperStyle(isPhoneValid)}>
                   <input
                     ref={phoneInputRef}
                     type="tel"
@@ -1617,7 +1629,7 @@ export function WholesaleCart({
                     placeholder={t.phonePlaceholder}
                     value={clientPhone}
                     onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
-                    style={getFieldStyle(isPhoneValid)}
+                    style={getInnerInputStyle()}
                   />
                   {clientPhone.length > 0 && (
                     <ClearFieldButton
@@ -1637,35 +1649,38 @@ export function WholesaleCart({
                 )}
               </div>
 
+              {/* 4. Отделение / Адрес */}
               <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
-                <input
-                  ref={warehouseInputRef}
-                  type="text"
-                  placeholder={
-                    warehousesLoading
-                      ? t.warehouseLoading
-                      : t.warehousePlaceholder(getLocalizedCityName(selectedCity))
-                  }
-                  value={branchOrComment}
-                  onFocus={() => setShowWarehouseDropdown(true)}
-                  onChange={(e) => {
-                    setBranchOrComment(e.target.value);
-                    setShowWarehouseDropdown(true);
-                  }}
-                  style={getFieldStyle(isBranchValid)}
-                />
-
-                {branchOrComment.length > 0 && (
-                  <ClearFieldButton
-                    ariaLabel={t.clearWarehouseAria}
-                    themePalette={THEME}
-                    onClear={() => {
-                      setBranchOrComment('');
+                <div style={getFieldWrapperStyle(isBranchValid)}>
+                  <input
+                    ref={warehouseInputRef}
+                    type="text"
+                    placeholder={
+                      warehousesLoading
+                        ? t.warehouseLoading
+                        : t.warehousePlaceholder(getLocalizedCityName(selectedCity))
+                    }
+                    value={branchOrComment}
+                    onFocus={() => setShowWarehouseDropdown(true)}
+                    onChange={(e) => {
+                      setBranchOrComment(e.target.value);
                       setShowWarehouseDropdown(true);
-                      warehouseInputRef.current?.focus();
                     }}
+                    style={getInnerInputStyle()}
                   />
-                )}
+
+                  {branchOrComment.length > 0 && (
+                    <ClearFieldButton
+                      ariaLabel={t.clearWarehouseAria}
+                      themePalette={THEME}
+                      onClear={() => {
+                        setBranchOrComment('');
+                        setShowWarehouseDropdown(true);
+                        warehouseInputRef.current?.focus();
+                      }}
+                    />
+                  )}
+                </div>
 
                 {showWarehouseDropdown && filteredWarehouses.length > 0 && (
                   <div
@@ -1708,31 +1723,34 @@ export function WholesaleCart({
                 )}
               </div>
 
-              <div style={{ position: 'relative', marginBottom: '12px' }}>
-                <textarea
-                  ref={commentInputRef}
-                  rows={2}
-                  placeholder={t.commentPlaceholder}
-                  value={orderComment}
-                  onChange={(e) => setOrderComment(e.target.value)}
-                  style={{
-                    ...getFieldStyle(true),
-                    resize: 'vertical',
-                    minHeight: '54px',
-                    lineHeight: 1.4,
-                  }}
-                />
-                {orderComment.length > 0 && (
-                  <ClearFieldButton
-                    isTextarea
-                    ariaLabel={t.clearCommentAria}
-                    themePalette={THEME}
-                    onClear={() => {
-                      setOrderComment('');
-                      commentInputRef.current?.focus();
+              {/* 5. Комментарий */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={getFieldWrapperStyle(true, true)}>
+                  <textarea
+                    ref={commentInputRef}
+                    rows={3}
+                    placeholder={t.commentPlaceholder}
+                    value={orderComment}
+                    onChange={(e) => setOrderComment(e.target.value)}
+                    style={{
+                      ...getInnerInputStyle(),
+                      resize: 'vertical',
+                      minHeight: '68px',
+                      lineHeight: 1.4,
                     }}
                   />
-                )}
+                  {orderComment.length > 0 && (
+                    <ClearFieldButton
+                      isTextarea
+                      ariaLabel={t.clearCommentAria}
+                      themePalette={THEME}
+                      onClear={() => {
+                        setOrderComment('');
+                        commentInputRef.current?.focus();
+                      }}
+                    />
+                  )}
+                </div>
               </div>
 
               <div
