@@ -26,23 +26,155 @@ const STANDARD_8_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 2, 43: 2, 44
 const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1, 45: 1 };
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
+const THEME_STORAGE_KEY = 'cardio_theme';
 
 const HERO_VIDEO_SRC = '/logo%281%29.mp4';
 const FOOTER_BANNER_SRC = '/baner.jpg';
 
-const THEME = {
+const LIGHT_THEME = {
   bg: '#F2EFE9',
   surface: '#F8F6F1',
   surfaceActive: '#EAE5DC',
+  cardInCart: '#EFECE4',
+  imageStage: '#F8F6F1',
+  imageStageActive: '#EAE5DC',
   ink: '#161514',
   inkMuted: '#6E6A63',
   inkLight: '#9A958C',
+  onInk: '#FFFFFF',
+  onInkMuted: '#D6D1C7',
   border: '#DCD7CC',
   borderStrong: '#161514',
   accentGreen: '#1E4620',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
+
+const DARK_THEME = {
+  bg: '#0E0E10',
+  surface: '#17171A',
+  surfaceActive: '#232328',
+  cardInCart: '#1E2420',
+  imageStage: '#E6E1D8',
+  imageStageActive: '#DAD4C8',
+  ink: '#F4EFE6',
+  inkMuted: '#A19D95',
+  inkLight: '#75716A',
+  onInk: '#121214',
+  onInkMuted: '#4A4742',
+  border: '#2C2C30',
+  borderStrong: '#F4EFE6',
+  accentGreen: '#2E7D32',
+  serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
+  sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
+};
+
+type TgWebApp = {
+  ready?: () => void;
+  colorScheme?: 'light' | 'dark';
+  setHeaderColor?: (color: string) => void;
+  setBackgroundColor?: (color: string) => void;
+  onEvent?: (eventType: string, callback: () => void) => void;
+  offEvent?: (eventType: string, callback: () => void) => void;
+  HapticFeedback?: {
+    impactOccurred?: (s: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+    notificationOccurred?: (t: 'error' | 'success' | 'warning') => void;
+  };
+};
+
+function getTgWebApp(): TgWebApp | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
+}
+
+export function getInitialIsDark(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem('theme');
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+  } catch {}
+  if (document.documentElement.classList.contains('dark')) return true;
+  const tgScheme = getTgWebApp()?.colorScheme;
+  if (tgScheme === 'dark') return true;
+  if (tgScheme === 'light') return false;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+}
+
+export function applyAppTheme(dark: boolean, saveToStorage = true) {
+  if (typeof window === 'undefined') return;
+  const root = document.documentElement;
+  root.classList.toggle('dark', dark);
+  root.style.colorScheme = dark ? 'dark' : 'light';
+
+  if (saveToStorage) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    } catch {}
+  }
+
+  try {
+    const tg = getTgWebApp();
+    const bgHex = dark ? '#0E0E10' : '#F2EFE9';
+    tg?.setBackgroundColor?.(bgHex);
+    tg?.setHeaderColor?.(bgHex);
+  } catch {}
+
+  window.dispatchEvent(new CustomEvent('cardio-theme-change', { detail: { isDark: dark } }));
+}
+
+export function useCardioTheme() {
+  const [isDark, setIsDark] = useState<boolean>(() => getInitialIsDark());
+
+  useEffect(() => {
+    applyAppTheme(isDark, false);
+  }, [isDark]);
+
+  useEffect(() => {
+    const onCustomTheme = (e: Event) => {
+      const custom = e as CustomEvent<{ isDark: boolean }>;
+      if (typeof custom.detail?.isDark === 'boolean') {
+        setIsDark(custom.detail.isDark);
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      const domDark = document.documentElement.classList.contains('dark');
+      setIsDark((prev) => (prev !== domDark ? domDark : prev));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    const tg = getTgWebApp();
+    const onTgThemeChanged = () => {
+      try {
+        const manual = localStorage.getItem(THEME_STORAGE_KEY);
+        if (!manual && tg?.colorScheme) {
+          const nextDark = tg.colorScheme === 'dark';
+          applyAppTheme(nextDark, false);
+          setIsDark(nextDark);
+        }
+      } catch {}
+    };
+
+    window.addEventListener('cardio-theme-change', onCustomTheme);
+    tg?.onEvent?.('themeChanged', onTgThemeChanged);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('cardio-theme-change', onCustomTheme);
+      tg?.offEvent?.('themeChanged', onTgThemeChanged);
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    applyAppTheme(next, true);
+  };
+
+  return { isDark, toggleTheme, THEME: isDark ? DARK_THEME : LIGHT_THEME };
+}
 
 let sharedAudioCtx: AudioContext | null = null;
 
@@ -114,19 +246,7 @@ function playTapticClick(level: 'light' | 'medium' | 'success') {
 function fireHaptic(level: 'light' | 'medium' | 'success') {
   playTapticClick(level);
   try {
-    const tgHaptic = (
-      window as unknown as {
-        Telegram?: {
-          WebApp?: {
-            HapticFeedback?: {
-              impactOccurred?: (s: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
-              notificationOccurred?: (t: 'error' | 'success' | 'warning') => void;
-            };
-          };
-        };
-      }
-    ).Telegram?.WebApp?.HapticFeedback;
-
+    const tgHaptic = getTgWebApp()?.HapticFeedback;
     if (tgHaptic) {
       if (level === 'light') tgHaptic.impactOccurred?.('medium');
       else if (level === 'medium') tgHaptic.impactOccurred?.('heavy');
@@ -137,6 +257,7 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
 
 export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
   const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
+  const { isDark, toggleTheme, THEME } = useCardioTheme();
 
   const t = {
     ru: {
@@ -302,7 +423,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
 
   useEffect(() => {
     try {
-      (window as unknown as { Telegram?: { WebApp?: { ready?: () => void } } }).Telegram?.WebApp?.ready?.();
+      getTgWebApp()?.ready?.();
     } catch {}
 
     const unlockAudio = () => { getAudioContext(); };
@@ -568,6 +689,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
           color: THEME.ink,
           boxSizing: 'border-box',
           fontFamily: THEME.sans,
+          colorScheme: isDark ? 'dark' : 'light',
+          transition: 'background-color 0.2s ease, color 0.2s ease',
         }}
       >
         <div
@@ -575,13 +698,13 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '12px',
+            gap: '8px',
             paddingBottom: '12px',
             marginBottom: '20px',
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flexShrink: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
             <img
               src="/logo.png"
               alt="Cardio"
@@ -590,10 +713,11 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 setSelectedShoe(null);
               }}
               style={{
-                height: '36px',
+                height: '34px',
                 width: 'auto',
                 objectFit: 'contain',
-                mixBlendMode: 'multiply',
+                mixBlendMode: isDark ? 'screen' : 'multiply',
+                filter: isDark ? 'invert(1) hue-rotate(180deg) brightness(1.1)' : 'none',
                 display: 'block',
                 cursor: 'pointer',
                 flexShrink: 0,
@@ -628,29 +752,56 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              fireHaptic('medium');
-              setIsCartOpen(true);
-            }}
-            style={{
-              backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
-              border: `1px solid ${THEME.ink}`,
-              padding: '8px 12px',
-              fontSize: '10px',
-              letterSpacing: '0.8px',
-              textTransform: 'uppercase',
-              fontWeight: 600,
-              cursor: 'pointer',
-              color: cart.length > 0 ? '#FFFFFF' : THEME.ink,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              touchAction: 'manipulation',
-            }}
-          >
-            {t.invoiceBtn(cartTotalPairs)}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => {
+                fireHaptic('light');
+                toggleTheme();
+              }}
+              aria-label="Toggle theme"
+              style={{
+                backgroundColor: THEME.surface,
+                border: `1px solid ${THEME.border}`,
+                width: '32px',
+                height: '32px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '13px',
+                color: THEME.ink,
+                cursor: 'pointer',
+                flexShrink: 0,
+                touchAction: 'manipulation',
+              }}
+            >
+              {isDark ? '☀' : '☾'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                fireHaptic('medium');
+                setIsCartOpen(true);
+              }}
+              style={{
+                backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
+                border: `1px solid ${THEME.ink}`,
+                padding: '8px 12px',
+                fontSize: '10px',
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: cart.length > 0 ? THEME.onInk : THEME.ink,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                touchAction: 'manipulation',
+              }}
+            >
+              {t.invoiceBtn(cartTotalPairs)}
+            </button>
+          </div>
         </div>
 
         {alreadyInCartPairs > 0 && (
@@ -765,13 +916,14 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             </span>
           </div>
 
+          {/* Студийный подиум с гарантированным запасом воздуха по вертикали и горизонтали */}
           <div
             style={{
               width: '100%',
-              height: '220px',
-              padding: '14px 20px',
+              height: '240px',
+              padding: '20px 26px',
               boxSizing: 'border-box',
-              backgroundColor: THEME.surface,
+              backgroundColor: THEME.imageStage,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -782,10 +934,10 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               src={selectedShoe.image}
               alt={`Модель ${selectedShoe.modelNumber}`}
               style={{
+                width: '100%',
+                height: '100%',
                 maxWidth: '100%',
-                maxHeight: '192px',
-                width: 'auto',
-                height: 'auto',
+                maxHeight: '100%',
                 objectFit: 'contain',
                 objectPosition: 'center center',
                 display: 'block',
@@ -853,6 +1005,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               {modelVariants.map((v, i) => {
                 const isCurrent = v.id === selectedShoe.id;
                 const cellBg = isCurrent ? THEME.surfaceActive : THEME.surface;
+                const thumbStageBg = isCurrent ? THEME.imageStageActive : THEME.imageStage;
                 const translatedVariantColor = getLocalizedColor(v.color, safeLang);
                 return (
                   <div
@@ -887,25 +1040,26 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                     <div
                       style={{
                         width: '100%',
-                        height: '96px',
-                        padding: '4px',
+                        height: '92px',
+                        padding: '10px 8px',
                         boxSizing: 'border-box',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         overflow: 'hidden',
-                        backgroundColor: cellBg,
+                        backgroundColor: thumbStageBg,
                       }}
                     >
                       <img
                         src={v.image}
                         alt={v.color}
                         style={{
+                          width: '100%',
+                          height: '100%',
                           maxWidth: '100%',
-                          maxHeight: '86px',
-                          width: 'auto',
-                          height: 'auto',
+                          maxHeight: '100%',
                           objectFit: 'contain',
+                          objectPosition: 'center center',
                           display: 'block',
                           margin: '0 auto',
                           mixBlendMode: 'multiply',
@@ -966,7 +1120,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               }}
               style={{
                 backgroundColor: orderMode === 'wholesale' ? THEME.ink : 'transparent',
-                color: orderMode === 'wholesale' ? '#FFFFFF' : THEME.ink,
+                color: orderMode === 'wholesale' ? THEME.onInk : THEME.ink,
                 border: 'none',
                 padding: '11px 8px',
                 fontSize: '10px',
@@ -988,7 +1142,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               }}
               style={{
                 backgroundColor: orderMode === 'sample' ? THEME.ink : 'transparent',
-                color: orderMode === 'sample' ? '#FFFFFF' : THEME.ink,
+                color: orderMode === 'sample' ? THEME.onInk : THEME.ink,
                 border: 'none',
                 borderLeft: `1px solid ${THEME.ink}`,
                 padding: '11px 8px',
@@ -1024,7 +1178,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                     fontWeight: 600,
                     padding: '3px 8px',
                     backgroundColor: isCustomRun ? THEME.ink : THEME.surfaceActive,
-                    color: isCustomRun ? '#FFFFFF' : THEME.ink,
+                    color: isCustomRun ? THEME.onInk : THEME.ink,
                     border: `1px solid ${isCustomRun ? THEME.ink : THEME.border}`,
                   }}
                 >
@@ -1052,7 +1206,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   }}
                   style={{
                     backgroundColor: isStandard8 ? THEME.ink : THEME.surface,
-                    color: isStandard8 ? '#FFFFFF' : THEME.ink,
+                    color: isStandard8 ? THEME.onInk : THEME.ink,
                     border: `1px solid ${isStandard8 ? THEME.ink : THEME.border}`,
                     padding: '10px 10px',
                     textAlign: 'left',
@@ -1079,7 +1233,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   <div
                     style={{
                       fontSize: '10px',
-                      color: isStandard8 ? '#D6D1C7' : THEME.inkMuted,
+                      color: isStandard8 ? THEME.onInkMuted : THEME.inkMuted,
                       fontFamily: THEME.serif,
                       fontStyle: 'italic',
                     }}
@@ -1096,7 +1250,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   }}
                   style={{
                     backgroundColor: isEven6 ? THEME.ink : THEME.surface,
-                    color: isEven6 ? '#FFFFFF' : THEME.ink,
+                    color: isEven6 ? THEME.onInk : THEME.ink,
                     border: `1px solid ${isEven6 ? THEME.ink : THEME.border}`,
                     padding: '10px 10px',
                     textAlign: 'left',
@@ -1123,7 +1277,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   <div
                     style={{
                       fontSize: '10px',
-                      color: isEven6 ? '#D6D1C7' : THEME.inkMuted,
+                      color: isEven6 ? THEME.onInkMuted : THEME.inkMuted,
                       fontFamily: THEME.serif,
                       fontStyle: 'italic',
                     }}
@@ -1162,7 +1316,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                         style={{
                           fontSize: '10px',
                           backgroundColor: isDoubled ? THEME.ink : 'transparent',
-                          color: isDoubled ? '#FFFFFF' : THEME.inkMuted,
+                          color: isDoubled ? THEME.onInk : THEME.inkMuted,
                           fontWeight: isDoubled ? 600 : 400,
                           padding: '6px 0',
                           borderBottom: `1px solid ${THEME.border}`,
@@ -1178,6 +1332,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                           border: 'none',
                           padding: '8px 0',
                           fontSize: '16px',
+                          color: THEME.ink,
                           cursor: 'pointer',
                         }}
                       >
@@ -1202,6 +1357,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                           border: 'none',
                           padding: '8px 0',
                           fontSize: '16px',
+                          color: THEME.ink,
                           cursor: 'pointer',
                         }}
                       >
@@ -1245,7 +1401,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                         border: 'none',
                         borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
                         backgroundColor: boxesCount === num ? THEME.ink : THEME.surface,
-                        color: boxesCount === num ? '#FFFFFF' : THEME.ink,
+                        color: boxesCount === num ? THEME.onInk : THEME.ink,
                         fontSize: '11px',
                         fontWeight: 600,
                         cursor: 'pointer',
@@ -1292,7 +1448,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                       borderRight: `1px solid ${THEME.border}`,
                       borderBottom: `1px solid ${THEME.border}`,
                       backgroundColor: sampleSize === sz ? THEME.ink : THEME.surface,
-                      color: sampleSize === sz ? '#FFFFFF' : THEME.ink,
+                      color: sampleSize === sz ? THEME.onInk : THEME.ink,
                       fontSize: '13px',
                       fontFamily: THEME.serif,
                       cursor: 'pointer',
@@ -1314,7 +1470,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             width: '100%',
             padding: '16px 20px',
             backgroundColor: justAdded ? THEME.accentGreen : THEME.ink,
-            color: '#FFFFFF',
+            color: justAdded ? '#FFFFFF' : THEME.onInk,
             border: 'none',
             fontSize: '11px',
             fontWeight: 600,
@@ -1367,6 +1523,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
         color: THEME.ink,
         fontFamily: THEME.sans,
         boxSizing: 'border-box',
+        colorScheme: isDark ? 'dark' : 'light',
+        transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
       <div
@@ -1388,10 +1546,11 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             src="/logo.png"
             alt="Cardio Footwear Logo"
             style={{
-              height: '46px',
+              height: '44px',
               width: 'auto',
               objectFit: 'contain',
-              mixBlendMode: 'multiply',
+              mixBlendMode: isDark ? 'screen' : 'multiply',
+              filter: isDark ? 'invert(1) hue-rotate(180deg) brightness(1.1)' : 'none',
               display: 'block',
               flexShrink: 0,
             }}
@@ -1428,31 +1587,58 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
           </div>
         </div>
 
-        {onBack && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <button
             type="button"
             onClick={() => {
               fireHaptic('light');
-              onBack();
+              toggleTheme();
             }}
+            aria-label="Toggle theme"
             style={{
               backgroundColor: THEME.surface,
-              border: `1px solid ${THEME.borderStrong}`,
-              padding: '7px 10px',
-              fontSize: '9px',
-              letterSpacing: '0.9px',
-              textTransform: 'uppercase',
-              fontWeight: 600,
-              cursor: 'pointer',
+              border: `1px solid ${THEME.border}`,
+              width: '30px',
+              height: '30px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '13px',
               color: THEME.ink,
-              whiteSpace: 'nowrap',
+              cursor: 'pointer',
               flexShrink: 0,
               touchAction: 'manipulation',
             }}
           >
-            {t.mainPageBtn}
+            {isDark ? '☀' : '☾'}
           </button>
-        )}
+
+          {onBack && (
+            <button
+              type="button"
+              onClick={() => {
+                fireHaptic('light');
+                onBack();
+              }}
+              style={{
+                backgroundColor: THEME.surface,
+                border: `1px solid ${THEME.borderStrong}`,
+                padding: '7px 10px',
+                fontSize: '9px',
+                letterSpacing: '0.9px',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: THEME.ink,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                touchAction: 'manipulation',
+              }}
+            >
+              {t.mainPageBtn}
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -1580,6 +1766,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               border: 'none',
               backgroundColor: 'transparent',
               color: THEME.ink,
+              WebkitTextFillColor: THEME.ink,
+              caretColor: THEME.ink,
               fontSize: '13px',
               outline: 'none',
             }}
@@ -1619,7 +1807,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 }}
                 style={{
                   background: isActive ? THEME.ink : 'transparent',
-                  color: isActive ? '#FFFFFF' : THEME.ink,
+                  color: isActive ? THEME.onInk : THEME.ink,
                   border: 'none',
                   borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
                   padding: '9px 4px',
@@ -1698,7 +1886,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               }}
               style={{
                 backgroundColor: gridMode === '2col' ? THEME.ink : THEME.surface,
-                color: gridMode === '2col' ? '#FFFFFF' : THEME.inkMuted,
+                color: gridMode === '2col' ? THEME.onInk : THEME.inkMuted,
                 border: 'none',
                 padding: '5px 9px',
                 fontSize: '9px',
@@ -1718,7 +1906,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               }}
               style={{
                 backgroundColor: gridMode === 'large' ? THEME.ink : THEME.surface,
-                color: gridMode === 'large' ? '#FFFFFF' : THEME.inkMuted,
+                color: gridMode === 'large' ? THEME.onInk : THEME.inkMuted,
                 border: 'none',
                 borderLeft: `1px solid ${THEME.border}`,
                 padding: '5px 9px',
@@ -1744,7 +1932,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             const variantsCount = cardioCatalog.filter((i) => i.modelNumber === shoe.modelNumber).length;
             const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
             const isLarge = gridMode === 'large';
-            const cardBg = inCartPairs > 0 ? '#EFECE4' : THEME.surface;
+            const cardBg = inCartPairs > 0 ? THEME.cardInCart : THEME.surface;
+            const stageBg = inCartPairs > 0 ? THEME.imageStageActive : THEME.imageStage;
             const translatedColor = getLocalizedColor(shoe.color, safeLang);
             const translatedCategory = getLocalizedCategory(shoe.category, safeLang);
 
@@ -1782,7 +1971,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   </span>
 
                   {inCartPairs > 0 ? (
-                    <span style={{ backgroundColor: THEME.ink, color: '#FFFFFF', padding: '2px 5px', fontSize: '8px', fontWeight: 600 }}>
+                    <span style={{ backgroundColor: THEME.ink, color: THEME.onInk, padding: '2px 5px', fontSize: '8px', fontWeight: 600 }}>
                       {t.inCartBadge(inCartPairs)}
                     </span>
                   ) : (
@@ -1792,15 +1981,16 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   )}
                 </div>
 
+                {/* Контейнер изображения с фиксированным соотношением и внутренними отступами для ботинок */}
                 <div
                   style={{
                     width: '100%',
-                    height: isLarge ? '200px' : '125px',
-                    padding: '6px',
+                    height: isLarge ? '210px' : '136px',
+                    padding: isLarge ? '14px 18px' : '10px 12px',
                     boxSizing: 'border-box',
                     marginBottom: '8px',
                     overflow: 'hidden',
-                    backgroundColor: cardBg,
+                    backgroundColor: stageBg,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1811,11 +2001,12 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                     alt={`Модель ${shoe.modelNumber}`}
                     loading="lazy"
                     style={{
+                      width: '100%',
+                      height: '100%',
                       maxWidth: '100%',
-                      maxHeight: isLarge ? '184px' : '112px',
-                      width: 'auto',
-                      height: 'auto',
+                      maxHeight: '100%',
                       objectFit: 'contain',
+                      objectPosition: 'center center',
                       display: 'block',
                       margin: '0 auto',
                       mixBlendMode: 'multiply',
@@ -2011,7 +2202,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 letterSpacing: '1.2px',
                 textTransform: 'uppercase',
                 fontWeight: 600,
-                color: '#FFFFFF',
+                color: THEME.onInk,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
@@ -2043,15 +2234,15 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             left: 0,
             right: 0,
             backgroundColor: THEME.ink,
-            color: '#FFFFFF',
+            color: THEME.onInk,
             padding: '12px 16px',
             zIndex: 900,
-            borderTop: `1px solid ${THEME.ink}`,
+            borderTop: `1px solid ${THEME.border}`,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: '#A09C94' }}>
+              <div style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: THEME.onInkMuted }}>
                 {t.bottomOrderTitle}
               </div>
               <div style={{ fontFamily: THEME.serif, fontSize: '16px', marginTop: '1px' }}>
