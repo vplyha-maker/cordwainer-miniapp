@@ -13,6 +13,8 @@ export type ManagerContact = {
 
 type ManagersContactCardProps = {
   lang?: Lang;
+  theme?: 'light' | 'dark';
+  isDark?: boolean;
   itemsCount?: number;
   onSendOrder?: (manager: {
     id: string;
@@ -94,7 +96,7 @@ const MANAGERS: ManagerContact[] = [
 const COOLDOWN_STORAGE_KEY = 'cardio_b2b_send_cooldown_v1';
 const COOLDOWN_SECONDS = 60;
 
-const THEME = {
+const LIGHT_THEME = {
   bg: '#F2EFE9',
   surface: '#F8F6F1',
   surfaceActive: '#EAE5DC',
@@ -104,9 +106,66 @@ const THEME = {
   border: '#DCD7CC',
   accentGreen: '#1E4620',
   danger: '#9E2A2B',
+  dangerBg: '#FDF2F2',
+  primaryBtnBg: '#161514',
+  primaryBtnText: '#FFFFFF',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
+
+const DARK_THEME = {
+  bg: '#0E0E0E',
+  surface: '#161616',
+  surfaceActive: '#22211F',
+  ink: '#F2EFE9',
+  inkMuted: '#9E988E',
+  inkLight: '#6E6A63',
+  border: '#2C2A27',
+  accentGreen: '#2E6F32',
+  danger: '#E05A5B',
+  dangerBg: '#2A1415',
+  primaryBtnBg: '#F2EFE9',
+  primaryBtnText: '#141413',
+  serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
+  sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
+};
+
+function detectDarkMode(propTheme?: 'light' | 'dark', propIsDark?: boolean): boolean {
+  if (typeof propIsDark === 'boolean') return propIsDark;
+  if (propTheme === 'dark') return true;
+  if (propTheme === 'light') return false;
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const html = document.documentElement;
+    const body = document.body;
+    if (
+      html.classList.contains('dark') ||
+      body.classList.contains('dark') ||
+      html.getAttribute('data-theme') === 'dark' ||
+      body.getAttribute('data-theme') === 'dark'
+    ) {
+      return true;
+    }
+    if (
+      html.classList.contains('light') ||
+      body.classList.contains('light') ||
+      html.getAttribute('data-theme') === 'light' ||
+      body.getAttribute('data-theme') === 'light'
+    ) {
+      return false;
+    }
+
+    const keys = ['cardio_theme', 'app_theme', 'theme'];
+    for (const k of keys) {
+      const val = localStorage.getItem(k);
+      if (val === 'dark') return true;
+      if (val === 'light') return false;
+    }
+  } catch {}
+
+  return false;
+}
 
 export function triggerHaptic(style: HapticStyle = 'light'): void {
   try {
@@ -217,6 +276,8 @@ function resolveActiveLang(propLang?: Lang): Lang {
 
 export function ManagersContactCard({
   lang,
+  theme,
+  isDark: propIsDark,
   itemsCount = 0,
   onSendOrder,
   onCopyInvoice,
@@ -226,6 +287,41 @@ export function ManagersContactCard({
   onValidationFail,
 }: ManagersContactCardProps) {
   const safeLang: Lang = resolveActiveLang(lang);
+  const [darkActive, setDarkActive] = useState<boolean>(() =>
+    detectDarkMode(theme, propIsDark)
+  );
+
+  useEffect(() => {
+    setDarkActive(detectDarkMode(theme, propIsDark));
+  }, [theme, propIsDark]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncTheme = () => setDarkActive(detectDarkMode(theme, propIsDark));
+
+    window.addEventListener('storage', syncTheme);
+    window.addEventListener('cardio-theme-change', syncTheme);
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    });
+    if (document.body) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme'],
+      });
+    }
+
+    return () => {
+      window.removeEventListener('storage', syncTheme);
+      window.removeEventListener('cardio-theme-change', syncTheme);
+      observer.disconnect();
+    };
+  }, [theme, propIsDark]);
+
+  const THEME = darkActive ? DARK_THEME : LIGHT_THEME;
 
   const t = {
     ru: {
@@ -412,7 +508,7 @@ export function ManagersContactCard({
   const spamLockSeconds = Math.max(0, Math.ceil((spamBlockedUntil - nowTick) / 1000));
 
   return (
-    <div style={{ fontFamily: THEME.sans, color: THEME.ink }}>
+    <div style={{ fontFamily: THEME.sans, color: THEME.ink, transition: 'color 0.2s ease' }}>
       <input
         type="text"
         name="company_fax_bot_trap"
@@ -452,7 +548,7 @@ export function ManagersContactCard({
       {isSpamLocked && (
         <div
           style={{
-            backgroundColor: '#FDF2F2',
+            backgroundColor: THEME.dangerBg,
             border: `1px solid ${THEME.danger}`,
             color: THEME.danger,
             padding: '10px 12px',
@@ -540,7 +636,7 @@ export function ManagersContactCard({
                 border: `1px solid ${isConfirmingThis ? THEME.ink : THEME.border}`,
                 padding: '14px',
                 boxSizing: 'border-box',
-                transition: 'border-color 0.2s ease',
+                transition: 'border-color 0.2s ease, background-color 0.2s ease',
               }}
             >
               <div
@@ -679,9 +775,9 @@ export function ManagersContactCard({
                       style={{
                         width: '100%',
                         padding: '12px 12px',
-                        backgroundColor: isOnCooldown ? THEME.surfaceActive : THEME.ink,
-                        color: isOnCooldown ? THEME.accentGreen : '#FFFFFF',
-                        border: `1px solid ${isOnCooldown ? THEME.accentGreen : THEME.ink}`,
+                        backgroundColor: isOnCooldown ? THEME.surfaceActive : THEME.primaryBtnBg,
+                        color: isOnCooldown ? THEME.accentGreen : THEME.primaryBtnText,
+                        border: `1px solid ${isOnCooldown ? THEME.accentGreen : THEME.primaryBtnBg}`,
                         cursor:
                           isOnCooldown || isAnySending || isSpamLocked
                             ? 'not-allowed'
