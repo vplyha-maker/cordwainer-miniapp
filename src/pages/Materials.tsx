@@ -1,13 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  cardioCatalog, 
-  getLocalizedCategory, 
-  getLocalizedColor, 
-  getLocalizedFeature, 
-  type ShoeCategory, 
-  type ShoeItem, 
-  type CartItem, 
-  type SizeKey 
+import {
+  cardioCatalog,
+  getLocalizedCategory,
+  getLocalizedColor,
+  getLocalizedFeature,
+  type ShoeCategory,
+  type ShoeItem,
+  type CartItem,
+  type SizeKey,
 } from '../data/catalog';
 import { WholesaleCart } from '../components/WholesaleCart';
 import type { Lang } from '../App';
@@ -15,6 +15,8 @@ import type { Lang } from '../App';
 type MaterialsProps = {
   onBack?: () => void;
   lang?: Lang;
+  theme?: 'light' | 'dark';
+  isDark?: boolean;
 };
 
 const CATEGORIES: ('Все' | ShoeCategory)[] = ['Все', 'Ботинки', 'Кроссовки', 'Туфли'];
@@ -26,7 +28,7 @@ const STANDARD_8_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 2, 43: 2, 44
 const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1, 45: 1 };
 
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
-const THEME_STORAGE_KEY = 'cardio_theme';
+const THEME_STORAGE_KEYS = ['theme', 'app_theme', 'cardio_theme'] as const;
 
 const HERO_VIDEO_SRC = '/logo%281%29.mp4';
 const FOOTER_BANNER_SRC = '/baner.jpg';
@@ -51,15 +53,15 @@ const LIGHT_THEME = {
 };
 
 const DARK_THEME = {
-  bg: '#0E0E10',
-  surface: '#17171A',
-  surfaceActive: '#232328',
-  cardInCart: '#1E2420',
+  bg: '#0A0A0A',
+  surface: '#141416',
+  surfaceActive: '#222226',
+  cardInCart: '#1A221C',
   imageStage: '#E6E1D8',
   imageStageActive: '#DAD4C8',
   ink: '#F4EFE6',
-  inkMuted: '#A19D95',
-  inkLight: '#75716A',
+  inkMuted: '#A1A1AA',
+  inkLight: '#71717A',
   onInk: '#121214',
   onInkMuted: '#4A4742',
   border: '#2C2C30',
@@ -87,14 +89,42 @@ function getTgWebApp(): TgWebApp | undefined {
   return (window as unknown as { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
 }
 
-export function getInitialIsDark(): boolean {
+/**
+ * Читает активную тему из главного приложения (HTML-класс .dark, data-theme или localStorage настроек)
+ */
+export function getInitialIsDark(propTheme?: 'light' | 'dark', propIsDark?: boolean): boolean {
+  if (typeof propIsDark === 'boolean') return propIsDark;
+  if (propTheme === 'dark') return true;
+  if (propTheme === 'light') return false;
   if (typeof window === 'undefined') return false;
+
+  const root = document.documentElement;
+  const body = document.body;
+  if (
+    root.classList.contains('dark') ||
+    body?.classList.contains('dark') ||
+    root.getAttribute('data-theme') === 'dark' ||
+    body?.getAttribute('data-theme') === 'dark'
+  ) {
+    return true;
+  }
+  if (
+    root.classList.contains('light') ||
+    body?.classList.contains('light') ||
+    root.getAttribute('data-theme') === 'light' ||
+    body?.getAttribute('data-theme') === 'light'
+  ) {
+    return false;
+  }
+
   try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem('theme');
-    if (saved === 'dark') return true;
-    if (saved === 'light') return false;
+    for (const key of THEME_STORAGE_KEYS) {
+      const saved = localStorage.getItem(key);
+      if (saved === 'dark') return true;
+      if (saved === 'light') return false;
+    }
   } catch {}
-  if (document.documentElement.classList.contains('dark')) return true;
+
   const tgScheme = getTgWebApp()?.colorScheme;
   if (tgScheme === 'dark') return true;
   if (tgScheme === 'light') return false;
@@ -103,69 +133,82 @@ export function getInitialIsDark(): boolean {
 
 export function applyAppTheme(dark: boolean, saveToStorage = true) {
   if (typeof window === 'undefined') return;
+  const mode = dark ? 'dark' : 'light';
   const root = document.documentElement;
+  const body = document.body;
+
   root.classList.toggle('dark', dark);
-  root.style.colorScheme = dark ? 'dark' : 'light';
+  root.classList.toggle('light', !dark);
+  root.setAttribute('data-theme', mode);
+  root.style.colorScheme = mode;
+
+  if (body) {
+    body.classList.toggle('dark', dark);
+    body.classList.toggle('light', !dark);
+    body.setAttribute('data-theme', mode);
+  }
 
   if (saveToStorage) {
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, dark ? 'dark' : 'light');
-      localStorage.setItem('theme', dark ? 'dark' : 'light');
+      for (const key of THEME_STORAGE_KEYS) {
+        localStorage.setItem(key, mode);
+      }
     } catch {}
   }
 
   try {
     const tg = getTgWebApp();
-    const bgHex = dark ? '#0E0E10' : '#F2EFE9';
+    const bgHex = dark ? '#0A0A0A' : '#F2EFE9';
     tg?.setBackgroundColor?.(bgHex);
     tg?.setHeaderColor?.(bgHex);
   } catch {}
 
-  window.dispatchEvent(new CustomEvent('cardio-theme-change', { detail: { isDark: dark } }));
+  window.dispatchEvent(new CustomEvent('cardio-theme-change', { detail: { isDark: dark, theme: mode } }));
 }
 
-export function useCardioTheme() {
-  const [isDark, setIsDark] = useState<boolean>(() => getInitialIsDark());
+export function useCardioTheme(propTheme?: 'light' | 'dark', propIsDark?: boolean) {
+  const [isDark, setIsDark] = useState<boolean>(() => getInitialIsDark(propTheme, propIsDark));
 
   useEffect(() => {
-    applyAppTheme(isDark, false);
-  }, [isDark]);
+    setIsDark(getInitialIsDark(propTheme, propIsDark));
+  }, [propTheme, propIsDark]);
 
   useEffect(() => {
+    const syncFromApp = () => {
+      const next = getInitialIsDark(propTheme, propIsDark);
+      setIsDark((prev) => (prev !== next ? next : prev));
+    };
+
     const onCustomTheme = (e: Event) => {
-      const custom = e as CustomEvent<{ isDark: boolean }>;
+      const custom = e as CustomEvent<{ isDark?: boolean; theme?: string }>;
       if (typeof custom.detail?.isDark === 'boolean') {
         setIsDark(custom.detail.isDark);
+      } else {
+        syncFromApp();
       }
     };
 
-    const observer = new MutationObserver(() => {
-      const domDark = document.documentElement.classList.contains('dark');
-      setIsDark((prev) => (prev !== domDark ? domDark : prev));
+    const observer = new MutationObserver(syncFromApp);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    if (document.body) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme'],
+      });
+    }
 
-    const tg = getTgWebApp();
-    const onTgThemeChanged = () => {
-      try {
-        const manual = localStorage.getItem(THEME_STORAGE_KEY);
-        if (!manual && tg?.colorScheme) {
-          const nextDark = tg.colorScheme === 'dark';
-          applyAppTheme(nextDark, false);
-          setIsDark(nextDark);
-        }
-      } catch {}
-    };
-
+    window.addEventListener('storage', syncFromApp);
     window.addEventListener('cardio-theme-change', onCustomTheme);
-    tg?.onEvent?.('themeChanged', onTgThemeChanged);
 
     return () => {
       observer.disconnect();
+      window.removeEventListener('storage', syncFromApp);
       window.removeEventListener('cardio-theme-change', onCustomTheme);
-      tg?.offEvent?.('themeChanged', onTgThemeChanged);
     };
-  }, []);
+  }, [propTheme, propIsDark]);
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -255,9 +298,9 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
   } catch {}
 }
 
-export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
+export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: MaterialsProps) {
   const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
-  const { isDark, toggleTheme, THEME } = useCardioTheme();
+  const { isDark, THEME } = useCardioTheme(theme, propIsDark);
 
   const t = {
     ru: {
@@ -372,7 +415,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       addedSuccess: '✓ Zur Rechnung hinzugefügt',
       addToCart: 'Zur Rechnung hinzufügen',
       mainPageBtn: '← Startseite',
-      searchPlaceholder: 'Modellnummer oder Farbe...',
+      searchPlaceholder: 'Modellnummer или Farbe...',
       searchLabel: 'Suche:',
       found: (n: number) => `GEFUNDEN: ${n}`,
       grid2Col: '2 SPALTEN',
@@ -426,7 +469,9 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       getTgWebApp()?.ready?.();
     } catch {}
 
-    const unlockAudio = () => { getAudioContext(); };
+    const unlockAudio = () => {
+      getAudioContext();
+    };
     window.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
     window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
     return () => {
@@ -449,7 +494,10 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
     const tryPlay = () => {
       if (!videoEl) return;
       videoEl.muted = true;
-      videoEl.play().then(() => setIsVideoReady(true)).catch(() => setIsVideoReady(true));
+      videoEl
+        .play()
+        .then(() => setIsVideoReady(true))
+        .catch(() => setIsVideoReady(true));
     };
 
     tryPlay();
@@ -473,7 +521,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
         if (initialBannerTopRef.current === null) {
           initialBannerTopRef.current = rect.top + Math.max(0, pageScrollY);
         }
-        const rawScrolled = pageScrollY > 0 ? pageScrollY : Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
+        const rawScrolled =
+          pageScrollY > 0 ? pageScrollY : Math.max(0, (initialBannerTopRef.current || 0) - rect.top);
         const maxScroll = 320;
         const clamped = Math.max(0, Math.min(maxScroll, rawScrolled));
         const progress = clamped / maxScroll;
@@ -641,6 +690,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
       <WholesaleCart
         items={cart}
         lang={safeLang}
+        isDark={isDark}
+        theme={isDark ? 'dark' : 'light'}
         onUpdateQuantity={(uid, newBoxes) => {
           if (newBoxes < 1) return;
           fireHaptic('medium');
@@ -693,18 +744,19 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
           transition: 'background-color 0.2s ease, color 0.2s ease',
         }}
       >
+        {/* Шапка карточки модели без лишней кнопки темы, чтобы кнопки Каталог и Накладная никогда не слипались */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '8px',
+            gap: '12px',
             paddingBottom: '12px',
             marginBottom: '20px',
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <img
               src="/logo.png"
               alt="Cardio"
@@ -713,7 +765,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 setSelectedShoe(null);
               }}
               style={{
-                height: '34px',
+                height: '32px',
                 width: 'auto',
                 objectFit: 'contain',
                 mixBlendMode: isDark ? 'screen' : 'multiply',
@@ -732,7 +784,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               style={{
                 backgroundColor: THEME.surface,
                 border: `1px solid ${THEME.ink}`,
-                padding: '8px 10px',
+                padding: '8px 12px',
                 fontSize: '10px',
                 letterSpacing: '0.8px',
                 textTransform: 'uppercase',
@@ -741,7 +793,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 fontWeight: 600,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
                 touchAction: 'manipulation',
@@ -752,56 +804,29 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => {
-                fireHaptic('light');
-                toggleTheme();
-              }}
-              aria-label="Toggle theme"
-              style={{
-                backgroundColor: THEME.surface,
-                border: `1px solid ${THEME.border}`,
-                width: '32px',
-                height: '32px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '13px',
-                color: THEME.ink,
-                cursor: 'pointer',
-                flexShrink: 0,
-                touchAction: 'manipulation',
-              }}
-            >
-              {isDark ? '☀' : '☾'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                fireHaptic('medium');
-                setIsCartOpen(true);
-              }}
-              style={{
-                backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
-                border: `1px solid ${THEME.ink}`,
-                padding: '8px 12px',
-                fontSize: '10px',
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                cursor: 'pointer',
-                color: cart.length > 0 ? THEME.onInk : THEME.ink,
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                touchAction: 'manipulation',
-              }}
-            >
-              {t.invoiceBtn(cartTotalPairs)}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              fireHaptic('medium');
+              setIsCartOpen(true);
+            }}
+            style={{
+              backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
+              border: `1px solid ${THEME.ink}`,
+              padding: '8px 14px',
+              fontSize: '10px',
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              cursor: 'pointer',
+              color: cart.length > 0 ? THEME.onInk : THEME.ink,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              touchAction: 'manipulation',
+            }}
+          >
+            {t.invoiceBtn(cartTotalPairs)}
+          </button>
         </div>
 
         {alreadyInCartPairs > 0 && (
@@ -820,9 +845,7 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               color: THEME.ink,
             }}
           >
-            <span>
-              {t.alreadyInCart(alreadyInCartPairs)}
-            </span>
+            <span>{t.alreadyInCart(alreadyInCartPairs)}</span>
             <span
               onClick={() => {
                 fireHaptic('medium');
@@ -854,7 +877,9 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               marginBottom: '6px',
             }}
           >
-            <span>{t.cardTitle} // {getLocalizedCategory(selectedShoe.category, safeLang)}</span>
+            <span>
+              {t.cardTitle} // {getLocalizedCategory(selectedShoe.category, safeLang)}
+            </span>
             <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', textTransform: 'none', fontSize: '12px' }}>
               Арт. № {selectedShoe.modelNumber}
             </span>
@@ -916,7 +941,6 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             </span>
           </div>
 
-          {/* Студийный подиум с гарантированным запасом воздуха по вертикали и горизонтали */}
           <div
             style={{
               width: '100%',
@@ -1168,7 +1192,11 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 }}
               >
                 <span style={{ fontSize: '12px', color: THEME.inkMuted, fontStyle: 'italic', fontFamily: THEME.serif }}>
-                  {safeLang === 'de' ? 'Kisteninhalt (40–45):' : safeLang === 'uk' ? 'Комплектація короба (40–45):' : 'Комплектация короба (40–45):'}
+                  {safeLang === 'de'
+                    ? 'Kisteninhalt (40–45):'
+                    : safeLang === 'uk'
+                    ? 'Комплектація короба (40–45):'
+                    : 'Комплектация короба (40–45):'}
                 </span>
                 <span
                   style={{
@@ -1183,10 +1211,22 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   }}
                 >
                   {isStandard8
-                    ? (safeLang === 'de' ? 'Standard (8 P.)' : safeLang === 'uk' ? 'Стандарт (8 пар)' : 'Стандарт (8 пар)')
+                    ? safeLang === 'de'
+                      ? 'Standard (8 P.)'
+                      : safeLang === 'uk'
+                      ? 'Стандарт (8 пар)'
+                      : 'Стандарт (8 пар)'
                     : isEven6
-                    ? (safeLang === 'de' ? 'Gleich (6 P.)' : safeLang === 'uk' ? 'Рівна (6 пар)' : 'Ровная (6 пар)')
-                    : (safeLang === 'de' ? `Eigen (${pairsPerBox} P.)` : safeLang === 'uk' ? `Своя (${pairsPerBox} пар)` : `Своя (${pairsPerBox} пар)`)}
+                    ? safeLang === 'de'
+                      ? 'Gleich (6 P.)'
+                      : safeLang === 'uk'
+                      ? 'Рівна (6 пар)'
+                      : 'Ровная (6 пар)'
+                    : safeLang === 'de'
+                    ? `Eigen (${pairsPerBox} P.)`
+                    : safeLang === 'uk'
+                    ? `Своя (${pairsPerBox} пар)`
+                    : `Своя (${pairsPerBox} пар)`}
                 </span>
               </div>
 
@@ -1587,31 +1627,32 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          <button
-            type="button"
-            onClick={() => {
-              fireHaptic('light');
-              toggleTheme();
-            }}
-            aria-label="Toggle theme"
-            style={{
-              backgroundColor: THEME.surface,
-              border: `1px solid ${THEME.border}`,
-              width: '30px',
-              height: '30px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-              color: THEME.ink,
-              cursor: 'pointer',
-              flexShrink: 0,
-              touchAction: 'manipulation',
-            }}
-          >
-            {isDark ? '☀' : '☾'}
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          {cart.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                fireHaptic('medium');
+                setIsCartOpen(true);
+              }}
+              style={{
+                backgroundColor: THEME.ink,
+                border: `1px solid ${THEME.ink}`,
+                padding: '7px 11px',
+                fontSize: '9px',
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                cursor: 'pointer',
+                color: THEME.onInk,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                touchAction: 'manipulation',
+              }}
+            >
+              {t.invoiceBtn(cartTotalPairs)}
+            </button>
+          )}
 
           {onBack && (
             <button
@@ -1656,10 +1697,26 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
             zIndex: 3,
           }}
         >
-          <span style={{ fontSize: '8px', letterSpacing: '1.6px', textTransform: 'uppercase', color: THEME.inkMuted, fontWeight: 600 }}>
+          <span
+            style={{
+              fontSize: '8px',
+              letterSpacing: '1.6px',
+              textTransform: 'uppercase',
+              color: THEME.inkMuted,
+              fontWeight: 600,
+            }}
+          >
             ● MOTION LOOKBOOK
           </span>
-          <span style={{ fontSize: '8px', letterSpacing: '1.5px', textTransform: 'uppercase', color: THEME.inkMuted, fontWeight: 600 }}>
+          <span
+            style={{
+              fontSize: '8px',
+              letterSpacing: '1.5px',
+              textTransform: 'uppercase',
+              color: THEME.inkMuted,
+              fontWeight: 600,
+            }}
+          >
             CARDIO // 40—45
           </span>
         </div>
@@ -1701,7 +1758,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               left: 0,
               width: '65%',
               height: '100%',
-              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.36) 50%, rgba(255,255,255,0) 100%)',
+              background:
+                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.36) 50%, rgba(255,255,255,0) 100%)',
               mixBlendMode: 'overlay',
               pointerEvents: 'none',
               opacity: 0.14,
@@ -1779,7 +1837,14 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                 fireHaptic('light');
                 setSearchQuery('');
               }}
-              style={{ background: 'none', border: 'none', color: THEME.inkMuted, cursor: 'pointer', fontSize: '12px', padding: '4px' }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: THEME.inkMuted,
+                cursor: 'pointer',
+                fontSize: '12px',
+                padding: '4px',
+              }}
             >
               ✕
             </button>
@@ -1971,7 +2036,15 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   </span>
 
                   {inCartPairs > 0 ? (
-                    <span style={{ backgroundColor: THEME.ink, color: THEME.onInk, padding: '2px 5px', fontSize: '8px', fontWeight: 600 }}>
+                    <span
+                      style={{
+                        backgroundColor: THEME.ink,
+                        color: THEME.onInk,
+                        padding: '2px 5px',
+                        fontSize: '8px',
+                        fontWeight: 600,
+                      }}
+                    >
                       {t.inCartBadge(inCartPairs)}
                     </span>
                   ) : (
@@ -1981,7 +2054,6 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
                   )}
                 </div>
 
-                {/* Контейнер изображения с фиксированным соотношением и внутренними отступами для ботинок */}
                 <div
                   style={{
                     width: '100%',
@@ -2016,17 +2088,41 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontFamily: THEME.serif, fontSize: isLarge ? '26px' : '19px', fontWeight: 400, color: THEME.ink }}>
+                    <span
+                      style={{
+                        fontFamily: THEME.serif,
+                        fontSize: isLarge ? '26px' : '19px',
+                        fontWeight: 400,
+                        color: THEME.ink,
+                      }}
+                    >
                       № {shoe.modelNumber}
                     </span>
                     {shoe.variant && (
-                      <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: isLarge ? '13px' : '11px', color: THEME.inkMuted }}>
+                      <span
+                        style={{
+                          fontFamily: THEME.serif,
+                          fontStyle: 'italic',
+                          fontSize: isLarge ? '13px' : '11px',
+                          color: THEME.inkMuted,
+                        }}
+                      >
                         {shoe.variant}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ fontSize: isLarge ? '11px' : '10px', color: THEME.inkMuted, textTransform: 'uppercase', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div
+                    style={{
+                      fontSize: isLarge ? '11px' : '10px',
+                      color: THEME.inkMuted,
+                      textTransform: 'uppercase',
+                      marginTop: '2px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     {translatedColor}
                   </div>
 
@@ -2130,7 +2226,8 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
               left: 0,
               width: '65%',
               height: '100%',
-              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.34) 50%, rgba(255,255,255,0) 100%)',
+              background:
+                'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,244,214,0.34) 50%, rgba(255,255,255,0) 100%)',
               mixBlendMode: 'overlay',
               pointerEvents: 'none',
               opacity: 0.12,
@@ -2242,7 +2339,14 @@ export function Materials({ onBack, lang = 'ru' }: MaterialsProps) {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '9px', letterSpacing: '1.4px', textTransform: 'uppercase', color: THEME.onInkMuted }}>
+              <div
+                style={{
+                  fontSize: '9px',
+                  letterSpacing: '1.4px',
+                  textTransform: 'uppercase',
+                  color: THEME.onInkMuted,
+                }}
+              >
                 {t.bottomOrderTitle}
               </div>
               <div style={{ fontFamily: THEME.serif, fontSize: '16px', marginTop: '1px' }}>
