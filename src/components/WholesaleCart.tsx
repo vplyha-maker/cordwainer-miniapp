@@ -353,8 +353,8 @@ function isMatchingCityLabel(query: string, city: CityOption): boolean {
 }
 
 /**
- * Статично позиционированная кнопка очистки (не меняет ширину input при появлении,
- * благодаря чему Android WebView не теряет GPU-текстуру поля во время набора).
+ * Изолированная кнопка очистки: встроена внутрь обертки поля ввода, 
+ * не создает вертикальных линий и жестко привязана к правому краю.
  */
 function ClearFieldButton({
   visible,
@@ -388,11 +388,11 @@ function ClearFieldButton({
       }}
       style={{
         position: 'absolute',
-        right: '4px',
-        top: isTextarea ? '6px' : '50%',
+        right: '8px',
+        top: isTextarea ? '10px' : '50%',
         transform: isTextarea ? 'none' : 'translateY(-50%)',
-        width: '32px',
-        height: '32px',
+        width: '30px',
+        height: '30px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -400,7 +400,7 @@ function ClearFieldButton({
         cursor: visible ? 'pointer' : 'default',
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? 'auto' : 'none',
-         zIndex: 4,
+        zIndex: 5,
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
         userSelect: 'none',
@@ -1127,10 +1127,6 @@ export function WholesaleCart({
     }
   };
 
-  /**
-   * Прямой непрозрачный стиль самого input/textarea с аппаратным слоем translateZ(0).
-   * Исключает исчезание рамки и текста при открытии клавиатуры Samsung в Android WebView.
-   */
   const getSolidInputStyle = (isValid: boolean, isFocused: boolean): CSSProperties => {
     const hasError = showValidationErrors && !isValid;
     const borderColor = hasError
@@ -1142,9 +1138,10 @@ export function WholesaleCart({
 
     return {
       display: 'block',
-      width: '100%',
+      width: '100vw',
+      maxWidth: '100%',
       boxSizing: 'border-box',
-      padding: '11px 38px 11px 12px',
+      padding: '11px 44px 11px 12px',
       border: `1.5px solid ${borderColor}`,
       backgroundColor: bgColor,
       color: THEME.ink,
@@ -1163,8 +1160,6 @@ export function WholesaleCart({
       WebkitTransform: 'translateZ(0)',
       backfaceVisibility: 'hidden',
       WebkitBackfaceVisibility: 'hidden',
-      position: 'relative',
-      zIndex: 2,
     };
   };
 
@@ -1634,7 +1629,7 @@ export function WholesaleCart({
               {/* 1. Город */}
               <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '10px' }}>
                 {renderFieldHeader(t.labelCity, cityQuery, activeField === 'city')}
-                <div style={{ position: 'relative', width: '100%' }}>
+                <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
                   <input
                     ref={cityInputRef}
                     className="wc-solid-input"
@@ -1718,7 +1713,7 @@ export function WholesaleCart({
               {/* 2. Имя и Фамилия */}
               <div style={{ marginBottom: '10px' }}>
                 {renderFieldHeader(t.labelName, clientName, activeField === 'name')}
-                <div style={{ position: 'relative', width: '100%' }}>
+                <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
                   <input
                     ref={nameInputRef}
                     className="wc-solid-input"
@@ -1748,7 +1743,7 @@ export function WholesaleCart({
               {/* 3. Телефон */}
               <div style={{ marginBottom: '10px' }}>
                 {renderFieldHeader(t.labelPhone, clientPhone, activeField === 'phone')}
-                <div style={{ position: 'relative', width: '100%' }}>
+                <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
                   <input
                     ref={phoneInputRef}
                     className="wc-solid-input"
@@ -1784,7 +1779,7 @@ export function WholesaleCart({
               {/* 4. Отделение / Адрес */}
               <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '10px' }}>
                 {renderFieldHeader(t.labelWarehouse, branchOrComment, activeField === 'warehouse')}
-                <div style={{ position: 'relative', width: '100%' }}>
+                <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
                   <input
                     ref={warehouseInputRef}
                     className="wc-solid-input"
@@ -1865,7 +1860,7 @@ export function WholesaleCart({
               {/* 5. Комментарий */}
               <div style={{ marginBottom: '12px' }}>
                 {renderFieldHeader(t.labelComment, orderComment, activeField === 'comment')}
-                <div style={{ position: 'relative', width: '100%' }}>
+                <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
                   <textarea
                     ref={commentInputRef}
                     className="wc-solid-input"
