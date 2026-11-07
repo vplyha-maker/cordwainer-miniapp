@@ -63,10 +63,17 @@
 }
 
 @layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   html,
   body,
   #root {
-    height: 100%;
     min-height: 100%;
     min-height: 100dvh;
     margin: 0;
@@ -81,7 +88,36 @@
     color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+  }
+
+  /* Глобальная защита всех полей ввода в приложении (Android / iOS Telegram WebView) */
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+    color: var(--color-ink);
+    caret-color: var(--color-ink);
+    -webkit-text-fill-color: var(--color-ink);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-muted);
+    -webkit-text-fill-color: var(--color-muted);
+    opacity: 0.85;
+  }
+
+  /* Блокировка системной перекраски фона при автозаполнении в мобильном WebView */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-ink) !important;
+    caret-color: var(--color-ink) !important;
+    transition: background-color 5000s ease-in-out 0s;
   }
 
   .focus-visible:focus-visible {
@@ -292,7 +328,10 @@ html.perf-fast body {
   }
 
   .calc-result-card {
-    padding: 1.5rem !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
   }
 
   .calc-page-title {
