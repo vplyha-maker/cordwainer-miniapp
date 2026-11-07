@@ -346,6 +346,10 @@ function isMatchingCityLabel(query: string, city: CityOption): boolean {
   return candidates.some((label) => label.toLowerCase() === q);
 }
 
+/**
+ * Использован <div> с role="button" вместо <button>, чтобы глобальные CSS-правила
+ * для button в проекте не растягивали кнопку на всю высоту родительского блока.
+ */
 function ClearFieldButton({
   onClear,
   isTextarea = false,
@@ -357,7 +361,7 @@ function ClearFieldButton({
   ariaLabel?: string;
   themePalette: ThemePalette;
 }) {
-  const handleTrigger = (e: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>) => {
+  const handleTrigger = (e: ReactPointerEvent<HTMLDivElement> | ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     triggerHaptic('light');
@@ -365,29 +369,26 @@ function ClearFieldButton({
   };
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       aria-label={ariaLabel}
       onPointerDown={handleTrigger}
       onClick={(e) => {
         if (e.detail === 0) handleTrigger(e);
       }}
+      className="wc-clear-btn"
       style={{
-        position: 'static',
-        flexShrink: 0,
+        flex: '0 0 36px',
+        width: '36px',
+        height: '36px',
         alignSelf: isTextarea ? 'flex-start' : 'center',
-        width: '38px',
-        height: '38px',
         marginTop: isTextarea ? '4px' : '0',
         marginRight: '2px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background: 'transparent',
-        backgroundColor: 'transparent',
-        border: 'none',
-        boxShadow: 'none',
-        padding: 0,
         cursor: 'pointer',
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
@@ -396,8 +397,8 @@ function ClearFieldButton({
     >
       <span
         style={{
-          width: '22px',
-          height: '22px',
+          width: '20px',
+          height: '20px',
           borderRadius: '50%',
           backgroundColor: themePalette.surfaceActive,
           border: `1px solid ${themePalette.border}`,
@@ -405,7 +406,7 @@ function ClearFieldButton({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '11px',
+          fontSize: '10px',
           lineHeight: 1,
           fontWeight: 600,
           pointerEvents: 'none',
@@ -413,7 +414,7 @@ function ClearFieldButton({
       >
         ✕
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -638,9 +639,9 @@ export function WholesaleCart({
       citySearchingText: 'Поиск...',
       cityNotFound: 'Не найдено',
       namePlaceholder: '2. Имя и Фамилия получателя *',
-      phonePlaceholder: '3. Телефон получателя: +38 (0XX) XXX-XX-XX *',
+      phonePlaceholder: '3. Телефон: +38 (0XX) XXX-XX-XX *',
       warehouseLoading: 'Загрузка доступных отделений...',
-      warehousePlaceholder: (city: string) => `4. Выберите отделение или введите адрес (${city}) *`,
+      warehousePlaceholder: (city: string) => `4. Выберите отделение или адрес (${city}) *`,
       commentPlaceholder: '5. Комментарий к заказу (необязательно — пожелания по отправке, упаковке или срокам)',
       totalToShip: 'Всего к отгрузке:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
@@ -687,9 +688,9 @@ export function WholesaleCart({
       citySearchingText: 'Пошук...',
       cityNotFound: 'Не знайдено',
       namePlaceholder: '2. Ім’я та Прізвище отримувача *',
-      phonePlaceholder: '3. Телефон отримувача: +38 (0XX) XXX-XX-XX *',
+      phonePlaceholder: '3. Телефон: +38 (0XX) XXX-XX-XX *',
       warehouseLoading: 'Завантаження доступних відділень...',
-      warehousePlaceholder: (city: string) => `4. Виберіть відділення або введіть адресу (${city}) *`,
+      warehousePlaceholder: (city: string) => `4. Виберіть відділення або адресу (${city}) *`,
       commentPlaceholder: '5. Коментар до замовлення (необов’язково — побажання щодо відправки, упаковки чи термінів)',
       totalToShip: 'Всього до відвантаження:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
@@ -738,7 +739,7 @@ export function WholesaleCart({
       namePlaceholder: '2. Vor- und Nachname des Empfängers *',
       phonePlaceholder: '3. Telefon: +38 (0XX) XXX-XX-XX *',
       warehouseLoading: 'Filialen werden geladen...',
-      warehousePlaceholder: (city: string) => `4. Filiale wählen oder Adresse eingeben (${city}) *`,
+      warehousePlaceholder: (city: string) => `4. Filiale wählen oder Adresse (${city}) *`,
       commentPlaceholder: '5. Kommentar zur Bestellung (optional — Wünsche zu Versand oder Verpackung)',
       totalToShip: 'Gesamtmenge:',
       boxesSuffix: (b: number) => `(~${b} Kist.)`,
@@ -805,6 +806,15 @@ export function WholesaleCart({
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
   const warehouseInputRef = useRef<HTMLInputElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const scrollFieldIntoView = (el: HTMLElement | null) => {
+    if (!el) return;
+    setTimeout(() => {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch {}
+    }, 220);
+  };
 
   useEffect(() => {
     setCityQuery((prev) => {
@@ -1101,12 +1111,13 @@ export function WholesaleCart({
 
   const getFieldWrapperStyle = (isValid: boolean, isTextarea = false): CSSProperties => ({
     display: 'flex',
+    flexDirection: 'row',
     alignItems: isTextarea ? 'flex-start' : 'center',
     width: '100%',
     boxSizing: 'border-box',
     border: `1px solid ${showValidationErrors && !isValid ? THEME.danger : THEME.border}`,
     backgroundColor: showValidationErrors && !isValid ? THEME.dangerFieldBg : THEME.surface,
-    transition: 'background-color 0.2s ease, border-color 0.2s ease',
+    transition: 'background-color 0.15s ease, border-color 0.15s ease',
   });
 
   const getInnerInputStyle = (): CSSProperties => ({
@@ -1114,14 +1125,13 @@ export function WholesaleCart({
     minWidth: 0,
     width: '100%',
     boxSizing: 'border-box',
-    padding: '11px 8px 11px 12px',
+    padding: '11px 6px 11px 12px',
     border: 'none',
-    fontSize: '13px',
+    fontSize: '14px',
     backgroundColor: 'transparent',
     color: THEME.ink,
     WebkitTextFillColor: THEME.ink,
     caretColor: THEME.ink,
-    colorScheme: darkActive ? 'dark' : 'light',
     outline: 'none',
     borderRadius: 0,
     fontFamily: THEME.sans,
@@ -1129,11 +1139,11 @@ export function WholesaleCart({
 
   return (
     <div
-      className={darkActive ? 'wholesale-cart-dark' : 'wholesale-cart-light'}
+      className={`wholesale-cart-root ${darkActive ? 'wholesale-cart-dark' : 'wholesale-cart-light'}`}
       style={{
         backgroundColor: THEME.bg,
         minHeight: '100vh',
-        padding: '18px 16px 60px 16px',
+        padding: '18px 16px 90px 16px',
         color: THEME.ink,
         fontFamily: THEME.sans,
         colorScheme: darkActive ? 'dark' : 'light',
@@ -1141,6 +1151,53 @@ export function WholesaleCart({
         transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
+      {/* Жесткая изоляция стилей от внешних CSS-файлов проекта */}
+      <style>{`
+        .wholesale-cart-root input.wc-input,
+        .wholesale-cart-root textarea.wc-input,
+        .wholesale-cart-root input.wc-input:focus,
+        .wholesale-cart-root textarea.wc-input:focus,
+        .wholesale-cart-root input.wc-input:active,
+        .wholesale-cart-root textarea.wc-input:active {
+          background: transparent !important;
+          background-color: transparent !important;
+          color: ${THEME.ink} !important;
+          -webkit-text-fill-color: ${THEME.ink} !important;
+          caret-color: ${THEME.ink} !important;
+          opacity: 1 !important;
+          border: none !important;
+          box-shadow: none !important;
+          outline: none !important;
+          -webkit-appearance: none !important;
+          appearance: none !important;
+        }
+        .wholesale-cart-root input.wc-input::placeholder,
+        .wholesale-cart-root textarea.wc-input::placeholder {
+          color: ${THEME.inkMuted} !important;
+          -webkit-text-fill-color: ${THEME.inkMuted} !important;
+          opacity: 0.85 !important;
+        }
+        .wholesale-cart-root input.wc-input:-webkit-autofill,
+        .wholesale-cart-root input.wc-input:-webkit-autofill:hover,
+        .wholesale-cart-root input.wc-input:-webkit-autofill:focus,
+        .wholesale-cart-root textarea.wc-input:-webkit-autofill {
+          -webkit-text-fill-color: ${THEME.ink} !important;
+          -webkit-box-shadow: 0 0 0px 1000px ${THEME.surface} inset !important;
+          transition: background-color 5000s ease-in-out 0s !important;
+        }
+        .wholesale-cart-root .wc-clear-btn {
+          background: transparent !important;
+          background-color: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          width: 36px !important;
+          min-width: 36px !important;
+          max-width: 36px !important;
+          height: 36px !important;
+          padding: 0 !important;
+        }
+      `}</style>
+
       <div
         style={{
           display: 'flex',
@@ -1152,6 +1209,7 @@ export function WholesaleCart({
         }}
       >
         <button
+          type="button"
           onClick={() => {
             triggerHaptic('light');
             onClose();
@@ -1257,6 +1315,7 @@ export function WholesaleCart({
             {t.emptyText}
           </p>
           <button
+            type="button"
             onClick={() => {
               triggerHaptic('light');
               onClose();
@@ -1523,10 +1582,15 @@ export function WholesaleCart({
                 <div style={getFieldWrapperStyle(isCityValid)}>
                   <input
                     ref={cityInputRef}
+                    className="wc-input"
                     type="text"
+                    autoComplete="off"
                     placeholder={t.cityPlaceholder}
                     value={cityQuery}
-                    onFocus={() => setShowCityDropdown(true)}
+                    onFocus={(e) => {
+                      setShowCityDropdown(true);
+                      scrollFieldIntoView(e.currentTarget);
+                    }}
                     onChange={(e) => {
                       setCityQuery(e.target.value);
                       setShowCityDropdown(true);
@@ -1600,9 +1664,12 @@ export function WholesaleCart({
                 <div style={getFieldWrapperStyle(isNameValid)}>
                   <input
                     ref={nameInputRef}
+                    className="wc-input"
                     type="text"
+                    autoComplete="name"
                     placeholder={t.namePlaceholder}
                     value={clientName}
+                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                     onChange={(e) => setClientName(e.target.value)}
                     style={getInnerInputStyle()}
                   />
@@ -1624,10 +1691,13 @@ export function WholesaleCart({
                 <div style={getFieldWrapperStyle(isPhoneValid)}>
                   <input
                     ref={phoneInputRef}
+                    className="wc-input"
                     type="tel"
                     inputMode="tel"
+                    autoComplete="tel"
                     placeholder={t.phonePlaceholder}
                     value={clientPhone}
+                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                     onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
                     style={getInnerInputStyle()}
                   />
@@ -1654,14 +1724,19 @@ export function WholesaleCart({
                 <div style={getFieldWrapperStyle(isBranchValid)}>
                   <input
                     ref={warehouseInputRef}
+                    className="wc-input"
                     type="text"
+                    autoComplete="off"
                     placeholder={
                       warehousesLoading
                         ? t.warehouseLoading
                         : t.warehousePlaceholder(getLocalizedCityName(selectedCity))
                     }
                     value={branchOrComment}
-                    onFocus={() => setShowWarehouseDropdown(true)}
+                    onFocus={(e) => {
+                      setShowWarehouseDropdown(true);
+                      scrollFieldIntoView(e.currentTarget);
+                    }}
                     onChange={(e) => {
                       setBranchOrComment(e.target.value);
                       setShowWarehouseDropdown(true);
@@ -1728,9 +1803,11 @@ export function WholesaleCart({
                 <div style={getFieldWrapperStyle(true, true)}>
                   <textarea
                     ref={commentInputRef}
+                    className="wc-input"
                     rows={3}
                     placeholder={t.commentPlaceholder}
                     value={orderComment}
+                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                     onChange={(e) => setOrderComment(e.target.value)}
                     style={{
                       ...getInnerInputStyle(),
