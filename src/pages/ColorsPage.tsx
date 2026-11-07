@@ -42,6 +42,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
   } catch {}
 }
+
 /* ============================================================================
    1. RUNNER — ATELIER LUXURY RUNNER (Пропорции: Loro Piana / Loewe)
    ============================================================================ */
@@ -65,57 +66,45 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
       className="w-full h-auto max-h-[225px] md:max-h-[285px] select-none overflow-visible"
     >
       <defs>
-        {/* Контактная тень студийного лукбука */}
         <radialGradient id="lp-floor" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.75' : '0.22'} />
           <stop offset="55%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.07'} />
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        {/* Светотень объема колодки */}
         <linearGradient id="lp-last-volume" x1="15%" y1="0%" x2="25%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.2' : '0.36'} />
           <stop offset="42%" stopColor="#ffffff" stopOpacity="0" />
           <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.48' : '0.26'} />
         </linearGradient>
 
-        {/* Мягкий бархатистый градиент для замшевых деталей */}
         <linearGradient id="lp-suede" x1="0%" y1="0%" x2="80%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.12' : '0.24'} />
           <stop offset="50%" stopColor="#000000" stopOpacity="0.04" />
           <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.4' : '0.22'} />
         </linearGradient>
 
-        {/* Глубокая тень внутри горловины */}
         <linearGradient id="lp-interior" x1="0%" y1="0%" x2="20%" y2="100%">
           <stop offset="0%" stopColor="#000000" stopOpacity="0.18" />
           <stop offset="100%" stopColor="#000000" stopOpacity="0.68" />
         </linearGradient>
 
-        {/* Градиент скульптурной межподошвы */}
         <linearGradient id="lp-midsole" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor={midsoleTop} />
           <stop offset="100%" stopColor={midsoleBottom} />
         </linearGradient>
 
-        {/* Единый герметичный силуэт верха (исключает любые дыры и зазоры) */}
         <clipPath id="lp-upper-clip">
           <path d="M 104 234 C 98 198, 108 156, 126 122 C 132 112, 142 110, 156 114 C 188 120, 224 118, 252 108 C 266 90, 280 76, 296 74 C 312 72, 326 82, 338 98 C 368 134, 408 166, 452 184 C 494 194, 542 200, 574 214 C 588 220, 592 232, 582 242 C 525 250, 420 252, 310 250 C 212 248, 146 242, 104 234 Z" />
         </clipPath>
       </defs>
 
-      {/* Опорная тень */}
       <ellipse cx="342" cy="280" rx="268" ry="14" fill="url(#lp-floor)" />
       <ellipse cx="335" cy="277" rx="210" ry="6" fill="url(#lp-floor)" />
 
-      {/* =====================================================================
-          ВЕРХ ОБУВИ (Собран внутри единого лекала #lp-upper-clip)
-         ===================================================================== */}
-      <g clipPath="url(#lp-upper-clip)" style={{ transition: 'all 0.45s ease' }}>
-        {/* 1. ВНУТРЕННЯЯ ПОДКЛАДКА И СТЕЛЬКА (Tertiary 15% — закрывает всю горловину) */}
+      <g clipPath="url(#lp-upper-clip)">
         <rect x="90" y="65" width="270" height="140" fill={tertiaryColor} />
         <rect x="90" y="65" width="270" height="140" fill="url(#lp-interior)" />
-        {/* Стеганые ребра кожаной подкладки пятки */}
         <path
           d="M 155 110 C 150 130, 150 150, 154 168 M 185 112 C 180 132, 180 152, 184 170 M 215 112 C 210 132, 210 152, 214 170"
           fill="none"
@@ -124,7 +113,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           opacity="0.25"
         />
 
-        {/* 2. АНАТОМИЧЕСКИЙ ЯЗЫЧОК (Secondary 30%) */}
         <path
           d="M 235 165 C 242 122, 265 82, 296 74 C 314 72, 328 82, 340 100 C 368 136, 405 168, 445 186 L 315 205 Z"
           fill={secondaryColor}
@@ -133,7 +121,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 235 165 C 242 122, 265 82, 296 74 C 314 72, 328 82, 340 100 C 368 136, 405 168, 445 186 L 315 205 Z"
           fill="url(#lp-suede)"
         />
-        {/* Жаккардовый фирменный лейбл на язычке (Accent 10%) */}
         <path
           d="M 284 74 L 324 80 L 314 102 L 276 94 Z"
           fill={accentColor}
@@ -141,7 +128,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="1"
         />
 
-        {/* 3. БАЗА ВЕРХА И СОЮЗКА (Secondary 30% — Замша/Нубук) */}
         <path
           d="M 100 135 C 155 152, 202 158, 240 138 L 318 102 L 455 180 L 595 210 L 595 258 L 100 258 Z"
           fill={secondaryColor}
@@ -151,7 +137,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           fill="url(#lp-suede)"
         />
 
-        {/* 4. МЯГКИЙ ВАЛИК ВОРОТНИКА ЩИКОЛОТКИ (Tertiary 15%) */}
         <path
           d="M 122 120 C 156 150, 198 158, 234 140 C 254 130, 268 112, 284 96 L 302 112 C 282 136, 260 158, 228 166 C 188 176, 142 162, 112 138 Z"
           fill={tertiaryColor}
@@ -163,7 +148,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           fill="url(#lp-last-volume)"
         />
 
-        {/* 5. ФИРМЕННЫЙ ДИАГОНАЛЬНЫЙ ШЕВРОН АТЕЛЬЕ (Accent 10%) */}
         <path
           d="M 248 162 L 298 152 L 352 248 L 302 248 Z"
           fill={accentColor}
@@ -178,7 +162,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="0.9"
         />
 
-        {/* 6. АРХИТЕКТУРНАЯ ПЛАНКА ШНУРОВКИ / БЕРЦЫ (Main 60%) */}
         <path
           d="M 236 172 C 258 152, 276 122, 292 98 C 300 88, 312 88, 322 98 C 354 132, 394 164, 442 184 L 424 208 C 388 194, 348 168, 312 132 C 296 154, 278 174, 254 186 Z"
           fill={mainColor}
@@ -197,7 +180,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeDasharray="2.5 2.5"
         />
 
-        {/* 7. НИЗКОПРОФИЛЬНЫЙ ОБТЕКАТЕЛЬ МЫСКА (Mudguard — Main 60%) */}
         <path
           d="M 382 252 C 392 216, 424 196, 468 198 C 512 200, 554 204, 588 216 L 592 254 Z"
           fill={mainColor}
@@ -216,7 +198,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeDasharray="2.5 2.5"
         />
 
-        {/* 8. СКУЛЬПТУРНЫЙ ПЯТОЧНЫЙ СТАКАН (Heel Counter — Main 60%) */}
         <path
           d="M 98 240 L 122 120 C 148 152, 186 174, 224 192 C 238 210, 244 230, 242 252 L 98 252 Z"
           fill={mainColor}
@@ -234,7 +215,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="0.9"
           strokeDasharray="2.5 2.5"
         />
-        {/* Кожаная петля на заднике (Accent 10%) */}
         <path
           d="M 118 118 L 142 118 L 136 146 L 112 142 Z"
           fill={accentColor}
@@ -242,7 +222,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="1"
         />
 
-        {/* Тень стыка верха с подошвой (придает посадку в колодку) */}
         <path
           d="M 104 234 C 146 242, 212 248, 310 250 C 420 252, 525 250, 582 242"
           fill="none"
@@ -252,7 +231,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* ВНЕШНИЙ КОНТУР ВЕРХА И КАНТ ГОРЛОВИНЫ */}
       <path
         d="M 104 234 C 98 198, 108 156, 126 122 C 132 112, 142 110, 156 114 C 188 120, 224 118, 252 108 C 266 90, 280 76, 296 74 C 312 72, 326 82, 338 98 C 368 134, 408 166, 452 184 C 494 194, 542 200, 574 214 C 588 220, 592 232, 582 242 C 525 250, 420 252, 310 250 C 212 248, 146 242, 104 234 Z"
         fill="none"
@@ -260,7 +238,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         strokeWidth="1.4"
         strokeLinejoin="round"
       />
-      {/* Блик по переднему канту выреза щиколотки */}
       <path
         d="M 126 122 C 158 150, 198 158, 234 140 C 254 130, 268 112, 284 96"
         fill="none"
@@ -269,7 +246,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         strokeLinecap="round"
       />
 
-      {/* ЛЮВЕРСЫ И ПЛОСКАЯ ШНУРОВКА */}
       <g>
         {[
           { x1: 312, y1: 112, x2: 338, y2: 98, accent: true },
@@ -306,11 +282,7 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         ))}
       </g>
 
-      {/* =====================================================================
-          МНОГОСЛОЙНАЯ ПОДОШВА С ВЫСТУПАЮЩИМ СПОЙЛЕРОМ (Loro Piana Sole)
-         ===================================================================== */}
-      <g style={{ transition: 'all 0.45s ease' }}>
-        {/* Резиновый протектор с заходом на мысок и пятку (Outsole — Accent 10%) */}
+      <g>
         <path
           d="M 94 264 C 96 273, 110 276, 138 276 L 478 276 C 528 276, 568 266, 592 246 C 596 238, 594 228, 586 224 L 580 232 C 562 254, 522 266, 472 268 L 100 264 Z"
           fill={accentColor}
@@ -319,7 +291,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeLinejoin="round"
         />
 
-        {/* Скульптурная межподошва (Midsole) */}
         <path
           d="M 102 232 C 146 242, 212 248, 310 250 C 420 252, 525 250, 582 240 C 588 246, 588 254, 580 260 C 546 268, 495 270, 440 270 L 102 268 C 92 266, 88 258, 92 246 Z"
           fill="url(#lp-midsole)"
@@ -328,7 +299,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeLinejoin="round"
         />
 
-        {/* Стабилизирующий спойлер в пятке (Tertiary 15%) */}
         <path
           d="M 91 248 L 232 253 C 238 253, 242 257, 240 261 C 238 265, 232 268, 224 268 L 98 267 C 91 264, 89 256, 91 248 Z"
           fill={tertiaryColor}
@@ -336,7 +306,6 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="1.1"
         />
 
-        {/* Архитектурная грань пресс-формы подошвы */}
         <path
           d="M 96 242 C 165 252, 265 256, 390 258 C 475 259, 542 254, 584 244"
           fill="none"
@@ -352,10 +321,10 @@ function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
    2. DERBY — BESPOKE PATINA BROGUE (Пропорции: Berluti / John Lobb)
    ============================================================================ */
 function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0] // 60% — Берцы «лебединая шея», мысок Wingtip, пяточный стакан
-  const secondaryColor = colors[1] // 30% — Полированная союзка (Vamp) и язычок
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Кожаная подкладка, стелька, рант Goodyear
-  const accentColor = colors[colors.length - 1] // 10% — Набойка, профилактика, шнурки, клеймо стельки
+  const mainColor = colors[0]
+  const secondaryColor = colors[1]
+  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1]
+  const accentColor = colors[colors.length - 1]
 
   const outline = isDark ? 'rgba(244, 240, 232, 0.48)' : 'rgba(28, 24, 22, 0.42)'
   const seam = isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(28, 24, 22, 0.25)'
@@ -376,14 +345,12 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        {/* Зеркальный глассаж (Glaçage) и патина на телячьей коже */}
         <linearGradient id="jl-glacage" x1="10%" y1="0%" x2="25%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.25' : '0.42'} />
           <stop offset="36%" stopColor="#ffffff" stopOpacity="0.02" />
           <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.52' : '0.3'} />
         </linearGradient>
 
-        {/* Темный патинированный мысок и пятка (эффект Berluti) */}
         <radialGradient id="jl-toe-burnish" cx="92%" cy="65%" r="35%">
           <stop offset="0%" stopColor="#000000" stopOpacity="0.32" />
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
@@ -400,32 +367,24 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <stop offset="100%" stopColor={soleWaist} />
         </linearGradient>
 
-        {/* Герметичный силуэт верха Дерби */}
         <clipPath id="jl-upper-clip">
           <path d="M 108 242 C 102 206, 110 164, 128 130 C 133 122, 142 120, 155 122 C 192 125, 232 124, 266 116 C 278 98, 294 86, 310 88 C 324 90, 336 102, 348 116 C 380 148, 418 176, 458 190 C 504 202, 554 208, 584 222 C 596 228, 596 240, 586 246 C 535 256, 442 258, 338 256 C 282 255, 244 248, 204 246 L 108 242 Z" />
         </clipPath>
       </defs>
 
-      {/* Опорная тень под каблуком и пучками стопы */}
       <ellipse cx="344" cy="280" rx="262" ry="13" fill="url(#jl-floor)" />
       <ellipse cx="156" cy="279" rx="58" ry="6" fill="url(#jl-floor)" />
       <ellipse cx="455" cy="279" rx="135" ry="7" fill="url(#jl-floor)" />
 
-      {/* =====================================================================
-          ВЕРХ ДЕРБИ (Собран без единого зазора в #jl-upper-clip)
-         ===================================================================== */}
-      <g clipPath="url(#jl-upper-clip)" style={{ transition: 'all 0.45s ease' }}>
-        {/* 1. КОЖАНАЯ ПОДКЛАДКА И СТЕЛЬКА (Tertiary 15% — полностью закрывает вырез) */}
+      <g clipPath="url(#jl-upper-clip)">
         <rect x="95" y="75" width="275" height="125" fill={tertiaryColor} />
         <rect x="95" y="75" width="275" height="125" fill="url(#jl-interior)" />
-        {/* Золотое/акцентное тиснение герба на подпятнике стельки */}
         <path
           d="M 152 132 L 194 136 L 188 148 L 146 144 Z"
           fill={accentColor}
           fillOpacity="0.85"
         />
 
-        {/* 2. ЯЗЫЧОК И СОЮЗКА (Vamp & Tongue — Secondary 30%) */}
         <path
           d="M 230 175 C 242 128, 272 90, 310 88 C 326 90, 338 102, 352 118 C 385 152, 422 178, 462 192 L 598 218 L 598 262 L 220 262 Z"
           fill={secondaryColor}
@@ -435,7 +394,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           fill="url(#jl-glacage)"
         />
 
-        {/* 3. БЕРЦЫ ОТКРЫТОЙ ШНУРОВКИ С ВЫРЕЗОМ SWAN-NECK (Main 60%) */}
         <path
           d="M 124 128 C 160 148, 204 156, 240 142 C 266 132, 282 112, 298 98 C 306 92, 316 92, 326 102 C 356 132, 392 162, 430 180 C 402 198, 386 222, 398 244 L 340 260 L 104 252 L 104 128 Z"
           fill={mainColor}
@@ -446,7 +404,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 124 128 C 160 148, 204 156, 240 142 C 266 132, 282 112, 298 98 C 306 92, 316 92, 326 102 C 356 132, 392 162, 430 180 C 402 198, 386 222, 398 244 L 340 260 L 104 252 L 104 128 Z"
           fill="url(#jl-glacage)"
         />
-        {/* Изящный изгиб двойной строчки «лебединая шея» на берцах */}
         <path
           d="M 304 106 C 334 136, 370 164, 418 182 C 392 200, 378 224, 388 244"
           fill="none"
@@ -454,7 +411,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="0.95"
           strokeDasharray="2.5 2.5"
         />
-        {/* Перфорация вдоль берцев */}
         <g fill={outline} opacity="0.8">
           <circle cx="410" cy="190" r="1.7" />
           <circle cx="399" cy="200" r="1.7" />
@@ -463,7 +419,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <circle cx="393" cy="238" r="1.7" />
         </g>
 
-        {/* 4. КРЫЛОВИДНЫЙ МЫСОК С МЕДАЛЬОНОМ (Wingtip — Main 60%) */}
         <path
           d="M 358 258 C 382 228, 420 204, 464 188 C 472 204, 496 208, 516 196 C 550 204, 580 214, 596 226 L 596 258 Z"
           fill={mainColor}
@@ -485,7 +440,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="0.95"
           strokeDasharray="2.5 2.5"
         />
-        {/* Брогирование крыла и ажурная розетка медальона */}
         <g fill={outline} opacity="0.82">
           <circle cx="380" cy="245" r="1.8" />
           <circle cx="395" cy="233" r="1.8" />
@@ -498,7 +452,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <circle cx="524" cy="208" r="1.8" />
           <circle cx="544" cy="213" r="1.8" />
           <circle cx="564" cy="220" r="1.8" />
-          {/* Розетка медальона */}
           <circle cx="536" cy="232" r="2.3" />
           <circle cx="548" cy="234" r="1.5" />
           <circle cx="524" cy="230" r="1.5" />
@@ -507,7 +460,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <circle cx="560" cy="236" r="1.7" />
         </g>
 
-        {/* 5. ПЯТОЧНЫЙ СТАКАН (Heel Counter — Main 60%) */}
         <path
           d="M 104 244 L 124 132 C 164 154, 202 184, 228 220 C 236 232, 238 242, 236 250 L 104 246 Z"
           fill={mainColor}
@@ -534,7 +486,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <circle cx="220" cy="234" r="1.7" />
         </g>
 
-        {/* Тень посадки верха в рант */}
         <path
           d="M 108 242 L 204 246 C 244 248, 282 255, 338 256 C 442 258, 535 256, 586 246"
           fill="none"
@@ -544,7 +495,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* ВНЕШНИЙ КОНТУР КОЛОДКИ И КАНТ ВЫРЕЗА */}
       <path
         d="M 108 242 C 102 206, 110 164, 128 130 C 133 122, 142 120, 155 122 C 192 125, 232 124, 266 116 C 278 98, 294 86, 310 88 C 324 90, 336 102, 348 116 C 380 148, 418 176, 458 190 C 504 202, 554 208, 584 222 C 596 228, 596 240, 586 246 C 535 256, 442 258, 338 256 C 282 255, 244 248, 204 246 L 108 242 Z"
         fill="none"
@@ -552,7 +502,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         strokeWidth="1.4"
         strokeLinejoin="round"
       />
-      {/* Световая грань кожаного канта горловины */}
       <path
         d="M 128 130 C 162 148, 204 156, 240 142 C 266 132, 282 112, 298 98"
         fill="none"
@@ -561,7 +510,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         strokeLinecap="round"
       />
 
-      {/* ТОНКАЯ ВОЩЕНАЯ ШНУРОВКА (Accent 10%) */}
       <g>
         {[
           { x1: 318, y1: 112, x2: 342, y2: 100 },
@@ -577,17 +525,12 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
               stroke={accentColor}
               strokeWidth="2.6"
               strokeLinecap="round"
-              style={{ transition: 'all 0.45s ease' }}
             />
           </g>
         ))}
       </g>
 
-      {/* =====================================================================
-          РАНТ GOODYEAR, СКОШЕННАЯ ТАЛИЯ FIDDLEBACK И НАБОРНЫЙ КАБЛУК
-         ===================================================================== */}
-      <g style={{ transition: 'all 0.45s ease' }}>
-        {/* Скошенный наборный кожаный каблук (Cuban / Bespoke Pitched Heel) */}
+      <g>
         <path
           d="M 108 246 L 204 249 L 200 271 L 114 271 Z"
           fill="url(#jl-sole-grad)"
@@ -595,10 +538,8 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="1.3"
           strokeLinejoin="round"
         />
-        {/* Слои кожи наборного каблука (Leather Lifts) */}
         <line x1="110" y1="254" x2="203" y2="256" stroke={seam} strokeWidth="0.9" />
         <line x1="112" y1="262" x2="201" y2="263" stroke={seam} strokeWidth="0.9" />
-        {/* Акцентная набойка каблука с уголком Джентльмена (Accent 10%) */}
         <path
           d="M 114 271 L 200 271 L 198 278 L 116 278 Z"
           fill={accentColor}
@@ -607,7 +548,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeLinejoin="round"
         />
 
-        {/* Непрерывная кожаная подошва с узкой талией (без щелей и разрывов!) */}
         <path
           d="M 204 249 C 244 250, 282 257, 338 260 C 442 262, 535 260, 588 250 L 584 260 C 538 270, 445 272, 332 270 C 276 268, 242 257, 202 256 Z"
           fill="url(#jl-sole-grad)"
@@ -616,7 +556,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeLinejoin="round"
         />
 
-        {/* Износостойкая профилактика пучков подошвы (Topy — Accent 10%) */}
         <path
           d="M 312 269 C 425 271, 528 269, 584 260 L 574 269 C 532 276, 448 278, 326 276 Z"
           fill={accentColor}
@@ -625,7 +564,6 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeLinejoin="round"
         />
 
-        {/* Выступающий рант Гудьир с насечкой (Goodyear Welt — Tertiary 15%) */}
         <path
           d="M 105 240 L 204 244 C 244 246, 282 253, 338 255 C 442 257, 535 255, 589 244 L 590 250 C 535 261, 442 263, 338 261 C 282 259, 244 252, 204 250 L 106 246 Z"
           fill={tertiaryColor}
@@ -649,10 +587,10 @@ function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
    3. PUMP — HAUTE COUTURE STILETTO 105mm (Пропорции: Gianvito Rossi / YSL)
    ============================================================================ */
 function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0] // 60% — Скульптурный корпус лодочки
-  const secondaryColor = colors[1] // 30% — Игольчатая шпилька, пяточная чашка и острый мысок-кап
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Внутренняя кожаная стелька и подкладка
-  const accentColor = colors[colors.length - 1] // 10% — Контрастная лакированная подошва, набойка, пряжка
+  const mainColor = colors[0]
+  const secondaryColor = colors[1]
+  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1]
+  const accentColor = colors[colors.length - 1]
 
   const outline = isDark ? 'rgba(244, 240, 232, 0.48)' : 'rgba(28, 24, 22, 0.42)'
   const stitch = isDark ? 'rgba(244, 240, 232, 0.5)' : 'rgba(28, 24, 22, 0.4)'
@@ -670,42 +608,34 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           <stop offset="100%" stopColor="#000000" stopOpacity="0" />
         </radialGradient>
 
-        {/* Шелковый глянец вечерней колодки */}
         <linearGradient id="gr-satin" x1="15%" y1="0%" x2="35%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.26' : '0.45'} />
           <stop offset="40%" stopColor="#ffffff" stopOpacity="0.02" />
           <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.5' : '0.28'} />
         </linearGradient>
 
-        {/* Мягкая внутренняя тень свода стельки */}
         <linearGradient id="gr-footbed-depth" x1="0%" y1="0%" x2="85%" y2="100%">
           <stop offset="0%" stopColor="#000000" stopOpacity="0.1" />
           <stop offset="55%" stopColor="#000000" stopOpacity="0.32" />
           <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
         </linearGradient>
 
-        {/* Цилиндрический блик на тонкой шпильке */}
         <linearGradient id="gr-stiletto" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
           <stop offset="45%" stopColor="#000000" stopOpacity="0" />
           <stop offset="100%" stopColor="#000000" stopOpacity="0.45" />
         </linearGradient>
 
-        {/* Единый лекальный контур внешнего корпуса лодочки */}
         <clipPath id="gr-body-clip">
           <path d="M 152 64 C 130 92, 126 128, 138 156 C 194 168, 250 214, 322 264 C 352 280, 382 282, 422 282 L 502 282 C 538 282, 568 272, 592 254 C 556 238, 496 226, 438 220 C 392 246, 336 236, 278 190 C 222 146, 178 92, 152 64 Z" />
         </clipPath>
       </defs>
 
-      {/* Подиумные тени: точечная под шпилькой, глубокая под мыском и легкая под высоким сводом */}
       <ellipse cx="365" cy="283" rx="238" ry="10" fill="url(#gr-floor)" />
       <ellipse cx="148" cy="281" rx="22" ry="5" fill="url(#gr-floor)" />
       <ellipse cx="475" cy="281" rx="115" ry="7" fill="url(#gr-floor)" />
 
-      {/* =====================================================================
-          1. ИГОЛЬЧАТАЯ ШПИЛЬКА 105 ММ (Stiletto Heel — Secondary 30%)
-         ===================================================================== */}
-      <g style={{ transition: 'all 0.45s ease' }}>
+      <g>
         <path
           d="M 138 154 L 180 168 C 162 192, 154 230, 152 273 L 144 273 C 144 230, 142 188, 138 154 Z"
           fill={secondaryColor}
@@ -717,7 +647,6 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 138 154 L 180 168 C 162 192, 154 230, 152 273 L 144 273 C 144 230, 142 188, 138 154 Z"
           fill="url(#gr-stiletto)"
         />
-        {/* Миниатюрная набойка шпильки (Accent 10%) */}
         <path
           d="M 144 273 L 152 273 L 152 280 L 144 280 Z"
           fill={accentColor}
@@ -726,10 +655,7 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* =====================================================================
-          2. ВНУТРЕННЯЯ ЧАША СТЕЛЬКИ И ДАЛЬНИЙ БОРТ (Insole — Tertiary 15%)
-         ===================================================================== */}
-      <g style={{ transition: 'all 0.45s ease' }}>
+      <g>
         <path
           d="M 152 64 C 186 78, 232 122, 290 168 C 344 210, 396 226, 438 220 L 408 248 C 320 232, 218 156, 148 112 Z"
           fill={tertiaryColor}
@@ -740,7 +666,6 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           d="M 152 64 C 186 78, 232 122, 290 168 C 344 210, 396 226, 438 220 L 408 248 C 320 232, 218 156, 148 112 Z"
           fill="url(#gr-footbed-depth)"
         />
-        {/* Фирменный кожаный подпятник с тиснением на стельке (Accent 10%) */}
         <path
           d="M 176 92 C 198 106, 222 126, 244 146 L 230 158 C 208 138, 184 118, 164 102 Z"
           fill={accentColor}
@@ -750,10 +675,7 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* =====================================================================
-          3. ЛАКИРОВАННАЯ ПОДОШВА ПОД СВОДОМ (Signature Sole — Accent 10%)
-         ===================================================================== */}
-      <g style={{ transition: 'all 0.45s ease' }}>
+      <g>
         <path
           d="M 138 154 C 194 166, 250 212, 322 262 C 352 278, 382 280, 422 280 L 502 280 C 538 280, 568 270, 592 254 L 594 259 C 568 276, 538 285, 502 285 L 420 285 C 380 285, 350 282, 318 266 C 248 218, 192 172, 138 160 Z"
           fill={accentColor}
@@ -763,15 +685,10 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* =====================================================================
-          4. СКУЛЬПТУРНЫЙ КОРПУС, ПЯТОЧНАЯ ЧАШКА И ОСТРЫЙ МЫСОК (#gr-body-clip)
-         ===================================================================== */}
-      <g clipPath="url(#gr-body-clip)" style={{ transition: 'all 0.45s ease' }}>
-        {/* Основной корпус лодочки (Main 60%) */}
+      <g clipPath="url(#gr-body-clip)">
         <rect x="120" y="55" width="480" height="235" fill={mainColor} />
         <rect x="120" y="55" width="480" height="235" fill="url(#gr-satin)" />
 
-        {/* Скульптурная пяточная чашка (Heel Cup — Secondary 30%) */}
         <path
           d="M 120 60 L 166 60 C 188 106, 212 152, 232 204 L 120 190 Z"
           fill={secondaryColor}
@@ -790,7 +707,6 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeDasharray="2.5 2.5"
         />
 
-        {/* Заостренный кутюрный мысок-кап (Pointed Toe Cap — Secondary 30%) */}
         <path
           d="M 468 215 C 482 242, 480 266, 462 288 L 598 288 L 598 215 Z"
           fill={secondaryColor}
@@ -810,7 +726,6 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         />
       </g>
 
-      {/* Внешний бритвенно-четкий контур лодочки и блик по декольте */}
       <path
         d="M 152 64 C 130 92, 126 128, 138 156 C 194 168, 250 214, 322 264 C 352 280, 382 282, 422 282 L 502 282 C 538 282, 568 272, 592 254 C 556 238, 496 226, 438 220 C 392 246, 336 236, 278 190 C 222 146, 178 92, 152 64 Z"
         fill="none"
@@ -826,10 +741,7 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
         strokeLinecap="round"
       />
 
-      {/* =====================================================================
-          5. ЮВЕЛИРНАЯ ПРЯЖКА НА ДЕКОЛЬТЕ МЫСКА (Couture Hardware — Accent 10%)
-         ===================================================================== */}
-      <g style={{ transition: 'all 0.45s ease' }}>
+      <g>
         <path
           d="M 432 214 L 478 222 L 470 240 L 424 231 Z"
           fill={accentColor}
@@ -844,7 +756,6 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
           strokeWidth="0.9"
           strokeLinejoin="round"
         />
-        {/* Блик на грани пряжки */}
         <line
           x1="434"
           y1="216"
@@ -858,14 +769,6 @@ function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
     </svg>
   )
 }
-
-
-        
-
-        
-
-          
-        
 
 /* ============================================================================
    ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ
@@ -891,8 +794,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const wheelRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
-  const rafId = useRef<number | null>(null)
-  const pendingValue = useRef<number | null>(null)
+  const lastHapticHue = useRef(0)
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -1100,7 +1002,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideFootwear:
         '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
       guideTip:
-        'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильніше, ніж здається.',
+        'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильнее, ніж здається.',
     },
     de: {
       title: 'Farben',
@@ -1166,75 +1068,124 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
-  const makeIttenColor = (hue: number, white: number, black: number, satBase = 85): string => {
-    const sat = Math.max(12, Math.min(92, satBase * (1 - white * 0.75) * (1 - black * 0.55)))
-    const light = Math.max(
-      18,
-      Math.min(88, 50 * (1 - black * 0.9) * (1 - white * 0.45) + white * 42)
-    )
-    return `hsl(${((hue % 360) + 360) % 360}, ${sat.toFixed(1)}%, ${light.toFixed(1)}%)`
-  }
+  // Точная колористическая формула Иттена с корректным откликом на ползунки Белого и Черного
+  const makeIttenColor = useCallback(
+    (hue: number, white: number, black: number, satBase = 85): string => {
+      const normHue = ((hue % 360) + 360) % 360
+      const w = Math.max(0, Math.min(1, white))
+      const b = Math.max(0, Math.min(1, black))
 
+      const sat = Math.max(8, Math.min(95, satBase * (1 - w * 0.72) * (1 - b * 0.65)))
+      const baseLight = 50 + w * 38 - b * 36 - w * b * 12
+      const light = Math.max(12, Math.min(90, baseLight))
+
+      return `hsl(${normHue}, ${sat.toFixed(1)}%, ${light.toFixed(1)}%)`
+    },
+    []
+  )
+
+  // Активные углы на круге Иттена для визуализации выбранной схемы
+  const getSchemeHues = useCallback((): number[] => {
+    const h = ((baseHue % 360) + 360) % 360
+    switch (scheme) {
+      case 'monochromatic':
+        return [h]
+      case 'complementary':
+        return [h, (h + 180) % 360]
+      case 'analogous':
+        return [h, (h + 30) % 360, (h + 330) % 360]
+      case 'triadic':
+        return [h, (h + 120) % 360, (h + 240) % 360]
+      case 'split-complementary':
+        return [h, (h + 150) % 360, (h + 210) % 360]
+      case 'tetradic':
+        return [h, (h + 90) % 360, (h + 180) % 360, (h + 270) % 360]
+      case 'rectangular':
+        return [h, (h + 60) % 360, (h + 180) % 360, (h + 240) % 360]
+      default:
+        return [h, (h + 180) % 360]
+    }
+  }, [baseHue, scheme])
+
+  // Генерация гармоничной палитры обуви по законам теории цвета
   const getColors = useCallback((): string[] => {
     const h = ((baseHue % 360) + 360) % 360
 
-    if (scheme === 'monochromatic') {
-      return [
-        makeIttenColor(h, whiteAmount * 0.15, blackAmount * 0.3, 82),
-        makeIttenColor(h, whiteAmount + 0.45, blackAmount * 0.2, 45),
-        makeIttenColor(h, whiteAmount * 0.05, blackAmount + 0.35, 70),
-      ]
-    }
-
     switch (scheme) {
+      case 'monochromatic':
+        // 1 цвет в 3 градациях светлоты и насыщенности (кожа + светлая замша + глубокий акцент)
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount, 84),
+          makeIttenColor(h, Math.min(1, whiteAmount + 0.38), blackAmount * 0.4, 52),
+          makeIttenColor(h, whiteAmount * 0.3, Math.min(1, blackAmount + 0.42), 76),
+        ]
+
       case 'complementary':
+        // 60% основной тон, 30% мягкий родственный тон кожи/замши, 10% противоположный комплементарный удар (180°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.55, blackAmount * 0.45, 78),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.1, blackAmount * 0.15, 88),
+          makeIttenColor(
+            h,
+            Math.min(1, whiteAmount * 0.7 + 0.25),
+            Math.min(1, blackAmount * 0.7 + 0.15),
+            55
+          ),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.45, blackAmount * 0.45, 90),
         ]
+
       case 'analogous':
+        // 3 соседних тона на круге (0°, +30°, -30°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 30) % 360, whiteAmount * 0.6, blackAmount * 0.35, 80),
-          makeIttenColor((h - 30 + 360) % 360, whiteAmount * 0.15, blackAmount * 0.25, 86),
+          makeIttenColor((h + 30) % 360, Math.min(1, whiteAmount * 0.85 + 0.1), blackAmount * 0.85, 76),
+          makeIttenColor((h + 330) % 360, whiteAmount * 0.5, blackAmount * 0.5, 88),
         ]
+
       case 'triadic':
+        // 3 равноудаленных тона через 120° (0°, +120°, +240°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 120) % 360, whiteAmount * 0.55, blackAmount * 0.4, 80),
-          makeIttenColor((h + 240) % 360, whiteAmount * 0.12, blackAmount * 0.2, 86),
+          makeIttenColor((h + 120) % 360, Math.min(1, whiteAmount * 0.8 + 0.12), blackAmount * 0.8, 72),
+          makeIttenColor((h + 240) % 360, whiteAmount * 0.45, blackAmount * 0.45, 88),
         ]
-      case 'tetradic':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 90) % 360, whiteAmount * 0.5 + 0.1, blackAmount * 0.4 + 0.05, 72),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.45 + 0.12, blackAmount * 0.35 + 0.08, 68),
-          makeIttenColor((h + 270) % 360, whiteAmount * 0.08, blackAmount * 0.12, 88),
-        ]
-      case 'rectangular':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 60) % 360, whiteAmount * 0.45 + 0.08, blackAmount * 0.35 + 0.05, 75),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.45 + 0.12, blackAmount * 0.35 + 0.08, 70),
-          makeIttenColor((h + 240) % 360, whiteAmount * 0.08, blackAmount * 0.12, 88),
-        ]
+
       case 'split-complementary':
+        // Основной тон (0°) + два соседних к комплементу (+150° и +210°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 150) % 360, whiteAmount * 0.55, blackAmount * 0.4, 80),
-          makeIttenColor((h + 210) % 360, whiteAmount * 0.12, blackAmount * 0.2, 86),
+          makeIttenColor((h + 150) % 360, Math.min(1, whiteAmount * 0.8 + 0.12), blackAmount * 0.8, 74),
+          makeIttenColor((h + 210) % 360, whiteAmount * 0.45, blackAmount * 0.45, 88),
         ]
+
+      case 'tetradic':
+        // Квадрат: 4 цвета через 90° (0°, +90°, +180°, +270°)
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 90) % 360, Math.min(1, whiteAmount * 0.8 + 0.1), blackAmount * 0.8, 72),
+          makeIttenColor((h + 180) % 360, Math.min(1, whiteAmount * 0.75 + 0.15), blackAmount * 0.75, 68),
+          makeIttenColor((h + 270) % 360, whiteAmount * 0.4, blackAmount * 0.4, 90),
+        ]
+
+      case 'rectangular':
+        // Прямоугольник: две комплементарные пары (0°, +60°, +180°, +240°)
+        return [
+          makeIttenColor(h, whiteAmount, blackAmount, 85),
+          makeIttenColor((h + 60) % 360, Math.min(1, whiteAmount * 0.8 + 0.1), blackAmount * 0.8, 74),
+          makeIttenColor((h + 180) % 360, Math.min(1, whiteAmount * 0.75 + 0.15), blackAmount * 0.75, 70),
+          makeIttenColor((h + 240) % 360, whiteAmount * 0.4, blackAmount * 0.4, 90),
+        ]
+
       default:
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.55, blackAmount * 0.45, 78),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.1, blackAmount * 0.15, 88),
+          makeIttenColor(h, Math.min(1, whiteAmount + 0.25), Math.min(1, blackAmount + 0.15), 55),
+          makeIttenColor((h + 180) % 360, whiteAmount * 0.45, blackAmount * 0.45, 90),
         ]
     }
-  }, [baseHue, whiteAmount, blackAmount, scheme])
+  }, [baseHue, whiteAmount, blackAmount, scheme, makeIttenColor])
 
   const colors = getColors()
+  const schemeHues = getSchemeHues()
   const isTetrad = scheme === 'tetradic' || scheme === 'rectangular'
 
   const wheelBackground = `conic-gradient(
@@ -1254,9 +1205,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     hsl(360, 90%, 50%)
   )`
 
-  const pointerColor = `hsl(${baseHue}, 85%, 50%)`
-
-  const updateFromAngle = useCallback((clientX: number, clientY: number) => {
+  // Безотказное вычисление угла касания/мыши
+  const updateFromClientXY = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
     if (!el) return
 
@@ -1267,38 +1217,77 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     const dy = clientY - cy
 
     let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = (angle + 90 + 360) % 360
+    angle = Math.round((angle + 90 + 360) % 360)
 
-    pendingValue.current = Math.round(angle)
-
-    if (rafId.current === null) {
-      rafId.current = requestAnimationFrame(() => {
-        if (pendingValue.current !== null) {
-          setBaseHue(pendingValue.current)
-          pendingValue.current = null
-        }
-        rafId.current = null
-      })
+    if (Math.abs(angle - lastHapticHue.current) >= 15) {
+      haptic('light')
+      lastHapticHue.current = angle
     }
+
+    setBaseHue(angle)
   }, [])
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  // Глобальная подписка во время перетаскивания (работает даже если палец вышел за пределы круга)
+  useEffect(() => {
+    const onWindowPointerMove = (e: PointerEvent) => {
+      if (!isDragging.current) return
+      updateFromClientXY(e.clientX, e.clientY)
+    }
+
+    const onWindowTouchMove = (e: TouchEvent) => {
+      if (!isDragging.current || !e.touches[0]) return
+      if (e.cancelable) e.preventDefault()
+      updateFromClientXY(e.touches[0].clientX, e.touches[0].clientY)
+    }
+
+    const onWindowEnd = () => {
+      isDragging.current = false
+    }
+
+    window.addEventListener('pointermove', onWindowPointerMove)
+    window.addEventListener('pointerup', onWindowEnd)
+    window.addEventListener('pointercancel', onWindowEnd)
+    window.addEventListener('touchmove', onWindowTouchMove, { passive: false })
+    window.addEventListener('touchend', onWindowEnd)
+    window.addEventListener('touchcancel', onWindowEnd)
+
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove)
+      window.removeEventListener('pointerup', onWindowEnd)
+      window.removeEventListener('pointercancel', onWindowEnd)
+      window.removeEventListener('touchmove', onWindowTouchMove)
+      window.removeEventListener('touchend', onWindowEnd)
+      window.removeEventListener('touchcancel', onWindowEnd)
+    }
+  }, [updateFromClientXY])
+
+  const handleWheelPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDragging.current = true
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    updateFromAngle(e.clientX, e.clientY)
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
+    updateFromClientXY(e.clientX, e.clientY)
   }
 
-  const handlePointerMove = (e: React.PointerEvent) => {
+  const handleWheelPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging.current) return
-    updateFromAngle(e.clientX, e.clientY)
+    updateFromClientXY(e.clientX, e.clientY)
   }
 
-  const handlePointerUp = (e: React.PointerEvent) => {
+  const handleWheelPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     isDragging.current = false
-    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
   }
 
-  const pointerAngle = baseHue
+  const handleWheelTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    isDragging.current = true
+    if (e.touches[0]) {
+      updateFromClientXY(e.touches[0].clientX, e.touches[0].clientY)
+    }
+  }
+
   const ratioLabels = isTetrad
     ? [t.main55, t.secondary20, t.secondary15, t.accent10]
     : [t.main60, t.secondary30, t.accent10]
@@ -1348,6 +1337,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         input[type=range] {
           -webkit-appearance: none;
           background: transparent;
+          touch-action: pan-x;
         }
         input[type=range]::-webkit-slider-runnable-track {
           width: 100%;
@@ -1356,12 +1346,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
-          height: 12px;
-          width: 12px;
+          height: 14px;
+          width: 14px;
           border-radius: 50%;
           background: ${isDark ? '#F4F0E8' : '#1C1816'};
-          margin-top: -5px;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+          margin-top: -6px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+          cursor: pointer;
         }
       `}</style>
 
@@ -1438,30 +1429,51 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               className="relative w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
                 background: wheelBackground,
+                touchAction: 'none',
                 boxShadow: `0 0 0 1px ${
                   isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
                 }, 0 10px 30px rgba(0,0,0,0.15)`,
               }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
+              onPointerDown={handleWheelPointerDown}
+              onPointerMove={handleWheelPointerMove}
+              onPointerUp={handleWheelPointerUp}
+              onPointerCancel={handleWheelPointerUp}
+              onTouchStart={handleWheelTouchStart}
             >
+              {/* Центральная 3D-сфера (pointer-events-none, чтобы не блокировать касания) */}
               <div
-                className="absolute inset-[24%] rounded-full"
+                className="absolute inset-[24%] rounded-full pointer-events-none"
                 style={{
                   background: `radial-gradient(circle at 35% 32%, white 0%, ${colors[0]} 42%, #111 95%)`,
                   boxShadow:
                     'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
                 }}
               />
+
+              {/* Вспомогательные маркеры гармонических углов выбранной схемы */}
+              {schemeHues.slice(1).map((hAngle, idx) => (
+                <div
+                  key={idx}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ transform: `rotate(${hAngle}deg)` }}
+                >
+                  <div
+                    className="absolute top-[7px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border border-white/90 shadow-sm"
+                    style={{ backgroundColor: `hsl(${hAngle}, 85%, 50%)` }}
+                  />
+                </div>
+              ))}
+
+              {/* Главный маркер базового цвета (0°) */}
               <div
-                className="absolute top-1 left-1/2 w-4 h-4 rounded-full border-[1.5px] border-white shadow-md pointer-events-none origin-[50%_86px] md:origin-[50%_106px]"
-                style={{
-                  backgroundColor: pointerColor,
-                  transform: `translateX(-50%) rotate(${pointerAngle}deg)`,
-                }}
-              />
+                className="absolute inset-0 pointer-events-none"
+                style={{ transform: `rotate(${baseHue}deg)` }}
+              >
+                <div
+                  className="absolute top-1 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-[1.5px] border-white shadow-md"
+                  style={{ backgroundColor: `hsl(${baseHue}, 85%, 50%)` }}
+                />
+              </div>
             </div>
             <p className={`mt-6 text-[9px] font-sans tracking-[0.3em] uppercase ${cTextMuted}`}>
               {t.ittenLabel}
@@ -1470,7 +1482,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
           {/* СИЛУЭТЫ ОБУВИ, ПЕРЕКЛЮЧАТЕЛЬ И СВОТЧИ */}
           <div className="flex-1 w-full max-w-md">
-            {/* Переключатель силуэтов обуви */}
             <div className="flex justify-center items-center gap-6 mb-4">
               {SILHOUETTES.map((item) => {
                 const active = silhouette === item.id
@@ -1531,6 +1542,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   step="0.01"
                   value={whiteAmount}
                   onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
+                  className="w-full"
                 />
               </div>
               <div>
@@ -1547,6 +1559,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   step="0.01"
                   value={blackAmount}
                   onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
+                  className="w-full"
                 />
               </div>
             </div>
@@ -1556,7 +1569,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               {colors.map((c, i) => (
                 <div key={i} className="flex flex-col">
                   <div
-                    className={`w-full h-24 mb-3 shadow-sm border ${
+                    className={`w-full h-24 mb-3 shadow-sm border transition-colors duration-200 ${
                       isDark ? 'border-white/10' : 'border-black/5'
                     }`}
                     style={{ backgroundColor: c }}
