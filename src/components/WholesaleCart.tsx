@@ -210,11 +210,13 @@ function translateCatalogText(raw: string | undefined, lang: Lang): string {
 type ThemePalette = {
   bg: string;
   surface: string;
+  fieldBg: string;
   surfaceActive: string;
   ink: string;
   inkMuted: string;
   inkLight: string;
   border: string;
+  focusBorder: string;
   danger: string;
   dangerBg: string;
   dangerFieldBg: string;
@@ -230,14 +232,16 @@ type ThemePalette = {
 const LIGHT_THEME: ThemePalette = {
   bg: '#F2EFE9',
   surface: '#F8F6F1',
+  fieldBg: '#FFFFFF',
   surfaceActive: '#EAE5DC',
   ink: '#161514',
   inkMuted: '#6E6A63',
   inkLight: '#9A958C',
   border: '#DCD7CC',
+  focusBorder: '#161514',
   danger: '#9E2A2B',
   dangerBg: '#FDF2F2',
-  dangerFieldBg: '#FDF6F6',
+  dangerFieldBg: '#FFF5F5',
   accentGreen: '#1E4620',
   successBg: '#EFF5F0',
   primaryBtnBg: '#161514',
@@ -250,14 +254,16 @@ const LIGHT_THEME: ThemePalette = {
 const DARK_THEME: ThemePalette = {
   bg: '#0E0E0E',
   surface: '#161616',
-  surfaceActive: '#22211F',
+  fieldBg: '#1E1E1E',
+  surfaceActive: '#2A2927',
   ink: '#F2EFE9',
   inkMuted: '#9E988E',
   inkLight: '#6E6A63',
-  border: '#2C2A27',
+  border: '#33312E',
+  focusBorder: '#C5A880',
   danger: '#E05A5B',
   dangerBg: '#2A1415',
-  dangerFieldBg: '#241314',
+  dangerFieldBg: '#281516',
   accentGreen: '#2E6F32',
   successBg: '#132615',
   primaryBtnBg: '#F2EFE9',
@@ -347,15 +353,17 @@ function isMatchingCityLabel(query: string, city: CityOption): boolean {
 }
 
 /**
- * Использован <div> с role="button" вместо <button>, чтобы глобальные CSS-правила
- * для button в проекте не растягивали кнопку на всю высоту родительского блока.
+ * Статично позиционированная кнопка очистки (не меняет ширину input при появлении,
+ * благодаря чему Android WebView не теряет GPU-текстуру поля во время набора).
  */
 function ClearFieldButton({
+  visible,
   onClear,
   isTextarea = false,
   ariaLabel = 'Clear',
   themePalette,
 }: {
+  visible: boolean;
   onClear: () => void;
   isTextarea?: boolean;
   ariaLabel?: string;
@@ -364,6 +372,7 @@ function ClearFieldButton({
   const handleTrigger = (e: ReactPointerEvent<HTMLDivElement> | ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!visible) return;
     triggerHaptic('light');
     onClear();
   };
@@ -371,25 +380,27 @@ function ClearFieldButton({
   return (
     <div
       role="button"
-      tabIndex={0}
+      tabIndex={visible ? 0 : -1}
       aria-label={ariaLabel}
       onPointerDown={handleTrigger}
       onClick={(e) => {
         if (e.detail === 0) handleTrigger(e);
       }}
-      className="wc-clear-btn"
       style={{
-        flex: '0 0 36px',
-        width: '36px',
-        height: '36px',
-        alignSelf: isTextarea ? 'flex-start' : 'center',
-        marginTop: isTextarea ? '4px' : '0',
-        marginRight: '2px',
+        position: 'absolute',
+        right: '4px',
+        top: isTextarea ? '6px' : '50%',
+        transform: isTextarea ? 'none' : 'translateY(-50%)',
+        width: '32px',
+        height: '32px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background: 'transparent',
-        cursor: 'pointer',
+        cursor: visible ? 'pointer' : 'default',
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? 'auto' : 'none',
+         zIndex: 4,
         touchAction: 'manipulation',
         WebkitTapHighlightColor: 'transparent',
         userSelect: 'none',
@@ -635,14 +646,19 @@ export function WholesaleCart({
       fillRequired: 'Заполните обязательные поля:',
       cityPrompt: 'Населенный пункт:',
       citySub: 'Выберите город из быстрого списка или начните вводить название любого города, пгт или села:',
-      cityPlaceholder: '1. Начните вводить город, пгт или село *',
+      labelCity: '1. Населенный пункт (город, пгт, село) *',
+      cityPlaceholder: 'Введите название населенного пункта...',
       citySearchingText: 'Поиск...',
       cityNotFound: 'Не найдено',
-      namePlaceholder: '2. Имя и Фамилия получателя *',
-      phonePlaceholder: '3. Телефон: +38 (0XX) XXX-XX-XX *',
+      labelName: '2. Имя и Фамилия получателя *',
+      namePlaceholder: 'Например: Александр Коваленко',
+      labelPhone: '3. Телефон получателя *',
+      phonePlaceholder: '+38 (0XX) XXX-XX-XX',
+      labelWarehouse: '4. Отделение Новой Почты или адрес *',
       warehouseLoading: 'Загрузка доступных отделений...',
-      warehousePlaceholder: (city: string) => `4. Выберите отделение или адрес (${city}) *`,
-      commentPlaceholder: '5. Комментарий к заказу (необязательно — пожелания по отправке, упаковке или срокам)',
+      warehousePlaceholder: (city: string) => `Выберите отделение или адрес (${city})`,
+      labelComment: '5. Комментарий к заказу (необязательно)',
+      commentPlaceholder: 'Пожелания по отправке, упаковке или срокам...',
       totalToShip: 'Всего к отгрузке:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
       deleteTitle: 'Удалить позицию',
@@ -684,14 +700,19 @@ export function WholesaleCart({
       fillRequired: 'Заповніть обов’язкові поля:',
       cityPrompt: 'Населений пункт:',
       citySub: 'Виберіть місто зі швидкого списку або почніть вводити назву будь-якого міста, смт чи села:',
-      cityPlaceholder: '1. Почніть вводити місто, смт чи село *',
+      labelCity: '1. Населений пункт (місто, смт, село) *',
+      cityPlaceholder: 'Почніть вводити назву...',
       citySearchingText: 'Пошук...',
       cityNotFound: 'Не знайдено',
-      namePlaceholder: '2. Ім’я та Прізвище отримувача *',
-      phonePlaceholder: '3. Телефон: +38 (0XX) XXX-XX-XX *',
+      labelName: '2. Ім’я та Прізвище отримувача *',
+      namePlaceholder: 'Наприклад: Олександр Коваленко',
+      labelPhone: '3. Телефон отримувача *',
+      phonePlaceholder: '+38 (0XX) XXX-XX-XX',
+      labelWarehouse: '4. Відділення Нової Пошти або адреса *',
       warehouseLoading: 'Завантаження доступних відділень...',
-      warehousePlaceholder: (city: string) => `4. Виберіть відділення або адресу (${city}) *`,
-      commentPlaceholder: '5. Коментар до замовлення (необов’язково — побажання щодо відправки, упаковки чи термінів)',
+      warehousePlaceholder: (city: string) => `Виберіть відділення або адресу (${city})`,
+      labelComment: '5. Коментар до замовлення (необов’язково)',
+      commentPlaceholder: 'Побажання щодо відправки, упаковки чи термінів...',
       totalToShip: 'Всього до відвантаження:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
       deleteTitle: 'Видалити позицію',
@@ -733,14 +754,19 @@ export function WholesaleCart({
       fillRequired: 'Bitte füllen Sie Pflichtfelder aus:',
       cityPrompt: 'Ortschaft:',
       citySub: 'Wählen Sie eine Stadt aus oder geben Sie den Namen ein:',
-      cityPlaceholder: '1. Stadt, Gemeinde oder Dorf eingeben *',
+      labelCity: '1. Ortschaft (Stadt, Gemeinde, Dorf) *',
+      cityPlaceholder: 'Ortschaft eingeben...',
       citySearchingText: 'Suche...',
       cityNotFound: 'Nicht gefunden',
-      namePlaceholder: '2. Vor- und Nachname des Empfängers *',
-      phonePlaceholder: '3. Telefon: +38 (0XX) XXX-XX-XX *',
+      labelName: '2. Vor- und Nachname des Empfängers *',
+      namePlaceholder: 'z.B. Alexander Kowalenko',
+      labelPhone: '3. Telefon des Empfängers *',
+      phonePlaceholder: '+38 (0XX) XXX-XX-XX',
+      labelWarehouse: '4. Filiale oder Lieferadresse *',
       warehouseLoading: 'Filialen werden geladen...',
-      warehousePlaceholder: (city: string) => `4. Filiale wählen oder Adresse (${city}) *`,
-      commentPlaceholder: '5. Kommentar zur Bestellung (optional — Wünsche zu Versand oder Verpackung)',
+      warehousePlaceholder: (city: string) => `Filiale wählen oder Adresse (${city})`,
+      labelComment: '5. Kommentar zur Bestellung (optional)',
+      commentPlaceholder: 'Wünsche zu Versand oder Verpackung...',
       totalToShip: 'Gesamtmenge:',
       boxesSuffix: (b: number) => `(~${b} Kist.)`,
       deleteTitle: 'Position löschen',
@@ -793,6 +819,7 @@ export function WholesaleCart({
   );
   const [orderComment, setOrderComment] = useState(savedRecipient?.orderComment || '');
   const [showValidationErrors, setShowValidationErrors] = useState(false);
+  const [activeField, setActiveField] = useState<'city' | 'name' | 'phone' | 'warehouse' | 'comment' | null>(null);
 
   const [copied, setCopied] = useState(false);
   const [orderBanner, setOrderBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -806,15 +833,6 @@ export function WholesaleCart({
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
   const warehouseInputRef = useRef<HTMLInputElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const scrollFieldIntoView = (el: HTMLElement | null) => {
-    if (!el) return;
-    setTimeout(() => {
-      try {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch {}
-    }, 220);
-  };
 
   useEffect(() => {
     setCityQuery((prev) => {
@@ -867,7 +885,7 @@ export function WholesaleCart({
   if (!isBranchValid) missingFields.push(safeLang === 'de' ? 'Filiale / Adresse' : safeLang === 'uk' ? '№ відділення / адреса' : '№ отделения / адрес доставки');
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo(0, 0);
     preloadAppSounds();
   }, []);
 
@@ -1000,7 +1018,7 @@ export function WholesaleCart({
   const handleValidationFail = () => {
     triggerHaptic('error');
     setShowValidationErrors(true);
-    logisticsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    logisticsRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
   };
 
   const handleClearCart = () => {
@@ -1109,33 +1127,85 @@ export function WholesaleCart({
     }
   };
 
-  const getFieldWrapperStyle = (isValid: boolean, isTextarea = false): CSSProperties => ({
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: isTextarea ? 'flex-start' : 'center',
-    width: '100%',
-    boxSizing: 'border-box',
-    border: `1px solid ${showValidationErrors && !isValid ? THEME.danger : THEME.border}`,
-    backgroundColor: showValidationErrors && !isValid ? THEME.dangerFieldBg : THEME.surface,
-    transition: 'background-color 0.15s ease, border-color 0.15s ease',
-  });
+  /**
+   * Прямой непрозрачный стиль самого input/textarea с аппаратным слоем translateZ(0).
+   * Исключает исчезание рамки и текста при открытии клавиатуры Samsung в Android WebView.
+   */
+  const getSolidInputStyle = (isValid: boolean, isFocused: boolean): CSSProperties => {
+    const hasError = showValidationErrors && !isValid;
+    const borderColor = hasError
+      ? THEME.danger
+      : isFocused
+      ? THEME.focusBorder
+      : THEME.border;
+    const bgColor = hasError ? THEME.dangerFieldBg : THEME.fieldBg;
 
-  const getInnerInputStyle = (): CSSProperties => ({
-    flex: '1 1 auto',
-    minWidth: 0,
-    width: '100%',
-    boxSizing: 'border-box',
-    padding: '11px 6px 11px 12px',
-    border: 'none',
-    fontSize: '14px',
-    backgroundColor: 'transparent',
-    color: THEME.ink,
-    WebkitTextFillColor: THEME.ink,
-    caretColor: THEME.ink,
-    outline: 'none',
-    borderRadius: 0,
-    fontFamily: THEME.sans,
-  });
+    return {
+      display: 'block',
+      width: '100%',
+      boxSizing: 'border-box',
+      padding: '11px 38px 11px 12px',
+      border: `1.5px solid ${borderColor}`,
+      backgroundColor: bgColor,
+      color: THEME.ink,
+      WebkitTextFillColor: THEME.ink,
+      caretColor: THEME.ink,
+      fontSize: '15px',
+      lineHeight: '20px',
+      fontWeight: 500,
+      fontFamily: THEME.sans,
+      borderRadius: 0,
+      outline: 'none',
+      boxShadow: 'none',
+      WebkitAppearance: 'none',
+      appearance: 'none',
+      transform: 'translateZ(0)',
+      WebkitTransform: 'translateZ(0)',
+      backfaceVisibility: 'hidden',
+      WebkitBackfaceVisibility: 'hidden',
+      position: 'relative',
+      zIndex: 2,
+    };
+  };
+
+  const renderFieldHeader = (label: string, currentValue: string, isFocused: boolean) => (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        gap: '8px',
+        marginBottom: '4px',
+        fontSize: '10px',
+        lineHeight: 1.3,
+      }}
+    >
+      <span
+        style={{
+          color: isFocused ? THEME.ink : THEME.inkMuted,
+          fontWeight: isFocused ? 600 : 500,
+          letterSpacing: '0.3px',
+        }}
+      >
+        {label}
+      </span>
+      {currentValue.trim().length > 0 && (
+        <span
+          style={{
+            color: THEME.ink,
+            fontWeight: 600,
+            fontSize: '11px',
+            maxWidth: '55%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {currentValue}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <div
@@ -1148,53 +1218,37 @@ export function WholesaleCart({
         fontFamily: THEME.sans,
         colorScheme: darkActive ? 'dark' : 'light',
         boxSizing: 'border-box',
-        transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
-      {/* Жесткая изоляция стилей от внешних CSS-файлов проекта */}
       <style>{`
-        .wholesale-cart-root input.wc-input,
-        .wholesale-cart-root textarea.wc-input,
-        .wholesale-cart-root input.wc-input:focus,
-        .wholesale-cart-root textarea.wc-input:focus,
-        .wholesale-cart-root input.wc-input:active,
-        .wholesale-cart-root textarea.wc-input:active {
-          background: transparent !important;
-          background-color: transparent !important;
+        .wholesale-cart-root input.wc-solid-input,
+        .wholesale-cart-root textarea.wc-solid-input,
+        .wholesale-cart-root input.wc-solid-input:focus,
+        .wholesale-cart-root textarea.wc-solid-input:focus,
+        .wholesale-cart-root input.wc-solid-input:active,
+        .wholesale-cart-root textarea.wc-solid-input:active {
           color: ${THEME.ink} !important;
           -webkit-text-fill-color: ${THEME.ink} !important;
           caret-color: ${THEME.ink} !important;
           opacity: 1 !important;
-          border: none !important;
-          box-shadow: none !important;
-          outline: none !important;
+          visibility: visible !important;
           -webkit-appearance: none !important;
           appearance: none !important;
+          transform: translateZ(0) !important;
+          -webkit-transform: translateZ(0) !important;
         }
-        .wholesale-cart-root input.wc-input::placeholder,
-        .wholesale-cart-root textarea.wc-input::placeholder {
-          color: ${THEME.inkMuted} !important;
-          -webkit-text-fill-color: ${THEME.inkMuted} !important;
-          opacity: 0.85 !important;
+        .wholesale-cart-root input.wc-solid-input::placeholder,
+        .wholesale-cart-root textarea.wc-solid-input::placeholder {
+          color: ${THEME.inkLight} !important;
+          -webkit-text-fill-color: ${THEME.inkLight} !important;
+          opacity: 0.9 !important;
         }
-        .wholesale-cart-root input.wc-input:-webkit-autofill,
-        .wholesale-cart-root input.wc-input:-webkit-autofill:hover,
-        .wholesale-cart-root input.wc-input:-webkit-autofill:focus,
-        .wholesale-cart-root textarea.wc-input:-webkit-autofill {
+        .wholesale-cart-root input.wc-solid-input:-webkit-autofill,
+        .wholesale-cart-root input.wc-solid-input:-webkit-autofill:hover,
+        .wholesale-cart-root input.wc-solid-input:-webkit-autofill:focus,
+        .wholesale-cart-root textarea.wc-solid-input:-webkit-autofill {
           -webkit-text-fill-color: ${THEME.ink} !important;
-          -webkit-box-shadow: 0 0 0px 1000px ${THEME.surface} inset !important;
-          transition: background-color 5000s ease-in-out 0s !important;
-        }
-        .wholesale-cart-root .wc-clear-btn {
-          background: transparent !important;
-          background-color: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-          width: 36px !important;
-          min-width: 36px !important;
-          max-width: 36px !important;
-          height: 36px !important;
-          padding: 0 !important;
+          -webkit-box-shadow: 0 0 0px 1000px ${THEME.fieldBg} inset !important;
         }
       `}</style>
 
@@ -1551,7 +1605,7 @@ export function WholesaleCart({
                 {t.citySub}
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '14px' }}>
                 {POPULAR_CITIES.map((city) => {
                   const isSelected = selectedCity.ref === city.ref;
                   return (
@@ -1578,38 +1632,40 @@ export function WholesaleCart({
               </div>
 
               {/* 1. Город */}
-              <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
-                <div style={getFieldWrapperStyle(isCityValid)}>
+              <div ref={cityBoxRef} style={{ position: 'relative', marginBottom: '10px' }}>
+                {renderFieldHeader(t.labelCity, cityQuery, activeField === 'city')}
+                <div style={{ position: 'relative', width: '100%' }}>
                   <input
                     ref={cityInputRef}
-                    className="wc-input"
+                    className="wc-solid-input"
                     type="text"
                     autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder={t.cityPlaceholder}
                     value={cityQuery}
-                    onFocus={(e) => {
+                    onFocus={() => {
+                      setActiveField('city');
                       setShowCityDropdown(true);
-                      scrollFieldIntoView(e.currentTarget);
                     }}
+                    onBlur={() => setActiveField((prev) => (prev === 'city' ? null : prev))}
                     onChange={(e) => {
                       setCityQuery(e.target.value);
                       setShowCityDropdown(true);
                     }}
-                    style={getInnerInputStyle()}
+                    style={getSolidInputStyle(isCityValid, activeField === 'city')}
                   />
-
-                  {cityQuery.length > 0 && (
-                    <ClearFieldButton
-                      ariaLabel={t.clearCityAria}
-                      themePalette={THEME}
-                      onClear={() => {
-                        setCityQuery('');
-                        setCityResults([]);
-                        setShowCityDropdown(true);
-                        cityInputRef.current?.focus();
-                      }}
-                    />
-                  )}
+                  <ClearFieldButton
+                    visible={cityQuery.length > 0}
+                    ariaLabel={t.clearCityAria}
+                    themePalette={THEME}
+                    onClear={() => {
+                      setCityQuery('');
+                      setCityResults([]);
+                      setShowCityDropdown(true);
+                      cityInputRef.current?.focus();
+                    }}
+                  />
                 </div>
 
                 {showCityDropdown && cityQuery.trim().length >= 1 && !isMatchingCityLabel(cityQuery, selectedCity) && (
@@ -1620,14 +1676,14 @@ export function WholesaleCart({
                       left: 0,
                       right: 0,
                       zIndex: 30,
-                      backgroundColor: THEME.surface,
+                      backgroundColor: THEME.fieldBg,
                       border: `1px solid ${THEME.border}`,
                       maxHeight: '220px',
                       overflowY: 'auto',
                       WebkitOverflowScrolling: 'touch',
                       boxShadow: darkActive
-                        ? '0 6px 16px rgba(0,0,0,0.45)'
-                        : '0 6px 16px rgba(0,0,0,0.08)',
+                        ? '0 6px 16px rgba(0,0,0,0.65)'
+                        : '0 6px 16px rgba(0,0,0,0.12)',
                     }}
                   >
                     {citySearching ? (
@@ -1660,57 +1716,63 @@ export function WholesaleCart({
               </div>
 
               {/* 2. Имя и Фамилия */}
-              <div style={{ marginBottom: '8px' }}>
-                <div style={getFieldWrapperStyle(isNameValid)}>
+              <div style={{ marginBottom: '10px' }}>
+                {renderFieldHeader(t.labelName, clientName, activeField === 'name')}
+                <div style={{ position: 'relative', width: '100%' }}>
                   <input
                     ref={nameInputRef}
-                    className="wc-input"
+                    className="wc-solid-input"
                     type="text"
-                    autoComplete="name"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder={t.namePlaceholder}
                     value={clientName}
-                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                    onFocus={() => setActiveField('name')}
+                    onBlur={() => setActiveField((prev) => (prev === 'name' ? null : prev))}
                     onChange={(e) => setClientName(e.target.value)}
-                    style={getInnerInputStyle()}
+                    style={getSolidInputStyle(isNameValid, activeField === 'name')}
                   />
-                  {clientName.length > 0 && (
-                    <ClearFieldButton
-                      ariaLabel={t.clearNameAria}
-                      themePalette={THEME}
-                      onClear={() => {
-                        setClientName('');
-                        nameInputRef.current?.focus();
-                      }}
-                    />
-                  )}
+                  <ClearFieldButton
+                    visible={clientName.length > 0}
+                    ariaLabel={t.clearNameAria}
+                    themePalette={THEME}
+                    onClear={() => {
+                      setClientName('');
+                      nameInputRef.current?.focus();
+                    }}
+                  />
                 </div>
               </div>
 
               {/* 3. Телефон */}
-              <div style={{ marginBottom: '8px' }}>
-                <div style={getFieldWrapperStyle(isPhoneValid)}>
+              <div style={{ marginBottom: '10px' }}>
+                {renderFieldHeader(t.labelPhone, clientPhone, activeField === 'phone')}
+                <div style={{ position: 'relative', width: '100%' }}>
                   <input
                     ref={phoneInputRef}
-                    className="wc-input"
+                    className="wc-solid-input"
                     type="tel"
                     inputMode="tel"
-                    autoComplete="tel"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder={t.phonePlaceholder}
                     value={clientPhone}
-                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                    onFocus={() => setActiveField('phone')}
+                    onBlur={() => setActiveField((prev) => (prev === 'phone' ? null : prev))}
                     onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
-                    style={getInnerInputStyle()}
+                    style={getSolidInputStyle(isPhoneValid, activeField === 'phone')}
                   />
-                  {clientPhone.length > 0 && (
-                    <ClearFieldButton
-                      ariaLabel={t.clearPhoneAria}
-                      themePalette={THEME}
-                      onClear={() => {
-                        setClientPhone('');
-                        phoneInputRef.current?.focus();
-                      }}
-                    />
-                  )}
+                  <ClearFieldButton
+                    visible={clientPhone.length > 0}
+                    ariaLabel={t.clearPhoneAria}
+                    themePalette={THEME}
+                    onClear={() => {
+                      setClientPhone('');
+                      phoneInputRef.current?.focus();
+                    }}
+                  />
                 </div>
                 {phoneValidation.errorHint && (showValidationErrors || clientPhone.length >= 7) && (
                   <div style={{ fontSize: '10px', color: THEME.danger, marginTop: '4px', lineHeight: 1.3 }}>
@@ -1720,41 +1782,43 @@ export function WholesaleCart({
               </div>
 
               {/* 4. Отделение / Адрес */}
-              <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
-                <div style={getFieldWrapperStyle(isBranchValid)}>
+              <div ref={warehouseBoxRef} style={{ position: 'relative', marginBottom: '10px' }}>
+                {renderFieldHeader(t.labelWarehouse, branchOrComment, activeField === 'warehouse')}
+                <div style={{ position: 'relative', width: '100%' }}>
                   <input
                     ref={warehouseInputRef}
-                    className="wc-input"
+                    className="wc-solid-input"
                     type="text"
                     autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder={
                       warehousesLoading
                         ? t.warehouseLoading
                         : t.warehousePlaceholder(getLocalizedCityName(selectedCity))
                     }
                     value={branchOrComment}
-                    onFocus={(e) => {
+                    onFocus={() => {
+                      setActiveField('warehouse');
                       setShowWarehouseDropdown(true);
-                      scrollFieldIntoView(e.currentTarget);
                     }}
+                    onBlur={() => setActiveField((prev) => (prev === 'warehouse' ? null : prev))}
                     onChange={(e) => {
                       setBranchOrComment(e.target.value);
                       setShowWarehouseDropdown(true);
                     }}
-                    style={getInnerInputStyle()}
+                    style={getSolidInputStyle(isBranchValid, activeField === 'warehouse')}
                   />
-
-                  {branchOrComment.length > 0 && (
-                    <ClearFieldButton
-                      ariaLabel={t.clearWarehouseAria}
-                      themePalette={THEME}
-                      onClear={() => {
-                        setBranchOrComment('');
-                        setShowWarehouseDropdown(true);
-                        warehouseInputRef.current?.focus();
-                      }}
-                    />
-                  )}
+                  <ClearFieldButton
+                    visible={branchOrComment.length > 0}
+                    ariaLabel={t.clearWarehouseAria}
+                    themePalette={THEME}
+                    onClear={() => {
+                      setBranchOrComment('');
+                      setShowWarehouseDropdown(true);
+                      warehouseInputRef.current?.focus();
+                    }}
+                  />
                 </div>
 
                 {showWarehouseDropdown && filteredWarehouses.length > 0 && (
@@ -1765,14 +1829,14 @@ export function WholesaleCart({
                       left: 0,
                       right: 0,
                       zIndex: 25,
-                      backgroundColor: THEME.surface,
+                      backgroundColor: THEME.fieldBg,
                       border: `1px solid ${THEME.border}`,
                       maxHeight: '210px',
                       overflowY: 'auto',
                       WebkitOverflowScrolling: 'touch',
                       boxShadow: darkActive
-                        ? '0 6px 16px rgba(0,0,0,0.45)'
-                        : '0 6px 16px rgba(0,0,0,0.08)',
+                        ? '0 6px 16px rgba(0,0,0,0.65)'
+                        : '0 6px 16px rgba(0,0,0,0.12)',
                     }}
                   >
                     {filteredWarehouses.map((w) => (
@@ -1800,33 +1864,37 @@ export function WholesaleCart({
 
               {/* 5. Комментарий */}
               <div style={{ marginBottom: '12px' }}>
-                <div style={getFieldWrapperStyle(true, true)}>
+                {renderFieldHeader(t.labelComment, orderComment, activeField === 'comment')}
+                <div style={{ position: 'relative', width: '100%' }}>
                   <textarea
                     ref={commentInputRef}
-                    className="wc-input"
+                    className="wc-solid-input"
                     rows={3}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     placeholder={t.commentPlaceholder}
                     value={orderComment}
-                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                    onFocus={() => setActiveField('comment')}
+                    onBlur={() => setActiveField((prev) => (prev === 'comment' ? null : prev))}
                     onChange={(e) => setOrderComment(e.target.value)}
                     style={{
-                      ...getInnerInputStyle(),
+                      ...getSolidInputStyle(true, activeField === 'comment'),
                       resize: 'vertical',
                       minHeight: '68px',
-                      lineHeight: 1.4,
+                      lineHeight: '1.4',
                     }}
                   />
-                  {orderComment.length > 0 && (
-                    <ClearFieldButton
-                      isTextarea
-                      ariaLabel={t.clearCommentAria}
-                      themePalette={THEME}
-                      onClear={() => {
-                        setOrderComment('');
-                        commentInputRef.current?.focus();
-                      }}
-                    />
-                  )}
+                  <ClearFieldButton
+                    visible={orderComment.length > 0}
+                    isTextarea
+                    ariaLabel={t.clearCommentAria}
+                    themePalette={THEME}
+                    onClear={() => {
+                      setOrderComment('');
+                      commentInputRef.current?.focus();
+                    }}
+                  />
                 </div>
               </div>
 
