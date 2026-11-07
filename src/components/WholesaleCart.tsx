@@ -18,6 +18,8 @@ import type { Lang } from '../App';
 type WholesaleCartProps = {
   items: CartItem[];
   lang: Lang;
+  theme?: 'light' | 'dark';
+  isDark?: boolean;
   onUpdateQuantity: (uid: string, newBoxesCount: number) => void;
   onRemove: (uid: string) => void;
   onClear: () => void;
@@ -211,7 +213,27 @@ function translateCatalogText(raw: string | undefined, lang: Lang): string {
     .join('');
 }
 
-const THEME = {
+type ThemePalette = {
+  bg: string;
+  surface: string;
+  surfaceActive: string;
+  ink: string;
+  inkMuted: string;
+  inkLight: string;
+  border: string;
+  danger: string;
+  dangerBg: string;
+  dangerFieldBg: string;
+  accentGreen: string;
+  successBg: string;
+  primaryBtnBg: string;
+  primaryBtnText: string;
+  photoBg: string;
+  serif: string;
+  sans: string;
+};
+
+const LIGHT_THEME: ThemePalette = {
   bg: '#F2EFE9',
   surface: '#F8F6F1',
   surfaceActive: '#EAE5DC',
@@ -220,10 +242,73 @@ const THEME = {
   inkLight: '#9A958C',
   border: '#DCD7CC',
   danger: '#9E2A2B',
+  dangerBg: '#FDF2F2',
+  dangerFieldBg: '#FDF6F6',
   accentGreen: '#1E4620',
+  successBg: '#EFF5F0',
+  primaryBtnBg: '#161514',
+  primaryBtnText: '#FFFFFF',
+  photoBg: '#F2EFE9',
   serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
   sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
 };
+
+const DARK_THEME: ThemePalette = {
+  bg: '#0E0E0E',
+  surface: '#161616',
+  surfaceActive: '#22211F',
+  ink: '#F2EFE9',
+  inkMuted: '#9E988E',
+  inkLight: '#6E6A63',
+  border: '#2C2A27',
+  danger: '#E05A5B',
+  dangerBg: '#2A1415',
+  dangerFieldBg: '#241314',
+  accentGreen: '#2E6F32',
+  successBg: '#132615',
+  primaryBtnBg: '#F2EFE9',
+  primaryBtnText: '#141413',
+  photoBg: '#EAE5DC',
+  serif: '"Playfair Display", "Cormorant Garamond", Georgia, serif',
+  sans: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif',
+};
+
+function detectDarkMode(propTheme?: 'light' | 'dark', propIsDark?: boolean): boolean {
+  if (typeof propIsDark === 'boolean') return propIsDark;
+  if (propTheme === 'dark') return true;
+  if (propTheme === 'light') return false;
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const html = document.documentElement;
+    const body = document.body;
+    if (
+      html.classList.contains('dark') ||
+      body.classList.contains('dark') ||
+      html.getAttribute('data-theme') === 'dark' ||
+      body.getAttribute('data-theme') === 'dark'
+    ) {
+      return true;
+    }
+    if (
+      html.classList.contains('light') ||
+      body.classList.contains('light') ||
+      html.getAttribute('data-theme') === 'light' ||
+      body.getAttribute('data-theme') === 'light'
+    ) {
+      return false;
+    }
+
+    const keys = ['cardio_theme', 'app_theme', 'theme'];
+    for (const k of keys) {
+      const val = localStorage.getItem(k);
+      if (val === 'dark') return true;
+      if (val === 'light') return false;
+    }
+  } catch {}
+
+  return false;
+}
 
 type InvoiceMeta = {
   invoiceNumber: string;
@@ -271,10 +356,12 @@ function ClearFieldButton({
   onClear,
   isTextarea = false,
   ariaLabel = 'Clear',
+  themePalette,
 }: {
   onClear: () => void;
   isTextarea?: boolean;
   ariaLabel?: string;
+  themePalette: ThemePalette;
 }) {
   const handleTrigger = (e: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -317,9 +404,9 @@ function ClearFieldButton({
           width: '22px',
           height: '22px',
           borderRadius: '50%',
-          backgroundColor: THEME.surfaceActive,
-          border: `1px solid ${THEME.border}`,
-          color: THEME.ink,
+          backgroundColor: themePalette.surfaceActive,
+          border: `1px solid ${themePalette.border}`,
+          color: themePalette.ink,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -487,8 +574,52 @@ function loadSavedRecipient(): SavedRecipientData | null {
   }
 }
 
-export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear, onClose }: WholesaleCartProps) {
+export function WholesaleCart({
+  items,
+  lang,
+  theme,
+  isDark: propIsDark,
+  onUpdateQuantity,
+  onRemove,
+  onClear,
+  onClose,
+}: WholesaleCartProps) {
   const safeLang: Lang = resolveActiveLang(lang);
+  const [darkActive, setDarkActive] = useState<boolean>(() =>
+    detectDarkMode(theme, propIsDark)
+  );
+
+  useEffect(() => {
+    setDarkActive(detectDarkMode(theme, propIsDark));
+  }, [theme, propIsDark]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncTheme = () => setDarkActive(detectDarkMode(theme, propIsDark));
+
+    window.addEventListener('storage', syncTheme);
+    window.addEventListener('cardio-theme-change', syncTheme);
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    });
+    if (document.body) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme'],
+      });
+    }
+
+    return () => {
+      window.removeEventListener('storage', syncTheme);
+      window.removeEventListener('cardio-theme-change', syncTheme);
+      observer.disconnect();
+    };
+  }, [theme, propIsDark]);
+
+  const THEME = darkActive ? DARK_THEME : LIGHT_THEME;
 
   const t = {
     ru: {
@@ -980,27 +1111,29 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
     padding: '11px 46px 11px 12px',
     border: `1px solid ${showValidationErrors && !isValid ? THEME.danger : THEME.border}`,
     fontSize: '13px',
-    backgroundColor: showValidationErrors && !isValid ? '#FDF6F6' : THEME.surface,
+    backgroundColor: showValidationErrors && !isValid ? THEME.dangerFieldBg : THEME.surface,
     color: THEME.ink,
     WebkitTextFillColor: THEME.ink,
     caretColor: THEME.ink,
-    colorScheme: 'light',
+    colorScheme: darkActive ? 'dark' : 'light',
     outline: 'none',
     borderRadius: 0,
     fontFamily: THEME.sans,
+    transition: 'background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease',
   });
 
   return (
     <div
-      className="wholesale-cart-light"
+      className={darkActive ? 'wholesale-cart-dark' : 'wholesale-cart-light'}
       style={{
         backgroundColor: THEME.bg,
         minHeight: '100vh',
         padding: '18px 16px 60px 16px',
         color: THEME.ink,
         fontFamily: THEME.sans,
-        colorScheme: 'light',
+        colorScheme: darkActive ? 'dark' : 'light',
         boxSizing: 'border-box',
+        transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
       <div
@@ -1125,8 +1258,8 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
             }}
             style={{
               padding: '12px 24px',
-              backgroundColor: THEME.ink,
-              color: '#FFFFFF',
+              backgroundColor: THEME.primaryBtnBg,
+              color: THEME.primaryBtnText,
               border: 'none',
               fontSize: '10px',
               letterSpacing: '1.4px',
@@ -1172,7 +1305,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: THEME.bg,
+                      backgroundColor: THEME.photoBg,
                       border: `1px solid ${THEME.border}`,
                     }}
                   >
@@ -1331,7 +1464,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
               {showValidationErrors && !isFormValid && (
                 <div
                   style={{
-                    backgroundColor: '#FDF2F2',
+                    backgroundColor: THEME.dangerBg,
                     border: `1px solid ${THEME.danger}`,
                     color: THEME.danger,
                     padding: '8px 10px',
@@ -1365,9 +1498,9 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                       style={{
                         padding: '6px 10px',
                         fontSize: '10px',
-                        border: `1px solid ${isSelected ? THEME.ink : THEME.border}`,
-                        backgroundColor: isSelected ? THEME.ink : THEME.bg,
-                        color: isSelected ? '#FFFFFF' : THEME.ink,
+                        border: `1px solid ${isSelected ? THEME.primaryBtnBg : THEME.border}`,
+                        backgroundColor: isSelected ? THEME.primaryBtnBg : THEME.bg,
+                        color: isSelected ? THEME.primaryBtnText : THEME.ink,
                         cursor: 'pointer',
                         letterSpacing: '0.5px',
                         fontWeight: isSelected ? 600 : 400,
@@ -1397,6 +1530,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 {cityQuery.length > 0 && (
                   <ClearFieldButton
                     ariaLabel={t.clearCityAria}
+                    themePalette={THEME}
                     onClear={() => {
                       setCityQuery('');
                       setCityResults([]);
@@ -1419,7 +1553,9 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                       maxHeight: '220px',
                       overflowY: 'auto',
                       WebkitOverflowScrolling: 'touch',
-                      boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+                      boxShadow: darkActive
+                        ? '0 6px 16px rgba(0,0,0,0.45)'
+                        : '0 6px 16px rgba(0,0,0,0.08)',
                     }}
                   >
                     {citySearching ? (
@@ -1463,6 +1599,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 {clientName.length > 0 && (
                   <ClearFieldButton
                     ariaLabel={t.clearNameAria}
+                    themePalette={THEME}
                     onClear={() => {
                       setClientName('');
                       nameInputRef.current?.focus();
@@ -1485,6 +1622,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                   {clientPhone.length > 0 && (
                     <ClearFieldButton
                       ariaLabel={t.clearPhoneAria}
+                      themePalette={THEME}
                       onClear={() => {
                         setClientPhone('');
                         phoneInputRef.current?.focus();
@@ -1520,6 +1658,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 {branchOrComment.length > 0 && (
                   <ClearFieldButton
                     ariaLabel={t.clearWarehouseAria}
+                    themePalette={THEME}
                     onClear={() => {
                       setBranchOrComment('');
                       setShowWarehouseDropdown(true);
@@ -1541,7 +1680,9 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                       maxHeight: '210px',
                       overflowY: 'auto',
                       WebkitOverflowScrolling: 'touch',
-                      boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+                      boxShadow: darkActive
+                        ? '0 6px 16px rgba(0,0,0,0.45)'
+                        : '0 6px 16px rgba(0,0,0,0.08)',
                     }}
                   >
                     {filteredWarehouses.map((w) => (
@@ -1585,6 +1726,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                   <ClearFieldButton
                     isTextarea
                     ariaLabel={t.clearCommentAria}
+                    themePalette={THEME}
                     onClear={() => {
                       setOrderComment('');
                       commentInputRef.current?.focus();
@@ -1630,7 +1772,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
                 marginBottom: '16px',
                 padding: '12px 14px',
                 border: `1px solid ${orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger}`,
-                backgroundColor: orderBanner.type === 'success' ? '#EFF5F0' : '#FDF2F2',
+                backgroundColor: orderBanner.type === 'success' ? THEME.successBg : THEME.dangerBg,
                 color: orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger,
                 fontSize: '12px',
                 fontWeight: 600,
@@ -1643,6 +1785,7 @@ export function WholesaleCart({ items, lang, onUpdateQuantity, onRemove, onClear
           <div className="managers-contact-scope">
             <ManagersContactCard
               lang={safeLang}
+              isDark={darkActive}
               itemsCount={items.length}
               onSendOrder={sendToManager}
               onCopyInvoice={copyInvoice}
