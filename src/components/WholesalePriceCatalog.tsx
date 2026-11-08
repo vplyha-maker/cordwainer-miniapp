@@ -102,10 +102,13 @@ function getTelegramUserInfo(): { id?: number; label: string } {
   return { label: 'CONFIDENTIAL B2B PARTNER EDITION' };
 }
 
-/**
- * Сборка многостраничного PDF из массива JPEG DataURL
- */
-function buildPdfBase64FromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.28, pageHeightPt = 841.89): string {
+function buildPdfBase64FromJpegPages(
+  jpegDataUrls: string[],
+  imgW: number,
+  imgH: number,
+  pageWidthPt = 595.28,
+  pageHeightPt = 841.89
+): string {
   const encoder = new TextEncoder();
   const chunks: Uint8Array[] = [];
   const offsets: number[] = [0];
@@ -159,8 +162,6 @@ function buildPdfBase64FromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.2
       imgBytes[k] = binaryStr.charCodeAt(k);
     }
 
-    const imgW = 1240;
-    const imgH = 1754;
     const contentStream = `q\n${pageWidthPt.toFixed(2)} 0 0 ${pageHeightPt.toFixed(2)} 0 0 cm\n/Im${i} Do\nQ`;
 
     startObj(pageObjId);
@@ -232,9 +233,6 @@ type BannerProps = {
   onHaptic?: () => void;
 };
 
-/**
- * Компактная журнальная панель в стиле Materials.tsx (между видео и строкой поиска)
- */
 export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe, onHaptic }: BannerProps) {
   const safeLang: 'ru' | 'uk' | 'de' = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -405,11 +403,12 @@ function WholesalePriceCatalogModal({
     sentToTelegram: boolean;
     downloadUrl: string;
     fileName: string;
+    pages: string[];
   } | null>(null);
 
   const tgUser = useMemo(() => getTelegramUserInfo(), []);
 
-  // Берем ВСЕ 38 позиций из cardioCatalog (каждый цвет и каждый вариант #1, #2, #3 отдельно!)
+  // Все 38 позиций из cardioCatalog (каждый цвет и вариант #1, #2, #3 отдельно)
   const allCatalogItems: FullCatalogPriceItem[] = useMemo(() => {
     const result: FullCatalogPriceItem[] = [];
     for (const shoe of cardioCatalog) {
@@ -422,7 +421,6 @@ function WholesalePriceCatalogModal({
         });
       }
     }
-    // Сортируем: сначала Осень по номеру модели, затем Зима по номеру модели
     return result.sort((a, b) => {
       if (a.season !== b.season) return a.season === 'autumn' ? -1 : 1;
       return Number(a.shoe.modelNumber) - Number(b.shoe.modelNumber);
@@ -482,17 +480,14 @@ function WholesalePriceCatalogModal({
       askGeorgiy: 'Георгий • +38 (067) 719-37-16',
       lookbookTag: 'CARDIO FOOTWEAR // WHOLESALE LOOKBOOK 2026',
       mainTitle: 'Оптовый прайс-каталог',
-      downloadBtn: '⬇ Скачать PDF-каталог (все цвета)',
+      downloadBtn: '⬇ Получить PDF-каталог (все 38 цветов)',
       downloadBtnTop: '⬇ Скачать PDF',
       generatingPdf: 'Верстка PDF',
-      sentToTgBanner: '✓ Защищенный PDF-каталог отправлен вам в чат Telegram (пересылка закрыта)!',
+      sentToTgBanner: '✓ Защищенный PDF-каталог отправлен вам в чат Telegram от @Cordwainer_bot!',
       downloadDirectBtn: '📥 Скачать файл PDF в память телефона →',
       tabAll: `Все (${allCatalogItems.length})`,
       tabAutumn: `Осень (${autumnCount})`,
       tabWinter: `Зима (${winterCount})`,
-      seasonAutumn: 'AUTUMN 2026',
-      seasonWinter: 'WINTER 2026',
-      perPair: 'опт / пара',
       box6: 'Короб 6 пар',
       box8: 'Короб 8 пар',
       orderBtn: 'Выбрать ростовку →',
@@ -513,17 +508,14 @@ function WholesalePriceCatalogModal({
       askGeorgiy: 'Георгій • +38 (067) 719-37-16',
       lookbookTag: 'CARDIO FOOTWEAR // WHOLESALE LOOKBOOK 2026',
       mainTitle: 'Гуртовий прайс-каталог',
-      downloadBtn: '⬇ Завантажити PDF-каталог (всі кольори)',
+      downloadBtn: '⬇ Отримати PDF-каталог (всі 38 кольорів)',
       downloadBtnTop: '⬇ Завантажити PDF',
       generatingPdf: 'Верстка PDF',
-      sentToTgBanner: '✓ Захищений PDF-каталог надіслано вам у чат Telegram (пересилання закрито)!',
+      sentToTgBanner: '✓ Захищений PDF-каталог надіслано вам у чат Telegram від @Cordwainer_bot!',
       downloadDirectBtn: '📥 Завантажити файл PDF у пам’ять телефону →',
       tabAll: `Всі (${allCatalogItems.length})`,
       tabAutumn: `Осінь (${autumnCount})`,
       tabWinter: `Зима (${winterCount})`,
-      seasonAutumn: 'AUTUMN 2026',
-      seasonWinter: 'WINTER 2026',
-      perPair: 'гурт / пара',
       box6: 'Короб 6 пар',
       box8: 'Короб 8 пар',
       orderBtn: 'Вибрати ростовку →',
@@ -544,7 +536,7 @@ function WholesalePriceCatalogModal({
       askGeorgiy: 'Georgiy • +38 (067) 719-37-16',
       lookbookTag: 'CARDIO FOOTWEAR // WHOLESALE LOOKBOOK 2026',
       mainTitle: 'B2B Preiskatalog 2026',
-      downloadBtn: '⬇ PDF-Lookbook herunterladen (Alle Farben)',
+      downloadBtn: '⬇ PDF-Lookbook erhalten (Alle 38 Farben)',
       downloadBtnTop: '⬇ PDF laden',
       generatingPdf: 'PDF Layout',
       sentToTgBanner: '✓ Geschützter PDF-Katalog wurde in Ihren Telegram-Chat gesendet!',
@@ -552,9 +544,6 @@ function WholesalePriceCatalogModal({
       tabAll: `Alle (${allCatalogItems.length})`,
       tabAutumn: `Herbst (${autumnCount})`,
       tabWinter: `Winter (${winterCount})`,
-      seasonAutumn: 'AUTUMN 2026',
-      seasonWinter: 'WINTER 2026',
-      perPair: 'pro Paar',
       box6: 'Kiste 6 P.',
       box8: 'Kiste 8 P.',
       orderBtn: 'Serie wählen →',
@@ -588,9 +577,6 @@ function WholesalePriceCatalogModal({
     window.open(fullUrl, '_blank');
   };
 
-  /**
-   * Журнальная верстка всех 38 моделей и цветов в стиле Editorial Warm Alabaster (Loro Piana / Milan Showroom)
-   */
   const handleGenerateAndDeliverPdf = async () => {
     if (pdfGenerating) return;
     setPdfGenerating(true);
@@ -599,61 +585,59 @@ function WholesalePriceCatalogModal({
     try {
       const logoImg = await loadImageElement('/logo.png');
       const itemsToRender = visibleItems;
-      const cardsPerPage = 6; // 2 колонки × 3 ряда
+      const cardsPerPage = 6;
       const totalPages = Math.max(1, Math.ceil(itemsToRender.length / cardsPerPage));
       const jpegPages: string[] = [];
+
+      const W = 1040;
+      const H = 1471;
 
       for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
         setPdfProgressText(`${pageIdx + 1}/${totalPages}`);
         const canvas = document.createElement('canvas');
-        const W = 1240;
-        const H = 1754;
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
-        // 1. Фон дорогой дизайнерской бумаги Warm Alabaster
         ctx.fillStyle = '#F2EFE9';
         ctx.fillRect(0, 0, W, H);
 
-        const marginX = 64;
-        const contentW = W - marginX * 2; // 1112px
+        const marginX = 52;
+        const contentW = W - marginX * 2; // 936px
 
-        // 2. Верхний журнальный колонтитул
         ctx.fillStyle = '#6E6A63';
-        ctx.font = '600 13px Arial, sans-serif';
+        ctx.font = '600 11px Arial, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('CARDIO FOOTWEAR // KHARKIV • B2B LOOKBOOK 2026', marginX, 56);
+        ctx.fillText('CARDIO FOOTWEAR // KHARKIV • B2B LOOKBOOK 2026', marginX, 46);
 
         ctx.textAlign = 'right';
         ctx.fillText(
           `${tgUser.label}   •   PAGE ${String(pageIdx + 1).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}`,
           W - marginX,
-          56
+          46
         );
 
         ctx.strokeStyle = '#161514';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(marginX, 72);
-        ctx.lineTo(W - marginX, 72);
+        ctx.moveTo(marginX, 60);
+        ctx.lineTo(W - marginX, 60);
         ctx.stroke();
 
-        // Логотип и главный титул страницы
         if (logoImg) {
-          const lH = 48;
+          const lH = 40;
           const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
-          ctx.drawImage(logoImg, marginX, 88, lW, lH);
+          ctx.drawImage(logoImg, marginX, 74, lW, lH);
         }
 
         ctx.fillStyle = '#161514';
-        ctx.font = '400 38px Georgia, serif';
+        ctx.font = '400 32px Georgia, serif';
         ctx.textAlign = 'left';
-        ctx.fillText('CARDIO', marginX + 95, 122);
+        ctx.fillText('CARDIO', marginX + 80, 102);
 
         ctx.fillStyle = '#6E6A63';
-        ctx.font = 'italic 20px Georgia, serif';
+        ctx.font = 'italic 17px Georgia, serif';
         const collectionLabel =
           seasonFilter === 'autumn'
             ? 'Autumn Collection 2026'
@@ -661,22 +645,21 @@ function WholesalePriceCatalogModal({
             ? 'Winter Collection 2026'
             : 'Complete Wholesale Collection 2026 (All Colors)';
         ctx.textAlign = 'right';
-        ctx.fillText(collectionLabel, W - marginX, 120);
+        ctx.fillText(collectionLabel, W - marginX, 100);
 
         ctx.strokeStyle = '#DCD7CC';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(marginX, 150);
-        ctx.lineTo(W - marginX, 150);
+        ctx.moveTo(marginX, 126);
+        ctx.lineTo(W - marginX, 126);
         ctx.stroke();
 
-        // 3. Модульная швейцарская сетка карточек (2 колонки × 3 ряда)
         const slice = itemsToRender.slice(pageIdx * cardsPerPage, (pageIdx + 1) * cardsPerPage);
-        const gridTop = 168;
-        const gapX = 24;
-        const gapY = 22;
-        const cardW = (contentW - gapX) / 2; // 544px
-        const cardH = 468;
+        const gridTop = 142;
+        const gapX = 20;
+        const gapY = 18;
+        const cardW = (contentW - gapX) / 2; // 458px
+        const cardH = 392;
 
         for (let i = 0; i < slice.length; i++) {
           const entry = slice[i];
@@ -686,45 +669,41 @@ function WholesalePriceCatalogModal({
           const x = marginX + col * (cardW + gapX);
           const y = gridTop + row * (cardH + gapY);
 
-          // Фон карточки Ivory
           ctx.fillStyle = '#F8F6F1';
           ctx.fillRect(x, y, cardW, cardH);
 
-          // Тонкая архитектурная рамка 1px
           ctx.strokeStyle = '#DCD7CC';
-          ctx.lineWidth = 1.2;
+          ctx.lineWidth = 1;
           ctx.strokeRect(x, y, cardW, cardH);
 
-          // Верхняя строка карточки (Категория + Сезон | Размерная сетка 40-45)
           const catLocalized = getLocalizedCategory(shoe.category, lang).toUpperCase();
           const seasonShort = season === 'autumn' ? 'AUTUMN' : 'WINTER';
 
           ctx.fillStyle = '#6E6A63';
-          ctx.font = '600 12px Arial, sans-serif';
+          ctx.font = '600 10.5px Arial, sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText(`${catLocalized} // ${seasonShort} '26`, x + 18, y + 26);
+          ctx.fillText(`${catLocalized} // ${seasonShort} '26`, x + 14, y + 22);
 
           ctx.textAlign = 'right';
-          ctx.fillText('40—45', x + cardW - 18, y + 26);
+          ctx.fillText('40—45', x + cardW - 14, y + 22);
 
           ctx.strokeStyle = '#E5E0D5';
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(x, y + 38);
-          ctx.lineTo(x + cardW, y + 38);
+          ctx.moveTo(x, y + 32);
+          ctx.lineTo(x + cardW, y + 32);
           ctx.stroke();
 
-          // Студийный подиум для фотографии обуви
-          const stageX = x + 14;
-          const stageY = y + 48;
-          const stageW = cardW - 28;
-          const stageH = 264;
+          const stageX = x + 12;
+          const stageY = y + 40;
+          const stageW = cardW - 24;
+          const stageH = 222;
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(stageX, stageY, stageW, stageH);
 
           const shoeImg = await loadImageElement(shoe.image);
           if (shoeImg) {
-            const pad = 22;
+            const pad = 18;
             const availW = stageW - pad * 2;
             const availH = stageH - pad * 2;
             const scale = Math.min(
@@ -738,89 +717,83 @@ function WholesalePriceCatalogModal({
             ctx.drawImage(shoeImg, drawX, drawY, drawW, drawH);
           }
 
-          // Нижняя секция карточки: Номер модели + Вариант, Цвет + Особенности, Цена за пару и за короб
-          const infoTop = stageY + stageH + 14;
+          const infoTop = stageY + stageH + 12;
 
           ctx.fillStyle = '#161514';
-          ctx.font = '400 30px Georgia, serif';
+          ctx.font = '400 25px Georgia, serif';
           ctx.textAlign = 'left';
           const variantSuffix = shoe.variant ? ` (${shoe.variant})` : '';
-          ctx.fillText(`№ ${shoe.modelNumber}${variantSuffix}`, x + 18, infoTop + 26);
+          ctx.fillText(`№ ${shoe.modelNumber}${variantSuffix}`, x + 14, infoTop + 22);
 
-          // Крупная цена за пару справа
           ctx.fillStyle = '#161514';
-          ctx.font = '700 30px Georgia, serif';
+          ctx.font = '700 25px Georgia, serif';
           ctx.textAlign = 'right';
-          ctx.fillText(`$${priceUsd}`, x + cardW - 18, infoTop + 26);
+          ctx.fillText(`$${priceUsd}`, x + cardW - 14, infoTop + 22);
 
-          // Цвет и характеристики (Мех, Gore-Tex, Подошва)
           const colorLocalized = getLocalizedColor(shoe.color, lang);
           const featuresList = shoe.features.map((f) => getLocalizedFeature(f, lang)).join(' • ');
           const subtitleLine = featuresList ? `${colorLocalized}  •  ${featuresList}` : colorLocalized;
 
           ctx.fillStyle = '#6E6A63';
-          ctx.font = '500 14px Arial, sans-serif';
+          ctx.font = '500 12px Arial, sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText(subtitleLine.toUpperCase().slice(0, 48), x + 18, infoTop + 52);
+          ctx.fillText(subtitleLine.toUpperCase().slice(0, 46), x + 14, infoTop + 44);
 
-          // Разделительная линия перед ценами за короб
           ctx.strokeStyle = '#DCD7CC';
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(x + 18, infoTop + 68);
-          ctx.lineTo(x + cardW - 18, infoTop + 68);
+          ctx.moveTo(x + 14, infoTop + 56);
+          ctx.lineTo(x + cardW - 14, infoTop + 56);
           ctx.stroke();
 
-          // Таблица стоимости короба 6 пар и 8 пар
           ctx.fillStyle = '#6E6A63';
-          ctx.font = '600 12px Arial, sans-serif';
+          ctx.font = '600 10.5px Arial, sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText(`${t.box6.toUpperCase()}:`, x + 18, infoTop + 94);
+          ctx.fillText(`${t.box6.toUpperCase()}:`, x + 14, infoTop + 78);
 
           ctx.fillStyle = '#161514';
-          ctx.font = '700 15px Georgia, serif';
-          ctx.fillText(`$${priceUsd * 6}`, x + 118, infoTop + 94);
+          ctx.font = '700 13px Georgia, serif';
+          ctx.fillText(`$${priceUsd * 6}`, x + 102, infoTop + 78);
 
           ctx.fillStyle = '#6E6A63';
-          ctx.font = '600 12px Arial, sans-serif';
+          ctx.font = '600 10.5px Arial, sans-serif';
           ctx.textAlign = 'right';
-          ctx.fillText(`${t.box8.toUpperCase()}:  $${priceUsd * 8}`, x + cardW - 18, infoTop + 94);
+          ctx.fillText(`${t.box8.toUpperCase()}:  $${priceUsd * 8}`, x + cardW - 14, infoTop + 78);
         }
 
-        // 4. Строгий журнальный футер с контактами отдела оптовых продаж
-        const footerY = H - 86;
+        const footerY = H - 72;
         ctx.strokeStyle = '#161514';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(marginX, footerY);
         ctx.lineTo(W - marginX, footerY);
         ctx.stroke();
 
         ctx.fillStyle = '#161514';
-        ctx.font = '600 14px Arial, sans-serif';
+        ctx.font = '600 12px Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(
           `${t.footerSub}   •   +38 (067) 719-37-16 (${t.georgiyName})   •   +38 (097) 454-15-11 (${t.borisName})`,
           marginX,
-          footerY + 28
+          footerY + 24
         );
 
         ctx.fillStyle = '#6E6A63';
-        ctx.font = '400 12px Arial, sans-serif';
+        ctx.font = '400 10.5px Arial, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('CONFIDENTIAL B2B PRICE LIST • DO NOT FORWARD', W - marginX, footerY + 28);
+        ctx.fillText('CONFIDENTIAL B2B PRICE LIST • DO NOT FORWARD', W - marginX, footerY + 24);
 
-        jpegPages.push(canvas.toDataURL('image/jpeg', 0.92));
+        jpegPages.push(canvas.toDataURL('image/jpeg', 0.82));
       }
 
-      const pdfBase64 = buildPdfBase64FromJpegPages(jpegPages);
+      const pdfBase64 = buildPdfBase64FromJpegPages(jpegPages, W, H);
       const fileName = `CARDIO_LOOKBOOK_2026_${lang.toUpperCase()}.pdf`;
 
-      // Отправляем на сервер /api/pdf (который шлет защищенный файл в Telegram и возвращает прямую HTTPS-ссылку)
-      const res = await fetch('/api/pdf', {
+      const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'send_pdf',
           pdfBase64,
           fileName,
           chatId: tgUser.id,
@@ -835,8 +808,8 @@ function WholesalePriceCatalogModal({
             sentToTelegram: Boolean(data.sentToTelegram),
             downloadUrl: data.downloadPath,
             fileName,
+            pages: jpegPages,
           });
-          // Если бот еще не отправил в чат, сразу запускаем системную HTTPS-загрузку
           if (!data.sentToTelegram) {
             triggerDownloadUrl(data.downloadPath, fileName);
           }
@@ -872,7 +845,6 @@ function WholesalePriceCatalogModal({
         fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
       }}
     >
-      {/* Верхняя закрепленная панель в фирменном стиле Materials.tsx */}
       <div
         style={{
           position: 'sticky',
@@ -944,7 +916,6 @@ function WholesalePriceCatalogModal({
         )}
       </div>
 
-      {/* ЭКРАН 1: ВВОД PIN-КОДА ОПТОВИКА */}
       {!isUnlocked ? (
         <div
           style={{
@@ -1077,7 +1048,6 @@ function WholesalePriceCatalogModal({
           </div>
         </div>
       ) : (
-        /* ЭКРАН 2: ПОЛНЫЙ ЖУРНАЛЬНЫЙ ЛУКБУК С ЦЕНАМИ (ВСЕ 38 МОДЕЛЕЙ И ЦВЕТОВ) */
         <div>
           <div style={{ marginBottom: '16px' }}>
             <div
@@ -1162,7 +1132,6 @@ function WholesalePriceCatalogModal({
             )}
           </div>
 
-          {/* Переключатель сезонов (Все 38 | Осень 13 | Зима 25) */}
           <div
             style={{
               display: 'grid',
@@ -1199,7 +1168,6 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
-          {/* Швейцарская модульная сетка 2 колонки (в точности как в Materials.tsx) */}
           <div
             style={{
               display: 'grid',
@@ -1369,7 +1337,6 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
-          {/* Нижний блок контактов */}
           <div
             style={{
               backgroundColor: THEME.surface,
