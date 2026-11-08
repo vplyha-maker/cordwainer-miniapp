@@ -86,10 +86,6 @@ function getWatermarkText(): string {
   return 'CARDIO B2B • CONFIDENTIAL PRICE 2026 • DO NOT FORWARD';
 }
 
-/**
- * Сборка настоящего многостраничного PDF-файла из массива JPEG DataURL (без внешних npm-библиотек).
- * Работает в любом мобильном WebView (Telegram Android / iOS).
- */
 function buildPdfBlobFromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.28, pageHeightPt = 841.89): Blob {
   const encoder = new TextEncoder();
   const chunks: Uint8Array[] = [];
@@ -124,12 +120,10 @@ function buildPdfBlobFromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.28,
 
   pushStr('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n');
 
-  // 1: Catalog
   startObj(1);
   pushStr('<< /Type /Catalog /Pages 2 0 R >>');
   endObj();
 
-  // 2: Pages
   startObj(2);
   pushStr(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`);
   endObj();
@@ -146,13 +140,11 @@ function buildPdfBlobFromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.28,
       imgBytes[k] = binaryStr.charCodeAt(k);
     }
 
-    // Определяем реальные пиксельные размеры JPEG из заголовка или берем 1240x1754
     const imgW = 1240;
     const imgH = 1754;
 
     const contentStream = `q\n${pageWidthPt.toFixed(2)} 0 0 ${pageHeightPt.toFixed(2)} 0 0 cm\n/Im${i} Do\nQ`;
 
-    // Page object
     startObj(pageObjId);
     pushStr(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt.toFixed(2)} ${pageHeightPt.toFixed(2)}] ` +
@@ -160,12 +152,10 @@ function buildPdfBlobFromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.28,
     );
     endObj();
 
-    // Content stream object
     startObj(contentObjId);
     pushStr(`<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`);
     endObj();
 
-    // Image XObject
     startObj(imgObjId);
     pushStr(
       `<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB ` +
@@ -200,7 +190,7 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
 
 type EnrichedCatalogModel = PriceItemConfig & {
   variants: ShoeItem[];
-  primaryShoe: ShoeItem | null;
+  primaryShoe: ShoeItem;
 };
 
 type BannerProps = {
@@ -367,12 +357,43 @@ function WholesalePriceCatalogModal({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [seasonFilter, setSeasonFilter] = useState<'all' | SeasonKey>('all');
-  const [onlyWithPhoto, setOnlyWithPhoto] = useState<boolean>(false);
   const [activeVariantByModel, setActiveVariantByModel] = useState<Record<string, string>>({});
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgressText, setPdfProgressText] = useState('');
 
   const watermark = useMemo(() => getWatermarkText(), []);
+
+  // Оставляем только модели, которые реально есть с фотографиями в cardioCatalog
+  const enrichedModels: EnrichedCatalogModel[] = useMemo(() => {
+    const list: EnrichedCatalogModel[] = [];
+    for (const item of PRICE_LIST_2026) {
+      const variants = cardioCatalog.filter((s) => s.modelNumber.trim() === item.modelNumber.trim());
+      if (variants.length > 0) {
+        list.push({
+          ...item,
+          variants,
+          primaryShoe: variants[0],
+        });
+      }
+    }
+    return list;
+  }, []);
+
+  const autumnCount = useMemo(
+    () => enrichedModels.filter((m) => m.season === 'autumn').length,
+    [enrichedModels]
+  );
+  const winterCount = useMemo(
+    () => enrichedModels.filter((m) => m.season === 'winter').length,
+    [enrichedModels]
+  );
+
+  const visibleModels = useMemo(() => {
+    return enrichedModels.filter((m) => {
+      if (seasonFilter !== 'all' && m.season !== seasonFilter) return false;
+      return true;
+    });
+  }, [enrichedModels, seasonFilter]);
 
   const t = {
     ru: {
@@ -389,21 +410,17 @@ function WholesalePriceCatalogModal({
       mainTitle: 'Прайс-каталог CARDIO 2026',
       downloadPdf: '⬇ Скачать PDF с фото',
       generatingPdf: 'Сборка PDF...',
-      tabAll: 'Все сезоны (30)',
-      tabAutumn: 'Осень 2026 (11)',
-      tabWinter: 'Зима 2026 (19)',
-      photoFilterAll: 'Все модели прайса',
-      photoFilterOnly: 'Только с фото в каталоге',
+      tabAll: `Все модели (${enrichedModels.length})`,
+      tabAutumn: `Осень 2026 (${autumnCount})`,
+      tabWinter: `Зима 2026 (${winterCount})`,
       seasonAutumnBadge: 'AUTUMN 2026 // ОСЕНЬ',
       seasonWinterBadge: 'WINTER 2026 // ЗИМА',
       modelPrefix: 'Модель №',
       perPair: 'за пару',
       box6: 'Короб 6 п.',
       box8: 'Короб 8 п.',
-      colorsLabel: 'Цвета прайса:',
-      inCatalogColors: 'Фото расцветок:',
+      colorsLabel: 'Цвета в наличии:',
       orderModelBtn: 'Заказать ростовку →',
-      photoSoon: 'Фото модели в студийной обработке',
       contactsTitle: 'ДЛЯ ОПТОВОГО ЗАКАЗА',
       georgiyName: 'Георгий',
       borisName: 'Борис',
@@ -423,21 +440,17 @@ function WholesalePriceCatalogModal({
       mainTitle: 'Прайс-каталог CARDIO 2026',
       downloadPdf: '⬇ Завантажити PDF з фото',
       generatingPdf: 'Формування PDF...',
-      tabAll: 'Всі сезони (30)',
-      tabAutumn: 'Осінь 2026 (11)',
-      tabWinter: 'Зима 2026 (19)',
-      photoFilterAll: 'Всі моделі прайсу',
-      photoFilterOnly: 'Тільки з фото в каталозі',
+      tabAll: `Всі моделі (${enrichedModels.length})`,
+      tabAutumn: `Осінь 2026 (${autumnCount})`,
+      tabWinter: `Зима 2026 (${winterCount})`,
       seasonAutumnBadge: 'AUTUMN 2026 // ОСІНЬ',
       seasonWinterBadge: 'WINTER 2026 // ЗИМА',
       modelPrefix: 'Модель №',
       perPair: 'за пару',
       box6: 'Короб 6 п.',
       box8: 'Короб 8 п.',
-      colorsLabel: 'Кольори прайсу:',
-      inCatalogColors: 'Фото кольорів:',
+      colorsLabel: 'Кольори в наявності:',
       orderModelBtn: 'Замовити ростовку →',
-      photoSoon: 'Фото моделі в студійній обробці',
       contactsTitle: 'ДЛЯ ГУРТОВОГО ЗАМОВЛЕННЯ',
       georgiyName: 'Георгій',
       borisName: 'Борис',
@@ -457,46 +470,23 @@ function WholesalePriceCatalogModal({
       mainTitle: 'Preiskatalog CARDIO 2026',
       downloadPdf: '⬇ PDF mit Fotos laden',
       generatingPdf: 'PDF wird erstellt...',
-      tabAll: 'Alle Saisons (30)',
-      tabAutumn: 'Herbst 2026 (11)',
-      tabWinter: 'Winter 2026 (19)',
-      photoFilterAll: 'Alle Modelle',
-      photoFilterOnly: 'Nur mit Katalogfoto',
+      tabAll: `Alle Modelle (${enrichedModels.length})`,
+      tabAutumn: `Herbst 2026 (${autumnCount})`,
+      tabWinter: `Winter 2026 (${winterCount})`,
       seasonAutumnBadge: 'AUTUMN 2026 // HERBST',
       seasonWinterBadge: 'WINTER 2026 // WINTER',
       modelPrefix: 'Modell Nr.',
       perPair: 'pro Paar',
       box6: 'Kiste 6 P.',
       box8: 'Kiste 8 P.',
-      colorsLabel: 'Farben laut Preisliste:',
-      inCatalogColors: 'Farbvarianten:',
+      colorsLabel: 'Verfügbare Farben:',
       orderModelBtn: 'Serie bestellen →',
-      photoSoon: 'Studiofoto in Vorbereitung',
       contactsTitle: 'FÜR GROSSHANDELSBESTELLUNGEN',
       georgiyName: 'Georgiy',
       borisName: 'Boris',
       securityNotice: 'Weiterleitungsschutz: Dokument ist mit Ihrer ID markiert. Weitergabe an Dritte untersagt.',
     },
   }[lang];
-
-  const enrichedModels: EnrichedCatalogModel[] = useMemo(() => {
-    return PRICE_LIST_2026.map((item) => {
-      const variants = cardioCatalog.filter((s) => s.modelNumber.trim() === item.modelNumber.trim());
-      return {
-        ...item,
-        variants,
-        primaryShoe: variants[0] || null,
-      };
-    });
-  }, []);
-
-  const visibleModels = useMemo(() => {
-    return enrichedModels.filter((m) => {
-      if (seasonFilter !== 'all' && m.season !== seasonFilter) return false;
-      if (onlyWithPhoto && !m.primaryShoe) return false;
-      return true;
-    });
-  }, [enrichedModels, seasonFilter, onlyWithPhoto]);
 
   const handlePinSubmit = () => {
     const clean = pinInput.trim();
@@ -508,9 +498,6 @@ function WholesalePriceCatalogModal({
     }
   };
 
-  /**
-   * Генерация многостраничного иллюстрированного PDF на языке текущей страницы (uk / ru / de)
-   */
   const handleDownloadIllustratedPdf = async () => {
     if (pdfGenerating) return;
     setPdfGenerating(true);
@@ -518,7 +505,7 @@ function WholesalePriceCatalogModal({
     try {
       const logoImg = await loadImageElement('/logo.png');
       const modelsToRender = visibleModels;
-      const cardsPerPage = 6; // 2 колонки × 3 ряда на лист А4
+      const cardsPerPage = 6;
       const totalPages = Math.max(1, Math.ceil(modelsToRender.length / cardsPerPage));
       const jpegPages: string[] = [];
 
@@ -532,11 +519,9 @@ function WholesalePriceCatalogModal({
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
-        // 1. Темный премиальный фон (Obsidian Charcoal)
         ctx.fillStyle = '#18181A';
         ctx.fillRect(0, 0, W, H);
 
-        // 2. Декоративная золотая штриховка по краям (как на оригинальном прайсе)
         ctx.strokeStyle = '#C5A880';
         ctx.lineWidth = 2;
         for (let y = 30; y < H - 30; y += 18) {
@@ -551,12 +536,10 @@ function WholesalePriceCatalogModal({
           ctx.stroke();
         }
 
-        // 3. Внутренняя золотая рамка
         ctx.strokeStyle = '#C5A880';
         ctx.lineWidth = 2.5;
         ctx.strokeRect(52, 42, W - 104, H - 84);
 
-        // 4. Шапка страницы с логотипом CARDIO
         if (logoImg) {
           const logoH = 54;
           const logoW = (logoImg.width / Math.max(1, logoImg.height)) * logoH;
@@ -585,13 +568,12 @@ function WholesalePriceCatalogModal({
         ctx.lineWidth = 1.5;
         ctx.strokeRect(72, 54, W - 144, 80);
 
-        // 5. Сетка карточек моделей (2 колонки x 3 ряда)
         const slice = modelsToRender.slice(pageIdx * cardsPerPage, (pageIdx + 1) * cardsPerPage);
         const startX = 72;
         const startY = 154;
         const gapX = 24;
         const gapY = 22;
-        const cardW = (W - 144 - gapX) / 2; // 536px
+        const cardW = (W - 144 - gapX) / 2;
         const cardH = 445;
 
         for (let i = 0; i < slice.length; i++) {
@@ -601,14 +583,12 @@ function WholesalePriceCatalogModal({
           const x = startX + col * (cardW + gapX);
           const y = startY + row * (cardH + gapY);
 
-          // Рамка карточки
           ctx.fillStyle = '#202024';
           ctx.fillRect(x, y, cardW, cardH);
           ctx.strokeStyle = '#C5A880';
           ctx.lineWidth = 1.5;
           ctx.strokeRect(x, y, cardW, cardH);
 
-          // Верхняя плашка карточки: Номер модели + Цена в $
           ctx.fillStyle = '#141416';
           ctx.fillRect(x + 1, y + 1, cardW - 2, 58);
 
@@ -622,7 +602,6 @@ function WholesalePriceCatalogModal({
           ctx.textAlign = 'right';
           ctx.fillText(`$${item.priceUsd}`, x + cardW - 18, y + 40);
 
-          // Светлый подиум для фото обуви
           const stageX = x + 16;
           const stageY = y + 70;
           const stageW = cardW - 32;
@@ -647,14 +626,8 @@ function WholesalePriceCatalogModal({
               const drawY = stageY + (stageH - drawH) / 2;
               ctx.drawImage(shoeImg, drawX, drawY, drawW, drawH);
             }
-          } else {
-            ctx.fillStyle = '#6E6A63';
-            ctx.font = 'italic 20px Georgia, serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`CARDIO № ${item.modelNumber}`, stageX + stageW / 2, stageY + stageH / 2);
           }
 
-          // Информация под фото: Цвета и Расчет за короб 6 / 8 пар
           ctx.textAlign = 'left';
           ctx.fillStyle = '#C5A880';
           ctx.font = 'bold 15px Arial, sans-serif';
@@ -673,10 +646,11 @@ function WholesalePriceCatalogModal({
 
           ctx.fillStyle = '#F4EFE6';
           ctx.font = '18px Georgia, serif';
-          const colorText = item.rawColors[lang] || item.rawColors.uk;
-          ctx.fillText(colorText.slice(0, 42), x + 18, y + 372);
+          const catalogColorsText = item.variants
+            .map((v) => `${getLocalizedColor(v.color, lang)}${v.variant ? ` ${v.variant}` : ''}`)
+            .join(' / ');
+          ctx.fillText(catalogColorsText.slice(0, 42), x + 18, y + 372);
 
-          // Плашка цены короба 6 и 8 пар
           ctx.strokeStyle = '#383632';
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -693,7 +667,6 @@ function WholesalePriceCatalogModal({
           );
         }
 
-        // 6. Диагональный водяной знак защиты от пересылки поверх листа
         ctx.save();
         ctx.translate(W / 2, H / 2);
         ctx.rotate(-Math.PI / 6);
@@ -705,7 +678,6 @@ function WholesalePriceCatalogModal({
         ctx.fillText(watermark, 0, 280);
         ctx.restore();
 
-        // 7. Нижний колонтитул с контактами Георгия и Бориса
         ctx.strokeStyle = '#C5A880';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(72, H - 140, W - 144, 82);
@@ -730,7 +702,6 @@ function WholesalePriceCatalogModal({
       const fileName = `CARDIO_PRICE_2026_${lang.toUpperCase()}.pdf`;
       const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      // Если мобильное устройство поддерживает системное меню "Поделиться / Сохранить файл"
       const nav = navigator as Navigator & { canShare?: (data: { files?: File[] }) => boolean };
       if (nav.canShare && nav.canShare({ files: [pdfFile] })) {
         await navigator.share({
@@ -748,7 +719,6 @@ function WholesalePriceCatalogModal({
         setTimeout(() => URL.revokeObjectURL(url), 5000);
       }
     } catch {
-      // Резервный вызов печати
       window.print();
     } finally {
       setPdfGenerating(false);
@@ -781,7 +751,6 @@ function WholesalePriceCatalogModal({
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Верхняя панель закрытия */}
       <div
         style={{
           display: 'flex',
@@ -832,7 +801,6 @@ function WholesalePriceCatalogModal({
         )}
       </div>
 
-      {/* ЭКРАН 1: ВВОД PIN-КОДА ОПТОВИКА */}
       {!isUnlocked ? (
         <div
           style={{
@@ -962,7 +930,6 @@ function WholesalePriceCatalogModal({
           </div>
         </div>
       ) : (
-        /* ЭКРАН 2: ИЛЛЮСТРИРОВАННЫЙ ПРАЙС-КАТАЛОГ С ФОТО И ЦЕНАМИ */
         <div>
           <div
             style={{
@@ -982,13 +949,12 @@ function WholesalePriceCatalogModal({
             <div style={{ fontSize: '10px', color: MUTED }}>{watermark}</div>
           </div>
 
-          {/* Переключатель сезонов Осень / Зима */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               border: `1px solid ${GOLD}`,
-              marginBottom: '10px',
+              marginBottom: '16px',
             }}
           >
             {(['all', 'autumn', 'winter'] as const).map((tab, idx) => {
@@ -1018,43 +984,6 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
-          {/* Фильтр: Все позиции прайса / Только с фото */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-            <button
-              type="button"
-              onClick={() => setOnlyWithPhoto(false)}
-              style={{
-                flex: 1,
-                padding: '7px 8px',
-                fontSize: '10px',
-                border: `1px solid ${!onlyWithPhoto ? GOLD : BORDER}`,
-                backgroundColor: !onlyWithPhoto ? '#262420' : SURFACE,
-                color: !onlyWithPhoto ? GOLD : MUTED,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {t.photoFilterAll}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOnlyWithPhoto(true)}
-              style={{
-                flex: 1,
-                padding: '7px 8px',
-                fontSize: '10px',
-                border: `1px solid ${onlyWithPhoto ? GOLD : BORDER}`,
-                backgroundColor: onlyWithPhoto ? '#262420' : SURFACE,
-                color: onlyWithPhoto ? GOLD : MUTED,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {t.photoFilterOnly}
-            </button>
-          </div>
-
-          {/* Сетка иллюстрированных карточек с ценами */}
           <div
             style={{
               display: 'grid',
@@ -1067,6 +996,9 @@ function WholesalePriceCatalogModal({
               const selectedVarId = activeVariantByModel[item.modelNumber];
               const activeShoe =
                 item.variants.find((v) => v.id === selectedVarId) || item.primaryShoe;
+              const catalogColorsList = item.variants
+                .map((v) => `${getLocalizedColor(v.color, lang)}${v.variant ? ` ${v.variant}` : ''}`)
+                .join(' • ');
 
               return (
                 <div
@@ -1081,7 +1013,6 @@ function WholesalePriceCatalogModal({
                     overflow: 'hidden',
                   }}
                 >
-                  {/* Верхняя строка карточки: сезон + цена */}
                   <div
                     style={{
                       display: 'flex',
@@ -1117,12 +1048,11 @@ function WholesalePriceCatalogModal({
                     </div>
                   </div>
 
-                  {/* Фотография модели из каталога */}
                   <div
                     style={{
                       width: '100%',
                       height: '190px',
-                      backgroundColor: activeShoe ? '#F2EFE9' : '#18181C',
+                      backgroundColor: '#F2EFE9',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1131,27 +1061,17 @@ function WholesalePriceCatalogModal({
                       position: 'relative',
                     }}
                   >
-                    {activeShoe ? (
-                      <img
-                        src={activeShoe.image}
-                        alt={`Cardio ${item.modelNumber}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          mixBlendMode: 'multiply',
-                        }}
-                      />
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '12px' }}>
-                        <div style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '20px', color: GOLD, marginBottom: '4px' }}>
-                          CARDIO № {item.modelNumber}
-                        </div>
-                        <div style={{ fontSize: '10px', color: MUTED }}>{t.photoSoon}</div>
-                      </div>
-                    )}
+                    <img
+                      src={activeShoe.image}
+                      alt={`Cardio ${item.modelNumber}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        mixBlendMode: 'multiply',
+                      }}
+                    />
 
-                    {/* Водяной знак поверх фото */}
                     <div
                       style={{
                         position: 'absolute',
@@ -1159,7 +1079,7 @@ function WholesalePriceCatalogModal({
                         right: '6px',
                         fontSize: '7.5px',
                         letterSpacing: '0.8px',
-                        color: activeShoe ? 'rgba(22,21,20,0.35)' : 'rgba(244,239,230,0.25)',
+                        color: 'rgba(22,21,20,0.35)',
                         pointerEvents: 'none',
                         fontWeight: 600,
                       }}
@@ -1168,7 +1088,6 @@ function WholesalePriceCatalogModal({
                     </div>
                   </div>
 
-                  {/* Миниатюры переключения расцветок, если у модели несколько фото */}
                   {item.variants.length > 1 && (
                     <div
                       style={{
@@ -1181,7 +1100,7 @@ function WholesalePriceCatalogModal({
                       }}
                     >
                       {item.variants.map((v) => {
-                        const isSelected = activeShoe?.id === v.id;
+                        const isSelected = activeShoe.id === v.id;
                         return (
                           <button
                             key={v.id}
@@ -1210,14 +1129,13 @@ function WholesalePriceCatalogModal({
                     </div>
                   )}
 
-                  {/* Описание цветов и расчет стоимости короба (6 и 8 пар) */}
                   <div style={{ padding: '10px 12px', borderTop: `1px solid ${BORDER}` }}>
                     <div style={{ fontSize: '10px', color: MUTED, marginBottom: '2px' }}>{t.colorsLabel}</div>
                     <div style={{ fontSize: '13px', fontFamily: '"Playfair Display", Georgia, serif', color: INK, marginBottom: '8px' }}>
-                      {item.rawColors[lang] || item.rawColors.uk}
+                      {catalogColorsList}
                     </div>
 
-                    {activeShoe && activeShoe.features.length > 0 && (
+                    {activeShoe.features.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
                         {activeShoe.features.map((f) => (
                           <span
@@ -1244,7 +1162,7 @@ function WholesalePriceCatalogModal({
                         padding: '7px 8px',
                         backgroundColor: '#121214',
                         border: `1px solid ${BORDER}`,
-                        marginBottom: activeShoe && onSelectShoe ? '10px' : '0',
+                        marginBottom: onSelectShoe ? '10px' : '0',
                       }}
                     >
                       <div>
@@ -1257,7 +1175,7 @@ function WholesalePriceCatalogModal({
                       </div>
                     </div>
 
-                    {activeShoe && onSelectShoe && (
+                    {onSelectShoe && (
                       <button
                         type="button"
                         onClick={() => onSelectShoe(activeShoe)}
@@ -1283,7 +1201,6 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
-          {/* Футер с контактами Георгия и Бориса */}
           <div
             style={{
               border: `1.5px solid ${GOLD}`,
@@ -1343,4 +1260,3 @@ function WholesalePriceCatalogModal({
 }
 
 export default WholesalePriceBanner;
-
