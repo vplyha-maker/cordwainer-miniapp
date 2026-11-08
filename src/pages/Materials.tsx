@@ -10,6 +10,7 @@ import {
   type SizeKey,
 } from '../data/catalog';
 import { WholesaleCart } from '../components/WholesaleCart';
+import { WholesalePriceBanner } from '../components/WholesalePriceCatalog';
 import type { Lang } from '../App';
 
 type MaterialsProps = {
@@ -415,7 +416,7 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
       addedSuccess: '✓ Zur Rechnung hinzugefügt',
       addToCart: 'Zur Rechnung hinzufügen',
       mainPageBtn: '← Startseite',
-      searchPlaceholder: 'Modellnummer или Farbe...',
+      searchPlaceholder: 'Modellnummer oder Farbe...',
       searchLabel: 'Suche:',
       found: (n: number) => `GEFUNDEN: ${n}`,
       grid2Col: '2 SPALTEN',
@@ -744,7 +745,6 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
           transition: 'background-color 0.2s ease, color 0.2s ease',
         }}
       >
-        {/* Шапка карточки модели без лишней кнопки темы, чтобы кнопки Каталог и Накладная никогда не слипались */}
         <div
           style={{
             display: 'flex',
@@ -1791,6 +1791,14 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
           borderBottom: `1px solid ${THEME.border}`,
         }}
       >
+        {/* Кнопка-баннер закрытого прайс-каталога PDF (между видео и поиском) */}
+        <WholesalePriceBanner
+          lang={safeLang}
+          isDark={isDark}
+          onHaptic={() => fireHaptic('medium')}
+          onSelectShoe={(shoe) => setSelectedShoe(shoe)}
+        />
+
         <div
           style={{
             display: 'flex',
