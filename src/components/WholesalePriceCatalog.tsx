@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   cardioCatalog,
   getLocalizedCategory,
@@ -118,7 +119,7 @@ function buildPdfBlobFromJpegPages(jpegDataUrls: string[], pageWidthPt = 595.28,
     pageIds.push(3 + i * 3);
   }
 
-  pushStr('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n');
+  pushStr('%PDF-1.4\n');
 
   startObj(1);
   pushStr('<< /Type /Catalog /Pages 2 0 R >>');
@@ -200,9 +201,6 @@ type BannerProps = {
   onHaptic?: () => void;
 };
 
-/**
- * Компактная премиальная панель для вставки в Materials.tsx (между видео и поиском)
- */
 export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe, onHaptic }: BannerProps) {
   const safeLang: 'ru' | 'uk' | 'de' = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -245,6 +243,30 @@ export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe
   const GOLD = '#C5A880';
   const bg = isDark ? '#141416' : '#161514';
   const textMain = '#F4EFE6';
+
+  const modalNode =
+    isModalOpen && typeof document !== 'undefined'
+      ? createPortal(
+          <WholesalePriceCatalogModal
+            lang={safeLang}
+            isDark={isDark}
+            isUnlocked={isUnlocked}
+            onUnlockSuccess={() => {
+              setIsUnlocked(true);
+              try {
+                localStorage.setItem(PIN_STORAGE_KEY, '1');
+                window.dispatchEvent(new Event('cardio-pin-unlocked'));
+              } catch {}
+            }}
+            onClose={() => setIsModalOpen(false)}
+            onSelectShoe={(shoe) => {
+              setIsModalOpen(false);
+              onSelectShoe?.(shoe);
+            }}
+          />,
+          document.body
+        )
+      : null;
 
   return (
     <>
@@ -315,25 +337,7 @@ export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe
         </button>
       </div>
 
-      {isModalOpen && (
-        <WholesalePriceCatalogModal
-          lang={safeLang}
-          isDark={isDark}
-          isUnlocked={isUnlocked}
-          onUnlockSuccess={() => {
-            setIsUnlocked(true);
-            try {
-              localStorage.setItem(PIN_STORAGE_KEY, '1');
-              window.dispatchEvent(new Event('cardio-pin-unlocked'));
-            } catch {}
-          }}
-          onClose={() => setIsModalOpen(false)}
-          onSelectShoe={(shoe) => {
-            setIsModalOpen(false);
-            onSelectShoe?.(shoe);
-          }}
-        />
-      )}
+      {modalNode}
     </>
   );
 }
@@ -345,6 +349,13 @@ type ModalProps = {
   onUnlockSuccess: () => void;
   onClose: () => void;
   onSelectShoe?: (shoe: ShoeItem) => void;
+};
+
+type ReadyPdfBundle = {
+  file: File;
+  blob: Blob;
+  fileName: string;
+  pages: string[];
 };
 
 function WholesalePriceCatalogModal({
@@ -360,10 +371,11 @@ function WholesalePriceCatalogModal({
   const [activeVariantByModel, setActiveVariantByModel] = useState<Record<string, string>>({});
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfProgressText, setPdfProgressText] = useState('');
+  const [readyPdf, setReadyPdf] = useState<ReadyPdfBundle | null>(null);
+  const [shareHint, setShareHint] = useState<string | null>(null);
 
   const watermark = useMemo(() => getWatermarkText(), []);
 
-  // Оставляем только модели, которые реально есть с фотографиями в cardioCatalog
   const enrichedModels: EnrichedCatalogModel[] = useMemo(() => {
     const list: EnrichedCatalogModel[] = [];
     for (const item of PRICE_LIST_2026) {
@@ -408,8 +420,15 @@ function WholesalePriceCatalogModal({
       askGeorgiy: 'Запросить PIN • Георгий (+38067-719-37-16)',
       headerSub: 'CONFIDENTIAL B2B LOOKBOOK // DO NOT FORWARD',
       mainTitle: 'Прайс-каталог CARDIO 2026',
-      downloadPdf: '⬇ Скачать PDF с фото',
+      downloadPdf: '⬇ Сформировать и скачать PDF с фото',
+      downloadPdfShort: '⬇ Скачать PDF',
       generatingPdf: 'Сборка PDF...',
+      pdfReadyTitle: (pages: number) => `✓ PDF-каталог готов (${pages} стр. А4)`,
+      pdfReadySub: 'Нажмите золотую кнопку ниже — откроется меню телефона (можно сохранить в Загрузки, открыть в PDF или отправить себе в Избранное Telegram):',
+      saveToPhoneBtn: '📥 СОХРАНИТЬ / ОТКРЫТЬ PDF НА ТЕЛЕФОНЕ',
+      closeReadyBtn: '← Вернуться к карточкам',
+      pagesPreviewLabel: 'ГОТОВЫЕ ЛИСТЫ КАТАЛОГА (А4):',
+      pageNumberLabel: (idx: number, total: number) => `Лист ${idx} из ${total}`,
       tabAll: `Все модели (${enrichedModels.length})`,
       tabAutumn: `Осень 2026 (${autumnCount})`,
       tabWinter: `Зима 2026 (${winterCount})`,
@@ -438,8 +457,15 @@ function WholesalePriceCatalogModal({
       askGeorgiy: 'Запитати PIN • Георгій (+38067-719-37-16)',
       headerSub: 'CONFIDENTIAL B2B LOOKBOOK // DO NOT FORWARD',
       mainTitle: 'Прайс-каталог CARDIO 2026',
-      downloadPdf: '⬇ Завантажити PDF з фото',
+      downloadPdf: '⬇ Сформувати та завантажити PDF з фото',
+      downloadPdfShort: '⬇ Завантажити PDF',
       generatingPdf: 'Формування PDF...',
+      pdfReadyTitle: (pages: number) => `✓ PDF-каталог готовий (${pages} стор. А4)`,
+      pdfReadySub: 'Натисніть золоту кнопку нижче — відкриється меню телефону (можна зберегти в Завантаження, відкрити в PDF або зберегти в Обране Telegram):',
+      saveToPhoneBtn: '📥 ЗБЕРЕГТИ / ВІДКРИТИ PDF НА ТЕЛЕФОНІ',
+      closeReadyBtn: '← Повернутися до карток',
+      pagesPreviewLabel: 'ГОТОВІ АРКУШІ КАТАЛОГУ (А4):',
+      pageNumberLabel: (idx: number, total: number) => `Аркуш ${idx} з ${total}`,
       tabAll: `Всі моделі (${enrichedModels.length})`,
       tabAutumn: `Осінь 2026 (${autumnCount})`,
       tabWinter: `Зима 2026 (${winterCount})`,
@@ -468,8 +494,15 @@ function WholesalePriceCatalogModal({
       askGeorgiy: 'PIN anfordern • Georgiy (+38067-719-37-16)',
       headerSub: 'CONFIDENTIAL B2B LOOKBOOK // DO NOT FORWARD',
       mainTitle: 'Preiskatalog CARDIO 2026',
-      downloadPdf: '⬇ PDF mit Fotos laden',
+      downloadPdf: '⬇ PDF-Katalog mit Fotos erstellen',
+      downloadPdfShort: '⬇ PDF laden',
       generatingPdf: 'PDF wird erstellt...',
+      pdfReadyTitle: (pages: number) => `✓ PDF-Katalog bereit (${pages} Seiten A4)`,
+      pdfReadySub: 'Tippen Sie auf den goldenen Button unten, um die PDF-Datei auf Ihrem Smartphone zu speichern oder zu öffnen:',
+      saveToPhoneBtn: '📥 PDF SPEICHERN / ÖFFNEN',
+      closeReadyBtn: '← Zurück zum Katalog',
+      pagesPreviewLabel: 'KATALOGSEITEN (A4):',
+      pageNumberLabel: (idx: number, total: number) => `Seite ${idx} von ${total}`,
       tabAll: `Alle Modelle (${enrichedModels.length})`,
       tabAutumn: `Herbst 2026 (${autumnCount})`,
       tabWinter: `Winter 2026 (${winterCount})`,
@@ -498,9 +531,13 @@ function WholesalePriceCatalogModal({
     }
   };
 
-  const handleDownloadIllustratedPdf = async () => {
+  /**
+   * Шаг 1: Рендерим все страницы А4 в память и открываем экран готового файла
+   */
+  const handleBuildIllustratedPdf = async () => {
     if (pdfGenerating) return;
     setPdfGenerating(true);
+    setShareHint(null);
 
     try {
       const logoImg = await loadImageElement('/logo.png');
@@ -702,28 +739,59 @@ function WholesalePriceCatalogModal({
       const fileName = `CARDIO_PRICE_2026_${lang.toUpperCase()}.pdf`;
       const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      const nav = navigator as Navigator & { canShare?: (data: { files?: File[] }) => boolean };
-      if (nav.canShare && nav.canShare({ files: [pdfFile] })) {
-        await navigator.share({
-          files: [pdfFile],
-          title: 'CARDIO B2B Price Catalog 2026',
-        });
-      } else {
-        const url = URL.createObjectURL(pdfBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-      }
-    } catch {
-      window.print();
+      setReadyPdf({
+        file: pdfFile,
+        blob: pdfBlob,
+        fileName,
+        pages: jpegPages,
+      });
     } finally {
       setPdfGenerating(false);
       setPdfProgressText('');
     }
+  };
+
+  /**
+   * Шаг 2: Вызывается СИНХРОННО в момент клика пользователя по кнопке "СОХРАНИТЬ / ОТКРЫТЬ PDF".
+   * Благодаря 0 мс задержки Android WebView сохраняет User Gesture и открывает системное меню сохранения файла.
+   */
+  const handleInstantSaveOrShare = async () => {
+    if (!readyPdf) return;
+    setShareHint(null);
+
+    try {
+      const nav = navigator as Navigator & { canShare?: (data: { files?: File[] }) => boolean };
+      if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [readyPdf.file] }))) {
+        await nav.share({
+          files: [readyPdf.file],
+          title: readyPdf.fileName,
+        });
+        return;
+      }
+    } catch (err) {
+      const errName = (err as { name?: string })?.name;
+      if (errName === 'AbortError') return;
+    }
+
+    // Резервный метод скачивания для десктопных и мобильных браузеров
+    try {
+      const url = URL.createObjectURL(readyPdf.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = readyPdf.fileName;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+      setShareHint(
+        lang === 'de'
+          ? 'Datei wurde in Downloads gespeichert. Sie können auch die Seiten unten lang drücken.'
+          : lang === 'uk'
+          ? 'Файл надіслано в Завантаження. Ви також можете затиснути будь-який аркуш нижче, щоб зберегти його в Галерею.'
+          : 'Файл отправлен в Загрузки. Вы также можете зажать любой лист ниже пальцем, чтобы сохранить его в Галерею.'
+      );
+    } catch {}
   };
 
   const GOLD = '#C5A880';
@@ -738,74 +806,107 @@ function WholesalePriceCatalogModal({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: 99999,
         backgroundColor: BG,
         color: INK,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
-        padding: '16px 14px 90px 14px',
+        padding: '0 14px 90px 14px',
         boxSizing: 'border-box',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
       }}
-      onContextMenu={(e) => e.preventDefault()}
     >
+      {/* Липкая верхняя шапка (всегда на самом верху, ничего её не перекрывает) */}
       <div
         style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          backgroundColor: BG,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingBottom: '12px',
-          marginBottom: '16px',
-          borderBottom: `1px solid ${BORDER}`,
+          gap: '8px',
+          padding: '12px 0',
+          marginBottom: '14px',
+          borderBottom: `1px solid ${GOLD}`,
         }}
       >
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => {
+            if (readyPdf) {
+              setReadyPdf(null);
+            } else {
+              onClose();
+            }
+          }}
           style={{
-            background: 'transparent',
+            background: SURFACE,
             border: `1px solid ${GOLD}`,
             color: GOLD,
-            padding: '7px 12px',
+            padding: '9px 12px',
             fontSize: '10px',
-            fontWeight: 600,
-            letterSpacing: '1px',
+            fontWeight: 700,
+            letterSpacing: '0.8px',
             textTransform: 'uppercase',
             cursor: 'pointer',
+            whiteSpace: 'nowrap',
           }}
         >
-          {t.back}
+          {readyPdf ? t.closeReadyBtn : t.back}
         </button>
 
-        {isUnlocked && (
+        {isUnlocked && !readyPdf && (
           <button
             type="button"
             disabled={pdfGenerating}
-            onClick={handleDownloadIllustratedPdf}
+            onClick={handleBuildIllustratedPdf}
             style={{
               backgroundColor: GOLD,
               color: '#141413',
               border: 'none',
-              padding: '8px 14px',
+              padding: '9px 14px',
               fontSize: '10px',
               fontWeight: 700,
-              letterSpacing: '1px',
+              letterSpacing: '0.9px',
               textTransform: 'uppercase',
               cursor: pdfGenerating ? 'wait' : 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
-            {pdfGenerating ? `${t.generatingPdf} ${pdfProgressText}` : t.downloadPdf}
+            {pdfGenerating ? `${t.generatingPdf} ${pdfProgressText}` : t.downloadPdfShort}
+          </button>
+        )}
+
+        {isUnlocked && readyPdf && (
+          <button
+            type="button"
+            onClick={handleInstantSaveOrShare}
+            style={{
+              backgroundColor: GOLD,
+              color: '#141413',
+              border: 'none',
+              padding: '9px 14px',
+              fontSize: '10px',
+              fontWeight: 700,
+              letterSpacing: '0.9px',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            📥 PDF ({readyPdf.pages.length})
           </button>
         )}
       </div>
 
+      {/* ЭКРАН 1: ВВОД PIN-КОДА */}
       {!isUnlocked ? (
         <div
           style={{
             maxWidth: '400px',
-            margin: '28px auto',
+            margin: '20px auto',
             backgroundColor: SURFACE,
             border: `1.5px solid ${GOLD}`,
             padding: '24px 18px',
@@ -929,7 +1030,104 @@ function WholesalePriceCatalogModal({
             </div>
           </div>
         </div>
+      ) : readyPdf ? (
+        /* ЭКРАН 2: СФОРМИРОВАННЫЙ PDF ГОТОВ К СОХРАНЕНИЮ В ОДИН КЛИК + ПРОСМОТР ЛИСТОВ А4 */
+        <div>
+          <div
+            style={{
+              border: `2px solid ${GOLD}`,
+              backgroundColor: SURFACE,
+              padding: '18px 14px',
+              marginBottom: '18px',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '18px', fontFamily: '"Playfair Display", Georgia, serif', color: GOLD, marginBottom: '6px' }}>
+              {t.pdfReadyTitle(readyPdf.pages.length)}
+            </div>
+            <div style={{ fontSize: '11.5px', color: MUTED, lineHeight: 1.45, marginBottom: '14px' }}>
+              {t.pdfReadySub}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleInstantSaveOrShare}
+              style={{
+                width: '100%',
+                padding: '15px 16px',
+                backgroundColor: GOLD,
+                color: '#141413',
+                border: 'none',
+                fontSize: '11px',
+                fontWeight: 800,
+                letterSpacing: '1.1px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              {t.saveToPhoneBtn}
+            </button>
+
+            {shareHint && (
+              <div style={{ fontSize: '11px', color: GOLD, marginTop: '10px', lineHeight: 1.35 }}>
+                {shareHint}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              fontSize: '10px',
+              letterSpacing: '1.4px',
+              color: GOLD,
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              marginBottom: '10px',
+            }}
+          >
+            {t.pagesPreviewLabel}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {readyPdf.pages.map((dataUrl, idx) => (
+              <div
+                key={idx}
+                style={{
+                  border: `1px solid ${GOLD}`,
+                  backgroundColor: '#18181A',
+                  padding: '8px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '10px',
+                    color: GOLD,
+                    marginBottom: '6px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                  }}
+                >
+                  <span>{t.pageNumberLabel(idx + 1, readyPdf.pages.length)}</span>
+                  <span>CARDIO 2026</span>
+                </div>
+                <img
+                  src={dataUrl}
+                  alt={`CARDIO PDF Page ${idx + 1}`}
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    display: 'block',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
+        /* ЭКРАН 3: ВИТРИНА ПРАЙС-КАТАЛОГА */
         <div>
           <div
             style={{
@@ -943,10 +1141,31 @@ function WholesalePriceCatalogModal({
             <div style={{ fontSize: '9px', letterSpacing: '1.8px', color: GOLD, textTransform: 'uppercase', marginBottom: '4px' }}>
               {t.headerSub}
             </div>
-            <h1 style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '28px', fontWeight: 400, margin: '0 0 6px 0' }}>
+            <h1 style={{ fontFamily: '"Playfair Display", Georgia, serif', fontSize: '26px', fontWeight: 400, margin: '0 0 6px 0' }}>
               {t.mainTitle}
             </h1>
-            <div style={{ fontSize: '10px', color: MUTED }}>{watermark}</div>
+            <div style={{ fontSize: '10px', color: MUTED, marginBottom: '14px' }}>{watermark}</div>
+
+            {/* Крупная заметная кнопка скачивания PDF прямо в заголовке */}
+            <button
+              type="button"
+              disabled={pdfGenerating}
+              onClick={handleBuildIllustratedPdf}
+              style={{
+                width: '100%',
+                padding: '13px 16px',
+                backgroundColor: GOLD,
+                color: '#141413',
+                border: 'none',
+                fontSize: '10.5px',
+                fontWeight: 800,
+                letterSpacing: '1.1px',
+                textTransform: 'uppercase',
+                cursor: pdfGenerating ? 'wait' : 'pointer',
+              }}
+            >
+              {pdfGenerating ? `${t.generatingPdf} ${pdfProgressText}` : t.downloadPdf}
+            </button>
           </div>
 
           <div
