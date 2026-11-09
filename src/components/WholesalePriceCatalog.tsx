@@ -6,7 +6,10 @@ import {
   getLocalizedColor,
   getLocalizedFeature,
   type ShoeItem,
+  type CartItem,
+  type SizeKey,
 } from '../data/catalog';
+import { WholesaleCart } from './WholesaleCart';
 import type { Lang } from '../App';
 
 /**
@@ -18,6 +21,11 @@ import type { Lang } from '../App';
  */
 export const VALID_WHOLESALE_PINS = new Set(['2026', '7777', '1511', '3716']);
 const PIN_STORAGE_KEY = 'cardio_b2b_price_pin_ok_v1';
+const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
+
+const SIZES: readonly SizeKey[] = [40, 41, 42, 43, 44, 45] as const;
+const STANDARD_8_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 2, 43: 2, 44: 1, 45: 1 };
+const EVEN_6_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 1, 43: 1, 44: 1, 45: 1 };
 
 export type SeasonKey = 'autumn' | 'winter';
 
@@ -88,7 +96,7 @@ function getTgWebApp(): TgWebAppExtended | undefined {
   return (window as unknown as { Telegram?: { WebApp?: TgWebAppExtended } }).Telegram?.WebApp;
 }
 
-function getTelegramUserInfo(): { id?: number; label: string } {
+function getTelegramUserInfo(): { id?: number; label: string; watermarkLine: string } {
   try {
     const u = getTgWebApp()?.initDataUnsafe?.user;
     if (u?.id) {
@@ -96,10 +104,14 @@ function getTelegramUserInfo(): { id?: number; label: string } {
       return {
         id: u.id,
         label: `PARTNER ID: ${u.id}${namePart ? ` (${namePart})` : ''}`,
+        watermarkLine: `CARDIO B2B 2026   •   ID: ${u.id} ${namePart}   •   CONFIDENTIAL   •   DO NOT FORWARD`,
       };
     }
   } catch {}
-  return { label: 'CONFIDENTIAL B2B PARTNER EDITION' };
+  return {
+    label: 'CONFIDENTIAL B2B EDITION',
+    watermarkLine: 'CARDIO B2B 2026   •   CONFIDENTIAL WHOLESALE PRICE   •   DO NOT COPY OR FORWARD',
+  };
 }
 
 function buildPdfBase64FromJpegPages(
@@ -233,7 +245,10 @@ type BannerProps = {
   onHaptic?: () => void;
 };
 
-export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe, onHaptic }: BannerProps) {
+/**
+ * Журнальный баннер для Materials.tsx — без обрезки текста и без троеточий
+ */
+export function WholesalePriceBanner({ lang = 'ru', isDark = false, onHaptic }: BannerProps) {
   const safeLang: 'ru' | 'uk' | 'de' = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -256,19 +271,22 @@ export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe
 
   const labels = {
     ru: {
-      sub: isUnlocked ? 'B2B SHOWROOM // 38 МОДЕЛЕЙ С ЦЕНАМИ' : 'B2B SHOWROOM // ДОСТУП ПО PIN',
-      title: 'Оптовый прайс-лукбук 2026 (PDF)',
-      btn: isUnlocked ? 'Открыть прайс →' : 'Открыть PDF →',
+      sub: isUnlocked ? 'B2B SHOWROOM // 38 МОДЕЛЕЙ С ЦЕНАМИ' : 'B2B SHOWROOM // ДОСТУП ПО PIN-КОДУ',
+      title: 'Оптовый прайс-каталог 2026',
+      desc: 'Закрытый лукбук фабрики с оптовыми ценами, расчетом коробов и выгрузкой в PDF',
+      btn: isUnlocked ? 'Открыть прайс-каталог →' : 'Ввести PIN и открыть прайс →',
     },
     uk: {
-      sub: isUnlocked ? 'B2B SHOWROOM // 38 МОДЕЛЕЙ З ЦІНАМИ' : 'B2B SHOWROOM // ДОСТУП ЗА PIN',
-      title: 'Гуртовий прайс-лукбук 2026 (PDF)',
-      btn: isUnlocked ? 'Відкрити прайс →' : 'Відкрити PDF →',
+      sub: isUnlocked ? 'B2B SHOWROOM // 38 МОДЕЛЕЙ З ЦІНАМИ' : 'B2B SHOWROOM // ДОСТУП ЗА PIN-КОДОМ',
+      title: 'Гуртовий прайс-каталог 2026',
+      desc: 'Закритий лукбук фабрики з гуртовими цінами, розрахунком коробів та вивантаженням у PDF',
+      btn: isUnlocked ? 'Відкрити прайс-каталог →' : 'Ввести PIN та відкрити прайс →',
     },
     de: {
-      sub: isUnlocked ? 'B2B SHOWROOM // 38 MODELLE MIT PREISEN' : 'B2B SHOWROOM // PIN-ZUGANG',
-      title: 'Großhandel Preiskatalog 2026 (PDF)',
-      btn: isUnlocked ? 'Preise öffnen →' : 'PDF öffnen →',
+      sub: isUnlocked ? 'B2B SHOWROOM // 38 MODELLE MIT PREISEN' : 'B2B SHOWROOM // ZUGANG MIT PIN-CODE',
+      title: 'Großhandel Preiskatalog 2026',
+      desc: 'Exklusives Lookbook ab Werk mit Großhandelspreisen, Kistenkalkulation und PDF-Export',
+      btn: isUnlocked ? 'Preiskatalog öffnen →' : 'PIN eingeben & Katalog öffnen →',
     },
   }[safeLang];
 
@@ -292,11 +310,12 @@ export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe
                 window.dispatchEvent(new Event('cardio-pin-unlocked'));
               } catch {}
             }}
-            onClose={() => setIsModalOpen(false)}
-            onSelectShoe={(shoe) => {
+            onClose={() => {
               setIsModalOpen(false);
-              onSelectShoe?.(shoe);
+              // Обновляем страницу каталога, если корзина менялась внутри прайса
+              window.dispatchEvent(new Event('storage'));
             }}
+            onHaptic={onHaptic}
           />,
           document.body
         )
@@ -315,57 +334,62 @@ export function WholesalePriceBanner({ lang = 'ru', isDark = false, onSelectShoe
           backgroundColor: surface,
           border: `1px solid ${border}`,
           borderLeft: `3px solid ${ink}`,
-          padding: '12px 14px',
-          marginBottom: '16px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '12px',
+          padding: '14px 16px',
+          marginBottom: '18px',
           cursor: 'pointer',
           touchAction: 'manipulation',
         }}
       >
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: '8.5px',
-              letterSpacing: '1.4px',
-              textTransform: 'uppercase',
-              color: muted,
-              fontWeight: 600,
-              marginBottom: '3px',
-            }}
-          >
-            {labels.sub}
-          </div>
-          <div
-            style={{
-              fontFamily: '"Playfair Display", Georgia, serif',
-              fontSize: '16px',
-              color: ink,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {labels.title}
-          </div>
+        <div
+          style={{
+            fontSize: '9px',
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase',
+            color: muted,
+            fontWeight: 600,
+            marginBottom: '4px',
+          }}
+        >
+          {labels.sub}
+        </div>
+
+        <div
+          style={{
+            fontFamily: '"Playfair Display", Georgia, serif',
+            fontSize: '22px',
+            color: ink,
+            lineHeight: 1.18,
+            marginBottom: '6px',
+          }}
+        >
+          {labels.title}
+        </div>
+
+        <div
+          style={{
+            fontSize: '11.5px',
+            color: muted,
+            lineHeight: 1.4,
+            marginBottom: '12px',
+          }}
+        >
+          {labels.desc}
         </div>
 
         <button
           type="button"
           style={{
+            width: '100%',
             backgroundColor: ink,
             color: onInk,
             border: 'none',
-            padding: '9px 12px',
-            fontSize: '9px',
+            padding: '11px 14px',
+            fontSize: '10px',
             fontWeight: 600,
-            letterSpacing: '1px',
+            letterSpacing: '1.2px',
             textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
             cursor: 'pointer',
+            textAlign: 'center',
           }}
         >
           {labels.btn}
@@ -383,7 +407,7 @@ type ModalProps = {
   isUnlocked: boolean;
   onUnlockSuccess: () => void;
   onClose: () => void;
-  onSelectShoe?: (shoe: ShoeItem) => void;
+  onHaptic?: () => void;
 };
 
 function WholesalePriceCatalogModal({
@@ -392,7 +416,7 @@ function WholesalePriceCatalogModal({
   isUnlocked,
   onUnlockSuccess,
   onClose,
-  onSelectShoe,
+  onHaptic,
 }: ModalProps) {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -403,12 +427,35 @@ function WholesalePriceCatalogModal({
     sentToTelegram: boolean;
     downloadUrl: string;
     fileName: string;
-    pages: string[];
   } | null>(null);
+
+  // Внутренняя навигация внутри закрытого прайс-каталога (чтобы не выбрасывало на главную!)
+  const [selectedShoeInPrice, setSelectedShoeInPrice] = useState<ShoeItem | null>(null);
+  const [isCartOpenInPrice, setIsCartOpenInPrice] = useState(false);
+  const [orderMode, setOrderMode] = useState<'wholesale' | 'sample'>('wholesale');
+  const [sizeRun, setSizeRun] = useState<Record<SizeKey, number>>(STANDARD_8_RUN);
+  const [sampleSize, setSampleSize] = useState<SizeKey>(42);
+  const [boxesCount, setBoxesCount] = useState<number>(1);
+  const [justAdded, setJustAdded] = useState(false);
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      return saved ? (JSON.parse(saved) as CartItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch {}
+  }, [cart]);
 
   const tgUser = useMemo(() => getTelegramUserInfo(), []);
 
-  // Все 38 позиций из cardioCatalog (каждый цвет и вариант #1, #2, #3 отдельно)
+  // Все 38 моделей из cardioCatalog с привязкой к ценам
   const allCatalogItems: FullCatalogPriceItem[] = useMemo(() => {
     const result: FullCatalogPriceItem[] = [];
     for (const shoe of cardioCatalog) {
@@ -441,37 +488,69 @@ function WholesalePriceCatalogModal({
     return allCatalogItems.filter((i) => i.season === seasonFilter);
   }, [allCatalogItems, seasonFilter]);
 
+  const cartTotalPairs = useMemo(() => cart.reduce((s, i) => s + i.totalPairs, 0), [cart]);
+  const cartTotalUsd = useMemo(
+    () =>
+      cart.reduce((sum, item) => {
+        const p = getWholesalePriceByModel(item.shoe.modelNumber) || 0;
+        return sum + p * item.totalPairs;
+      }, 0),
+    [cart]
+  );
+
+  const pairsInCartByShoeId = useMemo(() => {
+    const map: Record<string, number> = {};
+    cart.forEach((item) => {
+      map[item.shoe.id] = (map[item.shoe.id] || 0) + item.totalPairs;
+    });
+    return map;
+  }, [cart]);
+
+  const pairsPerBox = useMemo(() => SIZES.reduce((sum, sz) => sum + (sizeRun[sz] || 0), 0), [sizeRun]);
+  const isStandard8 = useMemo(() => SIZES.every((sz) => sizeRun[sz] === STANDARD_8_RUN[sz]), [sizeRun]);
+  const isEven6 = useMemo(() => SIZES.every((sz) => sizeRun[sz] === EVEN_6_RUN[sz]), [sizeRun]);
+  const isCustomRun = !isStandard8 && !isEven6;
+  const currentTotalPairs = orderMode === 'sample' ? 1 : pairsPerBox * boxesCount;
+
   const THEME = isDark
     ? {
         bg: '#0A0A0A',
         surface: '#141416',
         surfaceActive: '#222226',
+        cardInCart: '#1A221C',
         imageStage: '#E6E1D8',
         ink: '#F4EFE6',
         inkMuted: '#A1A1AA',
         inkLight: '#71717A',
         onInk: '#121214',
+        onInkMuted: '#4A4742',
         border: '#2C2C30',
         accentGreen: '#2E7D32',
+        serif: '"Playfair Display", Georgia, serif',
       }
     : {
         bg: '#F2EFE9',
         surface: '#F8F6F1',
         surfaceActive: '#EAE5DC',
+        cardInCart: '#EFECE4',
         imageStage: '#F8F6F1',
         ink: '#161514',
         inkMuted: '#6E6A63',
         inkLight: '#9A958C',
         onInk: '#FFFFFF',
+        onInkMuted: '#D6D1C7',
         border: '#DCD7CC',
         accentGreen: '#1E4620',
+        serif: '"Playfair Display", Georgia, serif',
       };
 
   const t = {
     ru: {
-      back: '← В каталог',
+      backToPublic: '← Выход',
+      backToPriceList: '← Прайс-каталог',
+      invoiceBtn: (p: number, usd: number) => `Накладная (${p} п. • $${usd})`,
       pinTag: 'CARDIO B2B // ЗАКРЫТЫЙ РАЗДЕЛ',
-      pinTitle: 'Оптовый прайс-лукбук 2026',
+      pinTitle: 'Оптовый прайс-каталог 2026',
       pinSub: 'Оптовые цены предназначены исключительно для партнеров фабрики и владельцев магазинов. Введите 4-значный PIN-код:',
       pinUnlockBtn: 'Открыть прайс-каталог →',
       pinErrorText: 'Неверный PIN-код. Запросите код у руководителя отдела продаж ниже.',
@@ -479,27 +558,53 @@ function WholesalePriceCatalogModal({
       askBoris: 'Борис • +38 (097) 454-15-11',
       askGeorgiy: 'Георгий • +38 (067) 719-37-16',
       lookbookTag: 'CARDIO FOOTWEAR // WHOLESALE LOOKBOOK 2026',
-      mainTitle: 'Оптовый прайс-каталог',
-      downloadBtn: '⬇ Получить PDF-каталог (все 38 цветов)',
-      downloadBtnTop: '⬇ Скачать PDF',
+      mainTitle: 'Оптовый прайс-каталог 2026',
+      downloadBtn: (count: number) => `⬇ Скачать прайс-каталог PDF (${count} моделей)`,
+      downloadBtnTop: '⬇ PDF',
       generatingPdf: 'Верстка PDF',
-      sentToTgBanner: '✓ Защищенный PDF-каталог отправлен вам в чат Telegram от @Cordwainer_bot!',
+      sentToTgBanner: '✓ Защищенный PDF-каталог с водяным знаком отправлен вам в чат Telegram от @Cordwainer_bot!',
       downloadDirectBtn: '📥 Скачать файл PDF в память телефона →',
-      tabAll: `Все (${allCatalogItems.length})`,
-      tabAutumn: `Осень (${autumnCount})`,
-      tabWinter: `Зима (${winterCount})`,
+      tabAll: `Все модели (${allCatalogItems.length})`,
+      tabAutumn: `Осень 2026 (${autumnCount})`,
+      tabWinter: `Зима 2026 (${winterCount})`,
       box6: 'Короб 6 пар',
       box8: 'Короб 8 пар',
       orderBtn: 'Выбрать ростовку →',
+      reorderBtn: 'Дозаказать →',
+      inCartBadge: (p: number) => `В ЗАКАЗЕ: ${p} П.`,
       footerSub: 'ОТДЕЛ ОПТОВЫХ ПРОДАЖ // CARDIO ХАРЬКОВ',
       georgiyName: 'Георгий',
       borisName: 'Борис',
-      securityNote: 'Конфиденциальный B2B-документ. Защищен от пересылки третьим лицам.',
+      securityNote: 'Конфиденциальный B2B-документ. Защищен персональным водяным знаком и запретом пересылки.',
+      // Для карточки заказа внутри прайса:
+      cardTitle: 'КАРТОЧКА МОДЕЛИ (B2B ПРАЙС)',
+      colorLabel: 'Цвет:',
+      wholesalePriceLabel: 'Оптовая цена:',
+      perPairWord: 'за пару',
+      availableColors: 'ВСЕ РАСЦВЕТКИ ЭТОЙ МОДЕЛИ',
+      orderParams: 'КОМПЛЕКТАЦИЯ ЗАКАЗА В НАКЛАДНУЮ',
+      wholesaleRun: 'Оптовая ростовка',
+      sampleRun: 'Тестовый образец (1 п.)',
+      standard8: '8 пар • Стандарт',
+      standard8Desc: '42 и 43 р. — по 2 пары',
+      even6: '6 пар • Ровная',
+      even6Desc: '40–45 р. — все по 1 паре',
+      boxesCountLabel: 'Количество коробов:',
+      samplePrompt: 'Выберите размер тестового образца:',
+      addToCart: 'Добавить в накладную',
+      addedSuccess: '✓ Добавлено в накладную',
+      alreadyInCart: (p: number, usd: number) => `Уже в накладной: ${p} пар ($${usd})`,
+      openWord: 'Открыть →',
+      bottomOrderTitle: 'ВАШ ОПТОВЫЙ ЗАКАЗ (ПО ПРАЙСУ)',
+      bottomInvoiceText: (m: number, p: number, usd: number) => `${m} мод. • ${p} пар • $${usd}`,
+      openInvoiceBtn: 'Оформить →',
     },
     uk: {
-      back: '← У каталог',
+      backToPublic: '← Вихід',
+      backToPriceList: '← Прайс-каталог',
+      invoiceBtn: (p: number, usd: number) => `Накладна (${p} п. • $${usd})`,
       pinTag: 'CARDIO B2B // ЗАКРИТИЙ РОЗДІЛ',
-      pinTitle: 'Гуртовий прайс-лукбук 2026',
+      pinTitle: 'Гуртовий прайс-каталог 2026',
       pinSub: 'Гуртові ціни призначені виключно для партнерів фабрики та власників магазинів. Введіть 4-значний PIN-код:',
       pinUnlockBtn: 'Відкрити прайс-каталог →',
       pinErrorText: 'Невірний PIN-код. Запитайте код у керівника відділу продажу нижче.',
@@ -507,27 +612,52 @@ function WholesalePriceCatalogModal({
       askBoris: 'Борис • +38 (097) 454-15-11',
       askGeorgiy: 'Георгій • +38 (067) 719-37-16',
       lookbookTag: 'CARDIO FOOTWEAR // WHOLESALE LOOKBOOK 2026',
-      mainTitle: 'Гуртовий прайс-каталог',
-      downloadBtn: '⬇ Отримати PDF-каталог (всі 38 кольорів)',
-      downloadBtnTop: '⬇ Завантажити PDF',
+      mainTitle: 'Гуртовий прайс-каталог 2026',
+      downloadBtn: (count: number) => `⬇ Завантажити прайс-каталог PDF (${count} моделей)`,
+      downloadBtnTop: '⬇ PDF',
       generatingPdf: 'Верстка PDF',
-      sentToTgBanner: '✓ Захищений PDF-каталог надіслано вам у чат Telegram від @Cordwainer_bot!',
+      sentToTgBanner: '✓ Захищений PDF-каталог з водяним знаком надіслано вам у чат Telegram від @Cordwainer_bot!',
       downloadDirectBtn: '📥 Завантажити файл PDF у пам’ять телефону →',
-      tabAll: `Всі (${allCatalogItems.length})`,
-      tabAutumn: `Осінь (${autumnCount})`,
-      tabWinter: `Зима (${winterCount})`,
+      tabAll: `Всі моделі (${allCatalogItems.length})`,
+      tabAutumn: `Осінь 2026 (${autumnCount})`,
+      tabWinter: `Зима 2026 (${winterCount})`,
       box6: 'Короб 6 пар',
       box8: 'Короб 8 пар',
       orderBtn: 'Вибрати ростовку →',
+      reorderBtn: 'Дозамовити →',
+      inCartBadge: (p: number) => `У ЗАМОВЛЕННІ: ${p} П.`,
       footerSub: 'ВІДДІЛ ГУРТОВОГО ПРОДАЖУ // CARDIO ХАРКІВ',
       georgiyName: 'Георгій',
       borisName: 'Борис',
-      securityNote: 'Конфіденційний B2B-документ. Захищено від пересилання третім особам.',
+      securityNote: 'Конфіденційний B2B-документ. Захищено персональним водяним знаком та забороною пересилання.',
+      cardTitle: 'КАРТКА МОДЕЛІ (B2B ПРАЙС)',
+      colorLabel: 'Колір:',
+      wholesalePriceLabel: 'Гуртова ціна:',
+      perPairWord: 'за пару',
+      availableColors: 'ВСІ КОЛЬОРИ ЦІЄЇ МОДЕЛІ',
+      orderParams: 'КОМПЛЕКТАЦІЯ ЗАМОВЛЕННЯ У НАКЛАДНУ',
+      wholesaleRun: 'Гуртова ростовка',
+      sampleRun: 'Тестовий зразок (1 п.)',
+      standard8: '8 пар • Стандарт',
+      standard8Desc: '42 і 43 р. — по 2 пари',
+      even6: '6 пар • Рівна',
+      even6Desc: '40–45 р. — всі по 1 парі',
+      boxesCountLabel: 'Кількість коробів:',
+      samplePrompt: 'Виберіть розмір тестового зразка:',
+      addToCart: 'Додати до накладної',
+      addedSuccess: '✓ Додано до накладної',
+      alreadyInCart: (p: number, usd: number) => `Вже у накладній: ${p} пар ($${usd})`,
+      openWord: 'Відкрити →',
+      bottomOrderTitle: 'ВАШЕ ГУРТОВЕ ЗАМОВЛЕННЯ (ЗА ПРАЙСОМ)',
+      bottomInvoiceText: (m: number, p: number, usd: number) => `${m} мод. • ${p} пар • $${usd}`,
+      openInvoiceBtn: 'Оформити →',
     },
     de: {
-      back: '← Zum Katalog',
+      backToPublic: '← Zurück',
+      backToPriceList: '← Preiskatalog',
+      invoiceBtn: (p: number, usd: number) => `Rechnung (${p} P. • $${usd})`,
       pinTag: 'CARDIO B2B // EXKLUSIVER BEREICH',
-      pinTitle: 'Großhandel Lookbook 2026',
+      pinTitle: 'Großhandel Preiskatalog 2026',
       pinSub: 'Die Großhandelspreise sind ausschließlich für autorisierte Partner bestimmt. Bitte 4-stelligen PIN eingeben:',
       pinUnlockBtn: 'Preiskatalog öffnen →',
       pinErrorText: 'Ungültiger PIN-Code. Bitte beim Verkaufsleiter anfordern.',
@@ -535,24 +665,87 @@ function WholesalePriceCatalogModal({
       askBoris: 'Boris • +38 (097) 454-15-11',
       askGeorgiy: 'Georgiy • +38 (067) 719-37-16',
       lookbookTag: 'CARDIO FOOTWEAR // WHOLESALE LOOKBOOK 2026',
-      mainTitle: 'B2B Preiskatalog 2026',
-      downloadBtn: '⬇ PDF-Lookbook erhalten (Alle 38 Farben)',
-      downloadBtnTop: '⬇ PDF laden',
+      mainTitle: 'Großhandel Preiskatalog 2026',
+      downloadBtn: (count: number) => `⬇ Preiskatalog PDF herunterladen (${count} Modelle)`,
+      downloadBtnTop: '⬇ PDF',
       generatingPdf: 'PDF Layout',
-      sentToTgBanner: '✓ Geschützter PDF-Katalog wurde in Ihren Telegram-Chat gesendet!',
+      sentToTgBanner: '✓ Geschützter PDF-Katalog mit Wasserzeichen wurde in Ihren Telegram-Chat gesendet!',
       downloadDirectBtn: '📥 PDF-Datei auf Smartphone speichern →',
-      tabAll: `Alle (${allCatalogItems.length})`,
-      tabAutumn: `Herbst (${autumnCount})`,
-      tabWinter: `Winter (${winterCount})`,
-      box6: 'Kiste 6 P.',
-      box8: 'Kiste 8 P.',
+      tabAll: `Alle Modelle (${allCatalogItems.length})`,
+      tabAutumn: `Herbst 2026 (${autumnCount})`,
+      tabWinter: `Winter 2026 (${winterCount})`,
+      box6: 'Kiste 6 Paar',
+      box8: 'Kiste 8 Paar',
       orderBtn: 'Serie wählen →',
+      reorderBtn: 'Nachbestellen →',
+      inCartBadge: (p: number) => `IM WAGEN: ${p} P.`,
       footerSub: 'GROSSHANDELSABTEILUNG // CARDIO CHARKIW',
       georgiyName: 'Georgiy',
       borisName: 'Boris',
-      securityNote: 'Vertrauliches B2B-Dokument. Weiterleitung an Dritte untersagt.',
+      securityNote: 'Vertrauliches B2B-Dokument. Geschützt durch persönliches Wasserzeichen.',
+      cardTitle: 'MODELLKARTE (B2B PREIS)',
+      colorLabel: 'Farbe:',
+      wholesalePriceLabel: 'Großhandelspreis:',
+      perPairWord: 'pro Paar',
+      availableColors: 'VERFÜGBARE FARBVARIANTEN',
+      orderParams: 'BESTELLKONFIGURATION',
+      wholesaleRun: 'Großhandelsserie',
+      sampleRun: 'Testmuster (1 P.)',
+      standard8: '8 Paar • Standard',
+      standard8Desc: 'Gr. 42 & 43 — je 2 Paar',
+      even6: '6 Paar • Gleich',
+      even6Desc: 'Gr. 40–45 — je 1 Paar',
+      boxesCountLabel: 'Anzahl Kisten:',
+      samplePrompt: 'Testmuster-Größe wählen:',
+      addToCart: 'Zur Rechnung hinzufügen',
+      addedSuccess: '✓ Hinzugefügt',
+      alreadyInCart: (p: number, usd: number) => `Bereits auf der Rechnung: ${p} Paar ($${usd})`,
+      openWord: 'Öffnen →',
+      bottomOrderTitle: 'IHRE GROSSHANDELSBESTELLUNG',
+      bottomInvoiceText: (m: number, p: number, usd: number) => `${m} Mod. • ${p} Paar • $${usd}`,
+      openInvoiceBtn: 'Bestellen →',
     },
   }[lang];
+
+  const updateSizeCount = (size: SizeKey, delta: number) => {
+    const currentVal = sizeRun[size] || 0;
+    const nextVal = Math.max(0, Math.min(10, currentVal + delta));
+    if (nextVal !== currentVal) {
+      onHaptic?.();
+      setSizeRun((prev) => ({ ...prev, [size]: nextVal }));
+    }
+  };
+
+  const addSelectedShoeToCart = () => {
+    if (!selectedShoeInPrice || currentTotalPairs === 0) return;
+    onHaptic?.();
+
+    const pricePerPair = getWholesalePriceByModel(selectedShoeInPrice.modelNumber) || 0;
+    const lineUsd = pricePerPair * currentTotalPairs;
+
+    const formulaText =
+      orderMode === 'sample'
+        ? `${t.sampleRun} — р. ${sampleSize} ($${lineUsd})`
+        : `Ростовок ×${boxesCount} ($${lineUsd}): ` +
+          SIZES.filter((sz) => sizeRun[sz] > 0)
+            .map((sz) => `${sz}р.(${sizeRun[sz] * boxesCount})`)
+            .join(' • ');
+
+    const newItem: CartItem = {
+      uid: `${selectedShoeInPrice.id}-${Date.now()}`,
+      shoe: selectedShoeInPrice,
+      orderMode,
+      sizeRun: { ...sizeRun },
+      boxesCount,
+      sampleSize,
+      totalPairs: currentTotalPairs,
+      formulaText,
+    };
+
+    setCart((prev) => [...prev, newItem]);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 2200);
+  };
 
   const triggerDownloadUrl = (relativeOrFullUrl: string, fileName: string) => {
     const fullUrl = relativeOrFullUrl.startsWith('http')
@@ -577,6 +770,11 @@ function WholesalePriceCatalogModal({
     window.open(fullUrl, '_blank');
   };
 
+  /**
+   * Крупноформатная журнальная верстка PDF:
+   * - По 2 крупные модели во всю ширину листа А4 на страницу (идеально читается с экрана телефона)
+   * - Контрастный диагональный водяной знак с ID партнера поверх каждого листа и подиума
+   */
   const handleGenerateAndDeliverPdf = async () => {
     if (pdfGenerating) return;
     setPdfGenerating(true);
@@ -585,12 +783,12 @@ function WholesalePriceCatalogModal({
     try {
       const logoImg = await loadImageElement('/logo.png');
       const itemsToRender = visibleItems;
-      const cardsPerPage = 6;
+      const cardsPerPage = 2; // 2 крупные широкоформатные карточки во всю ширину листа А4!
       const totalPages = Math.max(1, Math.ceil(itemsToRender.length / cardsPerPage));
       const jpegPages: string[] = [];
 
-      const W = 1040;
-      const H = 1471;
+      const W = 960;
+      const H = 1358;
 
       for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
         setPdfProgressText(`${pageIdx + 1}/${totalPages}`);
@@ -600,112 +798,129 @@ function WholesalePriceCatalogModal({
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
+        // 1. Фон дизайнерской бумаги Warm Alabaster
         ctx.fillStyle = '#F2EFE9';
         ctx.fillRect(0, 0, W, H);
 
-        const marginX = 52;
-        const contentW = W - marginX * 2; // 936px
+        const marginX = 48;
+        const contentW = W - marginX * 2; // 864px
 
-        ctx.fillStyle = '#6E6A63';
-        ctx.font = '600 11px Arial, sans-serif';
+        // 2. Верхний колонтитул с ID партнера и номером листа
+        ctx.fillStyle = '#161514';
+        ctx.font = '700 13px Arial, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('CARDIO FOOTWEAR // KHARKIV • B2B LOOKBOOK 2026', marginX, 46);
+        ctx.fillText('CARDIO FOOTWEAR // KHARKIV • B2B LOOKBOOK 2026', marginX, 42);
 
         ctx.textAlign = 'right';
         ctx.fillText(
-          `${tgUser.label}   •   PAGE ${String(pageIdx + 1).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}`,
+          `${tgUser.label}   •   ${ String(pageIdx + 1).padStart(2, '0') } / ${ String(totalPages).padStart(2, '0') }`,
           W - marginX,
-          46
+          42
         );
 
         ctx.strokeStyle = '#161514';
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(marginX, 60);
-        ctx.lineTo(W - marginX, 60);
+        ctx.moveTo(marginX, 56);
+        ctx.lineTo(W - marginX, 56);
         ctx.stroke();
 
+        // Шапка с логотипом и названием коллекции
         if (logoImg) {
-          const lH = 40;
+          const lH = 42;
           const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
-          ctx.drawImage(logoImg, marginX, 74, lW, lH);
+          ctx.drawImage(logoImg, marginX, 68, lW, lH);
         }
 
         ctx.fillStyle = '#161514';
-        ctx.font = '400 32px Georgia, serif';
+        ctx.font = '700 32px Georgia, serif';
         ctx.textAlign = 'left';
-        ctx.fillText('CARDIO', marginX + 80, 102);
+        ctx.fillText('CARDIO', marginX + 82, 99);
 
         ctx.fillStyle = '#6E6A63';
-        ctx.font = 'italic 17px Georgia, serif';
-        const collectionLabel =
-          seasonFilter === 'autumn'
-            ? 'Autumn Collection 2026'
-            : seasonFilter === 'winter'
-            ? 'Winter Collection 2026'
-            : 'Complete Wholesale Collection 2026 (All Colors)';
+        ctx.font = 'italic 20px Georgia, serif';
         ctx.textAlign = 'right';
-        ctx.fillText(collectionLabel, W - marginX, 100);
+        ctx.fillText(t.mainTitle, W - marginX, 98);
 
         ctx.strokeStyle = '#DCD7CC';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(marginX, 126);
-        ctx.lineTo(W - marginX, 126);
+        ctx.moveTo(marginX, 120);
+        ctx.lineTo(W - marginX, 120);
         ctx.stroke();
 
+        // 3. Две крупные карточки моделей во всю ширину страницы (864px × 535px каждая)
         const slice = itemsToRender.slice(pageIdx * cardsPerPage, (pageIdx + 1) * cardsPerPage);
-        const gridTop = 142;
-        const gapX = 20;
-        const gapY = 18;
-        const cardW = (contentW - gapX) / 2; // 458px
-        const cardH = 392;
+        const startY = 138;
+        const cardH = 535;
+        const gapY = 26;
 
         for (let i = 0; i < slice.length; i++) {
-          const entry = slice[i];
-          const { shoe, priceUsd, season } = entry;
-          const col = i % 2;
-          const row = Math.floor(i / 2);
-          const x = marginX + col * (cardW + gapX);
-          const y = gridTop + row * (cardH + gapY);
+          const { shoe, priceUsd, season } = slice[i];
+          const x = marginX;
+          const y = startY + i * (cardH + gapY);
 
+          // Корпус карточки
           ctx.fillStyle = '#F8F6F1';
-          ctx.fillRect(x, y, cardW, cardH);
+          ctx.fillRect(x, y, contentW, cardH);
+          ctx.strokeStyle = '#161514';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x, y, contentW, cardH);
 
-          ctx.strokeStyle = '#DCD7CC';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x, y, cardW, cardH);
+          // Верхняя темная плашка карточки с крупным номером модели и крупной ценой
+          ctx.fillStyle = '#161514';
+          ctx.fillRect(x, y, contentW, 64);
 
-          const catLocalized = getLocalizedCategory(shoe.category, lang).toUpperCase();
-          const seasonShort = season === 'autumn' ? 'AUTUMN' : 'WINTER';
-
-          ctx.fillStyle = '#6E6A63';
-          ctx.font = '600 10.5px Arial, sans-serif';
+          const variantSuffix = shoe.variant ? ` (${shoe.variant})` : '';
+          ctx.fillStyle = '#F8F6F1';
+          ctx.font = '700 32px Georgia, serif';
           ctx.textAlign = 'left';
-          ctx.fillText(`${catLocalized} // ${seasonShort} '26`, x + 14, y + 22);
+          ctx.fillText(`Модель № ${shoe.modelNumber}${variantSuffix}`, x + 24, y + 43);
 
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '700 34px Georgia, serif';
           ctx.textAlign = 'right';
-          ctx.fillText('40—45', x + cardW - 14, y + 22);
+          ctx.fillText(`$${priceUsd}`, x + contentW - 24, y + 44);
 
-          ctx.strokeStyle = '#E5E0D5';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(x, y + 32);
-          ctx.lineTo(x + cardW, y + 32);
-          ctx.stroke();
-
-          const stageX = x + 12;
-          const stageY = y + 40;
-          const stageW = cardW - 24;
-          const stageH = 222;
+          // Студийный белый подиум во всю ширину (824px × 324px)
+          const stageX = x + 20;
+          const stageY = y + 80;
+          const stageW = contentW - 40;
+          const stageH = 320;
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(stageX, stageY, stageW, stageH);
+          ctx.strokeStyle = '#E5E0D5';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(stageX, stageY, stageW, stageH);
 
+          // Бейджи внутри подиума (Сезон + Категория | Ростовка 40-45)
+          const catLocalized = getLocalizedCategory(shoe.category, lang).toUpperCase();
+          const seasonLocalized =
+            season === 'autumn'
+              ? lang === 'de'
+                ? 'HERBST 2026'
+                : lang === 'uk'
+                ? 'ОСІНЬ 2026'
+                : 'ОСЕНЬ 2026'
+              : lang === 'de'
+              ? 'WINTER 2026'
+              : 'ЗИМА 2026';
+
+          ctx.fillStyle = '#6E6A63';
+          ctx.font = '700 15px Arial, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(`${catLocalized}   •   ${seasonLocalized}`, stageX + 18, stageY + 28);
+
+          ctx.textAlign = 'right';
+          ctx.fillText('40—45', stageX + stageW - 18, stageY + 28);
+
+          // Отрисовка крупной фотографии обуви
           const shoeImg = await loadImageElement(shoe.image);
           if (shoeImg) {
-            const pad = 18;
-            const availW = stageW - pad * 2;
-            const availH = stageH - pad * 2;
+            const padX = 40;
+            const padY = 28;
+            const availW = stageW - padX * 2;
+            const availH = stageH - padY * 2;
             const scale = Math.min(
               availW / Math.max(1, shoeImg.width),
               availH / Math.max(1, shoeImg.height)
@@ -713,81 +928,101 @@ function WholesalePriceCatalogModal({
             const drawW = shoeImg.width * scale;
             const drawH = shoeImg.height * scale;
             const drawX = stageX + (stageW - drawW) / 2;
-            const drawY = stageY + (stageH - drawH) / 2;
+            const drawY = stageY + (stageH - drawH) / 2 + 8;
             ctx.drawImage(shoeImg, drawX, drawY, drawW, drawH);
           }
 
-          const infoTop = stageY + stageH + 12;
+          // Нижняя информационная панель карточки (Цвет, Характеристики и Крупный расчет коробов)
+          const infoY = stageY + stageH + 34;
+          const colorLocalized = getLocalizedColor(shoe.color, lang).toUpperCase();
+          const featuresList = shoe.features
+            .map((f) => getLocalizedFeature(f, lang).toUpperCase())
+            .join('  •  ');
+          const specsLine = featuresList
+            ? `${t.colorLabel.toUpperCase()} ${colorLocalized}     •     ${featuresList}`
+            : `${t.colorLabel.toUpperCase()} ${colorLocalized}`;
 
           ctx.fillStyle = '#161514';
-          ctx.font = '400 25px Georgia, serif';
+          ctx.font = '700 18px Arial, sans-serif';
           ctx.textAlign = 'left';
-          const variantSuffix = shoe.variant ? ` (${shoe.variant})` : '';
-          ctx.fillText(`№ ${shoe.modelNumber}${variantSuffix}`, x + 14, infoTop + 22);
+          ctx.fillText(specsLine, x + 24, infoY);
 
-          ctx.fillStyle = '#161514';
-          ctx.font = '700 25px Georgia, serif';
-          ctx.textAlign = 'right';
-          ctx.fillText(`$${priceUsd}`, x + cardW - 14, infoTop + 22);
-
-          const colorLocalized = getLocalizedColor(shoe.color, lang);
-          const featuresList = shoe.features.map((f) => getLocalizedFeature(f, lang)).join(' • ');
-          const subtitleLine = featuresList ? `${colorLocalized}  •  ${featuresList}` : colorLocalized;
-
-          ctx.fillStyle = '#6E6A63';
-          ctx.font = '500 12px Arial, sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText(subtitleLine.toUpperCase().slice(0, 46), x + 14, infoTop + 44);
-
+          // Разделительная черта перед расчетом коробов
           ctx.strokeStyle = '#DCD7CC';
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.moveTo(x + 14, infoTop + 56);
-          ctx.lineTo(x + cardW - 14, infoTop + 56);
+          ctx.moveTo(x + 20, infoY + 18);
+          ctx.lineTo(x + contentW - 20, infoY + 18);
           ctx.stroke();
 
+          // Крупные плашки цен за короб 6 пар и 8 пар
+          const boxRowY = infoY + 56;
           ctx.fillStyle = '#6E6A63';
-          ctx.font = '600 10.5px Arial, sans-serif';
+          ctx.font = '700 18px Arial, sans-serif';
           ctx.textAlign = 'left';
-          ctx.fillText(`${t.box6.toUpperCase()}:`, x + 14, infoTop + 78);
+          ctx.fillText(`${t.box6.toUpperCase()} (40–45):`, x + 24, boxRowY);
 
           ctx.fillStyle = '#161514';
-          ctx.font = '700 13px Georgia, serif';
-          ctx.fillText(`$${priceUsd * 6}`, x + 102, infoTop + 78);
+          ctx.font = '700 26px Georgia, serif';
+          ctx.fillText(`$${priceUsd * 6}`, x + 245, boxRowY + 2);
 
           ctx.fillStyle = '#6E6A63';
-          ctx.font = '600 10.5px Arial, sans-serif';
+          ctx.font = '700 18px Arial, sans-serif';
           ctx.textAlign = 'right';
-          ctx.fillText(`${t.box8.toUpperCase()}:  $${priceUsd * 8}`, x + cardW - 14, infoTop + 78);
+          ctx.fillText(`${t.box8.toUpperCase()}:`, x + contentW - 125, boxRowY);
+
+          ctx.fillStyle = '#161514';
+          ctx.font = '700 26px Georgia, serif';
+          ctx.fillText(`$${priceUsd * 8}`, x + contentW - 24, boxRowY + 2);
         }
 
-        const footerY = H - 72;
+        // 4. ЗАЩИТНЫЙ ДИАГОНАЛЬНЫЙ ВОДЯНОЙ ЗНАК ПОВЕРХ ВСЕГО ЛИСТА (3 полосы + штамп)
+        ctx.save();
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(-Math.PI / 6.5);
+        ctx.textAlign = 'center';
+
+        const watermarkOffsets = [-380, 0, 380];
+        for (const offsetY of watermarkOffsets) {
+          // Рамка-штамп вокруг водяного знака
+          ctx.strokeStyle = 'rgba(22, 21, 20, 0.11)';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(-520, offsetY - 32, 1040, 46);
+
+          ctx.fillStyle = 'rgba(22, 21, 20, 0.11)';
+          ctx.font = '700 21px Arial, sans-serif';
+          ctx.fillText(tgUser.watermarkLine, 0, offsetY - 2);
+        }
+        ctx.restore();
+
+        // 5. Нижний колонтитул с контактами Бориса и Георгия
+        const footerY = H - 70;
         ctx.strokeStyle = '#161514';
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(marginX, footerY);
         ctx.lineTo(W - marginX, footerY);
         ctx.stroke();
 
         ctx.fillStyle = '#161514';
-        ctx.font = '600 12px Arial, sans-serif';
+        ctx.font = '700 15px Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(
           `${t.footerSub}   •   +38 (067) 719-37-16 (${t.georgiyName})   •   +38 (097) 454-15-11 (${t.borisName})`,
           marginX,
-          footerY + 24
+          footerY + 28
         );
 
         ctx.fillStyle = '#6E6A63';
-        ctx.font = '400 10.5px Arial, sans-serif';
+        ctx.font = '700 12px Arial, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText('CONFIDENTIAL B2B PRICE LIST • DO NOT FORWARD', W - marginX, footerY + 24);
+        ctx.fillText('DO NOT COPY OR FORWARD', W - marginX, footerY + 28);
 
-        jpegPages.push(canvas.toDataURL('image/jpeg', 0.82));
+        jpegPages.push(canvas.toDataURL('image/jpeg', 0.8));
       }
 
       const pdfBase64 = buildPdfBase64FromJpegPages(jpegPages, W, H);
-      const fileName = `CARDIO_LOOKBOOK_2026_${lang.toUpperCase()}.pdf`;
+      const fileName = `CARDIO_PRICE_CATALOG_2026_${lang.toUpperCase()}.pdf`;
 
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -808,7 +1043,6 @@ function WholesalePriceCatalogModal({
             sentToTelegram: Boolean(data.sentToTelegram),
             downloadUrl: data.downloadPath,
             fileName,
-            pages: jpegPages,
           });
           if (!data.sentToTelegram) {
             triggerDownloadUrl(data.downloadPath, fileName);
@@ -830,6 +1064,641 @@ function WholesalePriceCatalogModal({
     }
   };
 
+  // ===========================================================================
+  // РЕЖИМ А: ОТКРЫТА НАКЛАДНАЯ ПРЯМО ВНУТРИ ПРАЙС-КАТАЛОГА
+  // ===========================================================================
+  if (isCartOpenInPrice) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99999,
+          backgroundColor: THEME.bg,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        <WholesaleCart
+          items={cart}
+          lang={lang}
+          isDark={isDark}
+          theme={isDark ? 'dark' : 'light'}
+          onUpdateQuantity={(uid, newBoxes) => {
+            if (newBoxes < 1) return;
+            onHaptic?.();
+            setCart((prev) =>
+              prev.map((item) => {
+                if (item.uid !== uid) return item;
+                const pairsPerRun = Object.values(item.sizeRun).reduce((a, b) => a + b, 0);
+                const newTotalPairs = pairsPerRun * newBoxes;
+                const unitPrice = getWholesalePriceByModel(item.shoe.modelNumber) || 0;
+                const lineUsd = unitPrice * newTotalPairs;
+                const updatedFormula =
+                  item.orderMode === 'sample'
+                    ? item.formulaText
+                    : `Ростовок ×${newBoxes} ($${lineUsd}): ` +
+                      SIZES.filter((sz) => item.sizeRun[sz] > 0)
+                        .map((sz) => `${sz}р.(${item.sizeRun[sz] * newBoxes})`)
+                        .join(' • ');
+                return { ...item, boxesCount: newBoxes, totalPairs: newTotalPairs, formulaText: updatedFormula };
+              })
+            );
+          }}
+          onRemove={(uid) => {
+            onHaptic?.();
+            setCart((prev) => prev.filter((item) => item.uid !== uid));
+          }}
+          onClear={() => {
+            onHaptic?.();
+            setCart([]);
+          }}
+          onClose={() => {
+            onHaptic?.();
+            setIsCartOpenInPrice(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ===========================================================================
+  // РЕЖИМ Б: КАРТОЧКА ЗАКАЗА МОДЕЛИ ВНУТРИ ЗАКРЫТОГО ПРАЙС-КАТАЛОГА (С ЦЕНАМИ В $)
+  // ===========================================================================
+  if (selectedShoeInPrice) {
+    const unitPriceUsd = getWholesalePriceByModel(selectedShoeInPrice.modelNumber) || 0;
+    const totalLineUsd = unitPriceUsd * currentTotalPairs;
+    const alreadyInCartPairs = pairsInCartByShoeId[selectedShoeInPrice.id] || 0;
+    const alreadyInCartUsd = alreadyInCartPairs * unitPriceUsd;
+    const translatedSelectedColor = getLocalizedColor(selectedShoeInPrice.color, lang);
+    const modelVariants = cardioCatalog.filter((i) => i.modelNumber === selectedShoeInPrice.modelNumber);
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99999,
+          backgroundColor: THEME.bg,
+          color: THEME.ink,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: '0 16px 110px 16px',
+          boxSizing: 'border-box',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+        }}
+      >
+        {/* Шапка карточки модели: возврат обратно в прайс-каталог (не на главную!) */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backgroundColor: THEME.bg,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '12px 0',
+            marginBottom: '18px',
+            borderBottom: `1px solid ${THEME.border}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onHaptic?.();
+              setSelectedShoeInPrice(null);
+            }}
+            style={{
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.ink}`,
+              padding: '8px 12px',
+              fontSize: '10px',
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              color: THEME.ink,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {t.backToPriceList}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onHaptic?.();
+              setIsCartOpenInPrice(true);
+            }}
+            style={{
+              backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
+              border: `1px solid ${THEME.ink}`,
+              padding: '8px 12px',
+              fontSize: '10px',
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              cursor: 'pointer',
+              color: cart.length > 0 ? THEME.onInk : THEME.ink,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {t.invoiceBtn(cartTotalPairs, cartTotalUsd)}
+          </button>
+        </div>
+
+        {alreadyInCartPairs > 0 && (
+          <div
+            style={{
+              backgroundColor: THEME.surfaceActive,
+              border: `1px solid ${THEME.border}`,
+              borderLeft: `3px solid ${THEME.ink}`,
+              padding: '10px 14px',
+              fontSize: '11px',
+              marginBottom: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              color: THEME.ink,
+            }}
+          >
+            <span>{t.alreadyInCart(alreadyInCartPairs, alreadyInCartUsd)}</span>
+            <span
+              onClick={() => {
+                onHaptic?.();
+                setIsCartOpenInPrice(true);
+              }}
+              style={{
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                borderBottom: `1px solid ${THEME.ink}`,
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              {t.openWord}
+            </span>
+          </div>
+        )}
+
+        {/* Заголовок модели + Оптовая цена в $ */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '12px',
+            marginBottom: '18px',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: '9.5px',
+                color: THEME.inkMuted,
+                textTransform: 'uppercase',
+                letterSpacing: '1.3px',
+                marginBottom: '4px',
+              }}
+            >
+              {t.cardTitle} // {getLocalizedCategory(selectedShoeInPrice.category, lang)}
+            </div>
+            <h1
+              style={{
+                fontFamily: THEME.serif,
+                fontSize: '32px',
+                margin: '0 0 4px 0',
+                fontWeight: 400,
+                lineHeight: 1.1,
+              }}
+            >
+              Модель № {selectedShoeInPrice.modelNumber}
+              {selectedShoeInPrice.variant && (
+                <span style={{ fontSize: '18px', color: THEME.inkMuted, fontStyle: 'italic', marginLeft: '6px' }}>
+                  ({selectedShoeInPrice.variant})
+                </span>
+              )}
+            </h1>
+            <div style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '15px', color: THEME.inkMuted }}>
+              {t.colorLabel} {translatedSelectedColor}
+            </div>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.ink}`,
+              padding: '8px 12px',
+              textAlign: 'right',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ fontSize: '8.5px', textTransform: 'uppercase', letterSpacing: '1px', color: THEME.inkMuted }}>
+              {t.wholesalePriceLabel}
+            </div>
+            <div style={{ fontFamily: THEME.serif, fontSize: '26px', fontWeight: 700, color: THEME.ink, lineHeight: 1.1 }}>
+              ${unitPriceUsd}
+            </div>
+            <div style={{ fontSize: '9px', color: THEME.inkMuted }}>{t.perPairWord}</div>
+          </div>
+        </div>
+
+        {/* Подиум с фото обуви */}
+        <div
+          style={{
+            backgroundColor: THEME.surface,
+            border: `1px solid ${THEME.border}`,
+            marginBottom: '20px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '8px 14px',
+              borderBottom: `1px solid ${THEME.border}`,
+              fontSize: '9px',
+              letterSpacing: '1.3px',
+              color: THEME.inkLight,
+              textTransform: 'uppercase',
+            }}
+          >
+            <span>{t.box6}: ${unitPriceUsd * 6}</span>
+            <span>{t.box8}: ${unitPriceUsd * 8}</span>
+          </div>
+
+          <div
+            style={{
+              width: '100%',
+              height: '230px',
+              padding: '18px 24px',
+              boxSizing: 'border-box',
+              backgroundColor: THEME.imageStage,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={selectedShoeInPrice.image}
+              alt={`Модель ${selectedShoeInPrice.modelNumber}`}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                mixBlendMode: 'multiply',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Переключение расцветок этой же модели */}
+        {modelVariants.length > 1 && (
+          <div style={{ marginBottom: '22px' }}>
+            <div
+              style={{
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1.2px',
+                color: THEME.inkMuted,
+                marginBottom: '8px',
+              }}
+            >
+              {t.availableColors}
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.min(modelVariants.length, 4)}, 1fr)`,
+                borderTop: `1px solid ${THEME.border}`,
+                borderLeft: `1px solid ${THEME.border}`,
+              }}
+            >
+              {modelVariants.map((v, i) => {
+                const isCurrent = v.id === selectedShoeInPrice.id;
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => {
+                      if (!isCurrent) {
+                        onHaptic?.();
+                        setSelectedShoeInPrice(v);
+                        setJustAdded(false);
+                      }
+                    }}
+                    style={{
+                      borderRight: `1px solid ${THEME.border}`,
+                      borderBottom: `1px solid ${THEME.border}`,
+                      backgroundColor: isCurrent ? THEME.surfaceActive : THEME.surface,
+                      padding: '8px',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '8px', textAlign: 'left', marginBottom: '4px', fontWeight: isCurrent ? 700 : 400 }}>
+                      0{i + 1} {isCurrent ? '✓' : ''}
+                    </div>
+                    <div
+                      style={{
+                        height: '76px',
+                        padding: '6px',
+                        backgroundColor: THEME.imageStage,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <img
+                        src={v.image}
+                        alt={v.color}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '10px', marginTop: '6px', fontWeight: isCurrent ? 600 : 400 }}>
+                      {getLocalizedColor(v.color, lang)} {v.variant || ''}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Выбор комплектации ростовки */}
+        <div style={{ marginBottom: '22px' }}>
+          <div
+            style={{
+              fontSize: '10px',
+              textTransform: 'uppercase',
+              letterSpacing: '1.2px',
+              color: THEME.inkMuted,
+              marginBottom: '10px',
+            }}
+          >
+            {t.orderParams}
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              border: `1px solid ${THEME.ink}`,
+              marginBottom: '16px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setOrderMode('wholesale')}
+              style={{
+                backgroundColor: orderMode === 'wholesale' ? THEME.ink : 'transparent',
+                color: orderMode === 'wholesale' ? THEME.onInk : THEME.ink,
+                border: 'none',
+                padding: '11px 8px',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {t.wholesaleRun}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderMode('sample')}
+              style={{
+                backgroundColor: orderMode === 'sample' ? THEME.ink : 'transparent',
+                color: orderMode === 'sample' ? THEME.onInk : THEME.ink,
+                border: 'none',
+                borderLeft: `1px solid ${THEME.ink}`,
+                padding: '11px 8px',
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {t.sampleRun}
+            </button>
+          </div>
+
+          {orderMode === 'wholesale' ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSizeRun({ ...STANDARD_8_RUN })}
+                  style={{
+                    backgroundColor: isStandard8 ? THEME.ink : THEME.surface,
+                    color: isStandard8 ? THEME.onInk : THEME.ink,
+                    border: `1px solid ${isStandard8 ? THEME.ink : THEME.border}`,
+                    padding: '10px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '3px' }}>
+                    {t.standard8} (${unitPriceUsd * 8})
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.8, fontFamily: THEME.serif, fontStyle: 'italic' }}>
+                    {t.standard8Desc}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSizeRun({ ...EVEN_6_RUN })}
+                  style={{
+                    backgroundColor: isEven6 ? THEME.ink : THEME.surface,
+                    color: isEven6 ? THEME.onInk : THEME.ink,
+                    border: `1px solid ${isEven6 ? THEME.ink : THEME.border}`,
+                    padding: '10px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '3px' }}>
+                    {t.even6} (${unitPriceUsd * 6})
+                  </div>
+                  <div style={{ fontSize: '10px', opacity: 0.8, fontFamily: THEME.serif, fontStyle: 'italic' }}>
+                    {t.even6Desc}
+                  </div>
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  borderTop: `1px solid ${THEME.border}`,
+                  borderLeft: `1px solid ${THEME.border}`,
+                  marginBottom: '16px',
+                }}
+              >
+                {SIZES.map((sz) => {
+                  const count = sizeRun[sz] || 0;
+                  const isDoubled = count >= 2;
+                  return (
+                    <div
+                      key={sz}
+                      style={{
+                        backgroundColor: count > 0 ? THEME.surface : THEME.bg,
+                        borderRight: `1px solid ${THEME.border}`,
+                        borderBottom: `1px solid ${THEME.border}`,
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          backgroundColor: isDoubled ? THEME.ink : 'transparent',
+                          color: isDoubled ? THEME.onInk : THEME.inkMuted,
+                          fontWeight: isDoubled ? 600 : 400,
+                          padding: '6px 0',
+                          borderBottom: `1px solid ${THEME.border}`,
+                        }}
+                      >
+                        {sz}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateSizeCount(sz, 1)}
+                        style={{ background: 'none', border: 'none', padding: '8px 0', fontSize: '16px', color: THEME.ink, cursor: 'pointer' }}
+                      >
+                        +
+                      </button>
+                      <div style={{ fontFamily: THEME.serif, fontSize: '18px', fontWeight: 600, padding: '2px 0' }}>
+                        {count}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateSizeCount(sz, -1)}
+                        style={{ background: 'none', border: 'none', padding: '8px 0', fontSize: '16px', color: THEME.ink, cursor: 'pointer' }}
+                      >
+                        −
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {isCustomRun && (
+                <div style={{ fontSize: '11px', color: THEME.inkMuted, marginBottom: '10px', textAlign: 'right' }}>
+                  В одном коробе: {pairsPerBox} п. (${pairsPerBox * unitPriceUsd})
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '12px',
+                  borderTop: `1px solid ${THEME.border}`,
+                }}
+              >
+                <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1.1px', color: THEME.inkMuted }}>
+                  {t.boxesCountLabel}
+                </span>
+                <div style={{ display: 'flex', border: `1px solid ${THEME.border}` }}>
+                  {[1, 2, 3, 5, 10].map((num, idx) => (
+                    <button
+                      type="button"
+                      key={num}
+                      onClick={() => setBoxesCount(num)}
+                      style={{
+                        padding: '7px 12px',
+                        border: 'none',
+                        borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
+                        backgroundColor: boxesCount === num ? THEME.ink : THEME.surface,
+                        color: boxesCount === num ? THEME.onInk : THEME.ink,
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <div style={{ fontSize: '12px', fontFamily: THEME.serif, fontStyle: 'italic', color: THEME.inkMuted, marginBottom: '10px' }}>
+                {t.samplePrompt}
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  borderTop: `1px solid ${THEME.border}`,
+                  borderLeft: `1px solid ${THEME.border}`,
+                }}
+              >
+                {SIZES.map((sz) => (
+                  <button
+                    type="button"
+                    key={sz}
+                    onClick={() => setSampleSize(sz)}
+                    style={{
+                      padding: '14px 0',
+                      border: 'none',
+                      borderRight: `1px solid ${THEME.border}`,
+                      borderBottom: `1px solid ${THEME.border}`,
+                      backgroundColor: sampleSize === sz ? THEME.ink : THEME.surface,
+                      color: sampleSize === sz ? THEME.onInk : THEME.ink,
+                      fontSize: '13px',
+                      fontFamily: THEME.serif,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {sz}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          disabled={currentTotalPairs === 0}
+          onClick={addSelectedShoeToCart}
+          style={{
+            width: '100%',
+            padding: '16px 18px',
+            backgroundColor: justAdded ? THEME.accentGreen : THEME.ink,
+            color: justAdded ? '#FFFFFF' : THEME.onInk,
+            border: 'none',
+            fontSize: '11px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '1.3px',
+            cursor: currentTotalPairs === 0 ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span>{justAdded ? t.addedSuccess : t.addToCart}</span>
+          <span style={{ fontFamily: THEME.serif, fontStyle: 'italic', fontSize: '16px', textTransform: 'none' }}>
+            {currentTotalPairs} п. • ${totalLineUsd} →
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  // ===========================================================================
+  // РЕЖИМ В: ГЛАВНЫЙ ЭКРАН ПРАЙС-КАТАЛОГА (ВВОД PIN ИЛИ СЕТКА ВСЕХ 38 МОДЕЛЕЙ)
+  // ===========================================================================
   return (
     <div
       style={{
@@ -840,11 +1709,12 @@ function WholesalePriceCatalogModal({
         color: THEME.ink,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
-        padding: '0 16px 90px 16px',
+        padding: '0 16px 110px 16px',
         boxSizing: 'border-box',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
       }}
     >
+      {/* Липкая верхняя панель */}
       <div
         style={{
           position: 'sticky',
@@ -854,7 +1724,7 @@ function WholesalePriceCatalogModal({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '10px',
+          gap: '8px',
           padding: '12px 0',
           marginBottom: '16px',
           borderBottom: `1px solid ${THEME.border}`,
@@ -887,32 +1757,59 @@ function WholesalePriceCatalogModal({
               letterSpacing: '0.8px',
               textTransform: 'uppercase',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
-            {t.back}
+            {t.backToPublic}
           </button>
         </div>
 
         {isUnlocked && (
-          <button
-            type="button"
-            disabled={pdfGenerating}
-            onClick={handleGenerateAndDeliverPdf}
-            style={{
-              backgroundColor: THEME.ink,
-              color: THEME.onInk,
-              border: `1px solid ${THEME.ink}`,
-              padding: '8px 14px',
-              fontSize: '10px',
-              fontWeight: 600,
-              letterSpacing: '0.9px',
-              textTransform: 'uppercase',
-              cursor: pdfGenerating ? 'wait' : 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {pdfGenerating ? `${t.generatingPdf} ${pdfProgressText}...` : t.downloadBtnTop}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onHaptic?.();
+                  setIsCartOpenInPrice(true);
+                }}
+                style={{
+                  backgroundColor: THEME.surface,
+                  color: THEME.ink,
+                  border: `1px solid ${THEME.ink}`,
+                  padding: '8px 10px',
+                  fontSize: '9.5px',
+                  fontWeight: 600,
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t.invoiceBtn(cartTotalPairs, cartTotalUsd)}
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={pdfGenerating}
+              onClick={handleGenerateAndDeliverPdf}
+              style={{
+                backgroundColor: THEME.ink,
+                color: THEME.onInk,
+                border: `1px solid ${THEME.ink}`,
+                padding: '8px 12px',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                cursor: pdfGenerating ? 'wait' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {pdfGenerating ? `${pdfProgressText}` : t.downloadBtnTop}
+            </button>
+          </div>
         )}
       </div>
 
@@ -940,7 +1837,7 @@ function WholesalePriceCatalogModal({
           </div>
           <h2
             style={{
-              fontFamily: '"Playfair Display", Georgia, serif',
+              fontFamily: THEME.serif,
               fontSize: '26px',
               fontWeight: 400,
               margin: '0 0 10px 0',
@@ -1049,26 +1946,30 @@ function WholesalePriceCatalogModal({
         </div>
       ) : (
         <div>
+          {/* Журнальная шапка без обрезки и без переносов */}
           <div style={{ marginBottom: '16px' }}>
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 fontSize: '9px',
-                letterSpacing: '1.4px',
+                letterSpacing: '1.3px',
                 textTransform: 'uppercase',
                 color: THEME.inkMuted,
-                marginBottom: '4px',
+                marginBottom: '6px',
               }}
             >
               <span>{t.lookbookTag}</span>
               <span>40—45</span>
             </div>
+
             <h1
               style={{
-                fontFamily: '"Playfair Display", Georgia, serif',
-                fontSize: '30px',
+                fontFamily: THEME.serif,
+                fontSize: '26px',
                 fontWeight: 400,
+                lineHeight: 1.15,
                 margin: '0 0 12px 0',
                 color: THEME.ink,
               }}
@@ -1088,12 +1989,14 @@ function WholesalePriceCatalogModal({
                 border: 'none',
                 fontSize: '10px',
                 fontWeight: 600,
-                letterSpacing: '1.3px',
+                letterSpacing: '1.2px',
                 textTransform: 'uppercase',
                 cursor: pdfGenerating ? 'wait' : 'pointer',
               }}
             >
-              {pdfGenerating ? `${t.generatingPdf} (${pdfProgressText})...` : t.downloadBtn}
+              {pdfGenerating
+                ? `${t.generatingPdf} (${pdfProgressText})...`
+                : t.downloadBtn(visibleItems.length)}
             </button>
 
             {deliveryStatus && (
@@ -1132,6 +2035,7 @@ function WholesalePriceCatalogModal({
             )}
           </div>
 
+          {/* Табы сезонов: Все модели (38) | Осень 2026 (13) | Зима 2026 (25) */}
           <div
             style={{
               display: 'grid',
@@ -1155,9 +2059,9 @@ function WholesalePriceCatalogModal({
                     border: 'none',
                     borderLeft: idx === 0 ? 'none' : `1px solid ${THEME.border}`,
                     padding: '10px 4px',
-                    fontSize: '10px',
+                    fontSize: '9.5px',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.8px',
+                    letterSpacing: '0.6px',
                     fontWeight: isActive ? 600 : 400,
                     cursor: 'pointer',
                   }}
@@ -1168,6 +2072,7 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
+          {/* Сетка 38 моделей с ценами и индикацией заказа */}
           <div
             style={{
               display: 'grid',
@@ -1181,13 +2086,18 @@ function WholesalePriceCatalogModal({
               const translatedCat = getLocalizedCategory(shoe.category, lang);
               const translatedColor = getLocalizedColor(shoe.color, lang);
               const translatedFeatures = shoe.features.map((f) => getLocalizedFeature(f, lang));
+              const inCartPairs = pairsInCartByShoeId[shoe.id] || 0;
 
               return (
                 <div
                   key={shoe.id}
-                  onClick={() => onSelectShoe?.(shoe)}
+                  onClick={() => {
+                    onHaptic?.();
+                    setSelectedShoeInPrice(shoe);
+                    setJustAdded(false);
+                  }}
                   style={{
-                    backgroundColor: THEME.surface,
+                    backgroundColor: inCartPairs > 0 ? THEME.cardInCart : THEME.surface,
                     borderRight: `1px solid ${THEME.border}`,
                     borderBottom: `1px solid ${THEME.border}`,
                     padding: '10px',
@@ -1205,14 +2115,29 @@ function WholesalePriceCatalogModal({
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         marginBottom: '6px',
-                        fontSize: '8px',
-                        letterSpacing: '0.6px',
-                        textTransform: 'uppercase',
-                        color: THEME.inkLight,
+                        minHeight: '16px',
                       }}
                     >
-                      <span>{translatedCat}</span>
-                      <span>{season === 'autumn' ? 'AUTUMN' : 'WINTER'}</span>
+                      <span style={{ fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', color: THEME.inkLight }}>
+                        {translatedCat}
+                      </span>
+                      {inCartPairs > 0 ? (
+                        <span
+                          style={{
+                            backgroundColor: THEME.ink,
+                            color: THEME.onInk,
+                            padding: '2px 5px',
+                            fontSize: '8px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {t.inCartBadge(inCartPairs)}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '8px', color: THEME.inkLight }}>
+                          {season === 'autumn' ? 'AUTUMN' : 'WINTER'}
+                        </span>
+                      )}
                     </div>
 
                     <div
@@ -1245,7 +2170,7 @@ function WholesalePriceCatalogModal({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                       <span
                         style={{
-                          fontFamily: '"Playfair Display", Georgia, serif',
+                          fontFamily: THEME.serif,
                           fontSize: '19px',
                           color: THEME.ink,
                         }}
@@ -1260,9 +2185,9 @@ function WholesalePriceCatalogModal({
 
                       <span
                         style={{
-                          fontFamily: '"Playfair Display", Georgia, serif',
+                          fontFamily: THEME.serif,
                           fontSize: '19px',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           color: THEME.ink,
                         }}
                       >
@@ -1276,9 +2201,6 @@ function WholesalePriceCatalogModal({
                         color: THEME.inkMuted,
                         textTransform: 'uppercase',
                         marginTop: '2px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
                       }}
                     >
                       {translatedColor}
@@ -1290,9 +2212,6 @@ function WholesalePriceCatalogModal({
                           fontSize: '8.5px',
                           color: THEME.inkLight,
                           marginTop: '2px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
                         }}
                       >
                         {translatedFeatures.join(' • ')}
@@ -1325,11 +2244,11 @@ function WholesalePriceCatalogModal({
                         letterSpacing: '0.7px',
                         textTransform: 'uppercase',
                         fontWeight: 600,
-                        color: THEME.ink,
+                        color: inCartPairs > 0 ? THEME.accentGreen : THEME.ink,
                         textAlign: 'right',
                       }}
                     >
-                      {t.orderBtn}
+                      {inCartPairs > 0 ? t.reorderBtn : t.orderBtn}
                     </div>
                   </div>
                 </div>
@@ -1387,6 +2306,62 @@ function WholesalePriceCatalogModal({
               </a>
             </div>
             <div style={{ fontSize: '9px', color: THEME.inkLight }}>{t.securityNote}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Фиксированная нижняя панель накладной прямо внутри прайс-каталога */}
+      {isUnlocked && cart.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: THEME.ink,
+            color: THEME.onInk,
+            padding: '12px 16px',
+            zIndex: 1000,
+            borderTop: `1px solid ${THEME.border}`,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div>
+              <div
+                style={{
+                  fontSize: '8.5px',
+                  letterSpacing: '1.3px',
+                  textTransform: 'uppercase',
+                  color: THEME.onInkMuted,
+                }}
+              >
+                {t.bottomOrderTitle}
+              </div>
+              <div style={{ fontFamily: THEME.serif, fontSize: '16px', marginTop: '1px' }}>
+                {t.bottomInvoiceText(cart.length, cartTotalPairs, cartTotalUsd)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onHaptic?.();
+                setIsCartOpenInPrice(true);
+              }}
+              style={{
+                backgroundColor: THEME.surface,
+                color: THEME.ink,
+                border: 'none',
+                padding: '10px 16px',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '1.1px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.openInvoiceBtn}
+            </button>
           </div>
         </div>
       )}
