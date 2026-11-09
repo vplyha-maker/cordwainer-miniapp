@@ -3,18 +3,13 @@
  * @description Главный компонент-оркестратор закрытого B2B прайс-каталога CARDIO 2026
  * и входного баннера для оптовых покупателей.
  *
- * ЗАЧЕМ НУЖЕН ЭТОТ ФАЙЛ:
- * 1. Отрисовывает публичный баннер-приглашение (`WholesalePriceBanner`) на главной витрине
- *    и открывает полноэкранный B2B-портал поверх приложения через `createPortal`.
- * 2. Синхронизирует состояние авторизации по PIN-коду и оптовую корзину с `localStorage`.
- * 3. Управляет звуковым сопровождением (`/pdf.wav`) и прогресс-баром во время работы
- *    графического движка `pdfLookbookEngine`.
- * 4. Переключает 4 состояния экрана внутри B2B-модалки:
- *    - Экран ввода PIN-кода (`WholesalePinUnlockScreen`)
- *    - Главная сетка оптового прайс-каталога с фильтрами Осень / Зима
- *    - Карточка выбора ростовки конкретной модели (`ProductOrderScreen`)
- *    - Оптовая накладная / корзина (`WholesaleCart`)
- * 5. Ре-экспортирует прайс-лист и утилиты цен для обратной совместимости со всем проектом.
+ * ЧТО ИСПРАВЛЕНО В ЛОГИКЕ КНОПОК PDF:
+ * 1. Если PDF уже сформирован (`deliveryStatus !== null`), верхняя кнопка в шапке и главная
+ *    кнопка в каталоге НЕ запускают повторную генерацию с нуля, а сразу скачивают/открывают
+ *    готовый файл из памяти устройства (`triggerPdfDownload`).
+ * 2. Убрано дублирование двух больших чёрных кнопок одна под другой после завершения верстки.
+ * 3. При переключении фильтра сезона (Все / Осень / Зима) статус готового PDF сбрасывается,
+ *    чтобы партнёр мог при желании сформировать отдельный лукбук выбранного сезона.
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -53,7 +48,7 @@ import {
   type WholesaleLang,
 } from './wholesale/wholesaleThemeAndI18n';
 
-// Импорт движка генерации PDF-лукбука и интеграции с Telegram WebApp
+// Импорт движка генерации PDF-лукбука и прямого сохранения на телефон
 import {
   getTelegramUserInfo,
   generateAndDeliverLookbookPdf,
@@ -87,7 +82,7 @@ type BannerProps = {
 };
 
 /**
- * Баннер входа в оптовый прайс-каталог (размещается в шапке или на главной витрине приложения).
+ * Баннер входа в оптовый прайс-каталог (размещается на главной витрине приложения).
  */
 export function WholesalePriceBanner({ lang = 'ru', isDark = false, onHaptic }: BannerProps) {
   const safeLang = normalizeWholesaleLang(lang);
@@ -368,6 +363,9 @@ function WholesalePriceCatalogModal({
     [lang, allCatalogItems.length, autumnItems.length, winterItems.length]
   );
 
+  /**
+   * Запускает первичную генерацию PDF-лукбука и отправку в Telegram.
+   */
   const handleGenerateAndDeliverPdf = async () => {
     if (pdfStage !== 'idle') return;
     setDeliveryStatus(null);
@@ -396,6 +394,22 @@ function WholesalePriceCatalogModal({
       stopPdfSoundtrack();
       setPdfStage('idle');
     }
+  };
+
+  /**
+   * Умный обработчик для всех кнопок PDF:
+   * - Если PDF уже сформирован (`deliveryStatus` готов), сразу скачивает/открывает готовый файл
+   *   на телефоне без повторной генерации.
+   * - Если ещё не сформирован — запускает генерацию.
+   */
+  const handlePdfAction = () => {
+    if (pdfStage !== 'idle') return;
+    onHaptic?.();
+    if (deliveryStatus) {
+      triggerPdfDownload(deliveryStatus);
+      return;
+    }
+    handleGenerateAndDeliverPdf();
   };
 
   const handlePinSubmit = () => {
@@ -603,11 +617,11 @@ function WholesalePriceCatalogModal({
             <button
               type="button"
               disabled={isBusy}
-              onClick={handleGenerateAndDeliverPdf}
+              onClick={handlePdfAction}
               style={{
-                backgroundColor: THEME.ink,
-                color: THEME.onInk,
-                border: `1px solid ${THEME.ink}`,
+                backgroundColor: deliveryStatus ? THEME.accentGreen : THEME.ink,
+                color: deliveryStatus ? '#FFFFFF' : THEME.onInk,
+                border: `1px solid ${deliveryStatus ? THEME.accentGreen : THEME.ink}`,
                 padding: '8px 12px',
                 fontSize: '10px',
                 fontWeight: 600,
@@ -631,6 +645,8 @@ function WholesalePriceCatalogModal({
                   <span>PDF</span>
                   <BlinkingDots phase={dotPhase} />
                 </>
+              ) : deliveryStatus ? (
+                '📥 PDF ✓'
               ) : (
                 t.downloadBtnTop
               )}
@@ -653,7 +669,7 @@ function WholesalePriceCatalogModal({
         />
       ) : (
         <div>
-          {/* Шапка каталога и блок управления генерацией PDF */}
+          {/* Шапка каталога и единый понятный блок управления PDF */}
           <div style={{ marginBottom: '16px' }}>
             <div
               style={{
@@ -684,40 +700,43 @@ function WholesalePriceCatalogModal({
               {t.mainTitle}
             </h1>
 
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={handleGenerateAndDeliverPdf}
-              style={{
-                width: '100%',
-                padding: '14px 16px',
-                backgroundColor: THEME.ink,
-                color: THEME.onInk,
-                border: 'none',
-                fontSize: '10px',
-                fontWeight: 600,
-                letterSpacing: '1.1px',
-                textTransform: 'uppercase',
-                cursor: isBusy ? 'wait' : 'pointer',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              {pdfStage === 'rendering_pages' ? (
-                <>
-                  <span>{t.stageRendering(pdfCurrentPage, pdfTotalPages)}</span>
-                  <BlinkingDots phase={dotPhase} />
-                </>
-              ) : pdfStage === 'packaging_and_uploading' ? (
-                <>
-                  <span>{t.stagePackaging(pdfTotalPages)}</span>
-                  <BlinkingDots phase={dotPhase} />
-                </>
-              ) : (
-                t.downloadBtn(visibleItems.length)
-              )}
-            </button>
+            {/* Показываем кнопку запуска генерации ТОЛЬКО пока файл ещё не сформирован */}
+            {!deliveryStatus && (
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={handlePdfAction}
+                style={{
+                  width: '100%',
+                  padding: '14px 16px',
+                  backgroundColor: THEME.ink,
+                  color: THEME.onInk,
+                  border: 'none',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  letterSpacing: '1.1px',
+                  textTransform: 'uppercase',
+                  cursor: isBusy ? 'wait' : 'pointer',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                {pdfStage === 'rendering_pages' ? (
+                  <>
+                    <span>{t.stageRendering(pdfCurrentPage, pdfTotalPages)}</span>
+                    <BlinkingDots phase={dotPhase} />
+                  </>
+                ) : pdfStage === 'packaging_and_uploading' ? (
+                  <>
+                    <span>{t.stagePackaging(pdfTotalPages)}</span>
+                    <BlinkingDots phase={dotPhase} />
+                  </>
+                ) : (
+                  t.downloadBtn(visibleItems.length)
+                )}
+              </button>
+            )}
 
             {/* Интерактивный блок прогресса верстки PDF */}
             {isBusy && (
@@ -796,11 +815,10 @@ function WholesalePriceCatalogModal({
               </div>
             )}
 
-            {/* Блок успешной готовности PDF */}
+            {/* Единый блок готового PDF (без дублирующей верхней кнопки) */}
             {!isBusy && deliveryStatus && (
               <div
                 style={{
-                  marginTop: '10px',
                   padding: '14px',
                   backgroundColor: THEME.surface,
                   border: `1.5px solid ${THEME.ink}`,
@@ -840,16 +858,19 @@ function WholesalePriceCatalogModal({
                       marginBottom: '8px',
                     }}
                   >
-                    Режим прямой выдачи ({deliveryError})
+                    Файл готов в памяти телефона ({deliveryError})
                   </div>
                 )}
 
                 <button
                   type="button"
-                  onClick={() => triggerPdfDownload(deliveryStatus)}
+                  onClick={() => {
+                    onHaptic?.();
+                    triggerPdfDownload(deliveryStatus);
+                  }}
                   style={{
                     width: '100%',
-                    padding: '12px 14px',
+                    padding: '13px 14px',
                     backgroundColor: THEME.ink,
                     color: THEME.onInk,
                     border: 'none',
@@ -884,7 +905,12 @@ function WholesalePriceCatalogModal({
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setSeasonFilter(tab)}
+                  onClick={() => {
+                    if (seasonFilter !== tab) {
+                      setSeasonFilter(tab);
+                      setDeliveryStatus(null);
+                    }
+                  }}
                   style={{
                     background: isActive ? THEME.ink : 'transparent',
                     color: isActive ? THEME.onInk : THEME.ink,
