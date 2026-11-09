@@ -1,17 +1,18 @@
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
- * и модуль доставки файла в Telegram WebApp / на устройство пользователя.
+ * и модуль прямого сохранения файла на телефон / в Telegram.
  *
- * ЗАЧЕМ НУЖЕН ЭТОТ ФАЙЛ:
- * 1. Выполняет автоматическое кадрирование пустых белых полей вокруг фото обуви и переводит
- *    белый студийный фон в тон тёплой бумаги #F5F3EE (эффект бесшовной журнальной вёрстки).
- * 2. Отрисовывает на HTML5 Canvas 5 типов страниц формата А4: Обложку, Манифест/Оглавление,
- *    Шмуцтитулы сезонов (Осень/Зима), Карточки моделей и Контакты оптового отдела.
- * 3. Собирает массив JPEG-страниц в валидный бинарный документ стандарта PDF 1.4 без
- *    тяжёлых сторонних библиотек (экономия размера бандла).
- * 4. Отправляет готовый PDF на сервер (/api/orders) для пересылки через Telegram-бота
- *    и запускает прямое скачивание на телефон.
+ * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
+ * 1. ОБЛОЖКА (COVER): Вместо фото ботинка загружается фирменный 3D-знак `/baner1.png`,
+ *    под ним выводится крупный титул CARDIO и слоган «BUILT TO LEAD. ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ».
+ * 2. НЕ ОБРЕЗАЮТСЯ НОМЕРА МОДЕЛЕЙ: Фото обуви накладывается через композитный режим `multiply`,
+ *    поэтому рамка кадра никогда не перекрывает и не срезает крупные фоновые номера `№ 20`, `№ 70`, `№ 206`.
+ * 3. ВОДЯНОЙ ЗНАК (WATERMARK): На каждую страницу товара наносится защитный диагональный
+ *    водяной знак `CARDIO FOOTWEAR • B2B ORIGINAL • {partnerCode}`.
+ * 4. ПРЯМОЕ СКАЧИВАНИЕ НА ТЕЛЕФОН: Убран редирект через `tg.openLink` на `www.cordwainer.app`.
+ *    Готовый файл сохраняется напрямую из локального `Blob` в памяти телефона (через системное
+ *    меню «Поделиться / Сохранить в файлы» или прямую загрузку `<a download>`).
  */
 
 import {
@@ -90,9 +91,9 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * Автоматически находит границы ботинка, отсекает лишние пустые поля вокруг обуви
- * и умножает RGB-каналы на цвет бумаги #F5F3EE (245, 243, 238), чтобы обувь
- * занимала максимум площади страницы без белых прямоугольных рамок.
+ * Автоматически находит границы объекта (обуви или 3D-логотипа), отсекает лишние пустые поля
+ * и переводит чисто белые пиксели фона в прозрачные / бумажные, чтобы при наложении
+ * через `multiply` изображение никогда не перекрывало фоновую типографику и номера моделей.
  */
 function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   const srcW = img.naturalWidth || img.width || 800;
@@ -116,14 +117,13 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   let maxX = 0;
   let maxY = 0;
 
-  // Ищем крайние не-белые пиксели обуви (порог яркости < 245)
   for (let y = 0; y < srcH; y++) {
     for (let x = 0; x < srcW; x++) {
       const idx = (y * srcW + x) * 4;
       const r = data[idx];
       const g = data[idx + 1];
       const b = data[idx + 2];
-      if (r < 245 || g < 245 || b < 245) {
+      if (r < 246 || g < 246 || b < 246) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
@@ -132,19 +132,10 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
     }
   }
 
-  // Тонируем белый фон в цвет журнальной бумаги #F5F3EE (RGB: 245, 243, 238)
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.round((data[i] * 245) / 255);
-    data[i + 1] = Math.round((data[i + 1] * 243) / 255);
-    data[i + 2] = Math.round((data[i + 2] * 238) / 255);
-  }
-  tempCtx.putImageData(imgData, 0, 0);
-
   if (maxX <= minX || maxY <= minY) {
     return tempCanvas;
   }
 
-  // Оставляем аккуратное поле 4% вокруг контура обуви
   const padX = Math.round((maxX - minX) * 0.04);
   const padY = Math.round((maxY - minY) * 0.04);
   const cropX = Math.max(0, minX - padX);
@@ -157,7 +148,7 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   outCanvas.height = cropH;
   const outCtx = outCanvas.getContext('2d');
   if (outCtx) {
-    outCtx.fillStyle = '#F5F3EE';
+    outCtx.fillStyle = '#FFFFFF';
     outCtx.fillRect(0, 0, cropW, cropH);
     outCtx.drawImage(tempCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
   }
@@ -165,8 +156,42 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
 }
 
 /**
+ * Отрисовывает фирменный защитный водяной знак CARDIO B2B по диагонали страницы.
+ * Защищает фотографии и оптовые цены при пересылке скриншотов.
+ */
+function drawEditorialWatermark(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  partnerCode: string,
+  modelNumber?: string
+) {
+  ctx.save();
+  ctx.translate(W / 2, H / 2 - 40);
+  ctx.rotate((-28 * Math.PI) / 180);
+  ctx.textAlign = 'center';
+
+  // Основная широкая диагональная лента водяного знака
+  ctx.fillStyle = 'rgba(23, 23, 23, 0.038)';
+  ctx.font = '700 44px "Inter", "Helvetica Neue", Arial, sans-serif';
+  const wmLine = `CARDIO FOOTWEAR   ·   ${partnerCode}   ·   WHOLESALE 2026`;
+
+  ctx.fillText(wmLine, 0, -290);
+  ctx.fillText(wmLine, 0, 10);
+  ctx.fillText(wmLine, 0, 310);
+
+  if (modelNumber) {
+    ctx.fillStyle = 'rgba(23, 23, 23, 0.032)';
+    ctx.font = '400 72px "Playfair Display", Georgia, serif';
+    ctx.fillText(`CARDIO ORIGINAL  //  MODEL №${modelNumber}`, 0, -140);
+    ctx.fillText(`CARDIO ORIGINAL  //  MODEL №${modelNumber}`, 0, 160);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Утилита автоматического переноса длинных строк текста по словам на Canvas.
- * Возвращает Y-координату следующей свободной строки.
  */
 function drawWrappedText(
   ctx: CanvasRenderingContext2D,
@@ -199,7 +224,6 @@ function drawWrappedText(
 
 /**
  * Низкоуровневый сборщик бинарного файла формата PDF 1.4 из массива JPEG DataURL.
- * Каждая страница встраивается как DCTDecode XObject на лист А4 (595.28 × 841.89 pt).
  */
 function buildPdfBytesFromJpegPages(
   jpegDataUrls: string[],
@@ -308,7 +332,7 @@ function buildPdfBytesFromJpegPages(
 }
 
 /**
- * Конвертирует бинарный массив Uint8Array в строку Base64 чанками по 32 КБ (защита от переполнения стека).
+ * Конвертирует бинарный массив Uint8Array в строку Base64 чанками по 32 КБ.
  */
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -323,37 +347,22 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Универсальная функция скачивания или открытия готового PDF-файла:
- * поддерживает нативный метод Telegram `downloadFile`, `openLink`, Web Share API и Blob-ссылку.
+ * Надёжное сохранение готового PDF-файла напрямую на телефон пользователя
+ * БЕЗ открытия главной страницы сайта `www.cordwainer.app`.
+ *
+ * Приоритет:
+ * 1. Если есть локальный `localBlob` — используем системный диалог телефона `navigator.share({ files })`
+ *    (на iOS и Android позволяет в 1 клик «Сохранить в Файлы / Загрузки» или открыть в PDF-ридере)
+ *    и дублируем прямым скачиванием через `<a download>`.
+ * 2. Только если поддерживается нативный `tg.downloadFile` (Telegram 8.0+), передаём полный URL,
+ *    но НИКОГДА не вызываем `tg.openLink` на SPA-маршрут.
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
   localBlob?: Blob;
   fileName: string;
 }): Promise<void> {
-  const tg = getTgWebApp();
-
-  if (status.downloadUrl) {
-    const fullUrl = status.downloadUrl.startsWith('http')
-      ? status.downloadUrl
-      : `${window.location.origin}${status.downloadUrl}`;
-
-    if (typeof tg?.downloadFile === 'function') {
-      try {
-        tg.downloadFile({ url: fullUrl, file_name: status.fileName });
-        return;
-      } catch {}
-    }
-    if (typeof tg?.openLink === 'function') {
-      try {
-        tg.openLink(fullUrl);
-        return;
-      } catch {}
-    }
-    window.open(fullUrl, '_blank');
-    return;
-  }
-
+  // 1. Работаем напрямую с готовым файлом в памяти смартфона (не перекидывая на сайт!)
   if (status.localBlob) {
     try {
       const file = new File([status.localBlob], status.fileName, {
@@ -366,20 +375,43 @@ export async function triggerPdfDownload(status: {
         typeof nav.share === 'function' &&
         (!nav.canShare || nav.canShare({ files: [file] }))
       ) {
-        await nav.share({ files: [file], title: status.fileName });
+        await nav.share({
+          files: [file],
+          title: status.fileName,
+        });
         return;
       }
-    } catch {}
+    } catch (err) {
+      // Если пользователь сам закрыл шторку Share (AbortError), не делаем лишних редиректов
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+    }
 
-    const blobUrl = URL.createObjectURL(status.localBlob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = status.fileName;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 8000);
+    // Прямое скачивание через Blob-ссылку в браузере
+    try {
+      const blobUrl = URL.createObjectURL(status.localBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = status.fileName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    } catch {}
+  }
+
+  // 2. Запасной вариант только через нативный загрузчик Telegram (без открытия веб-страницы)
+  const tg = getTgWebApp();
+  if (status.downloadUrl && typeof tg?.downloadFile === 'function') {
+    const fullUrl = status.downloadUrl.startsWith('http')
+      ? status.downloadUrl
+      : `${window.location.origin}${status.downloadUrl}`;
+    try {
+      tg.downloadFile({ url: fullUrl, file_name: status.fileName });
+    } catch {}
   }
 }
 
@@ -398,7 +430,7 @@ export interface GenerateLookbookParams {
 
 /**
  * Главная функция-оркестратор: верстает все страницы каталога на Canvas,
- * упаковывает их в PDF, отправляет копию в Telegram-чат и возвращает статус доставки.
+ * упаковывает их в PDF и отправляет копию в Telegram-чат.
  */
 export async function generateAndDeliverLookbookPdf(
   params: GenerateLookbookParams
@@ -406,7 +438,6 @@ export async function generateAndDeliverLookbookPdf(
   const {
     lang,
     seasonFilter,
-    allCatalogItems,
     autumnItems,
     winterItems,
     tgUser,
@@ -415,8 +446,6 @@ export async function generateAndDeliverLookbookPdf(
     onPageProgress,
   } = params;
 
-  // Оптимальное разрешение А4 (900x1273 при виртуальной сетке 1240x1754 через ctx.scale),
-  // чтобы все 43 страницы весили ~1.3 МБ и гарантированно проходили через лимит 4.5 МБ на Vercel
   const VIRTUAL_W = 1240;
   const VIRTUAL_H = 1754;
   const OUT_W = 900;
@@ -465,20 +494,26 @@ export async function generateAndDeliverLookbookPdf(
   onPageProgress(1, totalPages);
   onStageChange('rendering_pages');
 
+  // Загружаем маленький логотип для колонтитулов и главный 3D-баннер `/baner1.png` для обложки
   const logoImg = await loadImageElement('/logo.png');
-  const heroShoeItem =
-    allCatalogItems.find((i) => i.shoe.modelNumber === '226')?.shoe ||
-    allCatalogItems[0]?.shoe ||
-    null;
-  const heroShoeImgRaw = heroShoeItem ? await loadImageElement(heroShoeItem.image) : null;
-  const heroShoeCropped = heroShoeImgRaw ? prepareSeamlessShoeCanvas(heroShoeImgRaw) : null;
+  const coverBannerRaw =
+    (await loadImageElement('/baner1.png')) || logoImg;
+  const coverBannerCropped = coverBannerRaw
+    ? prepareSeamlessShoeCanvas(coverBannerRaw)
+    : null;
+
+  // Локализованный мощный слоган для обложки в стиле мировых спортивных гигантов
+  const coverSloganLocal = {
+    ru: 'ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ.',
+    uk: 'КРОК ПОПЕРЕДУ. ХАРАКТЕР У КОЖНІЙ ПАРІ.',
+    de: 'EINEN SCHRITT VORAUS. CHARAKTER IN JEDEM PAAR.',
+  }[lang];
 
   const pdfT = getPdfLookbookText(lang);
   const jpegPages: string[] = [];
 
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     onPageProgress(pageIdx + 1, totalPages);
-    // Даем браузеру отрисовать прогресс-бар и мигание точек
     await new Promise((r) => setTimeout(r, 0));
 
     const pageDesc = pagePlan[pageIdx];
@@ -497,6 +532,10 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
+      // Тонкий диагональный водяной знак на обложке
+      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
+
+      // Верхний колонтитул обложки
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -513,56 +552,71 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 98);
       ctx.stroke();
 
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 132px "Playfair Display", Georgia, serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO', PAD - 4, 248);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 28px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText('F O O T W E A R', PAD + 4, 298);
-
-      if (logoImg) {
-        const lH = 68;
-        const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
-        ctx.drawImage(logoImg, W - PAD - lW, 146, lW, lH);
-      }
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 338);
-      ctx.lineTo(W - PAD, 338);
-      ctx.stroke();
-
-      if (heroShoeCropped) {
-        const availW = CONTENT_W - 40;
-        const availH = 820;
+      // ЦЕНТРАЛЬНАЯ КОМПОЗИЦИЯ ОБЛОЖКИ: 3D-ЛОГОТИП `/baner1.png` + ТИТУЛ CARDIO + МОЩНЫЙ СЛОГАН
+      if (coverBannerCropped) {
+        const availW = CONTENT_W - 60;
+        const availH = 540;
         const scale = Math.min(
-          availW / Math.max(1, heroShoeCropped.width),
-          availH / Math.max(1, heroShoeCropped.height)
+          availW / Math.max(1, coverBannerCropped.width),
+          availH / Math.max(1, coverBannerCropped.height)
         );
-        const drawW = heroShoeCropped.width * scale;
-        const drawH = heroShoeCropped.height * scale;
+        const drawW = coverBannerCropped.width * scale;
+        const drawH = coverBannerCropped.height * scale;
         const drawX = PAD + (CONTENT_W - drawW) / 2;
-        const drawY = 390 + (availH - drawH) / 2;
+        const drawY = 190 + (availH - drawH) / 2;
 
+        // Мягкая подиумная тень под 3D-эмблемой
         ctx.save();
-        ctx.translate(W / 2, drawY + drawH - 12);
-        ctx.scale(1, 0.08);
-        const grad = ctx.createRadialGradient(0, 0, 20, 0, 0, drawW * 0.46);
-        grad.addColorStop(0, 'rgba(23, 23, 23, 0.22)');
-        grad.addColorStop(0.6, 'rgba(23, 23, 23, 0.08)');
+        ctx.translate(W / 2, drawY + drawH + 16);
+        ctx.scale(1, 0.06);
+        const grad = ctx.createRadialGradient(0, 0, 20, 0, 0, drawW * 0.42);
+        grad.addColorStop(0, 'rgba(23, 23, 23, 0.20)');
+        grad.addColorStop(0.6, 'rgba(23, 23, 23, 0.06)');
         grad.addColorStop(1, 'rgba(23, 23, 23, 0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(0, 0, drawW * 0.46, 0, Math.PI * 2);
+        ctx.arc(0, 0, drawW * 0.42, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
-        ctx.drawImage(heroShoeCropped, drawX, drawY, drawW, drawH);
+        // Отрисовка `/baner1.png` через multiply, чтобы белый фон идеально слился с бумагой #F5F3EE
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(coverBannerCropped, drawX, drawY, drawW, drawH);
+        ctx.restore();
       }
 
+      // Мощный центрированный блок бренда и слогана под логотипом
+      const brandCenterY = 890;
+
+      ctx.fillStyle = GRAPHITE;
+      ctx.font = '400 138px "Playfair Display", Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('CARDIO', W / 2, brandCenterY);
+
+      ctx.fillStyle = GREY;
+      ctx.font = '700 22px "Inter", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText('F O O T W E A R', W / 2, brandCenterY + 46);
+
+      // Акцентная линия-разделитель под именем бренда
+      ctx.strokeStyle = GRAPHITE;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 90, brandCenterY + 84);
+      ctx.lineTo(W / 2 + 90, brandCenterY + 84);
+      ctx.stroke();
+
+      // Главный международный слоган (в стиле Nike Jordan / Adidas)
+      ctx.fillStyle = GRAPHITE;
+      ctx.font = '800 30px "Inter", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText('BUILT TO LEAD. ENGINEERED FOR EVERY STEP.', W / 2, brandCenterY + 142);
+
+      // Локализованный слоган-манифест
+      ctx.fillStyle = METALLIC;
+      ctx.font = '600 19px "Inter", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText(coverSloganLocal, W / 2, brandCenterY + 184);
+
+      // Нижний блок коллекции 2026
       const bottomBlockY = 1360;
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.5;
@@ -597,6 +651,8 @@ export async function generateAndDeliverLookbookPdf(
     } else if (pageDesc.type === 'manifesto') {
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
+
+      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -780,6 +836,9 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
+      // 1. Защитный диагональный водяной знак с номером модели и кодом партнёра
+      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode, shoe.modelNumber);
+
       if (logoImg) {
         const lH = 30;
         const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
@@ -812,18 +871,20 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 104);
       ctx.stroke();
 
-      ctx.fillStyle = '#EAE6DF';
-      ctx.font = '400 180px "Playfair Display", Georgia, serif';
+      // 2. Крупный журнальный номер модели в верхнем левом углу (не обрезается!)
+      ctx.fillStyle = '#DFDBD2';
+      ctx.font = '400 164px "Playfair Display", Georgia, serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`№${shoe.modelNumber}`, PAD - 6, 285);
+      ctx.fillText(`№ ${shoe.modelNumber}`, PAD - 4, 265);
 
+      // 3. Отрисовка фото обуви в режиме `multiply` (белый фон фото становится прозрачным и НЕ срезает цифры!)
       const rawShoeImg = await loadImageElement(shoe.image);
       if (rawShoeImg) {
         const seamlessCanvas = prepareSeamlessShoeCanvas(rawShoeImg);
-        const stageTop = 150;
-        const stageHeight = 1060;
+        const stageTop = 180;
+        const stageHeight = 1030;
         const maxShoeW = CONTENT_W - 20;
-        const maxShoeH = 880;
+        const maxShoeH = 850;
 
         const scale = Math.min(
           maxShoeW / Math.max(1, seamlessCanvas.width),
@@ -847,7 +908,11 @@ export async function generateAndDeliverLookbookPdf(
         ctx.fill();
         ctx.restore();
 
+        // ВАЖНО: композитный режим multiply гарантирует, что прямоугольник кадра не перекроет номер модели
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
         ctx.drawImage(seamlessCanvas, drawX, drawY, drawW, drawH);
+        ctx.restore();
       }
 
       const specTopY = 1270;
@@ -978,6 +1043,8 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
+      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
+
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -1070,7 +1137,7 @@ export async function generateAndDeliverLookbookPdf(
   }
 
   // =======================================================================
-  // ФАЗА 2: УПАКОВКА БИНАРНОГО PDF И ОТПРАВКА НА СЕРВЕР / В TELEGRAM
+  // ФАЗА 2: УПАКОВКА БИНАРНОГО PDF И ОТПРАВКА В TELEGRAM-БОТ
   // =======================================================================
   onStageChange('packaging_and_uploading');
   await new Promise((r) => setTimeout(r, 80));
@@ -1097,17 +1164,14 @@ export async function generateAndDeliverLookbookPdf(
 
     if (res.ok) {
       const data = await res.json();
-      if (data?.downloadPath) {
-        const statusObj: PdfDeliveryStatus = {
-          sentToTelegram: Boolean(data.sentToTelegram),
-          downloadUrl: data.downloadPath,
-          localBlob,
-          fileName,
-          totalPages,
-        };
-        await triggerPdfDownload(statusObj);
-        return { status: statusObj, error: null };
-      }
+      const statusObj: PdfDeliveryStatus = {
+        sentToTelegram: Boolean(data?.sentToTelegram),
+        downloadUrl: data?.downloadPath,
+        localBlob,
+        fileName,
+        totalPages,
+      };
+      return { status: statusObj, error: null };
     } else {
       deliveryError = `HTTP ${res.status}`;
     }
@@ -1115,14 +1179,11 @@ export async function generateAndDeliverLookbookPdf(
     deliveryError = err instanceof Error ? err.message : 'Network error';
   }
 
-  // Fallback: если сервер недоступен или вернул ошибку, отдаём собранный PDF напрямую из памяти браузера
   const fallbackStatus: PdfDeliveryStatus = {
     sentToTelegram: false,
     localBlob,
     fileName,
     totalPages,
   };
-  await triggerPdfDownload(fallbackStatus);
   return { status: fallbackStatus, error: deliveryError };
 }
-
