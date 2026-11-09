@@ -1,7 +1,7 @@
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
- * и модуль прямого сохранения файла на телефон / в Telegram.
+ * и модуль прямого сохранения файла на телефон (iOS + Android) / в Telegram.
  *
  * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
  * 1. ОБЛОЖКА (COVER): Вместо фото ботинка загружается фирменный 3D-знак `/baner1.png`,
@@ -10,9 +10,11 @@
  *    поэтому рамка кадра никогда не перекрывает и не срезает крупные фоновые номера `№ 20`, `№ 70`, `№ 206`.
  * 3. ВОДЯНОЙ ЗНАК (WATERMARK): На каждую страницу товара наносится защитный диагональный
  *    водяной знак `CARDIO FOOTWEAR • B2B ORIGINAL • {partnerCode}`.
- * 4. ПРЯМОЕ СКАЧИВАНИЕ НА ТЕЛЕФОН: Убран редирект через `tg.openLink` на `www.cordwainer.app`.
- *    Готовый файл сохраняется напрямую из локального `Blob` в памяти телефона (через системное
- *    меню «Поделиться / Сохранить в файлы» или прямую загрузку `<a download>`).
+ * 4. СКАЧИВАНИЕ НА IPHONE И ANDROID:
+ *    - На iPhone (iOS) используется системное меню `navigator.share({ files })`.
+ *    - На Android (где WebView блокирует `blob:` и `navigator.share`) вызывается нативный
+ *      загрузчик Telegram `tg.downloadFile` сразу после генерации и по нажатию кнопки,
+ *      без редиректа через `tg.openLink` на `www.cordwainer.app`.
  */
 
 import {
@@ -92,8 +94,8 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
 
 /**
  * Автоматически находит границы объекта (обуви или 3D-логотипа), отсекает лишние пустые поля
- * и переводит чисто белые пиксели фона в прозрачные / бумажные, чтобы при наложении
- * через `multiply` изображение никогда не перекрывало фоновую типографику и номера моделей.
+ * и оставляет чисто белый фон вокруг объекта, чтобы при наложении через `multiply`
+ * изображение никогда не перекрывало фоновую типографику и номера моделей.
  */
 function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   const srcW = img.naturalWidth || img.width || 800;
@@ -171,7 +173,6 @@ function drawEditorialWatermark(
   ctx.rotate((-28 * Math.PI) / 180);
   ctx.textAlign = 'center';
 
-  // Основная широкая диагональная лента водяного знака
   ctx.fillStyle = 'rgba(23, 23, 23, 0.038)';
   ctx.font = '700 44px "Inter", "Helvetica Neue", Arial, sans-serif';
   const wmLine = `CARDIO FOOTWEAR   ·   ${partnerCode}   ·   WHOLESALE 2026`;
@@ -347,22 +348,24 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Надёжное сохранение готового PDF-файла напрямую на телефон пользователя
- * БЕЗ открытия главной страницы сайта `www.cordwainer.app`.
+ * Универсальное сохранение готового PDF-файла с учётом различий iOS и Android:
  *
- * Приоритет:
- * 1. Если есть локальный `localBlob` — используем системный диалог телефона `navigator.share({ files })`
- *    (на iOS и Android позволяет в 1 клик «Сохранить в Файлы / Загрузки» или открыть в PDF-ридере)
- *    и дублируем прямым скачиванием через `<a download>`.
- * 2. Только если поддерживается нативный `tg.downloadFile` (Telegram 8.0+), передаём полный URL,
- *    но НИКОГДА не вызываем `tg.openLink` на SPA-маршрут.
+ * 1. На iOS (iPhone / iPad): используется системное меню `navigator.share({ files })`,
+ *    которое сразу сохраняет `localBlob` из памяти в «Файлы» без обращения к серверу.
+ * 2. На Android внутри Telegram WebView: `navigator.share({ files })` и `blob:`-ссылки
+ *    не поддерживаются системой Android, поэтому вызывается нативный метод Telegram
+ *    `tg.downloadFile` по прямой HTTPS-ссылке `downloadUrl` (без `tg.openLink`).
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
   localBlob?: Blob;
   fileName: string;
 }): Promise<void> {
-  // 1. Работаем напрямую с готовым файлом в памяти смартфона (не перекидывая на сайт!)
+  const tg = getTgWebApp();
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+  const isAndroid = /Android/i.test(ua);
+
+  // 1. Попытка через системное меню "Поделиться / Сохранить в Файлы" (штатно работает на iPhone)
   if (status.localBlob) {
     try {
       const file = new File([status.localBlob], status.fileName, {
@@ -373,7 +376,8 @@ export async function triggerPdfDownload(status: {
       };
       if (
         typeof nav.share === 'function' &&
-        (!nav.canShare || nav.canShare({ files: [file] }))
+        typeof nav.canShare === 'function' &&
+        nav.canShare({ files: [file] })
       ) {
         await nav.share({
           files: [file],
@@ -382,13 +386,42 @@ export async function triggerPdfDownload(status: {
         return;
       }
     } catch (err) {
-      // Если пользователь сам закрыл шторку Share (AbortError), не делаем лишних редиректов
       if (err instanceof Error && err.name === 'AbortError') {
         return;
       }
     }
+  }
 
-    // Прямое скачивание через Blob-ссылку в браузере
+  // 2. Для Android (и клиентов Telegram, где Web Share для файлов недоступен):
+  // вызываем нативный загрузчик Telegram `tg.downloadFile` по серверной HTTPS-ссылке
+  if (status.downloadUrl) {
+    const fullUrl = status.downloadUrl.startsWith('http')
+      ? status.downloadUrl
+      : `${window.location.origin}${status.downloadUrl}`;
+
+    if (typeof tg?.downloadFile === 'function') {
+      try {
+        tg.downloadFile({ url: fullUrl, file_name: status.fileName });
+        return;
+      } catch {}
+    }
+
+    if (isAndroid) {
+      try {
+        const a = document.createElement('a');
+        a.href = fullUrl;
+        a.download = status.fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      } catch {}
+    }
+  }
+
+  // 3. Fallback для ПК (Desktop) — скачивание из локального Blob в памяти браузера
+  if (status.localBlob) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
       const a = document.createElement('a');
@@ -399,18 +432,6 @@ export async function triggerPdfDownload(status: {
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-      return;
-    } catch {}
-  }
-
-  // 2. Запасной вариант только через нативный загрузчик Telegram (без открытия веб-страницы)
-  const tg = getTgWebApp();
-  if (status.downloadUrl && typeof tg?.downloadFile === 'function') {
-    const fullUrl = status.downloadUrl.startsWith('http')
-      ? status.downloadUrl
-      : `${window.location.origin}${status.downloadUrl}`;
-    try {
-      tg.downloadFile({ url: fullUrl, file_name: status.fileName });
     } catch {}
   }
 }
@@ -430,7 +451,7 @@ export interface GenerateLookbookParams {
 
 /**
  * Главная функция-оркестратор: верстает все страницы каталога на Canvas,
- * упаковывает их в PDF и отправляет копию в Telegram-чат.
+ * упаковывает их в PDF, отправляет копию в Telegram-чат и на Android сразу вызывает скачивание.
  */
 export async function generateAndDeliverLookbookPdf(
   params: GenerateLookbookParams
@@ -502,7 +523,7 @@ export async function generateAndDeliverLookbookPdf(
     ? prepareSeamlessShoeCanvas(coverBannerRaw)
     : null;
 
-  // Локализованный мощный слоган для обложки в стиле мировых спортивных гигантов
+  // Локализованный мощный слоган для обложки
   const coverSloganLocal = {
     ru: 'ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ.',
     uk: 'КРОК ПОПЕРЕДУ. ХАРАКТЕР У КОЖНІЙ ПАРІ.',
@@ -532,10 +553,8 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
-      // Тонкий диагональный водяной знак на обложке
       drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
 
-      // Верхний колонтитул обложки
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -565,7 +584,6 @@ export async function generateAndDeliverLookbookPdf(
         const drawX = PAD + (CONTENT_W - drawW) / 2;
         const drawY = 190 + (availH - drawH) / 2;
 
-        // Мягкая подиумная тень под 3D-эмблемой
         ctx.save();
         ctx.translate(W / 2, drawY + drawH + 16);
         ctx.scale(1, 0.06);
@@ -579,14 +597,12 @@ export async function generateAndDeliverLookbookPdf(
         ctx.fill();
         ctx.restore();
 
-        // Отрисовка `/baner1.png` через multiply, чтобы белый фон идеально слился с бумагой #F5F3EE
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
         ctx.drawImage(coverBannerCropped, drawX, drawY, drawW, drawH);
         ctx.restore();
       }
 
-      // Мощный центрированный блок бренда и слогана под логотипом
       const brandCenterY = 890;
 
       ctx.fillStyle = GRAPHITE;
@@ -598,7 +614,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.font = '700 22px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText('F O O T W E A R', W / 2, brandCenterY + 46);
 
-      // Акцентная линия-разделитель под именем бренда
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -606,17 +621,14 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W / 2 + 90, brandCenterY + 84);
       ctx.stroke();
 
-      // Главный международный слоган (в стиле Nike Jordan / Adidas)
       ctx.fillStyle = GRAPHITE;
       ctx.font = '800 30px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText('BUILT TO LEAD. ENGINEERED FOR EVERY STEP.', W / 2, brandCenterY + 142);
 
-      // Локализованный слоган-манифест
       ctx.fillStyle = METALLIC;
       ctx.font = '600 19px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(coverSloganLocal, W / 2, brandCenterY + 184);
 
-      // Нижний блок коллекции 2026
       const bottomBlockY = 1360;
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.5;
@@ -836,7 +848,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
-      // 1. Защитный диагональный водяной знак с номером модели и кодом партнёра
       drawEditorialWatermark(ctx, W, H, tgUser.partnerCode, shoe.modelNumber);
 
       if (logoImg) {
@@ -871,13 +882,11 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 104);
       ctx.stroke();
 
-      // 2. Крупный журнальный номер модели в верхнем левом углу (не обрезается!)
       ctx.fillStyle = '#DFDBD2';
       ctx.font = '400 164px "Playfair Display", Georgia, serif';
       ctx.textAlign = 'left';
       ctx.fillText(`№ ${shoe.modelNumber}`, PAD - 4, 265);
 
-      // 3. Отрисовка фото обуви в режиме `multiply` (белый фон фото становится прозрачным и НЕ срезает цифры!)
       const rawShoeImg = await loadImageElement(shoe.image);
       if (rawShoeImg) {
         const seamlessCanvas = prepareSeamlessShoeCanvas(rawShoeImg);
@@ -908,7 +917,6 @@ export async function generateAndDeliverLookbookPdf(
         ctx.fill();
         ctx.restore();
 
-        // ВАЖНО: композитный режим multiply гарантирует, что прямоугольник кадра не перекроет номер модели
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
         ctx.drawImage(seamlessCanvas, drawX, drawY, drawW, drawH);
@@ -1171,6 +1179,14 @@ export async function generateAndDeliverLookbookPdf(
         fileName,
         totalPages,
       };
+
+      // На Android сразу вызываем нативное окно скачивания Telegram, пока кэш сервера горячий
+      const isAndroid =
+        typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+      if (isAndroid && statusObj.downloadUrl) {
+        await triggerPdfDownload(statusObj);
+      }
+
       return { status: statusObj, error: null };
     } else {
       deliveryError = `HTTP ${res.status}`;
