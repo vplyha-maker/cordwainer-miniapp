@@ -969,7 +969,7 @@ function WholesalePriceCatalogModal({
       // чтобы все 43 страницы весили ~1.3 МБ и гарантированно проходили через лимит 4.5 МБ на Vercel
       const VIRTUAL_W = 1240;
       const VIRTUAL_H = 1754;
-      constOUT_W = 900;
+      const OUT_W = 900;
       const OUT_H = 1273;
       const SCALE_FACTOR = OUT_W / VIRTUAL_W;
 
