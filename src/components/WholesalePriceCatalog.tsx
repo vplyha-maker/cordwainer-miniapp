@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   cardioCatalog,
@@ -22,6 +22,7 @@ import type { Lang } from '../App';
 export const VALID_WHOLESALE_PINS = new Set(['2026', '7777', '1511', '3716']);
 const PIN_STORAGE_KEY = 'cardio_b2b_price_pin_ok_v1';
 const CART_STORAGE_KEY = 'cardio_b2b_cart_v1';
+const PDF_AUDIO_SRC = '/pdf.wav';
 
 const SIZES: readonly SizeKey[] = [40, 41, 42, 43, 44, 45] as const;
 const STANDARD_8_RUN: Record<SizeKey, number> = { 40: 1, 41: 1, 42: 2, 43: 2, 44: 1, 45: 1 };
@@ -123,8 +124,7 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
 
 /**
  * Автоматически кадрирует пустые белые поля вокруг обуви и переводит белый фон фото
- * в благородный тон бумаги #F5F3EE (RGB: 245, 243, 238), чтобы обувь занимала 65% страницы
- * без белых прямоугольников и рамок.
+ * в тон бумаги #F5F3EE (RGB: 245, 243, 238), чтобы обувь занимала 65% страницы без рамок.
  */
 function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   const srcW = img.naturalWidth || img.width || 800;
@@ -148,14 +148,12 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   let maxX = 0;
   let maxY = 0;
 
-  // Ищем границы самой обуви (отсекая чистый белый студийный фон)
   for (let y = 0; y < srcH; y++) {
     for (let x = 0; x < srcW; x++) {
       const idx = (y * srcW + x) * 4;
       const r = data[idx];
       const g = data[idx + 1];
       const b = data[idx + 2];
-      // Если пиксель темнее чем #F6F6F6 — это часть обуви или ее естественной тени
       if (r < 245 || g < 245 || b < 245) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -165,8 +163,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
     }
   }
 
-  // Умножаем каждый пиксель на тон бумаги #F5F3EE (245, 243, 238),
-  // чтобы белый фон (#FFFFFF) стал ровно #F5F3EE и бесшовно слился с листом каталога
   for (let i = 0; i < data.length; i += 4) {
     data[i] = Math.round((data[i] * 245) / 255);
     data[i + 1] = Math.round((data[i + 1] * 243) / 255);
@@ -306,6 +302,34 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
   }
   return btoa(binary);
+}
+
+/**
+ * Компонент мигающих точек индикации активного процесса
+ */
+function BlinkingDots({ phase }: { phase: number }) {
+  const dots = [0, 1, 2];
+  return (
+    <span style={{ display: 'inline-flex', gap: '4px', marginLeft: '6px', verticalAlign: 'middle' }}>
+      {dots.map((d) => {
+        const active = phase % 3 === d;
+        return (
+          <span
+            key={d}
+            style={{
+              width: '5px',
+              height: '5px',
+              borderRadius: '50%',
+              backgroundColor: 'currentColor',
+              opacity: active ? 1 : 0.25,
+              transition: 'opacity 0.2s ease',
+              display: 'inline-block',
+            }}
+          />
+        );
+      })}
+    </span>
+  );
 }
 
 export interface FullCatalogPriceItem {
@@ -482,6 +506,8 @@ type ModalProps = {
   onHaptic?: () => void;
 };
 
+type PdfStage = 'idle' | 'rendering_pages' | 'packaging_and_uploading';
+
 function WholesalePriceCatalogModal({
   lang,
   isDark,
@@ -493,14 +519,22 @@ function WholesalePriceCatalogModal({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [seasonFilter, setSeasonFilter] = useState<'all' | SeasonKey>('all');
-  const [pdfGenerating, setPdfGenerating] = useState(false);
-  const [pdfProgressText, setPdfProgressText] = useState('');
+
+  const [pdfStage, setPdfStage] = useState<PdfStage>('idle');
+  const [pdfCurrentPage, setPdfCurrentPage] = useState(0);
+  const [pdfTotalPages, setPdfTotalPages] = useState(0);
+  const [dotPhase, setDotPhase] = useState(0);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
+
   const [deliveryStatus, setDeliveryStatus] = useState<{
     sentToTelegram: boolean;
     downloadUrl?: string;
     localBlob?: Blob;
     fileName: string;
+    totalPages: number;
   } | null>(null);
+
+  const pdfAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [selectedShoeInPrice, setSelectedShoeInPrice] = useState<ShoeItem | null>(null);
   const [isCartOpenInPrice, setIsCartOpenInPrice] = useState(false);
@@ -524,6 +558,49 @@ function WholesalePriceCatalogModal({
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     } catch {}
   }, [cart]);
+
+  // Таймер мигающих точек во время генерации и отправки PDF
+  useEffect(() => {
+    if (pdfStage === 'idle') return;
+    const timer = window.setInterval(() => {
+      setDotPhase((prev) => (prev + 1) % 3);
+    }, 320);
+    return () => window.clearInterval(timer);
+  }, [pdfStage]);
+
+  // Остановка аудио при размонтировании модального окна
+  useEffect(() => {
+    return () => {
+      if (pdfAudioRef.current) {
+        try {
+          pdfAudioRef.current.pause();
+          pdfAudioRef.current.currentTime = 0;
+        } catch {}
+      }
+    };
+  }, []);
+
+  const startPdfSoundtrack = () => {
+    try {
+      if (!pdfAudioRef.current) {
+        const audio = new Audio(PDF_AUDIO_SRC);
+        audio.loop = true;
+        audio.volume = 0.85;
+        pdfAudioRef.current = audio;
+      }
+      pdfAudioRef.current.currentTime = 0;
+      pdfAudioRef.current.play().catch(() => {});
+    } catch {}
+  };
+
+  const stopPdfSoundtrack = () => {
+    try {
+      if (pdfAudioRef.current) {
+        pdfAudioRef.current.pause();
+        pdfAudioRef.current.currentTime = 0;
+      }
+    } catch {}
+  };
 
   const tgUser = useMemo(() => getTelegramUserInfo(), []);
 
@@ -632,9 +709,13 @@ function WholesalePriceCatalogModal({
       mainTitle: 'Оптовый прайс-каталог 2026',
       downloadBtn: (count: number) => `⬇ Скачать Editorial Lookbook PDF (${count} мод. • 1 мод. = 1 стр.)`,
       downloadBtnTop: '⬇ PDF Lookbook',
-      generatingPdf: 'Верстка PDF',
-      sentToTgBanner: '✓ Премиальный PDF-каталог отправлен вам в чат Telegram от @Cordwainer_bot!',
-      downloadDirectBtn: '📥 Скачать / Открыть PDF на устройстве →',
+      stageRendering: (cur: number, tot: number) => `ВЕРСТКА СТРАНИЦ КАТАЛОГА (${cur}/${tot})`,
+      stagePackaging: (tot: number) => `✓ ВСЕ ${tot} СТР. СФОРМИРОВАНЫ • УПАКОВКА И ОТПРАВКА PDF`,
+      stagePackagingSub: 'Формируется защищенный файл для телефона и Telegram-бота, пожалуйста подождите',
+      soundPlayingHint: '♪ Звуковое сопровождение верстки активно',
+      readyBannerTitle: (tot: number) => `✓ КАТАЛОГ ПОЛНОСТЬЮ СФОРМИРОВАН (${tot} СТРАНИЦ А4)`,
+      sentToTgBanner: '✓ Файл также отправлен вам в чат Telegram от @Cordwainer_bot!',
+      downloadDirectBtn: '📥 СКАЧАТЬ / ОТКРЫТЬ ГОТОВЫЙ PDF НА ТЕЛЕФОНЕ →',
       tabAll: `Все модели (${allCatalogItems.length})`,
       tabAutumn: `Осень 2026 (${autumnItems.length})`,
       tabWinter: `Зима 2026 (${winterItems.length})`,
@@ -685,9 +766,13 @@ function WholesalePriceCatalogModal({
       mainTitle: 'Гуртовий прайс-каталог 2026',
       downloadBtn: (count: number) => `⬇ Завантажити Editorial Lookbook PDF (${count} мод. • 1 мод. = 1 стор.)`,
       downloadBtnTop: '⬇ PDF Lookbook',
-      generatingPdf: 'Верстка PDF',
-      sentToTgBanner: '✓ Преміальний PDF-каталог надіслано вам у чат Telegram від @Cordwainer_bot!',
-      downloadDirectBtn: '📥 Завантажити / Відкрити PDF на пристрої →',
+      stageRendering: (cur: number, tot: number) => `ВЕРСТКА СТОРІНОК КАТАЛОГУ (${cur}/${tot})`,
+      stagePackaging: (tot: number) => `✓ ВСІ ${tot} СТОР. СФОРМОВАНО • УПАКОВКА ТА ВІДПРАВКА PDF`,
+      stagePackagingSub: 'Формується захищений файл для телефону та Telegram-бота, зачекайте будь ласка',
+      soundPlayingHint: '♪ Звуковий супровід верстки активний',
+      readyBannerTitle: (tot: number) => `✓ КАТАЛОГ ПОВНІСТЮ СФОРМОВАНО (${tot} СТОРІНОК А4)`,
+      sentToTgBanner: '✓ Файл також надіслано вам у чат Telegram від @Cordwainer_bot!',
+      downloadDirectBtn: '📥 ЗАВАНТАЖИТИ / ВІДКРИТИ ГОТОВИЙ PDF НА ТЕЛЕФОНІ →',
       tabAll: `Всі моделі (${allCatalogItems.length})`,
       tabAutumn: `Осінь 2026 (${autumnItems.length})`,
       tabWinter: `Зима 2026 (${winterItems.length})`,
@@ -738,9 +823,13 @@ function WholesalePriceCatalogModal({
       mainTitle: 'Großhandel Preiskatalog 2026',
       downloadBtn: (count: number) => `⬇ Editorial Lookbook PDF laden (${count} Mod. • 1 Mod. = 1 Seite)`,
       downloadBtnTop: '⬇ PDF Lookbook',
-      generatingPdf: 'PDF Layout',
-      sentToTgBanner: '✓ Exklusiver PDF-Katalog wurde in Ihren Telegram-Chat gesendet!',
-      downloadDirectBtn: '📥 PDF-Datei auf Gerät speichern / öffnen →',
+      stageRendering: (cur: number, tot: number) => `KATALOGSEITEN WERDEN ERSTELLT (${cur}/${tot})`,
+      stagePackaging: (tot: number) => `✓ ALLE ${tot} SEITEN ERSTELLT • PDF WIRD VERPACKT & GESENDET`,
+      stagePackagingSub: 'Geschützte PDF-Datei wird für Ihr Gerät und Telegram vorbereitet, bitte warten',
+      soundPlayingHint: '♪ Audio-Begleitung aktiv',
+      readyBannerTitle: (tot: number) => `✓ KATALOG VOLLSTÄNDIG ERSTELLT (${tot} SEITEN A4)`,
+      sentToTgBanner: '✓ Datei wurde auch in Ihren Telegram-Chat von @Cordwainer_bot gesendet!',
+      downloadDirectBtn: '📥 FERTIGE PDF AUF GERÄT HERUNTERLADEN / ÖFFNEN →',
       tabAll: `Alle Modelle (${allCatalogItems.length})`,
       tabAutumn: `Herbst 2026 (${autumnItems.length})`,
       tabWinter: `Winter 2026 (${winterItems.length})`,
@@ -867,22 +956,26 @@ function WholesalePriceCatalogModal({
     }
   };
 
-  /**
-   * ГЕНЕРАТОР ПРЕМИАЛЬНОГО EDITORIAL LOOKBOOK PDF (А4):
-   * - Палитра: #F5F3EE (Warm Milky-White), #171717 (Deep Graphite), #85837E (Soft Grey), #A69984 (Metallic Accent)
-   * - Главное правило: ОДНА МОДЕЛЬ ОБУВИ (ОДИН ЦВЕТ) — ОДНА ПОЛНОЦЕННАЯ СТРАНИЦА А4
-   * - Обувь занимает 60–70% визуального пространства страницы без рамок и прямоугольников
-   * - Включает Обложку, Манифест/Оглавление, Разделители сезонов, 38 товарных полос и Контактную полосу
-   */
   const handleGenerateAndDeliverPdf = async () => {
-    if (pdfGenerating) return;
-    setPdfGenerating(true);
+    if (pdfStage !== 'idle') return;
     setDeliveryStatus(null);
+    setDeliveryError(null);
+
+    // 1. Запускаем звуковую дорожку /pdf.wav
+    startPdfSoundtrack();
 
     try {
-      const W = 1240;
-      const H = 1754;
-      const PAD = 84; // Воздушные журнальные поля
+      // Оптимальное разрешение А4 (900x1273 при виртуальной сетке 1240x1754 через ctx.scale),
+      // чтобы все 43 страницы весили ~1.3 МБ и гарантированно проходили через лимит 4.5 МБ на Vercel
+      const VIRTUAL_W = 1240;
+      const VIRTUAL_H = 1754;
+      constOUT_W = 900;
+      const OUT_H = 1273;
+      const SCALE_FACTOR = OUT_W / VIRTUAL_W;
+
+      const W = VIRTUAL_W;
+      const H = VIRTUAL_H;
+      const PAD = 84;
       const CONTENT_W = W - PAD * 2;
 
       const PAPER = '#F5F3EE';
@@ -891,9 +984,6 @@ function WholesalePriceCatalogModal({
       const METALLIC = '#A69984';
       const RULE = '#D6D1C7';
 
-      const logoImg = await loadImageElement('/logo.png');
-
-      // Определяем список сезонов для рендера
       const includeAutumn = seasonFilter === 'all' || seasonFilter === 'autumn';
       const includeWinter = seasonFilter === 'all' || seasonFilter === 'winter';
 
@@ -922,9 +1012,11 @@ function WholesalePriceCatalogModal({
       pagePlan.push({ type: 'contacts' });
 
       const totalPages = pagePlan.length;
-      const jpegPages: string[] = [];
+      setPdfTotalPages(totalPages);
+      setPdfCurrentPage(1);
+      setPdfStage('rendering_pages');
 
-      // Предзагрузим фото флагманской модели для обложки (например, 226 или первая доступная)
+      const logoImg = await loadImageElement('/logo.png');
       const heroShoeItem =
         allCatalogItems.find((i) => i.shoe.modelNumber === '226')?.shoe ||
         allCatalogItems[0]?.shoe ||
@@ -932,7 +1024,6 @@ function WholesalePriceCatalogModal({
       const heroShoeImgRaw = heroShoeItem ? await loadImageElement(heroShoeItem.image) : null;
       const heroShoeCropped = heroShoeImgRaw ? prepareSeamlessShoeCanvas(heroShoeImgRaw) : null;
 
-      // Локализованные тексты внутри PDF
       const pdfT = {
         ru: {
           edition: 'WHOLESALE EDITORIAL LOOKBOOK // 2026',
@@ -1056,7 +1147,6 @@ function WholesalePriceCatalogModal({
         },
       }[lang];
 
-      // Помощник переноса длинных абзацев по словам
       const drawWrappedText = (
         ctx: CanvasRenderingContext2D,
         text: string,
@@ -1086,25 +1176,29 @@ function WholesalePriceCatalogModal({
         return curY;
       };
 
+      const jpegPages: string[] = [];
+
       for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-        setPdfProgressText(`${pageIdx + 1}/${totalPages}`);
+        setPdfCurrentPage(pageIdx + 1);
+        // Даем браузеру отрисовать прогресс-бар и мигание точек
+        await new Promise((r) => setTimeout(r, 0));
+
         const pageDesc = pagePlan[pageIdx];
         const pageNumStr = `${String(pageIdx + 1).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}`;
 
         const canvas = document.createElement('canvas');
-        canvas.width = W;
-        canvas.height = H;
+        canvas.width = OUT_W;
+        canvas.height = OUT_H;
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
-        // =====================================================================
-        // ПОЛОСА 1: ОБЛОЖКА (COVER PAGE)
-        // =====================================================================
+        ctx.save();
+        ctx.scale(SCALE_FACTOR, SCALE_FACTOR);
+
         if (pageDesc.type === 'cover') {
           ctx.fillStyle = PAPER;
           ctx.fillRect(0, 0, W, H);
 
-          // Верхняя архитектурная строка
           ctx.fillStyle = GRAPHITE;
           ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.textAlign = 'left';
@@ -1121,7 +1215,6 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, 98);
           ctx.stroke();
 
-          // Монументальная швейцарская типографика заголовка
           ctx.fillStyle = GRAPHITE;
           ctx.font = '400 132px "Playfair Display", Georgia, serif';
           ctx.textAlign = 'left';
@@ -1144,7 +1237,6 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, 338);
           ctx.stroke();
 
-          // Центральный подиум обложки с крупным силуэтом обуви (занимает ~55% высоты)
           if (heroShoeCropped) {
             const availW = CONTENT_W - 40;
             const availH = 820;
@@ -1157,7 +1249,6 @@ function WholesalePriceCatalogModal({
             const drawX = PAD + (CONTENT_W - drawW) / 2;
             const drawY = 390 + (availH - drawH) / 2;
 
-            // Мягкая контактная студийная тень под обувью
             ctx.save();
             ctx.translate(W / 2, drawY + drawH - 12);
             ctx.scale(1, 0.08);
@@ -1174,7 +1265,6 @@ function WholesalePriceCatalogModal({
             ctx.drawImage(heroShoeCropped, drawX, drawY, drawW, drawH);
           }
 
-          // Нижний титульный блок обложки
           const bottomBlockY = 1360;
           ctx.strokeStyle = GRAPHITE;
           ctx.lineWidth = 1.5;
@@ -1206,16 +1296,10 @@ function WholesalePriceCatalogModal({
 
           ctx.textAlign = 'right';
           ctx.fillText(pageNumStr, W - PAD, H - 78);
-        }
-
-        // =====================================================================
-        // ПОЛОСА 2: О КОЛЛЕКЦИИ, ОГЛАВЛЕНИЕ И СТАНДАРТЫ КОРОБОВ
-        // =====================================================================
-        else if (pageDesc.type === 'manifesto') {
+        } else if (pageDesc.type === 'manifesto') {
           ctx.fillStyle = PAPER;
           ctx.fillRect(0, 0, W, H);
 
-          // Верхний колонтитул
           ctx.fillStyle = GRAPHITE;
           ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.textAlign = 'left';
@@ -1235,7 +1319,6 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, 98);
           ctx.stroke();
 
-          // Заголовок манифеста
           ctx.fillStyle = METALLIC;
           ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.textAlign = 'left';
@@ -1245,7 +1328,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '400 44px "Playfair Display", Georgia, serif';
           ctx.fillText(pdfT.overviewTitle, PAD, 232);
 
-          // Текст о коллекции
           ctx.fillStyle = GRAPHITE;
           ctx.font = '400 26px "Playfair Display", Georgia, serif';
           const nextY = drawWrappedText(ctx, pdfT.manifestoLead, PAD, 315, CONTENT_W, 40);
@@ -1254,7 +1336,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '400 20px "Inter", "Helvetica Neue", Arial, sans-serif';
           drawWrappedText(ctx, pdfT.manifestoBody, PAD, nextY + 24, CONTENT_W, 32);
 
-          // Секция Оглавления
           const tocY = 580;
           ctx.strokeStyle = RULE;
           ctx.lineWidth = 1;
@@ -1293,14 +1374,12 @@ function WholesalePriceCatalogModal({
             ctx.stroke();
           });
 
-          // Секция Стандартов комплектации коробов (6 и 8 пар)
           const boxSecY = 1040;
           ctx.fillStyle = METALLIC;
           ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.textAlign = 'left';
           ctx.fillText(`03 // ${pdfT.boxStandardsTitle}`, PAD, boxSecY);
 
-          // Блок 8 пар
           ctx.strokeStyle = GRAPHITE;
           ctx.lineWidth = 1.5;
           ctx.strokeRect(PAD, boxSecY + 36, CONTENT_W, 175);
@@ -1313,7 +1392,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '400 22px "Playfair Display", Georgia, serif';
           ctx.fillText(pdfT.box8Formula, PAD + 32, boxSecY + 150);
 
-          // Блок 6 пар
           ctx.strokeStyle = RULE;
           ctx.lineWidth = 1.5;
           ctx.strokeRect(PAD, boxSecY + 240, CONTENT_W, 175);
@@ -1326,7 +1404,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '400 22px "Playfair Display", Georgia, serif';
           ctx.fillText(pdfT.box6Formula, PAD + 32, boxSecY + 354);
 
-          // Нижний колонтитул
           ctx.strokeStyle = RULE;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -1340,13 +1417,12 @@ function WholesalePriceCatalogModal({
           ctx.fillText('CARDIO FOOTWEAR  ·  WHOLESALE COLLECTION 2026', PAD, H - 76);
 
           ctx.textAlign = 'right';
-          ctx.fillText(`+38 (067) 719-37-16 (${pdfT.georgiyName})   ·   +38 (097) 454-15-11 (${pdfT.borisName})`, W - PAD, H - 76);
-        }
-
-        // =====================================================================
-        // ШМУЦТИТУЛЫ СЕЗОНОВ (SECTION DIVIDERS — AUTUMN / WINTER)
-        // =====================================================================
-        else if (pageDesc.type === 'divider') {
+          ctx.fillText(
+            `+38 (067) 719-37-16 (${pdfT.georgiyName})   ·   +38 (097) 454-15-11 (${pdfT.borisName})`,
+            W - PAD,
+            H - 76
+          );
+        } else if (pageDesc.type === 'divider') {
           ctx.fillStyle = GRAPHITE;
           ctx.fillRect(0, 0, W, H);
 
@@ -1397,22 +1473,15 @@ function WholesalePriceCatalogModal({
 
           ctx.textAlign = 'right';
           ctx.fillText('SIZES 40—45', W - PAD, H - 78);
-        }
-
-        // =====================================================================
-        // ТОВАРНАЯ ПОЛОСА (1 МОДЕЛЬ И 1 ЦВЕТ = 1 ПОЛНАЯ СТРАНИЦА А4)
-        // =====================================================================
-        else if (pageDesc.type === 'product') {
+        } else if (pageDesc.type === 'product') {
           const { shoe, priceUsd, season } = pageDesc.item;
           const catUpper = getLocalizedCategory(shoe.category, lang).toUpperCase();
           const colorUpper = getLocalizedColor(shoe.color, lang).toUpperCase();
           const featuresUpper = shoe.features.map((f) => getLocalizedFeature(f, lang).toUpperCase());
 
-          // 1. Чистый теплый молочно-белый лист #F5F3EE
           ctx.fillStyle = PAPER;
           ctx.fillRect(0, 0, W, H);
 
-          // 2. ВЕРХНЯЯ ЗОНА (Логотип CARDIO, Сезон и коллекция, Категория обуви, Номер страницы)
           if (logoImg) {
             const lH = 30;
             const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
@@ -1445,8 +1514,6 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, 104);
           ctx.stroke();
 
-          // 3. ЦЕНТРАЛЬНАЯ ЗОНА (Крупная фотография обуви — 62% площади страницы, максимум воздуха)
-          // Деликатный архитектурный индекс на фоне в верхнем левом углу студийной зоны
           ctx.fillStyle = '#EAE6DF';
           ctx.font = '400 180px "Playfair Display", Georgia, serif';
           ctx.textAlign = 'left';
@@ -1456,8 +1523,8 @@ function WholesalePriceCatalogModal({
           if (rawShoeImg) {
             const seamlessCanvas = prepareSeamlessShoeCanvas(rawShoeImg);
             const stageTop = 150;
-            const stageHeight = 1060; // 60.5% от общей высоты листа А4!
-            const maxShoeW = CONTENT_W - 20; // До 1052px в ширину
+            const stageHeight = 1060;
+            const maxShoeW = CONTENT_W - 20;
             const maxShoeH = 880;
 
             const scale = Math.min(
@@ -1469,7 +1536,6 @@ function WholesalePriceCatalogModal({
             const drawX = PAD + (CONTENT_W - drawW) / 2;
             const drawY = stageTop + (stageHeight - drawH) / 2;
 
-            // Мягкая студийная опорная тень под подошвой
             ctx.save();
             ctx.translate(W / 2, drawY + drawH - 8);
             ctx.scale(1, 0.075);
@@ -1486,10 +1552,8 @@ function WholesalePriceCatalogModal({
             ctx.drawImage(seamlessCanvas, drawX, drawY, drawW, drawH);
           }
 
-          // 4. НИЖНЯЯ ЗОНА (Типографическая спецификация и коммерческий блок)
           const specTopY = 1270;
 
-          // Главная графитовая линия отделения студийной зоны
           ctx.strokeStyle = GRAPHITE;
           ctx.lineWidth = 1.8;
           ctx.beginPath();
@@ -1497,7 +1561,6 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, specTopY);
           ctx.stroke();
 
-          // ЯРУС 1: Крупный номер модели слева + Оптовая цена за пару справа
           ctx.fillStyle = GREY;
           ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.textAlign = 'left';
@@ -1517,7 +1580,6 @@ function WholesalePriceCatalogModal({
           ctx.textAlign = 'right';
           ctx.fillText(`$${priceUsd}`, W - PAD, specTopY + 114);
 
-          // Тонкая разделительная линия перед коммерческой матрицей
           const matrixTopY = specTopY + 150;
           ctx.strokeStyle = RULE;
           ctx.lineWidth = 1;
@@ -1526,14 +1588,12 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, matrixTopY);
           ctx.stroke();
 
-          // ЯРУС 2: 4 колонки (Цвет и характеристики | Размерный ряд | Короб 6 пар | Короб 8 пар)
           const col1X = PAD;
           const col2X = PAD + 340;
           const col3X = PAD + 565;
           const col4X = PAD + 825;
           const matrixBottomY = matrixTopY + 168;
 
-          // Вертикальные тонкие швейцарские линии между колонками
           [col2X - 24, col3X - 24, col4X - 24].forEach((divX) => {
             ctx.strokeStyle = RULE;
             ctx.lineWidth = 1;
@@ -1543,7 +1603,6 @@ function WholesalePriceCatalogModal({
             ctx.stroke();
           });
 
-          // Колонка 1: Цвет и материалы
           ctx.textAlign = 'left';
           ctx.fillStyle = GREY;
           ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -1559,7 +1618,6 @@ function WholesalePriceCatalogModal({
             featuresUpper.length > 0 ? featuresUpper.join('  ·  ') : pdfT.naturalLeather;
           ctx.fillText(featLine.slice(0, 32), col1X, matrixTopY + 122);
 
-          // Колонка 2: Размерный ряд
           ctx.fillStyle = GREY;
           ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.fillText(pdfT.sizeRangeLabel, col2X, matrixTopY + 42);
@@ -1572,7 +1630,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.fillText(pdfT.fullSizeScale, col2X, matrixTopY + 122);
 
-          // Колонка 3: Стоимость коробки на 6 пар
           ctx.fillStyle = GREY;
           ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.fillText(pdfT.box6Label, col3X, matrixTopY + 42);
@@ -1585,7 +1642,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.fillText(pdfT.box6Sub, col3X, matrixTopY + 122);
 
-          // Колонка 4: Стоимость коробки на 8 пар
           ctx.fillStyle = GREY;
           ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.fillText(pdfT.box8Label, col4X, matrixTopY + 42);
@@ -1598,7 +1654,6 @@ function WholesalePriceCatalogModal({
           ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.fillText(pdfT.box8Sub, col4X, matrixTopY + 122);
 
-          // Нижняя линия и чистый колонтитул без наложений
           ctx.strokeStyle = RULE;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -1621,12 +1676,7 @@ function WholesalePriceCatalogModal({
             W - PAD,
             H - 72
           );
-        }
-
-        // =====================================================================
-        // ФИНАЛЬНАЯ ПОЛОСА: КОНТАКТЫ ОПТОВОГО ОТДЕЛА
-        // =====================================================================
-        else if (pageDesc.type === 'contacts') {
+        } else if (pageDesc.type === 'contacts') {
           ctx.fillStyle = PAPER;
           ctx.fillRect(0, 0, W, H);
 
@@ -1668,7 +1718,6 @@ function WholesalePriceCatalogModal({
           ctx.lineTo(W - PAD, 440);
           ctx.stroke();
 
-          // Карточки руководителей отдела оптовых продаж (Георгий и Борис)
           const contactsList = [
             { name: pdfT.georgiyName, phone: '+38 (067) 719-37-16' },
             { name: pdfT.borisName, phone: '+38 (097) 454-15-11' },
@@ -1695,7 +1744,6 @@ function WholesalePriceCatalogModal({
             ctx.fillText(c.phone, W - PAD - 40, cY + 112);
           });
 
-          // Условия отгрузки
           ctx.fillStyle = GREY;
           ctx.font = '400 20px "Inter", "Helvetica Neue", Arial, sans-serif';
           ctx.textAlign = 'left';
@@ -1719,11 +1767,17 @@ function WholesalePriceCatalogModal({
           ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 82);
         }
 
-        // Из-за чистой палитры #F5F3EE без шума каждый лист при качестве 0.82 весит всего ~55 КБ
-        jpegPages.push(canvas.toDataURL('image/jpeg', 0.82));
+        ctx.restore();
+        jpegPages.push(canvas.toDataURL('image/jpeg', 0.72));
       }
 
-      const pdfBytes = buildPdfBytesFromJpegPages(jpegPages, W, H);
+      // =======================================================================
+      // ФАЗА 2: ВСЕ СТРАНИЦЫ СФОРМИРОВАНЫ -> УПАКОВКА И ОТПРАВКА С МИГАЮЩИМИ ТОЧКАМИ
+      // =======================================================================
+      setPdfStage('packaging_and_uploading');
+      await new Promise((r) => setTimeout(r, 80));
+
+      const pdfBytes = buildPdfBytesFromJpegPages(jpegPages, OUT_W, OUT_H);
       const localBlob = new Blob([pdfBytes], { type: 'application/pdf' });
       const pdfBase64 = uint8ArrayToBase64(pdfBytes);
       const fileName = `CARDIO_LOOKBOOK_2026_${lang.toUpperCase()}.pdf`;
@@ -1746,34 +1800,38 @@ function WholesalePriceCatalogModal({
           const data = await res.json();
           if (data?.downloadPath) {
             deliveredViaServer = true;
-            setDeliveryStatus({
+            const statusObj = {
               sentToTelegram: Boolean(data.sentToTelegram),
               downloadUrl: data.downloadPath,
               localBlob,
               fileName,
-            });
-            if (!data.sentToTelegram) {
-              await triggerDownload({
-                downloadUrl: data.downloadPath,
-                localBlob,
-                fileName,
-              });
-            }
+              totalPages,
+            };
+            setDeliveryStatus(statusObj);
+            // Сразу запускаем открытие/скачивание по прямой HTTPS-ссылке
+            await triggerDownload(statusObj);
           }
+        } else {
+          setDeliveryError(`HTTP ${res.status}`);
         }
-      } catch {}
+      } catch (err) {
+        setDeliveryError(err instanceof Error ? err.message : 'Network error');
+      }
 
       if (!deliveredViaServer) {
-        setDeliveryStatus({
+        const fallbackStatus = {
           sentToTelegram: false,
           localBlob,
           fileName,
-        });
-        await triggerDownload({ localBlob, fileName });
+          totalPages,
+        };
+        setDeliveryStatus(fallbackStatus);
+        await triggerDownload(fallbackStatus);
       }
     } finally {
-      setPdfGenerating(false);
-      setPdfProgressText('');
+      // Выключаем звуковую дорожку /pdf.wav только когда процесс полностью завершен
+      stopPdfSoundtrack();
+      setPdfStage('idle');
     }
   };
 
@@ -1786,9 +1844,6 @@ function WholesalePriceCatalogModal({
     }
   };
 
-  // ===========================================================================
-  // РЕЖИМ А: ОТКРЫТА НАКЛАДНАЯ ВНУТРИ ПРАЙС-КАТАЛОГА
-  // ===========================================================================
   if (isCartOpenInPrice) {
     return (
       <div
@@ -1844,9 +1899,6 @@ function WholesalePriceCatalogModal({
     );
   }
 
-  // ===========================================================================
-  // РЕЖИМ Б: КАРТОЧКА ЗАКАЗА МОДЕЛИ ВНУТРИ ПРАЙС-КАТАЛОГА
-  // ===========================================================================
   if (selectedShoeInPrice) {
     const unitPriceUsd = getWholesalePriceByModel(selectedShoeInPrice.modelNumber) || 0;
     const totalLineUsd = unitPriceUsd * currentTotalPairs;
@@ -2413,9 +2465,14 @@ function WholesalePriceCatalogModal({
     );
   }
 
-  // ===========================================================================
-  // РЕЖИМ В: ГЛАВНЫЙ ЭКРАН ПРАЙС-КАТАЛОГА
-  // ===========================================================================
+  const isBusy = pdfStage !== 'idle';
+  const progressPercent =
+    pdfStage === 'rendering_pages'
+      ? Math.round((pdfCurrentPage / Math.max(1, pdfTotalPages)) * 85)
+      : pdfStage === 'packaging_and_uploading'
+      ? 95
+      : 0;
+
   return (
     <div
       style={{
@@ -2508,7 +2565,7 @@ function WholesalePriceCatalogModal({
 
             <button
               type="button"
-              disabled={pdfGenerating}
+              disabled={isBusy}
               onClick={handleGenerateAndDeliverPdf}
               style={{
                 backgroundColor: THEME.ink,
@@ -2519,11 +2576,25 @@ function WholesalePriceCatalogModal({
                 fontWeight: 600,
                 letterSpacing: '0.8px',
                 textTransform: 'uppercase',
-                cursor: pdfGenerating ? 'wait' : 'pointer',
+                cursor: isBusy ? 'wait' : 'pointer',
                 whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
               }}
             >
-              {pdfGenerating ? `${pdfProgressText}` : t.downloadBtnTop}
+              {pdfStage === 'rendering_pages' ? (
+                <>
+                  <span>{pdfCurrentPage}/{pdfTotalPages}</span>
+                  <BlinkingDots phase={dotPhase} />
+                </>
+              ) : pdfStage === 'packaging_and_uploading' ? (
+                <>
+                  <span>PDF</span>
+                  <BlinkingDots phase={dotPhase} />
+                </>
+              ) : (
+                t.downloadBtnTop
+              )}
             </button>
           </div>
         )}
@@ -2694,7 +2765,7 @@ function WholesalePriceCatalogModal({
 
             <button
               type="button"
-              disabled={pdfGenerating}
+              disabled={isBusy}
               onClick={handleGenerateAndDeliverPdf}
               style={{
                 width: '100%',
@@ -2706,40 +2777,139 @@ function WholesalePriceCatalogModal({
                 fontWeight: 600,
                 letterSpacing: '1.1px',
                 textTransform: 'uppercase',
-                cursor: pdfGenerating ? 'wait' : 'pointer',
+                cursor: isBusy ? 'wait' : 'pointer',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
             >
-              {pdfGenerating
-                ? `${t.generatingPdf} (${pdfProgressText})...`
-                : t.downloadBtn(visibleItems.length)}
+              {pdfStage === 'rendering_pages' ? (
+                <>
+                  <span>{t.stageRendering(pdfCurrentPage, pdfTotalPages)}</span>
+                  <BlinkingDots phase={dotPhase} />
+                </>
+              ) : pdfStage === 'packaging_and_uploading' ? (
+                <>
+                  <span>{t.stagePackaging(pdfTotalPages)}</span>
+                  <BlinkingDots phase={dotPhase} />
+                </>
+              ) : (
+                t.downloadBtn(visibleItems.length)
+              )}
             </button>
 
-            {deliveryStatus && (
+            {/* Интерактивный блок прогресса и мигающих точек, пока еще не появилась кнопка скачивания */}
+            {isBusy && (
               <div
                 style={{
                   marginTop: '10px',
-                  padding: '12px',
+                  padding: '12px 14px',
                   backgroundColor: THEME.surface,
                   border: `1px solid ${THEME.ink}`,
                 }}
               >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.8px',
+                    textTransform: 'uppercase',
+                    color: THEME.ink,
+                    marginBottom: '8px',
+                  }}
+                >
+                  <span>
+                    {pdfStage === 'rendering_pages'
+                      ? t.stageRendering(pdfCurrentPage, pdfTotalPages)
+                      : t.stagePackaging(pdfTotalPages)}
+                    <BlinkingDots phase={dotPhase} />
+                  </span>
+                  <span>{progressPercent}%</span>
+                </div>
+
+                {/* Линия прогресса */}
+                <div
+                  style={{
+                    width: '100%',
+                    height: '5px',
+                    backgroundColor: THEME.border,
+                    overflow: 'hidden',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${progressPercent}%`,
+                      height: '100%',
+                      backgroundColor: THEME.ink,
+                      transition: 'width 0.2s ease',
+                    }}
+                  />
+                </div>
+
+                {pdfStage === 'packaging_and_uploading' && (
+                  <div style={{ fontSize: '11px', color: THEME.ink, fontWeight: 500, marginBottom: '4px' }}>
+                    {t.stagePackagingSub}
+                    <BlinkingDots phase={dotPhase} />
+                  </div>
+                )}
+
+                <div style={{ fontSize: '9.5px', color: THEME.inkMuted, fontStyle: 'italic' }}>
+                  {t.soundPlayingHint}
+                </div>
+              </div>
+            )}
+
+            {/* Блок готового сформированного PDF */}
+            {!isBusy && deliveryStatus && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  padding: '14px',
+                  backgroundColor: THEME.surface,
+                  border: `1.5px solid ${THEME.ink}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    letterSpacing: '0.9px',
+                    textTransform: 'uppercase',
+                    color: THEME.accentGreen,
+                    marginBottom: '6px',
+                  }}
+                >
+                  {t.readyBannerTitle(deliveryStatus.totalPages)}
+                </div>
+
                 {deliveryStatus.sentToTelegram && (
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: THEME.accentGreen, marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: THEME.ink, marginBottom: '10px' }}>
                     {t.sentToTgBanner}
                   </div>
                 )}
+
+                {deliveryError && (
+                  <div style={{ fontSize: '10px', color: THEME.inkMuted, marginBottom: '8px' }}>
+                    Режим прямой выдачи ({deliveryError})
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => triggerDownload(deliveryStatus)}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    backgroundColor: THEME.surfaceActive,
-                    color: THEME.ink,
-                    border: `1px solid ${THEME.ink}`,
+                    padding: '12px 14px',
+                    backgroundColor: THEME.ink,
+                    color: THEME.onInk,
+                    border: 'none',
                     fontSize: '10px',
-                    fontWeight: 600,
-                    letterSpacing: '0.8px',
+                    fontWeight: 700,
+                    letterSpacing: '1px',
                     textTransform: 'uppercase',
                     cursor: 'pointer',
                   }}
