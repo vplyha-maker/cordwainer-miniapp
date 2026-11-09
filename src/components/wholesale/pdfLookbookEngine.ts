@@ -4,17 +4,14 @@
  * и модуль прямого сохранения файла на телефон (iOS + Android) / в Telegram.
  *
  * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
- * 1. ОБЛОЖКА (COVER): Вместо фото ботинка загружается фирменный 3D-знак `/baner1.png`,
- *    под ним выводится крупный титул CARDIO и слоган «BUILT TO LEAD. ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ».
- * 2. НЕ ОБРЕЗАЮТСЯ НОМЕРА МОДЕЛЕЙ: Фото обуви накладывается через композитный режим `multiply`,
- *    поэтому рамка кадра никогда не перекрывает и не срезает крупные фоновые номера `№ 20`, `№ 70`, `№ 206`.
- * 3. ВОДЯНОЙ ЗНАК (WATERMARK): На каждую страницу товара наносится защитный диагональный
- *    водяной знак `CARDIO FOOTWEAR • B2B ORIGINAL • {partnerCode}`.
- * 4. СКАЧИВАНИЕ НА IPHONE И ANDROID:
- *    - На iPhone (iOS) используется системное меню `navigator.share({ files })`.
- *    - На Android (где WebView блокирует `blob:` и `navigator.share`) вызывается нативный
- *      загрузчик Telegram `tg.downloadFile` сразу после генерации и по нажатию кнопки,
- *      без редиректа через `tg.openLink` на `www.cordwainer.app`.
+ * 1. СТРОГОЕ РАЗДЕЛЕНИЕ iOS И ANDROID В `triggerPdfDownload`:
+ *    - `navigator.share({ files })` вызывается ТОЛЬКО на iOS (`isIOS`), где он работает безотказно.
+ *    - На Android `navigator.share` полностью исключён (чтобы Android WebView не обрывал
+ *      скачивание ошибкой `AbortError` при активном касании экрана).
+ *    - На Android всегда напрямую вызывается `tg.downloadFile` с анти-кэш меткой `&_dl=Date.now()`.
+ * 2. ОБЛОЖКА (COVER): 3D-знак `/baner1.png`, титул CARDIO и слоган «BUILT TO LEAD».
+ * 3. НЕ ОБРЕЗАЮТСЯ НОМЕРА МОДЕЛЕЙ: Фото обуви накладывается через `multiply`.
+ * 4. ВОДЯНОЙ ЗНАК (WATERMARK): Диагональная защита на каждой странице.
  */
 
 import {
@@ -159,7 +156,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
 
 /**
  * Отрисовывает фирменный защитный водяной знак CARDIO B2B по диагонали страницы.
- * Защищает фотографии и оптовые цены при пересылке скриншотов.
  */
 function drawEditorialWatermark(
   ctx: CanvasRenderingContext2D,
@@ -348,13 +344,12 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Универсальное сохранение готового PDF-файла с учётом различий iOS и Android:
+ * Безотказное сохранение готового PDF-файла с жёстким разделением iOS и Android:
  *
- * 1. На iOS (iPhone / iPad): используется системное меню `navigator.share({ files })`,
- *    которое сразу сохраняет `localBlob` из памяти в «Файлы» без обращения к серверу.
- * 2. На Android внутри Telegram WebView: `navigator.share({ files })` и `blob:`-ссылки
- *    не поддерживаются системой Android, поэтому вызывается нативный метод Telegram
- *    `tg.downloadFile` по прямой HTTPS-ссылке `downloadUrl` (без `tg.openLink`).
+ * 1. ТОЛЬКО iOS (iPhone / iPad): вызывается системное меню `navigator.share({ files })`,
+ *    которое сохраняет `localBlob` напрямую из памяти телефона.
+ * 2. ANDROID: `navigator.share` НЕ вызывается (чтобы не блокировать загрузку ошибкой AbortError).
+ *    Сразу вызывается нативный загрузчик Telegram `tg.downloadFile` с уникальной меткой `&_dl=Date.now()`.
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -364,9 +359,14 @@ export async function triggerPdfDownload(status: {
   const tg = getTgWebApp();
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
   const isAndroid = /Android/i.test(ua);
+  const isIOS =
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (typeof navigator !== 'undefined' &&
+      navigator.platform === 'MacIntel' &&
+      navigator.maxTouchPoints > 1);
 
-  // 1. Попытка через системное меню "Поделиться / Сохранить в Файлы" (штатно работает на iPhone)
-  if (status.localBlob) {
+  // 1. ТОЛЬКО ДЛЯ iPHONE / iPAD (iOS): сохранение из памяти через системную шторку
+  if (isIOS && !isAndroid && status.localBlob) {
     try {
       const file = new File([status.localBlob], status.fileName, {
         type: 'application/pdf',
@@ -376,8 +376,7 @@ export async function triggerPdfDownload(status: {
       };
       if (
         typeof nav.share === 'function' &&
-        typeof nav.canShare === 'function' &&
-        nav.canShare({ files: [file] })
+        (!nav.canShare || nav.canShare({ files: [file] }))
       ) {
         await nav.share({
           files: [file],
@@ -392,16 +391,20 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // 2. Для Android (и клиентов Telegram, где Web Share для файлов недоступен):
-  // вызываем нативный загрузчик Telegram `tg.downloadFile` по серверной HTTPS-ссылке
+  // 2. ДЛЯ ANDROID И TELEGRAM: прямое скачивание по HTTPS с анти-кэш параметром
   if (status.downloadUrl) {
-    const fullUrl = status.downloadUrl.startsWith('http')
+    const baseFullUrl = status.downloadUrl.startsWith('http')
       ? status.downloadUrl
       : `${window.location.origin}${status.downloadUrl}`;
+    const sep = baseFullUrl.includes('?') ? '&' : '?';
+    const freshUrl = `${baseFullUrl}${sep}_dl=${Date.now()}`;
 
     if (typeof tg?.downloadFile === 'function') {
       try {
-        tg.downloadFile({ url: fullUrl, file_name: status.fileName });
+        tg.downloadFile({
+          url: freshUrl,
+          file_name: status.fileName,
+        });
         return;
       } catch {}
     }
@@ -409,7 +412,7 @@ export async function triggerPdfDownload(status: {
     if (isAndroid) {
       try {
         const a = document.createElement('a');
-        a.href = fullUrl;
+        a.href = freshUrl;
         a.download = status.fileName;
         a.style.display = 'none';
         document.body.appendChild(a);
@@ -420,7 +423,7 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // 3. Fallback для ПК (Desktop) — скачивание из локального Blob в памяти браузера
+  // 3. Fallback для ПК (Desktop)
   if (status.localBlob) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
@@ -515,7 +518,6 @@ export async function generateAndDeliverLookbookPdf(
   onPageProgress(1, totalPages);
   onStageChange('rendering_pages');
 
-  // Загружаем маленький логотип для колонтитулов и главный 3D-баннер `/baner1.png` для обложки
   const logoImg = await loadImageElement('/logo.png');
   const coverBannerRaw =
     (await loadImageElement('/baner1.png')) || logoImg;
@@ -523,7 +525,6 @@ export async function generateAndDeliverLookbookPdf(
     ? prepareSeamlessShoeCanvas(coverBannerRaw)
     : null;
 
-  // Локализованный мощный слоган для обложки
   const coverSloganLocal = {
     ru: 'ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ.',
     uk: 'КРОК ПОПЕРЕДУ. ХАРАКТЕР У КОЖНІЙ ПАРІ.',
@@ -571,7 +572,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 98);
       ctx.stroke();
 
-      // ЦЕНТРАЛЬНАЯ КОМПОЗИЦИЯ ОБЛОЖКИ: 3D-ЛОГОТИП `/baner1.png` + ТИТУЛ CARDIO + МОЩНЫЙ СЛОГАН
       if (coverBannerCropped) {
         const availW = CONTENT_W - 60;
         const availH = 540;
@@ -1180,7 +1180,7 @@ export async function generateAndDeliverLookbookPdf(
         totalPages,
       };
 
-      // На Android сразу вызываем нативное окно скачивания Telegram, пока кэш сервера горячий
+      // На Android сразу вызываем нативный загрузчик Telegram (пока серверный кэш горячий)
       const isAndroid =
         typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
       if (isAndroid && statusObj.downloadUrl) {
