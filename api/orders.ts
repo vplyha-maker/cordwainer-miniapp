@@ -1,16 +1,10 @@
 /**
  * @file api/orders.ts
  * @description Serverless-обработчик Vercel для:
- * 1. Приема и отправки защищенного PDF-каталога в Telegram (@Cordwainer_bot) с выдачей
- *    безотказной прямой HTTPS-ссылки для скачивания на iPhone и Android.
- * 2. Оформления оптовых заказов (накладных) в Telegram руководителям и сохранения в БД Neon.
- *
- * ЧТО ИСПРАВЛЕНО ДЛЯ ANDROID И VERCEL:
- * 1. Защита от потери памяти между инстансами Vercel: если `GET`-запрос попадает на
- *    другой поток сервера, где `pdfMemoryStore` пуст, сервер автоматически восстанавливает
- *    PDF-файл напрямую через `file_id` серверов Telegram или из кэш-таблицы базы данных Neon.
- * 2. Добавлена поддержка HTTP-метода `HEAD`, который используется системным загрузчиком
- *    Android (`DownloadManager`) для проверки типа `application/pdf` перед скачиванием.
+ * 1. Выдачи архива заказов покупателя из базы данных Neon (`GET ?action=history`)
+ *    как по Telegram/Web `clientUid`, так и по номеру телефона (для www.cordwainer.app).
+ * 2. Приема и выдачи защищенного PDF-каталога (`GET / HEAD ?pdfId=...` и `POST action=send_pdf`).
+ * 3. Отправки оптовых накладных руководителям в Telegram и сохранения в таблицу `orders` Neon DB.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -38,10 +32,6 @@ export const config = {
   },
 };
 
-/**
- * Скачивает PDF-файл с серверов Telegram по его `file_id`, если локальная память
- * инстанса Vercel очистилась или запрос попал на соседний серверный поток.
- */
 async function fetchPdfBufferFromTelegram(
   botToken: string,
   tgFileId: string
@@ -71,8 +61,96 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const connectionString = process.env.DATABASE_URL;
 
   // =========================================================================
+  // 0. GET-ЗАПРОС АРХИВА ЗАКАЗОВ («МОИ ЗАКАЗЫ» ИЗ БАЗЫ NEON)
+  // Работает и для Telegram Mini App (по clientUid), и для www.cordwainer.app (по телефону)
+  // =========================================================================
+  if (req.method === 'GET' && req.query?.action === 'history') {
+    if (!connectionString) {
+      return res.status(200).json({ orders: [] });
+    }
+
+    const rawUid = req.query?.clientUid;
+    const rawPhone = req.query?.phone;
+    const clientUid = Array.isArray(rawUid) ? rawUid[0] : String(rawUid || '').trim();
+    const cleanPhone = (Array.isArray(rawPhone) ? rawPhone[0] : String(rawPhone || ''))
+      .replace(/\D/g, '')
+      .slice(-10);
+
+    try {
+      const sql = neon(connectionString);
+
+      // Безопасно добавляем колонки для архива, если таблица была создана ранее без них
+      await sql`
+        ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS invoice_number TEXT,
+        ADD COLUMN IF NOT EXISTS client_uid TEXT,
+        ADD COLUMN IF NOT EXISTS client_phone TEXT,
+        ADD COLUMN IF NOT EXISTS total_usd INTEGER DEFAULT 0
+      `;
+
+      // Форматируем шаблон последних 7 цифр телефона для поиска даже по старым заказам
+      const last7 = cleanPhone.length >= 7 ? cleanPhone.slice(-7) : '';
+      const formattedTail =
+        last7.length === 7
+          ? `%${last7.slice(0, 3)}%${last7.slice(3, 5)}%${last7.slice(5, 7)}%`
+          : '';
+
+      let rows: Array<Record<string, any>> = [];
+
+      if (clientUid && cleanPhone.length >= 7) {
+        rows = await sql`
+          SELECT id, invoice_number, manager_name, client_contact, branch_or_comment,
+                 total_pairs, total_usd, invoice_text, created_at
+          FROM orders
+          WHERE client_uid = ${clientUid}
+             OR client_phone = ${cleanPhone}
+             OR (
+               ${formattedTail} <> ''
+               AND regexp_replace(client_contact, '[^0-9]', '', 'g') LIKE ${'%' + last7 + '%'}
+             )
+          ORDER BY id DESC
+          LIMIT 25
+        `;
+      } else if (cleanPhone.length >= 7) {
+        rows = await sql`
+          SELECT id, invoice_number, manager_name, client_contact, branch_or_comment,
+                 total_pairs, total_usd, invoice_text, created_at
+          FROM orders
+          WHERE client_phone = ${cleanPhone}
+             OR regexp_replace(client_contact, '[^0-9]', '', 'g') LIKE ${'%' + last7 + '%'}
+          ORDER BY id DESC
+          LIMIT 25
+        `;
+      } else if (clientUid && clientUid !== 'web_guest') {
+        rows = await sql`
+          SELECT id, invoice_number, manager_name, client_contact, branch_or_comment,
+                 total_pairs, total_usd, invoice_text, created_at
+          FROM orders
+          WHERE client_uid = ${clientUid}
+          ORDER BY id DESC
+          LIMIT 25
+        `;
+      }
+
+      const orders = rows.map((r) => ({
+        id: String(r.invoice_number || `CRD-DB-${r.id}`),
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+        managerName: String(r.manager_name || ''),
+        clientContact: String(r.client_contact || ''),
+        branchOrComment: String(r.branch_or_comment || ''),
+        totalPairs: Number(r.total_pairs || 0),
+        totalUsd: Number(r.total_usd || 0) || undefined,
+        invoiceText: String(r.invoice_text || ''),
+      }));
+
+      return res.status(200).json({ orders });
+    } catch {
+      return res.status(200).json({ orders: [] });
+    }
+  }
+
+  // =========================================================================
   // 1. GET / HEAD ЗАПРОС: Прямое скачивание готового PDF-каталога по HTTPS-ссылке
-  // (Поддержка HEAD обязательна для системного загрузчика Android DownloadManager)
   // =========================================================================
   if (req.method === 'GET' || req.method === 'HEAD') {
     const rawId = req.query?.pdfId;
@@ -87,10 +165,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       (Array.isArray(rawFn) ? rawFn[0] : String(rawFn || '')) ||
       'CARDIO_LOOKBOOK_2026.pdf';
 
-    // Шаг 1: Ищем файл в быстрой оперативной памяти текущего потока Vercel
     let item = pdfId ? pdfMemoryStore.get(pdfId) : undefined;
 
-    // Шаг 2: Если запрос попал на другой поток Vercel — забираем файл по `tgFileId` из Telegram
     if (!item && tgFileId && botToken) {
       const tgBuffer = await fetchPdfBufferFromTelegram(botToken, tgFileId);
       if (tgBuffer && tgBuffer.length > 0) {
@@ -105,7 +181,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Шаг 3: Резервный поиск в базе данных Neon (если открывали вне Telegram и попали на другой поток)
     if (!item && pdfId && connectionString) {
       try {
         const sql = neon(connectionString);
@@ -158,8 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = req.body || {};
 
   // =========================================================================
-  // 2. POST-ЗАПРОС (РЕЖИМ PDF): Принимает PDF-каталог, шлет в Telegram с запретом
-  // пересылки (protect_content: true) и создает безотказную ссылку для скачивания
+  // 2. POST-ЗАПРОС (РЕЖИМ PDF)
   // =========================================================================
   if (body.action === 'send_pdf' || body.pdfBase64) {
     try {
@@ -191,7 +265,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (oldestKey) pdfMemoryStore.delete(oldestKey);
       }
 
-      // Дополнительно сохраняем в кэш-таблицу Neon (на случай межпоточных запросов на Vercel)
       if (connectionString) {
         try {
           const sql = neon(connectionString);
@@ -219,7 +292,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const form = new FormData();
           form.append('chat_id', String(chatId));
-          form.append('protect_content', 'true'); // Запрет на пересылку и сохранение в Telegram
+          form.append('protect_content', 'true');
           if (caption) form.append('caption', String(caption));
 
           const blob = new Blob([buffer], { type: 'application/pdf' });
@@ -261,14 +334,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // =========================================================================
-  // 3. POST-ЗАПРОС (РЕЖИМ НАКЛАДНОЙ): Стандартная отправка оптового заказа
+  // 3. POST-ЗАПРОС (РЕЖИМ НАКЛАДНОЙ): Отправка заказа и запись в архив Neon DB
   // =========================================================================
   const {
+    invoiceNumber,
+    clientUid,
+    clientPhone,
     telegramId,
     managerName,
     clientContact,
     branchOrComment,
     totalPairs,
+    totalUsd,
     deliveryCost,
     invoiceText,
   } = body;
@@ -308,12 +385,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .json({ error: description || 'Telegram API error' });
     }
 
-    // 2. Сохраняем заказ в базу данных Neon (если подключена DATABASE_URL)
+    // 2. Сохраняем заказ в базу данных Neon вместе с идентификаторами для «Моих заказов»
     if (connectionString) {
       const sql = neon(connectionString);
       await sql`
-        INSERT INTO orders (manager_name, client_contact, branch_or_comment, total_pairs, delivery_cost, invoice_text)
-        VALUES (${managerName}, ${clientContact || ''}, ${branchOrComment || ''}, ${totalPairs || 0}, ${deliveryCost || 0}, ${invoiceText})
+        ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS invoice_number TEXT,
+        ADD COLUMN IF NOT EXISTS client_uid TEXT,
+        ADD COLUMN IF NOT EXISTS client_phone TEXT,
+        ADD COLUMN IF NOT EXISTS total_usd INTEGER DEFAULT 0
+      `;
+
+      await sql`
+        INSERT INTO orders (
+          invoice_number,
+          client_uid,
+          client_phone,
+          manager_name,
+          client_contact,
+          branch_or_comment,
+          total_pairs,
+          total_usd,
+          delivery_cost,
+          invoice_text
+        )
+        VALUES (
+          ${invoiceNumber || ''},
+          ${clientUid || ''},
+          ${clientPhone || ''},
+          ${managerName},
+          ${clientContact || ''},
+          ${branchOrComment || ''},
+          ${totalPairs || 0},
+          ${totalUsd || 0},
+          ${deliveryCost || 0},
+          ${invoiceText}
+        )
       `;
     }
 
