@@ -3,13 +3,13 @@
  * @description Главный компонент-оркестратор закрытого B2B прайс-каталога CARDIO 2026
  * и входного баннера для оптовых покупателей.
  *
- * ЧТО ИСПРАВЛЕНО В ЛОГИКЕ КНОПОК PDF:
- * 1. Если PDF уже сформирован (`deliveryStatus !== null`), верхняя кнопка в шапке и главная
- *    кнопка в каталоге НЕ запускают повторную генерацию с нуля, а сразу скачивают/открывают
- *    готовый файл из памяти устройства (`triggerPdfDownload`).
- * 2. Убрано дублирование двух больших чёрных кнопок одна под другой после завершения верстки.
- * 3. При переключении фильтра сезона (Все / Осень / Зима) статус готового PDF сбрасывается,
- *    чтобы партнёр мог при желании сформировать отдельный лукбук выбранного сезона.
+ * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
+ * 1. УСТРАНЕН НАЕЗД КНОПОК В ШАПКЕ: Верхняя панель адаптирована под узкие экраны смартфонов
+ *    (320px–430px) — кнопки «← Выход», «📂 Заказы» и «⬇ PDF» имеют компактные отступы и не перекрывают друг друга.
+ * 2. ПОСТОЯННЫЙ ДОСТУП К АРХИВУ «МОИ ЗАКАЗЫ»: Кнопка «📂 Заказы» в шапке доступна всегда,
+ *    даже когда текущая накладная пуста после отправки заказа.
+ * 3. АВТООЧИСТКА КОРЗИНЫ: Подписка на событие `cardio-cart-cleared` гарантирует, что после
+ *    отправки заказа старые позиции мгновенно исчезают из прайс-каталога.
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -24,7 +24,6 @@ import {
 import { WholesaleCart } from './WholesaleCart';
 import type { Lang } from '../App';
 
-// Импорт бизнес-данных, прайсов и формул расчёта
 import {
   VALID_WHOLESALE_PINS,
   PIN_STORAGE_KEY,
@@ -39,7 +38,6 @@ import {
   type FullCatalogPriceItem,
 } from './wholesale/wholesaleData';
 
-// Импорт тем оформления и мультиязычных словарей (RU / UK / DE)
 import {
   normalizeWholesaleLang,
   getWholesaleTheme,
@@ -48,7 +46,6 @@ import {
   type WholesaleLang,
 } from './wholesale/wholesaleThemeAndI18n';
 
-// Импорт движка генерации PDF-лукбука и прямого сохранения на телефон
 import {
   getTelegramUserInfo,
   generateAndDeliverLookbookPdf,
@@ -57,14 +54,12 @@ import {
   type PdfDeliveryStatus,
 } from './wholesale/pdfLookbookEngine';
 
-// Импорт дочерних экранов (PIN-авторизация, карточка ростовки, индикатор точек)
 import {
   BlinkingDots,
   WholesalePinUnlockScreen,
   ProductOrderScreen,
 } from './wholesale/WholesaleSubViews';
 
-// Ре-экспорт для 100% обратной совместимости с остальными модулями проекта (App.tsx, WholesaleCart.tsx и др.)
 export {
   VALID_WHOLESALE_PINS,
   PRICE_LIST_2026,
@@ -241,7 +236,6 @@ function WholesalePriceCatalogModal({
   const [pinError, setPinError] = useState(false);
   const [seasonFilter, setSeasonFilter] = useState<'all' | SeasonKey>('all');
 
-  // Состояния генерации и доставки PDF-лукбука
   const [pdfStage, setPdfStage] = useState<PdfStage>('idle');
   const [pdfCurrentPage, setPdfCurrentPage] = useState(0);
   const [pdfTotalPages, setPdfTotalPages] = useState(0);
@@ -251,11 +245,9 @@ function WholesalePriceCatalogModal({
 
   const pdfAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Состояния навигации внутри прайс-каталога (выбранная модель / корзина)
   const [selectedShoeInPrice, setSelectedShoeInPrice] = useState<ShoeItem | null>(null);
   const [isCartOpenInPrice, setIsCartOpenInPrice] = useState(false);
 
-  // Оптовая корзина с автосохранением в localStorage
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem(CART_STORAGE_KEY);
@@ -271,7 +263,15 @@ function WholesalePriceCatalogModal({
     } catch {}
   }, [cart]);
 
-  // Анимация мигающих точек во время генерации и отправки PDF
+  // Слушаем глобальное событие очистки корзины после отправки заказа
+  useEffect(() => {
+    const handleCleared = () => {
+      setCart([]);
+    };
+    window.addEventListener('cardio-cart-cleared', handleCleared);
+    return () => window.removeEventListener('cardio-cart-cleared', handleCleared);
+  }, []);
+
   useEffect(() => {
     if (pdfStage === 'idle') return;
     const timer = window.setInterval(() => {
@@ -280,7 +280,6 @@ function WholesalePriceCatalogModal({
     return () => window.clearInterval(timer);
   }, [pdfStage]);
 
-  // Гарантированная остановка аудио при закрытии модального окна
   useEffect(() => {
     return () => {
       if (pdfAudioRef.current) {
@@ -363,9 +362,22 @@ function WholesalePriceCatalogModal({
     [lang, allCatalogItems.length, autumnItems.length, winterItems.length]
   );
 
-  /**
-   * Запускает первичную генерацию PDF-лукбука и отправку в Telegram.
-   */
+  // Компактная подпись кнопки заказов в шапке (чтобы никогда не наезжала на соседние кнопки)
+  const headerOrdersLabel = useMemo(() => {
+    if (cartTotalPairs > 0) {
+      return lang === 'de'
+        ? `📂 Wagen (${cartTotalPairs} P.)`
+        : lang === 'uk'
+        ? `📂 Накладна (${cartTotalPairs} п.)`
+        : `📂 Накладная (${cartTotalPairs} п.)`;
+    }
+    return lang === 'de'
+      ? '📂 Bestellungen'
+      : lang === 'uk'
+      ? '📂 Замовлення'
+      : '📂 Мои заказы';
+  }, [cartTotalPairs, lang]);
+
   const handleGenerateAndDeliverPdf = async () => {
     if (pdfStage !== 'idle') return;
     setDeliveryStatus(null);
@@ -396,12 +408,6 @@ function WholesalePriceCatalogModal({
     }
   };
 
-  /**
-   * Умный обработчик для всех кнопок PDF:
-   * - Если PDF уже сформирован (`deliveryStatus` готов), сразу скачивает/открывает готовый файл
-   *   на телефоне без повторной генерации.
-   * - Если ещё не сформирован — запускает генерацию.
-   */
   const handlePdfAction = () => {
     if (pdfStage !== 'idle') return;
     onHaptic?.();
@@ -421,7 +427,7 @@ function WholesalePriceCatalogModal({
     }
   };
 
-  // 1. ЭКРАН ОПТОВОЙ КОРЗИНЫ (НАКЛАДНОЙ)
+  // 1. ЭКРАН ОПТОВОЙ КОРЗИНЫ И АРХИВА «МОИ ЗАКАЗЫ»
   if (isCartOpenInPrice) {
     return (
       <div
@@ -514,7 +520,7 @@ function WholesalePriceCatalogModal({
     );
   }
 
-  // 3. ГЛАВНЫЙ ЭКРАН ПРАЙС-КАТАЛОГА (ИЛИ ВВОД PIN-КОДА, ЕСЛИ ЗАБЛОКИРОВАНО)
+  // 3. ГЛАВНЫЙ ЭКРАН ПРАЙС-КАТАЛОГА
   const isBusy = pdfStage !== 'idle';
   const progressPercent =
     pdfStage === 'rendering_pages'
@@ -533,12 +539,12 @@ function WholesalePriceCatalogModal({
         color: THEME.ink,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
-        padding: '0 16px 110px 16px',
+        padding: '0 14px 110px 14px',
         boxSizing: 'border-box',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
       }}
     >
-      {/* Верхняя закрепленная панель навигации */}
+      {/* Верхняя закрепленная панель навигации (адаптивная, без наезда кнопок) */}
       <div
         style={{
           position: 'sticky',
@@ -548,24 +554,25 @@ function WholesalePriceCatalogModal({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '8px',
-          padding: '12px 0',
+          gap: '6px',
+          padding: '10px 0',
           marginBottom: '16px',
           borderBottom: `1px solid ${THEME.border}`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           <img
             src="/logo.png"
             alt="Cardio"
             onClick={onClose}
             style={{
-              height: '32px',
+              height: '26px',
               width: 'auto',
               objectFit: 'contain',
               mixBlendMode: isDark ? 'screen' : 'multiply',
               filter: isDark ? 'invert(1) hue-rotate(180deg) brightness(1.1)' : 'none',
               cursor: 'pointer',
+              flexShrink: 0,
             }}
           />
           <button
@@ -575,10 +582,10 @@ function WholesalePriceCatalogModal({
               backgroundColor: THEME.surface,
               border: `1px solid ${THEME.ink}`,
               color: THEME.ink,
-              padding: '8px 12px',
-              fontSize: '10px',
+              padding: '7px 9px',
+              fontSize: '9.5px',
               fontWeight: 600,
-              letterSpacing: '0.8px',
+              letterSpacing: '0.5px',
               textTransform: 'uppercase',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -589,30 +596,40 @@ function WholesalePriceCatalogModal({
         </div>
 
         {isUnlocked && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {cart.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  onHaptic?.();
-                  setIsCartOpenInPrice(true);
-                }}
-                style={{
-                  backgroundColor: THEME.surface,
-                  color: THEME.ink,
-                  border: `1px solid ${THEME.ink}`,
-                  padding: '8px 10px',
-                  fontSize: '9.5px',
-                  fontWeight: 600,
-                  letterSpacing: '0.6px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {t.invoiceBtn(cartTotalPairs, cartTotalUsd)}
-              </button>
-            )}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '6px',
+              flexWrap: 'nowrap',
+              minWidth: 0,
+            }}
+          >
+            {/* Кнопка входа в Накладную и Архив «Мои заказы» */}
+            <button
+              type="button"
+              onClick={() => {
+                onHaptic?.();
+                setIsCartOpenInPrice(true);
+              }}
+              style={{
+                backgroundColor: cart.length > 0 ? THEME.surfaceActive : THEME.surface,
+                color: THEME.ink,
+                border: `1px solid ${THEME.ink}`,
+                padding: '7px 9px',
+                fontSize: '9.5px',
+                fontWeight: 600,
+                letterSpacing: '0.4px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {headerOrdersLabel}
+            </button>
 
             <button
               type="button"
@@ -622,15 +639,16 @@ function WholesalePriceCatalogModal({
                 backgroundColor: deliveryStatus ? THEME.accentGreen : THEME.ink,
                 color: deliveryStatus ? '#FFFFFF' : THEME.onInk,
                 border: `1px solid ${deliveryStatus ? THEME.accentGreen : THEME.ink}`,
-                padding: '8px 12px',
-                fontSize: '10px',
+                padding: '7px 10px',
+                fontSize: '9.5px',
                 fontWeight: 600,
-                letterSpacing: '0.8px',
+                letterSpacing: '0.5px',
                 textTransform: 'uppercase',
                 cursor: isBusy ? 'wait' : 'pointer',
                 whiteSpace: 'nowrap',
                 display: 'inline-flex',
                 alignItems: 'center',
+                flexShrink: 0,
               }}
             >
               {pdfStage === 'rendering_pages' ? (
@@ -648,7 +666,7 @@ function WholesalePriceCatalogModal({
               ) : deliveryStatus ? (
                 '📥 PDF ✓'
               ) : (
-                t.downloadBtnTop
+                '⬇ PDF'
               )}
             </button>
           </div>
@@ -669,7 +687,6 @@ function WholesalePriceCatalogModal({
         />
       ) : (
         <div>
-          {/* Шапка каталога и единый понятный блок управления PDF */}
           <div style={{ marginBottom: '16px' }}>
             <div
               style={{
@@ -700,7 +717,6 @@ function WholesalePriceCatalogModal({
               {t.mainTitle}
             </h1>
 
-            {/* Показываем кнопку запуска генерации ТОЛЬКО пока файл ещё не сформирован */}
             {!deliveryStatus && (
               <button
                 type="button"
@@ -738,7 +754,6 @@ function WholesalePriceCatalogModal({
               </button>
             )}
 
-            {/* Интерактивный блок прогресса верстки PDF */}
             {isBusy && (
               <div
                 style={{
@@ -815,7 +830,6 @@ function WholesalePriceCatalogModal({
               </div>
             )}
 
-            {/* Единый блок готового PDF (без дублирующей верхней кнопки) */}
             {!isBusy && deliveryStatus && (
               <div
                 style={{
@@ -887,7 +901,6 @@ function WholesalePriceCatalogModal({
             )}
           </div>
 
-          {/* Вкладки фильтрации по сезонам (Все / Осень / Зима) */}
           <div
             style={{
               display: 'grid',
@@ -930,7 +943,6 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
-          {/* Двухколоночная журнальная сетка моделей с оптовыми ценами */}
           <div
             style={{
               display: 'grid',
@@ -1139,7 +1151,6 @@ function WholesalePriceCatalogModal({
             })}
           </div>
 
-          {/* Футер с прямыми контактами руководителей оптового отдела */}
           <div
             style={{
               backgroundColor: THEME.surface,
@@ -1202,7 +1213,6 @@ function WholesalePriceCatalogModal({
         </div>
       )}
 
-      {/* Нижняя плавающая панель быстрого перехода к оформлению накладной */}
       {isUnlocked && cart.length > 0 && (
         <div
           style={{
@@ -1217,6 +1227,14 @@ function WholesalePriceCatalogModal({
             borderTop: `1px solid ${THEME.border}`,
           }}
         >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '10px',
+            }}
+          />
           <div
             style={{
               display: 'flex',
