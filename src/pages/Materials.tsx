@@ -1,3 +1,18 @@
+/**
+ * @file src/pages/Materials.tsx
+ * @description Главная B2B-витрина каталога обуви CARDIO с видео-лукбуком, фильтрацией,
+ * переходом в закрытый прайс-каталог и доступом к накладной и архиву «Мои заказы».
+ *
+ * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
+ * 1. УСТРАНЕН НАЕЗД КНОПОК НА ЛОГОТИП В ШАПКЕ: Сбалансированы размеры блока «CARDIO / KHARKIV • 2026»
+ *    и правых кнопок навигации для экранов смартфонов (320px–430px).
+ * 2. СИНХРОНИЗАЦИЯ И АВТООЧИСТКА НАКЛАДНОЙ: Добавлена подписка на глобальные события
+ *    `cardio-cart-cleared` и `storage`. После отправки заказа в `WholesaleCart` или изменений
+ *    в модальном прайс-каталоге состояние корзины в `Materials.tsx` обновляется мгновенно.
+ * 3. ПОСТОЯННЫЙ ДОСТУП В «МОИ ЗАКАЗЫ»: Кнопка «📂 Заказы» в шапке видна всегда (даже при пустой
+ *    корзине), позволяя покупателю в любой момент открыть архив отправленных накладных.
+ */
+
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   cardioCatalog,
@@ -299,6 +314,15 @@ function fireHaptic(level: 'light' | 'medium' | 'success') {
   } catch {}
 }
 
+function readCartFromStorage(): CartItem[] {
+  try {
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
+    return saved ? (JSON.parse(saved) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: MaterialsProps) {
   const safeLang = lang && ['ru', 'uk', 'de'].includes(lang) ? lang : 'ru';
   const { isDark, THEME } = useCardioTheme(theme, propIsDark);
@@ -306,7 +330,8 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
   const t = {
     ru: {
       catalogBtn: 'Каталог',
-      invoiceBtn: (p: number) => `Накладная (${p} п.)`,
+      invoiceBtn: (p: number) => (p > 0 ? `📂 Накладная (${p} п.)` : '📂 Заказы'),
+      headerCompactInvoiceBtn: (p: number) => (p > 0 ? `📂 (${p} п.)` : '📂 Заказы'),
       alreadyInCart: (p: number) => `Уже в вашей накладной: ${p} пар`,
       openWord: 'Открыть →',
       cardTitle: 'КАРТОЧКА МОДЕЛИ',
@@ -352,7 +377,8 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
     },
     uk: {
       catalogBtn: 'Каталог',
-      invoiceBtn: (p: number) => `Накладна (${p} п.)`,
+      invoiceBtn: (p: number) => (p > 0 ? `📂 Накладна (${p} п.)` : '📂 Замовлення'),
+      headerCompactInvoiceBtn: (p: number) => (p > 0 ? `📂 (${p} п.)` : '📂 Замовлення'),
       alreadyInCart: (p: number) => `Вже у вашій накладній: ${p} пар`,
       openWord: 'Відкрити →',
       cardTitle: 'КАРТКА МОДЕЛІ',
@@ -398,7 +424,8 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
     },
     de: {
       catalogBtn: 'Katalog',
-      invoiceBtn: (p: number) => `Rechnung (${p} P.)`,
+      invoiceBtn: (p: number) => (p > 0 ? `📂 Rechnung (${p} P.)` : '📂 Archiv'),
+      headerCompactInvoiceBtn: (p: number) => (p > 0 ? `📂 (${p} P.)` : '📂 Archiv'),
       alreadyInCart: (p: number) => `Bereits auf der Rechnung: ${p} Paar`,
       openWord: 'Öffnen →',
       cardTitle: 'MODELLKARTE',
@@ -415,7 +442,7 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
       samplePrompt: 'Testmuster-Größe wählen:',
       addedSuccess: '✓ Zur Rechnung hinzugefügt',
       addToCart: 'Zur Rechnung hinzufügen',
-      mainPageBtn: '← Startseite',
+      mainPageBtn: '← Start',
       searchPlaceholder: 'Modellnummer oder Farbe...',
       searchLabel: 'Suche:',
       found: (n: number) => `GEFUNDEN: ${n}`,
@@ -586,20 +613,30 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
     };
   }, [selectedShoe, isCartOpen, activeCategory, activeFeature, searchQuery, gridMode]);
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
-      return saved ? (JSON.parse(saved) as CartItem[]) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useState<CartItem[]>(() => readCartFromStorage());
 
+  // Сохраняем в localStorage при локальных изменениях
   useEffect(() => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     } catch {}
   }, [cart]);
+
+  // ВАЖНО: Синхронизируем корзину, когда она очищается после отправки заказа или меняется в модалке прайс-каталога
+  useEffect(() => {
+    const handleCartCleared = () => {
+      setCart([]);
+    };
+    const handleStorageSync = () => {
+      setCart(readCartFromStorage());
+    };
+    window.addEventListener('cardio-cart-cleared', handleCartCleared);
+    window.addEventListener('storage', handleStorageSync);
+    return () => {
+      window.removeEventListener('cardio-cart-cleared', handleCartCleared);
+      window.removeEventListener('storage', handleStorageSync);
+    };
+  }, []);
 
   const [orderMode, setOrderMode] = useState<'sample' | 'wholesale'>('wholesale');
   const [sizeRun, setSizeRun] = useState<Record<SizeKey, number>>(STANDARD_8_RUN);
@@ -750,13 +787,13 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '12px',
+            gap: '8px',
             paddingBottom: '12px',
             marginBottom: '20px',
             borderBottom: `1px solid ${THEME.border}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
             <img
               src="/logo.png"
               alt="Cardio"
@@ -765,7 +802,7 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
                 setSelectedShoe(null);
               }}
               style={{
-                height: '32px',
+                height: '30px',
                 width: 'auto',
                 objectFit: 'contain',
                 mixBlendMode: isDark ? 'screen' : 'multiply',
@@ -784,16 +821,16 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
               style={{
                 backgroundColor: THEME.surface,
                 border: `1px solid ${THEME.ink}`,
-                padding: '8px 12px',
-                fontSize: '10px',
-                letterSpacing: '0.8px',
+                padding: '7px 10px',
+                fontSize: '9.5px',
+                letterSpacing: '0.6px',
                 textTransform: 'uppercase',
                 cursor: 'pointer',
                 color: THEME.ink,
                 fontWeight: 600,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '4px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
                 touchAction: 'manipulation',
@@ -811,11 +848,11 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
               setIsCartOpen(true);
             }}
             style={{
-              backgroundColor: cart.length > 0 ? THEME.ink : 'transparent',
+              backgroundColor: cart.length > 0 ? THEME.ink : THEME.surface,
               border: `1px solid ${THEME.ink}`,
-              padding: '8px 14px',
-              fontSize: '10px',
-              letterSpacing: '0.8px',
+              padding: '7px 11px',
+              fontSize: '9.5px',
+              letterSpacing: '0.6px',
               textTransform: 'uppercase',
               fontWeight: 600,
               cursor: 'pointer',
@@ -1567,12 +1604,13 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
         transition: 'background-color 0.2s ease, color 0.2s ease',
       }}
     >
+      {/* Верхняя шапка каталога (адаптирована под мобильные экраны без наезда кнопок) */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '10px',
+          gap: '8px',
           paddingBottom: '12px',
           marginBottom: '14px',
           borderBottom: `1px solid ${THEME.border}`,
@@ -1581,12 +1619,12 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
           backgroundColor: THEME.bg,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
           <img
             src="/logo.png"
             alt="Cardio Footwear Logo"
             style={{
-              height: '44px',
+              height: '34px',
               width: 'auto',
               objectFit: 'contain',
               mixBlendMode: isDark ? 'screen' : 'multiply',
@@ -1595,31 +1633,35 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
               flexShrink: 0,
             }}
           />
-          <div style={{ width: '1px', height: '32px', backgroundColor: THEME.border, flexShrink: 0 }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+          <div style={{ width: '1px', height: '26px', backgroundColor: THEME.border, flexShrink: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, overflow: 'hidden' }}>
             <span
               style={{
                 fontFamily: THEME.serif,
-                fontSize: '18px',
+                fontSize: '15px',
                 fontWeight: 600,
-                letterSpacing: '2.2px',
+                letterSpacing: '1.4px',
                 textTransform: 'uppercase',
                 color: THEME.ink,
-                lineHeight: 1,
+                lineHeight: 1.05,
                 whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               CARDIO
             </span>
             <span
               style={{
-                fontSize: '8.5px',
-                letterSpacing: '1.3px',
+                fontSize: '7.5px',
+                letterSpacing: '0.9px',
                 textTransform: 'uppercase',
                 color: THEME.inkMuted,
                 fontWeight: 500,
                 lineHeight: 1.15,
                 whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               KHARKIV • 2026
@@ -1627,32 +1669,31 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          {cart.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                fireHaptic('medium');
-                setIsCartOpen(true);
-              }}
-              style={{
-                backgroundColor: THEME.ink,
-                border: `1px solid ${THEME.ink}`,
-                padding: '7px 11px',
-                fontSize: '9px',
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                cursor: 'pointer',
-                color: THEME.onInk,
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                touchAction: 'manipulation',
-              }}
-            >
-              {t.invoiceBtn(cartTotalPairs)}
-            </button>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {/* Кнопка входа в Накладную и Архив «Мои заказы» (доступна всегда) */}
+          <button
+            type="button"
+            onClick={() => {
+              fireHaptic('medium');
+              setIsCartOpen(true);
+            }}
+            style={{
+              backgroundColor: cart.length > 0 ? THEME.ink : THEME.surface,
+              border: `1px solid ${THEME.borderStrong}`,
+              padding: '7px 9px',
+              fontSize: '9px',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              fontWeight: 600,
+              cursor: 'pointer',
+              color: cart.length > 0 ? THEME.onInk : THEME.ink,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              touchAction: 'manipulation',
+            }}
+          >
+            {t.headerCompactInvoiceBtn(cartTotalPairs)}
+          </button>
 
           {onBack && (
             <button
@@ -1664,9 +1705,9 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
               style={{
                 backgroundColor: THEME.surface,
                 border: `1px solid ${THEME.borderStrong}`,
-                padding: '7px 10px',
+                padding: '7px 9px',
                 fontSize: '9px',
-                letterSpacing: '0.9px',
+                letterSpacing: '0.6px',
                 textTransform: 'uppercase',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -1791,7 +1832,6 @@ export function Materials({ onBack, lang = 'ru', theme, isDark: propIsDark }: Ma
           borderBottom: `1px solid ${THEME.border}`,
         }}
       >
-        {/* Кнопка-баннер закрытого прайс-каталога PDF (между видео и поиском) */}
         <WholesalePriceBanner
           lang={safeLang}
           isDark={isDark}
