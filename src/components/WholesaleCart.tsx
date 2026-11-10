@@ -1,3 +1,18 @@
+/**
+ * @file src/components/WholesaleCart.tsx
+ * @description Компонент оптовой накладной (корзины), расчёта логистики Новой Почты
+ * и личного архива отправленных заказов («Мои заказы»).
+ *
+ * ЧТО ИСПРАВЛЕНО И ДОБАВЛЕНО:
+ * 1. АВТООЧИСТКА НАКЛАДНОЙ: После успешной отправки заказа руководителю текущая корзина
+ *    полностью очищается во всех окнах приложения, чтобы старый заказ не висел повторно.
+ * 2. АРХИВ «МОИ ЗАКАЗЫ»: Добавлен переключатель вкладок «Текущая накладная» / «Мои заказы».
+ *    Все отправленные накладные сохраняются локально и синхронизируются с базой Neon.
+ * 3. ПОДДЕРЖКА ВЕБ-ВЕРСИИ (www.cordwainer.app): Покупатель, зашедший через браузер без Telegram,
+ *    получает привязку заказов по `clientUid` и своему номеру телефона с возможностью
+ *    подгрузить историю своих заказов из базы данных Neon в 1 клик.
+ */
+
 import {
   useState,
   useEffect,
@@ -11,6 +26,16 @@ import {
   playAppSound,
   preloadAppSounds,
 } from './ManagersContactCard';
+import { getWholesalePriceByModel } from './wholesale/wholesaleData';
+import {
+  getUniversalClientUid,
+  normalizePhoneForSearch,
+  getLocalArchivedOrders,
+  saveOrderToLocalArchive,
+  fetchAndMergeOrderHistory,
+  clearWholesaleCartEverywhere,
+  type ArchivedOrder,
+} from './wholesale/orderHistoryStore';
 import type { Lang } from '../App';
 
 type WholesaleCartProps = {
@@ -546,6 +571,15 @@ export function WholesaleCart({
     detectDarkMode(theme, propIsDark)
   );
 
+  // Вкладка: текущая накладная или архив «Мои заказы»
+  const [activeTab, setActiveTab] = useState<'current' | 'archive'>('current');
+  const [archivedOrders, setArchivedOrders] = useState<ArchivedOrder[]>(() =>
+    getLocalArchivedOrders()
+  );
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [expandedArchiveId, setExpandedArchiveId] = useState<string | null>(null);
+  const [copiedArchiveId, setCopiedArchiveId] = useState<string | null>(null);
+
   useEffect(() => {
     setDarkActive(detectDarkMode(theme, propIsDark));
   }, [theme, propIsDark]);
@@ -585,8 +619,21 @@ export function WholesaleCart({
       headerSub: 'CARDIO FOOTWEAR // ОПТОВЫЙ ЗАКАЗ',
       invoiceBadge: (num: string, date: string) => `№ ${num} от ${date}`,
       title: (count: number) => `Оптовая накладная (${count})`,
-      emptyText: 'В вашей накладной пока нет выбранных моделей.',
+      archiveTitle: (count: number) => `Мои заказы (${count})`,
+      tabCurrent: (count: number) => `Накладная (${count})`,
+      tabArchive: (count: number) => `Мои заказы (${count})`,
+      emptyText: 'В вашей текущей накладной нет выбранных моделей.',
       goToCatalog: 'Перейти в каталог →',
+      openArchiveBtn: (count: number) => `📂 Открыть архив «Мои заказы» (${count})`,
+      archiveEmpty: 'У вас пока нет отправленных заказов на этом устройстве.',
+      archiveWebHint: 'Зашли через браузер (www.cordwainer.app)? Введите ваш телефон ниже, чтобы загрузить свои заказы из базы фабрики:',
+      archiveSyncBtn: 'Найти мои заказы по телефону',
+      archiveSyncing: 'Поиск в базе...',
+      archiveShowDetails: 'Показать состав накладной ▼',
+      archiveHideDetails: 'Скрыть состав ▲',
+      archiveCopyBtn: 'Скопировать накладную',
+      archiveCopied: '✓ Скопировано',
+      archiveManagerLabel: 'Руководитель:',
       modelPrefix: '№',
       totalPairsLabel: 'Итого:',
       pairsUnit: 'пар',
@@ -613,7 +660,8 @@ export function WholesaleCart({
       totalToShip: 'Всего к отгрузке:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
       deleteTitle: 'Удалить позицию',
-      orderSentSuccess: (num: string, mgr: string) => `✓ Накладная № ${num} успешно отправлена руководителю (${mgr})!`,
+      orderSentSuccess: (num: string, mgr: string) =>
+        `✓ Накладная № ${num} успешно отправлена руководителю (${mgr})! Текущая корзина очищена, заказ сохранен в «Мои заказы».`,
       orderSendError: (err?: string) => `Ошибка отправки: ${err || 'Не удалось отправить заказ'}`,
       orderNetworkError: 'Ошибка соединения с сервером.',
       invHeader: (num: string) => `📦 ОПТОВАЯ НАКЛАДНАЯ № ${num}`,
@@ -635,8 +683,21 @@ export function WholesaleCart({
       headerSub: 'CARDIO FOOTWEAR // ГУРТОВЕ ЗАМОВЛЕННЯ',
       invoiceBadge: (num: string, date: string) => `№ ${num} від ${date}`,
       title: (count: number) => `Гуртова накладна (${count})`,
-      emptyText: 'У вашій накладній поки немає обраних моделей.',
+      archiveTitle: (count: number) => `Мої замовлення (${count})`,
+      tabCurrent: (count: number) => `Накладна (${count})`,
+      tabArchive: (count: number) => `Мої замовлення (${count})`,
+      emptyText: 'У вашій поточній накладній немає обраних моделей.',
       goToCatalog: 'Перейти до каталогу →',
+      openArchiveBtn: (count: number) => `📂 Відкрити архів «Мої замовлення» (${count})`,
+      archiveEmpty: 'У вас поки немає відправлених замовлень на цьому пристрої.',
+      archiveWebHint: 'Зайшли через браузер (www.cordwainer.app)? Введіть ваш телефон нижче, щоб завантажити свої замовлення з бази фабрики:',
+      archiveSyncBtn: 'Знайти мої замовлення за телефоном',
+      archiveSyncing: 'Пошук у базі...',
+      archiveShowDetails: 'Показати склад накладної ▼',
+      archiveHideDetails: 'Сховати склад ▲',
+      archiveCopyBtn: 'Скопіювати накладну',
+      archiveCopied: '✓ Скопійовано',
+      archiveManagerLabel: 'Керівник:',
       modelPrefix: '№',
       totalPairsLabel: 'Разом:',
       pairsUnit: 'пар',
@@ -663,7 +724,8 @@ export function WholesaleCart({
       totalToShip: 'Всього до відвантаження:',
       boxesSuffix: (b: number) => `(~${b} кор.)`,
       deleteTitle: 'Видалити позицію',
-      orderSentSuccess: (num: string, mgr: string) => `✓ Накладну № ${num} успішно надіслано керівнику (${mgr})!`,
+      orderSentSuccess: (num: string, mgr: string) =>
+        `✓ Накладну № ${num} успішно надіслано керівнику (${mgr})! Поточний кошик очищено, замовлення збережено в «Мої замовлення».`,
       orderSendError: (err?: string) => `Помилка надсилання: ${err || 'Не вдалося надіслати замовлення'}`,
       orderNetworkError: 'Помилка з’єднання з сервером.',
       invHeader: (num: string) => `📦 ГУРТОВА НАКЛАДНА № ${num}`,
@@ -685,8 +747,21 @@ export function WholesaleCart({
       headerSub: 'CARDIO FOOTWEAR // GROSSHANDELSBESTELLUNG',
       invoiceBadge: (num: string, date: string) => `Nr. ${num} vom ${date}`,
       title: (count: number) => `Großhandelsrechnung (${count})`,
-      emptyText: 'Ihre Rechnung enthält noch keine Modelle.',
+      archiveTitle: (count: number) => `Meine Bestellungen (${count})`,
+      tabCurrent: (count: number) => `Rechnung (${count})`,
+      tabArchive: (count: number) => `Archiv (${count})`,
+      emptyText: 'Ihre aktuelle Rechnung enthält keine Modelle.',
       goToCatalog: 'Zum Katalog →',
+      openArchiveBtn: (count: number) => `📂 Archiv «Meine Bestellungen» (${count})`,
+      archiveEmpty: 'Noch keine gesendeten Bestellungen auf diesem Gerät.',
+      archiveWebHint: 'Über Browser (www.cordwainer.app) geöffnet? Telefonnummer eingeben, um Bestellungen aus der Datenbank zu laden:',
+      archiveSyncBtn: 'Bestellungen per Telefon suchen',
+      archiveSyncing: 'Suche läuft...',
+      archiveShowDetails: 'Rechnungsdetails anzeigen ▼',
+      archiveHideDetails: 'Details ausblenden ▲',
+      archiveCopyBtn: 'Rechnung kopieren',
+      archiveCopied: '✓ Kopiert',
+      archiveManagerLabel: 'Verkaufsleiter:',
       modelPrefix: 'Nr.',
       totalPairsLabel: 'Gesamt:',
       pairsUnit: 'Paar',
@@ -713,7 +788,8 @@ export function WholesaleCart({
       totalToShip: 'Gesamtmenge:',
       boxesSuffix: (b: number) => `(~${b} Kist.)`,
       deleteTitle: 'Position löschen',
-      orderSentSuccess: (num: string, mgr: string) => `✓ Rechnung Nr. ${num} erfolgreich an ${mgr} gesendet!`,
+      orderSentSuccess: (num: string, mgr: string) =>
+        `✓ Rechnung Nr. ${num} erfolgreich an ${mgr} gesendet! Warenkorb geleert und im Archiv gespeichert.`,
       orderSendError: (err?: string) => `Sendefehler: ${err || 'Bestellung konnte nicht gesendet werden'}`,
       orderNetworkError: 'Verbindungsfehler zum Server.',
       invHeader: (num: string) => `📦 GROSSHANDELSRECHNUNG Nr. ${num}`,
@@ -772,6 +848,17 @@ export function WholesaleCart({
   const warehouseInputRef = useRef<HTMLInputElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Подгружаем историю заказов из базы Neon при открытии корзины
+  useEffect(() => {
+    let active = true;
+    fetchAndMergeOrderHistory(savedRecipient?.clientPhone).then((merged) => {
+      if (active) setArchivedOrders(merged);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     setCityQuery((prev) => {
       if (isMatchingCityLabel(prev, selectedCity)) {
@@ -806,6 +893,10 @@ export function WholesaleCart({
   }, []);
 
   const grandTotalPairs = items.reduce((sum, item) => sum + item.totalPairs, 0);
+  const grandTotalUsd = items.reduce((sum, item) => {
+    const p = getWholesalePriceByModel(item.shoe.modelNumber) || 0;
+    return sum + p * item.totalPairs;
+  }, 0);
   const grandTotalBoxes = useMemoOrCalcBoxes(items, grandTotalPairs);
 
   const isCityValid = cityQuery.trim().length >= 2;
@@ -963,6 +1054,7 @@ export function WholesaleCart({
     triggerHaptic('warning');
     playAppSound('nul.mp3');
     setInvoiceMeta(getOrCreateInvoiceMeta(true));
+    clearWholesaleCartEverywhere();
     setTimeout(() => onClear(), 150);
   };
 
@@ -1000,6 +1092,10 @@ export function WholesaleCart({
     );
   };
 
+  /**
+   * Отправляет накладную руководителю, сохраняет заказ в архив («Мои заказы» + Neon DB)
+   * и АВТОМАТИЧЕСКИ ОЧИЩАЕТ текущую корзину, чтобы старая накладная больше не висела.
+   */
   const sendToManager = async (manager: { name: string; telegramId?: string }): Promise<boolean> => {
     if (!manager.telegramId) return false;
     if (!isFormValid) {
@@ -1010,6 +1106,11 @@ export function WholesaleCart({
     setOrderBanner(null);
     const text = buildInvoiceText();
     const trimmedComment = orderComment.trim();
+    const clientUid = getUniversalClientUid();
+    const cleanPhone = normalizePhoneForSearch(clientPhone);
+    const fullBranchText = trimmedComment
+      ? `${cityQuery.trim()} — ${branchOrComment.trim()} (${trimmedComment})`
+      : `${cityQuery.trim()} — ${branchOrComment.trim()}`;
 
     try {
       const response = await fetch('/api/orders', {
@@ -1017,14 +1118,15 @@ export function WholesaleCart({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           invoiceNumber: invoiceMeta.invoiceNumber,
+          clientUid,
+          clientPhone: cleanPhone,
           telegramId: manager.telegramId,
           managerName: manager.name,
           clientContact: combinedClientContact,
-          branchOrComment: trimmedComment
-            ? `${cityQuery.trim()} — ${branchOrComment.trim()} (${trimmedComment})`
-            : `${cityQuery.trim()} — ${branchOrComment.trim()}`,
+          branchOrComment: fullBranchText,
           orderComment: trimmedComment,
           totalPairs: grandTotalPairs,
+          totalUsd: grandTotalUsd,
           deliveryCost: 0,
           invoiceText: text,
         }),
@@ -1033,10 +1135,37 @@ export function WholesaleCart({
       const data = await response.json();
       if (response.ok && data.success) {
         triggerHaptic('success');
+
+        // 1. Сохраняем отправленный заказ в архив «Мои заказы»
+        const sentInvoiceNum = invoiceMeta.invoiceNumber;
+        const archivedItem: ArchivedOrder = {
+          id: sentInvoiceNum,
+          createdAt: new Date().toISOString(),
+          managerName: manager.name,
+          clientContact: combinedClientContact,
+          branchOrComment: fullBranchText,
+          totalPairs: grandTotalPairs,
+          totalUsd: grandTotalUsd,
+          invoiceText: text,
+          items: [...items],
+        };
+        const updatedArchive = saveOrderToLocalArchive(archivedItem);
+        setArchivedOrders(updatedArchive);
+        setExpandedArchiveId(sentInvoiceNum);
+
+        // 2. Показываем баннер успеха и генерируем новый номер для будущих заказов
         setOrderBanner({
           type: 'success',
-          text: t.orderSentSuccess(invoiceMeta.invoiceNumber, manager.name),
+          text: t.orderSentSuccess(sentInvoiceNum, manager.name),
         });
+        setInvoiceMeta(getOrCreateInvoiceMeta(true));
+
+        // 3. Очищаем текущую накладную во всех компонентах и переключаем на вкладку «Мои заказы»
+        clearWholesaleCartEverywhere();
+        onClear();
+        setActiveTab('archive');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
         return true;
       } else {
         triggerHaptic('error');
@@ -1045,7 +1174,7 @@ export function WholesaleCart({
       }
     } catch {
       triggerHaptic('error');
-      setOrderBanner({ type: 'error', text: t.orderNetworkError });
+      setOrderBanner({ type: 'error', text: t.orderSendError(t.orderNetworkError) });
       return false;
     }
   };
@@ -1065,10 +1194,17 @@ export function WholesaleCart({
     }
   };
 
-  /**
-   * Монолитный стиль поля ввода без каких-либо transform / translateZ / position: absolute.
-   * Полностью устраняет черные/белые вертикальные полосы и мигание в Android WebView.
-   */
+  const handleSyncArchiveByPhone = async () => {
+    triggerHaptic('light');
+    setArchiveLoading(true);
+    try {
+      const merged = await fetchAndMergeOrderHistory(clientPhone);
+      setArchivedOrders(merged);
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
   const getSolidInputStyle = (isValid: boolean, isFocused: boolean): CSSProperties => {
     const hasError = showValidationErrors && !isValid;
     const borderColor = hasError
@@ -1100,10 +1236,6 @@ export function WholesaleCart({
     };
   };
 
-  /**
-   * Шапка над полем: слева название поля, справа аккуратная кнопка "✕ Очистить" (когда есть текст).
-   * Никаких наложений поверх input!
-   */
   const renderFieldHeader = (
     label: string,
     currentValue: string,
@@ -1217,12 +1349,13 @@ export function WholesaleCart({
         }
       `}</style>
 
+      {/* Верхняя строка: Назад и Очистить */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '16px',
+          marginBottom: '14px',
           paddingBottom: '12px',
           borderBottom: `1px solid ${THEME.border}`,
         }}
@@ -1248,7 +1381,7 @@ export function WholesaleCart({
           {t.back}
         </button>
 
-        {items.length > 0 && (
+        {activeTab === 'current' && items.length > 0 && (
           <button
             type="button"
             onClick={handleClearCart}
@@ -1269,6 +1402,77 @@ export function WholesaleCart({
         )}
       </div>
 
+      {/* Переключатель вкладок: Текущая накладная / Мои заказы (Архив) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          border: `1px solid ${THEME.ink}`,
+          marginBottom: '18px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTab('current');
+          }}
+          style={{
+            backgroundColor: activeTab === 'current' ? THEME.primaryBtnBg : THEME.surface,
+            color: activeTab === 'current' ? THEME.primaryBtnText : THEME.ink,
+            border: 'none',
+            padding: '11px 8px',
+            fontSize: '10px',
+            fontWeight: 600,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+          }}
+        >
+          {t.tabCurrent(items.length)}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTab('archive');
+          }}
+          style={{
+            backgroundColor: activeTab === 'archive' ? THEME.primaryBtnBg : THEME.surface,
+            color: activeTab === 'archive' ? THEME.primaryBtnText : THEME.ink,
+            border: 'none',
+            borderLeft: `1px solid ${THEME.ink}`,
+            padding: '11px 8px',
+            fontSize: '10px',
+            fontWeight: 600,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+          }}
+        >
+          {t.tabArchive(archivedOrders.length)}
+        </button>
+      </div>
+
+      {/* Баннер успешной отправки (виден даже после очистки корзины) */}
+      {orderBanner && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '12px 14px',
+            border: `1.5px solid ${orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger}`,
+            backgroundColor: orderBanner.type === 'success' ? THEME.successBg : THEME.dangerBg,
+            color: orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger,
+            fontSize: '12px',
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
+          {orderBanner.text}
+        </div>
+      )}
+
+      {/* Заголовок активной вкладки */}
       <div style={{ marginBottom: '20px' }}>
         <div
           style={{
@@ -1285,7 +1489,7 @@ export function WholesaleCart({
           }}
         >
           <span>{t.headerSub}</span>
-          {items.length > 0 && (
+          {activeTab === 'current' && items.length > 0 && (
             <span
               style={{
                 backgroundColor: THEME.surface,
@@ -1303,22 +1507,255 @@ export function WholesaleCart({
         <h1
           style={{
             fontFamily: THEME.serif,
-            fontSize: '32px',
+            fontSize: '30px',
             margin: 0,
             fontWeight: 400,
             letterSpacing: '0.2px',
           }}
         >
-          {t.title(items.length)}
+          {activeTab === 'current'
+            ? t.title(items.length)
+            : t.archiveTitle(archivedOrders.length)}
         </h1>
       </div>
 
-      {items.length === 0 ? (
+      {/* ===================================================================== */}
+      {/* ВКЛАДКА 2: АРХИВ «МОИ ЗАКАЗЫ» (Telegram + Web www.cordwainer.app)     */}
+      {/* ===================================================================== */}
+      {activeTab === 'archive' ? (
+        <div>
+          {/* Блок синхронизации по номеру телефона (для тех, кто зашел через www.cordwainer.app) */}
+          <div
+            style={{
+              backgroundColor: THEME.surface,
+              border: `1px solid ${THEME.border}`,
+              padding: '12px 14px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ fontSize: '11px', color: THEME.inkMuted, lineHeight: 1.4, marginBottom: '10px' }}>
+              {t.archiveWebHint}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="tel"
+                inputMode="tel"
+                className="wc-solid-input"
+                placeholder={t.phonePlaceholder}
+                value={clientPhone}
+                onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
+                style={{
+                  ...getSolidInputStyle(true, false),
+                  flex: '1 1 180px',
+                  padding: '9px 12px',
+                  fontSize: '13px',
+                }}
+              />
+              <button
+                type="button"
+                disabled={archiveLoading}
+                onClick={handleSyncArchiveByPhone}
+                style={{
+                  backgroundColor: THEME.primaryBtnBg,
+                  color: THEME.primaryBtnText,
+                  border: 'none',
+                  padding: '10px 14px',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  letterSpacing: '0.8px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {archiveLoading ? t.archiveSyncing : t.archiveSyncBtn}
+              </button>
+            </div>
+          </div>
+
+          {archivedOrders.length === 0 ? (
+            <div
+              style={{
+                backgroundColor: THEME.surface,
+                border: `1px solid ${THEME.border}`,
+                padding: '40px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: THEME.serif,
+                  fontStyle: 'italic',
+                  fontSize: '16px',
+                  color: THEME.inkMuted,
+                  margin: '0 0 18px 0',
+                }}
+              >
+                {t.archiveEmpty}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  onClose();
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: THEME.primaryBtnBg,
+                  color: THEME.primaryBtnText,
+                  border: 'none',
+                  fontSize: '10px',
+                  letterSpacing: '1.4px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                {t.goToCatalog}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {archivedOrders.map((ord) => {
+                const isExpanded = expandedArchiveId === ord.id;
+                const isThisCopied = copiedArchiveId === ord.id;
+                const dateObj = new Date(ord.createdAt);
+                const readableDate = isNaN(dateObj.getTime())
+                  ? ord.createdAt
+                  : dateObj.toLocaleDateString('ru-RU', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+
+                return (
+                  <div
+                    key={ord.id}
+                    style={{
+                      backgroundColor: THEME.surface,
+                      border: `1px solid ${THEME.border}`,
+                      borderLeft: `3px solid ${THEME.primaryBtnBg}`,
+                      padding: '14px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '8px',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '10px', color: THEME.inkMuted, letterSpacing: '0.8px' }}>
+                          {readableDate}
+                        </div>
+                        <div style={{ fontFamily: THEME.serif, fontSize: '19px', fontWeight: 600 }}>
+                          {ord.id}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontFamily: THEME.serif, fontSize: '18px', fontWeight: 700 }}>
+                          {ord.totalPairs} {t.pairsUnit}
+                          {ord.totalUsd ? ` • $${ord.totalUsd}` : ''}
+                        </div>
+                        <div style={{ fontSize: '10px', color: THEME.accentGreen, fontWeight: 600 }}>
+                          ✓ {t.archiveManagerLabel} {ord.managerName}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: THEME.inkMuted, marginBottom: '10px', lineHeight: 1.35 }}>
+                      <div>{ord.branchOrComment}</div>
+                      <div>{ord.clientContact}</div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic('light');
+                          setExpandedArchiveId(isExpanded ? null : ord.id);
+                        }}
+                        style={{
+                          flex: '1 1 auto',
+                          backgroundColor: THEME.bg,
+                          color: THEME.ink,
+                          border: `1px solid ${THEME.border}`,
+                          padding: '8px 10px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isExpanded ? t.archiveHideDetails : t.archiveShowDetails}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(ord.invoiceText);
+                            triggerHaptic('success');
+                            setCopiedArchiveId(ord.id);
+                            setTimeout(() => setCopiedArchiveId(null), 2000);
+                          } catch {}
+                        }}
+                        style={{
+                          backgroundColor: isThisCopied ? THEME.accentGreen : THEME.primaryBtnBg,
+                          color: isThisCopied ? '#FFFFFF' : THEME.primaryBtnText,
+                          border: 'none',
+                          padding: '8px 12px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isThisCopied ? t.archiveCopied : t.archiveCopyBtn}
+                      </button>
+                    </div>
+
+                    {isExpanded && (
+                      <pre
+                        style={{
+                          marginTop: '10px',
+                          padding: '10px',
+                          backgroundColor: THEME.bg,
+                          border: `1px solid ${THEME.border}`,
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          color: THEME.ink,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {ord.invoiceText}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : items.length === 0 ? (
+        /* ===================================================================== */
+        /* ВКЛАДКА 1 (ПУСТАЯ): В текущей накладной нет моделей                   */
+        /* ===================================================================== */
         <div
           style={{
             backgroundColor: THEME.surface,
             border: `1px solid ${THEME.border}`,
-            padding: '48px 20px',
+            padding: '44px 20px',
             textAlign: 'center',
           }}
         >
@@ -1333,28 +1770,57 @@ export function WholesaleCart({
           >
             {t.emptyText}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic('light');
-              onClose();
-            }}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: THEME.primaryBtnBg,
-              color: THEME.primaryBtnText,
-              border: 'none',
-              fontSize: '10px',
-              letterSpacing: '1.4px',
-              textTransform: 'uppercase',
-              cursor: 'pointer',
-              fontWeight: 500,
-            }}
-          >
-            {t.goToCatalog}
-          </button>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '280px', margin: '0 auto' }}>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                onClose();
+              }}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: THEME.primaryBtnBg,
+                color: THEME.primaryBtnText,
+                border: 'none',
+                fontSize: '10px',
+                letterSpacing: '1.4px',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              {t.goToCatalog}
+            </button>
+
+            {archivedOrders.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActiveTab('archive');
+                }}
+                style={{
+                  padding: '11px 18px',
+                  backgroundColor: THEME.bg,
+                  color: THEME.ink,
+                  border: `1px solid ${THEME.ink}`,
+                  fontSize: '10px',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                {t.openArchiveBtn(archivedOrders.length)}
+              </button>
+            )}
+          </div>
         </div>
       ) : (
+        /* ===================================================================== */
+        /* ВКЛАДКА 1 (АКТИВНАЯ): Список выбранных моделей и форма отправки       */
+        /* ===================================================================== */
         <>
           <div style={{ borderTop: `1px solid ${THEME.border}`, marginBottom: '24px' }}>
             {items.map((item, idx) => {
@@ -1851,22 +2317,6 @@ export function WholesaleCart({
               </div>
             </div>
           </div>
-
-          {orderBanner && (
-            <div
-              style={{
-                marginBottom: '16px',
-                padding: '12px 14px',
-                border: `1px solid ${orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger}`,
-                backgroundColor: orderBanner.type === 'success' ? THEME.successBg : THEME.dangerBg,
-                color: orderBanner.type === 'success' ? THEME.accentGreen : THEME.danger,
-                fontSize: '12px',
-                fontWeight: 600,
-              }}
-            >
-              {orderBanner.text}
-            </div>
-          )}
 
           <div className="managers-contact-scope">
             <ManagersContactCard
