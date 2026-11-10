@@ -1,17 +1,17 @@
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
- * и модуль прямого сохранения файла на телефон (iOS + Android) / в Telegram.
+ * и модуль прямого сохранения и встроенного просмотра файла на телефоне (iOS + Android).
  *
  * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
- * 1. СТРОГОЕ РАЗДЕЛЕНИЕ iOS И ANDROID В `triggerPdfDownload`:
- *    - `navigator.share({ files })` вызывается ТОЛЬКО на iOS (`isIOS`), где он работает безотказно.
- *    - На Android `navigator.share` полностью исключён (чтобы Android WebView не обрывал
- *      скачивание ошибкой `AbortError` при активном касании экрана).
- *    - На Android всегда напрямую вызывается `tg.downloadFile` с анти-кэш меткой `&_dl=Date.now()`.
- * 2. ОБЛОЖКА (COVER): 3D-знак `/baner1.png`, титул CARDIO и слоган «BUILT TO LEAD».
- * 3. НЕ ОБРЕЗАЮТСЯ НОМЕРА МОДЕЛЕЙ: Фото обуви накладывается через `multiply`.
- * 4. ВОДЯНОЙ ЗНАК (WATERMARK): Диагональная защита на каждой странице.
+ * 1. УНИКАЛЬНОЕ ИМЯ ФАЙЛА ДЛЯ ANDROID: Добавляется короткий штамп времени к имени файла
+ *    при каждом скачивании, чтобы загрузчик Android / Telegram не блокировал повторную
+ *    загрузку из-за конфликта с уже существующим файлом в папке «Загрузки».
+ * 2. ЗАЩИТА ОТ БЛОКИРОВКИ `tg.downloadFile`: Обрабатывается колбэк `(accepted)` и перехватывается
+ *    ошибка `WebAppDownloadFileAlreadyActive` с мгновенным переключением на прямую загрузку.
+ * 3. МГНОВЕННЫЙ ВСТРОЕННЫЙ ПРОСМОТР (`previewPages`): Сохраняются готовые листы А4 для
+ *    открытия каталога прямо внутри приложения без зависимости от сторонних PDF-ридеров.
+ * 4. ОБЛОЖКА `/baner1.png`, НЕОБРЕЗАЕМЫЕ НОМЕРА МОДЕЛЕЙ (`multiply`) И ВОДЯНОЙ ЗНАК.
  */
 
 import {
@@ -30,6 +30,7 @@ export interface PdfDeliveryStatus {
   sentToTelegram: boolean;
   downloadUrl?: string;
   localBlob?: Blob;
+  previewPages?: string[];
   fileName: string;
   totalPages: number;
 }
@@ -344,12 +345,28 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * Вспомогательный запуск скачивания через скрытый тег <a download>
+ */
+function triggerAnchorDownload(url: string, fileName: string): void {
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch {}
+}
+
+/**
  * Безотказное сохранение готового PDF-файла с жёстким разделением iOS и Android:
  *
  * 1. ТОЛЬКО iOS (iPhone / iPad): вызывается системное меню `navigator.share({ files })`,
  *    которое сохраняет `localBlob` напрямую из памяти телефона.
- * 2. ANDROID: `navigator.share` НЕ вызывается (чтобы не блокировать загрузку ошибкой AbortError).
- *    Сразу вызывается нативный загрузчик Telegram `tg.downloadFile` с уникальной меткой `&_dl=Date.now()`.
+ * 2. ANDROID: формируется уникальное имя файла (чтобы Android DownloadManager не блокировал
+ *    повторное скачивание существующего файла), вызывается `tg.downloadFile` с колбэком
+ *    и страховкой через прямую ссылку.
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -364,6 +381,10 @@ export async function triggerPdfDownload(status: {
     (typeof navigator !== 'undefined' &&
       navigator.platform === 'MacIntel' &&
       navigator.maxTouchPoints > 1);
+
+  // Формируем уникальное имя файла для каждого скачивания (защита от блокировки дубликатов на Android)
+  const stamp = String(Date.now()).slice(-4);
+  const uniqueFileName = status.fileName.replace(/\.pdf$/i, '') + `_${stamp}.pdf`;
 
   // 1. ТОЛЬКО ДЛЯ iPHONE / iPAD (iOS): сохранение из памяти через системную шторку
   if (isIOS && !isAndroid && status.localBlob) {
@@ -391,7 +412,7 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // 2. ДЛЯ ANDROID И TELEGRAM: прямое скачивание по HTTPS с анти-кэш параметром
+  // 2. ДЛЯ ANDROID И TELEGRAM: скачивание по HTTPS с уникальным именем и анти-кэш меткой
   if (status.downloadUrl) {
     const baseFullUrl = status.downloadUrl.startsWith('http')
       ? status.downloadUrl
@@ -401,39 +422,38 @@ export async function triggerPdfDownload(status: {
 
     if (typeof tg?.downloadFile === 'function') {
       try {
-        tg.downloadFile({
-          url: freshUrl,
-          file_name: status.fileName,
-        });
+        tg.downloadFile(
+          {
+            url: freshUrl,
+            file_name: uniqueFileName,
+          },
+          (accepted) => {
+            if (!accepted && isAndroid) {
+              triggerAnchorDownload(freshUrl, uniqueFileName);
+            }
+          }
+        );
         return;
-      } catch {}
+      } catch {
+        // Если Telegram выбросил WebAppDownloadFileAlreadyActive — качаем напрямую через <a>
+        if (isAndroid) {
+          triggerAnchorDownload(freshUrl, uniqueFileName);
+          return;
+        }
+      }
     }
 
     if (isAndroid) {
-      try {
-        const a = document.createElement('a');
-        a.href = freshUrl;
-        a.download = status.fileName;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        return;
-      } catch {}
+      triggerAnchorDownload(freshUrl, uniqueFileName);
+      return;
     }
   }
 
-  // 3. Fallback для ПК (Desktop)
+  // 3. Fallback для ПК (Desktop) и резервный канал через локальный Blob
   if (status.localBlob) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = status.fileName;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      triggerAnchorDownload(blobUrl, uniqueFileName);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
     } catch {}
   }
@@ -454,7 +474,7 @@ export interface GenerateLookbookParams {
 
 /**
  * Главная функция-оркестратор: верстает все страницы каталога на Canvas,
- * упаковывает их в PDF, отправляет копию в Telegram-чат и на Android сразу вызывает скачивание.
+ * упаковывает их в PDF, отправляет копию в Telegram-чат и возвращает готовые страницы.
  */
 export async function generateAndDeliverLookbookPdf(
   params: GenerateLookbookParams
@@ -1176,6 +1196,7 @@ export async function generateAndDeliverLookbookPdf(
         sentToTelegram: Boolean(data?.sentToTelegram),
         downloadUrl: data?.downloadPath,
         localBlob,
+        previewPages: jpegPages,
         fileName,
         totalPages,
       };
@@ -1198,6 +1219,7 @@ export async function generateAndDeliverLookbookPdf(
   const fallbackStatus: PdfDeliveryStatus = {
     sentToTelegram: false,
     localBlob,
+    previewPages: jpegPages,
     fileName,
     totalPages,
   };
