@@ -1,18 +1,16 @@
 /**
  * @file src/components/wholesale/orderHistoryStore.ts
- * @description Модуль управления историей («Мои заказы») и синхронизации корзины
- * для пользователей Telegram Mini App и веб-сайта www.cordwainer.app.
+ * @description Модуль управления историей («Мои заказы»), двухфакторной верификацией
+ * через Telegram OTP и синхронизации корзины для Telegram Mini App и сайта www.cordwainer.app.
  *
- * КАК РЕШЕНА ПРОБЛЕМА ВЕБ-САЙТА (www.cordwainer.app) И TELEGRAM:
- * 1. Каждому покупателю создается универсальный `clientUid`:
- *    - В Telegram: `tg_<ID пользователя>`
- *    - На сайте www.cordwainer.app: уникальный постоянный ключ `web_<UUID>`, сохраняемый в браузере.
- * 2. Дополнительно при отправке заказа сохраняется нормализованный номер телефона покупателя.
- *    По этому номеру телефона и `clientUid` заказы сохраняются в базу Neon и подтягиваются
- *    в раздел «Мои заказы» даже если человек зашел с обычного браузера на www.cordwainer.app.
- * 3. Функция `clearWholesaleCartEverywhere()` полностью очищает корзину в localStorage
- *    и рассылает глобальное событие `cardio-cart-cleared`, чтобы накладная мгновенно
- *    очищалась и в прайс-каталоге, и на главной витрине.
+ * КАК РАБОТАЕТ ЗАЩИТА «МОИХ ЗАКАЗОВ»:
+ * 1. Внутри Telegram Mini App (`isTelegramMiniApp() === true`):
+ *    Покупатель уже авторизован самим мессенджером (`tg_<ID>`). Заказы подгружаются автоматически,
+ *    а его телефон привязывается к его Telegram ID в базе Neon.
+ * 2. На внешнем сайте www.cordwainer.app (`isTelegramMiniApp() === false`):
+ *    Простой перебор чужих номеров заблокирован. Чтобы подгрузить свои заказы по номеру телефона,
+ *    вызывается `requestTelegramOtp(phone)` -> бот @Cordwainer_bot присылает 4-значный код ->
+ *    `verifyTelegramOtp(phone, code)` проверяет код, сохраняет защищенный `sessionToken` и выдает архив.
  */
 
 import type { CartItem } from '../../data/catalog';
@@ -22,6 +20,7 @@ import { getTgWebApp } from './pdfLookbookEngine';
 const CLIENT_UID_KEY = 'cardio_b2b_client_uid_v1';
 const CLIENT_PHONE_KEY = 'cardio_b2b_client_phone_v1';
 const LOCAL_HISTORY_KEY = 'cardio_b2b_orders_archive_v1';
+const OTP_SESSION_KEY = 'cardio_b2b_otp_session_v1';
 
 /** Структура сохраненного заказа в архиве «Мои заказы» */
 export interface ArchivedOrder {
@@ -36,12 +35,34 @@ export interface ArchivedOrder {
   items?: CartItem[];
 }
 
+/** Структура подтвержденной OTP-сессии для веб-браузера */
+export interface VerifiedPhoneSession {
+  phone: string;
+  sessionToken: string;
+  verifiedAt: number;
+}
+
 /**
- * Нормализует телефонный номер (оставляет только последние 9–12 цифр) для поиска в БД Neon.
+ * Нормализует телефонный номер до 10 цифр украинского формата (например: 0988901364).
+ * Полностью совпадает с нормализацией на сервере в `api/orders.ts`.
  */
 export function normalizePhoneForSearch(rawPhone: string): string {
   const digits = (rawPhone || '').replace(/\D/g, '');
-  return digits.length >= 9 ? digits.slice(-10) : digits;
+  if (!digits) return '';
+  if (digits.startsWith('380') && digits.length >= 12) return digits.slice(2, 12);
+  if (digits.startsWith('80') && digits.length >= 11) return digits.slice(1, 11);
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+/**
+ * Проверяет, открыто ли приложение официально внутри Telegram Mini App.
+ */
+export function isTelegramMiniApp(): boolean {
+  try {
+    return Boolean(getTgWebApp()?.initDataUnsafe?.user?.id);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -72,7 +93,7 @@ export function getUniversalClientUid(): string {
 }
 
 /**
- * Запоминает телефон клиента при оформлении заказа (для привязки истории на www.cordwainer.app).
+ * Запоминает телефон клиента при оформлении заказа.
  */
 export function saveLastClientPhone(phone: string): void {
   try {
@@ -91,7 +112,47 @@ export function getLastClientPhone(): string {
 }
 
 /**
- * Читает локальный архив заказов из памяти устройства (доступен мгновенно без ожидания сети).
+ * Возвращает сохраненную подтвержденную OTP-сессию (если пользователь на сайте уже вводил код).
+ */
+export function getVerifiedPhoneSession(): VerifiedPhoneSession | null {
+  try {
+    const raw = localStorage.getItem(OTP_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as VerifiedPhoneSession;
+    if (parsed?.phone && parsed?.sessionToken) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Сохраняет токен подтвержденного телефона в localStorage браузера.
+ */
+function saveVerifiedPhoneSession(phone: string, sessionToken: string): void {
+  try {
+    const payload: VerifiedPhoneSession = {
+      phone: normalizePhoneForSearch(phone),
+      sessionToken,
+      verifiedAt: Date.now(),
+    };
+    localStorage.setItem(OTP_SESSION_KEY, JSON.stringify(payload));
+  } catch {}
+}
+
+/**
+ * Сбрасывает подтвержденную сессию (если пользователь хочет сменить номер телефона на сайте).
+ */
+export function clearVerifiedPhoneSession(): void {
+  try {
+    localStorage.removeItem(OTP_SESSION_KEY);
+  } catch {}
+}
+
+/**
+ * Читает локальный архив заказов из памяти устройства.
  */
 export function getLocalArchivedOrders(): ArchivedOrder[] {
   try {
@@ -100,6 +161,34 @@ export function getLocalArchivedOrders(): ArchivedOrder[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Объединяет серверные заказы из базы Neon с локальными заказами без дубликатов.
+ */
+function mergeAndSaveOrders(serverOrders: ArchivedOrder[]): ArchivedOrder[] {
+  const localOrders = getLocalArchivedOrders();
+  if (!Array.isArray(serverOrders) || serverOrders.length === 0) {
+    return localOrders;
+  }
+
+  const mergedMap = new Map<string, ArchivedOrder>();
+  for (const o of [...serverOrders, ...localOrders]) {
+    const key = o.id || `${o.createdAt.slice(0, 16)}_${o.totalPairs}_${o.managerName}`;
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, o);
+    }
+  }
+
+  const merged = Array.from(mergedMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  try {
+    localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(merged.slice(0, 30)));
+  } catch {}
+
+  return merged;
 }
 
 /**
@@ -120,23 +209,33 @@ export function saveOrderToLocalArchive(order: ArchivedOrder): ArchivedOrder[] {
 }
 
 /**
- * Подгружает историю заказов покупателя с сервера (из базы данных Neon) по его `clientUid`
- * или номеру телефона и объединяет с локальным архивом.
+ * Безопасно подгружает историю заказов с сервера `/api/orders`:
+ * - В Telegram Mini App передает `clientUid = tg_...`
+ * - На сайте www.cordwainer.app передает `sessionToken` (полученный после ввода 4-значного кода).
+ * Без `sessionToken` чужие номера телефонов сервером игнорируются.
  */
 export async function fetchAndMergeOrderHistory(
   customPhone?: string
 ): Promise<ArchivedOrder[]> {
   const localOrders = getLocalArchivedOrders();
   const clientUid = getUniversalClientUid();
-  const phoneToQuery = normalizePhoneForSearch(customPhone || getLastClientPhone());
+  const verifiedSession = getVerifiedPhoneSession();
+
+  const phoneToQuery = normalizePhoneForSearch(
+     verifiedSession?.phone || customPhone || getLastClientPhone()
+  );
 
   try {
     const params = new URLSearchParams({
       action: 'history',
       clientUid,
     });
-    if (phoneToQuery.length >= 7) {
+
+    if (phoneToQuery.length >= 10) {
       params.set('phone', phoneToQuery);
+    }
+    if (verifiedSession?.sessionToken) {
+      params.set('sessionToken', verifiedSession.sessionToken);
     }
 
     const res = await fetch(`/api/orders?${params.toString()}`);
@@ -147,31 +246,121 @@ export async function fetchAndMergeOrderHistory(
       ? data.orders
       : [];
 
-    if (serverOrders.length === 0) return localOrders;
-
-    // Объединяем серверные заказы из Neon и локальные без дубликатов
-    const mergedMap = new Map<string, ArchivedOrder>();
-    for (const o of [...serverOrders, ...localOrders]) {
-      const key = `${o.createdAt.slice(0, 16)}_${o.totalPairs}_${o.managerName}`;
-      if (!mergedMap.has(key)) {
-        mergedMap.set(key, o);
-      }
-    }
-
-    const merged = Array.from(mergedMap.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-
-    localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(merged.slice(0, 30)));
-    return merged;
+    return mergeAndSaveOrders(serverOrders);
   } catch {
     return localOrders;
   }
 }
 
 /**
- * Полностью очищает текущую оптовую корзину во всех хранилищах (и в основном каталоге,
- * и в B2B прайс-каталоге) сразу после успешной отправки заказа.
+ * ШАГ 1 ВЕРИФИКАЦИИ НА САЙТЕ: Запрашивает отправку 4-значного кода в Telegram (@Cordwainer_bot).
+ */
+export async function requestTelegramOtp(phone: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  const cleanPhone = normalizePhoneForSearch(phone);
+  if (cleanPhone.length < 10) {
+    return {
+      success: false,
+      error: 'Введите корректный 10-значный номер телефона.',
+    };
+  }
+
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'request_otp',
+        phone: cleanPhone,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data?.success) {
+      return {
+        success: true,
+        message: data.message || 'Код отправлен в ваш Telegram!',
+      };
+    }
+
+    return {
+      success: false,
+      error: data?.error || 'Не удалось отправить код в Telegram.',
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Ошибка соединения с сервером.',
+    };
+  }
+}
+
+/**
+ * ШАГ 2 ВЕРИФИКАЦИИ НА САЙТЕ: Проверяет 4-значный код из Telegram,
+ * сохраняет защищенный `sessionToken` и возвращает найденные заказы покупателя.
+ */
+export async function verifyTelegramOtp(
+  phone: string,
+  code: string
+): Promise<{
+  success: boolean;
+  orders?: ArchivedOrder[];
+  error?: string;
+}> {
+  const cleanPhone = normalizePhoneForSearch(phone);
+  const cleanCode = (code || '').replace(/\D/g, '').trim();
+
+  if (cleanPhone.length < 10 || cleanCode.length !== 4) {
+    return {
+      success: false,
+      error: 'Введите 4-значный код из Telegram.',
+    };
+  }
+
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'verify_otp',
+        phone: cleanPhone,
+        code: cleanCode,
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data?.success && data?.sessionToken) {
+      saveVerifiedPhoneSession(cleanPhone, data.sessionToken);
+      saveLastClientPhone(phone);
+
+      const serverOrders: ArchivedOrder[] = Array.isArray(data.orders)
+        ? data.orders
+        : [];
+      const merged = mergeAndSaveOrders(serverOrders);
+
+      return {
+        success: true,
+        orders: merged,
+      };
+    }
+
+    return {
+      success: false,
+      error: data?.error || 'Неверный код подтверждения.',
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Ошибка соединения с сервером.',
+    };
+  }
+}
+
+/**
+ * Полностью очищает текущую оптовую корзину во всех хранилищах сразу после отправки заказа.
  */
 export function clearWholesaleCartEverywhere(): void {
   try {
@@ -182,4 +371,3 @@ export function clearWholesaleCartEverywhere(): void {
     window.dispatchEvent(new Event('storage'));
   } catch {}
 }
-
