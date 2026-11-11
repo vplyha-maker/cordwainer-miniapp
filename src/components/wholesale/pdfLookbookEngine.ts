@@ -1,8 +1,8 @@
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
- * стандарта PDF 1.7 с интерактивными закладками (Outlines), кликабельными ссылками (Instagram, Tel)
- * и модулем прямого сохранения на мобильных устройствах (iOS + Android).
+ * стандарта PDF 1.7 с интерактивными закладками (Outlines), кликабельными ссылками (Instagram, Tel),
+ * невидимым текстовым слоем для Android Linkify и интерактивным превью внутри приложения.
  */
 
 import {
@@ -42,6 +42,16 @@ type TgWebAppExtended = {
   ) => void;
 };
 
+/** Интерактивная зона на странице (в виртуальных координатах 1240x1754) */
+interface InteractiveHitBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  uri: string;
+  textFallback: string;
+}
+
 /**
  * Безопасное получение инстанса Telegram WebApp из глобального объекта window.
  */
@@ -51,21 +61,112 @@ export function getTgWebApp(): TgWebAppExtended | undefined {
 }
 
 /**
- * Извлекает Telegram ID партнёра и формирует персональный идентификатор клиента.
+ * Извлекает Telegram ID клиента и формирует персональный код для водяных знаков.
  */
-export function getTelegramUserInfo(): { id?: number; clientCode: string } {
+export function getTelegramUserInfo(): { id?: number; clientCode: string; partnerCode: string } {
   try {
     const u = getTgWebApp()?.initDataUnsafe?.user;
     if (u?.id) {
+      const code = `CLIENT-${u.id}`;
       return {
         id: u.id,
-        clientCode: `CLIENT-${u.id}`,
+        clientCode: code,
+        partnerCode: code,
       };
     }
   } catch {}
   return {
     clientCode: 'CARDIO-OFFICIAL',
+    partnerCode: 'CARDIO-OFFICIAL',
   };
+}
+
+/**
+ * Открывает внешнюю ссылку или вызывает набор телефонного номера в Telegram Mini App и браузере.
+ */
+function executeInteractiveUri(uri: string): void {
+  if (typeof window === 'undefined') return;
+  const tg = getTgWebApp();
+
+  if (uri.startsWith('tel:')) {
+    try {
+      const a = document.createElement('a');
+      a.href = uri;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.location.href = uri;
+    }
+    return;
+  }
+
+  if (typeof tg?.openLink === 'function') {
+    try {
+      tg.openLink(uri);
+      return;
+    } catch {}
+  }
+
+  window.open(uri, '_blank', 'noopener,noreferrer');
+}
+
+// Хранилище интерактивных зон для встроенного просмотра (`previewPages`) внутри приложения
+let activePreviewListener: ((e: MouseEvent) => void) | null = null;
+
+/**
+ * Делает обычные <img> страницы во встроенном превью (`previewPages`) кликабельными
+ * без необходимости менять React-компоненты модального окна.
+ */
+function bindInteractivePreviewClicks(
+  jpegPages: string[],
+  pageHitBoxes: Map<number, InteractiveHitBox[]>,
+  virtualW: number,
+  virtualH: number
+): void {
+  if (typeof document === 'undefined') return;
+
+  if (activePreviewListener) {
+    document.removeEventListener('click', activePreviewListener, true);
+  }
+
+  activePreviewListener = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target || target.tagName !== 'IMG') return;
+
+    const imgEl = target as HTMLImageElement;
+    const src = imgEl.src;
+    if (!src || !src.startsWith('data:image/jpeg')) return;
+
+    const pageIndex = jpegPages.indexOf(src);
+    if (pageIndex === -1) return;
+
+    const boxes = pageHitBoxes.get(pageIndex);
+    if (!boxes || boxes.length === 0) return;
+
+    const rect = imgEl.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
+    const clickX = ((e.clientX - rect.left) / rect.width) * virtualW;
+    const clickY = ((e.clientY - rect.top) / rect.height) * virtualH;
+
+    for (const box of boxes) {
+      if (
+        clickX >= box.x &&
+        clickX <= box.x + box.w &&
+        clickY >= box.y &&
+        clickY <= box.y + box.h
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        executeInteractiveUri(box.uri);
+        return;
+      }
+    }
+  };
+
+  document.addEventListener('click', activePreviewListener, true);
 }
 
 /**
@@ -211,7 +312,7 @@ function drawWrappedText(
 }
 
 /**
- * Получение локализованных текстов лукбука без упоминания B2B и коробов.
+ * Получение локализованных текстов лукбука (без упоминания B2B, коробов и палет).
  */
 function getEditorialText(lang: WholesaleLang) {
   switch (lang) {
@@ -224,8 +325,8 @@ function getEditorialText(lang: WholesaleLang) {
         manifestoBody:
           'Ми створюємо взуття для тих, хто обирає довговічність, статусний зовнішній дизайн та абсолютний комфорт у кожному русі. Власні виробничі потужності в Харкові гарантують контроль якості на кожному етапі.',
         tocTitle: 'ЗМІСТ КАТАЛОГУ',
-        tocAutumn: 'Колекція "Осінь 2026"',
-        tocWinter: 'Колекція "Зима 2026"',
+        tocAutumn: 'Колекція «Осінь 2026»',
+        tocWinter: 'Колекція «Зима 2026»',
         tocContacts: 'Контакти та замовлення',
         seasonAutumnLabel: 'КОЛЕКЦІЯ ОСІНЬ 2026',
         seasonWinterLabel: 'КОЛЕКЦІЯ ЗИМА 2026',
@@ -234,17 +335,19 @@ function getEditorialText(lang: WholesaleLang) {
         autumnSub: 'Демісезонна лінійка з натуральної шкіри та нубуку',
         winterSub: 'Утеплені моделі на натуральній вовні',
         modelLabel: 'МОДЕЛЬНИЙ РЯД',
-        priceLabel: 'РОЗДРІБНА ЦІНА',
+        priceLabel: 'ЦІНА ЗА ПАРУ',
         colorMaterialLabel: 'КОЛІР ТА МАТЕРІАЛ',
         sizeRangeLabel: 'РОЗМІРНА СІТКА',
         fullSizeScale: 'Повна повнота (40—45)',
         naturalLeather: '100% Натуральна шкіра / єврозима',
-        contactsPageSub: 'ЗВ`ЯЗОК З ВИРОБНИКОМ ТА ЗАМОВЛЕННЯ',
+        contactsPageSub: 'ЗВ’ЯЗОК З ВИРОБНИКОМ ТА ЗАМОВЛЕННЯ',
         contactsPageTitle: 'Контакти та підтримка',
         managerRole: 'ПРЕМІУМ-КОНСУЛЬТАНТ ФАБРИКИ',
+        tapToCall: 'НАТИСНІТЬ ДЛЯ ДЗВІНКА  ↗',
         georgiyName: 'Георгій',
         borisName: 'Борис',
         instagramLabel: 'Instagram: @cardio_shoes',
+        instagramSub: 'НАТИСНІТЬ, ЩОБ ПЕРЕЙТИ В ПРОФІЛЬ  ·  instagram.com/cardio_shoes',
         shippingNote:
           'Швидка доставка замовлень по всій Україні та за кордон. Гарантія якості від виробника.',
       };
@@ -275,9 +378,11 @@ function getEditorialText(lang: WholesaleLang) {
         contactsPageSub: 'DIREKTVERBINDUNG ZUR HERSTELLUNG',
         contactsPageTitle: 'Kontakte & Support',
         managerRole: 'WERKSBERATER',
+        tapToCall: 'ZUM ANRUFEN TIPPEN  ↗',
         georgiyName: 'Georgiy',
         borisName: 'Boris',
         instagramLabel: 'Instagram: @cardio_shoes',
+        instagramSub: 'PROFIL ÖFFNEN  ·  instagram.com/cardio_shoes',
         shippingNote:
           'Schneller Versand in der Ukraine und international. Herstellergarantie.',
       };
@@ -291,8 +396,8 @@ function getEditorialText(lang: WholesaleLang) {
         manifestoBody:
           'Мы создаем обувь для тех, кто выбирает долговечность, статусный внешний дизайн и абсолютный комфорт в каждом движении. Собственные производственные мощности в Харькове гарантируют контроль качества на каждом этапе.',
         tocTitle: 'СОДЕРЖАНИЕ КАТАЛОГА',
-        tocAutumn: 'Коллекция "Осень 2026"',
-        tocWinter: 'Коллекция "Зима 2026"',
+        tocAutumn: 'Коллекция «Осень 2026»',
+        tocWinter: 'Коллекция «Зима 2026»',
         tocContacts: 'Контакты и заказ',
         seasonAutumnLabel: 'КОЛЛЕКЦИЯ ОСЕНЬ 2026',
         seasonWinterLabel: 'КОЛЛЕКЦИЯ ЗИМА 2026',
@@ -309,9 +414,11 @@ function getEditorialText(lang: WholesaleLang) {
         contactsPageSub: 'СВЯЗЬ С ПРОИЗВОДИТЕЛЕМ И ЗАКАЗ',
         contactsPageTitle: 'Контакты и поддержка',
         managerRole: 'ПРЕМИУМ-КОНСУЛЬТАНТ ФАБРИКИ',
+        tapToCall: 'НАЖМИТЕ ДЛЯ ЗВОНКА  ↗',
         georgiyName: 'Георгий',
         borisName: 'Борис',
         instagramLabel: 'Instagram: @cardio_shoes',
+        instagramSub: 'НАЖМИТЕ ДЛЯ ПЕРЕХОДА В ПРОФИЛЬ  ·  instagram.com/cardio_shoes',
         shippingNote:
           'Быстрая доставка заказов по всей Украине и за рубеж. Гарантия качества от производителя.',
       };
@@ -319,17 +426,33 @@ function getEditorialText(lang: WholesaleLang) {
 }
 
 /**
+ * Кодирует любую строку (включая кириллицу) в стандартный PDF 1.7 UTF-16BE Hex формат с BOM (<FEFF...>).
+ * Это гарантирует отсутствие кракозябр в закладках (/Outlines) и метаданных в Telegram/Android/iOS.
+ */
+function toPdfUtf16Hex(str: string): string {
+  let hex = 'FEFF';
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    hex += code.toString(16).toUpperCase().padStart(4, '0');
+  }
+  return `<${hex}>`;
+}
+
+/**
  * Низкоуровневый сборщик бинарного файла формата PDF 1.7
- * с поддержкой интерактивных закладок (Outlines), метаданных (/Info) и ссылок (/Annots).
+ * с поддержкой интерактивных закладок (Outlines), метаданных (/Info),
+ * прямых массивов ссылок (/Annots) и невидимого текстового слоя (BT 3 Tr ... ET) для Android Linkify.
  */
 function buildPdfBytesFromJpegPages(
   jpegDataUrls: string[],
   imgW: number,
   imgH: number,
+  virtualW: number,
+  virtualH: number,
   pageWidthPt = 595.28,
   pageHeightPt = 841.89,
   outlines?: Array<{ title: string; pageIndex: number }>,
-  pageAnnotations?: Map<number, Array<{ rect: [number, number, number, number]; uri: string }>>
+  pageHitBoxes?: Map<number, InteractiveHitBox[]>
 ): Uint8Array {
   const encoder = new TextEncoder();
   const chunks: Uint8Array[] = [];
@@ -357,19 +480,18 @@ function buildPdfBytesFromJpegPages(
   };
 
   const pageCount = jpegDataUrls.length;
-  
+
   // Объектные идентификаторы:
   // 1: Catalog
   // 2: Pages Root
-  // 3: Info Dictionary
-  // 4: Outlines Root (если есть)
-  // 5+: Outline items, pages, content streams, XObjects, annotations
-  
+  // 3: Info Metadata
+  // 4: Standard Type1 Font (/Helvetica) для текстового слоя ссылок
   let nextObjId = 5;
+  const fontObjId = 4;
+
   const pageObjIds: number[] = [];
   const contentObjIds: number[] = [];
   const imgObjIds: number[] = [];
-  const annotListObjIds: (number | null)[] = [];
   const annotItemObjIds: number[][] = [];
 
   for (let i = 0; i < pageCount; i++) {
@@ -377,21 +499,18 @@ function buildPdfBytesFromJpegPages(
     contentObjIds.push(nextObjId++);
     imgObjIds.push(nextObjId++);
 
-    const annots = pageAnnotations?.get(i);
-    if (annots && annots.length > 0) {
-      annotListObjIds.push(nextObjId++);
+    const boxes = pageHitBoxes?.get(i);
+    if (boxes && boxes.length > 0) {
       const itemIds: number[] = [];
-      for (let a = 0; a < annots.length; a++) {
+      for (let a = 0; a < boxes.length; a++) {
         itemIds.push(nextObjId++);
       }
       annotItemObjIds.push(itemIds);
     } else {
-      annotListObjIds.push(null);
       annotItemObjIds.push([]);
     }
   }
 
-  // Outlines objects setup
   const outlineRootId = outlines && outlines.length > 0 ? nextObjId++ : null;
   const outlineItemIds: number[] = [];
   if (outlines && outlines.length > 0) {
@@ -400,33 +519,43 @@ function buildPdfBytesFromJpegPages(
     }
   }
 
-  pushStr('%PDF-1.7\n%âãÏÓ\n');
+  // Заголовок PDF 1.7 с бинарным маркером
+  pushStr('%PDF-1.7\n%\xE2\xE3\xCF\xD3\n');
 
   // Obj 1: Catalog
   startObj(1);
   let catalogDict = `<< /Type /Catalog /Pages 2 0 R`;
   if (outlineRootId !== null) {
-    catalogDict += ` /Outlines ${outlineRootId} 0 R`;
+    catalogDict += ` /Outlines ${outlineRootId} 0 R /PageMode /UseOutlines`;
   }
   catalogDict += ` >>`;
   pushStr(catalogDict);
   endObj();
 
-  // Obj 2: Pages
+  // Obj 2: Pages Root
   startObj(2);
   pushStr(
     `<< /Type /Pages /Kids [${pageObjIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`
   );
   endObj();
 
-  // Obj 3: Info Metadata
+  // Obj 3: Info Metadata (UTF-16BE Hex для полной совместимости)
   startObj(3);
   pushStr(
-    `<< /Title (CARDIO FOOTWEAR - Official Lookbook 2026) /Author (CARDIO Manufacturing) /Subject (Exclusive Footwear Collection) /Creator (CARDIO PDF Engine) /Producer (PDF 1.7 Generator) >>`
+    `<< /Title ${toPdfUtf16Hex('CARDIO FOOTWEAR — Official Lookbook 2026')} ` +
+      `/Author ${toPdfUtf16Hex('CARDIO Footwear (@cardio_shoes)')} ` +
+      `/Subject ${toPdfUtf16Hex('Autumn & Winter Footwear Collection 2026')} ` +
+      `/Creator ${toPdfUtf16Hex('CARDIO Editorial PDF 1.7 Engine')} ` +
+      `/Producer ${toPdfUtf16Hex('CARDIO PDF 1.7 Native Builder')} >>`
   );
   endObj();
 
-  // Obj 4: Outlines Root (если есть)
+  // Obj 4: Встроенный шрифт Helvetica для невидимого поискового/ссылочного слоя
+  startObj(fontObjId);
+  pushStr(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`);
+  endObj();
+
+  // Закладки (Outlines)
   if (outlineRootId !== null && outlines) {
     startObj(outlineRootId);
     pushStr(
@@ -434,7 +563,6 @@ function buildPdfBytesFromJpegPages(
     );
     endObj();
 
-    // Outline items
     for (let o = 0; o < outlines.length; o++) {
       const item = outlines[o];
       const itemId = outlineItemIds[o];
@@ -442,10 +570,10 @@ function buildPdfBytesFromJpegPages(
       const nextId = o < outlines.length - 1 ? outlineItemIds[o + 1] : null;
       const targetPageObjId = pageObjIds[item.pageIndex] || pageObjIds[0];
 
-      let itemDict = `<< /Title (${item.title}) /Parent ${outlineRootId} 0 R`;
+      let itemDict = `<< /Title ${toPdfUtf16Hex(item.title)} /Parent ${outlineRootId} 0 R`;
       if (prevId !== null) itemDict += ` /Prev ${prevId} 0 R`;
       if (nextId !== null) itemDict += ` /Next ${nextId} 0 R`;
-      itemDict += ` /Dest [${targetPageObjId} 0 R /XYZ null null null] >>`;
+      itemDict += ` /Dest [${targetPageObjId} 0 R /XYZ 0 ${pageHeightPt.toFixed(2)} null] >>`;
 
       startObj(itemId);
       pushStr(itemDict);
@@ -453,13 +581,13 @@ function buildPdfBytesFromJpegPages(
     }
   }
 
-  // Запись страниц, потоков контента, картинок и аннотаций
+  // Страницы, потоки контента, изображения и интерактивные ссылки
   for (let i = 0; i < pageCount; i++) {
     const pageObjId = pageObjIds[i];
     const contentObjId = contentObjIds[i];
     const imgObjId = imgObjIds[i];
-    const annotListId = annotListObjIds[i];
     const itemIds = annotItemObjIds[i];
+    const boxes = pageHitBoxes?.get(i) || [];
 
     const base64 = jpegDataUrls[i].split(',')[1] || '';
     const binaryStr = atob(base64);
@@ -468,14 +596,37 @@ function buildPdfBytesFromJpegPages(
       imgBytes[k] = binaryStr.charCodeAt(k);
     }
 
-    const contentStream = `q\n${pageWidthPt.toFixed(2)} 0 0 ${pageHeightPt.toFixed(2)} 0 0 cm\n/Im${i} Do\nQ`;
+    // Формируем невидимый текстовый слой (3 Tr) поверх кнопок, чтобы Android/iOS Linkify
+    // также распознавал номера телефонов и URL даже в ридерах, игнорирующих /Annots
+    let textLayerStream = '';
+    const pdfRects: Array<[string, string, string, string]> = [];
 
-    // Page Object
+    for (let a = 0; a < boxes.length; a++) {
+      const b = boxes[a];
+      const llx = (b.x * (pageWidthPt / virtualW)).toFixed(2);
+      const urx = ((b.x + b.w) * (pageWidthPt / virtualW)).toFixed(2);
+      const ury = (pageHeightPt - b.y * (pageHeightPt / virtualH)).toFixed(2);
+      const lly = (pageHeightPt - (b.y + b.h) * (pageHeightPt / virtualH)).toFixed(2);
+      pdfRects.push([llx, lly, urx, ury]);
+
+      const textX = (Number(llx) + 12).toFixed(2);
+      const textY = (Number(lly) + (Number(ury) - Number(lly)) * 0.35).toFixed(2);
+      const safeAsciiText = b.textFallback.replace(/[()\\]/g, '');
+      textLayerStream += `\nBT 3 Tr /F1 16 Tf ${textX} ${textY} Td (${safeAsciiText}) Tj ET`;
+    }
+
+    const contentStream =
+      `q\n${pageWidthPt.toFixed(2)} 0 0 ${pageHeightPt.toFixed(2)} 0 0 cm\n/Im${i} Do\nQ` +
+      textLayerStream;
+
+    // Page Object (важно: /Annots указывается как прямой массив [...] для мобильных PDF-ридеров)
     startObj(pageObjId);
-    let pageDict = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt.toFixed(2)} ${pageHeightPt.toFixed(2)}] ` +
-      `/Resources << /XObject << /Im${i} ${imgObjId} 0 R >> >> /Contents ${contentObjId} 0 R`;
-    if (annotListId !== null) {
-      pageDict += ` /Annots ${annotListId} 0 R`;
+    let pageDict =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt.toFixed(2)} ${pageHeightPt.toFixed(2)}] ` +
+      `/Resources << /XObject << /Im${i} ${imgObjId} 0 R >> /Font << /F1 ${fontObjId} 0 R >> >> ` +
+      `/Contents ${contentObjId} 0 R`;
+    if (itemIds.length > 0) {
+      pageDict += ` /Annots [${itemIds.map((id) => `${id} 0 R`).join(' ')}]`;
     }
     pageDict += ` >>`;
     pushStr(pageDict);
@@ -496,21 +647,17 @@ function buildPdfBytesFromJpegPages(
     pushStr('\nendstream');
     endObj();
 
-    // Annotation List & Items
-    const annots = pageAnnotations?.get(i);
-    if (annotListId !== null && annots && itemIds.length === annots.length) {
-      startObj(annotListId);
-      pushStr(`[${itemIds.map((id) => `${id} 0 R`).join(' ')}]`);
+    // Объекты интерактивных ссылок (/Annot /Subtype /Link с флагом /F 4)
+    for (let a = 0; a < boxes.length; a++) {
+      const box = boxes[a];
+      const [llx, lly, urx, ury] = pdfRects[a];
+      startObj(itemIds[a]);
+      pushStr(
+        `<< /Type /Annot /Subtype /Link /F 4 /Rect [${llx} ${lly} ${urx} ${ury}] ` +
+          `/Border [0 0 0] /BS << /W 0 >> /H /I ` +
+          `/A << /Type /Action /S /URI /URI (${box.uri}) >> >>`
+      );
       endObj();
-
-      for (let a = 0; a < annots.length; a++) {
-        const ann = annots[a];
-        startObj(itemIds[a]);
-        pushStr(
-          `<< /Type /Annot /Subtype /Link /Rect [${ann.rect.join(' ')}] /Border [0 0 0] /A << /S /URI /URI (${ann.uri}) >> >>`
-        );
-        endObj();
-      }
     }
   }
 
@@ -670,7 +817,7 @@ export interface GenerateLookbookParams {
 /**
  * Главная функция-оркестратор: верстает страницы каталога на Canvas,
  * упаковывает в PDF 1.7 с интерактивными закладками и ссылками,
- * отправляет копию в Telegram и возвращает превью.
+ * активирует кликабельные зоны во встроенном просмотре и отправляет копию в Telegram.
  */
 export async function generateAndDeliverLookbookPdf(
   params: GenerateLookbookParams
@@ -718,36 +865,33 @@ export async function generateAndDeliverLookbookPdf(
 
   const pagePlan: PageDescriptor[] = [{ type: 'cover' }, { type: 'manifesto' }];
 
-  // Для закладок (Outlines)
   const outlinesList: Array<{ title: string; pageIndex: number }> = [
-    { title: 'Обложка', pageIndex: 0 },
-    { title: 'Манифест и Оглавление', pageIndex: 1 },
+    { title: 'Обложка CARDIO 2026', pageIndex: 0 },
+    { title: pdfT.tocTitle, pageIndex: 1 },
   ];
 
   let globalProdIdx = 1;
-  let autumnDividerIndex = -1;
-  let winterDividerIndex = -1;
 
   if (includeAutumn && autumnItems.length > 0) {
-    autumnDividerIndex = pagePlan.length;
+    const autumnDividerIndex = pagePlan.length;
     pagePlan.push({ type: 'divider', season: 'autumn', count: autumnItems.length });
-    outlinesList.push({ title: 'Осенняя коллекция 2026', pageIndex: autumnDividerIndex });
+    outlinesList.push({ title: pdfT.tocAutumn, pageIndex: autumnDividerIndex });
     for (const item of autumnItems) {
       pagePlan.push({ type: 'product', item, indexInCatalog: globalProdIdx++ });
     }
   }
   if (includeWinter && winterItems.length > 0) {
-    winterDividerIndex = pagePlan.length;
+    const winterDividerIndex = pagePlan.length;
     pagePlan.push({ type: 'divider', season: 'winter', count: winterItems.length });
-    outlinesList.push({ title: 'Зимняя коллекция 2026', pageIndex: winterDividerIndex });
+    outlinesList.push({ title: pdfT.tocWinter, pageIndex: winterDividerIndex });
     for (const item of winterItems) {
       pagePlan.push({ type: 'product', item, indexInCatalog: globalProdIdx++ });
     }
   }
-  
+
   const contactsPageIndex = pagePlan.length;
   pagePlan.push({ type: 'contacts' });
-  outlinesList.push({ title: 'Контакты и заказ', pageIndex: contactsPageIndex });
+  outlinesList.push({ title: pdfT.tocContacts, pageIndex: contactsPageIndex });
 
   const totalPages = pagePlan.length;
   onPageProgress(1, totalPages);
@@ -764,7 +908,27 @@ export async function generateAndDeliverLookbookPdf(
   }[lang];
 
   const jpegPages: string[] = [];
-  const pageAnnotations = new Map<number, Array<{ rect: [number, number, number, number]; uri: string }>>();
+  const pageHitBoxes = new Map<number, InteractiveHitBox[]>();
+
+  // Зоны быстрого звонка в нижнем колонтитуле (для страниц манифеста и товаров)
+  const footerPhoneBoxes: InteractiveHitBox[] = [
+    {
+      x: W / 2,
+      y: H - 105,
+      w: (W - PAD - W / 2) / 2,
+      h: 60,
+      uri: 'tel:+380677193716',
+      textFallback: '+380677193716',
+    },
+    {
+      x: W / 2 + (W - PAD - W / 2) / 2,
+      y: H - 105,
+      w: (W - PAD - W / 2) / 2,
+      h: 60,
+      uri: 'tel:+380974541511',
+      textFallback: '+380974541511',
+    },
+  ];
 
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     onPageProgress(pageIdx + 1, totalPages);
@@ -888,7 +1052,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = GREY;
       ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('DIRECT FACTORY COLLECTION  ·  EDITION 2026', PAD, H - 78);
+      ctx.fillText('DIRECT FACTORY COLLECTION  ·  @CARDIO_SHOES', PAD, H - 78);
 
       ctx.textAlign = 'right';
       ctx.fillText(pageNumStr, W - PAD, H - 78);
@@ -988,7 +1152,7 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GREY;
       ctx.font = '400 22px "Playfair Display", Georgia, serif';
-      ctx.fillText('Selected Italian and Ukrainian leather, reinforced soles.', PAD + 32, boxSecY + 150);
+      ctx.fillText('Selected premium natural leather, reinforced anatomical soles.', PAD + 32, boxSecY + 150);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1.5;
@@ -1020,6 +1184,7 @@ export async function generateAndDeliverLookbookPdf(
         W - PAD,
         H - 76
       );
+      pageHitBoxes.set(pageIdx, footerPhoneBoxes);
     } else if (pageDesc.type === 'divider') {
       ctx.fillStyle = GRAPHITE;
       ctx.fillRect(0, 0, W, H);
@@ -1192,7 +1357,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.stroke();
 
       const col1X = PAD;
-      const col2X = PAD + 420;
+      const col2X = PAD + 480;
       const matrixBottomY = matrixTopY + 168;
 
       ctx.strokeStyle = RULE;
@@ -1250,6 +1415,7 @@ export async function generateAndDeliverLookbookPdf(
         W - PAD,
         H - 72
       );
+      pageHitBoxes.set(pageIdx, footerPhoneBoxes);
     } else if (pageDesc.type === 'contacts') {
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
@@ -1275,37 +1441,49 @@ export async function generateAndDeliverLookbookPdf(
       if (logoImg) {
         const lH = 60;
         const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
-        ctx.drawImage(logoImg, PAD, 180, lW, lH);
+        ctx.drawImage(logoImg, PAD, 175, lW, lH);
       }
 
       ctx.fillStyle = METALLIC;
       ctx.font = '600 15px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(pdfT.contactsPageSub, PAD, 310);
+      ctx.fillText(pdfT.contactsPageSub, PAD, 305);
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 58px "Playfair Display", Georgia, serif';
-      ctx.fillText(pdfT.contactsPageTitle, PAD, 385);
+      ctx.fillText(pdfT.contactsPageTitle, PAD, 380);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(PAD, 440);
-      ctx.lineTo(W - PAD, 440);
+      ctx.moveTo(PAD, 430);
+      ctx.lineTo(W - PAD, 430);
       ctx.stroke();
 
       const contactsList = [
-        { name: pdfT.georgiyName, phone: '+38 (067) 719-37-16', telUri: 'tel:+380677193716' },
-        { name: pdfT.borisName, phone: '+38 (097) 454-15-11', telUri: 'tel:+380974541511' },
+        {
+          name: pdfT.georgiyName,
+          phone: '+38 (067) 719-37-16',
+          telUri: 'tel:+380677193716',
+          rawPhone: '+380677193716',
+        },
+        {
+          name: pdfT.borisName,
+          phone: '+38 (097) 454-15-11',
+          telUri: 'tel:+380974541511',
+          rawPhone: '+380974541511',
+        },
       ];
 
-      const pageAnnotsList: Array<{ rect: [number, number, number, number]; uri: string }> = [];
+      const contactHitBoxes: InteractiveHitBox[] = [];
 
       contactsList.forEach((c, idx) => {
-        const cY = 510 + idx * 220;
+        const cY = 490 + idx * 215;
+        const cardH = 185;
+
         ctx.strokeStyle = GRAPHITE;
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(PAD, cY, CONTENT_W, 180);
+        ctx.strokeRect(PAD, cY, CONTENT_W, cardH);
 
         ctx.fillStyle = GREY;
         ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -1313,72 +1491,89 @@ export async function generateAndDeliverLookbookPdf(
         ctx.fillText(pdfT.managerRole, PAD + 40, cY + 52);
 
         ctx.fillStyle = GRAPHITE;
-        ctx.font = '400 38px "Playfair Display", Georgia, serif';
-        ctx.fillText(c.name, PAD + 40, cY + 115);
+        ctx.font = '400 40px "Playfair Display", Georgia, serif';
+        ctx.fillText(c.name, PAD + 40, cY + 122);
 
-        ctx.fillStyle = '#1D4ED8'; // Кликабельный синий цвет для телефона
-        ctx.font = '700 28px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillStyle = '#1D4ED8';
+        ctx.font = '700 30px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(c.phone, W - PAD - 40, cY + 112);
+        ctx.fillText(c.phone, W - PAD - 40, cY + 102);
 
-        // Добавляем PDF Annotation для телефона (конвертация координат Canvas в PDF points)
-        const boxX1 = (W - PAD - 40 - 240) * (595.28 / W);
-        const boxY1 = 841.89 - ((cY + 140) * (841.89 / H));
-        const boxX2 = (W - PAD - 40) * (595.28 / W);
-        const boxY2 = 841.89 - ((cY + 70) * (841.89 / H));
-        pageAnnotsList.push({ rect: [boxX1, boxY1, boxX2, boxY2], uri: c.telUri });
+        ctx.fillStyle = '#1D4ED8';
+        ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(pdfT.tapToCall, W - PAD - 40, cY + 142);
+
+        // Вся карточка целиком является кликабельной кнопкой
+        contactHitBoxes.push({
+          x: PAD,
+          y: cY,
+          w: CONTENT_W,
+          h: cardH,
+          uri: c.telUri,
+          textFallback: `tel:${c.rawPhone} ${c.rawPhone}`,
+        });
       });
 
-      // Блок Instagram ссылки
-      const igBoxY = 970;
-      ctx.strokeStyle = METALLIC;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(PAD, igBoxY, CONTENT_W, 100);
+      // Блок Instagram (@cardio_shoes)
+      const igBoxY = 935;
+      const igBoxH = 145;
+      ctx.strokeStyle = '#E1306C';
+      ctx.lineWidth = 1.8;
+      ctx.strokeRect(PAD, igBoxY, CONTENT_W, igBoxH);
 
-      ctx.fillStyle = '#E1306C'; // Фирменный цвет Instagram
-      ctx.font = '700 24px "Inter", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillStyle = '#E1306C';
+      ctx.font = '700 28px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(pdfT.instagramLabel, W / 2, igBoxY + 60);
+      ctx.fillText(pdfT.instagramLabel, W / 2, igBoxY + 64);
 
-      const igX1 = (PAD + CONTENT_W / 2 - 200) * (595.28 / W);
-      const igY1 = 841.89 - ((igBoxY + 90) * (841.89 / H));
-      const igX2 = (PAD + CONTENT_W / 2 + 200) * (595.28 / W);
-      const igY2 = 841.89 - ((igBoxY + 10) * (841.89 / H));
-      pageAnnotsList.push({ rect: [igX1, igY1, igX2, igY2], uri: 'https://instagram.com/cardio_shoes' });
+      ctx.fillStyle = GREY;
+      ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText(pdfT.instagramSub, W / 2, igBoxY + 108);
 
-      if (pageAnnotsList.length > 0) {
-        pageAnnotations.set(pageIdx, pageAnnotsList);
-      }
+      contactHitBoxes.push({
+        x: PAD,
+        y: igBoxY,
+        w: CONTENT_W,
+        h: igBoxH,
+        uri: 'https://www.instagram.com/cardio_shoes',
+        textFallback: 'https://www.instagram.com/cardio_shoes',
+      });
 
+      pageHitBoxes.set(pageIdx, contactHitBoxes);
+
+      // Отступ увеличен до 1165, чтобы текст не касался рамки Instagram
       ctx.fillStyle = GREY;
       ctx.font = '400 20px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      drawWrappedText(ctx, pdfT.shippingNote, PAD, 1120, CONTENT_W, 34);
+      drawWrappedText(ctx, pdfT.shippingNote, PAD, 1165, CONTENT_W, 34);
 
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(PAD, H - 110);
-      ctx.lineTo(W - PAD, H - 110);
+      ctx.moveTo(PAD, H - 115);
+      ctx.lineTo(W - PAD, H - 115);
       ctx.stroke();
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 26px "Playfair Display", Georgia, serif';
       ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  2026', PAD, H - 65);
+      ctx.fillText('CARDIO FOOTWEAR  ·  2026', PAD, H - 68);
 
       ctx.fillStyle = GREY;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 65);
+      ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 68);
     }
 
     ctx.restore();
-    jpegPages.push(canvas.toDataURL('image/jpeg', 0.75));
+    jpegPages.push(canvas.toDataURL('image/jpeg', 0.76));
   }
 
+  // Активируем клики по телефонам и Instagram прямо во встроенном просмотре (`previewPages`)
+  bindInteractivePreviewClicks(jpegPages, pageHitBoxes, VIRTUAL_W, VIRTUAL_H);
+
   // =======================================================================
-  // ФАЗА 2: СБОРКА PDF 1.7 И ДОСТАВКА
+  // ФАЗА 2: СБОРКА БИНАРНОГО PDF 1.7 И ДОСТАВКА В TELEGRAM
   // =======================================================================
   onStageChange('packaging_and_uploading');
   await new Promise((r) => setTimeout(r, 80));
@@ -1387,10 +1582,12 @@ export async function generateAndDeliverLookbookPdf(
     jpegPages,
     OUT_W,
     OUT_H,
+    VIRTUAL_W,
+    VIRTUAL_H,
     595.28,
     841.89,
     outlinesList,
-    pageAnnotations
+    pageHitBoxes
   );
 
   const localBlob = new Blob([pdfBytes], { type: 'application/pdf' });
