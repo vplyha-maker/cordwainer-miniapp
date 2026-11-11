@@ -1,16 +1,15 @@
 /**
  * @file src/components/WholesaleCart.tsx
  * @description Компонент оптовой накладной (корзины), расчёта логистики Новой Почты
- * и личного архива отправленных заказов («Мои заказы»).
+ * и защищённого личного архива отправленных заказов («Мои заказы»).
  *
  * ЧТО ИСПРАВЛЕНО И ДОБАВЛЕНО:
- * 1. АВТООЧИСТКА НАКЛАДНОЙ: После успешной отправки заказа руководителю текущая корзина
- *    полностью очищается во всех окнах приложения, чтобы старый заказ не висел повторно.
- * 2. АРХИВ «МОИ ЗАКАЗЫ»: Добавлен переключатель вкладок «Текущая накладная» / «Мои заказы».
- *    Все отправленные накладные сохраняются локально и синхронизируются с базой Neon.
- * 3. ПОДДЕРЖКА ВЕБ-ВЕРСИИ (www.cordwainer.app): Покупатель, зашедший через браузер без Telegram,
- *    получает привязку заказов по `clientUid` и своему номеру телефона с возможностью
- *    подгрузить историю своих заказов из базы данных Neon в 1 клик.
+ * 1. ДВУХФАКТОРНАЯ ЗАЩИТА АРХИВА (`TelegramOtpAuthBox`): На внешнем сайте (www.cordwainer.app)
+ *    доступ к истории заказов по номеру телефона защищён 4-значным кодом в Telegram (@Cordwainer_bot).
+ *    Конкуренты больше не могут пробить чужие накладные по номеру телефона.
+ * 2. АВТООЧИСТКА НАКЛАДНОЙ: После успешной отправки заказа руководителю текущая корзина
+ *    полностью очищается во всех окнах приложения.
+ * 3. АРХИВ «МОИ ЗАКАЗЫ»: Все отправленные накладные сохраняются локально и синхронизируются с базой Neon.
  */
 
 import {
@@ -36,6 +35,7 @@ import {
   clearWholesaleCartEverywhere,
   type ArchivedOrder,
 } from './wholesale/orderHistoryStore';
+import { TelegramOtpAuthBox } from './wholesale/TelegramOtpAuthBox';
 import type { Lang } from '../App';
 
 type WholesaleCartProps = {
@@ -576,7 +576,6 @@ export function WholesaleCart({
   const [archivedOrders, setArchivedOrders] = useState<ArchivedOrder[]>(() =>
     getLocalArchivedOrders()
   );
-  const [archiveLoading, setArchiveLoading] = useState(false);
   const [expandedArchiveId, setExpandedArchiveId] = useState<string | null>(null);
   const [copiedArchiveId, setCopiedArchiveId] = useState<string | null>(null);
 
@@ -625,10 +624,7 @@ export function WholesaleCart({
       emptyText: 'В вашей текущей накладной нет выбранных моделей.',
       goToCatalog: 'Перейти в каталог →',
       openArchiveBtn: (count: number) => `📂 Открыть архив «Мои заказы» (${count})`,
-      archiveEmpty: 'У вас пока нет отправленных заказов на этом устройстве.',
-      archiveWebHint: 'Зашли через браузер (www.cordwainer.app)? Введите ваш телефон ниже, чтобы загрузить свои заказы из базы фабрики:',
-      archiveSyncBtn: 'Найти мои заказы по телефону',
-      archiveSyncing: 'Поиск в базе...',
+      archiveEmpty: 'У вас пока нет доступных заказов. Подтвердите номер через Telegram выше или оформите новый заказ.',
       archiveShowDetails: 'Показать состав накладной ▼',
       archiveHideDetails: 'Скрыть состав ▲',
       archiveCopyBtn: 'Скопировать накладную',
@@ -689,10 +685,7 @@ export function WholesaleCart({
       emptyText: 'У вашій поточній накладній немає обраних моделей.',
       goToCatalog: 'Перейти до каталогу →',
       openArchiveBtn: (count: number) => `📂 Відкрити архів «Мої замовлення» (${count})`,
-      archiveEmpty: 'У вас поки немає відправлених замовлень на цьому пристрої.',
-      archiveWebHint: 'Зайшли через браузер (www.cordwainer.app)? Введіть ваш телефон нижче, щоб завантажити свої замовлення з бази фабрики:',
-      archiveSyncBtn: 'Знайти мої замовлення за телефоном',
-      archiveSyncing: 'Пошук у базі...',
+      archiveEmpty: 'У вас поки немає доступних замовлень. Підтвердіть номер через Telegram вище або оформіть нове замовлення.',
       archiveShowDetails: 'Показати склад накладної ▼',
       archiveHideDetails: 'Сховати склад ▲',
       archiveCopyBtn: 'Скопіювати накладну',
@@ -753,10 +746,7 @@ export function WholesaleCart({
       emptyText: 'Ihre aktuelle Rechnung enthält keine Modelle.',
       goToCatalog: 'Zum Katalog →',
       openArchiveBtn: (count: number) => `📂 Archiv «Meine Bestellungen» (${count})`,
-      archiveEmpty: 'Noch keine gesendeten Bestellungen auf diesem Gerät.',
-      archiveWebHint: 'Über Browser (www.cordwainer.app) geöffnet? Telefonnummer eingeben, um Bestellungen aus der Datenbank zu laden:',
-      archiveSyncBtn: 'Bestellungen per Telefon suchen',
-      archiveSyncing: 'Suche läuft...',
+      archiveEmpty: 'Noch keine Bestellungen verfügbar. Bitte Nummer oben via Telegram bestätigen.',
       archiveShowDetails: 'Rechnungsdetails anzeigen ▼',
       archiveHideDetails: 'Details ausblenden ▲',
       archiveCopyBtn: 'Rechnung kopieren',
@@ -848,7 +838,7 @@ export function WholesaleCart({
   const warehouseInputRef = useRef<HTMLInputElement | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Подгружаем историю заказов из базы Neon при открытии корзины
+  // Подгружаем историю заказов при открытии корзины (только если сессия доверенная)
   useEffect(() => {
     let active = true;
     fetchAndMergeOrderHistory(savedRecipient?.clientPhone).then((merged) => {
@@ -1092,10 +1082,6 @@ export function WholesaleCart({
     );
   };
 
-  /**
-   * Отправляет накладную руководителю, сохраняет заказ в архив («Мои заказы» + Neon DB)
-   * и АВТОМАТИЧЕСКИ ОЧИЩАЕТ текущую корзину, чтобы старая накладная больше не висела.
-   */
   const sendToManager = async (manager: { name: string; telegramId?: string }): Promise<boolean> => {
     if (!manager.telegramId) return false;
     if (!isFormValid) {
@@ -1136,7 +1122,6 @@ export function WholesaleCart({
       if (response.ok && data.success) {
         triggerHaptic('success');
 
-        // 1. Сохраняем отправленный заказ в архив «Мои заказы»
         const sentInvoiceNum = invoiceMeta.invoiceNumber;
         const archivedItem: ArchivedOrder = {
           id: sentInvoiceNum,
@@ -1153,14 +1138,12 @@ export function WholesaleCart({
         setArchivedOrders(updatedArchive);
         setExpandedArchiveId(sentInvoiceNum);
 
-        // 2. Показываем баннер успеха и генерируем новый номер для будущих заказов
         setOrderBanner({
           type: 'success',
           text: t.orderSentSuccess(sentInvoiceNum, manager.name),
         });
         setInvoiceMeta(getOrCreateInvoiceMeta(true));
 
-        // 3. Очищаем текущую накладную во всех компонентах и переключаем на вкладку «Мои заказы»
         clearWholesaleCartEverywhere();
         onClear();
         setActiveTab('archive');
@@ -1191,17 +1174,6 @@ export function WholesaleCart({
       setTimeout(() => setCopied(false), 2500);
     } catch {
       triggerHaptic('error');
-    }
-  };
-
-  const handleSyncArchiveByPhone = async () => {
-    triggerHaptic('light');
-    setArchiveLoading(true);
-    try {
-      const merged = await fetchAndMergeOrderHistory(clientPhone);
-      setArchivedOrders(merged);
-    } finally {
-      setArchiveLoading(false);
     }
   };
 
@@ -1454,7 +1426,7 @@ export function WholesaleCart({
         </button>
       </div>
 
-      {/* Баннер успешной отправки (виден даже после очистки корзины) */}
+      {/* Баннер успешной отправки */}
       {orderBanner && (
         <div
           style={{
@@ -1520,58 +1492,20 @@ export function WholesaleCart({
       </div>
 
       {/* ===================================================================== */}
-      {/* ВКЛАДКА 2: АРХИВ «МОИ ЗАКАЗЫ» (Telegram + Web www.cordwainer.app)     */}
+      {/* ВКЛАДКА 2: АРХИВ «МОИ ЗАКАЗЫ» С ЗАЩИТОЙ ЧЕРЕЗ TELEGRAM OTP            */}
       {/* ===================================================================== */}
       {activeTab === 'archive' ? (
         <div>
-          {/* Блок синхронизации по номеру телефона (для тех, кто зашел через www.cordwainer.app) */}
-          <div
-            style={{
-              backgroundColor: THEME.surface,
-              border: `1px solid ${THEME.border}`,
-              padding: '12px 14px',
-              marginBottom: '16px',
-            }}
-          >
-            <div style={{ fontSize: '11px', color: THEME.inkMuted, lineHeight: 1.4, marginBottom: '10px' }}>
-              {t.archiveWebHint}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <input
-                type="tel"
-                inputMode="tel"
-                className="wc-solid-input"
-                placeholder={t.phonePlaceholder}
-                value={clientPhone}
-                onChange={(e) => setClientPhone(formatUkrainePhone(e.target.value))}
-                style={{
-                  ...getSolidInputStyle(true, false),
-                  flex: '1 1 180px',
-                  padding: '9px 12px',
-                  fontSize: '13px',
-                }}
-              />
-              <button
-                type="button"
-                disabled={archiveLoading}
-                onClick={handleSyncArchiveByPhone}
-                style={{
-                  backgroundColor: THEME.primaryBtnBg,
-                  color: THEME.primaryBtnText,
-                  border: 'none',
-                  padding: '10px 14px',
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  letterSpacing: '0.8px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {archiveLoading ? t.archiveSyncing : t.archiveSyncBtn}
-              </button>
-            </div>
-          </div>
+          {/* Защищенный двухфакторный блок верификации через 4-значный код в Telegram */}
+          <TelegramOtpAuthBox
+            lang={safeLang}
+            clientPhone={clientPhone}
+            onPhoneChange={setClientPhone}
+            formatPhoneFn={formatUkrainePhone}
+            onOrdersLoaded={(merged) => setArchivedOrders(merged)}
+            onHaptic={(lvl) => triggerHaptic(lvl || 'light')}
+            theme={THEME}
+          />
 
           {archivedOrders.length === 0 ? (
             <div
