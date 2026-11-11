@@ -1,17 +1,8 @@
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
- * и модуль прямого сохранения и встроенного просмотра файла на телефоне (iOS + Android).
- *
- * ЧТО ИСПРАВЛЕНО В ЭТОЙ ВЕРСИИ:
- * 1. УНИКАЛЬНОЕ ИМЯ ФАЙЛА ДЛЯ ANDROID: Добавляется короткий штамп времени к имени файла
- *    при каждом скачивании, чтобы загрузчик Android / Telegram не блокировал повторную
- *    загрузку из-за конфликта с уже существующим файлом в папке «Загрузки».
- * 2. ЗАЩИТА ОТ БЛОКИРОВКИ `tg.downloadFile`: Обрабатывается колбэк `(accepted)` и перехватывается
- *    ошибка `WebAppDownloadFileAlreadyActive` с мгновенным переключением на прямую загрузку.
- * 3. МГНОВЕННЫЙ ВСТРОЕННЫЙ ПРОСМОТР (`previewPages`): Сохраняются готовые листы А4 для
- *    открытия каталога прямо внутри приложения без зависимости от сторонних PDF-ридеров.
- * 4. ОБЛОЖКА `/baner1.png`, НЕОБРЕЗАЕМЫЕ НОМЕРА МОДЕЛЕЙ (`multiply`) И ВОДЯНОЙ ЗНАК.
+ * стандарта PDF 1.7 с интерактивными закладками (Outlines), кликабельными ссылками (Instagram, Tel)
+ * и модулем прямого сохранения на мобильных устройствах (iOS + Android).
  */
 
 import {
@@ -20,7 +11,7 @@ import {
   getLocalizedFeature,
 } from '../../data/catalog';
 import type { FullCatalogPriceItem, SeasonKey } from './wholesaleData';
-import { getPdfLookbookText, type WholesaleLang } from './wholesaleThemeAndI18n';
+import type { WholesaleLang } from './wholesaleThemeAndI18n';
 
 /** Стадии жизненного цикла генерации PDF для отображения прогресса в UI */
 export type PdfStage = 'idle' | 'rendering_pages' | 'packaging_and_uploading';
@@ -60,20 +51,20 @@ export function getTgWebApp(): TgWebAppExtended | undefined {
 }
 
 /**
- * Извлекает Telegram ID партнёра и формирует персональный B2B-код для водяных знаков в PDF.
+ * Извлекает Telegram ID партнёра и формирует персональный идентификатор клиента.
  */
-export function getTelegramUserInfo(): { id?: number; partnerCode: string } {
+export function getTelegramUserInfo(): { id?: number; clientCode: string } {
   try {
     const u = getTgWebApp()?.initDataUnsafe?.user;
     if (u?.id) {
       return {
         id: u.id,
-        partnerCode: `B2B-${u.id}`,
+        clientCode: `CLIENT-${u.id}`,
       };
     }
   } catch {}
   return {
-    partnerCode: 'B2B-OFFICIAL',
+    clientCode: 'CARDIO-OFFICIAL',
   };
 }
 
@@ -91,9 +82,8 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * Автоматически находит границы объекта (обуви или 3D-логотипа), отсекает лишние пустые поля
- * и оставляет чисто белый фон вокруг объекта, чтобы при наложении через `multiply`
- * изображение никогда не перекрывало фоновую типографику и номера моделей.
+ * Автоматически находит границы объекта (обуви), отсекает лишние пустые поля
+ * и оставляет чистый белый фон вокруг объекта для бесшовного наложения через `multiply`.
  */
 function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   const srcW = img.naturalWidth || img.width || 800;
@@ -156,13 +146,13 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
 }
 
 /**
- * Отрисовывает фирменный защитный водяной знак CARDIO B2B по диагонали страницы.
+ * Отрисовывает фирменный защитный водяной знак CARDIO по диагонали страницы.
  */
 function drawEditorialWatermark(
   ctx: CanvasRenderingContext2D,
   W: number,
   H: number,
-  partnerCode: string,
+  clientCode: string,
   modelNumber?: string
 ) {
   ctx.save();
@@ -172,7 +162,7 @@ function drawEditorialWatermark(
 
   ctx.fillStyle = 'rgba(23, 23, 23, 0.038)';
   ctx.font = '700 44px "Inter", "Helvetica Neue", Arial, sans-serif';
-  const wmLine = `CARDIO FOOTWEAR   ·   ${partnerCode}   ·   WHOLESALE 2026`;
+  const wmLine = `CARDIO FOOTWEAR   ·   ${clientCode}   ·   LOOKBOOK 2026`;
 
   ctx.fillText(wmLine, 0, -290);
   ctx.fillText(wmLine, 0, 10);
@@ -221,14 +211,125 @@ function drawWrappedText(
 }
 
 /**
- * Низкоуровневый сборщик бинарного файла формата PDF 1.4 из массива JPEG DataURL.
+ * Получение локализованных текстов лукбука без упоминания B2B и коробов.
+ */
+function getEditorialText(lang: WholesaleLang) {
+  switch (lang) {
+    case 'uk':
+      return {
+        edition: 'ОФІЦІЙНИЙ КАТАЛОГ 2026',
+        overviewTitle: 'Філософія бездоганного стилю',
+        manifestoLead:
+          'Кожна пара в нашій колекції — це результат синергії інженерної точності, ручної роботи та безкомпромісного відбору натуральних матеріалів українського виробництва.',
+        manifestoBody:
+          'Ми створюємо взуття для тих, хто обирає довговічність, статусний зовнішній дизайн та абсолютний комфорт у кожному русі. Власні виробничі потужності в Харкові гарантують контроль якості на кожному етапі.',
+        tocTitle: 'ЗМІСТ КАТАЛОГУ',
+        tocAutumn: 'Колекція "Осінь 2026"',
+        tocWinter: 'Колекція "Зима 2026"',
+        tocContacts: 'Контакти та замовлення',
+        seasonAutumnLabel: 'КОЛЕКЦІЯ ОСІНЬ 2026',
+        seasonWinterLabel: 'КОЛЕКЦІЯ ЗИМА 2026',
+        autumnChapter: 'РОЗДІЛ І  ·  СЕЗОН ОСІНЬ',
+        winterChapter: 'РОЗДІЛ ІІ  ·  СЕЗОН ЗИМА',
+        autumnSub: 'Демісезонна лінійка з натуральної шкіри та нубуку',
+        winterSub: 'Утеплені моделі на натуральній вовні',
+        modelLabel: 'МОДЕЛЬНИЙ РЯД',
+        priceLabel: 'РОЗДРІБНА ЦІНА',
+        colorMaterialLabel: 'КОЛІР ТА МАТЕРІАЛ',
+        sizeRangeLabel: 'РОЗМІРНА СІТКА',
+        fullSizeScale: 'Повна повнота (40—45)',
+        naturalLeather: '100% Натуральна шкіра / єврозима',
+        contactsPageSub: 'ЗВ`ЯЗОК З ВИРОБНИКОМ ТА ЗАМОВЛЕННЯ',
+        contactsPageTitle: 'Контакти та підтримка',
+        managerRole: 'ПРЕМІУМ-КОНСУЛЬТАНТ ФАБРИКИ',
+        georgiyName: 'Георгій',
+        borisName: 'Борис',
+        instagramLabel: 'Instagram: @cardio_shoes',
+        shippingNote:
+          'Швидка доставка замовлень по всій Україні та за кордон. Гарантія якості від виробника.',
+      };
+    case 'de':
+      return {
+        edition: 'OFFIZIELLER KATALOG 2026',
+        overviewTitle: 'Philosophie des kompromisslosen Stils',
+        manifestoLead:
+          'Jedes Paar unserer Kollektion ist das Ergebnis ingenieurtechnischer Präzision, handwerklicher Perfektion und handverlesener Naturmaterialien.',
+        manifestoBody:
+          'Wir fertigen Schuhe für Menschen, die Wert auf Langlebigkeit, markantes Design und absoluten Tragekomfort legen. Unsere eigene Produktion in Charkiw garantiert höchste Qualitätsstandards.',
+        tocTitle: 'INHALTSVERZEICHNIS',
+        tocAutumn: 'Kollektion "Herbst 2026"',
+        tocWinter: 'Kollektion "Winter 2026"',
+        tocContacts: 'Kontakte & Bestellung',
+        seasonAutumnLabel: 'HERBST-KOLLEKTION 2026',
+        seasonWinterLabel: 'WINTER-KOLLEKTION 2026',
+        autumnChapter: 'KAPITEL I  ·  HERBST',
+        winterChapter: 'KAPITEL II  ·  WINTER',
+        autumnSub: 'Demisaison-Modelle aus echtem Leder und Nubuk',
+        winterSub: 'Gefütterte Modelle mit Naturwolle',
+        modelLabel: 'MODELLNUMMER',
+        priceLabel: 'PREIS PRO PAAR',
+        colorMaterialLabel: 'FARBE & MATERIAL',
+        sizeRangeLabel: 'GRÖSSENBEREICH',
+        fullSizeScale: 'Vollständige Skala (40—45)',
+        naturalLeather: '100% Echtes Leder',
+        contactsPageSub: 'DIREKTVERBINDUNG ZUR HERSTELLUNG',
+        contactsPageTitle: 'Kontakte & Support',
+        managerRole: 'WERKSBERATER',
+        georgiyName: 'Georgiy',
+        borisName: 'Boris',
+        instagramLabel: 'Instagram: @cardio_shoes',
+        shippingNote:
+          'Schneller Versand in der Ukraine und international. Herstellergarantie.',
+      };
+    case 'ru':
+    default:
+      return {
+        edition: 'ОФИЦИАЛЬНЫЙ КАТАЛОГ 2026',
+        overviewTitle: 'Философия безупречного стиля',
+        manifestoLead:
+          'Каждая пара в нашей коллекции — это результат синергии инженерной точности, ручной работы и бескомпромиссного отбора натуральных материалов.',
+        manifestoBody:
+          'Мы создаем обувь для тех, кто выбирает долговечность, статусный внешний дизайн и абсолютный комфорт в каждом движении. Собственные производственные мощности в Харькове гарантируют контроль качества на каждом этапе.',
+        tocTitle: 'СОДЕРЖАНИЕ КАТАЛОГА',
+        tocAutumn: 'Коллекция "Осень 2026"',
+        tocWinter: 'Коллекция "Зима 2026"',
+        tocContacts: 'Контакты и заказ',
+        seasonAutumnLabel: 'КОЛЛЕКЦИЯ ОСЕНЬ 2026',
+        seasonWinterLabel: 'КОЛЛЕКЦИЯ ЗИМА 2026',
+        autumnChapter: 'РАЗДЕЛ I  ·  СЕЗОН ОСЕНЬ',
+        winterChapter: 'РАЗДЕЛ II  ·  СЕЗОН ЗИМА',
+        autumnSub: 'Демисезонная линейка из натуральной кожи и нубука',
+        winterSub: 'Утепленные модели на натуральной шерсти',
+        modelLabel: 'МОДЕЛЬНЫЙ РЯД',
+        priceLabel: 'ЦЕНА ЗА ПАРУ',
+        colorMaterialLabel: 'ЦВЕТ И МАТЕРИАЛ',
+        sizeRangeLabel: 'РАЗМЕРНАЯ СЕТКА',
+        fullSizeScale: 'Полная полнота (40—45)',
+        naturalLeather: '100% Натуральная кожа / еврозима',
+        contactsPageSub: 'СВЯЗЬ С ПРОИЗВОДИТЕЛЕМ И ЗАКАЗ',
+        contactsPageTitle: 'Контакты и поддержка',
+        managerRole: 'ПРЕМИУМ-КОНСУЛЬТАНТ ФАБРИКИ',
+        georgiyName: 'Георгий',
+        borisName: 'Борис',
+        instagramLabel: 'Instagram: @cardio_shoes',
+        shippingNote:
+          'Быстрая доставка заказов по всей Украине и за рубеж. Гарантия качества от производителя.',
+      };
+  }
+}
+
+/**
+ * Низкоуровневый сборщик бинарного файла формата PDF 1.7
+ * с поддержкой интерактивных закладок (Outlines), метаданных (/Info) и ссылок (/Annots).
  */
 function buildPdfBytesFromJpegPages(
   jpegDataUrls: string[],
   imgW: number,
   imgH: number,
   pageWidthPt = 595.28,
-  pageHeightPt = 841.89
+  pageHeightPt = 841.89,
+  outlines?: Array<{ title: string; pageIndex: number }>,
+  pageAnnotations?: Map<number, Array<{ rect: [number, number, number, number]; uri: string }>>
 ): Uint8Array {
   const encoder = new TextEncoder();
   const chunks: Uint8Array[] = [];
@@ -256,27 +357,109 @@ function buildPdfBytesFromJpegPages(
   };
 
   const pageCount = jpegDataUrls.length;
-  const pageIds: number[] = [];
+  
+  // Объектные идентификаторы:
+  // 1: Catalog
+  // 2: Pages Root
+  // 3: Info Dictionary
+  // 4: Outlines Root (если есть)
+  // 5+: Outline items, pages, content streams, XObjects, annotations
+  
+  let nextObjId = 5;
+  const pageObjIds: number[] = [];
+  const contentObjIds: number[] = [];
+  const imgObjIds: number[] = [];
+  const annotListObjIds: (number | null)[] = [];
+  const annotItemObjIds: number[][] = [];
+
   for (let i = 0; i < pageCount; i++) {
-    pageIds.push(3 + i * 3);
+    pageObjIds.push(nextObjId++);
+    contentObjIds.push(nextObjId++);
+    imgObjIds.push(nextObjId++);
+
+    const annots = pageAnnotations?.get(i);
+    if (annots && annots.length > 0) {
+      annotListObjIds.push(nextObjId++);
+      const itemIds: number[] = [];
+      for (let a = 0; a < annots.length; a++) {
+        itemIds.push(nextObjId++);
+      }
+      annotItemObjIds.push(itemIds);
+    } else {
+      annotListObjIds.push(null);
+      annotItemObjIds.push([]);
+    }
   }
 
-  pushStr('%PDF-1.4\n');
+  // Outlines objects setup
+  const outlineRootId = outlines && outlines.length > 0 ? nextObjId++ : null;
+  const outlineItemIds: number[] = [];
+  if (outlines && outlines.length > 0) {
+    for (let o = 0; o < outlines.length; o++) {
+      outlineItemIds.push(nextObjId++);
+    }
+  }
 
+  pushStr('%PDF-1.7\n%âãÏÓ\n');
+
+  // Obj 1: Catalog
   startObj(1);
-  pushStr('<< /Type /Catalog /Pages 2 0 R >>');
+  let catalogDict = `<< /Type /Catalog /Pages 2 0 R`;
+  if (outlineRootId !== null) {
+    catalogDict += ` /Outlines ${outlineRootId} 0 R`;
+  }
+  catalogDict += ` >>`;
+  pushStr(catalogDict);
   endObj();
 
+  // Obj 2: Pages
   startObj(2);
   pushStr(
-    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`
+    `<< /Type /Pages /Kids [${pageObjIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`
   );
   endObj();
 
+  // Obj 3: Info Metadata
+  startObj(3);
+  pushStr(
+    `<< /Title (CARDIO FOOTWEAR - Official Lookbook 2026) /Author (CARDIO Manufacturing) /Subject (Exclusive Footwear Collection) /Creator (CARDIO PDF Engine) /Producer (PDF 1.7 Generator) >>`
+  );
+  endObj();
+
+  // Obj 4: Outlines Root (если есть)
+  if (outlineRootId !== null && outlines) {
+    startObj(outlineRootId);
+    pushStr(
+      `<< /Type /Outlines /First ${outlineItemIds[0]} 0 R /Last ${outlineItemIds[outlineItemIds.length - 1]} 0 R /Count ${outlines.length} >>`
+    );
+    endObj();
+
+    // Outline items
+    for (let o = 0; o < outlines.length; o++) {
+      const item = outlines[o];
+      const itemId = outlineItemIds[o];
+      const prevId = o > 0 ? outlineItemIds[o - 1] : null;
+      const nextId = o < outlines.length - 1 ? outlineItemIds[o + 1] : null;
+      const targetPageObjId = pageObjIds[item.pageIndex] || pageObjIds[0];
+
+      let itemDict = `<< /Title (${item.title}) /Parent ${outlineRootId} 0 R`;
+      if (prevId !== null) itemDict += ` /Prev ${prevId} 0 R`;
+      if (nextId !== null) itemDict += ` /Next ${nextId} 0 R`;
+      itemDict += ` /Dest [${targetPageObjId} 0 R /XYZ null null null] >>`;
+
+      startObj(itemId);
+      pushStr(itemDict);
+      endObj();
+    }
+  }
+
+  // Запись страниц, потоков контента, картинок и аннотаций
   for (let i = 0; i < pageCount; i++) {
-    const pageObjId = 3 + i * 3;
-    const contentObjId = pageObjId + 1;
-    const imgObjId = pageObjId + 2;
+    const pageObjId = pageObjIds[i];
+    const contentObjId = contentObjIds[i];
+    const imgObjId = imgObjIds[i];
+    const annotListId = annotListObjIds[i];
+    const itemIds = annotItemObjIds[i];
 
     const base64 = jpegDataUrls[i].split(',')[1] || '';
     const binaryStr = atob(base64);
@@ -287,17 +470,23 @@ function buildPdfBytesFromJpegPages(
 
     const contentStream = `q\n${pageWidthPt.toFixed(2)} 0 0 ${pageHeightPt.toFixed(2)} 0 0 cm\n/Im${i} Do\nQ`;
 
+    // Page Object
     startObj(pageObjId);
-    pushStr(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt.toFixed(2)} ${pageHeightPt.toFixed(2)}] ` +
-        `/Resources << /XObject << /Im${i} ${imgObjId} 0 R >> >> /Contents ${contentObjId} 0 R >>`
-    );
+    let pageDict = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt.toFixed(2)} ${pageHeightPt.toFixed(2)}] ` +
+      `/Resources << /XObject << /Im${i} ${imgObjId} 0 R >> >> /Contents ${contentObjId} 0 R`;
+    if (annotListId !== null) {
+      pageDict += ` /Annots ${annotListId} 0 R`;
+    }
+    pageDict += ` >>`;
+    pushStr(pageDict);
     endObj();
 
+    // Content Stream
     startObj(contentObjId);
     pushStr(`<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream`);
     endObj();
 
+    // Image XObject
     startObj(imgObjId);
     pushStr(
       `<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB ` +
@@ -306,9 +495,26 @@ function buildPdfBytesFromJpegPages(
     pushBytes(imgBytes);
     pushStr('\nendstream');
     endObj();
+
+    // Annotation List & Items
+    const annots = pageAnnotations?.get(i);
+    if (annotListId !== null && annots && itemIds.length === annots.length) {
+      startObj(annotListId);
+      pushStr(`[${itemIds.map((id) => `${id} 0 R`).join(' ')}]`);
+      endObj();
+
+      for (let a = 0; a < annots.length; a++) {
+        const ann = annots[a];
+        startObj(itemIds[a]);
+        pushStr(
+          `<< /Type /Annot /Subtype /Link /Rect [${ann.rect.join(' ')}] /Border [0 0 0] /A << /S /URI /URI (${ann.uri}) >> >>`
+        );
+        endObj();
+      }
+    }
   }
 
-  const totalObjects = 3 + pageCount * 3;
+  const totalObjects = nextObjId;
   const xrefOffset = currentOffset;
   pushStr(`xref\n0 ${totalObjects}\n0000000000 65535 f \n`);
   for (let id = 1; id < totalObjects; id++) {
@@ -316,7 +522,7 @@ function buildPdfBytesFromJpegPages(
     pushStr(`${off} 00000 n \n`);
   }
   pushStr(
-    `trailer\n<< /Size ${totalObjects} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+    `trailer\n<< /Size ${totalObjects} /Root 1 0 R /Info 3 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
   );
 
   const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
@@ -360,13 +566,7 @@ function triggerAnchorDownload(url: string, fileName: string): void {
 }
 
 /**
- * Безотказное сохранение готового PDF-файла с жёстким разделением iOS и Android:
- *
- * 1. ТОЛЬКО iOS (iPhone / iPad): вызывается системное меню `navigator.share({ files })`,
- *    которое сохраняет `localBlob` напрямую из памяти телефона.
- * 2. ANDROID: формируется уникальное имя файла (чтобы Android DownloadManager не блокировал
- *    повторное скачивание существующего файла), вызывается `tg.downloadFile` с колбэком
- *    и страховкой через прямую ссылку.
+ * Сохранение готового PDF-файла с разделением iOS и Android:
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -382,11 +582,9 @@ export async function triggerPdfDownload(status: {
       navigator.platform === 'MacIntel' &&
       navigator.maxTouchPoints > 1);
 
-  // Формируем уникальное имя файла для каждого скачивания (защита от блокировки дубликатов на Android)
   const stamp = String(Date.now()).slice(-4);
   const uniqueFileName = status.fileName.replace(/\.pdf$/i, '') + `_${stamp}.pdf`;
 
-  // 1. ТОЛЬКО ДЛЯ iPHONE / iPAD (iOS): сохранение из памяти через системную шторку
   if (isIOS && !isAndroid && status.localBlob) {
     try {
       const file = new File([status.localBlob], status.fileName, {
@@ -412,7 +610,6 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // 2. ДЛЯ ANDROID И TELEGRAM: скачивание по HTTPS с уникальным именем и анти-кэш меткой
   if (status.downloadUrl) {
     const baseFullUrl = status.downloadUrl.startsWith('http')
       ? status.downloadUrl
@@ -435,7 +632,6 @@ export async function triggerPdfDownload(status: {
         );
         return;
       } catch {
-        // Если Telegram выбросил WebAppDownloadFileAlreadyActive — качаем напрямую через <a>
         if (isAndroid) {
           triggerAnchorDownload(freshUrl, uniqueFileName);
           return;
@@ -449,7 +645,6 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // 3. Fallback для ПК (Desktop) и резервный канал через локальный Blob
   if (status.localBlob) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
@@ -466,15 +661,16 @@ export interface GenerateLookbookParams {
   allCatalogItems: FullCatalogPriceItem[];
   autumnItems: FullCatalogPriceItem[];
   winterItems: FullCatalogPriceItem[];
-  tgUser: { id?: number; partnerCode: string };
+  tgUser: { id?: number; clientCode?: string; partnerCode?: string };
   securityNote: string;
   onStageChange: (stage: PdfStage) => void;
   onPageProgress: (currentPage: number, totalPages: number) => void;
 }
 
 /**
- * Главная функция-оркестратор: верстает все страницы каталога на Canvas,
- * упаковывает их в PDF, отправляет копию в Telegram-чат и возвращает готовые страницы.
+ * Главная функция-оркестратор: верстает страницы каталога на Canvas,
+ * упаковывает в PDF 1.7 с интерактивными закладками и ссылками,
+ * отправляет копию в Telegram и возвращает превью.
  */
 export async function generateAndDeliverLookbookPdf(
   params: GenerateLookbookParams
@@ -489,6 +685,9 @@ export async function generateAndDeliverLookbookPdf(
     onStageChange,
     onPageProgress,
   } = params;
+
+  const clientCode = tgUser.clientCode || tgUser.partnerCode || 'CARDIO-OFFICIAL';
+  const pdfT = getEditorialText(lang);
 
   const VIRTUAL_W = 1240;
   const VIRTUAL_H = 1754;
@@ -519,31 +718,44 @@ export async function generateAndDeliverLookbookPdf(
 
   const pagePlan: PageDescriptor[] = [{ type: 'cover' }, { type: 'manifesto' }];
 
+  // Для закладок (Outlines)
+  const outlinesList: Array<{ title: string; pageIndex: number }> = [
+    { title: 'Обложка', pageIndex: 0 },
+    { title: 'Манифест и Оглавление', pageIndex: 1 },
+  ];
+
   let globalProdIdx = 1;
+  let autumnDividerIndex = -1;
+  let winterDividerIndex = -1;
+
   if (includeAutumn && autumnItems.length > 0) {
+    autumnDividerIndex = pagePlan.length;
     pagePlan.push({ type: 'divider', season: 'autumn', count: autumnItems.length });
+    outlinesList.push({ title: 'Осенняя коллекция 2026', pageIndex: autumnDividerIndex });
     for (const item of autumnItems) {
       pagePlan.push({ type: 'product', item, indexInCatalog: globalProdIdx++ });
     }
   }
   if (includeWinter && winterItems.length > 0) {
+    winterDividerIndex = pagePlan.length;
     pagePlan.push({ type: 'divider', season: 'winter', count: winterItems.length });
+    outlinesList.push({ title: 'Зимняя коллекция 2026', pageIndex: winterDividerIndex });
     for (const item of winterItems) {
       pagePlan.push({ type: 'product', item, indexInCatalog: globalProdIdx++ });
     }
   }
+  
+  const contactsPageIndex = pagePlan.length;
   pagePlan.push({ type: 'contacts' });
+  outlinesList.push({ title: 'Контакты и заказ', pageIndex: contactsPageIndex });
 
   const totalPages = pagePlan.length;
   onPageProgress(1, totalPages);
   onStageChange('rendering_pages');
 
   const logoImg = await loadImageElement('/logo.png');
-  const coverBannerRaw =
-    (await loadImageElement('/baner1.png')) || logoImg;
-  const coverBannerCropped = coverBannerRaw
-    ? prepareSeamlessShoeCanvas(coverBannerRaw)
-    : null;
+  const coverBannerRaw = (await loadImageElement('/baner1.png')) || logoImg;
+  const coverBannerCropped = coverBannerRaw ? prepareSeamlessShoeCanvas(coverBannerRaw) : null;
 
   const coverSloganLocal = {
     ru: 'ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ.',
@@ -551,8 +763,8 @@ export async function generateAndDeliverLookbookPdf(
     de: 'EINEN SCHRITT VORAUS. CHARAKTER IN JEDEM PAAR.',
   }[lang];
 
-  const pdfT = getPdfLookbookText(lang);
   const jpegPages: string[] = [];
+  const pageAnnotations = new Map<number, Array<{ rect: [number, number, number, number]; uri: string }>>();
 
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     onPageProgress(pageIdx + 1, totalPages);
@@ -574,7 +786,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
-      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
+      drawEditorialWatermark(ctx, W, H, clientCode);
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -583,7 +795,7 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GREY;
       ctx.textAlign = 'right';
-      ctx.fillText(`KHARKIV  ·  ${tgUser.partnerCode}`, W - PAD, 76);
+      ctx.fillText(`KHARKIV  ·  LOOKBOOK 2026`, W - PAD, 76);
 
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 2;
@@ -664,7 +876,7 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 54px "Playfair Display", Georgia, serif';
-      ctx.fillText('WHOLESALE COLLECTION 2026', PAD, bottomBlockY + 118);
+      ctx.fillText('OFFICIAL LOOKBOOK 2026', PAD, bottomBlockY + 118);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
@@ -676,7 +888,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = GREY;
       ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('B2B PARTNER CATALOG  ·  FACTORY DIRECT PRICING', PAD, H - 78);
+      ctx.fillText('DIRECT FACTORY COLLECTION  ·  EDITION 2026', PAD, H - 78);
 
       ctx.textAlign = 'right';
       ctx.fillText(pageNumStr, W - PAD, H - 78);
@@ -684,7 +896,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
-      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
+      drawEditorialWatermark(ctx, W, H, clientCode);
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -735,9 +947,9 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillText(`02 // ${pdfT.tocTitle}`, PAD, tocY + 52);
 
       const tocRows = [
-        { title: pdfT.tocAutumn, meta: `${autumnItems.length} MODELS  ·  $34—$39` },
-        { title: pdfT.tocWinter, meta: `${winterItems.length} MODELS  ·  $41—$49` },
-        { title: pdfT.tocContacts, meta: 'KHARKIV B2B' },
+        { title: pdfT.tocAutumn, meta: `${autumnItems.length} MODELS` },
+        { title: pdfT.tocWinter, meta: `${winterItems.length} MODELS` },
+        { title: pdfT.tocContacts, meta: 'KHARKIV DIRECT' },
       ];
 
       tocRows.forEach((row, idx) => {
@@ -764,7 +976,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = METALLIC;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`03 // ${pdfT.boxStandardsTitle}`, PAD, boxSecY);
+      ctx.fillText(`03 // BRAND STANDARDS`, PAD, boxSecY);
 
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.5;
@@ -772,11 +984,11 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.box8Title, PAD + 32, boxSecY + 92);
+      ctx.fillText('100% NATURAL MATERIALS & MEMORY COMFORT', PAD + 32, boxSecY + 92);
 
       ctx.fillStyle = GREY;
       ctx.font = '400 22px "Playfair Display", Georgia, serif';
-      ctx.fillText(pdfT.box8Formula, PAD + 32, boxSecY + 150);
+      ctx.fillText('Selected Italian and Ukrainian leather, reinforced soles.', PAD + 32, boxSecY + 150);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1.5;
@@ -784,11 +996,11 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.box6Title, PAD + 32, boxSecY + 296);
+      ctx.fillText('FULL SIZE RANGE & ORTHOPEDIC FIT', PAD + 32, boxSecY + 296);
 
       ctx.fillStyle = GREY;
       ctx.font = '400 22px "Playfair Display", Georgia, serif';
-      ctx.fillText(pdfT.box6Formula, PAD + 32, boxSecY + 354);
+      ctx.fillText('Full size scale from 40 to 45 with ergonomic instep support.', PAD + 32, boxSecY + 354);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
@@ -800,7 +1012,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = GREY;
       ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  WHOLESALE COLLECTION 2026', PAD, H - 76);
+      ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026', PAD, H - 76);
 
       ctx.textAlign = 'right';
       ctx.fillText(
@@ -815,7 +1027,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = GREY;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR // WHOLESALE 2026', PAD, 76);
+      ctx.fillText('CARDIO FOOTWEAR // LOOKBOOK 2026', PAD, 76);
 
       ctx.textAlign = 'right';
       ctx.fillText(pageNumStr, W - PAD, 76);
@@ -855,7 +1067,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = GREY;
       ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${pageDesc.count} MODELS IN SECTION`, PAD, H - 78);
+      ctx.fillText(`${pageDesc.count} MODELS FEATURED`, PAD, H - 78);
 
       ctx.textAlign = 'right';
       ctx.fillText('SIZES 40—45', W - PAD, H - 78);
@@ -868,7 +1080,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
-      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode, shoe.modelNumber);
+      drawEditorialWatermark(ctx, W, H, clientCode, shoe.modelNumber);
 
       if (logoImg) {
         const lH = 30;
@@ -958,7 +1170,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillText(pdfT.modelLabel, PAD, specTopY + 38);
 
       ctx.textAlign = 'right';
-      ctx.fillText(pdfT.wholesalePriceLabel, W - PAD, specTopY + 38);
+      ctx.fillText(pdfT.priceLabel, W - PAD, specTopY + 38);
 
       const variantTitle = shoe.variant ? `  ·  ${shoe.variant}` : '';
       ctx.fillStyle = GRAPHITE;
@@ -980,19 +1192,15 @@ export async function generateAndDeliverLookbookPdf(
       ctx.stroke();
 
       const col1X = PAD;
-      const col2X = PAD + 340;
-      const col3X = PAD + 565;
-      const col4X = PAD + 825;
+      const col2X = PAD + 420;
       const matrixBottomY = matrixTopY + 168;
 
-      [col2X - 24, col3X - 24, col4X - 24].forEach((divX) => {
-        ctx.strokeStyle = RULE;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(divX, matrixTopY + 22);
-        ctx.lineTo(divX, matrixBottomY - 22);
-        ctx.stroke();
-      });
+      ctx.strokeStyle = RULE;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(col2X - 40, matrixTopY + 22);
+      ctx.lineTo(col2X - 40, matrixBottomY - 22);
+      ctx.stroke();
 
       ctx.textAlign = 'left';
       ctx.fillStyle = GREY;
@@ -1005,45 +1213,20 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GREY;
       ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
-      const featLine =
-        featuresUpper.length > 0 ? featuresUpper.join('  ·  ') : pdfT.naturalLeather;
-      ctx.fillText(featLine.slice(0, 32), col1X, matrixTopY + 122);
+      const featLine = featuresUpper.length > 0 ? featuresUpper.join('  ·  ') : pdfT.naturalLeather;
+      ctx.fillText(featLine.slice(0, 52), col1X, matrixTopY + 122);
 
       ctx.fillStyle = GREY;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(pdfT.sizeRangeLabel, col2X, matrixTopY + 42);
 
       ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 26px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText('40 — 45', col2X, matrixTopY + 86);
+      ctx.font = '700 32px "Playfair Display", Georgia, serif';
+      ctx.fillText('40 — 45', col2X, matrixTopY + 88);
 
       ctx.fillStyle = GREY;
       ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(pdfT.fullSizeScale, col2X, matrixTopY + 122);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.box6Label, col3X, matrixTopY + 42);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 34px "Playfair Display", Georgia, serif';
-      ctx.fillText(`$${priceUsd * 6}`, col3X, matrixTopY + 90);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.box6Sub, col3X, matrixTopY + 122);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.box8Label, col4X, matrixTopY + 42);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 34px "Playfair Display", Georgia, serif';
-      ctx.fillText(`$${priceUsd * 8}`, col4X, matrixTopY + 90);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 14px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.box8Sub, col4X, matrixTopY + 122);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
@@ -1056,7 +1239,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.font = '500 13px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(
-        `CARDIO FOOTWEAR  ·  WHOLESALE 2026  ·  ${tgUser.partnerCode}`,
+        `CARDIO FOOTWEAR  ·  LOOKBOOK 2026  ·  ${clientCode}`,
         PAD,
         H - 72
       );
@@ -1071,7 +1254,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
-      drawEditorialWatermark(ctx, W, H, tgUser.partnerCode);
+      drawEditorialWatermark(ctx, W, H, clientCode);
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -1112,65 +1295,104 @@ export async function generateAndDeliverLookbookPdf(
       ctx.stroke();
 
       const contactsList = [
-        { name: pdfT.georgiyName, phone: '+38 (067) 719-37-16' },
-        { name: pdfT.borisName, phone: '+38 (097) 454-15-11' },
+        { name: pdfT.georgiyName, phone: '+38 (067) 719-37-16', telUri: 'tel:+380677193716' },
+        { name: pdfT.borisName, phone: '+38 (097) 454-15-11', telUri: 'tel:+380974541511' },
       ];
 
+      const pageAnnotsList: Array<{ rect: [number, number, number, number]; uri: string }> = [];
+
       contactsList.forEach((c, idx) => {
-        const cY = 510 + idx * 250;
+        const cY = 510 + idx * 220;
         ctx.strokeStyle = GRAPHITE;
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(PAD, cY, CONTENT_W, 200);
+        ctx.strokeRect(PAD, cY, CONTENT_W, 180);
 
         ctx.fillStyle = GREY;
         ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(pdfT.managerRole, PAD + 40, cY + 56);
+        ctx.fillText(pdfT.managerRole, PAD + 40, cY + 52);
 
         ctx.fillStyle = GRAPHITE;
-        ctx.font = '400 40px "Playfair Display", Georgia, serif';
+        ctx.font = '400 38px "Playfair Display", Georgia, serif';
         ctx.fillText(c.name, PAD + 40, cY + 115);
 
-        ctx.fillStyle = GRAPHITE;
-        ctx.font = '700 30px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillStyle = '#1D4ED8'; // Кликабельный синий цвет для телефона
+        ctx.font = '700 28px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(c.phone, W - PAD - 40, cY + 112);
+
+        // Добавляем PDF Annotation для телефона (конвертация координат Canvas в PDF points)
+        const boxX1 = (W - PAD - 40 - 240) * (595.28 / W);
+        const boxY1 = 841.89 - ((cY + 140) * (841.89 / H));
+        const boxX2 = (W - PAD - 40) * (595.28 / W);
+        const boxY2 = 841.89 - ((cY + 70) * (841.89 / H));
+        pageAnnotsList.push({ rect: [boxX1, boxY1, boxX2, boxY2], uri: c.telUri });
       });
+
+      // Блок Instagram ссылки
+      const igBoxY = 970;
+      ctx.strokeStyle = METALLIC;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(PAD, igBoxY, CONTENT_W, 100);
+
+      ctx.fillStyle = '#E1306C'; // Фирменный цвет Instagram
+      ctx.font = '700 24px "Inter", "Helvetica Neue", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(pdfT.instagramLabel, W / 2, igBoxY + 60);
+
+      const igX1 = (PAD + CONTENT_W / 2 - 200) * (595.28 / W);
+      const igY1 = 841.89 - ((igBoxY + 90) * (841.89 / H));
+      const igX2 = (PAD + CONTENT_W / 2 + 200) * (595.28 / W);
+      const igY2 = 841.89 - ((igBoxY + 10) * (841.89 / H));
+      pageAnnotsList.push({ rect: [igX1, igY1, igX2, igY2], uri: 'https://instagram.com/cardio_shoes' });
+
+      if (pageAnnotsList.length > 0) {
+        pageAnnotations.set(pageIdx, pageAnnotsList);
+      }
 
       ctx.fillStyle = GREY;
       ctx.font = '400 20px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      drawWrappedText(ctx, pdfT.shippingNote, PAD, 1080, CONTENT_W, 34);
+      drawWrappedText(ctx, pdfT.shippingNote, PAD, 1120, CONTENT_W, 34);
 
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(PAD, H - 140);
-      ctx.lineTo(W - PAD, H - 140);
+      ctx.moveTo(PAD, H - 110);
+      ctx.lineTo(W - PAD, H - 110);
       ctx.stroke();
 
       ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 28px "Playfair Display", Georgia, serif';
+      ctx.font = '400 26px "Playfair Display", Georgia, serif';
       ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  2026', PAD, H - 82);
+      ctx.fillText('CARDIO FOOTWEAR  ·  2026', PAD, H - 65);
 
       ctx.fillStyle = GREY;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 82);
+      ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 65);
     }
 
     ctx.restore();
-    jpegPages.push(canvas.toDataURL('image/jpeg', 0.72));
+    jpegPages.push(canvas.toDataURL('image/jpeg', 0.75));
   }
 
   // =======================================================================
-  // ФАЗА 2: УПАКОВКА БИНАРНОГО PDF И ОТПРАВКА В TELEGRAM-БОТ
+  // ФАЗА 2: СБОРКА PDF 1.7 И ДОСТАВКА
   // =======================================================================
   onStageChange('packaging_and_uploading');
   await new Promise((r) => setTimeout(r, 80));
 
-  const pdfBytes = buildPdfBytesFromJpegPages(jpegPages, OUT_W, OUT_H);
+  const pdfBytes = buildPdfBytesFromJpegPages(
+    jpegPages,
+    OUT_W,
+    OUT_H,
+    595.28,
+    841.89,
+    outlinesList,
+    pageAnnotations
+  );
+
   const localBlob = new Blob([pdfBytes], { type: 'application/pdf' });
   const pdfBase64 = uint8ArrayToBase64(pdfBytes);
   const fileName = `CARDIO_LOOKBOOK_2026_${lang.toUpperCase()}.pdf`;
@@ -1186,7 +1408,7 @@ export async function generateAndDeliverLookbookPdf(
         pdfBase64,
         fileName,
         chatId: tgUser.id,
-        caption: `📘 CARDIO FOOTWEAR — WHOLESALE COLLECTION 2026 (${totalPages} стр. А4)\n🔒 ${securityNote}`,
+        caption: `📘 CARDIO FOOTWEAR — OFFICIAL LOOKBOOK 2026 (${totalPages} стр. А4, PDF 1.7)\n🔒 ${securityNote}`,
       }),
     });
 
@@ -1201,7 +1423,6 @@ export async function generateAndDeliverLookbookPdf(
         totalPages,
       };
 
-      // На Android сразу вызываем нативный загрузчик Telegram (пока серверный кэш горячий)
       const isAndroid =
         typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
       if (isAndroid && statusObj.downloadUrl) {
