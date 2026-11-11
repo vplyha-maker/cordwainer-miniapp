@@ -69,7 +69,7 @@ export function getTelegramUserInfo(): { id?: number; clientCode: string; partne
   try {
     const u = getTgWebApp()?.initDataUnsafe?.user;
     if (u?.id) {
-      const code = `CLIENT-${u.id}`;
+      const code = 'CLIENT-' + String(u.id);
       return {
         id: u.id,
         clientCode: code,
@@ -187,8 +187,6 @@ function loadImageElement(src: string): Promise<HTMLImageElement | null> {
 /**
  * Автоматически находит границы объекта (обуви), отсекает лишние пустые поля
  * и оставляет чистый белый фон вокруг объекта для бесшовного наложения.
- * Улучшено для белой/светлой обуви, чёрной обуви, PNG с прозрачностью и естественных теней.
- * Не превращает изделие в силуэт и сохраняет реалистичные цвета кожи.
  */
 function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   const srcW = img.naturalWidth || img.width || 800;
@@ -200,7 +198,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
   if (!tempCtx) return tempCanvas;
 
-  // Белый фон как безопасная база
   tempCtx.fillStyle = '#FFFFFF';
   tempCtx.fillRect(0, 0, srcW, srcH);
   tempCtx.drawImage(img, 0, 0, srcW, srcH);
@@ -209,7 +206,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   try {
     imgData = tempCtx.getImageData(0, 0, srcW, srcH);
   } catch {
-    // CORS или security error — возвращаем исходный canvas без кропа
     return tempCanvas;
   }
   const data = imgData.data;
@@ -219,7 +215,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
   let maxX = 0;
   let maxY = 0;
 
-  // Более мягкий порог для светлой обуви + учёт альфы
   const THRESHOLD = 248;
   for (let y = 0; y < srcH; y++) {
     for (let x = 0; x < srcW; x++) {
@@ -228,7 +223,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
       const g = data[idx + 1];
       const b = data[idx + 2];
       const a = data[idx + 3];
-      // Считаем пиксель "объектом", если он не почти белый или имеет альфу
       if (a > 12 && (r < THRESHOLD || g < THRESHOLD || b < THRESHOLD)) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -238,12 +232,10 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
     }
   }
 
-  // Если объект не найден — возвращаем оригинал
   if (maxX <= minX || maxY <= minY) {
     return tempCanvas;
   }
 
-  // Небольшой паддинг, чтобы не срезать мягкие края и тени
   const padX = Math.round((maxX - minX) * 0.045);
   const padY = Math.round((maxY - minY) * 0.045);
   const cropX = Math.max(0, minX - padX);
@@ -265,7 +257,6 @@ function prepareSeamlessShoeCanvas(img: HTMLImageElement): HTMLCanvasElement {
 
 /**
  * Отрисовывает фирменный защитный водяной знак CARDIO по диагонали страницы.
- * Очень лёгкий, не мешает чтению.
  */
 function drawEditorialWatermark(
   ctx: CanvasRenderingContext2D,
@@ -281,7 +272,7 @@ function drawEditorialWatermark(
 
   ctx.fillStyle = 'rgba(23, 23, 23, 0.032)';
   ctx.font = '700 42px "Inter", "Helvetica Neue", Arial, sans-serif';
-  const wmLine = `CARDIO FOOTWEAR   ·   ${clientCode}   ·   LOOKBOOK 2026`;
+  const wmLine = 'CARDIO FOOTWEAR   ·   ' + clientCode + '   ·   LOOKBOOK 2026';
 
   ctx.fillText(wmLine, 0, -300);
   ctx.fillText(wmLine, 0, 0);
@@ -290,8 +281,9 @@ function drawEditorialWatermark(
   if (modelNumber) {
     ctx.fillStyle = 'rgba(23, 23, 23, 0.028)';
     ctx.font = '400 64px "Playfair Display", Georgia, serif';
-    ctx.fillText(`CARDIO ORIGINAL  //  MODEL №${modelNumber}`, 0, -150);
-    ctx.fillText(`CARDIO ORIGINAL  //  MODEL №${modelNumber}`, 0, 150);
+    const modelLine = 'CARDIO ORIGINAL  //  MODEL №' + modelNumber;
+    ctx.fillText(modelLine, 0, -150);
+    ctx.fillText(modelLine, 0, 150);
   }
 
   ctx.restore();
@@ -446,7 +438,6 @@ function getEditorialText(lang: WholesaleLang) {
 
 /**
  * Кодирует любую строку (включая кириллицу) в стандартный PDF 1.7 UTF-16BE Hex формат с BOM (<FEFF...>).
- * Это гарантирует отсутствие кракозябр в закладках (/Outlines) и метаданных в Telegram/Android/iOS.
  */
 function toPdfUtf16Hex(str: string): string {
   let hex = 'FEFF';
@@ -454,7 +445,7 @@ function toPdfUtf16Hex(str: string): string {
     const code = str.charCodeAt(i);
     hex += code.toString(16).toUpperCase().padStart(4, '0');
   }
-  return `<${hex}>`;
+  return '<' + hex + '>';
 }
 
 /**
@@ -491,7 +482,7 @@ function buildPdfBytesFromJpegPages(
 
   const startObj = (id: number) => {
     offsets[id] = currentOffset;
-    pushStr(`${id} 0 obj\n`);
+    pushStr(String(id) + ' 0 obj\n');
   };
 
   const endObj = () => {
@@ -500,11 +491,6 @@ function buildPdfBytesFromJpegPages(
 
   const pageCount = jpegDataUrls.length;
 
-  // Объектные идентификаторы:
-  // 1: Catalog
-  // 2: Pages Root
-  // 3: Info Metadata
-  // 4: Standard Type1 Font (/Helvetica) для текстового слоя ссылок
   let nextObjId = 5;
   const fontObjId = 4;
 
@@ -543,42 +529,55 @@ function buildPdfBytesFromJpegPages(
 
   // Obj 1: Catalog
   startObj(1);
-  let catalogDict = `<< /Type /Catalog /Pages 2 0 R`;
+  let catalogDict = '<< /Type /Catalog /Pages 2 0 R';
   if (outlineRootId !== null) {
-    catalogDict += ` /Outlines ${outlineRootId} 0 R /PageMode /UseOutlines`;
+    catalogDict += ' /Outlines ' + String(outlineRootId) + ' 0 R /PageMode /UseOutlines';
   }
-  catalogDict += ` >>`;
+  catalogDict += ' >>';
   pushStr(catalogDict);
   endObj();
 
   // Obj 2: Pages Root
   startObj(2);
-  pushStr(
-    `<< /Type /Pages /Kids [\( {pageObjIds.map((id) => ` \){id} 0 R`).join(' ')}] /Count ${pageCount} >>`
-  );
+  const kidsRefs = pageObjIds.map((id) => String(id) + ' 0 R').join(' ');
+  pushStr('<< /Type /Pages /Kids [' + kidsRefs + '] /Count ' + String(pageCount) + ' >>');
   endObj();
 
-  // Obj 3: Info Metadata (UTF-16BE Hex для полной совместимости)
+  // Obj 3: Info Metadata
   startObj(3);
   pushStr(
-    `<< /Title ${toPdfUtf16Hex('CARDIO FOOTWEAR — Official Lookbook 2026')} ` +
-      `/Author ${toPdfUtf16Hex('CARDIO Footwear (@cardio_shoes)')} ` +
-      `/Subject ${toPdfUtf16Hex('Autumn & Winter Footwear Collection 2026')} ` +
-      `/Creator ${toPdfUtf16Hex('CARDIO Editorial PDF 1.7 Engine')} ` +
-      `/Producer ${toPdfUtf16Hex('CARDIO PDF 1.7 Native Builder')} >>`
+    '<< /Title ' +
+      toPdfUtf16Hex('CARDIO FOOTWEAR — Official Lookbook 2026') +
+      ' /Author ' +
+      toPdfUtf16Hex('CARDIO Footwear (@cardio_shoes)') +
+      ' /Subject ' +
+      toPdfUtf16Hex('Autumn & Winter Footwear Collection 2026') +
+      ' /Creator ' +
+      toPdfUtf16Hex('CARDIO Editorial PDF 1.7 Engine') +
+      ' /Producer ' +
+      toPdfUtf16Hex('CARDIO PDF 1.7 Native Builder') +
+      ' >>'
   );
   endObj();
 
   // Obj 4: Встроенный шрифт Helvetica для невидимого поискового/ссылочного слоя
   startObj(fontObjId);
-  pushStr(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>`);
+  pushStr('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
   endObj();
 
   // Закладки (Outlines)
   if (outlineRootId !== null && outlines) {
     startObj(outlineRootId);
+    const firstOutlineId = outlineItemIds[0];
+    const lastOutlineId = outlineItemIds[outlineItemIds.length - 1];
     pushStr(
-      `<< /Type /Outlines /First ${outlineItemIds[0]} 0 R /Last ${outlineItemIds[outlineItemIds.length - 1]} 0 R /Count ${outlines.length} >>`
+      '<< /Type /Outlines /First ' +
+        String(firstOutlineId) +
+        ' 0 R /Last ' +
+        String(lastOutlineId) +
+        ' 0 R /Count ' +
+        String(outlines.length) +
+        ' >>'
     );
     endObj();
 
@@ -589,10 +588,20 @@ function buildPdfBytesFromJpegPages(
       const nextId = o < outlines.length - 1 ? outlineItemIds[o + 1] : null;
       const targetPageObjId = pageObjIds[item.pageIndex] || pageObjIds[0];
 
-      let itemDict = `<< /Title ${toPdfUtf16Hex(item.title)} /Parent ${outlineRootId} 0 R`;
-      if (prevId !== null) itemDict += ` /Prev ${prevId} 0 R`;
-      if (nextId !== null) itemDict += ` /Next ${nextId} 0 R`;
-      itemDict += ` /Dest [${targetPageObjId} 0 R /XYZ 0 ${pageHeightPt.toFixed(2)} null] >>`;
+      let itemDict =
+        '<< /Title ' +
+        toPdfUtf16Hex(item.title) +
+        ' /Parent ' +
+        String(outlineRootId) +
+        ' 0 R';
+      if (prevId !== null) itemDict += ' /Prev ' + String(prevId) + ' 0 R';
+      if (nextId !== null) itemDict += ' /Next ' + String(nextId) + ' 0 R';
+      itemDict +=
+        ' /Dest [' +
+        String(targetPageObjId) +
+        ' 0 R /XYZ 0 ' +
+        pageHeightPt.toFixed(2) +
+        ' null] >>';
 
       startObj(itemId);
       pushStr(itemDict);
@@ -615,8 +624,6 @@ function buildPdfBytesFromJpegPages(
       imgBytes[k] = binaryStr.charCodeAt(k);
     }
 
-    // Формируем невидимый текстовый слой (3 Tr) поверх кнопок, чтобы Android/iOS Linkify
-    // также распознавал номера телефонов и URL даже в ридерах, игнорирующих /Annots
     let textLayerStream = '';
     const pdfRects: Array<[string, string, string, string]> = [];
 
@@ -631,36 +638,66 @@ function buildPdfBytesFromJpegPages(
       const textX = (Number(llx) + 12).toFixed(2);
       const textY = (Number(lly) + (Number(ury) - Number(lly)) * 0.35).toFixed(2);
       const safeAsciiText = b.textFallback.replace(/[()\\]/g, '');
-      textLayerStream += `\nBT 3 Tr /F1 16 Tf ${textX} \( {textY} Td ( \){safeAsciiText}) Tj ET`;
+      textLayerStream +=
+        '\nBT 3 Tr /F1 16 Tf ' + textX + ' ' + textY + ' Td (' + safeAsciiText + ') Tj ET';
     }
 
     const contentStream =
-      `q\n${pageWidthPt.toFixed(2)} 0 0 \( {pageHeightPt.toFixed(2)} 0 0 cm\n/Im \){i} Do\nQ` +
+      'q\n' +
+      pageWidthPt.toFixed(2) +
+      ' 0 0 ' +
+      pageHeightPt.toFixed(2) +
+      ' 0 0 cm\n/Im' +
+      String(i) +
+      ' Do\nQ' +
       textLayerStream;
 
-    // Page Object (важно: /Annots указывается как прямой массив [...] для мобильных PDF-ридеров)
+    // Page Object
     startObj(pageObjId);
     let pageDict =
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidthPt.toFixed(2)} ${pageHeightPt.toFixed(2)}] ` +
-      `/Resources << /XObject << /Im${i} ${imgObjId} 0 R >> /Font << /F1 ${fontObjId} 0 R >> >> ` +
-      `/Contents ${contentObjId} 0 R`;
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' +
+      pageWidthPt.toFixed(2) +
+      ' ' +
+      pageHeightPt.toFixed(2) +
+      '] /Resources << /XObject << /Im' +
+      String(i) +
+      ' ' +
+      String(imgObjId) +
+      ' 0 R >> /Font << /F1 ' +
+      String(fontObjId) +
+      ' 0 R >> >> /Contents ' +
+      String(contentObjId) +
+      ' 0 R';
+
     if (itemIds.length > 0) {
-      pageDict += ` /Annots [\( {itemIds.map((id) => ` \){id} 0 R`).join(' ')}]`;
+      const annotRefs = itemIds.map((id) => String(id) + ' 0 R').join(' ');
+      pageDict += ' /Annots [' + annotRefs + ']';
     }
-    pageDict += ` >>`;
+    pageDict += ' >>';
     pushStr(pageDict);
     endObj();
 
     // Content Stream
     startObj(contentObjId);
-    pushStr(`<< /Length \( {contentStream.length} >>\nstream\n \){contentStream}\nendstream`);
+    pushStr(
+      '<< /Length ' +
+        String(contentStream.length) +
+        ' >>\nstream\n' +
+        contentStream +
+        '\nendstream'
+    );
     endObj();
 
     // Image XObject
     startObj(imgObjId);
     pushStr(
-      `<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB ` +
-        `/BitsPerComponent 8 /Filter /DCTDecode /Length ${imgBytes.length} >>\nstream\n`
+      '<< /Type /XObject /Subtype /Image /Width ' +
+        String(imgW) +
+        ' /Height ' +
+        String(imgH) +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
+        String(imgBytes.length) +
+        ' >>\nstream\n'
     );
     pushBytes(imgBytes);
     pushStr('\nendstream');
@@ -672,9 +709,17 @@ function buildPdfBytesFromJpegPages(
       const [llx, lly, urx, ury] = pdfRects[a];
       startObj(itemIds[a]);
       pushStr(
-        `<< /Type /Annot /Subtype /Link /F 4 /Rect [${llx} ${lly} ${urx} ${ury}] ` +
-          `/Border [0 0 0] /BS << /W 0 >> /H /I ` +
-          `/A << /Type /Action /S /URI /URI (${box.uri}) >> >>`
+        '<< /Type /Annot /Subtype /Link /F 4 /Rect [' +
+          llx +
+          ' ' +
+          lly +
+          ' ' +
+          urx +
+          ' ' +
+          ury +
+          '] /Border [0 0 0] /BS << /W 0 >> /H /I /A << /Type /Action /S /URI /URI (' +
+          box.uri +
+          ') >> >>'
       );
       endObj();
     }
@@ -682,13 +727,17 @@ function buildPdfBytesFromJpegPages(
 
   const totalObjects = nextObjId;
   const xrefOffset = currentOffset;
-  pushStr(`xref\n0 ${totalObjects}\n0000000000 65535 f \n`);
+  pushStr('xref\n0 ' + String(totalObjects) + '\n0000000000 65535 f \n');
   for (let id = 1; id < totalObjects; id++) {
     const off = String(offsets[id] || 0).padStart(10, '0');
-    pushStr(`${off} 00000 n \n`);
+    pushStr(off + ' 00000 n \n');
   }
   pushStr(
-    `trailer\n<< /Size \( {totalObjects} /Root 1 0 R /Info 3 0 R >>\nstartxref\n \){xrefOffset}\n%%EOF`
+    'trailer\n<< /Size ' +
+      String(totalObjects) +
+      ' /Root 1 0 R /Info 3 0 R >>\nstartxref\n' +
+      String(xrefOffset) +
+      '\n%%EOF'
   );
 
   const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
@@ -732,7 +781,7 @@ function triggerAnchorDownload(url: string, fileName: string): void {
 }
 
 /**
- * Сохранение готового PDF-файла с разделением iOS и Android:
+ * Сохранение готового PDF-файла с разделением iOS и Android
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -749,7 +798,10 @@ export async function triggerPdfDownload(status: {
       navigator.maxTouchPoints > 1);
 
   const stamp = String(Date.now()).slice(-4);
-  const uniqueFileName = status.fileName.replace(/\.pdf\( /i, '') + `_ \){stamp}.pdf`;
+  const baseName = status.fileName.toLowerCase().endsWith('.pdf')
+    ? status.fileName.slice(0, -4)
+    : status.fileName;
+  const uniqueFileName = baseName + '_' + stamp + '.pdf';
 
   if (isIOS && !isAndroid && status.localBlob) {
     try {
@@ -779,9 +831,9 @@ export async function triggerPdfDownload(status: {
   if (status.downloadUrl) {
     const baseFullUrl = status.downloadUrl.startsWith('http')
       ? status.downloadUrl
-      : `\( {window.location.origin} \){status.downloadUrl}`;
+      : window.location.origin + status.downloadUrl;
     const sep = baseFullUrl.includes('?') ? '&' : '?';
-    const freshUrl = `\( {baseFullUrl} \){sep}_dl=${Date.now()}`;
+    const freshUrl = baseFullUrl + sep + '_dl=' + String(Date.now());
 
     if (typeof tg?.downloadFile === 'function') {
       try {
@@ -855,7 +907,6 @@ export async function generateAndDeliverLookbookPdf(
   const clientCode = tgUser.clientCode || tgUser.partnerCode || 'CARDIO-OFFICIAL';
   const pdfT = getEditorialText(lang);
 
-  // Виртуальная сетка высокого разрешения для точной композиции
   const VIRTUAL_W = 1240;
   const VIRTUAL_H = 1754;
   const OUT_W = 900;
@@ -870,11 +921,9 @@ export async function generateAndDeliverLookbookPdf(
   // Luxury editorial palette
   const PAPER = '#F5F3EE';
   const GRAPHITE = '#171717';
-  const CHARCOAL = '#242321';
   const GREY = '#85837E';
   const METALLIC = '#A69984';
   const RULE = '#D6D1C7';
-  const WARM_IVORY = '#F5F3EE';
 
   const includeAutumn = seasonFilter === 'all' || seasonFilter === 'autumn';
   const includeWinter = seasonFilter === 'all' || seasonFilter === 'winter';
@@ -883,7 +932,12 @@ export async function generateAndDeliverLookbookPdf(
     | { type: 'cover' }
     | { type: 'manifesto' }
     | { type: 'divider'; season: SeasonKey; count: number }
-    | { type: 'product'; item: FullCatalogPriceItem; indexInCatalog: number; layoutVariant: 0 | 1 | 2 }
+    | {
+        type: 'product';
+        item: FullCatalogPriceItem;
+        indexInCatalog: number;
+        layoutVariant: 0 | 1 | 2;
+      }
     | { type: 'contacts' };
 
   const pagePlan: PageDescriptor[] = [{ type: 'cover' }, { type: 'manifesto' }];
@@ -944,7 +998,6 @@ export async function generateAndDeliverLookbookPdf(
   const jpegPages: string[] = [];
   const pageHitBoxes = new Map<number, InteractiveHitBox[]>();
 
-  // Зоны быстрого звонка в нижнем колонтитуле (для страниц манифеста и товаров)
   const footerPhoneBoxes: InteractiveHitBox[] = [
     {
       x: W / 2,
@@ -964,13 +1017,20 @@ export async function generateAndDeliverLookbookPdf(
     },
   ];
 
+  const footerPhonesLine =
+    '+38 (067) 719-37-16 (' +
+    pdfT.georgiyName +
+    ')   ·   +38 (097) 454-15-11 (' +
+    pdfT.borisName +
+    ')';
+
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
     onPageProgress(pageIdx + 1, totalPages);
-    // Yield to keep UI responsive
     await new Promise((r) => setTimeout(r, 0));
 
     const pageDesc = pagePlan[pageIdx];
-    const pageNumStr = `${String(pageIdx + 1).padStart(2, '0')} / ${String(totalPages).padStart(2, '0')}`;
+    const pageNumStr =
+      String(pageIdx + 1).padStart(2, '0') + ' / ' + String(totalPages).padStart(2, '0');
 
     const canvas = document.createElement('canvas');
     canvas.width = OUT_W;
@@ -990,7 +1050,6 @@ export async function generateAndDeliverLookbookPdf(
 
       drawEditorialWatermark(ctx, W, H, clientCode);
 
-      // Top masthead
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -1000,7 +1059,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.textAlign = 'right';
       ctx.fillText('KHARKIV  ·  LOOKBOOK 2026', W - PAD, 72);
 
-      // Thin rule
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -1008,7 +1066,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 92);
       ctx.stroke();
 
-      // Hero product image — large, centered, with soft ground shadow
       if (coverBannerCropped) {
         const availW = CONTENT_W - 40;
         const availH = 620;
@@ -1021,7 +1078,6 @@ export async function generateAndDeliverLookbookPdf(
         const drawX = PAD + (CONTENT_W - drawW) / 2;
         const drawY = 160 + (availH - drawH) / 2;
 
-        // Soft elliptical shadow
         ctx.save();
         ctx.translate(W / 2, drawY + drawH + 18);
         ctx.scale(1, 0.055);
@@ -1035,7 +1091,6 @@ export async function generateAndDeliverLookbookPdf(
         ctx.fill();
         ctx.restore();
 
-        // Draw shoe with careful multiply so leather stays true
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
         ctx.globalAlpha = 0.97;
@@ -1043,7 +1098,6 @@ export async function generateAndDeliverLookbookPdf(
         ctx.restore();
       }
 
-      // Brand block — strong editorial hierarchy
       const brandY = 920;
 
       ctx.fillStyle = GRAPHITE;
@@ -1053,10 +1107,10 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GREY;
       ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.letterSpacing = '0.35em';
+      (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0.35em';
       ctx.fillText('F O O T W E A R', W / 2, brandY + 42);
+      (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
 
-      // Thin centered rule
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -1072,7 +1126,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.font = '600 16px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(coverSloganLocal, W / 2, brandY + 152);
 
-      // Bottom info block
       const bottomY = 1380;
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.2;
@@ -1115,7 +1168,6 @@ export async function generateAndDeliverLookbookPdf(
 
       drawEditorialWatermark(ctx, W, H, clientCode);
 
-      // Header
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -1135,28 +1187,23 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 92);
       ctx.stroke();
 
-      // Section label
       ctx.fillStyle = METALLIC;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText('01  ·  EDITORIAL INTRODUCTION', PAD, 160);
 
-      // Large display title
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 46px "Playfair Display", Georgia, serif';
       ctx.fillText(pdfT.overviewTitle, PAD, 230);
 
-      // Lead paragraph
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 24px "Playfair Display", Georgia, serif';
       const nextY = drawWrappedText(ctx, pdfT.manifestoLead, PAD, 310, CONTENT_W, 38);
 
-      // Body
       ctx.fillStyle = GREY;
       ctx.font = '400 18px "Inter", "Helvetica Neue", Arial, sans-serif';
       drawWrappedText(ctx, pdfT.manifestoBody, PAD, nextY + 28, CONTENT_W, 30);
 
-      // Contents block
       const tocY = 620;
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
@@ -1167,11 +1214,11 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = METALLIC;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(`02  ·  ${pdfT.tocTitle}`, PAD, tocY + 48);
+      ctx.fillText('02  ·  ' + pdfT.tocTitle, PAD, tocY + 48);
 
       const tocRows = [
-        { title: pdfT.tocAutumn, meta: `${autumnItems.length} MODELS` },
-        { title: pdfT.tocWinter, meta: `${winterItems.length} MODELS` },
+        { title: pdfT.tocAutumn, meta: String(autumnItems.length) + ' MODELS' },
+        { title: pdfT.tocWinter, meta: String(winterItems.length) + ' MODELS' },
         { title: pdfT.tocContacts, meta: 'KHARKIV DIRECT' },
       ];
 
@@ -1195,14 +1242,12 @@ export async function generateAndDeliverLookbookPdf(
         ctx.stroke();
       });
 
-      // Brand standards cards
       const boxSecY = 1020;
       ctx.fillStyle = METALLIC;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText('03  ·  BRAND STANDARDS', PAD, boxSecY);
 
-      // Card 1
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.2;
       ctx.strokeRect(PAD, boxSecY + 28, CONTENT_W, 148);
@@ -1213,9 +1258,12 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GREY;
       ctx.font = '400 18px "Playfair Display", Georgia, serif';
-      ctx.fillText('Selected premium natural leather, reinforced anatomical soles.', PAD + 28, boxSecY + 122);
+      ctx.fillText(
+        'Selected premium natural leather, reinforced anatomical soles.',
+        PAD + 28,
+        boxSecY + 122
+      );
 
-      // Card 2
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1.2;
       ctx.strokeRect(PAD, boxSecY + 198, CONTENT_W, 148);
@@ -1226,9 +1274,12 @@ export async function generateAndDeliverLookbookPdf(
 
       ctx.fillStyle = GREY;
       ctx.font = '400 18px "Playfair Display", Georgia, serif';
-      ctx.fillText('Full size scale from 40 to 45 with ergonomic instep support.', PAD + 28, boxSecY + 292);
+      ctx.fillText(
+        'Full size scale from 40 to 45 with ergonomic instep support.',
+        PAD + 28,
+        boxSecY + 292
+      );
 
-      // Footer
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -1242,11 +1293,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026', PAD, H - 72);
 
       ctx.textAlign = 'right';
-      ctx.fillText(
-        `+38 (067) 719-37-16 (\( {pdfT.georgiyName})   ·   +38 (097) 454-15-11 ( \){pdfT.borisName})`,
-        W - PAD,
-        H - 72
-      );
+      ctx.fillText(footerPhonesLine, W - PAD, H - 72);
       pageHitBoxes.set(pageIdx, footerPhoneBoxes);
     }
 
@@ -1274,13 +1321,11 @@ export async function generateAndDeliverLookbookPdf(
 
       const isAutumn = pageDesc.season === 'autumn';
 
-      // Chapter label
       ctx.fillStyle = METALLIC;
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(isAutumn ? pdfT.autumnChapter : pdfT.winterChapter, PAD, H / 2 - 140);
 
-      // Massive season name
       ctx.fillStyle = PAPER;
       ctx.font = '400 128px "Playfair Display", Georgia, serif';
       ctx.fillText(isAutumn ? 'AUTUMN' : 'WINTER', PAD - 6, H / 2 - 10);
@@ -1289,7 +1334,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.font = '400 36px "Playfair Display", Georgia, serif';
       ctx.fillText('COLLECTION 2026', PAD, H / 2 + 56);
 
-      // Thin accent line
       ctx.strokeStyle = METALLIC;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -1301,11 +1345,10 @@ export async function generateAndDeliverLookbookPdf(
       ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(isAutumn ? pdfT.autumnSub : pdfT.winterSub, PAD, H / 2 + 148);
 
-      // Bottom meta
       ctx.fillStyle = GREY;
       ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${pageDesc.count} MODELS FEATURED`, PAD, H - 72);
+      ctx.fillText(String(pageDesc.count) + ' MODELS FEATURED', PAD, H - 72);
 
       ctx.textAlign = 'right';
       ctx.fillText('SIZES 40—45', W - PAD, H - 72);
@@ -1319,14 +1362,13 @@ export async function generateAndDeliverLookbookPdf(
       const catUpper = getLocalizedCategory(shoe.category, lang).toUpperCase();
       const colorUpper = getLocalizedColor(shoe.color, lang).toUpperCase();
       const featuresUpper = shoe.features.map((f) => getLocalizedFeature(f, lang).toUpperCase());
-      const layout = pageDesc.layoutVariant; // 0 = Hero, 1 = Detail, 2 = Campaign
+      const layout = pageDesc.layoutVariant;
 
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
 
       drawEditorialWatermark(ctx, W, H, clientCode, shoe.modelNumber);
 
-      // ——— Header ———
       if (logoImg) {
         const lH = 26;
         const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
@@ -1350,7 +1392,7 @@ export async function generateAndDeliverLookbookPdf(
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(`${catUpper}  ·  ${pageNumStr}`, W - PAD, 72);
+      ctx.fillText(catUpper + '  ·  ' + pageNumStr, W - PAD, 72);
 
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
@@ -1359,14 +1401,12 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, 96);
       ctx.stroke();
 
-      // ——— Load & prepare shoe ———
       const rawShoeImg = await loadImageElement(shoe.image);
       let seamlessCanvas: HTMLCanvasElement | null = null;
       if (rawShoeImg) {
         seamlessCanvas = prepareSeamlessShoeCanvas(rawShoeImg);
       }
 
-      // Adaptive stage calculation — shoe dominates 55–70 % of page height when possible
       const stageTop = 130;
       const stageBottom = 1180;
       const stageH = stageBottom - stageTop;
@@ -1388,7 +1428,6 @@ export async function generateAndDeliverLookbookPdf(
         drawX = PAD + (CONTENT_W - drawW) / 2;
         drawY = stageTop + (stageH - drawH) / 2;
 
-        // Soft ground shadow
         ctx.save();
         ctx.translate(W / 2, drawY + drawH - 6);
         ctx.scale(1, 0.07);
@@ -1402,7 +1441,6 @@ export async function generateAndDeliverLookbookPdf(
         ctx.fill();
         ctx.restore();
 
-        // Draw shoe — careful multiply to keep leather colours true
         ctx.save();
         ctx.globalCompositeOperation = 'multiply';
         ctx.globalAlpha = 0.98;
@@ -1410,7 +1448,6 @@ export async function generateAndDeliverLookbookPdf(
         ctx.restore();
       }
 
-      // ——— Spec block (common base, layout-specific emphasis) ———
       const specTopY = 1210;
 
       ctx.strokeStyle = GRAPHITE;
@@ -1420,7 +1457,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, specTopY);
       ctx.stroke();
 
-      // Model & Price labels
       ctx.fillStyle = GREY;
       ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -1429,27 +1465,24 @@ export async function generateAndDeliverLookbookPdf(
       ctx.textAlign = 'right';
       ctx.fillText(pdfT.priceLabel, W - PAD, specTopY + 32);
 
-      // Large model number + variant
-      const variantTitle = shoe.variant ? `  ·  ${shoe.variant}` : '';
-      const modelDisplay = `№ \( {shoe.modelNumber} \){variantTitle}`;
+      const variantTitle = shoe.variant ? '  ·  ' + shoe.variant : '';
+      const modelDisplay = '№ ' + shoe.modelNumber + variantTitle;
 
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 56px "Playfair Display", Georgia, serif';
       ctx.textAlign = 'left';
-      // Prevent overflow of very long variant names
       const modelMetrics = ctx.measureText(modelDisplay);
       if (modelMetrics.width > CONTENT_W * 0.62) {
         ctx.font = '400 44px "Playfair Display", Georgia, serif';
       }
       ctx.fillText(modelDisplay, PAD, specTopY + 98);
 
-      // Price
+      const usdSymbol = String.fromCharCode(36);
       ctx.fillStyle = GRAPHITE;
       ctx.font = '400 56px "Playfair Display", Georgia, serif';
       ctx.textAlign = 'right';
-      ctx.fillText(`$${priceUsd}`, W - PAD, specTopY + 98);
+      ctx.fillText(usdSymbol + String(priceUsd), W - PAD, specTopY + 98);
 
-      // Matrix row
       const matrixTopY = specTopY + 128;
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
@@ -1462,7 +1495,6 @@ export async function generateAndDeliverLookbookPdf(
       const col2X = PAD + 460;
       const matrixBottomY = matrixTopY + 142;
 
-      // Vertical divider
       ctx.strokeStyle = RULE;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -1470,7 +1502,6 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(col2X - 36, matrixBottomY - 18);
       ctx.stroke();
 
-      // Color & Material
       ctx.textAlign = 'left';
       ctx.fillStyle = GREY;
       ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
@@ -1486,7 +1517,6 @@ export async function generateAndDeliverLookbookPdf(
       const featSafe = featLine.length > 48 ? featLine.slice(0, 46) + '…' : featLine;
       ctx.fillText(featSafe, col1X, matrixTopY + 104);
 
-      // Size
       ctx.fillStyle = GREY;
       ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.fillText(pdfT.sizeRangeLabel, col2X, matrixTopY + 36);
@@ -1506,31 +1536,18 @@ export async function generateAndDeliverLookbookPdf(
       ctx.lineTo(W - PAD, matrixBottomY);
       ctx.stroke();
 
-      // Footer
       ctx.fillStyle = GREY;
       ctx.font = '500 11px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(
-        `CARDIO FOOTWEAR  ·  LOOKBOOK 2026  ·  ${clientCode}`,
-        PAD,
-        H - 68
-      );
+      ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026  ·  ' + clientCode, PAD, H - 68);
 
       ctx.textAlign = 'right';
-      ctx.fillText(
-        `+38 (067) 719-37-16 (\( {pdfT.georgiyName})   ·   +38 (097) 454-15-11 ( \){pdfT.borisName})`,
-        W - PAD,
-        H - 68
-      );
+      ctx.fillText(footerPhonesLine, W - PAD, H - 68);
       pageHitBoxes.set(pageIdx, footerPhoneBoxes);
 
-      // Layout-specific micro-adjustments (subtle differentiation without breaking balance)
-      if (layout === 1) {
-        // Detail Editorial — slightly stronger feature emphasis already handled by text
-      } else if (layout === 2) {
-        // Campaign — large model number already dominant
+      if (layout === 1 || layout === 2) {
+        // Дифференциация макетов уже учтена в композиции
       }
-      // Layout 0 (Hero) is the baseline
     }
 
     // =====================================================================
@@ -1542,7 +1559,6 @@ export async function generateAndDeliverLookbookPdf(
 
       drawEditorialWatermark(ctx, W, H, clientCode);
 
-      // Header
       ctx.fillStyle = GRAPHITE;
       ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
@@ -1624,18 +1640,16 @@ export async function generateAndDeliverLookbookPdf(
         ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.fillText(pdfT.tapToCall, W - PAD - 36, cY + 130);
 
-        // Entire card is the interactive zone
         contactHitBoxes.push({
           x: PAD,
           y: cY,
           w: CONTENT_W,
           h: cardH,
           uri: c.telUri,
-          textFallback: `tel:${c.rawPhone} ${c.rawPhone}`,
+          textFallback: 'tel:' + c.rawPhone + ' ' + c.rawPhone,
         });
       });
 
-      // Instagram block
       const igBoxY = 880;
       const igBoxH = 132;
       ctx.strokeStyle = '#E1306C';
@@ -1662,13 +1676,11 @@ export async function generateAndDeliverLookbookPdf(
 
       pageHitBoxes.set(pageIdx, contactHitBoxes);
 
-      // Shipping note
       ctx.fillStyle = GREY;
       ctx.font = '400 17px "Inter", "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       drawWrappedText(ctx, pdfT.shippingNote, PAD, 1080, CONTENT_W, 30);
 
-      // Footer
       ctx.strokeStyle = GRAPHITE;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
@@ -1712,9 +1724,9 @@ export async function generateAndDeliverLookbookPdf(
     pageHitBoxes
   );
 
-  const localBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const localBlob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
   const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-  const fileName = `CARDIO_LOOKBOOK_2026_${lang.toUpperCase()}.pdf`;
+  const fileName = 'CARDIO_LOOKBOOK_2026_' + lang.toUpperCase() + '.pdf';
 
   let deliveryError: string | null = null;
 
@@ -1727,7 +1739,11 @@ export async function generateAndDeliverLookbookPdf(
         pdfBase64,
         fileName,
         chatId: tgUser.id,
-        caption: `📘 CARDIO FOOTWEAR — OFFICIAL LOOKBOOK 2026 (${totalPages} стр. А4, PDF 1.7)\n🔒 ${securityNote}`,
+        caption:
+          '📘 CARDIO FOOTWEAR — OFFICIAL LOOKBOOK 2026 (' +
+          String(totalPages) +
+          ' стр. А4, PDF 1.7)\n🔒 ' +
+          securityNote,
       }),
     });
 
@@ -1750,7 +1766,7 @@ export async function generateAndDeliverLookbookPdf(
 
       return { status: statusObj, error: null };
     } else {
-      deliveryError = `HTTP ${res.status}`;
+      deliveryError = 'HTTP ' + String(res.status);
     }
   } catch (err) {
     deliveryError = err instanceof Error ? err.message : 'Network error';
@@ -1764,4 +1780,4 @@ export async function generateAndDeliverLookbookPdf(
     totalPages,
   };
   return { status: fallbackStatus, error: deliveryError };
-  }
+}
