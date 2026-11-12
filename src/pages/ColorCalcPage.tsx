@@ -68,6 +68,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [tab, setTab] = useState<TabId>('mix')
   const [isWet, setIsWet] = useState(false)
   const [isAutoAdjusting, setIsAutoAdjusting] = useState(false)
+  // Активный слой выкраски (0 = Coat I, 1 = Coat II, 2 = Coat III, 3 = Coat ∞)
+  const [selectedCoatIdx, setSelectedCoatIdx] = useState<number>(3)
+  // Открытый паспорт пигмента
   const [inspectedPigmentId, setInspectedPigmentId] = useState<string | null>(null)
 
   const {
@@ -92,11 +95,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [activeTarget, setActiveTarget] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string>('ALL')
 
-  const liveDeltaE =
-    activeTarget && mixedColor?.hex
-      ? calculateDeltaE2000Hex(activeTarget, mixedColor.hex)
-      : null
-
   const [inventoryIds, setInventoryIds] = useState<string[]>([])
   const [maxComponents, setMaxComponents] = useState<3 | 4>(3)
   const [system, setSystem] = useState<CoverageSystem>('acrylic')
@@ -118,15 +116,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const isIOSRef = useRef(detectIOS())
 
   const isIOS = isIOSRef.current
-  const displayHex = mixedColor?.hex ? mixedColor.hex.toUpperCase() : null
-  const squareColor = displayHex || '#1E1B19'
 
-  const mixedLab = useMemo(() => {
-    if (!mixedColor?.rgb) return null
-    return rgbToLab(mixedColor.rgb.r, mixedColor.rgb.g, mixedColor.rgb.b)
-  }, [mixedColor])
-
-  // Симуляция выкраски в 1, 2, 3 слоя по Кубелке-Мунку
+  // Симуляция выкраски в 4 слоя (I, II, III, ∞) по Кубелке-Мунку
   const layerSwatches = useMemo(() => {
     if (!mixedColor?.spectrum || pigments.length === 0) return null
     const basePigment =
@@ -136,12 +127,28 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
     if (!basePigment?.spectrum) return null
     const sim = simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, system)
     return [
-      { label: 'I', hex: rgbToHex(spectrumToRGB(sim.layer1)) },
-      { label: 'II', hex: rgbToHex(spectrumToRGB(sim.layer2)) },
-      { label: 'III', hex: rgbToHex(spectrumToRGB(sim.layer3)) },
-      { label: '∞', hex: rgbToHex(spectrumToRGB(sim.final)) },
+      { label: 'I', hex: rgbToHex(spectrumToRGB(sim.layer1)).toUpperCase() },
+      { label: 'II', hex: rgbToHex(spectrumToRGB(sim.layer2)).toUpperCase() },
+      { label: 'III', hex: rgbToHex(spectrumToRGB(sim.layer3)).toUpperCase() },
+      { label: '∞', hex: rgbToHex(spectrumToRGB(sim.final)).toUpperCase() },
     ]
   }, [mixedColor, pigments, system])
+
+  // Активный оттенок зависит от того, какой из 4 слоёв (Coat I, II, III, ∞) нажал пользователь!
+  const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
+  const displayHex = activeCoat?.hex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null)
+  const squareColor = displayHex || '#1E1B19'
+
+  const activeLab = useMemo(() => {
+    if (!displayHex) return null
+    const rgb = hexToRgbObj(displayHex)
+    return rgbToLab(rgb.r, rgb.g, rgb.b)
+  }, [displayHex])
+
+  const liveDeltaE =
+    activeTarget && displayHex
+      ? calculateDeltaE2000Hex(activeTarget, displayHex)
+      : null
 
   const t = {
     ru: {
@@ -158,17 +165,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       autoAdjust: 'Калибровать под цель',
       adjusting: 'Калибровка…',
       result: 'Карта Оттенка',
-      wet: 'Мокрая',
-      dry: 'Сухая',
+      wet: 'WET GLAZE · Мокрая',
+      dry: 'DRY MATTE · Сухая',
       reset: 'Снять цель',
       target: 'Эталон',
       mix: 'Образец',
       ciePerfect: 'Эталонный допуск Haute Couture (ΔE ≤ 2.0)',
       cieAcceptable: 'Коммерческий допуск (ΔE 2.0 – 5.0)',
       cieBad: 'Требуется корректировка тона (ΔE > 5.0)',
-      copy: 'Копировать',
+      copy: 'Скопировать',
       copied: 'Скопировано',
-      totalVolume: 'Выход',
+      totalVolume: 'Суммарный выход',
       targetColor: 'Целевой Образец',
       uploadPhoto: 'Загрузить Лукбук / Фото',
       camera: 'Видоискатель',
@@ -201,6 +208,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       opacitySemiOpaque: 'Полукроющий',
       opacitySemiTrans: 'Полупрозрачный',
       opacityTrans: 'Лессировочный',
+      coatHint: 'Нажмите на слой (I – ∞) для просмотра перекрытия',
       ml: 'мл',
       l: 'л',
     },
@@ -218,17 +226,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       autoAdjust: 'Калібрувати під ціль',
       adjusting: 'Калібрування…',
       result: 'Карта Відтінку',
-      wet: 'Мокра',
-      dry: 'Суха',
+      wet: 'WET GLAZE · Мокра',
+      dry: 'DRY MATTE · Суха',
       reset: 'Зняти ціль',
       target: 'Еталон',
       mix: 'Зразок',
       ciePerfect: 'Еталонний допуск Haute Couture (ΔE ≤ 2.0)',
       cieAcceptable: 'Комерційний допуск (ΔE 2.0 – 5.0)',
       cieBad: 'Потребує коригування тону (ΔE > 5.0)',
-      copy: 'Копіювати',
+      copy: 'Скопіювати',
       copied: 'Скопійовано',
-      totalVolume: 'Вихід',
+      totalVolume: 'Сумарний вихід',
       targetColor: 'Цільовий Зразок',
       uploadPhoto: 'Завантажити Лукбук / Фото',
       camera: 'Видошукач',
@@ -261,6 +269,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       opacitySemiOpaque: 'Напівкриючий',
       opacitySemiTrans: 'Напівпрозорий',
       opacityTrans: 'Лесувальний',
+      coatHint: 'Натисніть на шар (I – ∞) для перегляду перекриття',
       ml: 'мл',
       l: 'л',
     },
@@ -278,8 +287,8 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       autoAdjust: 'Auf Ziel kalibrieren',
       adjusting: 'Kalibrierung…',
       result: 'Farbkarte',
-      wet: 'Nass',
-      dry: 'Trocken',
+      wet: 'WET GLAZE · Nass',
+      dry: 'DRY MATTE · Trocken',
       reset: 'Ziel lösen',
       target: 'Referenz',
       mix: 'Muster',
@@ -288,7 +297,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       cieBad: 'Tonkorrektur erforderlich (ΔE > 5.0)',
       copy: 'Kopieren',
       copied: 'Kopiert',
-      totalVolume: 'Volumen',
+      totalVolume: 'Gesamtvolumen',
       targetColor: 'Ziel-Referenz',
       uploadPhoto: 'Lookbook / Foto laden',
       camera: 'Sucher',
@@ -321,6 +330,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       opacitySemiOpaque: 'Halbdeckend',
       opacitySemiTrans: 'Halbtransparent',
       opacityTrans: 'Lasierend',
+      coatHint: 'Schicht (I – ∞) antippen, um Deckkraft zu prüfen',
       ml: 'ml',
       l: 'l',
     },
@@ -721,6 +731,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       }))
     )
     setActiveTarget(targetHex)
+    setSelectedCoatIdx(3)
     stopCamera()
     setTab('mix')
   }
@@ -763,14 +774,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         boxSizing: 'border-box',
       }}
     >
-      {/* Компактная шапка и переключатель режимов */}
+      {/* Editorial Top Header */}
       <header
-        className="flex items-center justify-between py-2.5 border-b"
+        className="flex items-center justify-between py-3.5 border-b"
         style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
       >
         <button
           onClick={onBack}
-          className="w-9 h-9 -ml-2 flex items-center justify-center rounded-full transition-opacity opacity-70 hover:opacity-100"
+          className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full transition-opacity opacity-70 hover:opacity-100"
           style={{ color: 'var(--color-ink, #F5F1EA)' }}
           aria-label="Back"
         >
@@ -780,17 +791,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         </button>
 
         <div className="flex flex-col items-center">
-          <h1 className="text-[16px] font-serif tracking-wide" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+          <span className="text-[9px] tracking-[0.26em] uppercase opacity-45 font-medium">
+            {t.edition}
+          </span>
+          <h1 className="text-[18px] font-serif tracking-wide mt-0.5" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
             {t.title}
           </h1>
         </div>
 
-        <div className="w-9 text-right font-mono text-[10px] opacity-40">N°01</div>
+        <div className="w-10 text-right font-mono text-[10px] opacity-40">N°01</div>
       </header>
 
-      {/* Переключатель вкладок */}
+      {/* Editorial Segmented Switcher */}
       <div
-        className="grid grid-cols-2 p-1 rounded-none border my-2.5"
+        className="grid grid-cols-2 p-1 rounded-none border my-4"
         style={{
           borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
           background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
@@ -805,7 +819,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 setTab(id)
                 if (id !== 'pro') stopCamera()
               }}
-              className="py-2 text-[11px] uppercase tracking-[0.16em] font-semibold transition-all"
+              className="py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold transition-all"
               style={{
                 background: active ? 'var(--color-ink, #F5F1EA)' : 'transparent',
                 color: active ? 'var(--color-bg, #141210)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 60%, transparent)',
@@ -817,125 +831,252 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         })}
       </div>
 
-      <div className="flex-1 flex flex-col gap-3">
+      <div className="flex-1 flex flex-col gap-5">
         {tab === 'mix' && (
           <>
-            {/* УЛЬТРАКОМПАКТНАЯ ЗАКРЕПЛЁННАЯ КАРТА ОТТЕНКА (всего ~90px в высоту — ползунки видны сразу без скролла!) */}
+            {/* HAUTE COUTURE LOOKBOOK SWATCH CARD (Pantone / Hermès Editorial Style) */}
             <section
               className="border overflow-hidden transition-all"
               style={{
-                position: 'sticky',
-                top: 4,
-                zIndex: 30,
                 background: 'var(--color-surface, #1C1917)',
-                borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.22)',
+                borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
               }}
             >
-              {/* Полоса живого цвета (52px) с переключателем Сухая/Мокрая прямо внутри */}
+              {/* Верхняя архитектурная планка: КАРТА ОТТЕНКА + Снять цель слева, СУХАЯ / МОКРАЯ справа */}
+              <div
+                className="px-4 py-2.5 flex items-center justify-between border-b"
+                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[10px] uppercase tracking-[0.22em] opacity-65 font-semibold">
+                    {t.result}
+                  </span>
+                  {activeTarget && (
+                    <button
+                      onClick={() => setActiveTarget(null)}
+                      className="text-[10px] uppercase tracking-[0.12em] px-2 py-0.5 border"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--color-danger, #f87171) 45%, transparent)',
+                        color: 'var(--color-danger, #f87171)',
+                      }}
+                    >
+                      ✕ {t.reset}
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setIsWet(!isWet)}
+                  className="text-[10px] tracking-[0.14em] uppercase font-semibold px-3 py-1 border transition-all"
+                  style={{
+                    borderColor: isWet
+                      ? 'var(--color-accent, #D8A35C)'
+                      : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
+                    color: isWet ? 'var(--color-accent, #D8A35C)' : 'var(--color-ink, #F5F1EA)',
+                    background: isWet
+                      ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 12%, transparent)'
+                      : 'transparent',
+                  }}
+                >
+                  {isWet ? t.wet : t.dry}
+                </button>
+              </div>
+
+              {/* Главное поле цвета Lookbook: чистая дихотомия 50/50 (Эталон слева, Образец активного слоя справа) */}
               <div
                 className="relative w-full flex overflow-hidden"
-                style={{ height: 52 }}
+                style={{ height: 156 }}
               >
                 {activeTarget && (
                   <div
-                    className="w-1/2 h-full relative flex items-center px-3 border-r"
+                    className="w-1/2 h-full relative flex flex-col justify-end p-3.5 border-r"
                     style={{
                       backgroundColor: activeTarget,
-                      borderColor: 'rgba(255,255,255,0.2)',
+                      borderColor: 'rgba(255,255,255,0.18)',
                     }}
                   >
-                    <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] font-mono bg-black/50 text-white">
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 'fit-content',
+                        padding: '3px 8px',
+                        fontSize: 9,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        fontFamily: 'monospace',
+                        backgroundColor: 'rgba(0,0,0,0.52)',
+                        color: '#FFFFFF',
+                      }}
+                    >
                       {t.target} · {activeTarget}
                     </span>
                   </div>
                 )}
 
                 <div
-                  className="flex-1 h-full relative flex items-center justify-between px-3 transition-colors duration-300"
+                  className="flex-1 h-full relative flex flex-col justify-between p-3.5 transition-colors duration-300"
                   style={{ backgroundColor: squareColor }}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] font-mono bg-black/50 text-white">
-                      {t.mix} · {displayHex || 'UNMIXED'}
-                    </span>
+                  {isWet ? (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background:
+                          'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.03) 38%, rgba(0,0,0,0.08) 100%)',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0 pointer-events-none opacity-15"
+                      style={{
+                        backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 0)',
+                        backgroundSize: '6px 6px',
+                      }}
+                    />
+                  )}
 
+                  {/* Верхний правый угол поля образца: бейдж ΔE₀₀ (не налезает на подпись внизу!) */}
+                  <div className="relative z-10 flex justify-end w-full">
                     {liveDeltaE !== null && (
                       <span
-                        className="px-2 py-0.5 text-[10px] font-mono font-bold bg-black/70"
                         style={{
+                          padding: '4px 10px',
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          backgroundColor: 'rgba(0,0,0,0.68)',
                           color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
                         }}
                       >
-                        ΔE {liveDeltaE.toFixed(1)}
+                        ΔE₀₀ {liveDeltaE.toFixed(1)}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    {activeTarget && (
-                      <button
-                        onClick={() => setActiveTarget(null)}
-                        className="text-[9px] uppercase px-2 py-0.5 bg-black/55 text-red-300 border border-red-400/40"
-                      >
-                        ✕ {t.reset}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setIsWet(!isWet)}
-                      className="text-[9px] tracking-[0.12em] uppercase font-semibold px-2.5 py-1 bg-black/55 text-white border border-white/25"
+                  {/* Нижний левый угол поля образца: подпись Образец + выбранный слой */}
+                  <div className="relative z-10 flex items-end justify-between w-full">
+                    <span
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: 9,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        fontFamily: 'monospace',
+                        backgroundColor: 'rgba(0,0,0,0.52)',
+                        color: '#FFFFFF',
+                      }}
                     >
-                      {isWet ? t.wet : t.dry}
-                    </button>
+                      {t.mix} {activeCoat ? `(COAT ${activeCoat.label})` : ''} · {displayHex || 'UNMIXED'}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Нижняя строка спецификации в ОДНУ линию (38px): HEX + Слои I-III + Выход мл + Копировать */}
+              {/* ИНТЕРАКТИВНАЯ ШКАЛА 4 СЛОЁВ ПО КУБЕЛКЕ–МУНКУ (COAT I, COAT II, COAT III, COAT ∞):
+                  При нажатии на любой из 4 слоёв выкраска и спектр переключаются на этот слой! */}
+              {layerSwatches && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    borderTop: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                  }}
+                >
+                  {layerSwatches.map((ls, idx) => {
+                    const isSelectedCoat = selectedCoatIdx === idx
+                    return (
+                      <button
+                        key={ls.label}
+                        type="button"
+                        onClick={() => setSelectedCoatIdx(idx)}
+                        title={t.coatHint}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 7,
+                          padding: '9px 6px',
+                          borderRight:
+                            idx < 3
+                              ? '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)'
+                              : 'none',
+                          borderBottom: isSelectedCoat
+                            ? '2px solid var(--color-accent, #D8A35C)'
+                            : '2px solid transparent',
+                          background: isSelectedCoat
+                            ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 12%, transparent)'
+                            : 'transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 15,
+                            height: 15,
+                            borderRadius: '50%',
+                            backgroundColor: ls.hex,
+                            border: '1px solid rgba(0,0,0,0.25)',
+                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.25)',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            fontWeight: isSelectedCoat ? 700 : 500,
+                            letterSpacing: '0.08em',
+                            opacity: isSelectedCoat ? 1 : 0.65,
+                            color: 'var(--color-ink, #F5F1EA)',
+                          }}
+                        >
+                          COAT {ls.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Pantone-Style Technical Specification Footer */}
               <div
-                className="px-3 py-1.5 flex items-center justify-between gap-2 border-t"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
-                  whiteSpace: 'nowrap',
-                }}
+                className="p-4 flex flex-wrap items-center justify-between gap-3 border-t"
+                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
               >
-                <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
-                  <span className="font-mono text-[15px] font-bold tracking-wider">
-                    {displayHex || '#------'}
+                <div className="flex flex-col">
+                  <span className="text-[9px] uppercase tracking-[0.22em] opacity-45">
+                    SPECTRUM HEX / CIELAB {activeCoat ? `· COAT ${activeCoat.label}` : ''}
                   </span>
-
-                  {layerSwatches && (
-                    <div className="flex items-center gap-1.5">
-                      {layerSwatches.map((ls) => (
-                        <div key={ls.label} className="flex items-center gap-0.5" title={`Coat ${ls.label}: ${ls.hex}`}>
-                          <span
-                            className="w-3 h-3 rounded-full border border-white/20 flex-shrink-0"
-                            style={{ backgroundColor: ls.hex }}
-                          />
-                          <span className="text-[9px] font-mono opacity-60">{ls.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {mixedLab && (
-                    <span className="font-mono text-[10px] opacity-50 hidden sm:inline">
-                      L*{mixedLab.L.toFixed(0)} a*{mixedLab.a.toFixed(0)} b*{mixedLab.b.toFixed(0)}
+                  <div className="flex items-baseline gap-3 mt-0.5">
+                    <span className="font-mono text-[20px] font-semibold tracking-wider">
+                      {displayHex || '#------'}
                     </span>
-                  )}
+                    {activeLab && (
+                      <span className="font-mono text-[11px] opacity-55">
+                        L*{activeLab.L.toFixed(0)} a*{activeLab.a.toFixed(0)} b*{activeLab.b.toFixed(0)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="font-mono text-[13px] font-semibold tabular-nums">
-                    {totalAmount > 1000
-                      ? (totalAmount / 1000).toFixed(2) + ' ' + t.l
-                      : totalAmount.toFixed(1) + ' ' + t.ml}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="text-right pr-2">
+                    <span className="block text-[9px] uppercase tracking-[0.2em] opacity-45">
+                      {t.totalVolume}
+                    </span>
+                    <span className="font-mono text-[15px] font-semibold tabular-nums">
+                      {totalAmount > 1000
+                        ? (totalAmount / 1000).toFixed(2) + ' ' + t.l
+                        : totalAmount.toFixed(1) + ' ' + t.ml}
+                    </span>
+                  </div>
 
                   <button
                     onClick={copyHex}
                     disabled={!displayHex}
-                    className="px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] font-semibold border transition-all disabled:opacity-30"
+                    className="h-10 px-4 text-[11px] uppercase tracking-[0.18em] font-semibold border transition-all disabled:opacity-30"
                     style={{
                       borderColor: 'var(--color-accent, #D8A35C)',
                       background: copied ? 'var(--color-accent, #D8A35C)' : 'transparent',
@@ -946,27 +1087,54 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </button>
                 </div>
               </div>
+
+              {liveDeltaE !== null && (
+                <div
+                  className="px-4 py-2 text-[11px] border-t flex items-center justify-between"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
+                    background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
+                  }}
+                >
+                  <span className="opacity-75">
+                    {liveDeltaE <= 2 ? t.ciePerfect : liveDeltaE <= 5 ? t.cieAcceptable : t.cieBad}
+                  </span>
+                </div>
+              )}
             </section>
 
-            {/* СЕКЦИЯ ПРОПОРЦИЙ КОМПОНЕНТОВ — без дублей названий, без наездов и без горизонтального скролла */}
+            {/* СЕКЦИЯ ПРОПОРЦИЙ КОМПОНЕНТОВ */}
             <section
-              className="border p-3.5"
+              className="border p-4 md:p-5"
               style={{
                 background: 'var(--color-surface, #1C1917)',
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
               }}
             >
               <div
-                className="flex items-center justify-between pb-2.5 mb-2.5 border-b"
+                className="flex items-center justify-between pb-3.5 mb-3.5 border-b"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
               >
-                <h2 className="text-[11px] uppercase tracking-[0.2em] font-semibold opacity-75">
-                  {t.mixComposition}
-                </h2>
+                <div className="flex items-center gap-2.5">
+                  {/* Живой мини-индикатор цвета прямо над ползунками */}
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      backgroundColor: squareColor,
+                      border: '1px solid rgba(0,0,0,0.25)',
+                      display: 'inline-block',
+                    }}
+                  />
+                  <h2 className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-75">
+                    {t.mixComposition}
+                  </h2>
+                </div>
+
                 {totalAmount > 0 && (
                   <button
                     onClick={clearAllAmounts}
-                    className="text-[10px] uppercase tracking-[0.14em] opacity-70 hover:opacity-100"
+                    className="text-[10px] uppercase tracking-[0.16em] opacity-60 hover:opacity-100"
                     style={{ color: 'var(--color-danger, #f87171)' }}
                   >
                     {t.clear}
@@ -975,7 +1143,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
 
               {loading ? (
-                <div className="py-8 text-center text-[12px] uppercase tracking-[0.2em] opacity-40">
+                <div className="py-10 text-center text-[12px] uppercase tracking-[0.2em] opacity-40">
                   {t.loading}
                 </div>
               ) : loadError ? (
@@ -992,43 +1160,77 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col gap-3">
                   {paints.map((paint, idx) => {
                     const currentAmount = parseFloat(paint.amount) || 0
                     const sliderMax = Math.max(20, Math.ceil(currentAmount * 1.5))
                     const pct = totalAmount > 0 ? Math.round((currentAmount / totalAmount) * 100) : 0
                     const selectedPigment = pigments.find((p) => p.id === paint.pigmentId)
                     const lore = getPigmentLore(selectedPigment, lang)
-                    const shortCode = lore.code.split('·')[0].trim()
 
                     return (
                       <div
                         key={paint.id}
-                        className="p-2.5 border transition-colors"
+                        className="p-3.5 border transition-colors"
                         style={{
                           background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
                           borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
                         }}
                       >
-                        {/* РЯД 1: Оригинальный селектор пигмента + точный блок мл / % / Удалить (с жёсткими размерами, чтобы ничего не наезжало!) */}
-                        <div className="flex items-center gap-2" style={{ width: '100%' }}>
-                          <span className="font-mono text-[10px] opacity-35" style={{ width: 18, flexShrink: 0 }}>
+                        {/* ЯРУС 1: Номер + Селектор пигмента во всю ширину (название видно целиком!) + Кнопка удаления */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                          <span className="font-mono text-[10px] opacity-40" style={{ width: 20, flexShrink: 0 }}>
                             0{idx + 1}
                           </span>
 
-                          <div className="flex-1 min-w-0" style={{ overflow: 'hidden' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <PigmentSelector
                               pigments={pigments}
                               value={paint.pigmentId}
                               onChange={(newId) => updatePaint(paint.id, 'pigmentId', newId)}
                               lang={lang}
+                              onInspect={(id) => setInspectedPigmentId(id)}
                             />
                           </div>
 
-                          <div
-                            className="flex items-baseline justify-end gap-1"
-                            style={{ width: 72, flexShrink: 0 }}
+                          <button
+                            onClick={() => removePaint(paint.id)}
+                            disabled={paints.length <= 1}
+                            className="w-7 h-7 flex items-center justify-center opacity-40 hover:opacity-100 disabled:opacity-10"
+                            style={{ flexShrink: 0 }}
                           >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {/* ЯРУС 2: Ползунок слева + точный ввод мл и % справа (никаких пересечений с названием!) */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            paddingLeft: 28,
+                            marginTop: 10,
+                          }}
+                        >
+                          <input
+                            type="range"
+                            min="0"
+                            max={sliderMax}
+                            step="0.1"
+                            value={currentAmount}
+                            onChange={(e) => updatePaint(paint.id, 'amount', e.target.value)}
+                            className="h-1 appearance-none cursor-pointer"
+                            style={{
+                              flex: 1,
+                              background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
+                              accentColor: 'var(--color-accent, #D8A35C)',
+                            }}
+                          />
+
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexShrink: 0 }}>
                             <input
                               ref={(el) => {
                                 if (el) amountRefs.current.set(paint.id, el)
@@ -1054,78 +1256,47 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                                   if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
                                 }
                               }}
-                              className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0"
+                              className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[16px] font-semibold focus:outline-none p-0"
                               placeholder="0.0"
-                              style={{ width: 48, color: 'var(--color-ink, #F5F1EA)' }}
+                              style={{ width: 56, color: 'var(--color-ink, #F5F1EA)' }}
                             />
                             <span className="text-[11px] font-mono opacity-45">{t.ml}</span>
                           </div>
 
                           <span
-                            className="font-mono text-[10px] opacity-40 text-right tabular-nums"
-                            style={{ width: 32, flexShrink: 0 }}
+                            className="font-mono text-[10px] opacity-45 text-right tabular-nums"
+                            style={{ width: 34, flexShrink: 0 }}
                           >
                             {pct}%
                           </span>
-
-                          <button
-                            onClick={() => removePaint(paint.id)}
-                            disabled={paints.length <= 1}
-                            className="w-7 h-7 flex items-center justify-center opacity-40 hover:opacity-100 disabled:opacity-10"
-                            style={{ flexShrink: 0 }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-                            </svg>
-                          </button>
                         </div>
 
-                        {/* РЯД 2: Ползунок дозировки */}
-                        <div style={{ paddingLeft: 24, paddingRight: 4, marginTop: 6 }}>
-                          <input
-                            type="range"
-                            min="0"
-                            max={sliderMax}
-                            step="0.1"
-                            value={currentAmount}
-                            onChange={(e) => updatePaint(paint.id, 'amount', e.target.value)}
-                            className="w-full h-1 appearance-none cursor-pointer"
-                            style={{
-                              background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 15%, transparent)',
-                              accentColor: 'var(--color-accent, #D8A35C)',
-                            }}
-                          />
-                        </div>
-
-                        {/* РЯД 3: Компактная строка в 1 линию — Название/Индекс/Бренд слева + кнопка «ⓘ История и где брать» справа */}
+                        {/* ЯРУС 3: Строка паспорта в 1 линию — Укрывистость + Бренд слева, кнопка «ⓘ История и где брать» справа */}
                         <div
-                          className="flex items-center justify-between gap-2"
                           style={{
-                            paddingLeft: 24,
-                            paddingRight: 4,
-                            marginTop: 6,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                            paddingLeft: 28,
+                            marginTop: 8,
+                            paddingTop: 7,
+                            borderTop: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 7%, transparent)',
                             fontSize: 11,
-                            lineHeight: '16px',
                           }}
                         >
-                          <div
+                          <span
                             style={{
+                              opacity: 0.6,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              opacity: 0.72,
                               minWidth: 0,
                               flex: 1,
                             }}
                           >
-                            <strong style={{ fontWeight: 600 }}>{pigmentName(selectedPigment)}</strong>
-                            {' · '}
-                            <span className="font-mono">{shortCode}</span>
-                            {' · '}
-                            <span>{opacityLabel(lore.opacity)}</span>
-                            {' · '}
-                            <span>{lore.whereToBuy.leatherBrands[0]}</span>
-                          </div>
+                            {opacityLabel(lore.opacity)} · {lore.whereToBuy.leatherBrands[0]}
+                          </span>
 
                           <button
                             type="button"
@@ -1137,6 +1308,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               textDecoration: 'underline',
                               whiteSpace: 'nowrap',
                               fontSize: 11,
+                              cursor: 'pointer',
                             }}
                           >
                             ⓘ {t.pigmentInfoBtn}
@@ -1148,11 +1320,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-2 mt-3">
+              <div className="flex flex-col sm:flex-row gap-2.5 mt-4">
                 <button
                   onClick={addPaint}
                   disabled={loading || loadError}
-                  className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold border transition-opacity disabled:opacity-40"
+                  className="flex-1 py-3 text-[11px] uppercase tracking-[0.18em] font-semibold border transition-opacity disabled:opacity-40"
                   style={{
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 22%, transparent)',
                     color: 'var(--color-ink, #F5F1EA)',
@@ -1165,7 +1337,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <button
                     onClick={autoAdjustCurrentMix}
                     disabled={isAutoAdjusting || loading}
-                    className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold transition-all disabled:opacity-40"
+                    className="flex-1 py-3 text-[11px] uppercase tracking-[0.18em] font-semibold transition-all disabled:opacity-40"
                     style={{
                       background: 'var(--color-accent, #D8A35C)',
                       color: 'var(--color-bg, #141210)',
@@ -1183,22 +1355,22 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           <>
             {/* TARGET SWATCH & INTERACTIVE LOOKBOOK SAMPLER */}
             <section
-              className="border p-4"
+              className="border p-4 md:p-5"
               style={{
                 background: 'var(--color-surface, #1C1917)',
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
               }}
             >
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-75">
                   {t.targetColor}
                 </h2>
                 <span className="font-mono text-[11px] opacity-45">CIEDE2000 ENGINE</span>
               </div>
 
-              <div className="flex items-stretch gap-3 mb-3">
+              <div className="flex items-stretch gap-3 mb-4">
                 <div
-                  className="w-20 h-12 border flex-shrink-0"
+                  className="w-20 h-14 border flex-shrink-0"
                   style={{
                     backgroundColor: targetHex,
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
@@ -1226,7 +1398,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-3">
                 {isIOS ? (
                   <button
                     type="button"
@@ -1356,7 +1528,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
             {/* PARAMETERS & COVERAGE SYSTEM */}
             <section
-              className="border p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5"
+              className="border p-4 md:p-5 grid grid-cols-1 sm:grid-cols-2 gap-3"
               style={{
                 background: 'var(--color-surface, #1C1917)',
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
@@ -1397,7 +1569,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
             {/* CATEGORIZED ATELIER ARCHIVE */}
             <section
-              className="border p-4"
+              className="border p-4 md:p-5"
               style={{
                 background: 'var(--color-surface, #1C1917)',
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
@@ -1494,7 +1666,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <button
               onClick={runRecipeSearch}
               disabled={recipeLoading || loading || !targetHex || targetHex.length < 7 || inventoryIds.length === 0}
-              className="w-full py-3.5 text-[12px] uppercase tracking-[0.24em] font-semibold transition-opacity disabled:opacity-35"
+              className="w-full py-4 text-[12px] uppercase tracking-[0.24em] font-semibold transition-opacity disabled:opacity-35"
               style={{
                 background: 'var(--color-accent, #D8A35C)',
                 color: 'var(--color-bg, #141210)',
@@ -1523,7 +1695,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   }}
                 >
                   <div
-                    className="grid grid-cols-2 h-24 border-b"
+                    className="grid grid-cols-2 h-28 border-b"
                     style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)' }}
                   >
                     <div className="p-3 flex flex-col justify-between" style={{ backgroundColor: targetHex }}>
@@ -1547,7 +1719,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </div>
                   </div>
 
-                  <div className="p-4">
+                  <div className="p-4 md:p-5">
                     <div
                       className="flex flex-col divide-y mb-4"
                       style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
@@ -1561,9 +1733,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
                                 <span
-                                  className="w-3 h-3 rounded-full border border-white/20 flex-shrink-0"
+                                  className="w-3.5 h-3.5 rounded-full border border-white/20 flex-shrink-0"
                                   style={{ backgroundColor: item.pigment.hex || '#888' }}
                                 />
                                 <span className="text-[13px] font-medium truncate">
@@ -1575,7 +1747,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 mt-1" style={{ paddingLeft: 20, fontSize: 11 }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 8,
+                                paddingLeft: 24,
+                                marginTop: 4,
+                                fontSize: 11,
+                              }}
+                            >
                               <span className="opacity-60 truncate">
                                 {lore.code.split('·')[0].trim()} · {lore.whereToBuy.leatherBrands[0]}
                               </span>
@@ -1616,7 +1798,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         )}
       </div>
 
-      {/* МОДАЛЬНЫЙ ПАСПОРТ ПИГМЕНТА (на надёжных inline-стилях, не зависящих от сборки Tailwind) */}
+      {/* МОДАЛЬНЫЙ ПАСПОРТ ПИГМЕНТА (Контрастный Lookbook стиль) */}
       <AnimatePresence>
         {inspectedPigmentId && inspectedLore && (
           <motion.div
@@ -1628,7 +1810,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               position: 'fixed',
               inset: 0,
               zIndex: 9999,
-              backgroundColor: 'rgba(0, 0, 0, 0.72)',
+              backgroundColor: 'rgba(15, 13, 11, 0.72)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1640,35 +1822,61 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 24, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="border p-4"
               style={{
                 width: '100%',
                 maxWidth: 480,
                 maxHeight: '85vh',
                 overflowY: 'auto',
-                background: 'var(--color-surface, #1C1917)',
-                borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 22%, transparent)',
-                color: 'var(--color-ink, #F5F1EA)',
-                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                backgroundColor: '#FAF7F2',
+                color: '#181512',
+                border: '1px solid #2A2521',
+                padding: 20,
+                boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
               }}
             >
               <div
-                className="flex items-center justify-between gap-3 pb-3 mb-3 border-b"
-                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)' }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  paddingBottom: 14,
+                  marginBottom: 14,
+                  borderBottom: '1px solid rgba(24,21,18,0.12)',
+                }}
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   <div
-                    className="w-9 h-9 border flex-shrink-0"
                     style={{
+                      width: 38,
+                      height: 38,
+                      flexShrink: 0,
                       backgroundColor: inspectedPigment?.hex || '#2c2623',
-                      borderColor: 'rgba(255,255,255,0.25)',
+                      border: '1px solid rgba(0,0,0,0.25)',
                     }}
                   />
-                  <div className="min-w-0">
-                    <span className="text-[9px] font-mono uppercase tracking-[0.16em] opacity-60 block truncate">
+                  <div style={{ minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.16em',
+                        color: '#6E655C',
+                        display: 'block',
+                      }}
+                    >
                       {t.dossierTitle} · {inspectedLore.code}
                     </span>
-                    <h3 className="text-[16px] font-serif font-semibold truncate">
+                    <h3
+                      style={{
+                        fontSize: 17,
+                        fontFamily: 'serif',
+                        fontWeight: 700,
+                        color: '#181512',
+                        margin: 0,
+                      }}
+                    >
                       {inspectedPigmentId === 'acrylic_binder' ? t.binder : pigmentName(inspectedPigment)}
                     </h3>
                   </div>
@@ -1676,71 +1884,111 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                 <button
                   onClick={() => setInspectedPigmentId(null)}
-                  className="w-8 h-8 flex items-center justify-center border opacity-70 hover:opacity-100 flex-shrink-0"
-                  style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)' }}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(24,21,18,0.2)',
+                    background: 'transparent',
+                    color: '#181512',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="flex flex-col gap-3 text-[12px]" style={{ lineHeight: 1.55 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, lineHeight: 1.55 }}>
                 <div
-                  className="p-2.5 border"
                   style={{
-                    background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
-                    borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                    padding: 12,
+                    backgroundColor: '#F0ECE3',
+                    border: '1px solid rgba(24,21,18,0.1)',
                   }}
                 >
-                  <div className="text-[9px] uppercase tracking-[0.14em] opacity-50">{t.dossierChem}</div>
-                  <div className="font-semibold">{inspectedLore.chemicalFamily[lang]}</div>
-                  <div className="opacity-75 mt-1">
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#6E655C' }}>
+                    {t.dossierChem}
+                  </div>
+                  <div style={{ fontWeight: 700, color: '#181512', marginTop: 2 }}>
+                    {inspectedLore.chemicalFamily[lang]}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#4A433C', marginTop: 4 }}>
                     {opacityLabel(inspectedLore.opacity)} · {inspectedLore.lightfastness} · {inspectedLore.tintingStrength[lang]}
                   </div>
                 </div>
 
                 <div>
                   <div
-                    className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-1"
-                    style={{ color: 'var(--color-accent, #D8A35C)' }}
+                    style={{
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      fontWeight: 700,
+                      color: '#8C5E24',
+                      marginBottom: 4,
+                    }}
                   >
                     {t.dossierHistory}
                   </div>
-                  <p className="opacity-85">{inspectedLore.history[lang]}</p>
+                  <p style={{ margin: 0, color: '#26221E' }}>{inspectedLore.history[lang]}</p>
                 </div>
 
                 <div>
                   <div
-                    className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-1"
-                    style={{ color: 'var(--color-accent, #D8A35C)' }}
+                    style={{
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      fontWeight: 700,
+                      color: '#8C5E24',
+                      marginBottom: 4,
+                    }}
                   >
                     {t.dossierLeather}
                   </div>
-                  <p className="opacity-85">{inspectedLore.leatherUsage[lang]}</p>
+                  <p style={{ margin: 0, color: '#26221E' }}>{inspectedLore.leatherUsage[lang]}</p>
                 </div>
 
                 <div
-                  className="p-3 border flex flex-col gap-2"
                   style={{
-                    background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 8%, transparent)',
-                    borderColor: 'color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)',
+                    padding: 14,
+                    backgroundColor: '#EFE6D5',
+                    border: '1px solid #C59B5F',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
                   }}
                 >
                   <div
-                    className="text-[10px] uppercase tracking-[0.16em] font-semibold"
-                    style={{ color: 'var(--color-accent, #D8A35C)' }}
+                    style={{
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.18em',
+                      fontWeight: 700,
+                      color: '#8C5E24',
+                    }}
                   >
                     {t.dossierWhereToBuy}
                   </div>
 
                   <div>
-                    <div className="text-[11px] font-semibold mb-1">{t.dossierLeatherBrands}</div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#181512', marginBottom: 5 }}>
+                      {t.dossierLeatherBrands}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {inspectedLore.whereToBuy.leatherBrands.map((b) => (
                         <span
                           key={b}
-                          className="text-[11px] font-mono px-2 py-0.5 border"
                           style={{
-                            borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)',
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            padding: '3px 8px',
+                            backgroundColor: '#FAF7F2',
+                            border: '1px solid rgba(24,21,18,0.2)',
+                            color: '#181512',
                           }}
                         >
                           {b}
@@ -1750,14 +1998,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </div>
 
                   <div>
-                    <div className="text-[11px] font-semibold mb-1">{t.dossierArtSuppliers}</div>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#181512', marginBottom: 5 }}>
+                      {t.dossierArtSuppliers}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {inspectedLore.whereToBuy.pigmentSuppliers.map((s) => (
                         <span
                           key={s}
-                          className="text-[11px] font-mono px-2 py-0.5 border opacity-85"
                           style={{
-                            borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            padding: '3px 8px',
+                            backgroundColor: '#FAF7F2',
+                            border: '1px solid rgba(24,21,18,0.16)',
+                            color: '#3A342E',
                           }}
                         >
                           {s}
@@ -1766,7 +2020,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </div>
                   </div>
 
-                  <div className="text-[11px] opacity-75 pt-1 border-t" style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#4A433C',
+                      paddingTop: 8,
+                      borderTop: '1px solid rgba(24,21,18,0.12)',
+                    }}
+                  >
                     {inspectedLore.whereToBuy.searchHint[lang]}
                   </div>
                 </div>
@@ -1774,10 +2035,18 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
               <button
                 onClick={() => setInspectedPigmentId(null)}
-                className="w-full mt-4 py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold border"
                 style={{
-                  borderColor: 'var(--color-accent, #D8A35C)',
-                  color: 'var(--color-accent, #D8A35C)',
+                  width: '100%',
+                  marginTop: 16,
+                  padding: '11px 16px',
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.2em',
+                  fontWeight: 700,
+                  backgroundColor: '#181512',
+                  color: '#F5F1EA',
+                  border: 'none',
+                  cursor: 'pointer',
                 }}
               >
                 {t.dossierClose}
