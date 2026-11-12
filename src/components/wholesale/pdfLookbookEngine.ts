@@ -91,6 +91,68 @@ function isAndroidTelegramOrWebView(): boolean {
 }
 
 /**
+ * Вызывает нативное модальное окно скачивания файла в Telegram Mini App со сбросом
+ * возможной зависшей блокировки `fileDownloadRequestedCallback` в `telegram-web-app.js`
+ * и прямым фолбэком в мост `web_app_request_file_download` (без редиректа через openLink).
+ */
+function requestTelegramNativeFileDownload(url: string, fileName: string): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const win = window as unknown as {
+    Telegram?: {
+      WebView?: {
+        receiveEvent?: (eventType: string, eventData: unknown) => void;
+        postEvent?: (
+          eventType: string,
+          callback?: boolean | ((...args: unknown[]) => void),
+          eventData?: unknown
+        ) => void;
+      };
+    };
+    TelegramWebviewProxy?: {
+      postEvent?: (eventType: string, eventData: string) => void;
+    };
+  };
+
+  // Сбрасываем внутренний флаг активного скачивания в telegram-web-app.js,
+  // который может остаться заблокированным после предыдущего вызова downloadFile.
+  try {
+    win.Telegram?.WebView?.receiveEvent?.('file_download_requested', {
+      status: 'cancelled',
+    });
+  } catch {}
+
+  const tg = getTgWebApp();
+  if (typeof tg?.downloadFile === 'function') {
+    try {
+      tg.downloadFile({ url, file_name: fileName });
+      return true;
+    } catch {
+      // Если обёртка SDK выбросила WebAppDownloadFileInProgress, отправляем событие напрямую в нативный мост
+    }
+  }
+
+  try {
+    if (typeof win.Telegram?.WebView?.postEvent === 'function') {
+      win.Telegram.WebView.postEvent('web_app_request_file_download', false, {
+        url,
+        file_name: fileName,
+      });
+      return true;
+    }
+    if (typeof win.TelegramWebviewProxy?.postEvent === 'function') {
+      win.TelegramWebviewProxy.postEvent(
+        'web_app_request_file_download',
+        JSON.stringify({ url, file_name: fileName })
+      );
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+/**
  * Извлекает Telegram ID клиента и формирует персональный код для водяных знаков.
  */
 export function getTelegramUserInfo(): { id?: number; clientCode: string; partnerCode: string } {
@@ -810,7 +872,8 @@ function triggerAnchorDownload(url: string, fileName: string): void {
 }
 
 /**
- * Сохранение готового PDF-файла с учётом ограничений Android Telegram WebView на blob:-ссылки.
+ * Сохранение готового PDF-файла без выброса во внешний браузер (без tg.openLink)
+ * и со сбросом блокировки повторного вызова модального окна в Telegram на Android.
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -825,7 +888,7 @@ export async function triggerPdfDownload(status: {
       navigator.maxTouchPoints > 1);
   const isAndroidWebViewEnv = isAndroidTelegramOrWebView();
 
-  const stamp = String(Date.now()).slice(-6);
+  const stamp = String(Date.now()).slice(-4);
   const baseName = status.fileName.toLowerCase().endsWith('.pdf')
     ? status.fileName.slice(0, -4)
     : status.fileName;
@@ -835,18 +898,10 @@ export async function triggerPdfDownload(status: {
     const baseFullUrl = rawUrl.startsWith('http')
       ? rawUrl
       : window.location.origin + rawUrl;
-    const sep = baseFullUrl.includes('?') ? '&' : '?';
-    return (
-      baseFullUrl +
-      sep +
-      '_dl=' +
-      String(Date.now()) +
-      '&fn=' +
-      encodeURIComponent(uniqueFileName)
-    );
+    return baseFullUrl + (baseFullUrl.includes('?') ? '&' : '?') + '_dl=' + String(Date.now());
   };
 
-  // ——— 1. iOS: системный Share Sheet (самый надёжный способ для iPhone/iPad)
+  // ——— 1. iOS: системный Share Sheet
   if (isIOS && status.localBlob) {
     try {
       const file = new File([status.localBlob], uniqueFileName, {
@@ -864,68 +919,19 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // ——— 2. Android Telegram Mini App / Android WebView:
-  // В Android WebView <a href="blob:..."> НЕ работает (DownloadManager игнорирует схему blob: без ошибки JS).
-  // Поэтому на Android в Telegram приоритет отдаётся серверному HTTPS URL (через tg.downloadFile / openLink / HTTP-ссылку)
-  // либо системному navigator.share({ files }).
-  if (isAndroidWebViewEnv) {
-    if (status.downloadUrl) {
-      const freshUrl = buildFreshServerUrl(status.downloadUrl);
-      const tg = getTgWebApp();
-
-      if (typeof tg?.downloadFile === 'function') {
-        try {
-          tg.downloadFile(
-            { url: freshUrl, file_name: uniqueFileName },
-            (accepted) => {
-              if (!accepted) {
-                if (typeof tg.openLink === 'function') {
-                  tg.openLink(freshUrl);
-                } else {
-                  triggerAnchorDownload(freshUrl, uniqueFileName);
-                }
-              }
-            }
-          );
-          return;
-        } catch {
-          // переходим к следующему методу
-        }
-      }
-
-      if (typeof tg?.openLink === 'function') {
-        try {
-          tg.openLink(freshUrl);
-          return;
-        } catch {
-          // переходим к прямому скачиванию по HTTPS-ссылке
-        }
-      }
-
-      triggerAnchorDownload(freshUrl, uniqueFileName);
+  // ——— 2. Android Telegram Mini App / WebView:
+  // Вызываем нативное модальное окно Telegram со сбросом зависшего лока в telegram-web-app.js.
+  // ВАЖНО: никогда не вызываем tg.openLink(freshUrl), чтобы не выбрасывать пользователя на www.cordwainer.app.
+  if (isAndroidWebViewEnv && status.downloadUrl) {
+    const freshUrl = buildFreshServerUrl(status.downloadUrl);
+    if (requestTelegramNativeFileDownload(freshUrl, uniqueFileName)) {
       return;
     }
-
-    // Если серверный downloadUrl отсутствует, пробуем системный Web Share API на Android
-    if (status.localBlob) {
-      try {
-        const file = new File([status.localBlob], uniqueFileName, {
-          type: 'application/pdf',
-        });
-        const nav = navigator as Navigator & {
-          canShare?: (d: { files?: File[] }) => boolean;
-        };
-        if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
-          await nav.share({ files: [file], title: uniqueFileName });
-          return;
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return;
-      }
-    }
+    triggerAnchorDownload(freshUrl, uniqueFileName);
+    return;
   }
 
-  // ——— 3. Стандартные браузеры (Desktop / Web Chrome / Safari) — быстрый localBlob
+  // ——— 3. Стандартные браузеры (Desktop / Web Chrome / Safari) — localBlob
   if (status.localBlob && !isAndroidWebViewEnv) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
@@ -937,27 +943,12 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // ——— 4. Универсальный запасной путь через серверный URL
+  // ——— 4. Запасной путь через серверный URL
   if (status.downloadUrl) {
     const freshUrl = buildFreshServerUrl(status.downloadUrl);
-    const tg = getTgWebApp();
-
-    if (typeof tg?.downloadFile === 'function') {
-      try {
-        tg.downloadFile(
-          { url: freshUrl, file_name: uniqueFileName },
-          (accepted) => {
-            if (!accepted) {
-              triggerAnchorDownload(freshUrl, uniqueFileName);
-            }
-          }
-        );
-        return;
-      } catch {
-        // fall through
-      }
+    if (requestTelegramNativeFileDownload(freshUrl, uniqueFileName)) {
+      return;
     }
-
     triggerAnchorDownload(freshUrl, uniqueFileName);
   }
 }
