@@ -58,10 +58,17 @@ interface InteractiveHitBox {
 }
 
 // ============================================================================
-// ZERO-LATENCY AUDIO ENGINE ДЛЯ МГНОВЕННОГО ЗАПУСКА НА 95% (/pleasewait.mp3)
+// УПРАВЛЕНИЕ АУДИО ПРОГРЕСС-БАРА:
+// - 0% – 80%: играет основной аудиофайл, на 80% принудительно выключается
+// - 95% – 100% (до конца формирования PDF): зацикленно играет publik/pleasewait.mp3
 // ============================================================================
 
-const PLEASE_WAIT_AUDIO_URLS = ['/pleasewait.mp3', '/publik/pleasewait.mp3', 'pleasewait.mp3'];
+const PLEASE_WAIT_AUDIO_URLS = [
+  '/publik/pleasewait.mp3',
+  'publik/pleasewait.mp3',
+  '/pleasewait.mp3',
+  'pleasewait.mp3',
+];
 
 let sharedAudioCtx: AudioContext | null = null;
 let decodedPleaseWaitBuffer: AudioBuffer | null = null;
@@ -69,6 +76,120 @@ let rawPleaseWaitArrayBuffer: ArrayBuffer | null = null;
 let preloadPromise: Promise<void> | null = null;
 let fallbackHtmlAudio: HTMLAudioElement | null = null;
 let resolvedAudioUrl: string = PLEASE_WAIT_AUDIO_URLS[0];
+
+let activePleaseWaitSource: AudioBufferSourceNode | null = null;
+let activePleaseWaitHtmlAudio: HTMLAudioElement | null = null;
+let isPleaseWaitLoopActive = false;
+
+/**
+ * Глобальный реестр всех активных медиа-элементов и WebAudio-источников,
+ * чтобы гарантированно остановить основной аудиофайл ровно на 80% прогресса,
+ * даже если он был создан через `new Audio()` вне DOM.
+ */
+const trackedMediaElements = new Set<HTMLMediaElement>();
+const trackedWebAudioSources = new Set<AudioBufferSourceNode>();
+const internalAudioNodes = new WeakSet<AudioNode>();
+let isMainAudioMutedAfter80 = false;
+let mediaTrackerInstalled = false;
+
+function isPleaseWaitMediaElement(el: HTMLMediaElement): boolean {
+  if (el === fallbackHtmlAudio || el === activePleaseWaitHtmlAudio) return true;
+  const src = (el.currentSrc || el.src || '').toLowerCase();
+  return src.includes('pleasewait');
+}
+
+function installGlobalAudioTracker(): void {
+  if (typeof window === 'undefined' || mediaTrackerInstalled) return;
+  mediaTrackerInstalled = true;
+
+  if (typeof HTMLMediaElement !== 'undefined' && HTMLMediaElement.prototype?.play) {
+    const originalPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement): Promise<void> {
+      trackedMediaElements.add(this);
+
+      // Если прогресс уже достиг 80%, блокируем повторный запуск основного аудиофайла
+      if (isMainAudioMutedAfter80 && !isPleaseWaitMediaElement(this)) {
+        try {
+          this.pause();
+          this.currentTime = 0;
+        } catch {}
+        return Promise.resolve();
+      }
+
+      return originalPlay.apply(this);
+    };
+  }
+
+  if (typeof AudioBufferSourceNode !== 'undefined' && AudioBufferSourceNode.prototype?.start) {
+    const originalStart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (
+      this: AudioBufferSourceNode,
+      when?: number,
+      offset?: number,
+      duration?: number
+    ): void {
+      if (!internalAudioNodes.has(this)) {
+        trackedWebAudioSources.add(this);
+        if (isMainAudioMutedAfter80) {
+          try {
+            this.disconnect();
+          } catch {}
+          return;
+        }
+      }
+      if (duration !== undefined) {
+        originalStart.call(this, when, offset, duration);
+      } else if (offset !== undefined) {
+        originalStart.call(this, when, offset);
+      } else if (when !== undefined) {
+        originalStart.call(this, when);
+      } else {
+        originalStart.call(this);
+      }
+    };
+  }
+}
+
+installGlobalAudioTracker();
+
+/**
+ * Принудительно выключает основной аудиофайл прогресс-бара на отметке 80%
+ * и блокирует его повторное включение до завершения генерации PDF.
+ */
+export function stopMainProgressAudio(): void {
+  if (typeof window === 'undefined') return;
+  isMainAudioMutedAfter80 = true;
+
+  if (typeof document !== 'undefined') {
+    const domMedia = document.querySelectorAll('audio, video');
+    domMedia.forEach((node) => {
+      if (node instanceof HTMLMediaElement) {
+        trackedMediaElements.add(node);
+      }
+    });
+  }
+
+  trackedMediaElements.forEach((media) => {
+    if (isPleaseWaitMediaElement(media)) return;
+    try {
+      media.loop = false;
+      media.pause();
+      media.currentTime = 0;
+    } catch {}
+  });
+
+  trackedWebAudioSources.forEach((sourceNode) => {
+    if (internalAudioNodes.has(sourceNode)) return;
+    try {
+      sourceNode.loop = false;
+      sourceNode.stop(0);
+    } catch {}
+    try {
+      sourceNode.disconnect();
+    } catch {}
+  });
+  trackedWebAudioSources.clear();
+}
 
 /**
  * Возвращает или создаёт единый экземпляр AudioContext.
@@ -91,7 +212,25 @@ function getOrCreateAudioContext(): AudioContext | null {
 }
 
 /**
- * Заранее скачивает и декодирует `/pleasewait.mp3` в оперативную память,
+ * Проверяет, что скачанный буфер не является HTML-фолбэком SPA роутера.
+ */
+function isLikelyAudioBuffer(buf: ArrayBuffer, contentType: string): boolean {
+  if (buf.byteLength < 100) return false;
+  if (contentType.includes('text/html')) return false;
+  try {
+    const head = new TextDecoder('utf-8', { fatal: false })
+      .decode(buf.slice(0, 64))
+      .trim()
+      .toLowerCase();
+    if (head.startsWith('<!doctype') || head.startsWith('<html') || head.startsWith('<head')) {
+      return false;
+    }
+  } catch {}
+  return true;
+}
+
+/**
+ * Заранее скачивает и декодирует `publik/pleasewait.mp3` в оперативную память,
  * чтобы в момент 95% звук запустился за 0 мс без обращения к сети и диску.
  */
 export function preloadPleaseWaitAudio(): Promise<void> {
@@ -104,21 +243,31 @@ export function preloadPleaseWaitAudio(): Promise<void> {
       try {
         const res = await fetch(candidateUrl, { cache: 'force-cache' });
         if (!res.ok) continue;
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
         const buf = await res.arrayBuffer();
-        if (buf.byteLength < 100) continue;
+        if (!isLikelyAudioBuffer(buf, contentType)) continue;
 
-        resolvedAudioUrl = candidateUrl;
-        rawPleaseWaitArrayBuffer = buf.slice(0);
+        const ctx = getOrCreateAudioContext();
+        if (ctx) {
+          try {
+            const decoded = await ctx.decodeAudioData(buf.slice(0));
+            decodedPleaseWaitBuffer = decoded;
+            resolvedAudioUrl = candidateUrl;
+            rawPleaseWaitArrayBuffer = buf.slice(0);
+          } catch {
+            // Если файл по данному пути не декодируется как аудио, проверяем следующий путь
+            continue;
+          }
+        } else {
+          resolvedAudioUrl = candidateUrl;
+          rawPleaseWaitArrayBuffer = buf.slice(0);
+        }
 
         if (!fallbackHtmlAudio && typeof Audio !== 'undefined') {
           fallbackHtmlAudio = new Audio(resolvedAudioUrl);
           fallbackHtmlAudio.preload = 'auto';
+          fallbackHtmlAudio.loop = true;
           fallbackHtmlAudio.load();
-        }
-
-        const ctx = getOrCreateAudioContext();
-        if (ctx) {
-          decodedPleaseWaitBuffer = await ctx.decodeAudioData(buf.slice(0));
         }
         break;
       } catch {
@@ -148,6 +297,7 @@ function unlockAndWarmupPleaseWaitAudio(): void {
       // Пустой 1-сэмпловый импульс для мгновенного пробуждения аппаратного аудио-канала
       const silentBuffer = ctx.createBuffer(1, 1, 22050);
       const source = ctx.createBufferSource();
+      internalAudioNodes.add(source);
       source.buffer = silentBuffer;
       source.connect(ctx.destination);
       source.start(0);
@@ -167,16 +317,59 @@ function unlockAndWarmupPleaseWaitAudio(): void {
     try {
       fallbackHtmlAudio = new Audio(resolvedAudioUrl);
       fallbackHtmlAudio.preload = 'auto';
+      fallbackHtmlAudio.loop = true;
       fallbackHtmlAudio.load();
     } catch {}
   }
 }
 
 /**
- * Мгновенно запускает воспроизведение `pleasewait.mp3` без задержек (0ms latency).
+ * Останавливает зацикленное воспроизведение `publik/pleasewait.mp3`
+ * (вызывается автоматически по окончании формирования PDF-файла).
+ */
+export function stopPleaseWaitAudio(): void {
+  isPleaseWaitLoopActive = false;
+
+  if (activePleaseWaitSource) {
+    try {
+      activePleaseWaitSource.loop = false;
+      activePleaseWaitSource.stop(0);
+    } catch {}
+    try {
+      activePleaseWaitSource.disconnect();
+    } catch {}
+    activePleaseWaitSource = null;
+  }
+
+  if (activePleaseWaitHtmlAudio) {
+    try {
+      activePleaseWaitHtmlAudio.loop = false;
+      activePleaseWaitHtmlAudio.pause();
+      activePleaseWaitHtmlAudio.currentTime = 0;
+    } catch {}
+    activePleaseWaitHtmlAudio = null;
+  }
+
+  if (fallbackHtmlAudio) {
+    try {
+      fallbackHtmlAudio.loop = false;
+      fallbackHtmlAudio.pause();
+      fallbackHtmlAudio.currentTime = 0;
+    } catch {}
+  }
+}
+
+/**
+ * Мгновенно запускает зацикленное воспроизведение `publik/pleasewait.mp3` на 95%
+ * без задержек (0ms latency) до окончания формирования PDF-файла.
  */
 export function playPleaseWaitAudioInstant(): void {
   if (typeof window === 'undefined') return;
+
+  // Гарантируем, что основной аудиофайл выключен перед запуском pleasewait.mp3
+  stopMainProgressAudio();
+  stopPleaseWaitAudio();
+  isPleaseWaitLoopActive = true;
 
   const ctx = getOrCreateAudioContext();
   if (ctx && decodedPleaseWaitBuffer) {
@@ -185,21 +378,45 @@ export function playPleaseWaitAudioInstant(): void {
         void ctx.resume();
       }
       const source = ctx.createBufferSource();
+      internalAudioNodes.add(source);
       source.buffer = decodedPleaseWaitBuffer;
+      source.loop = true;
       source.connect(ctx.destination);
       source.start(0);
+      activePleaseWaitSource = source;
       return;
     } catch {}
   }
 
-  // Резервный запуск через предзагруженный HTMLAudioElement
+  // Резервный запуск через предзагруженный HTMLAudioElement в режиме зацикливания (loop = true)
   try {
     const audio = fallbackHtmlAudio ?? new Audio(resolvedAudioUrl);
     fallbackHtmlAudio = audio;
+    activePleaseWaitHtmlAudio = audio;
+    audio.loop = true;
     audio.currentTime = 0;
     const playResult = audio.play();
     if (playResult && typeof playResult.catch === 'function') {
-      playResult.catch(() => {});
+      playResult.catch(() => {
+        // Если HTMLAudioElement ещё не готов, пробуем запустить через WebAudio после декодирования
+        if (isPleaseWaitLoopActive && ctx && rawPleaseWaitArrayBuffer && !decodedPleaseWaitBuffer) {
+          ctx
+            .decodeAudioData(rawPleaseWaitArrayBuffer.slice(0))
+            .then((decoded) => {
+              decodedPleaseWaitBuffer = decoded;
+              if (isPleaseWaitLoopActive && !activePleaseWaitSource) {
+                const srcNode = ctx.createBufferSource();
+                internalAudioNodes.add(srcNode);
+                srcNode.buffer = decoded;
+                srcNode.loop = true;
+                srcNode.connect(ctx.destination);
+                srcNode.start(0);
+                activePleaseWaitSource = srcNode;
+              }
+            })
+            .catch(() => {});
+        }
+      });
     }
   } catch {}
 }
@@ -1116,6 +1333,8 @@ export interface GenerateLookbookParams {
   securityNote: string;
   onStageChange: (stage: PdfStage) => void;
   onPageProgress: (currentPage: number, totalPages: number) => void;
+  /** Опциональная ссылка на основной аудиофайл прогресс-бара (0% – 80%) */
+  mainAudio?: HTMLAudioElement | string;
 }
 
 /**
@@ -1135,900 +1354,938 @@ export async function generateAndDeliverLookbookPdf(
     securityNote,
     onStageChange,
     onPageProgress,
+    mainAudio,
   } = params;
 
-  // Разблокируем и прогреваем аудио-движок в момент старта прогресс-бара (0%),
-  // чтобы на 95% файл /pleasewait.mp3 сработал мгновенно (0 мс задержки)
+  // Сбрасываем флаги блокировки на старте (0%):
+  // основной аудиофайл свободно проигрывается от 0% до 80%,
+  // а publik/pleasewait.mp3 прогревается для мгновенного старта на 95%.
+  isMainAudioMutedAfter80 = false;
+  stopPleaseWaitAudio();
   unlockAndWarmupPleaseWaitAudio();
+
+  if (mainAudio) {
+    try {
+      const mainEl = typeof mainAudio === 'string' ? new Audio(mainAudio) : mainAudio;
+      trackedMediaElements.add(mainEl);
+      if (mainEl.paused) {
+        mainEl.currentTime = 0;
+        const p = mainEl.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      }
+    } catch {}
+  }
+
+  let hasStoppedMainAudioAt80 = false;
   let hasPlayedPleaseWaitAt95 = false;
 
-  const clientCode = tgUser.clientCode || tgUser.partnerCode || 'CARDIO-OFFICIAL';
-  const pdfT = getEditorialText(lang);
+  try {
+    const clientCode = tgUser.clientCode || tgUser.partnerCode || 'CARDIO-OFFICIAL';
+    const pdfT = getEditorialText(lang);
 
-  const VIRTUAL_W = 1240;
-  const VIRTUAL_H = 1754;
-  const OUT_W = 900;
-  const OUT_H = 1273;
-  const SCALE_FACTOR = OUT_W / VIRTUAL_W;
+    const VIRTUAL_W = 1240;
+    const VIRTUAL_H = 1754;
+    const OUT_W = 900;
+    const OUT_H = 1273;
+    const SCALE_FACTOR = OUT_W / VIRTUAL_W;
 
-  const W = VIRTUAL_W;
-  const H = VIRTUAL_H;
-  const PAD = 88;
-  const CONTENT_W = W - PAD * 2;
+    const W = VIRTUAL_W;
+    const H = VIRTUAL_H;
+    const PAD = 88;
+    const CONTENT_W = W - PAD * 2;
 
-  // Luxury editorial palette
-  const PAPER = '#F5F3EE';
-  const GRAPHITE = '#171717';
-  const GREY = '#85837E';
-  const METALLIC = '#A69984';
-  const RULE = '#D6D1C7';
+    // Luxury editorial palette
+    const PAPER = '#F5F3EE';
+    const GRAPHITE = '#171717';
+    const GREY = '#85837E';
+    const METALLIC = '#A69984';
+    const RULE = '#D6D1C7';
 
-  const includeAutumn = seasonFilter === 'all' || seasonFilter === 'autumn';
-  const includeWinter = seasonFilter === 'all' || seasonFilter === 'winter';
+    const includeAutumn = seasonFilter === 'all' || seasonFilter === 'autumn';
+    const includeWinter = seasonFilter === 'all' || seasonFilter === 'winter';
 
-  type PageDescriptor =
-    | { type: 'cover' }
-    | { type: 'manifesto' }
-    | { type: 'divider'; season: SeasonKey; count: number }
-    | {
-        type: 'product';
-        item: FullCatalogPriceItem;
-        indexInCatalog: number;
-        layoutVariant: 0 | 1 | 2;
+    type PageDescriptor =
+      | { type: 'cover' }
+      | { type: 'manifesto' }
+      | { type: 'divider'; season: SeasonKey; count: number }
+      | {
+          type: 'product';
+          item: FullCatalogPriceItem;
+          indexInCatalog: number;
+          layoutVariant: 0 | 1 | 2;
+        }
+      | { type: 'contacts' };
+
+    const pagePlan: PageDescriptor[] = [{ type: 'cover' }, { type: 'manifesto' }];
+
+    const outlinesList: Array<{ title: string; pageIndex: number }> = [
+      { title: 'Обложка CARDIO 2026', pageIndex: 0 },
+      { title: pdfT.tocTitle, pageIndex: 1 },
+    ];
+
+    let globalProdIdx = 1;
+    let layoutCycle = 0;
+
+    if (includeAutumn && autumnItems.length > 0) {
+      const autumnDividerIndex = pagePlan.length;
+      pagePlan.push({ type: 'divider', season: 'autumn', count: autumnItems.length });
+      outlinesList.push({ title: pdfT.tocAutumn, pageIndex: autumnDividerIndex });
+      for (const item of autumnItems) {
+        pagePlan.push({
+          type: 'product',
+          item,
+          indexInCatalog: globalProdIdx++,
+          layoutVariant: (layoutCycle++ % 3) as 0 | 1 | 2,
+        });
       }
-    | { type: 'contacts' };
-
-  const pagePlan: PageDescriptor[] = [{ type: 'cover' }, { type: 'manifesto' }];
-
-  const outlinesList: Array<{ title: string; pageIndex: number }> = [
-    { title: 'Обложка CARDIO 2026', pageIndex: 0 },
-    { title: pdfT.tocTitle, pageIndex: 1 },
-  ];
-
-  let globalProdIdx = 1;
-  let layoutCycle = 0;
-
-  if (includeAutumn && autumnItems.length > 0) {
-    const autumnDividerIndex = pagePlan.length;
-    pagePlan.push({ type: 'divider', season: 'autumn', count: autumnItems.length });
-    outlinesList.push({ title: pdfT.tocAutumn, pageIndex: autumnDividerIndex });
-    for (const item of autumnItems) {
-      pagePlan.push({
-        type: 'product',
-        item,
-        indexInCatalog: globalProdIdx++,
-        layoutVariant: (layoutCycle++ % 3) as 0 | 1 | 2,
-      });
     }
-  }
-  if (includeWinter && winterItems.length > 0) {
-    const winterDividerIndex = pagePlan.length;
-    pagePlan.push({ type: 'divider', season: 'winter', count: winterItems.length });
-    outlinesList.push({ title: pdfT.tocWinter, pageIndex: winterDividerIndex });
-    for (const item of winterItems) {
-      pagePlan.push({
-        type: 'product',
-        item,
-        indexInCatalog: globalProdIdx++,
-        layoutVariant: (layoutCycle++ % 3) as 0 | 1 | 2,
-      });
-    }
-  }
-
-  const contactsPageIndex = pagePlan.length;
-  pagePlan.push({ type: 'contacts' });
-  outlinesList.push({ title: pdfT.tocContacts, pageIndex: contactsPageIndex });
-
-  const totalPages = pagePlan.length;
-  onPageProgress(1, totalPages);
-  onStageChange('rendering_pages');
-
-  const logoImg = await loadImageElement('/logo.png');
-  const coverBannerRaw = (await loadImageElement('/baner1.png')) || logoImg;
-  const coverBannerCropped = coverBannerRaw ? prepareSeamlessShoeCanvas(coverBannerRaw) : null;
-
-  const coverSloganLocal = {
-    ru: 'ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ.',
-    uk: 'КРОК ПОПЕРЕДУ. ХАРАКТЕР У КОЖНІЙ ПАРІ.',
-    de: 'EINEN SCHRITT VORAUS. CHARAKTER IN JEDEM PAAR.',
-  }[lang];
-
-  const jpegPages: string[] = [];
-  const pageHitBoxes = new Map<number, InteractiveHitBox[]>();
-
-  const footerPhoneBoxes: InteractiveHitBox[] = [
-    {
-      x: W / 2,
-      y: H - 108,
-      w: (W - PAD - W / 2) / 2,
-      h: 58,
-      uri: 'tel:+380677193716',
-      textFallback: '+380677193716',
-    },
-    {
-      x: W / 2 + (W - PAD - W / 2) / 2,
-      y: H - 108,
-      w: (W - PAD - W / 2) / 2,
-      h: 58,
-      uri: 'tel:+380974541511',
-      textFallback: '+380974541511',
-    },
-  ];
-
-  const footerPhonesLine =
-    '+38 (067) 719-37-16 (' +
-    pdfT.georgiyName +
-    ')   ·   +38 (097) 454-15-11 (' +
-    pdfT.borisName +
-    ')';
-
-  for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-    const currentPage = pageIdx + 1;
-    const progressPercent = Math.round((currentPage / totalPages) * 100);
-
-    // Как только прогресс достигает 95% (или последней страницы при малом числе страниц),
-    // запускаем /pleasewait.mp3 мгновенно без всяких задержек
-    if (!hasPlayedPleaseWaitAt95 && (progressPercent >= 95 || currentPage === totalPages)) {
-      hasPlayedPleaseWaitAt95 = true;
-      playPleaseWaitAudioInstant();
+    if (includeWinter && winterItems.length > 0) {
+      const winterDividerIndex = pagePlan.length;
+      pagePlan.push({ type: 'divider', season: 'winter', count: winterItems.length });
+      outlinesList.push({ title: pdfT.tocWinter, pageIndex: winterDividerIndex });
+      for (const item of winterItems) {
+        pagePlan.push({
+          type: 'product',
+          item,
+          indexInCatalog: globalProdIdx++,
+          layoutVariant: (layoutCycle++ % 3) as 0 | 1 | 2,
+        });
+      }
     }
 
-    onPageProgress(currentPage, totalPages);
-    await new Promise((r) => setTimeout(r, 0));
+    const contactsPageIndex = pagePlan.length;
+    pagePlan.push({ type: 'contacts' });
+    outlinesList.push({ title: pdfT.tocContacts, pageIndex: contactsPageIndex });
 
-    const pageDesc = pagePlan[pageIdx];
-    const pageNumStr =
-      String(pageIdx + 1).padStart(2, '0') + ' / ' + String(totalPages).padStart(2, '0');
+    const totalPages = pagePlan.length;
+    onPageProgress(1, totalPages);
+    onStageChange('rendering_pages');
 
-    const canvas = document.createElement('canvas');
-    canvas.width = OUT_W;
-    canvas.height = OUT_H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) continue;
+    const logoImg = await loadImageElement('/logo.png');
+    const coverBannerRaw = (await loadImageElement('/baner1.png')) || logoImg;
+    const coverBannerCropped = coverBannerRaw ? prepareSeamlessShoeCanvas(coverBannerRaw) : null;
 
-    ctx.save();
-    ctx.scale(SCALE_FACTOR, SCALE_FACTOR);
+    const coverSloganLocal = {
+      ru: 'ШАГ ВПЕРЕДИ. ХАРАКТЕР В КАЖДОЙ ПАРЕ.',
+      uk: 'КРОК ПОПЕРЕДУ. ХАРАКТЕР У КОЖНІЙ ПАРІ.',
+      de: 'EINEN SCHRITT VORAUS. CHARAKTER IN JEDEM PAAR.',
+    }[lang];
 
-    // =====================================================================
-    // COVER — Fashion magazine cover
-    // =====================================================================
-    if (pageDesc.type === 'cover') {
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, W, H);
+    const jpegPages: string[] = [];
+    const pageHitBoxes = new Map<number, InteractiveHitBox[]>();
 
-      drawEditorialWatermark(ctx, W, H, clientCode);
+    const footerPhoneBoxes: InteractiveHitBox[] = [
+      {
+        x: W / 2,
+        y: H - 108,
+        w: (W - PAD - W / 2) / 2,
+        h: 58,
+        uri: 'tel:+380677193716',
+        textFallback: '+380677193716',
+      },
+      {
+        x: W / 2 + (W - PAD - W / 2) / 2,
+        y: H - 108,
+        w: (W - PAD - W / 2) / 2,
+        h: 58,
+        uri: 'tel:+380974541511',
+        textFallback: '+380974541511',
+      },
+    ];
 
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  MANUFACTURING EST.', PAD, 72);
+    const footerPhonesLine =
+      '+38 (067) 719-37-16 (' +
+      pdfT.georgiyName +
+      ')   ·   +38 (097) 454-15-11 (' +
+      pdfT.borisName +
+      ')';
 
-      ctx.fillStyle = GREY;
-      ctx.textAlign = 'right';
-      ctx.fillText('KHARKIV  ·  LOOKBOOK 2026', W - PAD, 72);
+    for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+      const currentPage = pageIdx + 1;
+      const progressPercent = Math.round((currentPage / totalPages) * 100);
 
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 92);
-      ctx.lineTo(W - PAD, 92);
-      ctx.stroke();
-
-      if (coverBannerCropped) {
-        const availW = CONTENT_W - 40;
-        const availH = 620;
-        const scale = Math.min(
-          availW / Math.max(1, coverBannerCropped.width),
-          availH / Math.max(1, coverBannerCropped.height)
-        );
-        const drawW = coverBannerCropped.width * scale;
-        const drawH = coverBannerCropped.height * scale;
-        const drawX = PAD + (CONTENT_W - drawW) / 2;
-        const drawY = 160 + (availH - drawH) / 2;
-
-        ctx.save();
-        ctx.translate(W / 2, drawY + drawH + 18);
-        ctx.scale(1, 0.055);
-        const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, drawW * 0.48);
-        grad.addColorStop(0, 'rgba(23, 23, 23, 0.18)');
-        grad.addColorStop(0.55, 'rgba(23, 23, 23, 0.05)');
-        grad.addColorStop(1, 'rgba(23, 23, 23, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(0, 0, drawW * 0.48, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.97;
-        ctx.drawImage(coverBannerCropped, drawX, drawY, drawW, drawH);
-        ctx.restore();
+      // На 80% прогресс-бара выключаем основной аудиофайл
+      if (!hasStoppedMainAudioAt80 && progressPercent >= 80) {
+        hasStoppedMainAudioAt80 = true;
+        stopMainProgressAudio();
       }
 
-      const brandY = 920;
+      // На 95% прогресс-бара включаем publik/pleasewait.mp3 в зацикленном режиме
+      if (!hasPlayedPleaseWaitAt95 && (progressPercent >= 95 || currentPage === totalPages)) {
+        hasPlayedPleaseWaitAt95 = true;
+        playPleaseWaitAudioInstant();
+      }
 
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 148px "Playfair Display", Georgia, serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('CARDIO', W / 2, brandY);
+      onPageProgress(currentPage, totalPages);
+      await new Promise((r) => setTimeout(r, 0));
 
-      ctx.fillStyle = GREY;
-      ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
-      (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0.35em';
-      ctx.fillText('F O O T W E A R', W / 2, brandY + 42);
-      (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
+      const pageDesc = pagePlan[pageIdx];
+      const pageNumStr =
+        String(pageIdx + 1).padStart(2, '0') + ' / ' + String(totalPages).padStart(2, '0');
 
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(W / 2 - 72, brandY + 72);
-      ctx.lineTo(W / 2 + 72, brandY + 72);
-      ctx.stroke();
+      const canvas = document.createElement('canvas');
+      canvas.width = OUT_W;
+      canvas.height = OUT_H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
 
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 22px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText('BUILT TO LEAD. ENGINEERED FOR EVERY STEP.', W / 2, brandY + 118);
+      ctx.save();
+      ctx.scale(SCALE_FACTOR, SCALE_FACTOR);
 
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 16px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(coverSloganLocal, W / 2, brandY + 152);
+      // =====================================================================
+      // COVER — Fashion magazine cover
+      // =====================================================================
+      if (pageDesc.type === 'cover') {
+        ctx.fillStyle = PAPER;
+        ctx.fillRect(0, 0, W, H);
 
-      const bottomY = 1380;
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(PAD, bottomY);
-      ctx.lineTo(W - PAD, bottomY);
-      ctx.stroke();
+        drawEditorialWatermark(ctx, W, H, clientCode);
 
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('AUTUMN & WINTER SEASONS  ·  SIZES 40—45', PAD, bottomY + 42);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 48px "Playfair Display", Georgia, serif';
-      ctx.fillText('OFFICIAL LOOKBOOK 2026', PAD, bottomY + 108);
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, bottomY + 148);
-      ctx.lineTo(W - PAD, bottomY + 148);
-      ctx.stroke();
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('DIRECT FACTORY COLLECTION  ·  @CARDIO_SHOES', PAD, H - 72);
-
-      ctx.textAlign = 'right';
-      ctx.fillText(pageNumStr, W - PAD, H - 72);
-    }
-
-    // =====================================================================
-    // MANIFESTO / EDITORIAL INTRODUCTION
-    // =====================================================================
-    else if (pageDesc.type === 'manifesto') {
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, W, H);
-
-      drawEditorialWatermark(ctx, W, H, clientCode);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR', PAD, 72);
-
-      ctx.fillStyle = GREY;
-      ctx.textAlign = 'center';
-      ctx.fillText(pdfT.edition, W / 2, 72);
-
-      ctx.textAlign = 'right';
-      ctx.fillText(pageNumStr, W - PAD, 72);
-
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 92);
-      ctx.lineTo(W - PAD, 92);
-      ctx.stroke();
-
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('01  ·  EDITORIAL INTRODUCTION', PAD, 160);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 46px "Playfair Display", Georgia, serif';
-      ctx.fillText(pdfT.overviewTitle, PAD, 230);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 24px "Playfair Display", Georgia, serif';
-      const nextY = drawWrappedText(ctx, pdfT.manifestoLead, PAD, 310, CONTENT_W, 38);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '400 18px "Inter", "Helvetica Neue", Arial, sans-serif';
-      drawWrappedText(ctx, pdfT.manifestoBody, PAD, nextY + 28, CONTENT_W, 30);
-
-      const tocY = 620;
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, tocY);
-      ctx.lineTo(W - PAD, tocY);
-      ctx.stroke();
-
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText('02  ·  ' + pdfT.tocTitle, PAD, tocY + 48);
-
-      const tocRows = [
-        { title: pdfT.tocAutumn, meta: String(autumnItems.length) + ' MODELS' },
-        { title: pdfT.tocWinter, meta: String(winterItems.length) + ' MODELS' },
-        { title: pdfT.tocContacts, meta: 'KHARKIV DIRECT' },
-      ];
-
-      tocRows.forEach((row, idx) => {
-        const rY = tocY + 110 + idx * 78;
         ctx.fillStyle = GRAPHITE;
-        ctx.font = '400 24px "Playfair Display", Georgia, serif';
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(row.title, PAD, rY);
+        ctx.fillText('CARDIO FOOTWEAR  ·  MANUFACTURING EST.', PAD, 72);
 
         ctx.fillStyle = GREY;
-        ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(row.meta, W - PAD, rY);
+        ctx.fillText('KHARKIV  ·  LOOKBOOK 2026', W - PAD, 72);
+
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(PAD, 92);
+        ctx.lineTo(W - PAD, 92);
+        ctx.stroke();
+
+        if (coverBannerCropped) {
+          const availW = CONTENT_W - 40;
+          const availH = 620;
+          const scale = Math.min(
+            availW / Math.max(1, coverBannerCropped.width),
+            availH / Math.max(1, coverBannerCropped.height)
+          );
+          const drawW = coverBannerCropped.width * scale;
+          const drawH = coverBannerCropped.height * scale;
+          const drawX = PAD + (CONTENT_W - drawW) / 2;
+          const drawY = 160 + (availH - drawH) / 2;
+
+          ctx.save();
+          ctx.translate(W / 2, drawY + drawH + 18);
+          ctx.scale(1, 0.055);
+          const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, drawW * 0.48);
+          grad.addColorStop(0, 'rgba(23, 23, 23, 0.18)');
+          grad.addColorStop(0.55, 'rgba(23, 23, 23, 0.05)');
+          grad.addColorStop(1, 'rgba(23, 23, 23, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(0, 0, drawW * 0.48, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = 0.97;
+          ctx.drawImage(coverBannerCropped, drawX, drawY, drawW, drawH);
+          ctx.restore();
+        }
+
+        const brandY = 920;
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 148px "Playfair Display", Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CARDIO', W / 2, brandY);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
+        (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0.35em';
+        ctx.fillText('F O O T W E A R', W / 2, brandY + 42);
+        (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = '0px';
+
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(W / 2 - 72, brandY + 72);
+        ctx.lineTo(W / 2 + 72, brandY + 72);
+        ctx.stroke();
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '700 22px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText('BUILT TO LEAD. ENGINEERED FOR EVERY STEP.', W / 2, brandY + 118);
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 16px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(coverSloganLocal, W / 2, brandY + 152);
+
+        const bottomY = 1380;
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(PAD, bottomY);
+        ctx.lineTo(W - PAD, bottomY);
+        ctx.stroke();
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('AUTUMN & WINTER SEASONS  ·  SIZES 40—45', PAD, bottomY + 42);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 48px "Playfair Display", Georgia, serif';
+        ctx.fillText('OFFICIAL LOOKBOOK 2026', PAD, bottomY + 108);
 
         ctx.strokeStyle = RULE;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(PAD, rY + 24);
-        ctx.lineTo(W - PAD, rY + 24);
+        ctx.moveTo(PAD, bottomY + 148);
+        ctx.lineTo(W - PAD, bottomY + 148);
         ctx.stroke();
-      });
 
-      const boxSecY = 1020;
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('03  ·  BRAND STANDARDS', PAD, boxSecY);
+        ctx.fillStyle = GREY;
+        ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('DIRECT FACTORY COLLECTION  ·  @CARDIO_SHOES', PAD, H - 72);
 
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(PAD, boxSecY + 28, CONTENT_W, 148);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 16px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText('100% NATURAL MATERIALS & MEMORY COMFORT', PAD + 28, boxSecY + 78);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '400 18px "Playfair Display", Georgia, serif';
-      ctx.fillText(
-        'Selected premium natural leather, reinforced anatomical soles.',
-        PAD + 28,
-        boxSecY + 122
-      );
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(PAD, boxSecY + 198, CONTENT_W, 148);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 16px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText('FULL SIZE RANGE & ORTHOPEDIC FIT', PAD + 28, boxSecY + 248);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '400 18px "Playfair Display", Georgia, serif';
-      ctx.fillText(
-        'Full size scale from 40 to 45 with ergonomic instep support.',
-        PAD + 28,
-        boxSecY + 292
-      );
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, H - 110);
-      ctx.lineTo(W - PAD, H - 110);
-      ctx.stroke();
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026', PAD, H - 72);
-
-      ctx.textAlign = 'right';
-      ctx.fillText(footerPhonesLine, W - PAD, H - 72);
-      pageHitBoxes.set(pageIdx, footerPhoneBoxes);
-    }
-
-    // =====================================================================
-    // SEASON DIVIDER — Chapter opener
-    // =====================================================================
-    else if (pageDesc.type === 'divider') {
-      ctx.fillStyle = GRAPHITE;
-      ctx.fillRect(0, 0, W, H);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026', PAD, 72);
-
-      ctx.textAlign = 'right';
-      ctx.fillText(pageNumStr, W - PAD, 72);
-
-      ctx.strokeStyle = '#333330';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 92);
-      ctx.lineTo(W - PAD, 92);
-      ctx.stroke();
-
-      const isAutumn = pageDesc.season === 'autumn';
-
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(isAutumn ? pdfT.autumnChapter : pdfT.winterChapter, PAD, H / 2 - 140);
-
-      ctx.fillStyle = PAPER;
-      ctx.font = '400 128px "Playfair Display", Georgia, serif';
-      ctx.fillText(isAutumn ? 'AUTUMN' : 'WINTER', PAD - 6, H / 2 - 10);
-
-      ctx.fillStyle = METALLIC;
-      ctx.font = '400 36px "Playfair Display", Georgia, serif';
-      ctx.fillText('COLLECTION 2026', PAD, H / 2 + 56);
-
-      ctx.strokeStyle = METALLIC;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(PAD, H / 2 + 100);
-      ctx.lineTo(PAD + 220, H / 2 + 100);
-      ctx.stroke();
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(isAutumn ? pdfT.autumnSub : pdfT.winterSub, PAD, H / 2 + 148);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(String(pageDesc.count) + ' MODELS FEATURED', PAD, H - 72);
-
-      ctx.textAlign = 'right';
-      ctx.fillText('SIZES 40—45', W - PAD, H - 72);
-    }
-
-    // =====================================================================
-    // PRODUCT PAGES — Three alternating editorial layouts
-    // =====================================================================
-    else if (pageDesc.type === 'product') {
-      const { shoe, priceUsd, season } = pageDesc.item;
-      const catUpper = getLocalizedCategory(shoe.category, lang).toUpperCase();
-      const colorUpper = getLocalizedColor(shoe.color, lang).toUpperCase();
-      const featuresUpper = shoe.features.map((f) => getLocalizedFeature(f, lang).toUpperCase());
-      const layout = pageDesc.layoutVariant;
-
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, W, H);
-
-      drawEditorialWatermark(ctx, W, H, clientCode, shoe.modelNumber);
-
-      if (logoImg) {
-        const lH = 26;
-        const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
-        ctx.drawImage(logoImg, PAD, 52, lW, lH);
+        ctx.textAlign = 'right';
+        ctx.fillText(pageNumStr, W - PAD, H - 72);
       }
 
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 13px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO', logoImg ? PAD + 46 : PAD, 72);
+      // =====================================================================
+      // MANIFESTO / EDITORIAL INTRODUCTION
+      // =====================================================================
+      else if (pageDesc.type === 'manifesto') {
+        ctx.fillStyle = PAPER;
+        ctx.fillRect(0, 0, W, H);
 
-      ctx.fillStyle = GREY;
-      ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        season === 'autumn' ? pdfT.seasonAutumnLabel : pdfT.seasonWinterLabel,
-        W / 2,
-        72
-      );
+        drawEditorialWatermark(ctx, W, H, clientCode);
 
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(catUpper + '  ·  ' + pageNumStr, W - PAD, 72);
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDIO FOOTWEAR', PAD, 72);
 
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 96);
-      ctx.lineTo(W - PAD, 96);
-      ctx.stroke();
+        ctx.fillStyle = GREY;
+        ctx.textAlign = 'center';
+        ctx.fillText(pdfT.edition, W / 2, 72);
 
-      const rawShoeImg = await loadImageElement(shoe.image);
-      let seamlessCanvas: HTMLCanvasElement | null = null;
-      if (rawShoeImg) {
-        seamlessCanvas = prepareSeamlessShoeCanvas(rawShoeImg);
-      }
-
-      const stageTop = 130;
-      const stageBottom = 1180;
-      const stageH = stageBottom - stageTop;
-      const maxShoeW = CONTENT_W - 10;
-      const maxShoeH = stageH * 0.92;
-
-      let drawW = 0;
-      let drawH = 0;
-      let drawX = PAD;
-      let drawY = stageTop;
-
-      if (seamlessCanvas) {
-        const scale = Math.min(
-          maxShoeW / Math.max(1, seamlessCanvas.width),
-          maxShoeH / Math.max(1, seamlessCanvas.height)
-        );
-        drawW = seamlessCanvas.width * scale;
-        drawH = seamlessCanvas.height * scale;
-        drawX = PAD + (CONTENT_W - drawW) / 2;
-        drawY = stageTop + (stageH - drawH) / 2;
-
-        ctx.save();
-        ctx.translate(W / 2, drawY + drawH - 6);
-        ctx.scale(1, 0.07);
-        const shadowGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, drawW * 0.48);
-        shadowGrad.addColorStop(0, 'rgba(23, 23, 23, 0.16)');
-        shadowGrad.addColorStop(0.6, 'rgba(23, 23, 23, 0.04)');
-        shadowGrad.addColorStop(1, 'rgba(23, 23, 23, 0)');
-        ctx.fillStyle = shadowGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, drawW * 0.48, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.98;
-        ctx.drawImage(seamlessCanvas, drawX, drawY, drawW, drawH);
-        ctx.restore();
-      }
-
-      const specTopY = 1210;
-
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(PAD, specTopY);
-      ctx.lineTo(W - PAD, specTopY);
-      ctx.stroke();
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(pdfT.modelLabel, PAD, specTopY + 32);
-
-      ctx.textAlign = 'right';
-      ctx.fillText(pdfT.priceLabel, W - PAD, specTopY + 32);
-
-      const variantTitle = shoe.variant ? '  ·  ' + shoe.variant : '';
-      const modelDisplay = '№ ' + shoe.modelNumber + variantTitle;
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 56px "Playfair Display", Georgia, serif';
-      ctx.textAlign = 'left';
-      const modelMetrics = ctx.measureText(modelDisplay);
-      if (modelMetrics.width > CONTENT_W * 0.62) {
-        ctx.font = '400 44px "Playfair Display", Georgia, serif';
-      }
-      ctx.fillText(modelDisplay, PAD, specTopY + 98);
-
-      const usdSymbol = String.fromCharCode(36);
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 56px "Playfair Display", Georgia, serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(usdSymbol + String(priceUsd), W - PAD, specTopY + 98);
-
-      const matrixTopY = specTopY + 128;
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, matrixTopY);
-      ctx.lineTo(W - PAD, matrixTopY);
-      ctx.stroke();
-
-      const col1X = PAD;
-      const col2X = PAD + 460;
-      const matrixBottomY = matrixTopY + 142;
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(col2X - 36, matrixTopY + 18);
-      ctx.lineTo(col2X - 36, matrixBottomY - 18);
-      ctx.stroke();
-
-      ctx.textAlign = 'left';
-      ctx.fillStyle = GREY;
-      ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.colorMaterialLabel, col1X, matrixTopY + 36);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(colorUpper, col1X, matrixTopY + 72);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 13px "Inter", "Helvetica Neue", Arial, sans-serif';
-      const featLine = featuresUpper.length > 0 ? featuresUpper.join('  ·  ') : pdfT.naturalLeather;
-      const featSafe = featLine.length > 48 ? featLine.slice(0, 46) + '…' : featLine;
-      ctx.fillText(featSafe, col1X, matrixTopY + 104);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.sizeRangeLabel, col2X, matrixTopY + 36);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '700 28px "Playfair Display", Georgia, serif';
-      ctx.fillText('40 — 45', col2X, matrixTopY + 74);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 13px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.fullSizeScale, col2X, matrixTopY + 104);
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, matrixBottomY);
-      ctx.lineTo(W - PAD, matrixBottomY);
-      ctx.stroke();
-
-      ctx.fillStyle = GREY;
-      ctx.font = '500 11px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026  ·  ' + clientCode, PAD, H - 68);
-
-      ctx.textAlign = 'right';
-      ctx.fillText(footerPhonesLine, W - PAD, H - 68);
-      pageHitBoxes.set(pageIdx, footerPhoneBoxes);
-
-      if (layout === 1 || layout === 2) {
-        // Дифференциация макетов уже учтена в композиции
-      }
-    }
-
-    // =====================================================================
-    // CONTACTS — Quiet closing editorial page
-    // =====================================================================
-    else if (pageDesc.type === 'contacts') {
-      ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, W, H);
-
-      drawEditorialWatermark(ctx, W, H, clientCode);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR', PAD, 72);
-
-      ctx.fillStyle = GREY;
-      ctx.textAlign = 'right';
-      ctx.fillText(pageNumStr, W - PAD, 72);
-
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 92);
-      ctx.lineTo(W - PAD, 92);
-      ctx.stroke();
-
-      if (logoImg) {
-        const lH = 52;
-        const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
-        ctx.drawImage(logoImg, PAD, 160, lW, lH);
-      }
-
-      ctx.fillStyle = METALLIC;
-      ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(pdfT.contactsPageSub, PAD, 280);
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 52px "Playfair Display", Georgia, serif';
-      ctx.fillText(pdfT.contactsPageTitle, PAD, 352);
-
-      ctx.strokeStyle = RULE;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PAD, 400);
-      ctx.lineTo(W - PAD, 400);
-      ctx.stroke();
-
-      const contactsList = [
-        {
-          name: pdfT.georgiyName,
-          phone: '+38 (067) 719-37-16',
-          telUri: 'tel:+380677193716',
-          rawPhone: '+380677193716',
-        },
-        {
-          name: pdfT.borisName,
-          phone: '+38 (097) 454-15-11',
-          telUri: 'tel:+380974541511',
-          rawPhone: '+380974541511',
-        },
-      ];
-
-      const contactHitBoxes: InteractiveHitBox[] = [];
-
-      contactsList.forEach((c, idx) => {
-        const cY = 450 + idx * 200;
-        const cardH = 172;
+        ctx.textAlign = 'right';
+        ctx.fillText(pageNumStr, W - PAD, 72);
 
         ctx.strokeStyle = GRAPHITE;
-        ctx.lineWidth = 1.3;
-        ctx.strokeRect(PAD, cY, CONTENT_W, cardH);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(PAD, 92);
+        ctx.lineTo(W - PAD, 92);
+        ctx.stroke();
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('01  ·  EDITORIAL INTRODUCTION', PAD, 160);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 46px "Playfair Display", Georgia, serif';
+        ctx.fillText(pdfT.overviewTitle, PAD, 230);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 24px "Playfair Display", Georgia, serif';
+        const nextY = drawWrappedText(ctx, pdfT.manifestoLead, PAD, 310, CONTENT_W, 38);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '400 18px "Inter", "Helvetica Neue", Arial, sans-serif';
+        drawWrappedText(ctx, pdfT.manifestoBody, PAD, nextY + 28, CONTENT_W, 30);
+
+        const tocY = 620;
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, tocY);
+        ctx.lineTo(W - PAD, tocY);
+        ctx.stroke();
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText('02  ·  ' + pdfT.tocTitle, PAD, tocY + 48);
+
+        const tocRows = [
+          { title: pdfT.tocAutumn, meta: String(autumnItems.length) + ' MODELS' },
+          { title: pdfT.tocWinter, meta: String(winterItems.length) + ' MODELS' },
+          { title: pdfT.tocContacts, meta: 'KHARKIV DIRECT' },
+        ];
+
+        tocRows.forEach((row, idx) => {
+          const rY = tocY + 110 + idx * 78;
+          ctx.fillStyle = GRAPHITE;
+          ctx.font = '400 24px "Playfair Display", Georgia, serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(row.title, PAD, rY);
+
+          ctx.fillStyle = GREY;
+          ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(row.meta, W - PAD, rY);
+
+          ctx.strokeStyle = RULE;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(PAD, rY + 24);
+          ctx.lineTo(W - PAD, rY + 24);
+          ctx.stroke();
+        });
+
+        const boxSecY = 1020;
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('03  ·  BRAND STANDARDS', PAD, boxSecY);
+
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(PAD, boxSecY + 28, CONTENT_W, 148);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '700 16px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText('100% NATURAL MATERIALS & MEMORY COMFORT', PAD + 28, boxSecY + 78);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '400 18px "Playfair Display", Georgia, serif';
+        ctx.fillText(
+          'Selected premium natural leather, reinforced anatomical soles.',
+          PAD + 28,
+          boxSecY + 122
+        );
+
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(PAD, boxSecY + 198, CONTENT_W, 148);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '700 16px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText('FULL SIZE RANGE & ORTHOPEDIC FIT', PAD + 28, boxSecY + 248);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '400 18px "Playfair Display", Georgia, serif';
+        ctx.fillText(
+          'Full size scale from 40 to 45 with ergonomic instep support.',
+          PAD + 28,
+          boxSecY + 292
+        );
+
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, H - 110);
+        ctx.lineTo(W - PAD, H - 110);
+        ctx.stroke();
+
+        ctx.fillStyle = GREY;
+        ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026', PAD, H - 72);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(footerPhonesLine, W - PAD, H - 72);
+        pageHitBoxes.set(pageIdx, footerPhoneBoxes);
+      }
+
+      // =====================================================================
+      // SEASON DIVIDER — Chapter opener
+      // =====================================================================
+      else if (pageDesc.type === 'divider') {
+        ctx.fillStyle = GRAPHITE;
+        ctx.fillRect(0, 0, W, H);
 
         ctx.fillStyle = GREY;
         ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(pdfT.managerRole, PAD + 36, cY + 48);
+        ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026', PAD, 72);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(pageNumStr, W - PAD, 72);
+
+        ctx.strokeStyle = '#333330';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, 92);
+        ctx.lineTo(W - PAD, 92);
+        ctx.stroke();
+
+        const isAutumn = pageDesc.season === 'autumn';
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(isAutumn ? pdfT.autumnChapter : pdfT.winterChapter, PAD, H / 2 - 140);
+
+        ctx.fillStyle = PAPER;
+        ctx.font = '400 128px "Playfair Display", Georgia, serif';
+        ctx.fillText(isAutumn ? 'AUTUMN' : 'WINTER', PAD - 6, H / 2 - 10);
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '400 36px "Playfair Display", Georgia, serif';
+        ctx.fillText('COLLECTION 2026', PAD, H / 2 + 56);
+
+        ctx.strokeStyle = METALLIC;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(PAD, H / 2 + 100);
+        ctx.lineTo(PAD + 220, H / 2 + 100);
+        ctx.stroke();
+
+        ctx.fillStyle = GREY;
+        ctx.font = '600 14px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(isAutumn ? pdfT.autumnSub : pdfT.winterSub, PAD, H / 2 + 148);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '500 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(String(pageDesc.count) + ' MODELS FEATURED', PAD, H - 72);
+
+        ctx.textAlign = 'right';
+        ctx.fillText('SIZES 40—45', W - PAD, H - 72);
+      }
+
+      // =====================================================================
+      // PRODUCT PAGES — Three alternating editorial layouts
+      // =====================================================================
+      else if (pageDesc.type === 'product') {
+        const { shoe, priceUsd, season } = pageDesc.item;
+        const catUpper = getLocalizedCategory(shoe.category, lang).toUpperCase();
+        const colorUpper = getLocalizedColor(shoe.color, lang).toUpperCase();
+        const featuresUpper = shoe.features.map((f) => getLocalizedFeature(f, lang).toUpperCase());
+        const layout = pageDesc.layoutVariant;
+
+        ctx.fillStyle = PAPER;
+        ctx.fillRect(0, 0, W, H);
+
+        drawEditorialWatermark(ctx, W, H, clientCode, shoe.modelNumber);
+
+        if (logoImg) {
+          const lH = 26;
+          const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
+          ctx.drawImage(logoImg, PAD, 52, lW, lH);
+        }
 
         ctx.fillStyle = GRAPHITE;
-        ctx.font = '400 36px "Playfair Display", Georgia, serif';
-        ctx.fillText(c.name, PAD + 36, cY + 112);
+        ctx.font = '700 13px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDIO', logoImg ? PAD + 46 : PAD, 72);
 
-        ctx.fillStyle = '#1D4ED8';
-        ctx.font = '700 26px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillStyle = GREY;
+        ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          season === 'autumn' ? pdfT.seasonAutumnLabel : pdfT.seasonWinterLabel,
+          W / 2,
+          72
+        );
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(c.phone, W - PAD - 36, cY + 92);
+        ctx.fillText(catUpper + '  ·  ' + pageNumStr, W - PAD, 72);
 
-        ctx.fillStyle = '#1D4ED8';
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, 96);
+        ctx.lineTo(W - PAD, 96);
+        ctx.stroke();
+
+        const rawShoeImg = await loadImageElement(shoe.image);
+        let seamlessCanvas: HTMLCanvasElement | null = null;
+        if (rawShoeImg) {
+          seamlessCanvas = prepareSeamlessShoeCanvas(rawShoeImg);
+        }
+
+        const stageTop = 130;
+        const stageBottom = 1180;
+        const stageH = stageBottom - stageTop;
+        const maxShoeW = CONTENT_W - 10;
+        const maxShoeH = stageH * 0.92;
+
+        let drawW = 0;
+        let drawH = 0;
+        let drawX = PAD;
+        let drawY = stageTop;
+
+        if (seamlessCanvas) {
+          const scale = Math.min(
+            maxShoeW / Math.max(1, seamlessCanvas.width),
+            maxShoeH / Math.max(1, seamlessCanvas.height)
+          );
+          drawW = seamlessCanvas.width * scale;
+          drawH = seamlessCanvas.height * scale;
+          drawX = PAD + (CONTENT_W - drawW) / 2;
+          drawY = stageTop + (stageH - drawH) / 2;
+
+          ctx.save();
+          ctx.translate(W / 2, drawY + drawH - 6);
+          ctx.scale(1, 0.07);
+          const shadowGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, drawW * 0.48);
+          shadowGrad.addColorStop(0, 'rgba(23, 23, 23, 0.16)');
+          shadowGrad.addColorStop(0.6, 'rgba(23, 23, 23, 0.04)');
+          shadowGrad.addColorStop(1, 'rgba(23, 23, 23, 0)');
+          ctx.fillStyle = shadowGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, drawW * 0.48, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = 0.98;
+          ctx.drawImage(seamlessCanvas, drawX, drawY, drawW, drawH);
+          ctx.restore();
+        }
+
+        const specTopY = 1210;
+
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(PAD, specTopY);
+        ctx.lineTo(W - PAD, specTopY);
+        ctx.stroke();
+
+        ctx.fillStyle = GREY;
+        ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(pdfT.modelLabel, PAD, specTopY + 32);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(pdfT.priceLabel, W - PAD, specTopY + 32);
+
+        const variantTitle = shoe.variant ? '  ·  ' + shoe.variant : '';
+        const modelDisplay = '№ ' + shoe.modelNumber + variantTitle;
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 56px "Playfair Display", Georgia, serif';
+        ctx.textAlign = 'left';
+        const modelMetrics = ctx.measureText(modelDisplay);
+        if (modelMetrics.width > CONTENT_W * 0.62) {
+          ctx.font = '400 44px "Playfair Display", Georgia, serif';
+        }
+        ctx.fillText(modelDisplay, PAD, specTopY + 98);
+
+        const usdSymbol = String.fromCharCode(36);
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 56px "Playfair Display", Georgia, serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(usdSymbol + String(priceUsd), W - PAD, specTopY + 98);
+
+        const matrixTopY = specTopY + 128;
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, matrixTopY);
+        ctx.lineTo(W - PAD, matrixTopY);
+        ctx.stroke();
+
+        const col1X = PAD;
+        const col2X = PAD + 460;
+        const matrixBottomY = matrixTopY + 142;
+
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(col2X - 36, matrixTopY + 18);
+        ctx.lineTo(col2X - 36, matrixBottomY - 18);
+        ctx.stroke();
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = GREY;
+        ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(pdfT.colorMaterialLabel, col1X, matrixTopY + 36);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '700 20px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(colorUpper, col1X, matrixTopY + 72);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '500 13px "Inter", "Helvetica Neue", Arial, sans-serif';
+        const featLine =
+          featuresUpper.length > 0 ? featuresUpper.join('  ·  ') : pdfT.naturalLeather;
+        const featSafe = featLine.length > 48 ? featLine.slice(0, 46) + '…' : featLine;
+        ctx.fillText(featSafe, col1X, matrixTopY + 104);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '600 11px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(pdfT.sizeRangeLabel, col2X, matrixTopY + 36);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '700 28px "Playfair Display", Georgia, serif';
+        ctx.fillText('40 — 45', col2X, matrixTopY + 74);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '500 13px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(pdfT.fullSizeScale, col2X, matrixTopY + 104);
+
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, matrixBottomY);
+        ctx.lineTo(W - PAD, matrixBottomY);
+        ctx.stroke();
+
+        ctx.fillStyle = GREY;
+        ctx.font = '500 11px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDIO FOOTWEAR  ·  LOOKBOOK 2026  ·  ' + clientCode, PAD, H - 68);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(footerPhonesLine, W - PAD, H - 68);
+        pageHitBoxes.set(pageIdx, footerPhoneBoxes);
+
+        if (layout === 1 || layout === 2) {
+          // Дифференциация макетов уже учтена в композиции
+        }
+      }
+
+      // =====================================================================
+      // CONTACTS — Quiet closing editorial page
+      // =====================================================================
+      else if (pageDesc.type === 'contacts') {
+        ctx.fillStyle = PAPER;
+        ctx.fillRect(0, 0, W, H);
+
+        drawEditorialWatermark(ctx, W, H, clientCode);
+
+        ctx.fillStyle = GRAPHITE;
         ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-        ctx.fillText(pdfT.tapToCall, W - PAD - 36, cY + 130);
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDIO FOOTWEAR', PAD, 72);
+
+        ctx.fillStyle = GREY;
+        ctx.textAlign = 'right';
+        ctx.fillText(pageNumStr, W - PAD, 72);
+
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(PAD, 92);
+        ctx.lineTo(W - PAD, 92);
+        ctx.stroke();
+
+        if (logoImg) {
+          const lH = 52;
+          const lW = (logoImg.width / Math.max(1, logoImg.height)) * lH;
+          ctx.drawImage(logoImg, PAD, 160, lW, lH);
+        }
+
+        ctx.fillStyle = METALLIC;
+        ctx.font = '600 13px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(pdfT.contactsPageSub, PAD, 280);
+
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 52px "Playfair Display", Georgia, serif';
+        ctx.fillText(pdfT.contactsPageTitle, PAD, 352);
+
+        ctx.strokeStyle = RULE;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, 400);
+        ctx.lineTo(W - PAD, 400);
+        ctx.stroke();
+
+        const contactsList = [
+          {
+            name: pdfT.georgiyName,
+            phone: '+38 (067) 719-37-16',
+            telUri: 'tel:+380677193716',
+            rawPhone: '+380677193716',
+          },
+          {
+            name: pdfT.borisName,
+            phone: '+38 (097) 454-15-11',
+            telUri: 'tel:+380974541511',
+            rawPhone: '+380974541511',
+          },
+        ];
+
+        const contactHitBoxes: InteractiveHitBox[] = [];
+
+        contactsList.forEach((c, idx) => {
+          const cY = 450 + idx * 200;
+          const cardH = 172;
+
+          ctx.strokeStyle = GRAPHITE;
+          ctx.lineWidth = 1.3;
+          ctx.strokeRect(PAD, cY, CONTENT_W, cardH);
+
+          ctx.fillStyle = GREY;
+          ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(pdfT.managerRole, PAD + 36, cY + 48);
+
+          ctx.fillStyle = GRAPHITE;
+          ctx.font = '400 36px "Playfair Display", Georgia, serif';
+          ctx.fillText(c.name, PAD + 36, cY + 112);
+
+          ctx.fillStyle = '#1D4ED8';
+          ctx.font = '700 26px "Inter", "Helvetica Neue", Arial, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(c.phone, W - PAD - 36, cY + 92);
+
+          ctx.fillStyle = '#1D4ED8';
+          ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+          ctx.fillText(pdfT.tapToCall, W - PAD - 36, cY + 130);
+
+          contactHitBoxes.push({
+            x: PAD,
+            y: cY,
+            w: CONTENT_W,
+            h: cardH,
+            uri: c.telUri,
+            textFallback: 'tel:' + c.rawPhone + ' ' + c.rawPhone,
+          });
+        });
+
+        const igBoxY = 880;
+        const igBoxH = 132;
+        ctx.strokeStyle = '#E1306C';
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(PAD, igBoxY, CONTENT_W, igBoxH);
+
+        ctx.fillStyle = '#E1306C';
+        ctx.font = '700 24px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(pdfT.instagramLabel, W / 2, igBoxY + 58);
+
+        ctx.fillStyle = GREY;
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.fillText(pdfT.instagramSub, W / 2, igBoxY + 98);
 
         contactHitBoxes.push({
           x: PAD,
-          y: cY,
+          y: igBoxY,
           w: CONTENT_W,
-          h: cardH,
-          uri: c.telUri,
-          textFallback: 'tel:' + c.rawPhone + ' ' + c.rawPhone,
+          h: igBoxH,
+          uri: 'https://www.instagram.com/cardio_shoes',
+          textFallback: 'https://www.instagram.com/cardio_shoes',
         });
-      });
 
-      const igBoxY = 880;
-      const igBoxH = 132;
-      ctx.strokeStyle = '#E1306C';
-      ctx.lineWidth = 1.6;
-      ctx.strokeRect(PAD, igBoxY, CONTENT_W, igBoxH);
+        pageHitBoxes.set(pageIdx, contactHitBoxes);
 
-      ctx.fillStyle = '#E1306C';
-      ctx.font = '700 24px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(pdfT.instagramLabel, W / 2, igBoxY + 58);
+        ctx.fillStyle = GREY;
+        ctx.font = '400 17px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'left';
+        drawWrappedText(ctx, pdfT.shippingNote, PAD, 1080, CONTENT_W, 30);
 
-      ctx.fillStyle = GREY;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(pdfT.instagramSub, W / 2, igBoxY + 98);
+        ctx.strokeStyle = GRAPHITE;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(PAD, H - 110);
+        ctx.lineTo(W - PAD, H - 110);
+        ctx.stroke();
 
-      contactHitBoxes.push({
-        x: PAD,
-        y: igBoxY,
-        w: CONTENT_W,
-        h: igBoxH,
-        uri: 'https://www.instagram.com/cardio_shoes',
-        textFallback: 'https://www.instagram.com/cardio_shoes',
-      });
+        ctx.fillStyle = GRAPHITE;
+        ctx.font = '400 22px "Playfair Display", Georgia, serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDIO FOOTWEAR  ·  2026', PAD, H - 66);
 
-      pageHitBoxes.set(pageIdx, contactHitBoxes);
+        ctx.fillStyle = GREY;
+        ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 66);
+      }
 
-      ctx.fillStyle = GREY;
-      ctx.font = '400 17px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'left';
-      drawWrappedText(ctx, pdfT.shippingNote, PAD, 1080, CONTENT_W, 30);
-
-      ctx.strokeStyle = GRAPHITE;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(PAD, H - 110);
-      ctx.lineTo(W - PAD, H - 110);
-      ctx.stroke();
-
-      ctx.fillStyle = GRAPHITE;
-      ctx.font = '400 22px "Playfair Display", Georgia, serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('CARDIO FOOTWEAR  ·  2026', PAD, H - 66);
-
-      ctx.fillStyle = GREY;
-      ctx.font = '600 12px "Inter", "Helvetica Neue", Arial, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText('KHARKIV, UKRAINE', W - PAD, H - 66);
+      ctx.restore();
+      jpegPages.push(canvas.toDataURL('image/jpeg', 0.78));
     }
 
-    ctx.restore();
-    jpegPages.push(canvas.toDataURL('image/jpeg', 0.78));
-  }
+    // Активируем клики по телефонам и Instagram прямо во встроенном просмотре
+    bindInteractivePreviewClicks(jpegPages, pageHitBoxes, VIRTUAL_W, VIRTUAL_H);
 
-  // Активируем клики по телефонам и Instagram прямо во встроенном просмотре
-  bindInteractivePreviewClicks(jpegPages, pageHitBoxes, VIRTUAL_W, VIRTUAL_H);
-
-  // =======================================================================
-  // ФАЗА 2: СБОРКА БИНАРНОГО PDF 1.7 И ДОСТАВКА В TELEGRAM
-  // =======================================================================
-  if (!hasPlayedPleaseWaitAt95) {
-    hasPlayedPleaseWaitAt95 = true;
-    playPleaseWaitAudioInstant();
-  }
-  onStageChange('packaging_and_uploading');
-  await new Promise((r) => setTimeout(r, 0));
-
-  const pdfBytes = buildPdfBytesFromJpegPages(
-    jpegPages,
-    OUT_W,
-    OUT_H,
-    VIRTUAL_W,
-    VIRTUAL_H,
-    595.28,
-    841.89,
-    outlinesList,
-    pageHitBoxes
-  );
-
-  const localBlob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
-  const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-  const fileName = 'CARDIO_LOOKBOOK_2026_' + lang.toUpperCase() + '.pdf';
-
-  let deliveryError: string | null = null;
-
-  try {
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'send_pdf',
-        pdfBase64,
-        fileName,
-        chatId: tgUser.id,
-        caption:
-          '📘 CARDIO FOOTWEAR — OFFICIAL LOOKBOOK 2026 (' +
-          String(totalPages) +
-          ' стр. А4, PDF 1.7)\n🔒 ' +
-          securityNote,
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const statusObj: PdfDeliveryStatus = {
-        sentToTelegram: Boolean(data?.sentToTelegram),
-        downloadUrl: data?.downloadPath,
-        localBlob,
-        previewPages: jpegPages,
-        fileName,
-        totalPages,
-      };
-
-      await triggerPdfDownload(statusObj);
-
-      return { status: statusObj, error: null };
-    } else {
-      deliveryError = 'HTTP ' + String(res.status);
+    // =======================================================================
+    // ФАЗА 2: СБОРКА БИНАРНОГО PDF 1.7 И ДОСТАВКА В TELEGRAM
+    // =======================================================================
+    if (!hasStoppedMainAudioAt80) {
+      hasStoppedMainAudioAt80 = true;
+      stopMainProgressAudio();
     }
-  } catch (err) {
-    deliveryError = err instanceof Error ? err.message : 'Network error';
+    if (!hasPlayedPleaseWaitAt95) {
+      hasPlayedPleaseWaitAt95 = true;
+      playPleaseWaitAudioInstant();
+    }
+    onStageChange('packaging_and_uploading');
+    await new Promise((r) => setTimeout(r, 0));
+
+    const pdfBytes = buildPdfBytesFromJpegPages(
+      jpegPages,
+      OUT_W,
+      OUT_H,
+      VIRTUAL_W,
+      VIRTUAL_H,
+      595.28,
+      841.89,
+      outlinesList,
+      pageHitBoxes
+    );
+
+    const localBlob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
+    const pdfBase64 = uint8ArrayToBase64(pdfBytes);
+    const fileName = 'CARDIO_LOOKBOOK_2026_' + lang.toUpperCase() + '.pdf';
+
+    let deliveryError: string | null = null;
+
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_pdf',
+          pdfBase64,
+          fileName,
+          chatId: tgUser.id,
+          caption:
+            '📘 CARDIO FOOTWEAR — OFFICIAL LOOKBOOK 2026 (' +
+            String(totalPages) +
+            ' стр. А4, PDF 1.7)\n🔒 ' +
+            securityNote,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const statusObj: PdfDeliveryStatus = {
+          sentToTelegram: Boolean(data?.sentToTelegram),
+          downloadUrl: data?.downloadPath,
+          localBlob,
+          previewPages: jpegPages,
+          fileName,
+          totalPages,
+        };
+
+        // Формирование PDF завершено — останавливаем зацикленный publik/pleasewait.mp3
+        stopPleaseWaitAudio();
+        await triggerPdfDownload(statusObj);
+
+        return { status: statusObj, error: null };
+      } else {
+        deliveryError = 'HTTP ' + String(res.status);
+      }
+    } catch (err) {
+      deliveryError = err instanceof Error ? err.message : 'Network error';
+    }
+
+    const fallbackStatus: PdfDeliveryStatus = {
+      sentToTelegram: false,
+      localBlob,
+      previewPages: jpegPages,
+      fileName,
+      totalPages,
+    };
+
+    // Формирование PDF завершено — останавливаем зацикленный publik/pleasewait.mp3
+    stopPleaseWaitAudio();
+    await triggerPdfDownload(fallbackStatus);
+
+    return { status: fallbackStatus, error: deliveryError };
+  } finally {
+    // Гарантированный сброс зацикленного звука и блокировок по завершении генерации
+    stopPleaseWaitAudio();
+    isMainAudioMutedAfter80 = false;
   }
-
-  const fallbackStatus: PdfDeliveryStatus = {
-    sentToTelegram: false,
-    localBlob,
-    previewPages: jpegPages,
-    fileName,
-    totalPages,
-  };
-
-  await triggerPdfDownload(fallbackStatus);
-
-  return { status: fallbackStatus, error: deliveryError };
 }
