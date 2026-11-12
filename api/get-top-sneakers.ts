@@ -5,8 +5,9 @@ const KNOWN_BRANDS = new Set([
   'vans', 'puma', 'reebok', 'saucony', 'mizuno', 'salomon', 'hoka',
   'on', 'merrell', 'oakley', "arc'teryx", 'arcteryx', 'bape', 'supreme',
   'fear of god', 'kith', 'palace', 'balenciaga', 'off-white', 'gucci',
-  'prada', 'louis vuitton', 'dior', 'maison margiela', 'rick owens',
-  'alexander mcqueen', 'lanvin', 'crocs', 'timberland', 'ugg',
+  'prada', 'louis vuitton', 'dior', 'chanel', 'saint laurent', 'bottega veneta',
+  'miu miu', 'celine', 'loewe', 'hermes', 'loro piana', 'maison margiela',
+  'rick owens', 'alexander mcqueen', 'lanvin', 'crocs', 'timberland', 'ugg',
   'dr. martens', 'birkenstock', 'clarks', 'veja', 'autry', 'lacoste',
   'calvin klein', 'tommy hilfiger', 'polo ralph lauren', 'dsquared2',
   'versace', 'valentino', 'givenchy', 'under armour', 'fila', 'skechers',
@@ -14,7 +15,6 @@ const KNOWN_BRANDS = new Set([
 ])
 
 export default async function handler(req: any, res: any) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -50,7 +50,6 @@ export default async function handler(req: any, res: any) {
     let rows: any[] = []
     let totalCount = 0
 
-    // Используем только теговые шаблоны sql`...`, которые требует драйвер @neondatabase/serverless
     if (!query || query === 'all') {
       if (gender === 'all') {
         const [countRes, dataRes] = await Promise.all([
@@ -132,7 +131,6 @@ export default async function handler(req: any, res: any) {
       const price = Number(r.retail_price ?? r.retailprice ?? r.retailPrice ?? 0)
       const rawYear = Number(r.release_year ?? r.releaseyear ?? r.releaseYear ?? 0)
 
-      // Игнорируем искусственный дефолтный 2024 год, который записал старый парсер
       const cleanYear =
         rawYear >= 1970 && rawYear <= 2027 && rawYear !== 2024 ? rawYear : null
 
