@@ -2,6 +2,13 @@ import pg from 'pg'
 import axios from 'axios'
 
 const { Client } = pg
+
+// Настройки вашего Cloudflare R2 Воркера
+const R2_WORKER_URL = (
+  process.env.R2_WORKER_URL || 'https://steep-hall-ab15.vplyha.workers.dev'
+).replace(/\/$/, '')
+const R2_UPLOAD_SECRET = process.env.R2_UPLOAD_SECRET || 'cardio_secret_2026'
+
 const ALGOLIA_URL =
   'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
@@ -47,13 +54,11 @@ const SEARCH_TERMS = [
  * Извлекает реальный год релиза из полей Algolia без подстановки фейкового 2024 года
  */
 function extractRealReleaseYear(item) {
-  // 1. Прямое числовое поле release_date_year
   if (item.release_date_year) {
     const y = Number(item.release_date_year)
     if (!Number.isNaN(y) && y >= 1970 && y <= 2027) return y
   }
 
-  // 2. Поле release_date (может быть строкой '2021-05-14' или Unix timestamp в секундах)
   if (item.release_date) {
     if (typeof item.release_date === 'number') {
       const ms = item.release_date < 1e11 ? item.release_date * 1000 : item.release_date
@@ -65,19 +70,14 @@ function extractRealReleaseYear(item) {
     }
   }
 
-  // 3. Поиск года в названии модели (например, "'99" не берем, только полный 4-значный год)
   if (item.name && typeof item.name === 'string') {
     const nameMatch = item.name.match(/\b(19[8-9]\d|20[0-2]\d)\b/)
     if (nameMatch) return Number(nameMatch[1])
   }
 
-  // Возвращаем null вместо фейкового 2024
   return null
 }
 
-/**
- * Выбирает лучшую доступную ссылку на изображение из ответа Algolia
- */
 function pickSourceImageUrl(item) {
   const candidates = [
     item.main_picture_url,
@@ -94,9 +94,10 @@ function pickSourceImageUrl(item) {
 }
 
 /**
- * Скачивает картинку с браузерными заголовками и загружает на ImgBB (или возвращает рабочий прокси-URL)
+ * Скачивает фото с GOAT и заливает в ваш Cloudflare R2 через воркер steep-hall-ab15
+ * (с резервным откатом на ImgBB, если воркер временно недоступен)
  */
-async function resolveProductionImageUrl(sourceUrl) {
+async function uploadToCloudflareR2(sourceUrl, sneakerId) {
   try {
     const imgRes = await axios.get(sourceUrl, {
       responseType: 'arraybuffer',
@@ -109,44 +110,102 @@ async function resolveProductionImageUrl(sourceUrl) {
       },
     })
 
-    const contentType = imgRes.headers['content-type'] || ''
+    const contentType = imgRes.headers['content-type'] || 'image/jpeg'
     const imgSize = imgRes.data?.byteLength || 0
 
     if (!contentType.includes('image') || imgSize < 2500) {
+      console.log('  ⚠️ Файл поврежден или слишком мал, пропускаем.')
       return null
     }
 
-    if (process.env.IMGBB_API_KEY) {
-      const base64Data = Buffer.from(imgRes.data).toString('base64')
-      const form = new URLSearchParams()
-      form.append('image', base64Data)
+    const ext = contentType.includes('png')
+      ? 'png'
+      : contentType.includes('webp')
+      ? 'webp'
+      : 'jpg'
+    const objectKey = `shoes/${sneakerId}.${ext}`
 
-      const uploadRes = await axios.post(
-        `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
-        form.toString(),
+    // 1. Загружаем в ваш Cloudflare R2 через воркер steep-hall-ab15.vplyha.workers.dev
+    try {
+      const r2Res = await axios.put(
+        `${R2_WORKER_URL}/${objectKey}`,
+        Buffer.from(imgRes.data),
         {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': contentType,
+            'x-upload-secret': R2_UPLOAD_SECRET,
+          },
           timeout: 15000,
+          maxBodyLength: Infinity,
         }
       )
 
-      if (uploadRes.data?.data?.url) {
-        return uploadRes.data.data.url
+      if (r2Res.status === 200 && r2Res.data?.url) {
+        console.log(`  ☁️ Фото загружено в Cloudflare R2: ${r2Res.data.url}`)
+        return r2Res.data.url
       }
+    } catch (r2Err) {
+      console.log(
+        `  ⚠️ Воркер R2 вернул ошибку (${r2Err?.response?.status || r2Err.message}), пробуем резерв...`
+      )
     }
 
-    // Если ImgBB недоступен или лимит исчерпан, но фото валидно — используем проверенный исходный URL
+    // 2. Резервный вариант: ImgBB (если задан ключ)
+    if (process.env.IMGBB_API_KEY) {
+      try {
+        const base64Data = Buffer.from(imgRes.data).toString('base64')
+        const form = new URLSearchParams()
+        form.append('image', base64Data)
+
+        const uploadRes = await axios.post(
+          `https://api.imgbb.com/1/upload?key=${process.env.IMGBB_API_KEY}`,
+          form.toString(),
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 15000,
+          }
+        )
+
+        if (uploadRes.data?.data?.url) {
+          console.log(`  ✅ Фото залито на резервный ImgBB!`)
+          return uploadRes.data.data.url
+        }
+      } catch {}
+    }
+
     return sourceUrl
   } catch {
-    // Проверяем через глобальный кэш-прокси wsrv.nl
-    try {
-      const proxyUrl = `https://wsrv.nl/?url=${encodeURIComponent(sourceUrl)}&w=800&q=85&output=webp`
-      const checkProxy = await axios.head(proxyUrl, { timeout: 6000 })
-      if (checkProxy.status === 200) {
-        return proxyUrl
-      }
-    } catch {}
     return null
+  }
+}
+
+/**
+ * Автоматически чинит старые карточки в базе, у которых остались прямые ссылки goat.com
+ * (перезаливает их фото в ваш Cloudflare R2, не трогая рабочие фото на ImgBB)
+ */
+async function repairBrokenGoatLinks(client) {
+  console.log('\n🔍 Проверяем старые карточки с прямыми ссылками GOAT для переноса в R2...')
+  const brokenRes = await client.query(`
+    SELECT id, brand, name, image_url
+    FROM sneakers
+    WHERE image_url LIKE '%goat.com%'
+    ORDER BY created_at DESC
+    LIMIT 25
+  `)
+
+  if (brokenRes.rows.length === 0) {
+    console.log('✅ Все текущие карточки уже на облачном хостинге!')
+    return
+  }
+
+  console.log(`Найдено ${brokenRes.rows.length} карточек с прямыми ссылками GOAT. Переносим в R2...`)
+  for (const row of brokenRes.rows) {
+    const newUrl = await uploadToCloudflareR2(row.image_url, row.id)
+    if (newUrl && newUrl !== row.image_url) {
+      await client.query('UPDATE sneakers SET image_url = $1 WHERE id = $2', [newUrl, row.id])
+      console.log(`  🔧 Перенесено в R2: ${row.brand} | ${row.name}`)
+      await new Promise((r) => setTimeout(r, 400))
+    }
   }
 }
 
@@ -161,12 +220,16 @@ async function run() {
   const client = new Client({ connectionString })
   await client.connect()
 
-  // Гарантируем наличие колонки sku и очищаем пустые записи без фото
+  // Гарантируем наличие колонки sku и удаляем совсем пустые записи без фото
   await client.query(`
     ALTER TABLE sneakers ADD COLUMN IF NOT EXISTS sku TEXT;
     DELETE FROM sneakers WHERE image_url IS NULL OR TRIM(image_url) = '' OR TRIM(image_url) = 'null';
   `)
 
+  // Шаг 1: Чиним партию старых карточек, которые не загрузились на ImgBB
+  await repairBrokenGoatLinks(client)
+
+  // Шаг 2: Парсим новые модели и сразу сохраняем фото в Cloudflare R2
   for (let i = 0; i < 15; i++) {
     const randomBrand = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
     const randomPage = Math.floor(Math.random() * 6)
@@ -227,38 +290,36 @@ async function run() {
         const gender = Array.isArray(item.gender) ? item.gender[0] : item.gender || 'unisex'
         const price = item.retail_price_cents ? Math.round(item.retail_price_cents / 100) : 0
         const realYear = extractRealReleaseYear(item)
-        const sku = item.sku || item.designer_color || null
+        const sku = item.sku || null
 
-        // Проверяем, есть ли уже запись и нужно ли обновить ей фейковый 2024 год или пустой SKU
         const existingRes = await client.query(
-          'SELECT id, release_year, image_url, sku FROM sneakers WHERE id = $1',
+          'SELECT id, release_year, image_url FROM sneakers WHERE id = $1',
           [id]
         )
 
         if (existingRes.rows.length > 0) {
           const row = existingRes.rows[0]
-          const hasReliablePhoto =
-            row.image_url &&
-            (row.image_url.includes('imgbb.com') || row.image_url.includes('wsrv.nl'))
-
-          // Если год был записан как дефолтный 2024, исправляем на реальный год из Algolia
+          // Исправляем старый дефолтный 2024 год на реальный
           if (row.release_year === 2024 && realYear !== 2024) {
             await client.query(
               'UPDATE sneakers SET release_year = $1, sku = COALESCE(sku, $2) WHERE id = $3',
               [realYear, sku, id]
             )
-            console.log(`  🔧 Исправлен год релиза для: ${brand} | ${name} -> ${realYear ?? 'NULL'}`)
           }
-          if (hasReliablePhoto) continue
+          // Если фото уже лежит на ImgBB или вашем воркере R2 — не трогаем его!
+          if (
+            row.image_url &&
+            (row.image_url.includes('ibb.co') ||
+              row.image_url.includes('imgbb.com') ||
+              row.image_url.includes('workers.dev'))
+          ) {
+            continue
+          }
         }
 
-        console.log(`  -> Обработка: ${brand} | ${name} (${realYear ?? 'год не указан'})`)
-        const verifiedImageUrl = await resolveProductionImageUrl(sourceImage)
-
-        if (!verifiedImageUrl) {
-          console.log(`  ⏭️ Пропуск: фото недоступно или заблокировано CDN`)
-          continue
-        }
+        console.log(`  -> Обработка: ${brand} | ${name}`)
+        const finalImageUrl = await uploadToCloudflareR2(sourceImage, id)
+        if (!finalImageUrl) continue
 
         await client.query(
           `
@@ -266,25 +327,24 @@ async function run() {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           ON CONFLICT (id) DO UPDATE SET
             release_year = EXCLUDED.release_year,
-            image_url = COALESCE(EXCLUDED.image_url, sneakers.image_url),
-            sku = COALESCE(EXCLUDED.sku, sneakers.sku),
-            retail_price = CASE WHEN EXCLUDED.retail_price > 0 THEN EXCLUDED.retail_price ELSE sneakers.retail_price END
+            image_url = EXCLUDED.image_url,
+            sku = COALESCE(EXCLUDED.sku, sneakers.sku)
           `,
-          [id, brand, name, gender, price, realYear, verifiedImageUrl, sku]
+          [id, brand, name, gender, price, realYear, finalImageUrl, sku]
         )
 
-        console.log(`  💾 Сохранено: ${brand} | ${name}`)
-        await new Promise((resolve) => setTimeout(resolve, 600))
+        console.log(`  💾 Сохранено в БД: ${brand} | ${name}`)
+        await new Promise((resolve) => setTimeout(resolve, 500))
       }
     } catch (err) {
-      console.error('Ошибка шага синхронизации:', err?.message || err)
+      console.error('Ошибка API:', err?.message || err)
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1500))
   }
 
   await client.end()
-  console.log('\n🏁 СИНХРОНИЗАЦИЯ ЗАВЕРШЕНА!')
+  console.log('\n🏁 МЕГА-ЦИКЛ ЗАВЕРШЕН!')
 }
 
 run()
