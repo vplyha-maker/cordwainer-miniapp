@@ -422,7 +422,7 @@ function getEditorialText(lang: WholesaleLang) {
         sizeRangeLabel: 'РАЗМЕРНАЯ СЕТКА',
         fullSizeScale: 'Полная полнота (40—45)',
         naturalLeather: '100% Натуральная кожа / еврозима',
-        contactsPageSub: 'СВЯЗЬ С ПРОИЗВОДИТЕЛЕМ И ЗАКАЗ',
+        contactsPageSub: 'СВЯЗЬ С ПРОИЗВОДИТЕЛЬСТВОМ И ЗАКАЗ',
         contactsPageTitle: 'Контакты и поддержка',
         managerRole: 'ПРЕМИУМ-КОНСУЛЬТАНТ ФАБРИКИ',
         tapToCall: 'НАЖМИТЕ ДЛЯ ЗВОНКА  ↗',
@@ -774,6 +774,7 @@ function triggerAnchorDownload(url: string, fileName: string): void {
     a.href = url;
     a.download = fileName;
     a.style.display = 'none';
+    a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -781,16 +782,14 @@ function triggerAnchorDownload(url: string, fileName: string): void {
 }
 
 /**
- * Сохранение готового PDF-файла с разделением iOS и Android
+ * Сохранение готового PDF-файла с приоритетом локального Blob в памяти клиента
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
   localBlob?: Blob;
   fileName: string;
 }): Promise<void> {
-  const tg = getTgWebApp();
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-  const isAndroid = /Android/i.test(ua);
   const isIOS =
     /iPhone|iPad|iPod/i.test(ua) ||
     (typeof navigator !== 'undefined' &&
@@ -801,9 +800,10 @@ export async function triggerPdfDownload(status: {
   const baseName = status.fileName.toLowerCase().endsWith('.pdf')
     ? status.fileName.slice(0, -4)
     : status.fileName;
-  const uniqueFileName = baseName + '_' + stamp + '.pdf';
+  const uniqueFileName = `${baseName}_${stamp}.pdf`;
 
-  if (isIOS && !isAndroid && status.localBlob) {
+  // ——— 1. iOS: системный Share (самый надёжный способ)
+  if (isIOS && status.localBlob) {
     try {
       const file = new File([status.localBlob], status.fileName, {
         type: 'application/pdf',
@@ -811,64 +811,62 @@ export async function triggerPdfDownload(status: {
       const nav = navigator as Navigator & {
         canShare?: (d: { files?: File[] }) => boolean;
       };
-      if (
-        typeof nav.share === 'function' &&
-        (!nav.canShare || nav.canShare({ files: [file] }))
-      ) {
-        await nav.share({
-          files: [file],
-          title: status.fileName,
-        });
+      if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
+        await nav.share({ files: [file], title: status.fileName });
         return;
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
+      if (err instanceof Error && err.name === 'AbortError') return;
     }
   }
 
+  // ——— 2. Главный путь — localBlob (файл уже есть в памяти, сеть не нужна)
+  if (status.localBlob) {
+    try {
+      const blobUrl = URL.createObjectURL(status.localBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = uniqueFileName;
+      a.style.display = 'none';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Освобождаем память чуть позже
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 20000);
+      return;
+    } catch (e) {
+      console.warn('localBlob download failed', e);
+    }
+  }
+
+  // ——— 3. Запасной путь — серверный URL (если blob по какой-то причине нет)
   if (status.downloadUrl) {
     const baseFullUrl = status.downloadUrl.startsWith('http')
       ? status.downloadUrl
       : window.location.origin + status.downloadUrl;
-    const sep = baseFullUrl.includes('?') ? '&' : '?';
-    const freshUrl = baseFullUrl + sep + '_dl=' + String(Date.now());
+    const freshUrl = baseFullUrl + (baseFullUrl.includes('?') ? '&' : '?') + '_dl=' + Date.now();
 
+    const tg = getTgWebApp();
     if (typeof tg?.downloadFile === 'function') {
       try {
         tg.downloadFile(
-          {
-            url: freshUrl,
-            file_name: uniqueFileName,
-          },
+          { url: freshUrl, file_name: uniqueFileName },
           (accepted) => {
-            if (!accepted && isAndroid) {
+            if (!accepted) {
+              // если Telegram отказал — пробуем обычный anchor
               triggerAnchorDownload(freshUrl, uniqueFileName);
             }
           }
         );
         return;
       } catch {
-        if (isAndroid) {
-          triggerAnchorDownload(freshUrl, uniqueFileName);
-          return;
-        }
+        // fall through
       }
     }
 
-    if (isAndroid) {
-      triggerAnchorDownload(freshUrl, uniqueFileName);
-      return;
-    }
-  }
-
-  if (status.localBlob) {
-    try {
-      const blobUrl = URL.createObjectURL(status.localBlob);
-      triggerAnchorDownload(blobUrl, uniqueFileName);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-    } catch {}
+    triggerAnchorDownload(freshUrl, uniqueFileName);
   }
 }
 
@@ -1758,11 +1756,8 @@ export async function generateAndDeliverLookbookPdf(
         totalPages,
       };
 
-      const isAndroid =
-        typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
-      if (isAndroid && statusObj.downloadUrl) {
-        await triggerPdfDownload(statusObj);
-      }
+      // Скачиваем всегда, когда есть localBlob
+      await triggerPdfDownload(statusObj);
 
       return { status: statusObj, error: null };
     } else {
@@ -1779,5 +1774,9 @@ export async function generateAndDeliverLookbookPdf(
     fileName,
     totalPages,
   };
+
+  // Даже если серверный запрос не прошёл, локальный PDF уже собран в памяти
+  await triggerPdfDownload(fallbackStatus);
+
   return { status: fallbackStatus, error: deliveryError };
 }
