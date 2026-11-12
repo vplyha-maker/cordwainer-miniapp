@@ -1,4 +1,3 @@
-typescript
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
