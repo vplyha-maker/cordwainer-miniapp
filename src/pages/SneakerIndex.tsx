@@ -103,7 +103,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     savedArchive: 'Сохраненный архив',
     sneakerIndex: 'Footwear Index',
     editorialSub: 'Digital Footwear Encyclopedia & Lookbook',
-    searchPlaceholder: 'Поиск по модели, бренду или артикулу (Dunk, 550, Tabi)...',
+    searchPlaceholder: 'Модель, бренд или артикул (Dunk, 550, Tabi)...',
     searchBtn: 'Найти',
     allBrands: 'Все марки',
     catAll: 'Все сегменты',
@@ -127,8 +127,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     buySearch: 'Найти в продаже',
     copySku: 'Скопировать название',
     copied: 'Скопировано',
-    loadMore: 'Загрузить еще модели',
-    loading: 'Синхронизация каталога...',
+    loadMore: '+ Загрузить еще модели',
+    loading: 'Загрузка каталога...',
     errorLoad: 'Ошибка при загрузке данных',
     errorSneakers: 'Не удалось загрузить каталог',
     errorRateLimit: 'Слишком много запросов. Подождите минуту.',
@@ -138,9 +138,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     loaded: 'Показано',
     totalDb: 'В базе',
     updatedAt: 'Синхр.',
-    noPhoto: 'Студийное фото в обработке',
+    noPhoto: 'Фото в обработке',
     releaseYearLabel: 'Год релиза',
-    genderLabel: 'Категория',
     skuLabel: 'Артикул / SKU',
     close: 'Закрыть',
   },
@@ -152,7 +151,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     savedArchive: 'Збережений архів',
     sneakerIndex: 'Footwear Index',
     editorialSub: 'Digital Footwear Encyclopedia & Lookbook',
-    searchPlaceholder: 'Пошук за моделлю, брендом або артикулом (Dunk, 550, Tabi)...',
+    searchPlaceholder: 'Модель, бренд або артикул (Dunk, 550, Tabi)...',
     searchBtn: 'Знайти',
     allBrands: 'Всі марки',
     catAll: 'Всі сегменти',
@@ -176,8 +175,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     buySearch: 'Знайти у продажу',
     copySku: 'Скопіювати назву',
     copied: 'Скопійовано',
-    loadMore: 'Завантажити ще моделі',
-    loading: 'Синхронізація каталогу...',
+    loadMore: '+ Завантажити ще моделі',
+    loading: 'Завантаження каталогу...',
     errorLoad: 'Помилка завантаження даних',
     errorSneakers: 'Не вдалося завантажити каталог',
     errorRateLimit: 'Забагато запитів. Зачекайте хвилину.',
@@ -187,11 +186,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     loaded: 'Показано',
     totalDb: 'В базі',
     updatedAt: 'Синхр.',
-    noPhoto: 'Студійне фото в обробці',
+    noPhoto: 'Фото в обробці',
     releaseYearLabel: 'Рік релізу',
-    genderLabel: 'Категорія',
     skuLabel: 'Артикул / SKU',
-    close: 'Закриті',
+    close: 'Закрити',
   },
   de: {
     back: 'Zurück',
@@ -201,7 +199,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     savedArchive: 'Gespeichertes Archiv',
     sneakerIndex: 'Footwear Index',
     editorialSub: 'Digital Footwear Encyclopedia & Lookbook',
-    searchPlaceholder: 'Suche nach Modell, Marke oder SKU (Dunk, 550, Tabi)...',
+    searchPlaceholder: 'Modell, Marke oder SKU (Dunk, 550, Tabi)...',
     searchBtn: 'Suchen',
     allBrands: 'Alle Marken',
     catAll: 'Alle Segmente',
@@ -225,7 +223,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     buySearch: 'Online finden',
     copySku: 'Modellname kopieren',
     copied: 'Kopiert',
-    loadMore: 'Weitere Modelle laden',
+    loadMore: '+ Weitere Modelle laden',
     loading: 'Katalog wird geladen...',
     errorLoad: 'Fehler beim Laden der Daten',
     errorSneakers: 'Katalog konnte nicht geladen werden',
@@ -236,9 +234,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     loaded: 'Gezeigt',
     totalDb: 'In DB',
     updatedAt: 'Stand',
-    noPhoto: 'Studiofoto in Bearbeitung',
+    noPhoto: 'Foto in Bearbeitung',
     releaseYearLabel: 'Erscheinungsjahr',
-    genderLabel: 'Kategorie',
     skuLabel: 'SKU / Artikelnummer',
     close: 'Schließen',
   },
@@ -253,7 +250,7 @@ function haptic(kind: 'light' | 'medium' = 'light') {
 }
 
 /**
- * Extracts a reliable release year and avoids showing artificial fallback years
+ * Извлекает достоверный год релиза и отсекает дефолтный 2024 год из старых записей
  */
 function parseReleaseYear(sneaker: Sneaker): string | null {
   const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
@@ -265,21 +262,18 @@ function parseReleaseYear(sneaker: Sneaker): string | null {
   const rawYear = sneaker.year ?? sneaker.releaseYear
   if (rawYear !== null && rawYear !== undefined) {
     const numYear = Number(rawYear)
-    if (!Number.isNaN(numYear) && numYear >= 1970 && numYear <= 2027) {
+    // Исключаем 2024, если он был проставлен старым парсером по умолчанию
+    if (!Number.isNaN(numYear) && numYear >= 1970 && numYear <= 2027 && numYear !== 2024) {
       return String(numYear)
     }
   }
 
-  // Fallback: check if model name itself contains a release year like "1999" or "2021"
   const nameYearMatch = sneaker.name?.match(/\b(19[8-9]\d|20[0-2]\d)\b/)
   if (nameYearMatch) return nameYearMatch[1]
 
   return null
 }
 
-/**
- * Builds an array of resilient image URLs with global WebP CDN proxy fallbacks
- */
 function buildImageSources(rawUrl?: string | null): string[] {
   if (!rawUrl || typeof rawUrl !== 'string') return []
   const trimmed = rawUrl.trim()
@@ -288,23 +282,19 @@ function buildImageSources(rawUrl?: string | null): string[] {
   const httpsUrl = trimmed.replace(/^http:\/\//i, 'https://')
   const sources: string[] = []
 
-  // StockX clean formatting
   if (httpsUrl.includes('stockx.com')) {
     const base = httpsUrl.split('?')[0]
-    const formatted = `${base}?fit=fill&bg=FFFFFF&w=800&h=560&auto=format,compress&q=85&trim=color`
-    sources.push(formatted)
+    sources.push(`${base}?fit=fill&bg=FFFFFF&w=800&h=560&auto=format,compress&q=85&trim=color`)
     sources.push(`https://wsrv.nl/?url=${encodeURIComponent(base)}&w=800&q=85&output=webp`)
     return sources
   }
 
-  // GOAT CDN links often block direct hotlinking without proxy; prioritize wsrv.nl WebP CDN
   if (httpsUrl.includes('goat.com') || httpsUrl.includes('flightclub.com')) {
     sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=85&output=webp`)
     sources.push(httpsUrl)
     return sources
   }
 
-  // Direct Cloud Storage (Cloudflare R2, Firebase, ImgBB, Cloudinary)
   sources.push(httpsUrl)
   sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=85&output=webp`)
   return sources
@@ -375,7 +365,6 @@ function SneakerCard({
       className="group cursor-pointer flex flex-col justify-between transition-all duration-300"
     >
       <div>
-        {/* Editorial Studio Image Frame */}
         <div
           className={`w-full overflow-hidden relative flex items-center justify-center transition-colors ${
             isCompact ? 'aspect-[4/3] mb-3 p-3' : 'aspect-[16/11] mb-4 p-6 sm:p-8'
@@ -385,8 +374,7 @@ function SneakerCard({
             border: `1px solid ${themeColors.borderFaint}`,
           }}
         >
-          {/* Top-left Index & Year Tag */}
-          <div className="absolute top-3 left-3.5 z-10 flex items-center gap-2 pointer-events-none">
+          <div className="absolute top-2.5 left-3 z-10 flex items-center gap-2 pointer-events-none">
             <span
               className="text-[9px] font-mono tracking-[0.18em] uppercase"
               style={{ color: themeColors.textMuted }}
@@ -406,12 +394,11 @@ function SneakerCard({
             )}
           </div>
 
-          {/* Top-right Favorite Button */}
           <button
             type="button"
             onClick={(e) => toggleFavorite(e, sneaker)}
             aria-label="Favorite"
-            className="absolute top-2.5 right-2.5 z-20 w-8 h-8 flex items-center justify-center rounded-full outline-none bg-transparent border-none cursor-pointer transition-transform active:scale-90"
+            className="absolute top-2 right-2 z-20 w-8 h-8 flex items-center justify-center rounded-full outline-none bg-transparent border-none cursor-pointer transition-transform active:scale-90"
             style={{ color: isFav ? themeColors.accent : themeColors.textMuted }}
           >
             <svg
@@ -426,17 +413,15 @@ function SneakerCard({
             </svg>
           </button>
 
-          {/* Loading Shimmer */}
           {imgState === 'loading' && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div
-                className="w-10 h-10 rounded-full border border-t-transparent animate-spin opacity-30"
+                className="w-8 h-8 rounded-full border border-t-transparent animate-spin opacity-30"
                 style={{ borderColor: themeColors.textMuted, borderTopColor: 'transparent' }}
               />
             </div>
           )}
 
-          {/* Product Studio Image */}
           {currentSrc && imgState !== 'error' && (
             <img
               src={currentSrc}
@@ -457,25 +442,22 @@ function SneakerCard({
             />
           )}
 
-          {/* Editorial Silhouette Fallback if Photo Fails */}
           {imgState === 'error' && (
-            <div className="flex flex-col items-center justify-center text-center px-4 select-none">
+            <div className="flex flex-col items-center justify-center text-center px-3 select-none">
               <svg
-                width={isCompact ? '40' : '56'}
-                height={isCompact ? '24' : '32'}
+                width={isCompact ? '38' : '52'}
+                height={isCompact ? '22' : '30'}
                 viewBox="0 0 64 32"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.1"
-                className="opacity-20 mb-2"
+                className="opacity-20 mb-1.5"
               >
                 <path d="M4 24L8 12L22 10L34 18L54 19C58 19 60 21 60 24V27H4V24Z" />
                 <path d="M4 27H60" />
-                <path d="M25 12L29 16" />
-                <path d="M30 14L34 17" />
               </svg>
               <span
-                className="text-[9px] font-sans uppercase tracking-[0.2em] opacity-35"
+                className="text-[8px] font-sans uppercase tracking-[0.18em] opacity-35"
                 style={{ color: themeColors.text }}
               >
                 {t.noPhoto}
@@ -483,7 +465,6 @@ function SneakerCard({
             </div>
           )}
 
-          {/* Bottom-left SKU tag if present */}
           {sneaker.sku && !isCompact && (
             <span
               className="absolute bottom-2.5 left-3.5 text-[9px] font-mono uppercase tracking-[0.15em] opacity-40"
@@ -494,7 +475,6 @@ function SneakerCard({
           )}
         </div>
 
-        {/* Brand & Model Typography */}
         <div className="flex items-baseline justify-between gap-2 mb-1">
           <h3
             className={`font-serif tracking-tight leading-tight uppercase ${
@@ -505,10 +485,14 @@ function SneakerCard({
           </h3>
           {sneaker.gender && sneaker.gender !== 'unisex' && (
             <span
-              className="text-[8px] font-sans uppercase tracking-[0.2em] shrink-0"
+              className="text-[8px] font-sans uppercase tracking-[0.18em] shrink-0"
               style={{ color: themeColors.textFaint }}
             >
-              {sneaker.gender === 'men' ? t.men : sneaker.gender === 'women' ? t.women : sneaker.gender}
+              {sneaker.gender === 'men'
+                ? t.men
+                : sneaker.gender === 'women'
+                ? t.women
+                : sneaker.gender}
             </span>
           )}
         </div>
@@ -523,19 +507,18 @@ function SneakerCard({
         </p>
       </div>
 
-      {/* Price & Action Footer */}
       <div
         className="flex justify-between items-center pt-2.5"
         style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
       >
         <span
-          className="text-[9px] font-mono uppercase tracking-[0.16em]"
+          className="text-[9px] font-mono uppercase tracking-[0.14em]"
           style={{ color: sneaker.retailPrice > 0 ? themeColors.text : themeColors.textMuted }}
         >
           {sneaker.retailPrice > 0 ? `${t.retail} $${sneaker.retailPrice}` : t.priceUnav}
         </span>
         <span
-          className="text-[9px] font-sans uppercase tracking-[0.2em] transition-transform group-hover:translate-x-0.5"
+          className="text-[9px] font-sans uppercase tracking-[0.18em]"
           style={{ color: themeColors.textMuted }}
         >
           {t.find} →
@@ -631,7 +614,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
   const cacheRef = useRef<Record<string, { items: Sneaker[]; total: number | null }>>({})
 
-  // Load favorites from API or localStorage
   useEffect(() => {
     if (tgUserId) {
       fetch(`/api/favorites?user_id=${tgUserId}`)
@@ -651,7 +633,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }, [tgUserId])
 
-  // Smart Scroll Listener
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -687,7 +668,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }
 
-  // Sync Dark/Light Theme
   useEffect(() => {
     if (propTheme) {
       setIsDark(propTheme === 'dark')
@@ -730,7 +710,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const themeColors = {
     bg: isDark ? '#09090B' : '#F4F0E8',
-    headerBg: isDark ? 'rgba(9, 9, 11, 0.86)' : 'rgba(244, 240, 232, 0.88)',
     cardBg: isDark ? '#121215' : '#EBE5D9',
     modalBg: isDark ? '#141417' : '#F9F6F0',
     text: isDark ? '#F4F0E8' : '#09090B',
@@ -742,14 +721,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }
 
   const fetchSneakers = useCallback(
-    async (
-      query: string,
-      genderFilter: string,
-      sortOption: SortOption,
-      pageNum: number,
-      append: boolean = false
-    ) => {
-      const cacheKey = `${query}_${genderFilter}_${sortOption}_p${pageNum}`
+    async (query: string, genderFilter: string, pageNum: number, append: boolean = false) => {
+      const cacheKey = `${query}_${genderFilter}_p${pageNum}`
 
       if (!append && cacheRef.current[cacheKey]) {
         setSneakers(cacheRef.current[cacheKey].items)
@@ -768,9 +741,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       try {
         const url = `/api/get-top-sneakers?query=${encodeURIComponent(
           query
-        )}&gender=${encodeURIComponent(genderFilter)}&sort=${encodeURIComponent(
-          sortOption
-        )}&limit=60&page=${pageNum}`
+        )}&gender=${encodeURIComponent(genderFilter)}&limit=60&page=${pageNum}`
 
         const res = await fetch(url)
         const text = await res.text()
@@ -817,7 +788,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
         setSneakers((prev) => {
           const merged = append ? [...prev, ...newItems] : newItems
-          // Deduplicate by id
           const seen = new Set<string>()
           const unique = merged.filter((item) => {
             if (seen.has(item.id)) return false
@@ -856,9 +826,9 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   useEffect(() => {
     if (viewState === 'catalog') {
       setPage(1)
-      fetchSneakers(activeQuery, selectedGender, sortBy, 1, false)
+      fetchSneakers(activeQuery, selectedGender, 1, false)
     }
-  }, [activeQuery, selectedGender, sortBy, fetchSneakers, viewState])
+  }, [activeQuery, selectedGender, fetchSneakers, viewState])
 
   const visibleBrands = useMemo(() => {
     if (selectedCategory === 'all') return BRANDS
@@ -936,7 +906,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     haptic('light')
     const nextPage = page + 1
     setPage(nextPage)
-    fetchSneakers(activeQuery, selectedGender, sortBy, nextPage, true)
+    fetchSneakers(activeQuery, selectedGender, nextPage, true)
   }
 
   const handleExternalBuySearch = (sneaker: Sneaker) => {
@@ -998,13 +968,14 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     })
   }, [])
 
-  // Filter & sort client-side as a secondary guarantee alongside API parameters
   const processedCatalog = useMemo(() => {
     const filtered = sneakers.filter((sneaker) => {
-      // Push items with missing raw URLs out if valid ones exist
       if (selectedGender !== 'all' && sneaker.gender) {
         const g = sneaker.gender.toLowerCase()
-        if (selectedGender === 'men' && !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))) {
+        if (
+          selectedGender === 'men' &&
+          !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))
+        ) {
           return false
         }
         if (selectedGender === 'women' && !(g.includes('women') || g === 'unisex')) {
@@ -1014,7 +985,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       return true
     })
 
-    // Always place items with valid loaded photos ahead of broken/empty ones
     return [...filtered].sort((a, b) => {
       const aBroken = brokenIds.has(a.id) || !a.image?.original ? 1 : 0
       const bBroken = brokenIds.has(b.id) || !b.image?.original ? 1 : 0
@@ -1056,19 +1026,16 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   return (
     <div
       ref={scrollRef}
-      className="h-[100dvh] w-full overflow-y-auto transition-colors duration-500 relative select-none"
+      className="h-[100dvh] w-full overflow-y-auto px-5 sm:px-8 pt-6 pb-24 transition-colors duration-500 relative select-none"
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
-      {/* STICKY EDITORIAL NAVIGATION BAR */}
-      <header
-        className="sticky top-0 z-30 px-5 sm:px-8 pt-4 pb-3.5 backdrop-blur-md transition-colors"
-        style={{
-          backgroundColor: themeColors.headerBg,
-          borderBottom: `1px solid ${themeColors.borderFaint}`,
-        }}
-      >
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          {/* Left: Back Action */}
+      <div className="max-w-6xl mx-auto">
+        {/* ВЕРХНЯЯ НАВИГАЦИОННАЯ ПАНЕЛЬ (без тега <header>, чтобы не перекрывать заголовок) */}
+        <div
+          role="navigation"
+          className="pt-2 pb-4 mb-7 flex items-center justify-between gap-3"
+          style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
+        >
           <button
             type="button"
             onClick={() => {
@@ -1076,7 +1043,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               if (viewState !== 'catalog') setViewState('catalog')
               else if (onBack) onBack()
             }}
-            className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.22em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100 py-1"
+            className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100 py-1.5"
             style={{
               color: themeColors.textMuted,
               visibility: viewState === 'catalog' && !onBack ? 'hidden' : 'visible',
@@ -1086,21 +1053,20 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             <span>{t.back}</span>
           </button>
 
-          {/* Right: Segmented View Switcher (Catalog / Archive / Info) */}
-          <nav className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               type="button"
               onClick={() => {
                 haptic('light')
                 setViewState('catalog')
               }}
-              className="px-3 py-1.5 text-[10px] font-sans uppercase tracking-[0.2em] outline-none bg-transparent border-none cursor-pointer transition-all"
+              className="px-2.5 py-1.5 text-[10px] font-sans uppercase tracking-[0.18em] outline-none bg-transparent border-none cursor-pointer transition-all"
               style={{
                 color: viewState === 'catalog' ? themeColors.text : themeColors.textMuted,
                 borderBottom:
                   viewState === 'catalog'
-                    ? `1px solid ${themeColors.text}`
-                    : '1px solid transparent',
+                    ? `1.5px solid ${themeColors.text}`
+                    : '1.5px solid transparent',
               }}
             >
               {t.catalog}
@@ -1112,21 +1078,21 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 haptic('light')
                 setViewState(viewState === 'favorites' ? 'catalog' : 'favorites')
               }}
-              className="px-3 py-1.5 flex items-center gap-1.5 text-[10px] font-sans uppercase tracking-[0.2em] outline-none bg-transparent border-none cursor-pointer transition-all"
+              className="px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-sans uppercase tracking-[0.18em] outline-none bg-transparent border-none cursor-pointer transition-all"
               style={{
                 color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted,
                 borderBottom:
                   viewState === 'favorites'
-                    ? `1px solid ${themeColors.text}`
-                    : '1px solid transparent',
+                    ? `1.5px solid ${themeColors.text}`
+                    : '1.5px solid transparent',
               }}
             >
               <span>{t.archive}</span>
               {favorites.length > 0 && (
                 <span
-                  className="text-[9px] font-mono px-1.5 py-0.2 rounded-full"
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded-full leading-none"
                   style={{
-                    backgroundColor: isDark ? 'rgba(244,240,232,0.12)' : 'rgba(9,9,11,0.1)',
+                    backgroundColor: isDark ? 'rgba(244,240,232,0.14)' : 'rgba(9,9,11,0.1)',
                     color: themeColors.text,
                   }}
                 >
@@ -1141,77 +1107,70 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 haptic('light')
                 setViewState(viewState === 'about' ? 'catalog' : 'about')
               }}
-              className="px-3 py-1.5 text-[10px] font-sans uppercase tracking-[0.2em] outline-none bg-transparent border-none cursor-pointer transition-all"
+              className="px-2.5 py-1.5 text-[10px] font-sans uppercase tracking-[0.18em] outline-none bg-transparent border-none cursor-pointer transition-all"
               style={{
                 color: viewState === 'about' ? themeColors.text : themeColors.textMuted,
                 borderBottom:
                   viewState === 'about'
-                    ? `1px solid ${themeColors.text}`
-                    : '1px solid transparent',
+                    ? `1.5px solid ${themeColors.text}`
+                    : '1.5px solid transparent',
               }}
             >
               {t.info}
             </button>
-          </nav>
+          </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-5 sm:px-8 pt-6 pb-24">
         {viewState === 'about' ? (
           <AboutView lang={activeLang} themeColors={themeColors} isDark={isDark} />
         ) : (
           <>
-            {/* EDITORIAL MASTHEAD */}
+            {/* ЗАГОЛОВОК СТРАНИЦЫ */}
             <div className="flex flex-col mb-7">
               <span
-                className="text-[9px] font-mono uppercase tracking-[0.28em] mb-2"
+                className="text-[9px] font-mono uppercase tracking-[0.26em] mb-2 block"
                 style={{ color: themeColors.textMuted }}
               >
                 {t.editorialSub}
               </span>
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <h1 className="font-serif text-4xl sm:text-6xl leading-none tracking-[-0.02em]">
-                  {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
-                </h1>
+              <h1 className="font-serif text-[11vw] min-[390px]:text-5xl leading-[1.05] tracking-[-0.02em] mb-3">
+                {viewState === 'favorites' ? t.savedArchive : t.sneakerIndex}
+              </h1>
 
-                {/* Database Status Pill */}
-                {viewState === 'catalog' && (
-                  <div
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono uppercase tracking-[0.14em]"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    <span>
-                      {t.loaded}: <strong style={{ color: themeColors.text }}>{currentDisplayList.length}</strong>
-                    </span>
-                    {totalInDb !== null && (
-                      <>
-                        <span className="opacity-30">/</span>
-                        <span>
-                          {t.totalDb}: <strong style={{ color: themeColors.text }}>{totalInDb.toLocaleString()}</strong>
-                        </span>
-                      </>
-                    )}
-                    {lastSync && (
-                      <>
-                        <span className="opacity-30">|</span>
-                        <span>
-                          {t.updatedAt} {lastSync}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+              {viewState === 'catalog' && (
+                <div
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono uppercase tracking-[0.14em]"
+                  style={{ color: themeColors.textMuted }}
+                >
+                  <span>
+                    {t.loaded}: <strong style={{ color: themeColors.text }}>{currentDisplayList.length}</strong>
+                  </span>
+                  {totalInDb !== null && (
+                    <>
+                      <span className="opacity-30">|</span>
+                      <span>
+                        {t.totalDb}: <strong style={{ color: themeColors.text }}>{totalInDb}</strong>
+                      </span>
+                    </>
+                  )}
+                  {lastSync && (
+                    <>
+                      <span className="opacity-30">|</span>
+                      <span>
+                        {t.updatedAt} {lastSync}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {viewState === 'catalog' && (
               <>
-                {/* SEARCH BAR WITH ACTION BUTTON */}
+                {/* ПОИСКОВАЯ СТРОКА */}
                 <div
                   className="mb-5 flex items-center"
-                  style={{
-                    borderBottom: `1px solid ${themeColors.border}`,
-                  }}
+                  style={{ borderBottom: `1px solid ${themeColors.border}` }}
                 >
                   <svg
                     width="15"
@@ -1257,7 +1216,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                   </button>
                 </div>
 
-                {/* LEVEL 1 NAVIGATION: FASHION SEGMENTS */}
+                {/* СЕГМЕНТЫ КАТАЛОГА */}
                 <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-none mb-2">
                   {CATEGORIES.map((cat) => {
                     const active = selectedCategory === cat.id
@@ -1283,7 +1242,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                   })}
                 </div>
 
-                {/* LEVEL 2 NAVIGATION: CURATED BRANDS */}
+                {/* ПОЛОСА БРЕНДОВ */}
                 <div className="relative mb-5">
                   <div className="flex gap-4 overflow-x-auto py-2.5 scrollbar-none pr-12">
                     <button
@@ -1332,7 +1291,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                   />
                 </div>
 
-                {/* LEVEL 3 TOOLBAR: GENDER + SORT + GRID DENSITY */}
+                {/* ПАНЕЛЬ ФИЛЬТРА ПО ПОЛУ, СОРТИРОВКИ И СЕТКИ */}
                 <div
                   className="flex flex-wrap items-center justify-between gap-3 py-3 mb-8"
                   style={{
@@ -1340,7 +1299,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                     borderBottom: `1px solid ${themeColors.borderFaint}`,
                   }}
                 >
-                  {/* Gender Filter */}
                   <div className="flex items-center gap-4">
                     {GENDERS.map((gender) => {
                       const isActive = selectedGender === gender.id
@@ -1364,7 +1322,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                     })}
                   </div>
 
-                  {/* Right Controls: Sort + Layout Switcher */}
                   <div className="flex items-center gap-4">
                     <select
                       value={sortBy}
@@ -1389,7 +1346,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                       </option>
                     </select>
 
-                    {/* Grid Switcher (1-col Lookbook vs 2-col Compact) */}
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
@@ -1432,8 +1388,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               </>
             )}
 
-            {/* ERROR BANNER */}
-            {error && (
+            {/* ОШИБКА ТОЛЬКО В РЕЖИМЕ КАТАЛОГА */}
+            {error && viewState === 'catalog' && (
               <div
                 className="p-4 mb-8 flex items-center justify-between"
                 style={{ border: `1px solid ${themeColors.border}` }}
@@ -1443,7 +1399,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 </p>
                 <button
                   type="button"
-                  onClick={() => fetchSneakers(activeQuery, selectedGender, sortBy, page, false)}
+                  onClick={() => fetchSneakers(activeQuery, selectedGender, page, false)}
                   className="text-[10px] font-sans uppercase tracking-widest underline bg-transparent border-none cursor-pointer"
                   style={{ color: themeColors.text }}
                 >
@@ -1452,7 +1408,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               </div>
             )}
 
-            {/* SKELETON LOADER */}
+            {/* СКЕЛЕТОН ПРИ ЗАГРУЗКЕ */}
             {loading && viewState === 'catalog' && sneakers.length === 0 && (
               <div
                 className={
@@ -1480,7 +1436,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               </div>
             )}
 
-            {/* EMPTY STATES */}
+            {/* ПУСТОЙ РЕЗУЛЬТАТ */}
             {!loading && currentDisplayList.length === 0 && (
               <div className="py-20 text-center flex flex-col items-center justify-center gap-4">
                 <p
@@ -1505,7 +1461,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               </div>
             )}
 
-            {/* LOOKBOOK CATALOG GRID */}
+            {/* СЕТКА КАРТОЧЕК */}
             {currentDisplayList.length > 0 && (
               <div
                 className={
@@ -1538,7 +1494,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               </div>
             )}
 
-            {/* LOAD MORE PAGINATION */}
+            {/* ПАГИНАЦИЯ */}
             {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
               <div
                 className="pt-8 pb-12 text-center"
@@ -1560,9 +1516,9 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             )}
           </>
         )}
-      </main>
+      </div>
 
-      {/* EDITORIAL QUICK-VIEW MODAL */}
+      {/* МОДАЛЬНОЕ ОКНО ПРОСМОТРА МОДЕЛИ */}
       {selectedModalSneaker && (
         <div
           onClick={() => setSelectedModalSneaker(null)}
@@ -1604,9 +1560,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                   src={selectedModalSneaker.imageUrl}
                   alt={selectedModalSneaker.sneaker.name}
                   className="w-full h-full object-contain"
-                  style={{
-                    mixBlendMode: isDark ? 'normal' : 'multiply',
-                  }}
+                  style={{ mixBlendMode: isDark ? 'normal' : 'multiply' }}
                 />
               </div>
             )}
@@ -1689,7 +1643,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </div>
       )}
 
-      {/* SMART FLOATING SCROLL BUTTON */}
+      {/* КНОПКА ПРОКРУТКИ */}
       <button
         type="button"
         onClick={handleSmartScroll}
