@@ -10,6 +10,8 @@
  *    даже когда текущая накладная пуста после отправки заказа.
  * 3. АВТООЧИСТКА КОРЗИНЫ: Подписка на событие `cardio-cart-cleared` гарантирует, что после
  *    отправки заказа старые позиции мгновенно исчезают из прайс-каталога.
+ * 4. НАДЁЖНОЕ СКАЧИВАНИЕ PDF ИЗ ПАМЯТИ (localBlob): Добавлена крупная кнопка
+ *    «📥 Скачать PDF в Загрузки» со свежим жестом пользователя и индикацией сохранения.
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -242,6 +244,7 @@ function WholesalePriceCatalogModal({
   const [dotPhase, setDotPhase] = useState(0);
   const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState<PdfDeliveryStatus | null>(null);
+  const [justDownloaded, setJustDownloaded] = useState(false);
 
   const pdfAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -378,10 +381,36 @@ function WholesalePriceCatalogModal({
       : '📂 Мои заказы';
   }, [cartTotalPairs, lang]);
 
+  // Текст главной кнопки прямого сохранения PDF из localBlob
+  const primaryDownloadLabel = useMemo(() => {
+    if (justDownloaded) {
+      return lang === 'de'
+        ? '✓ PDF in Downloads gespeichert'
+        : lang === 'uk'
+        ? '✓ Файл збережено у Завантаження'
+        : '✓ Файл сохранён в Загрузки';
+    }
+    return lang === 'de'
+      ? '📥 PDF in Downloads speichern'
+      : lang === 'uk'
+      ? '📥 Завантажити PDF у Завантаження'
+      : '📥 Скачать PDF в Загрузки';
+  }, [justDownloaded, lang]);
+
+  const handleManualDownloadClick = (statusToDownload: PdfDeliveryStatus) => {
+    onHaptic?.();
+    setJustDownloaded(true);
+    void triggerPdfDownload(statusToDownload);
+    window.setTimeout(() => {
+      setJustDownloaded(false);
+    }, 3000);
+  };
+
   const handleGenerateAndDeliverPdf = async () => {
     if (pdfStage !== 'idle') return;
     setDeliveryStatus(null);
     setDeliveryError(null);
+    setJustDownloaded(false);
 
     startPdfSoundtrack();
 
@@ -410,12 +439,12 @@ function WholesalePriceCatalogModal({
 
   const handlePdfAction = () => {
     if (pdfStage !== 'idle') return;
-    onHaptic?.();
     if (deliveryStatus) {
-      triggerPdfDownload(deliveryStatus);
+      handleManualDownloadClick(deliveryStatus);
       return;
     }
-    handleGenerateAndDeliverPdf();
+    onHaptic?.();
+    void handleGenerateAndDeliverPdf();
   };
 
   const handlePinSubmit = () => {
@@ -830,6 +859,7 @@ function WholesalePriceCatalogModal({
               </div>
             )}
 
+            {/* Блок готового PDF с явной кнопкой [ Скачать PDF в Загрузки ] */}
             {!isBusy && deliveryStatus && (
               <div
                 style={{
@@ -864,38 +894,41 @@ function WholesalePriceCatalogModal({
                   </div>
                 )}
 
-                {deliveryError && (
+                {deliveryError && !deliveryStatus.sentToTelegram && (
                   <div
                     style={{
-                      fontSize: '10px',
+                      fontSize: '10.5px',
                       color: THEME.inkMuted,
-                      marginBottom: '8px',
+                      marginBottom: '10px',
                     }}
                   >
-                    Файл готов в памяти телефона ({deliveryError})
+                    {lang === 'de'
+                      ? 'PDF ist im Gerätespeicher bereit zum Speichern.'
+                      : lang === 'uk'
+                      ? 'PDF-каталог сформовано в пам’яті смартфона і готовий до збереження.'
+                      : 'PDF-каталог сформирован в памяти смартфона и готов к сохранению.'}
                   </div>
                 )}
 
                 <button
                   type="button"
-                  onClick={() => {
-                    onHaptic?.();
-                    triggerPdfDownload(deliveryStatus);
-                  }}
+                  onClick={() => handleManualDownloadClick(deliveryStatus)}
                   style={{
                     width: '100%',
-                    padding: '13px 14px',
-                    backgroundColor: THEME.ink,
-                    color: THEME.onInk,
+                    padding: '15px 16px',
+                    backgroundColor: justDownloaded ? THEME.accentGreen : THEME.ink,
+                    color: justDownloaded ? '#FFFFFF' : THEME.onInk,
                     border: 'none',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 700,
-                    letterSpacing: '1px',
+                    letterSpacing: '1.1px',
                     textTransform: 'uppercase',
                     cursor: 'pointer',
+                    touchAction: 'manipulation',
+                    transition: 'background-color 0.2s ease',
                   }}
                 >
-                  {t.downloadDirectBtn}
+                  {primaryDownloadLabel}
                 </button>
               </div>
             )}
@@ -922,6 +955,7 @@ function WholesalePriceCatalogModal({
                     if (seasonFilter !== tab) {
                       setSeasonFilter(tab);
                       setDeliveryStatus(null);
+                      setJustDownloaded(false);
                     }
                   }}
                   style={{
@@ -1227,14 +1261,6 @@ function WholesalePriceCatalogModal({
             borderTop: `1px solid ${THEME.border}`,
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-          />
           <div
             style={{
               display: 'flex',
