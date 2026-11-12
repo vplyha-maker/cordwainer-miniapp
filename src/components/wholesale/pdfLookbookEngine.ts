@@ -1,3 +1,4 @@
+typescript
 /**
  * @file src/components/wholesale/pdfLookbookEngine.ts
  * @description Автономный графический движок генерации журнального PDF-лукбука А4 (Editorial Lookbook)
@@ -30,6 +31,9 @@ export interface PdfDeliveryStatus {
 
 /** Расширенная типизация глобального объекта Telegram WebApp */
 type TgWebAppExtended = {
+  platform?: string;
+  version?: string;
+  initData?: string;
   initDataUnsafe?: {
     user?: {
       id?: number;
@@ -60,6 +64,31 @@ interface InteractiveHitBox {
 export function getTgWebApp(): TgWebAppExtended | undefined {
   if (typeof window === 'undefined') return undefined;
   return (window as unknown as { Telegram?: { WebApp?: TgWebAppExtended } }).Telegram?.WebApp;
+}
+
+/**
+ * Определяет, запущено ли приложение внутри Android WebView / встроенного браузера Telegram.
+ * В Android WebView ссылки формата blob: не обрабатываются системным DownloadManager.
+ */
+function isAndroidTelegramOrWebView(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isAndroid = /Android/i.test(ua);
+  if (!isAndroid) return false;
+
+  const win = window as unknown as {
+    TelegramWebview?: unknown;
+    TelegramWebviewProxy?: unknown;
+  };
+  const tg = getTgWebApp();
+  const isTgWebApp =
+    Boolean(win.TelegramWebview) ||
+    Boolean(win.TelegramWebviewProxy) ||
+    Boolean(tg?.initData) ||
+    (Boolean(tg?.platform) && tg?.platform !== 'unknown');
+  const isAndroidWebView = /; wv\)|Version\/\d+\.\d+\s+Chrome\//i.test(ua) || /Telegram/i.test(ua);
+
+  return isTgWebApp || isAndroidWebView;
 }
 
 /**
@@ -422,7 +451,7 @@ function getEditorialText(lang: WholesaleLang) {
         sizeRangeLabel: 'РАЗМЕРНАЯ СЕТКА',
         fullSizeScale: 'Полная полнота (40—45)',
         naturalLeather: '100% Натуральная кожа / еврозима',
-        contactsPageSub: 'СВЯЗЬ С ПРОИЗВОДИТЕЛЬСТВОМ И ЗАКАЗ',
+        contactsPageSub: 'СВЯЗЬ С ПРОИЗВОДСТВОМ И ЗАКАЗ',
         contactsPageTitle: 'Контакты и поддержка',
         managerRole: 'ПРЕМИУМ-КОНСУЛЬТАНТ ФАБРИКИ',
         tapToCall: 'НАЖМИТЕ ДЛЯ ЗВОНКА  ↗',
@@ -782,7 +811,7 @@ function triggerAnchorDownload(url: string, fileName: string): void {
 }
 
 /**
- * Сохранение готового PDF-файла с приоритетом локального Blob в памяти клиента
+ * Сохранение готового PDF-файла с учётом ограничений Android Telegram WebView на blob:-ссылки.
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -795,24 +824,40 @@ export async function triggerPdfDownload(status: {
     (typeof navigator !== 'undefined' &&
       navigator.platform === 'MacIntel' &&
       navigator.maxTouchPoints > 1);
+  const isAndroidWebViewEnv = isAndroidTelegramOrWebView();
 
-  const stamp = String(Date.now()).slice(-4);
+  const stamp = String(Date.now()).slice(-6);
   const baseName = status.fileName.toLowerCase().endsWith('.pdf')
     ? status.fileName.slice(0, -4)
     : status.fileName;
   const uniqueFileName = `${baseName}_${stamp}.pdf`;
 
-  // ——— 1. iOS: системный Share (самый надёжный способ)
+  const buildFreshServerUrl = (rawUrl: string): string => {
+    const baseFullUrl = rawUrl.startsWith('http')
+      ? rawUrl
+      : window.location.origin + rawUrl;
+    const sep = baseFullUrl.includes('?') ? '&' : '?';
+    return (
+      baseFullUrl +
+      sep +
+      '_dl=' +
+      String(Date.now()) +
+      '&fn=' +
+      encodeURIComponent(uniqueFileName)
+    );
+  };
+
+  // ——— 1. iOS: системный Share Sheet (самый надёжный способ для iPhone/iPad)
   if (isIOS && status.localBlob) {
     try {
-      const file = new File([status.localBlob], status.fileName, {
+      const file = new File([status.localBlob], uniqueFileName, {
         type: 'application/pdf',
       });
       const nav = navigator as Navigator & {
         canShare?: (d: { files?: File[] }) => boolean;
       };
       if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
-        await nav.share({ files: [file], title: status.fileName });
+        await nav.share({ files: [file], title: uniqueFileName });
         return;
       }
     } catch (err) {
@@ -820,20 +865,72 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // ——— 2. Главный путь — localBlob (файл уже есть в памяти, сеть не нужна)
-  if (status.localBlob) {
+  // ——— 2. Android Telegram Mini App / Android WebView:
+  // В Android WebView <a href="blob:..."> НЕ работает (DownloadManager игнорирует схему blob: без ошибки JS).
+  // Поэтому на Android в Telegram приоритет отдаётся серверному HTTPS URL (через tg.downloadFile / openLink / HTTP-ссылку)
+  // либо системному navigator.share({ files }).
+  if (isAndroidWebViewEnv) {
+    if (status.downloadUrl) {
+      const freshUrl = buildFreshServerUrl(status.downloadUrl);
+      const tg = getTgWebApp();
+
+      if (typeof tg?.downloadFile === 'function') {
+        try {
+          tg.downloadFile(
+            { url: freshUrl, file_name: uniqueFileName },
+            (accepted) => {
+              if (!accepted) {
+                if (typeof tg.openLink === 'function') {
+                  tg.openLink(freshUrl);
+                } else {
+                  triggerAnchorDownload(freshUrl, uniqueFileName);
+                }
+              }
+            }
+          );
+          return;
+        } catch {
+          // переходим к следующему методу
+        }
+      }
+
+      if (typeof tg?.openLink === 'function') {
+        try {
+          tg.openLink(freshUrl);
+          return;
+        } catch {
+          // переходим к прямому скачиванию по HTTPS-ссылке
+        }
+      }
+
+      triggerAnchorDownload(freshUrl, uniqueFileName);
+      return;
+    }
+
+    // Если серверный downloadUrl отсутствует, пробуем системный Web Share API на Android
+    if (status.localBlob) {
+      try {
+        const file = new File([status.localBlob], uniqueFileName, {
+          type: 'application/pdf',
+        });
+        const nav = navigator as Navigator & {
+          canShare?: (d: { files?: File[] }) => boolean;
+        };
+        if (typeof nav.share === 'function' && (!nav.canShare || nav.canShare({ files: [file] }))) {
+          await nav.share({ files: [file], title: uniqueFileName });
+          return;
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+  }
+
+  // ——— 3. Стандартные браузеры (Desktop / Web Chrome / Safari) — быстрый localBlob
+  if (status.localBlob && !isAndroidWebViewEnv) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = uniqueFileName;
-      a.style.display = 'none';
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // Освобождаем память чуть позже
+      triggerAnchorDownload(blobUrl, uniqueFileName);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 20000);
       return;
     } catch (e) {
@@ -841,21 +938,17 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // ——— 3. Запасной путь — серверный URL (если blob по какой-то причине нет)
+  // ——— 4. Универсальный запасной путь через серверный URL
   if (status.downloadUrl) {
-    const baseFullUrl = status.downloadUrl.startsWith('http')
-      ? status.downloadUrl
-      : window.location.origin + status.downloadUrl;
-    const freshUrl = baseFullUrl + (baseFullUrl.includes('?') ? '&' : '?') + '_dl=' + Date.now();
-
+    const freshUrl = buildFreshServerUrl(status.downloadUrl);
     const tg = getTgWebApp();
+
     if (typeof tg?.downloadFile === 'function') {
       try {
         tg.downloadFile(
           { url: freshUrl, file_name: uniqueFileName },
           (accepted) => {
             if (!accepted) {
-              // если Telegram отказал — пробуем обычный anchor
               triggerAnchorDownload(freshUrl, uniqueFileName);
             }
           }
@@ -1756,7 +1849,6 @@ export async function generateAndDeliverLookbookPdf(
         totalPages,
       };
 
-      // Скачиваем всегда, когда есть localBlob
       await triggerPdfDownload(statusObj);
 
       return { status: statusObj, error: null };
@@ -1775,7 +1867,6 @@ export async function generateAndDeliverLookbookPdf(
     totalPages,
   };
 
-  // Даже если серверный запрос не прошёл, локальный PDF уже собран в памяти
   await triggerPdfDownload(fallbackStatus);
 
   return { status: fallbackStatus, error: deliveryError };
