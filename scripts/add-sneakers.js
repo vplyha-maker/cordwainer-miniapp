@@ -3,7 +3,6 @@ import axios from 'axios'
 
 const { Client } = pg
 
-// Настройки вашего Cloudflare R2 Воркера
 const R2_WORKER_URL = (
   process.env.R2_WORKER_URL || 'https://steep-hall-ab15.vplyha.workers.dev'
 ).replace(/\/$/, '')
@@ -13,46 +12,44 @@ const ALGOLIA_URL =
   'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
 const SEARCH_TERMS = [
-  // 1. Спортивные, беговые и скейт-бренды
+  // 1. Высокая мода и Подиумные Дома (Приоритетный пул)
+  'Chanel', 'Chanel sneakers', 'Chanel loafers', 'Chanel boots', 'Chanel sandals', 'Chanel ballet flats',
+  'Prada', 'Prada loafers', 'Prada boots', 'Prada heels', 'Prada mules', 'Prada America Cup',
+  'Valentino', 'Valentino Garavani', 'Valentino heels', 'Valentino boots', 'Valentino sneakers',
+  'Balenciaga', 'Balenciaga boots', 'Balenciaga mules', 'Balenciaga sandals', 'Balenciaga Track', 'Balenciaga 3XL',
+  'Gucci', 'Gucci loafers', 'Gucci slides', 'Gucci boots', 'Gucci heels',
+  'Louis Vuitton', 'Louis Vuitton loafers', 'Louis Vuitton boots', 'Louis Vuitton mules', 'Louis Vuitton Trainer',
+  'Dior', 'Dior heels', 'Dior boots', 'Dior sandals', 'Dior B22', 'Dior B30',
+  'Saint Laurent', 'Saint Laurent heels', 'Saint Laurent boots', 'Saint Laurent loafers',
+  'Bottega Veneta', 'Bottega Veneta boots', 'Bottega Veneta mules', 'Bottega Veneta loafers',
+  'Miu Miu', 'Miu Miu loafers', 'Miu Miu boots', 'Miu Miu New Balance',
+  'Celine', 'Celine boots', 'Celine loafers', 'Celine sneakers',
+  'Loewe', 'Loewe sneakers', 'Loewe Cloudtilt', 'Loewe boots',
+  'Hermes', 'Hermes Oran', 'Hermes Chypre', 'Hermes loafers', 'Hermes boots',
+  'Loro Piana', 'Loro Piana Summer Walk', 'Loro Piana Open Walk', 'Loro Piana loafers',
+  'Maison Margiela', 'Maison Margiela Tabi', 'Maison Margiela Replica', 'Maison Margiela boots',
+  'Rick Owens', 'Rick Owens boots', 'Rick Owens Geobasket', 'Rick Owens Ramones',
+  'Alexander McQueen', 'Alexander McQueen Oversized', 'Alexander McQueen boots', 'Alexander McQueen loafers',
+  'Lanvin', 'Lanvin Curb', 'Lanvin sneakers', 'Lanvin boots',
+  'Versace', 'Versace loafers', 'Versace heels', 'Versace Chain Reaction',
+  'Givenchy', 'Givenchy boots', 'Givenchy slides',
+
+  // 2. Премиум кэжуал и Авангард
+  'Off-White', 'Fear of God', 'BAPE', 'Supreme', 'Kith', 'Palace',
+  "Arc'teryx", 'Veja', 'Autry',
+  'Lacoste', 'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2',
+
+  // 3. Культовые спортивные и беговые линейки
   'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse',
   'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 'On',
   'Under Armour', 'Fila', 'Skechers', 'Etnies', 'Osiris', 'DC',
 
-  // 2. Стритвир и нишевые марки
-  'BAPE', 'Supreme', 'Fear of God', 'Kith', 'Palace', 'Off-White',
-  "Arc'teryx", 'Veja', 'Autry',
-
-  // 3. Люкс и Высокая мода
-  'Prada', 'Prada loafers', 'Prada boots', 'Prada heels', 'Prada mules',
-  'Gucci', 'Gucci loafers', 'Gucci slides', 'Gucci boots', 'Gucci heels',
-  'Balenciaga', 'Balenciaga boots', 'Balenciaga mules', 'Balenciaga sandals',
-  'Louis Vuitton', 'Louis Vuitton loafers', 'Louis Vuitton boots', 'Louis Vuitton mules',
-  'Dior', 'Dior heels', 'Dior boots', 'Dior sandals',
-  'Maison Margiela', 'Maison Margiela Tabi', 'Maison Margiela boots', 'Maison Margiela loafers',
-  'Rick Owens', 'Rick Owens boots',
-  'Alexander McQueen', 'Alexander McQueen boots', 'Alexander McQueen loafers',
-  'Lanvin', 'Lanvin sneakers', 'Lanvin boots',
-  'Versace', 'Versace loafers', 'Versace heels',
-  'Valentino', 'Valentino heels', 'Valentino boots',
-  'Givenchy', 'Givenchy boots', 'Givenchy slides',
-
-  // 4. Премиум кэжуал
-  'Lacoste', 'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2',
-
-  // 5. Зима, Аутдор и Повседневная обувь
-  'Timberland', 'Timberland boots', 'Timberland boat shoes',
-  'UGG', 'UGG boots', 'UGG slippers', 'UGG Tasman',
-  'Crocs', 'Crocs clogs', 'Crocs sandals',
-  'Dr. Martens', 'Dr. Martens boots', 'Dr. Martens oxfords', 'Dr. Martens loafers',
-  'Birkenstock', 'Birkenstock sandals', 'Birkenstock clogs', 'Birkenstock Boston',
-  'Clarks', 'Clarks Wallabee', 'Clarks Desert Boot',
-  'Merrell', 'Merrell boots', 'Merrell moc',
-  'Oakley', 'Oakley mules', 'Oakley boots',
+  // 4. Аутдор и Классика
+  'Timberland', 'Timberland boots', 'UGG', 'UGG Tasman',
+  'Crocs', 'Dr. Martens', 'Birkenstock', 'Birkenstock Boston',
+  'Clarks', 'Clarks Wallabee', 'Merrell', 'Oakley',
 ]
 
-/**
- * Извлекает реальный год релиза из полей Algolia без подстановки фейкового 2024 года
- */
 function extractRealReleaseYear(item) {
   if (item.release_date_year) {
     const y = Number(item.release_date_year)
@@ -93,10 +90,6 @@ function pickSourceImageUrl(item) {
   return null
 }
 
-/**
- * Скачивает фото с GOAT и заливает в ваш Cloudflare R2 через воркер steep-hall-ab15
- * (с резервным откатом на ImgBB, если воркер временно недоступен)
- */
 async function uploadToCloudflareR2(sourceUrl, sneakerId) {
   try {
     const imgRes = await axios.get(sourceUrl, {
@@ -114,7 +107,6 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
     const imgSize = imgRes.data?.byteLength || 0
 
     if (!contentType.includes('image') || imgSize < 2500) {
-      console.log('  ⚠️ Файл поврежден или слишком мал, пропускаем.')
       return null
     }
 
@@ -125,7 +117,6 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
       : 'jpg'
     const objectKey = `shoes/${sneakerId}.${ext}`
 
-    // 1. Загружаем в ваш Cloudflare R2 через воркер steep-hall-ab15.vplyha.workers.dev
     try {
       const r2Res = await axios.put(
         `${R2_WORKER_URL}/${objectKey}`,
@@ -150,7 +141,6 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
       )
     }
 
-    // 2. Резервный вариант: ImgBB (если задан ключ)
     if (process.env.IMGBB_API_KEY) {
       try {
         const base64Data = Buffer.from(imgRes.data).toString('base64')
@@ -167,7 +157,6 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
         )
 
         if (uploadRes.data?.data?.url) {
-          console.log(`  ✅ Фото залито на резервный ImgBB!`)
           return uploadRes.data.data.url
         }
       } catch {}
@@ -179,12 +168,7 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
   }
 }
 
-/**
- * Автоматически чинит старые карточки в базе, у которых остались прямые ссылки goat.com
- * (перезаливает их фото в ваш Cloudflare R2, не трогая рабочие фото на ImgBB)
- */
 async function repairBrokenGoatLinks(client) {
-  console.log('\n🔍 Проверяем старые карточки с прямыми ссылками GOAT для переноса в R2...')
   const brokenRes = await client.query(`
     SELECT id, brand, name, image_url
     FROM sneakers
@@ -193,12 +177,6 @@ async function repairBrokenGoatLinks(client) {
     LIMIT 25
   `)
 
-  if (brokenRes.rows.length === 0) {
-    console.log('✅ Все текущие карточки уже на облачном хостинге!')
-    return
-  }
-
-  console.log(`Найдено ${brokenRes.rows.length} карточек с прямыми ссылками GOAT. Переносим в R2...`)
   for (const row of brokenRes.rows) {
     const newUrl = await uploadToCloudflareR2(row.image_url, row.id)
     if (newUrl && newUrl !== row.image_url) {
@@ -220,16 +198,13 @@ async function run() {
   const client = new Client({ connectionString })
   await client.connect()
 
-  // Гарантируем наличие колонки sku и удаляем совсем пустые записи без фото
   await client.query(`
     ALTER TABLE sneakers ADD COLUMN IF NOT EXISTS sku TEXT;
     DELETE FROM sneakers WHERE image_url IS NULL OR TRIM(image_url) = '' OR TRIM(image_url) = 'null';
   `)
 
-  // Шаг 1: Чиним партию старых карточек, которые не загрузились на ImgBB
   await repairBrokenGoatLinks(client)
 
-  // Шаг 2: Парсим новые модели и сразу сохраняем фото в Cloudflare R2
   for (let i = 0; i < 15; i++) {
     const randomBrand = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
     const randomPage = Math.floor(Math.random() * 6)
@@ -282,8 +257,6 @@ async function run() {
         }
       }
 
-      console.log(`Найдено ${uniqueSneakers.length} моделей с фото. Синхронизируем с БД...`)
-
       for (const { item, sourceImage, id } of uniqueSneakers) {
         const brand = item.brand_name || randomBrand.split(' ')[0]
         const name = item.name || 'Sneaker'
@@ -299,14 +272,12 @@ async function run() {
 
         if (existingRes.rows.length > 0) {
           const row = existingRes.rows[0]
-          // Исправляем старый дефолтный 2024 год на реальный
           if (row.release_year === 2024 && realYear !== 2024) {
             await client.query(
               'UPDATE sneakers SET release_year = $1, sku = COALESCE(sku, $2) WHERE id = $3',
               [realYear, sku, id]
             )
           }
-          // Если фото уже лежит на ImgBB или вашем воркере R2 — не трогаем его!
           if (
             row.image_url &&
             (row.image_url.includes('ibb.co') ||
