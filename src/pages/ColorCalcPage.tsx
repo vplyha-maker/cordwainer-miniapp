@@ -68,9 +68,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [tab, setTab] = useState<TabId>('mix')
   const [isWet, setIsWet] = useState(false)
   const [isAutoAdjusting, setIsAutoAdjusting] = useState(false)
-  // Компактный режим выкраски по умолчанию — избавляет от необходимости скроллить вверх-вниз!
-  const [expandedSwatch, setExpandedSwatch] = useState(false)
-  // Выбранный пигмент для открытия паспорта (история + где купить)
   const [inspectedPigmentId, setInspectedPigmentId] = useState<string | null>(null)
 
   const {
@@ -151,7 +148,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       edition: 'ATELIER COLORIMETRY · КУБЕЛКА–МУНК',
       title: 'Ателье Формул',
       mixTab: 'Формула Смеси',
-      proTab: 'Подбор по Цели',
+      proTab: 'Ателье Подбора',
       mixComposition: 'Пропорции компонентов',
       clear: 'Сбросить вес',
       loading: 'Загрузка спектрального архива…',
@@ -160,7 +157,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       addPigment: '+ Добавить компонент',
       autoAdjust: 'Калибровать под цель',
       adjusting: 'Калибровка…',
-      result: 'Выкраска',
+      result: 'Карта Оттенка',
       wet: 'Мокрая',
       dry: 'Сухая',
       reset: 'Снять цель',
@@ -174,7 +171,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       totalVolume: 'Выход',
       targetColor: 'Целевой Образец',
       uploadPhoto: 'Загрузить Лукбук / Фото',
-      camera: 'Камера',
+      camera: 'Видоискатель',
       photo: 'Фототека',
       pickColor: 'Зафиксировать тон',
       tapPhotoHint: 'Нажмите на любую область фото для снятия оттенка',
@@ -183,7 +180,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       aniline: 'Анилин (Лессировка)',
       inventory: 'Палитра Ателье',
       default: 'Базовая',
-      all: 'Все',
+      all: 'Весь архив',
       picking: 'Спектральный синтез…',
       pickRecipe: 'Синтезировать Рецепт',
       recipeError: 'Не удалось синтезировать точный рецепт',
@@ -191,8 +188,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipe: 'Спецификация Рецепта',
       binder: 'Акриловое связующее (База)',
       moveToMix: 'Передать на колеровку →',
-      expandSwatch: 'Крупно',
-      collapseSwatch: 'Компактно',
       pigmentInfoBtn: 'История и где брать',
       dossierTitle: 'Паспорт пигмента',
       dossierChem: 'Химический класс и индекс',
@@ -206,7 +201,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       opacitySemiOpaque: 'Полукроющий',
       opacitySemiTrans: 'Полупрозрачный',
       opacityTrans: 'Лессировочный',
-      changePigmentHint: 'Нажмите на квадрат слева, чтобы сменить пигмент',
       ml: 'мл',
       l: 'л',
     },
@@ -214,7 +208,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       edition: 'ATELIER COLORIMETRY · КУБЕЛКА–МУНК',
       title: 'Ательє Формул',
       mixTab: 'Формула Суміші',
-      proTab: 'Підбір за Ціллю',
+      proTab: 'Ательє Підбору',
       mixComposition: 'Пропорції компонентів',
       clear: 'Скинути вагу',
       loading: 'Завантаження спектрального архіву…',
@@ -223,7 +217,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       addPigment: '+ Додати компонент',
       autoAdjust: 'Калібрувати під ціль',
       adjusting: 'Калібрування…',
-      result: 'Вифарбування',
+      result: 'Карта Відтінку',
       wet: 'Мокра',
       dry: 'Суха',
       reset: 'Зняти ціль',
@@ -237,7 +231,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       totalVolume: 'Вихід',
       targetColor: 'Цільовий Зразок',
       uploadPhoto: 'Завантажити Лукбук / Фото',
-      camera: 'Камера',
+      camera: 'Видошукач',
       photo: 'Фототека',
       pickColor: 'Зафіксувати тон',
       tapPhotoHint: 'Натисніть на будь-яку ділянку фото для зняття відтінку',
@@ -246,7 +240,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       aniline: 'Анілін (Лесування)',
       inventory: 'Палітра Ательє',
       default: 'Базова',
-      all: 'Усі',
+      all: 'Увесь архів',
       picking: 'Спектральний синтез…',
       pickRecipe: 'Синтезувати Рецепт',
       recipeError: 'Не вдалося синтезувати рецепт',
@@ -254,8 +248,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipe: 'Специфікація Рецепта',
       binder: 'Акрилове зв’язуюче (База)',
       moveToMix: 'Передати на колерування →',
-      expandSwatch: 'Крупно',
-      collapseSwatch: 'Компактно',
       pigmentInfoBtn: 'Історія та де брати',
       dossierTitle: 'Паспорт пігменту',
       dossierChem: 'Хімічний клас та індекс',
@@ -269,7 +261,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       opacitySemiOpaque: 'Напівкриючий',
       opacitySemiTrans: 'Напівпрозорий',
       opacityTrans: 'Лесувальний',
-      changePigmentHint: 'Натисніть на квадрат ліворуч, щоб змінити пігмент',
       ml: 'мл',
       l: 'л',
     },
@@ -277,7 +268,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       edition: 'ATELIER COLORIMETRY · KUBELKA–MUNK',
       title: 'Farb-Atelier',
       mixTab: 'Rezeptur',
-      proTab: 'Ziel-Matching',
+      proTab: 'Atelier-Matching',
       mixComposition: 'Komponenten & Anteile',
       clear: 'Gewicht leeren',
       loading: 'Spektralarchiv wird geladen…',
@@ -300,7 +291,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       totalVolume: 'Volumen',
       targetColor: 'Ziel-Referenz',
       uploadPhoto: 'Lookbook / Foto laden',
-      camera: 'Kamera',
+      camera: 'Sucher',
       photo: 'Galerie',
       pickColor: 'Farbton erfassen',
       tapPhotoHint: 'Tippen Sie auf das Foto, um den Farbton aufzunehmen',
@@ -317,8 +308,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       recipe: 'Rezeptur-Spezifikation',
       binder: 'Acryl-Bindemittel (Basis)',
       moveToMix: 'In Rezeptur übernehmen →',
-      expandSwatch: 'Groß',
-      collapseSwatch: 'Kompakt',
       pigmentInfoBtn: 'Historie & Bezugsquellen',
       dossierTitle: 'Pigment-Dossier',
       dossierChem: 'Chemische Klasse & Colour Index',
@@ -332,7 +321,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       opacitySemiOpaque: 'Halbdeckend',
       opacitySemiTrans: 'Halbtransparent',
       opacityTrans: 'Lasierend',
-      changePigmentHint: 'Quadrat links antippen, um Pigment zu wechseln',
       ml: 'ml',
       l: 'l',
     },
@@ -764,244 +752,190 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      className="min-h-screen flex flex-col pt-safe px-3 sm:px-6 pb-10 max-w-5xl mx-auto w-full"
-      style={{ background: 'var(--color-bg, #141210)', color: 'var(--color-ink, #F5F1EA)' }}
+      exit={{ opacity: 0, y: -8 }}
+      className="min-h-screen flex flex-col pt-safe px-4 md:px-8 pb-12 max-w-2xl mx-auto w-full"
+      style={{
+        background: 'var(--color-bg, #141210)',
+        color: 'var(--color-ink, #F5F1EA)',
+        overflowX: 'hidden',
+        boxSizing: 'border-box',
+      }}
     >
-      {/* Компактная шапка + переключатель режимов в одну линию (экономит 90px высоты экрана!) */}
+      {/* Компактная шапка и переключатель режимов */}
       <header
-        className="flex flex-wrap items-center justify-between gap-2 py-2.5 border-b"
+        className="flex items-center justify-between py-2.5 border-b"
         style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
       >
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full transition-opacity opacity-75 hover:opacity-100"
-            style={{ color: 'var(--color-ink, #F5F1EA)' }}
-            aria-label="Back"
-          >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 18L9 12L15 6"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-
-          <div>
-            <h1 className="text-[16px] font-serif tracking-wide leading-tight" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
-              {t.title}
-            </h1>
-            <span className="block text-[8px] tracking-[0.2em] uppercase opacity-45 font-medium">
-              {t.edition}
-            </span>
-          </div>
-        </div>
-
-        {/* Переключатель табов прямо в шапке */}
-        <div
-          className="grid grid-cols-2 p-0.5 border"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
-            background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 4%, transparent)',
-          }}
+        <button
+          onClick={onBack}
+          className="w-9 h-9 -ml-2 flex items-center justify-center rounded-full transition-opacity opacity-70 hover:opacity-100"
+          style={{ color: 'var(--color-ink, #F5F1EA)' }}
+          aria-label="Back"
         >
-          {(['mix', 'pro'] as const).map((id) => {
-            const active = tab === id
-            return (
-              <button
-                key={id}
-                onClick={() => {
-                  setTab(id)
-                  if (id !== 'pro') stopCamera()
-                }}
-                className="px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] font-semibold transition-all whitespace-nowrap"
-                style={{
-                  background: active ? 'var(--color-ink, #F5F1EA)' : 'transparent',
-                  color: active ? 'var(--color-bg, #141210)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 65%, transparent)',
-                }}
-              >
-                {id === 'mix' ? t.mixTab : t.proTab}
-              </button>
-            )
-          })}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
+        <div className="flex flex-col items-center">
+          <h1 className="text-[16px] font-serif tracking-wide" style={{ color: 'var(--color-ink, #F5F1EA)' }}>
+            {t.title}
+          </h1>
         </div>
+
+        <div className="w-9 text-right font-mono text-[10px] opacity-40">N°01</div>
       </header>
 
-      <div className="flex-1 flex flex-col mt-3">
-        {tab === 'mix' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-            {/* STICKY LIVE HUD ВЫКРАСКИ: всегда закреплена вверху экрана при прокрутке ползунков! */}
-            <section
-              className="lg:col-span-5 sticky top-1 z-30 border shadow-lg transition-all overflow-hidden"
+      {/* Переключатель вкладок */}
+      <div
+        className="grid grid-cols-2 p-1 rounded-none border my-2.5"
+        style={{
+          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
+          background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
+        }}
+      >
+        {(['mix', 'pro'] as const).map((id) => {
+          const active = tab === id
+          return (
+            <button
+              key={id}
+              onClick={() => {
+                setTab(id)
+                if (id !== 'pro') stopCamera()
+              }}
+              className="py-2 text-[11px] uppercase tracking-[0.16em] font-semibold transition-all"
               style={{
-                background: 'var(--color-surface, #1C1917)',
-                borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
+                background: active ? 'var(--color-ink, #F5F1EA)' : 'transparent',
+                color: active ? 'var(--color-bg, #141210)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 60%, transparent)',
               }}
             >
-              {/* Верхняя строка управления выкраской */}
+              {id === 'mix' ? t.mixTab : t.proTab}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex-1 flex flex-col gap-3">
+        {tab === 'mix' && (
+          <>
+            {/* УЛЬТРАКОМПАКТНАЯ ЗАКРЕПЛЁННАЯ КАРТА ОТТЕНКА (всего ~90px в высоту — ползунки видны сразу без скролла!) */}
+            <section
+              className="border overflow-hidden transition-all"
+              style={{
+                position: 'sticky',
+                top: 4,
+                zIndex: 30,
+                background: 'var(--color-surface, #1C1917)',
+                borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.22)',
+              }}
+            >
+              {/* Полоса живого цвета (52px) с переключателем Сухая/Мокрая прямо внутри */}
               <div
-                className="px-3 py-1.5 flex items-center justify-between border-b text-[10px]"
-                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="uppercase tracking-[0.18em] opacity-65 font-semibold">{t.result}</span>
-                  {activeTarget && (
-                    <button
-                      onClick={() => setActiveTarget(null)}
-                      className="text-[9px] uppercase tracking-[0.12em] px-1.5 py-0.5 border"
-                      style={{
-                        borderColor: 'color-mix(in srgb, var(--color-danger, #f87171) 40%, transparent)',
-                        color: 'var(--color-danger, #f87171)',
-                      }}
-                    >
-                      {t.reset}
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setIsWet(!isWet)}
-                    className="text-[9px] tracking-[0.12em] uppercase font-semibold px-2 py-0.5 border transition-all"
-                    style={{
-                      borderColor: isWet
-                        ? 'var(--color-accent, #D8A35C)'
-                        : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
-                      color: isWet ? 'var(--color-accent, #D8A35C)' : 'var(--color-ink, #F5F1EA)',
-                      background: isWet
-                        ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 14%, transparent)'
-                        : 'transparent',
-                    }}
-                  >
-                    {isWet ? t.wet : t.dry}
-                  </button>
-
-                  <button
-                    onClick={() => setExpandedSwatch((v) => !v)}
-                    className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 border opacity-75 hover:opacity-100"
-                    style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)' }}
-                  >
-                    {expandedSwatch ? t.collapseSwatch : t.expandSwatch}
-                  </button>
-                </div>
-              </div>
-
-              {/* Поле цвета: компактное (h-16) по умолчанию, чтобы видеть ползунки без скролла, или крупное (h-44) */}
-              <div
-                className={`relative w-full flex overflow-hidden transition-all duration-200 ${
-                  expandedSwatch ? 'h-44 md:h-56' : 'h-16 sm:h-20'
-                }`}
+                className="relative w-full flex overflow-hidden"
+                style={{ height: 52 }}
               >
                 {activeTarget && (
                   <div
-                    className="w-2/5 h-full relative flex flex-col justify-end p-2 border-r"
+                    className="w-1/2 h-full relative flex items-center px-3 border-r"
                     style={{
                       backgroundColor: activeTarget,
-                      borderColor: 'rgba(255,255,255,0.16)',
+                      borderColor: 'rgba(255,255,255,0.2)',
                     }}
                   >
-                    <span className="inline-block w-fit px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] font-mono backdrop-blur-md bg-black/50 text-white">
+                    <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-[0.14em] font-mono bg-black/50 text-white">
                       {t.target} · {activeTarget}
                     </span>
                   </div>
                 )}
 
                 <div
-                  className="flex-1 h-full relative flex flex-col justify-end p-2.5 transition-colors duration-200"
+                  className="flex-1 h-full relative flex items-center justify-between px-3 transition-colors duration-300"
                   style={{ backgroundColor: squareColor }}
                 >
-                  {isWet ? (
-                    <div
-                      className="absolute inset-0 pointer-events-none"
-                      style={{
-                        background:
-                          'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.03) 38%, rgba(0,0,0,0.08) 100%)',
-                      }}
-                    />
-                  ) : (
-                    <div
-                      className="absolute inset-0 pointer-events-none opacity-15"
-                      style={{
-                        backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 0)',
-                        backgroundSize: '6px 6px',
-                      }}
-                    />
-                  )}
-
-                  <div className="relative z-10 flex items-center justify-between w-full gap-2">
-                    <span className="px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] font-mono backdrop-blur-md bg-black/50 text-white">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] font-mono bg-black/50 text-white">
                       {t.mix} · {displayHex || 'UNMIXED'}
                     </span>
 
                     {liveDeltaE !== null && (
                       <span
-                        className="px-2 py-0.5 text-[10px] font-mono font-bold tracking-wider backdrop-blur-md bg-black/70"
+                        className="px-2 py-0.5 text-[10px] font-mono font-bold bg-black/70"
                         style={{
                           color: liveDeltaE <= 2 ? '#4ade80' : liveDeltaE <= 5 ? '#facc15' : '#f87171',
                         }}
                       >
-                        ΔE₀₀ {liveDeltaE.toFixed(1)}
+                        ΔE {liveDeltaE.toFixed(1)}
                       </span>
                     )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {activeTarget && (
+                      <button
+                        onClick={() => setActiveTarget(null)}
+                        className="text-[9px] uppercase px-2 py-0.5 bg-black/55 text-red-300 border border-red-400/40"
+                      >
+                        ✕ {t.reset}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsWet(!isWet)}
+                      className="text-[9px] tracking-[0.12em] uppercase font-semibold px-2.5 py-1 bg-black/55 text-white border border-white/25"
+                    >
+                      {isWet ? t.wet : t.dry}
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Компактная единая строка: Слои I-III + HEX/CIELAB + Выход мл + Кнопка копирования */}
+              {/* Нижняя строка спецификации в ОДНУ линию (38px): HEX + Слои I-III + Выход мл + Копировать */}
               <div
-                className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 border-t"
-                style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
+                className="px-3 py-1.5 flex items-center justify-between gap-2 border-t"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                  whiteSpace: 'nowrap',
+                }}
               >
-                <div className="flex items-center gap-3">
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono text-[15px] font-bold tracking-wider">
-                        {displayHex || '#------'}
-                      </span>
-                      {mixedLab && (
-                        <span className="font-mono text-[10px] opacity-55">
-                          L*{mixedLab.L.toFixed(0)} a*{mixedLab.a.toFixed(0)} b*{mixedLab.b.toFixed(0)}
-                        </span>
-                      )}
-                    </div>
+                <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
+                  <span className="font-mono text-[15px] font-bold tracking-wider">
+                    {displayHex || '#------'}
+                  </span>
 
-                    {/* Слои Кубелки-Мунка прямо здесь в компактном виде */}
-                    {layerSwatches && (
-                      <div className="flex items-center gap-2 mt-1">
-                        {layerSwatches.map((ls) => (
-                          <div key={ls.label} className="flex items-center gap-1" title={`Coat ${ls.label}: ${ls.hex}`}>
-                            <span
-                              className="w-3 h-3 rounded-full border border-white/25 inline-block"
-                              style={{ backgroundColor: ls.hex }}
-                            />
-                            <span className="text-[9px] font-mono opacity-60">{ls.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {layerSwatches && (
+                    <div className="flex items-center gap-1.5">
+                      {layerSwatches.map((ls) => (
+                        <div key={ls.label} className="flex items-center gap-0.5" title={`Coat ${ls.label}: ${ls.hex}`}>
+                          <span
+                            className="w-3 h-3 rounded-full border border-white/20 flex-shrink-0"
+                            style={{ backgroundColor: ls.hex }}
+                          />
+                          <span className="text-[9px] font-mono opacity-60">{ls.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {mixedLab && (
+                    <span className="font-mono text-[10px] opacity-50 hidden sm:inline">
+                      L*{mixedLab.L.toFixed(0)} a*{mixedLab.a.toFixed(0)} b*{mixedLab.b.toFixed(0)}
+                    </span>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2.5 ml-auto">
-                  <div className="text-right">
-                    <span className="block text-[8px] uppercase tracking-[0.16em] opacity-45">{t.totalVolume}</span>
-                    <span className="font-mono text-[13px] font-semibold tabular-nums">
-                      {totalAmount > 1000
-                        ? (totalAmount / 1000).toFixed(2) + ' ' + t.l
-                        : totalAmount.toFixed(1) + ' ' + t.ml}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="font-mono text-[13px] font-semibold tabular-nums">
+                    {totalAmount > 1000
+                      ? (totalAmount / 1000).toFixed(2) + ' ' + t.l
+                      : totalAmount.toFixed(1) + ' ' + t.ml}
+                  </span>
 
                   <button
                     onClick={copyHex}
                     disabled={!displayHex}
-                    className="h-8 px-2.5 text-[10px] uppercase tracking-[0.14em] font-semibold border transition-all disabled:opacity-30"
+                    className="px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] font-semibold border transition-all disabled:opacity-30"
                     style={{
                       borderColor: 'var(--color-accent, #D8A35C)',
                       background: copied ? 'var(--color-accent, #D8A35C)' : 'transparent',
@@ -1014,19 +948,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
-            {/* СЕКЦИЯ ПРОПОРЦИЙ И КАРТОЧЕК ПИГМЕНТОВ (с явными названиями, индексами и паспортом) */}
+            {/* СЕКЦИЯ ПРОПОРЦИЙ КОМПОНЕНТОВ — без дублей названий, без наездов и без горизонтального скролла */}
             <section
-              className="lg:col-span-7 border p-3.5 sm:p-4"
+              className="border p-3.5"
               style={{
                 background: 'var(--color-surface, #1C1917)',
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
               }}
             >
               <div
-                className="flex items-center justify-between pb-2.5 mb-3 border-b"
+                className="flex items-center justify-between pb-2.5 mb-2.5 border-b"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
               >
-                <h2 className="text-[11px] uppercase tracking-[0.2em] font-semibold opacity-80">
+                <h2 className="text-[11px] uppercase tracking-[0.2em] font-semibold opacity-75">
                   {t.mixComposition}
                 </h2>
                 {totalAmount > 0 && (
@@ -1041,7 +975,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
 
               {loading ? (
-                <div className="py-8 text-center text-[11px] uppercase tracking-[0.2em] opacity-40">
+                <div className="py-8 text-center text-[12px] uppercase tracking-[0.2em] opacity-40">
                   {t.loading}
                 </div>
               ) : loadError ? (
@@ -1065,24 +999,24 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     const pct = totalAmount > 0 ? Math.round((currentAmount / totalAmount) * 100) : 0
                     const selectedPigment = pigments.find((p) => p.id === paint.pigmentId)
                     const lore = getPigmentLore(selectedPigment, lang)
+                    const shortCode = lore.code.split('·')[0].trim()
 
                     return (
                       <div
                         key={paint.id}
-                        className="p-3 border transition-colors"
+                        className="p-2.5 border transition-colors"
                         style={{
-                          background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2.5%, transparent)',
-                          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 11%, transparent)',
+                          background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
+                          borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
                         }}
                       >
-                        {/* Верхний ряд карточки: Селектор + ЯВНОЕ НАЗВАНИЕ И КОД + Объем мл */}
-                        <div className="flex items-start sm:items-center gap-2.5">
-                          <span className="font-mono text-[10px] opacity-40 w-4 pt-1 sm:pt-0">
+                        {/* РЯД 1: Оригинальный селектор пигмента + точный блок мл / % / Удалить (с жёсткими размерами, чтобы ничего не наезжало!) */}
+                        <div className="flex items-center gap-2" style={{ width: '100%' }}>
+                          <span className="font-mono text-[10px] opacity-35" style={{ width: 18, flexShrink: 0 }}>
                             0{idx + 1}
                           </span>
 
-                          {/* Селектор пигмента (квадратик) */}
-                          <div className="flex-shrink-0" title={t.changePigmentHint}>
+                          <div className="flex-1 min-w-0" style={{ overflow: 'hidden' }}>
                             <PigmentSelector
                               pigments={pigments}
                               value={paint.pigmentId}
@@ -1091,102 +1025,63 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             />
                           </div>
 
-                          {/* Явное название пигмента, его химический код, укрывистость и кнопка "История и где брать" */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="font-semibold text-[14px] leading-snug break-words">
-                                {pigmentName(selectedPigment)}
-                              </span>
-                              <span
-                                className="text-[9px] font-mono px-1.5 py-0.5 border opacity-75 whitespace-nowrap"
-                                style={{
-                                  borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
-                                }}
-                              >
-                                {lore.code.split('·')[0].trim()}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                              <span className="text-[10px] opacity-55">
-                                {opacityLabel(lore.opacity)} · {lore.whereToBuy.leatherBrands[0]}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setInspectedPigmentId(paint.pigmentId)}
-                                className="inline-flex items-center gap-1 text-[10px] font-medium underline underline-offset-2 hover:opacity-100 transition-opacity"
-                                style={{ color: 'var(--color-accent, #D8A35C)' }}
-                              >
-                                <span>ⓘ {t.pigmentInfoBtn}</span>
-                              </button>
-                            </div>
+                          <div
+                            className="flex items-baseline justify-end gap-1"
+                            style={{ width: 72, flexShrink: 0 }}
+                          >
+                            <input
+                              ref={(el) => {
+                                if (el) amountRefs.current.set(paint.id, el)
+                                else amountRefs.current.delete(paint.id)
+                              }}
+                              type="text"
+                              inputMode="decimal"
+                              enterKeyHint="done"
+                              value={paint.amount}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(',', '.')
+                                if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                  const num = parseFloat(val)
+                                  if (!isNaN(num) && num > 5000) val = '5000'
+                                  updatePaint(paint.id, 'amount', val)
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const val = e.target.value.replace(',', '.')
+                                if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
+                                else {
+                                  const num = parseFloat(val)
+                                  if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
+                                }
+                              }}
+                              className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0"
+                              placeholder="0.0"
+                              style={{ width: 48, color: 'var(--color-ink, #F5F1EA)' }}
+                            />
+                            <span className="text-[11px] font-mono opacity-45">{t.ml}</span>
                           </div>
 
-                          {/* Ввод миллилитров и процент */}
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <div className="flex items-baseline justify-end gap-1 w-[74px]">
-                              <input
-                                ref={(el) => {
-                                  if (el) amountRefs.current.set(paint.id, el)
-                                  else amountRefs.current.delete(paint.id)
-                                }}
-                                type="text"
-                                inputMode="decimal"
-                                enterKeyHint="done"
-                                value={paint.amount}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(',', '.')
-                                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                    const num = parseFloat(val)
-                                    if (!isNaN(num) && num > 5000) val = '5000'
-                                    updatePaint(paint.id, 'amount', val)
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const val = e.target.value.replace(',', '.')
-                                  if (val === '.' || val === '') updatePaint(paint.id, 'amount', '')
-                                  else {
-                                    const num = parseFloat(val)
-                                    if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
-                                  }
-                                }}
-                                className="w-full bg-transparent border-b border-current/25 focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0"
-                                placeholder="0.0"
-                                style={{ color: 'var(--color-ink, #F5F1EA)' }}
-                              />
-                              <span className="text-[10px] font-mono opacity-45">{t.ml}</span>
-                            </div>
+                          <span
+                            className="font-mono text-[10px] opacity-40 text-right tabular-nums"
+                            style={{ width: 32, flexShrink: 0 }}
+                          >
+                            {pct}%
+                          </span>
 
-                            <span className="font-mono text-[10px] opacity-45 w-8 text-right tabular-nums">
-                              {pct}%
-                            </span>
-
-                            <button
-                              onClick={() => removePaint(paint.id)}
-                              disabled={paints.length <= 1}
-                              className="w-6 h-6 flex items-center justify-center opacity-40 hover:opacity-100 disabled:opacity-10"
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => removePaint(paint.id)}
+                            disabled={paints.length <= 1}
+                            className="w-7 h-7 flex items-center justify-center opacity-40 hover:opacity-100 disabled:opacity-10"
+                            style={{ flexShrink: 0 }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
 
-                        {/* Ползунок + быстрые кнопки шага (-0.5 / +0.5 мл) для точной дозировки без скролла */}
-                        <div className="mt-2.5 flex items-center gap-2 pl-6">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = Math.max(0, Number((currentAmount - 0.5).toFixed(1)))
-                              updatePaint(paint.id, 'amount', String(next))
-                            }}
-                            className="w-6 h-5 flex items-center justify-center text-[11px] font-mono border opacity-60 hover:opacity-100"
-                            style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)' }}
-                          >
-                            −
-                          </button>
-
+                        {/* РЯД 2: Ползунок дозировки */}
+                        <div style={{ paddingLeft: 24, paddingRight: 4, marginTop: 6 }}>
                           <input
                             type="range"
                             min="0"
@@ -1194,23 +1089,57 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             step="0.1"
                             value={currentAmount}
                             onChange={(e) => updatePaint(paint.id, 'amount', e.target.value)}
-                            className="flex-1 h-1.5 appearance-none cursor-pointer"
+                            className="w-full h-1 appearance-none cursor-pointer"
                             style={{
-                              background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
+                              background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 15%, transparent)',
                               accentColor: 'var(--color-accent, #D8A35C)',
                             }}
                           />
+                        </div>
+
+                        {/* РЯД 3: Компактная строка в 1 линию — Название/Индекс/Бренд слева + кнопка «ⓘ История и где брать» справа */}
+                        <div
+                          className="flex items-center justify-between gap-2"
+                          style={{
+                            paddingLeft: 24,
+                            paddingRight: 4,
+                            marginTop: 6,
+                            fontSize: 11,
+                            lineHeight: '16px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              opacity: 0.72,
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                          >
+                            <strong style={{ fontWeight: 600 }}>{pigmentName(selectedPigment)}</strong>
+                            {' · '}
+                            <span className="font-mono">{shortCode}</span>
+                            {' · '}
+                            <span>{opacityLabel(lore.opacity)}</span>
+                            {' · '}
+                            <span>{lore.whereToBuy.leatherBrands[0]}</span>
+                          </div>
 
                           <button
                             type="button"
-                            onClick={() => {
-                              const next = Math.min(5000, Number((currentAmount + 0.5).toFixed(1)))
-                              updatePaint(paint.id, 'amount', String(next))
+                            onClick={() => setInspectedPigmentId(paint.pigmentId)}
+                            style={{
+                              flexShrink: 0,
+                              color: 'var(--color-accent, #D8A35C)',
+                              fontWeight: 600,
+                              textDecoration: 'underline',
+                              whiteSpace: 'nowrap',
+                              fontSize: 11,
                             }}
-                            className="w-6 h-5 flex items-center justify-center text-[11px] font-mono border opacity-60 hover:opacity-100"
-                            style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)' }}
                           >
-                            +
+                            ⓘ {t.pigmentInfoBtn}
                           </button>
                         </div>
                       </div>
@@ -1219,11 +1148,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-2.5 mt-3.5">
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
                 <button
                   onClick={addPaint}
                   disabled={loading || loadError}
-                  className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.16em] font-semibold border transition-opacity disabled:opacity-40"
+                  className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold border transition-opacity disabled:opacity-40"
                   style={{
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 22%, transparent)',
                     color: 'var(--color-ink, #F5F1EA)',
@@ -1236,7 +1165,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <button
                     onClick={autoAdjustCurrentMix}
                     disabled={isAutoAdjusting || loading}
-                    className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.16em] font-semibold transition-all disabled:opacity-40"
+                    className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold transition-all disabled:opacity-40"
                     style={{
                       background: 'var(--color-accent, #D8A35C)',
                       color: 'var(--color-bg, #141210)',
@@ -1247,11 +1176,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 )}
               </div>
             </section>
-          </div>
+          </>
         )}
 
         {tab === 'pro' && (
-          <div className="flex flex-col gap-4">
+          <>
             {/* TARGET SWATCH & INTERACTIVE LOOKBOOK SAMPLER */}
             <section
               className="border p-4"
@@ -1264,12 +1193,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 <h2 className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-75">
                   {t.targetColor}
                 </h2>
-                <span className="font-mono text-[10px] opacity-45">CIEDE2000 ENGINE</span>
+                <span className="font-mono text-[11px] opacity-45">CIEDE2000 ENGINE</span>
               </div>
 
               <div className="flex items-stretch gap-3 mb-3">
                 <div
-                  className="w-16 h-11 border flex-shrink-0"
+                  className="w-20 h-12 border flex-shrink-0"
                   style={{
                     backgroundColor: targetHex,
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 18%, transparent)',
@@ -1286,7 +1215,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       setRecipeResult(null)
                     }
                   }}
-                  className="flex-1 px-3 font-mono tracking-[0.15em] text-[15px] border focus:outline-none"
+                  className="flex-1 px-4 font-mono tracking-[0.15em] text-[16px] border focus:outline-none"
                   style={{
                     background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 4%, transparent)',
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
@@ -1302,7 +1231,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 py-2 text-[11px] uppercase tracking-[0.16em] font-semibold border"
+                    className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.16em] font-semibold border"
                     style={{
                       borderColor: 'var(--color-accent, #D8A35C)',
                       color: 'var(--color-accent, #D8A35C)',
@@ -1315,7 +1244,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     <button
                       type="button"
                       onClick={startCamera}
-                      className="flex-1 py-2 text-[11px] uppercase tracking-[0.16em] font-semibold border"
+                      className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.16em] font-semibold border"
                       style={{
                         borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 22%, transparent)',
                         color: 'var(--color-ink, #F5F1EA)',
@@ -1326,7 +1255,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 py-2 text-[11px] uppercase tracking-[0.16em] font-semibold border"
+                      className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.16em] font-semibold border"
                       style={{
                         borderColor: 'var(--color-accent, #D8A35C)',
                         color: 'var(--color-accent, #D8A35C)',
@@ -1340,7 +1269,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     <button
                       type="button"
                       onClick={captureFromCamera}
-                      className="flex-1 py-2 text-[11px] uppercase tracking-[0.16em] font-semibold"
+                      className="flex-1 py-2.5 text-[11px] uppercase tracking-[0.16em] font-semibold"
                       style={{
                         background: 'var(--color-accent, #D8A35C)',
                         color: 'var(--color-bg, #141210)',
@@ -1351,7 +1280,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     <button
                       type="button"
                       onClick={stopCamera}
-                      className="px-4 py-2 text-[11px] border"
+                      className="px-4 py-2.5 text-[11px] border"
                       style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)' }}
                     >
                       ✕
@@ -1395,11 +1324,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                       src={uploadedPhotoUrl}
                       alt="Lookbook sample"
                       onLoad={(e) => sampleFromSource(e.currentTarget)}
-                      className="w-full max-h-56 object-contain mx-auto"
+                      className="w-full max-h-64 object-contain mx-auto"
                     />
                     {pickerCrosshair && (
                       <div
-                        className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg pointer-events-none"
+                        className="absolute w-7 h-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg pointer-events-none flex items-center justify-center"
                         style={{
                           left: `${pickerCrosshair.x}%`,
                           top: `${pickerCrosshair.y}%`,
@@ -1419,7 +1348,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   className="relative overflow-hidden mt-2 border bg-black"
                   style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)' }}
                 >
-                  <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-48 object-cover" />
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-52 object-cover" />
                   <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none w-6 h-6 border border-white/90" />
                 </div>
               )}
@@ -1466,7 +1395,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               </div>
             </section>
 
-            {/* CATEGORIZED ATELIER ARCHIVE (с кнопкой просмотра паспорта каждого пигмента) */}
+            {/* CATEGORIZED ATELIER ARCHIVE */}
             <section
               className="border p-4"
               style={{
@@ -1474,29 +1403,29 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
               }}
             >
-              <div className="flex items-center justify-between mb-2.5 gap-2">
-                <h2 className="text-[11px] uppercase tracking-[0.2em] font-semibold opacity-75">
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <h2 className="text-[11px] uppercase tracking-[0.22em] font-semibold opacity-75">
                   {t.inventory} ({inventoryIds.length})
                 </h2>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={resetInventoryDefaults}
-                    className="text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 border"
+                    className="text-[10px] uppercase tracking-[0.14em] px-2 py-1 border"
                     style={{ borderColor: 'var(--color-accent, #D8A35C)', color: 'var(--color-accent, #D8A35C)' }}
                   >
                     {t.default}
                   </button>
-                  <button onClick={selectAllInventory} className="text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 opacity-60 hover:opacity-100">
+                  <button onClick={selectAllInventory} className="text-[10px] uppercase tracking-[0.14em] px-2 py-1 opacity-60 hover:opacity-100">
                     {t.all}
                   </button>
-                  <button onClick={clearInventory} className="text-[10px] uppercase tracking-[0.14em] px-2 py-0.5 text-red-400">
+                  <button onClick={clearInventory} className="text-[10px] uppercase tracking-[0.14em] px-2 py-1 text-red-400">
                     ✕
                   </button>
                 </div>
               </div>
 
               <div
-                className="flex gap-1.5 overflow-x-auto pb-2 mb-2.5 border-b"
+                className="flex gap-1.5 overflow-x-auto pb-2.5 mb-3 border-b"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
               >
                 {categories.map((cat) => (
@@ -1514,21 +1443,20 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 ))}
               </div>
 
-              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+              <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto pr-1">
                 {filteredInventoryPigments.map((p) => {
                   const on = inventoryIds.includes(p.id)
-                  const lore = getPigmentLore(p, lang)
                   return (
                     <div
                       key={p.id}
-                      className="inline-flex items-center border transition-all"
+                      className="flex items-center border transition-all"
                       style={{
                         background: on
                           ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 18%, transparent)'
                           : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
                         borderColor: on
                           ? 'var(--color-accent, #D8A35C)'
-                          : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                          : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
                       }}
                     >
                       <button
@@ -1536,7 +1464,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         onClick={() => toggleInventory(p.id)}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px]"
                         style={{
-                          color: on ? 'var(--color-ink, #F5F1EA)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 55%, transparent)',
+                          color: on ? 'var(--color-ink, #F5F1EA)' : 'color-mix(in srgb, var(--color-ink, #F5F1EA) 50%, transparent)',
                         }}
                       >
                         <span
@@ -1544,14 +1472,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                           style={{ backgroundColor: p.hex || '#444' }}
                         />
                         <span>{pigmentName(p)}</span>
-                        <span className="text-[9px] font-mono opacity-55">
-                          {lore.code.split('·')[0].trim()}
-                        </span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setInspectedPigmentId(p.id)}
-                        className="px-2 py-1.5 text-[10px] border-l opacity-60 hover:opacity-100"
+                        className="px-2 py-1.5 text-[11px] border-l"
                         style={{
                           borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
                           color: 'var(--color-accent, #D8A35C)',
@@ -1569,7 +1494,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             <button
               onClick={runRecipeSearch}
               disabled={recipeLoading || loading || !targetHex || targetHex.length < 7 || inventoryIds.length === 0}
-              className="w-full py-3.5 text-[12px] uppercase tracking-[0.22em] font-semibold transition-opacity disabled:opacity-35"
+              className="w-full py-3.5 text-[12px] uppercase tracking-[0.24em] font-semibold transition-opacity disabled:opacity-35"
               style={{
                 background: 'var(--color-accent, #D8A35C)',
                 color: 'var(--color-bg, #141210)',
@@ -1632,39 +1557,41 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         return (
                           <div
                             key={i}
-                            className="flex items-center justify-between py-2.5 gap-2"
+                            className="py-2.5"
                             style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)' }}
                           >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span
-                                className="w-3.5 h-3.5 rounded-full border border-white/20 flex-shrink-0"
-                                style={{ backgroundColor: item.pigment.hex || '#888' }}
-                              />
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[13px] font-medium truncate">
-                                    {item.isBinder ? t.binder : pigmentName(item.pigment)}
-                                  </span>
-                                  <span className="text-[9px] font-mono opacity-55">
-                                    {lore.code.split('·')[0].trim()}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setInspectedPigmentId(item.pigment.id)}
-                                    className="text-[10px] underline"
-                                    style={{ color: 'var(--color-accent, #D8A35C)' }}
-                                  >
-                                    ⓘ {t.pigmentInfoBtn}
-                                  </button>
-                                </div>
-                                <span className="block text-[10px] opacity-55 truncate">
-                                  {lore.whereToBuy.leatherBrands.slice(0, 2).join(' · ')}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="w-3 h-3 rounded-full border border-white/20 flex-shrink-0"
+                                  style={{ backgroundColor: item.pigment.hex || '#888' }}
+                                />
+                                <span className="text-[13px] font-medium truncate">
+                                  {item.isBinder ? t.binder : pigmentName(item.pigment)}
                                 </span>
                               </div>
+                              <span className="font-mono text-[14px] font-semibold tabular-nums flex-shrink-0">
+                                {item.ml.toFixed(2)} {t.ml}
+                              </span>
                             </div>
-                            <span className="font-mono text-[14px] font-semibold tabular-nums flex-shrink-0">
-                              {item.ml.toFixed(2)} {t.ml}
-                            </span>
+
+                            <div className="flex items-center justify-between gap-2 mt-1" style={{ paddingLeft: 20, fontSize: 11 }}>
+                              <span className="opacity-60 truncate">
+                                {lore.code.split('·')[0].trim()} · {lore.whereToBuy.leatherBrands[0]}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setInspectedPigmentId(item.pigment.id)}
+                                style={{
+                                  color: 'var(--color-accent, #D8A35C)',
+                                  fontWeight: 600,
+                                  textDecoration: 'underline',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                ⓘ {t.pigmentInfoBtn}
+                              </button>
+                            </div>
                           </div>
                         )
                       })}
@@ -1672,7 +1599,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                     <button
                       onClick={sendRecipeToMix}
-                      className="w-full py-3 text-[11px] uppercase tracking-[0.2em] font-semibold border transition-colors"
+                      className="w-full py-3.5 text-[11px] uppercase tracking-[0.2em] font-semibold border transition-colors"
                       style={{
                         borderColor: 'var(--color-accent, #D8A35C)',
                         background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 16%, transparent)',
@@ -1685,11 +1612,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </motion.section>
               )}
             </AnimatePresence>
-          </div>
+          </>
         )}
       </div>
 
-      {/* МОДАЛЬНЫЙ ПАСПОРТ ПИГМЕНТА: ИСТОРИЯ, СВОЙСТВА И ГДЕ КУПИТЬ */}
+      {/* МОДАЛЬНЫЙ ПАСПОРТ ПИГМЕНТА (на надёжных inline-стилях, не зависящих от сборки Tailwind) */}
       <AnimatePresence>
         {inspectedPigmentId && inspectedLore && (
           <motion.div
@@ -1697,37 +1624,51 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setInspectedPigmentId(null)}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-0 sm:p-4"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(0, 0, 0, 0.72)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+            }}
           >
             <motion.div
-              initial={{ y: 40, opacity: 0 }}
+              initial={{ y: 24, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
+              exit={{ y: 24, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg max-h-[85vh] overflow-y-auto border p-5 shadow-2xl"
+              className="border p-4"
               style={{
+                width: '100%',
+                maxWidth: 480,
+                maxHeight: '85vh',
+                overflowY: 'auto',
                 background: 'var(--color-surface, #1C1917)',
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 22%, transparent)',
                 color: 'var(--color-ink, #F5F1EA)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
               }}
             >
               <div
-                className="flex items-start justify-between gap-3 pb-3.5 mb-4 border-b"
+                className="flex items-center justify-between gap-3 pb-3 mb-3 border-b"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 12%, transparent)' }}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="w-10 h-10 border flex-shrink-0"
+                    className="w-9 h-9 border flex-shrink-0"
                     style={{
                       backgroundColor: inspectedPigment?.hex || '#2c2623',
                       borderColor: 'rgba(255,255,255,0.25)',
                     }}
                   />
-                  <div>
-                    <span className="text-[9px] font-mono uppercase tracking-[0.2em] opacity-60 block">
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-mono uppercase tracking-[0.16em] opacity-60 block truncate">
                       {t.dossierTitle} · {inspectedLore.code}
                     </span>
-                    <h3 className="text-[17px] font-serif font-semibold leading-snug">
+                    <h3 className="text-[16px] font-serif font-semibold truncate">
                       {inspectedPigmentId === 'acrylic_binder' ? t.binder : pigmentName(inspectedPigment)}
                     </h3>
                   </div>
@@ -1735,77 +1676,64 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                 <button
                   onClick={() => setInspectedPigmentId(null)}
-                  className="w-8 h-8 flex items-center justify-center border opacity-70 hover:opacity-100"
+                  className="w-8 h-8 flex items-center justify-center border opacity-70 hover:opacity-100 flex-shrink-0"
                   style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)' }}
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="space-y-4 text-[13px] leading-relaxed">
-                {/* Химический класс и характеристики */}
+              <div className="flex flex-col gap-3 text-[12px]" style={{ lineHeight: 1.55 }}>
                 <div
-                  className="p-3 border grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px]"
+                  className="p-2.5 border"
                   style={{
                     background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 3%, transparent)',
                     borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
                   }}
                 >
-                  <div>
-                    <span className="text-[9px] uppercase tracking-[0.16em] opacity-50 block">
-                      {t.dossierChem}
-                    </span>
-                    <span className="font-medium">{inspectedLore.chemicalFamily[lang]}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] uppercase tracking-[0.16em] opacity-50 block">
-                      Kubelka–Munk / ASTM
-                    </span>
-                    <span className="font-medium">
-                      {opacityLabel(inspectedLore.opacity)} · {inspectedLore.lightfastness}
-                    </span>
+                  <div className="text-[9px] uppercase tracking-[0.14em] opacity-50">{t.dossierChem}</div>
+                  <div className="font-semibold">{inspectedLore.chemicalFamily[lang]}</div>
+                  <div className="opacity-75 mt-1">
+                    {opacityLabel(inspectedLore.opacity)} · {inspectedLore.lightfastness} · {inspectedLore.tintingStrength[lang]}
                   </div>
                 </div>
 
-                {/* История пигмента */}
                 <div>
-                  <h4
-                    className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-1"
+                  <div
+                    className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-1"
                     style={{ color: 'var(--color-accent, #D8A35C)' }}
                   >
                     {t.dossierHistory}
-                  </h4>
+                  </div>
                   <p className="opacity-85">{inspectedLore.history[lang]}</p>
                 </div>
 
-                {/* Применение на коже */}
                 <div>
-                  <h4
-                    className="text-[10px] uppercase tracking-[0.2em] font-semibold mb-1"
+                  <div
+                    className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-1"
                     style={{ color: 'var(--color-accent, #D8A35C)' }}
                   >
                     {t.dossierLeather}
-                  </h4>
+                  </div>
                   <p className="opacity-85">{inspectedLore.leatherUsage[lang]}</p>
                 </div>
 
-                {/* Где брать и в каких линейках искать */}
                 <div
-                  className="p-3.5 border space-y-2.5"
+                  className="p-3 border flex flex-col gap-2"
                   style={{
-                    background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 7%, transparent)',
+                    background: 'color-mix(in srgb, var(--color-accent, #D8A35C) 8%, transparent)',
                     borderColor: 'color-mix(in srgb, var(--color-accent, #D8A35C) 30%, transparent)',
                   }}
                 >
-                  <h4
-                    className="text-[10px] uppercase tracking-[0.2em] font-semibold"
+                  <div
+                    className="text-[10px] uppercase tracking-[0.16em] font-semibold"
                     style={{ color: 'var(--color-accent, #D8A35C)' }}
                   >
                     {t.dossierWhereToBuy}
-                  </h4>
+                  </div>
 
                   <div>
-                    <span className="text-[11px] font-semibold block mb-1">{t.dossierLeatherBrands}</span>
+                    <div className="text-[11px] font-semibold mb-1">{t.dossierLeatherBrands}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {inspectedLore.whereToBuy.leatherBrands.map((b) => (
                         <span
@@ -1813,7 +1741,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                           className="text-[11px] font-mono px-2 py-0.5 border"
                           style={{
                             borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 20%, transparent)',
-                            background: 'color-mix(in srgb, var(--color-bg, #141210) 60%, transparent)',
                           }}
                         >
                           {b}
@@ -1823,7 +1750,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                   </div>
 
                   <div>
-                    <span className="text-[11px] font-semibold block mb-1">{t.dossierArtSuppliers}</span>
+                    <div className="text-[11px] font-semibold mb-1">{t.dossierArtSuppliers}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {inspectedLore.whereToBuy.pigmentSuppliers.map((s) => (
                         <span
@@ -1839,15 +1766,15 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     </div>
                   </div>
 
-                  <p className="text-[11px] opacity-75 pt-1 border-t" style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}>
+                  <div className="text-[11px] opacity-75 pt-1 border-t" style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}>
                     {inspectedLore.whereToBuy.searchHint[lang]}
-                  </p>
+                  </div>
                 </div>
               </div>
 
               <button
                 onClick={() => setInspectedPigmentId(null)}
-                className="w-full mt-5 py-2.5 text-[11px] uppercase tracking-[0.2em] font-semibold border"
+                className="w-full mt-4 py-2.5 text-[11px] uppercase tracking-[0.18em] font-semibold border"
                 style={{
                   borderColor: 'var(--color-accent, #D8A35C)',
                   color: 'var(--color-accent, #D8A35C)',
