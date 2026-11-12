@@ -57,6 +57,158 @@ interface InteractiveHitBox {
   textFallback: string;
 }
 
+// ============================================================================
+// ZERO-LATENCY AUDIO ENGINE ДЛЯ МГНОВЕННОГО ЗАПУСКА НА 95% (/pleasewait.mp3)
+// ============================================================================
+
+const PLEASE_WAIT_AUDIO_URLS = ['/pleasewait.mp3', '/publik/pleasewait.mp3', 'pleasewait.mp3'];
+
+let sharedAudioCtx: AudioContext | null = null;
+let decodedPleaseWaitBuffer: AudioBuffer | null = null;
+let rawPleaseWaitArrayBuffer: ArrayBuffer | null = null;
+let preloadPromise: Promise<void> | null = null;
+let fallbackHtmlAudio: HTMLAudioElement | null = null;
+let resolvedAudioUrl: string = PLEASE_WAIT_AUDIO_URLS[0];
+
+/**
+ * Возвращает или создаёт единый экземпляр AudioContext.
+ */
+function getOrCreateAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!sharedAudioCtx) {
+    const AudioCtxClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtxClass) {
+      try {
+        sharedAudioCtx = new AudioCtxClass();
+      } catch {
+        sharedAudioCtx = null;
+      }
+    }
+  }
+  return sharedAudioCtx;
+}
+
+/**
+ * Заранее скачивает и декодирует `/pleasewait.mp3` в оперативную память,
+ * чтобы в момент 95% звук запустился за 0 мс без обращения к сети и диску.
+ */
+export function preloadPleaseWaitAudio(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (decodedPleaseWaitBuffer) return Promise.resolve();
+  if (preloadPromise) return preloadPromise;
+
+  preloadPromise = (async () => {
+    for (const candidateUrl of PLEASE_WAIT_AUDIO_URLS) {
+      try {
+        const res = await fetch(candidateUrl, { cache: 'force-cache' });
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength < 100) continue;
+
+        resolvedAudioUrl = candidateUrl;
+        rawPleaseWaitArrayBuffer = buf.slice(0);
+
+        if (!fallbackHtmlAudio && typeof Audio !== 'undefined') {
+          fallbackHtmlAudio = new Audio(resolvedAudioUrl);
+          fallbackHtmlAudio.preload = 'auto';
+          fallbackHtmlAudio.load();
+        }
+
+        const ctx = getOrCreateAudioContext();
+        if (ctx) {
+          decodedPleaseWaitBuffer = await ctx.decodeAudioData(buf.slice(0));
+        }
+        break;
+      } catch {
+        // Пробуем следующий резервный путь
+      }
+    }
+  })();
+
+  return preloadPromise;
+}
+
+/**
+ * Вызывается в самом начале генерации PDF (0%), пока активно нажатие пользователя,
+ * чтобы разблокировать Web Audio API в мобильных WebView (iOS / Android Telegram).
+ */
+function unlockAndWarmupPleaseWaitAudio(): void {
+  if (typeof window === 'undefined') return;
+
+  void preloadPleaseWaitAudio();
+
+  const ctx = getOrCreateAudioContext();
+  if (ctx) {
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    try {
+      // Пустой 1-сэмпловый импульс для мгновенного пробуждения аппаратного аудио-канала
+      const silentBuffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = silentBuffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch {}
+
+    if (!decodedPleaseWaitBuffer && rawPleaseWaitArrayBuffer) {
+      ctx
+        .decodeAudioData(rawPleaseWaitArrayBuffer.slice(0))
+        .then((decoded) => {
+          decodedPleaseWaitBuffer = decoded;
+        })
+        .catch(() => {});
+    }
+  }
+
+  if (!fallbackHtmlAudio && typeof Audio !== 'undefined') {
+    try {
+      fallbackHtmlAudio = new Audio(resolvedAudioUrl);
+      fallbackHtmlAudio.preload = 'auto';
+      fallbackHtmlAudio.load();
+    } catch {}
+  }
+}
+
+/**
+ * Мгновенно запускает воспроизведение `pleasewait.mp3` без задержек (0ms latency).
+ */
+export function playPleaseWaitAudioInstant(): void {
+  if (typeof window === 'undefined') return;
+
+  const ctx = getOrCreateAudioContext();
+  if (ctx && decodedPleaseWaitBuffer) {
+    try {
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+      const source = ctx.createBufferSource();
+      source.buffer = decodedPleaseWaitBuffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      return;
+    } catch {}
+  }
+
+  // Резервный запуск через предзагруженный HTMLAudioElement
+  try {
+    const audio = fallbackHtmlAudio ?? new Audio(resolvedAudioUrl);
+    fallbackHtmlAudio = audio;
+    audio.currentTime = 0;
+    const playResult = audio.play();
+    if (playResult && typeof playResult.catch === 'function') {
+      playResult.catch(() => {});
+    }
+  } catch {}
+}
+
+// Запускаем предзагрузку сразу при импорте модуля в браузере
+if (typeof window !== 'undefined') {
+  void preloadPleaseWaitAudio();
+}
+
 /**
  * Безопасное получение инстанса Telegram WebApp из глобального объекта window.
  */
@@ -985,6 +1137,11 @@ export async function generateAndDeliverLookbookPdf(
     onPageProgress,
   } = params;
 
+  // Разблокируем и прогреваем аудио-движок в момент старта прогресс-бара (0%),
+  // чтобы на 95% файл /pleasewait.mp3 сработал мгновенно (0 мс задержки)
+  unlockAndWarmupPleaseWaitAudio();
+  let hasPlayedPleaseWaitAt95 = false;
+
   const clientCode = tgUser.clientCode || tgUser.partnerCode || 'CARDIO-OFFICIAL';
   const pdfT = getEditorialText(lang);
 
@@ -1106,7 +1263,17 @@ export async function generateAndDeliverLookbookPdf(
     ')';
 
   for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-    onPageProgress(pageIdx + 1, totalPages);
+    const currentPage = pageIdx + 1;
+    const progressPercent = Math.round((currentPage / totalPages) * 100);
+
+    // Как только прогресс достигает 95% (или последней страницы при малом числе страниц),
+    // запускаем /pleasewait.mp3 мгновенно без всяких задержек
+    if (!hasPlayedPleaseWaitAt95 && (progressPercent >= 95 || currentPage === totalPages)) {
+      hasPlayedPleaseWaitAt95 = true;
+      playPleaseWaitAudioInstant();
+    }
+
+    onPageProgress(currentPage, totalPages);
     await new Promise((r) => setTimeout(r, 0));
 
     const pageDesc = pagePlan[pageIdx];
@@ -1790,8 +1957,12 @@ export async function generateAndDeliverLookbookPdf(
   // =======================================================================
   // ФАЗА 2: СБОРКА БИНАРНОГО PDF 1.7 И ДОСТАВКА В TELEGRAM
   // =======================================================================
+  if (!hasPlayedPleaseWaitAt95) {
+    hasPlayedPleaseWaitAt95 = true;
+    playPleaseWaitAudioInstant();
+  }
   onStageChange('packaging_and_uploading');
-  await new Promise((r) => setTimeout(r, 60));
+  await new Promise((r) => setTimeout(r, 0));
 
   const pdfBytes = buildPdfBytesFromJpegPages(
     jpegPages,
