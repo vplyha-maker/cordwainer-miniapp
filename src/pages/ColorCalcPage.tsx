@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Lang } from '../App'
 import { Pigment } from '../data/pigments'
 import { loadAllPigments } from '../data/loadPigments'
-import { getPigmentLore } from '../data/pigmentLore'
+import { getPigmentLore, OpacityLevel } from '../data/pigmentLore'
 import { usePaintMix } from '../hooks/usePaintMix'
 import { useColorCalculations } from '../hooks/useColorCalculations'
 import { PigmentSelector } from '../components/PigmentSelector'
@@ -68,10 +68,12 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   const [tab, setTab] = useState<TabId>('mix')
   const [isWet, setIsWet] = useState(false)
   const [isAutoAdjusting, setIsAutoAdjusting] = useState(false)
-  // Активный слой выкраски (0 = Coat I, 1 = Coat II, 2 = Coat III, 3 = Coat ∞)
+  // Активный слой выкраски (0 = 1 слой, 1 = 2 слоя, 2 = 3 слоя, 3 = Полный ∞)
   const [selectedCoatIdx, setSelectedCoatIdx] = useState<number>(3)
   // Открытый паспорт пигмента
   const [inspectedPigmentId, setInspectedPigmentId] = useState<string | null>(null)
+  // Открытая памятка-шпаргалка (что такое Слои, Мокрая/Сухая, Кроющий/Лессировочный)
+  const [showGuideModal, setShowGuideModal] = useState<boolean>(false)
 
   const {
     paints,
@@ -117,39 +119,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
   const isIOS = isIOSRef.current
 
-  // Симуляция выкраски в 4 слоя (I, II, III, ∞) по Кубелке-Мунку
-  const layerSwatches = useMemo(() => {
-    if (!mixedColor?.spectrum || pigments.length === 0) return null
-    const basePigment =
-      pigments.find((p) => p.id === 'cardboard') ||
-      pigments.find((p) => p.id === 'titanium_white') ||
-      pigments.find((p) => p.id === 'pw_6_anatase')
-    if (!basePigment?.spectrum) return null
-    const sim = simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, system)
-    return [
-      { label: 'I', hex: rgbToHex(spectrumToRGB(sim.layer1)).toUpperCase() },
-      { label: 'II', hex: rgbToHex(spectrumToRGB(sim.layer2)).toUpperCase() },
-      { label: 'III', hex: rgbToHex(spectrumToRGB(sim.layer3)).toUpperCase() },
-      { label: '∞', hex: rgbToHex(spectrumToRGB(sim.final)).toUpperCase() },
-    ]
-  }, [mixedColor, pigments, system])
-
-  // Активный оттенок зависит от того, какой из 4 слоёв (Coat I, II, III, ∞) нажал пользователь!
-  const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
-  const displayHex = activeCoat?.hex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null)
-  const squareColor = displayHex || '#1E1B19'
-
-  const activeLab = useMemo(() => {
-    if (!displayHex) return null
-    const rgb = hexToRgbObj(displayHex)
-    return rgbToLab(rgb.r, rgb.g, rgb.b)
-  }, [displayHex])
-
-  const liveDeltaE =
-    activeTarget && displayHex
-      ? calculateDeltaE2000Hex(activeTarget, displayHex)
-      : null
-
   const t = {
     ru: {
       edition: 'ATELIER COLORIMETRY · КУБЕЛКА–МУНК',
@@ -165,8 +134,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       autoAdjust: 'Калибровать под цель',
       adjusting: 'Калибровка…',
       result: 'Карта Оттенка',
-      wet: 'WET GLAZE · Мокрая',
-      dry: 'DRY MATTE · Сухая',
+      guideBtn: 'Как читать карту?',
+      wet: 'Мокрая (Глянец)',
+      dry: 'Сухая (Мат)',
+      wetExplain: 'Свежая краска в баночке или под глянцевым лаком/воском — цвет глубже и темнее.',
+      dryExplain: 'Высохшая краска без лака — микропоры рассеивают свет, тон выглядит чуть светлее и матовее.',
       reset: 'Снять цель',
       target: 'Эталон',
       mix: 'Образец',
@@ -198,17 +170,38 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       pigmentInfoBtn: 'История и где брать',
       dossierTitle: 'Паспорт пигмента',
       dossierChem: 'Химический класс и индекс',
+      dossierOpacityMeaning: 'Что значит укрывистость на коже',
       dossierHistory: 'История открытия',
       dossierLeather: 'Применение в кожевенном ремесле',
       dossierWhereToBuy: 'Где брать и в каких красках искать',
       dossierLeatherBrands: 'Краски для кожи и обуви (Cordwainer):',
       dossierArtSuppliers: 'Чистые пигменты и акриловые дисперсии:',
-      dossierClose: 'Закрыть паспорт',
+      dossierClose: 'Понятно, закрыть',
       opacityOpaque: 'Кроющий',
       opacitySemiOpaque: 'Полукроющий',
       opacitySemiTrans: 'Полупрозрачный',
       opacityTrans: 'Лессировочный',
-      coatHint: 'Нажмите на слой (I – ∞) для просмотра перекрытия',
+      opacityDesc: {
+        opaque: 'Кроющий (плотный) — закрашивает старый цвет кожи и пятна за 1–2 слоя, как грунтовая эмаль.',
+        'semi-opaque': 'Полукроющий — полностью перекрывает фон за 2–3 слоя, сохраняя живую текстуру кожи.',
+        'semi-transparent': 'Полупрозрачный — мягко тонирует кожу, оставляя видимым её природный рисунок.',
+        transparent: 'Лессировочный (прозрачный) — работает как цветное стекло для патины, глассажа и глубоких переливов.',
+      },
+      coatLabels: ['1 слой', '2 слоя', '3 слоя', 'Полный ∞'],
+      coatExplanations: [
+        '1 слой: тонкое нанесение — сквозь полупрозрачную краску ещё просвечивает светлая кожа.',
+        '2 слоя: стандартная покраска — цвет набирает силу, но прозрачные пигменты ещё дают глубину.',
+        '3 слоя: плотное покрытие — базовый фон кожи почти полностью перекрыт.',
+        'Полный (∞): 100% перекрытие — итоговый цвет густой краски в баночке или в 4+ слоёв.',
+      ],
+      guideModalTitle: 'Шпаргалка мастера: как работает карта оттенка',
+      guideSectionCoats: '1. Что такое «1 слой, 2 слоя, 3 слоя, Полный ∞»?',
+      guideSectionCoatsText:
+        'Краска на коже ложится не сразу намертво: в 1 слой сквозь неё слегка просвечивает бежевая кожа (особенно у прозрачных пигментов). Нажимая на кнопки «1 слой → 2 слоя → 3 слоя → Полный ∞», вы заранее видите, сколько слоёв нужно нанести кистью или аэрографом, чтобы перекрыть кожу до нужного оттенка.',
+      guideSectionWetDry: '2. Зачем переключатель «Сухая (Мат) / Мокрая (Глянец)»?',
+      guideSectionWetDryText:
+        'Любая краска для кожи при высыхании немного светлеет и становится матовой, потому что микрошероховатости рассеивают свет. Режим «Сухая» показывает цвет высохшей краски без финиша. Режим «Мокрая» показывает, каким сочным и тёмным станет этот же цвет, пока он свежий или когда вы покроете обувь глянцевым лаком, аппретом или воском.',
+      guideSectionOpacity: '3. Что означают типы укрывистости пигментов?',
       ml: 'мл',
       l: 'л',
     },
@@ -226,8 +219,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       autoAdjust: 'Калібрувати під ціль',
       adjusting: 'Калібрування…',
       result: 'Карта Відтінку',
-      wet: 'WET GLAZE · Мокра',
-      dry: 'DRY MATTE · Суха',
+      guideBtn: 'Як читати карту?',
+      wet: 'Мокра (Глянець)',
+      dry: 'Суха (Мат)',
+      wetExplain: 'Свіжа фарба в баночці або під глянцевим лаком/воском — колір глибший і темніший.',
+      dryExplain: 'Висохла фарба без лаку — мікропори розсіюють світло, тон виглядає трохи світлішим і матовішим.',
       reset: 'Зняти ціль',
       target: 'Еталон',
       mix: 'Зразок',
@@ -259,17 +255,38 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       pigmentInfoBtn: 'Історія та де брати',
       dossierTitle: 'Паспорт пігменту',
       dossierChem: 'Хімічний клас та індекс',
+      dossierOpacityMeaning: 'Що означає покривність на шкірі',
       dossierHistory: 'Історія відкриття',
       dossierLeather: 'Застосування у шкіряному ремеслі',
       dossierWhereToBuy: 'Де брати та в яких фарбах шукати',
       dossierLeatherBrands: 'Фарби для шкіри та взуття (Cordwainer):',
       dossierArtSuppliers: 'Чисті пігменти та акрилові дисперсії:',
-      dossierClose: 'Закрити паспорт',
+      dossierClose: 'Зрозуміло, закрити',
       opacityOpaque: 'Криючий',
       opacitySemiOpaque: 'Напівкриючий',
       opacitySemiTrans: 'Напівпрозорий',
       opacityTrans: 'Лесувальний',
-      coatHint: 'Натисніть на шар (I – ∞) для перегляду перекриття',
+      opacityDesc: {
+        opaque: 'Криючий (щільний) — зафарбовує старий колір шкіри та плями за 1–2 шари, як ґрунтова емаль.',
+        'semi-opaque': 'Напівкриючий — повністю перекриває фон за 2–3 шари, зберігаючи живу текстуру шкіри.',
+        'semi-transparent': 'Напівпрозорий — м’яко тонує шкіру, залишаючи видимим її природний малюнок.',
+        transparent: 'Лесувальний (прозорий) — працює як кольорове скло для патини, гласажу та глибоких переливів.',
+      },
+      coatLabels: ['1 шар', '2 шари', '3 шари', 'Повний ∞'],
+      coatExplanations: [
+        '1 шар: тонке нанесення — крізь напівпрозору фарбу ще просвічує світла шкіра.',
+        '2 шари: стандартне фарбування — колір набирає силу, але прозорі пігменти ще дають глибину.',
+        '3 шари: щільне покриття — базовий фон шкіри майже повністю перекритий.',
+        'Повний (∞): 100% перекриття — підсумковий колір густої фарби в баночці або в 4+ шарів.',
+      ],
+      guideModalTitle: 'Шпаргалка майстра: як працює карта відтінку',
+      guideSectionCoats: '1. Що таке «1 шар, 2 шари, 3 шари, Повний ∞»?',
+      guideSectionCoatsText:
+        'Фарба на шкірі лягає поступово: в 1 шар крізь неї злегка просвічує бежева основа шкіри. Натискаючи на кнопки шарів, ви заздалегідь бачите, скільки проходів пензлем чи аерографом потрібно зробити.',
+      guideSectionWetDry: '2. Навіщо перемикач «Суха (Мат) / Мокра (Глянець)»?',
+      guideSectionWetDryText:
+        'Будь-яка фарба при висиханні трохи світлішає і стає матовою. Режим «Суха» показує висохлу фарбу без фінішу, а «Мокра» — яким насиченим стане колір під глянцевим лаком, апретом або воском.',
+      guideSectionOpacity: '3. Що означають типи покривності пігментів?',
       ml: 'мл',
       l: 'л',
     },
@@ -287,8 +304,11 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       autoAdjust: 'Auf Ziel kalibrieren',
       adjusting: 'Kalibrierung…',
       result: 'Farbkarte',
-      wet: 'WET GLAZE · Nass',
-      dry: 'DRY MATTE · Trocken',
+      guideBtn: 'Hilfe & Begriffe',
+      wet: 'Nass (Glanz)',
+      dry: 'Trocken (Matt)',
+      wetExplain: 'Frische Farbe im Glas oder unter Glanz-Finish/Wachs — der Farbton wirkt tiefer und dunkler.',
+      dryExplain: 'Getrocknete Farbe ohne Finish — durch Lichtstreuung wirkt der Ton etwas heller und matter.',
       reset: 'Ziel lösen',
       target: 'Referenz',
       mix: 'Muster',
@@ -320,21 +340,74 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       pigmentInfoBtn: 'Historie & Bezugsquellen',
       dossierTitle: 'Pigment-Dossier',
       dossierChem: 'Chemische Klasse & Colour Index',
+      dossierOpacityMeaning: 'Bedeutung der Deckkraft auf Leder',
       dossierHistory: 'Entdeckungsgeschichte',
       dossierLeather: 'Anwendung im Schuh- & Lederhandwerk',
       dossierWhereToBuy: 'Bezugsquellen & Marken',
       dossierLeatherBrands: 'Leder- & Schuhfarben (Cordwainer):',
       dossierArtSuppliers: 'Reinpigmente & Künstler-Dispersionen:',
-      dossierClose: 'Schließen',
+      dossierClose: 'Verstanden, schließen',
       opacityOpaque: 'Deckend',
       opacitySemiOpaque: 'Halbdeckend',
       opacitySemiTrans: 'Halbtransparent',
       opacityTrans: 'Lasierend',
-      coatHint: 'Schicht (I – ∞) antippen, um Deckkraft zu prüfen',
+      opacityDesc: {
+        opaque: 'Deckend — überdeckt den alten Lederton und Flecken bereits in 1–2 Schichten vollständig.',
+        'semi-opaque': 'Halbdeckend — deckt nach 2–3 Schichten voll ab und erhält die natürliche Ledernarbung.',
+        'semi-transparent': 'Halbtransparent — tönt das Leder sanft ab, während die Struktur sichtbar bleibt.',
+        transparent: 'Lasierend (transparent) — wirkt wie farbiges Glas für Patina, Wasserglanz und Tiefeneffekte.',
+      },
+      coatLabels: ['1. Schicht', '2. Schicht', '3. Schicht', 'Vollton ∞'],
+      coatExplanations: [
+        '1. Schicht: Dünner Auftrag — das helle Grundleder scheint bei lasierenden Pigmenten noch durch.',
+        '2. Schicht: Normaler Auftrag — der Farbton gewinnt an Tiefe und Sättigung.',
+        '3. Schicht: Dichter Auftrag — der Untergrund ist fast vollständig abgedeckt.',
+        'Vollton (∞): 100 % Deckung — die Farbe im Gebinde oder ab 4+ Schichten.',
+      ],
+      guideModalTitle: 'Atelier-Leitfaden: Schichten, Glanz & Deckkraft',
+      guideSectionCoats: '1. Was bedeuten „1. Schicht, 2. Schicht, 3. Schicht, Vollton ∞“?',
+      guideSectionCoatsText:
+        'Je nach Deckkraft scheint beim ersten Auftrag noch das Grundleder durch. Durch Antippen der Schichten sehen Sie vorab, wie sich der Ton mit jedem Auftrag verändert.',
+      guideSectionWetDry: '2. Wozu dient der Schalter „Trocken (Matt) / Nass (Glanz)“?',
+      guideSectionWetDryText:
+        'Lederfarbe trocknet etwas heller und matter auf. „Trocken“ zeigt den unversiegelten Zustand, „Nass“ zeigt den tiefen Ton im nassen Zustand oder unter Glanzappretur/Wachs.',
+      guideSectionOpacity: '3. Was bedeuten die Deckkraft-Stufen?',
       ml: 'ml',
       l: 'l',
     },
   }[lang]
+
+  // Симуляция выкраски в 4 слоя по Кубелке-Мунку с понятными названиями
+  const layerSwatches = useMemo(() => {
+    if (!mixedColor?.spectrum || pigments.length === 0) return null
+    const basePigment =
+      pigments.find((p) => p.id === 'cardboard') ||
+      pigments.find((p) => p.id === 'titanium_white') ||
+      pigments.find((p) => p.id === 'pw_6_anatase')
+    if (!basePigment?.spectrum) return null
+    const sim = simulateLayersKM(basePigment.spectrum, mixedColor.spectrum, system)
+    return [
+      { short: 'I', label: t.coatLabels[0], hex: rgbToHex(spectrumToRGB(sim.layer1)).toUpperCase() },
+      { short: 'II', label: t.coatLabels[1], hex: rgbToHex(spectrumToRGB(sim.layer2)).toUpperCase() },
+      { short: 'III', label: t.coatLabels[2], hex: rgbToHex(spectrumToRGB(sim.layer3)).toUpperCase() },
+      { short: '∞', label: t.coatLabels[3], hex: rgbToHex(spectrumToRGB(sim.final)).toUpperCase() },
+    ]
+  }, [mixedColor, pigments, system, t.coatLabels])
+
+  const activeCoat = layerSwatches ? layerSwatches[selectedCoatIdx] || layerSwatches[3] : null
+  const displayHex = activeCoat?.hex || (mixedColor?.hex ? mixedColor.hex.toUpperCase() : null)
+  const squareColor = displayHex || '#1E1B19'
+
+  const activeLab = useMemo(() => {
+    if (!displayHex) return null
+    const rgb = hexToRgbObj(displayHex)
+    return rgbToLab(rgb.r, rgb.g, rgb.b)
+  }, [displayHex])
+
+  const liveDeltaE =
+    activeTarget && displayHex
+      ? calculateDeltaE2000Hex(activeTarget, displayHex)
+      : null
 
   const pigmentName = useCallback(
     (p: Pigment | undefined) => {
@@ -347,7 +420,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
   )
 
   const opacityLabel = useCallback(
-    (op: 'opaque' | 'semi-opaque' | 'semi-transparent' | 'transparent') => {
+    (op: OpacityLevel) => {
       if (op === 'opaque') return t.opacityOpaque
       if (op === 'semi-opaque') return t.opacitySemiOpaque
       if (op === 'semi-transparent') return t.opacitySemiTrans
@@ -799,7 +872,21 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
           </h1>
         </div>
 
-        <div className="w-10 text-right font-mono text-[10px] opacity-40">N°01</div>
+        <button
+          type="button"
+          onClick={() => setShowGuideModal(true)}
+          style={{
+            fontSize: 10,
+            padding: '4px 8px',
+            border: '1px solid color-mix(in srgb, var(--color-accent, #D8A35C) 50%, transparent)',
+            color: 'var(--color-accent, #D8A35C)',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          ?
+        </button>
       </header>
 
       {/* Editorial Segmented Switcher */}
@@ -834,7 +921,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
       <div className="flex-1 flex flex-col gap-5">
         {tab === 'mix' && (
           <>
-            {/* HAUTE COUTURE LOOKBOOK SWATCH CARD (Pantone / Hermès Editorial Style) */}
+            {/* HAUTE COUTURE LOOKBOOK SWATCH CARD */}
             <section
               className="border overflow-hidden transition-all"
               style={{
@@ -842,15 +929,30 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 14%, transparent)',
               }}
             >
-              {/* Верхняя архитектурная планка: КАРТА ОТТЕНКА + Снять цель слева, СУХАЯ / МОКРАЯ справа */}
+              {/* Верхняя планка: КАРТА ОТТЕНКА + Как читать карту? + Переключатель Сухая/Мокрая */}
               <div
-                className="px-4 py-2.5 flex items-center justify-between border-b"
+                className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b"
                 style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[10px] uppercase tracking-[0.22em] opacity-65 font-semibold">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.2em] opacity-70 font-semibold">
                     {t.result}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowGuideModal(true)}
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--color-accent, #D8A35C)',
+                      textDecoration: 'underline',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ⓘ {t.guideBtn}
+                  </button>
                   {activeTarget && (
                     <button
                       onClick={() => setActiveTarget(null)}
@@ -867,7 +969,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
 
                 <button
                   onClick={() => setIsWet(!isWet)}
-                  className="text-[10px] tracking-[0.14em] uppercase font-semibold px-3 py-1 border transition-all"
+                  className="text-[10px] tracking-[0.12em] uppercase font-semibold px-3 py-1 border transition-all"
                   style={{
                     borderColor: isWet
                       ? 'var(--color-accent, #D8A35C)'
@@ -882,10 +984,23 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 </button>
               </div>
 
-              {/* Главное поле цвета Lookbook: чистая дихотомия 50/50 (Эталон слева, Образец активного слоя справа) */}
+              {/* Понятная живая подсказка под переключателем Сухая / Мокрая */}
+              <div
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 11,
+                  opacity: 0.72,
+                  borderBottom: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
+                  background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
+                }}
+              >
+                {isWet ? t.wetExplain : t.dryExplain}
+              </div>
+
+              {/* Главное поле цвета Lookbook: 50/50 (Эталон слева, Образец активного слоя справа) */}
               <div
                 className="relative w-full flex overflow-hidden"
-                style={{ height: 156 }}
+                style={{ height: 152 }}
               >
                 {activeTarget && (
                   <div
@@ -901,7 +1016,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                         width: 'fit-content',
                         padding: '3px 8px',
                         fontSize: 9,
-                        letterSpacing: '0.18em',
+                        letterSpacing: '0.16em',
                         textTransform: 'uppercase',
                         fontFamily: 'monospace',
                         backgroundColor: 'rgba(0,0,0,0.52)',
@@ -935,7 +1050,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     />
                   )}
 
-                  {/* Верхний правый угол поля образца: бейдж ΔE₀₀ (не налезает на подпись внизу!) */}
                   <div className="relative z-10 flex justify-end w-full">
                     {liveDeltaE !== null && (
                       <span
@@ -954,90 +1068,101 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     )}
                   </div>
 
-                  {/* Нижний левый угол поля образца: подпись Образец + выбранный слой */}
                   <div className="relative z-10 flex items-end justify-between w-full">
                     <span
                       style={{
                         padding: '3px 8px',
                         fontSize: 9,
-                        letterSpacing: '0.18em',
+                        letterSpacing: '0.16em',
                         textTransform: 'uppercase',
                         fontFamily: 'monospace',
                         backgroundColor: 'rgba(0,0,0,0.52)',
                         color: '#FFFFFF',
                       }}
                     >
-                      {t.mix} {activeCoat ? `(COAT ${activeCoat.label})` : ''} · {displayHex || 'UNMIXED'}
+                      {t.mix} {activeCoat ? `(${activeCoat.label})` : ''} · {displayHex || 'UNMIXED'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* ИНТЕРАКТИВНАЯ ШКАЛА 4 СЛОЁВ ПО КУБЕЛКЕ–МУНКУ (COAT I, COAT II, COAT III, COAT ∞):
-                  При нажатии на любой из 4 слоёв выкраска и спектр переключаются на этот слой! */}
+              {/* ИНТЕРАКТИВНЫЕ 4 СЛОЯ НАНЕСЕНИЯ («1 слой», «2 слоя», «3 слоя», «Полный ∞») + ПОНЯТНАЯ РАСШИФРОВКА */}
               {layerSwatches && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    borderTop: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
-                  }}
-                >
-                  {layerSwatches.map((ls, idx) => {
-                    const isSelectedCoat = selectedCoatIdx === idx
-                    return (
-                      <button
-                        key={ls.label}
-                        type="button"
-                        onClick={() => setSelectedCoatIdx(idx)}
-                        title={t.coatHint}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 7,
-                          padding: '9px 6px',
-                          borderRight:
-                            idx < 3
-                              ? '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)'
-                              : 'none',
-                          borderBottom: isSelectedCoat
-                            ? '2px solid var(--color-accent, #D8A35C)'
-                            : '2px solid transparent',
-                          background: isSelectedCoat
-                            ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 12%, transparent)'
-                            : 'transparent',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <span
+                <>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      borderTop: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                    }}
+                  >
+                    {layerSwatches.map((ls, idx) => {
+                      const isSelectedCoat = selectedCoatIdx === idx
+                      return (
+                        <button
+                          key={ls.short}
+                          type="button"
+                          onClick={() => setSelectedCoatIdx(idx)}
                           style={{
-                            width: 15,
-                            height: 15,
-                            borderRadius: '50%',
-                            backgroundColor: ls.hex,
-                            border: '1px solid rgba(0,0,0,0.25)',
-                            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.25)',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontFamily: 'monospace',
-                            fontWeight: isSelectedCoat ? 700 : 500,
-                            letterSpacing: '0.08em',
-                            opacity: isSelectedCoat ? 1 : 0.65,
-                            color: 'var(--color-ink, #F5F1EA)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            padding: '9px 4px',
+                            borderRight:
+                              idx < 3
+                                ? '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)'
+                                : 'none',
+                            borderBottom: isSelectedCoat
+                              ? '2px solid var(--color-accent, #D8A35C)'
+                              : '2px solid transparent',
+                            background: isSelectedCoat
+                              ? 'color-mix(in srgb, var(--color-accent, #D8A35C) 14%, transparent)'
+                              : 'transparent',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
                           }}
                         >
-                          COAT {ls.label}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+                          <span
+                            style={{
+                              width: 13,
+                              height: 13,
+                              borderRadius: '50%',
+                              backgroundColor: ls.hex,
+                              border: '1px solid rgba(0,0,0,0.25)',
+                              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.25)',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: isSelectedCoat ? 700 : 500,
+                              opacity: isSelectedCoat ? 1 : 0.65,
+                              color: 'var(--color-ink, #F5F1EA)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {ls.label}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Человеческое объяснение выбранного слоя */}
+                  <div
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: 11,
+                      opacity: 0.75,
+                      borderTop: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 8%, transparent)',
+                      background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
+                    }}
+                  >
+                    {t.coatExplanations[selectedCoatIdx]}
+                  </div>
+                </>
               )}
 
               {/* Pantone-Style Technical Specification Footer */}
@@ -1047,7 +1172,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
               >
                 <div className="flex flex-col">
                   <span className="text-[9px] uppercase tracking-[0.22em] opacity-45">
-                    SPECTRUM HEX / CIELAB {activeCoat ? `· COAT ${activeCoat.label}` : ''}
+                    SPECTRUM HEX / CIELAB {activeCoat ? `· ${activeCoat.label.toUpperCase()}` : ''}
                   </span>
                   <div className="flex items-baseline gap-3 mt-0.5">
                     <span className="font-mono text-[20px] font-semibold tracking-wider">
@@ -1116,7 +1241,6 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                 style={{ borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)' }}
               >
                 <div className="flex items-center gap-2.5">
-                  {/* Живой мини-индикатор цвета прямо над ползунками */}
                   <span
                     style={{
                       width: 14,
@@ -1171,15 +1295,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     return (
                       <div
                         key={paint.id}
-                        className="p-3.5 border transition-colors"
+                        className="p-3 border transition-colors"
                         style={{
                           background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 2%, transparent)',
                           borderColor: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 10%, transparent)',
+                          overflow: 'hidden',
+                          boxSizing: 'border-box',
                         }}
                       >
-                        {/* ЯРУС 1: Номер + Селектор пигмента во всю ширину (название видно целиком!) + Кнопка удаления */}
+                        {/* ЯРУС 1: Номер + Селектор пигмента во всю ширину + Кнопка удаления */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                          <span className="font-mono text-[10px] opacity-40" style={{ width: 20, flexShrink: 0 }}>
+                          <span className="font-mono text-[10px] opacity-40" style={{ width: 18, flexShrink: 0 }}>
                             0{idx + 1}
                           </span>
 
@@ -1205,14 +1331,17 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                           </button>
                         </div>
 
-                        {/* ЯРУС 2: Ползунок слева + точный ввод мл и % справа (никаких пересечений с названием!) */}
+                        {/* ЯРУС 2: Ползунок с minWidth: 0 (чтобы проценты НИКОГДА не вылезали за рамки!) + мл + % */}
                         <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 12,
-                            paddingLeft: 28,
+                            gap: 8,
+                            paddingLeft: 26,
+                            paddingRight: 2,
                             marginTop: 10,
+                            width: '100%',
+                            boxSizing: 'border-box',
                           }}
                         >
                           <input
@@ -1225,12 +1354,14 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                             className="h-1 appearance-none cursor-pointer"
                             style={{
                               flex: 1,
+                              minWidth: 0,
+                              width: '100%',
                               background: 'color-mix(in srgb, var(--color-ink, #F5F1EA) 16%, transparent)',
                               accentColor: 'var(--color-accent, #D8A35C)',
                             }}
                           />
 
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, flexShrink: 0 }}>
                             <input
                               ref={(el) => {
                                 if (el) amountRefs.current.set(paint.id, el)
@@ -1256,47 +1387,60 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                                   if (!isNaN(num)) updatePaint(paint.id, 'amount', String(Math.min(num, 5000)))
                                 }
                               }}
-                              className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[16px] font-semibold focus:outline-none p-0"
+                              className="bg-transparent border-b border-transparent focus:border-current text-right font-mono text-[15px] font-semibold focus:outline-none p-0"
                               placeholder="0.0"
-                              style={{ width: 56, color: 'var(--color-ink, #F5F1EA)' }}
+                              style={{ width: 46, color: 'var(--color-ink, #F5F1EA)' }}
                             />
                             <span className="text-[11px] font-mono opacity-45">{t.ml}</span>
                           </div>
 
                           <span
-                            className="font-mono text-[10px] opacity-45 text-right tabular-nums"
-                            style={{ width: 34, flexShrink: 0 }}
+                            className="font-mono text-[10px] opacity-55 text-right tabular-nums"
+                            style={{ width: 32, flexShrink: 0 }}
                           >
                             {pct}%
                           </span>
                         </div>
 
-                        {/* ЯРУС 3: Строка паспорта в 1 линию — Укрывистость + Бренд слева, кнопка «ⓘ История и где брать» справа */}
+                        {/* ЯРУС 3: Кликабельный тип укрывистости (с объяснением) + бренд + кнопка «ⓘ История и где брать» */}
                         <div
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: 8,
-                            paddingLeft: 28,
+                            paddingLeft: 26,
                             marginTop: 8,
                             paddingTop: 7,
                             borderTop: '1px solid color-mix(in srgb, var(--color-ink, #F5F1EA) 7%, transparent)',
                             fontSize: 11,
                           }}
                         >
-                          <span
+                          <button
+                            type="button"
+                            onClick={() => setShowGuideModal(true)}
                             style={{
-                              opacity: 0.6,
+                              opacity: 0.7,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               minWidth: 0,
                               flex: 1,
+                              textAlign: 'left',
+                              background: 'transparent',
+                              border: 'none',
+                              padding: 0,
+                              color: 'inherit',
+                              cursor: 'pointer',
                             }}
+                            title={t.opacityDesc[lore.opacity]}
                           >
-                            {opacityLabel(lore.opacity)} · {lore.whereToBuy.leatherBrands[0]}
-                          </span>
+                            <span style={{ textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                              {opacityLabel(lore.opacity)} (?)
+                            </span>
+                            {' · '}
+                            <span>{lore.whereToBuy.leatherBrands[0]}</span>
+                          </button>
 
                           <button
                             type="button"
@@ -1309,6 +1453,9 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               whiteSpace: 'nowrap',
                               fontSize: 11,
                               cursor: 'pointer',
+                              background: 'transparent',
+                              border: 'none',
+                              padding: 0,
                             }}
                           >
                             ⓘ {t.pigmentInfoBtn}
@@ -1759,7 +1906,7 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                               }}
                             >
                               <span className="opacity-60 truncate">
-                                {lore.code.split('·')[0].trim()} · {lore.whereToBuy.leatherBrands[0]}
+                                {opacityLabel(lore.opacity)} · {lore.whereToBuy.leatherBrands[0]}
                               </span>
                               <button
                                 type="button"
@@ -1798,7 +1945,130 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
         )}
       </div>
 
-      {/* МОДАЛЬНЫЙ ПАСПОРТ ПИГМЕНТА (Контрастный Lookbook стиль) */}
+      {/* МОДАЛЬНАЯ ШПАРГАЛКА МАСТЕРА: Что такое Слои 1–∞, Мокрая/Сухая краска и Кроющий/Лессировочный пигмент */}
+      <AnimatePresence>
+        {showGuideModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowGuideModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(15, 13, 11, 0.72)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+            }}
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                maxHeight: '85vh',
+                overflowY: 'auto',
+                backgroundColor: '#FAF7F2',
+                color: '#181512',
+                border: '1px solid #2A2521',
+                padding: 20,
+                boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  paddingBottom: 12,
+                  marginBottom: 14,
+                  borderBottom: '1px solid rgba(24,21,18,0.12)',
+                }}
+              >
+                <h3 style={{ fontSize: 16, fontFamily: 'serif', fontWeight: 700, margin: 0, color: '#181512' }}>
+                  {t.guideModalTitle}
+                </h3>
+                <button
+                  onClick={() => setShowGuideModal(false)}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    border: '1px solid rgba(24,21,18,0.2)',
+                    background: 'transparent',
+                    color: '#181512',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, lineHeight: 1.55 }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#8C5E24', marginBottom: 4 }}>
+                    {t.guideSectionCoats}
+                  </div>
+                  <p style={{ margin: 0, color: '#26221E' }}>{t.guideSectionCoatsText}</p>
+                </div>
+
+                <div>
+                  <div style={{ fontWeight: 700, color: '#8C5E24', marginBottom: 4 }}>
+                    {t.guideSectionWetDry}
+                  </div>
+                  <p style={{ margin: 0, color: '#26221E' }}>{t.guideSectionWetDryText}</p>
+                </div>
+
+                <div
+                  style={{
+                    padding: 12,
+                    backgroundColor: '#EFE6D5',
+                    border: '1px solid #C59B5F',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: '#8C5E24' }}>
+                    {t.guideSectionOpacity}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#181512' }}>• {t.opacityDesc.opaque}</div>
+                  <div style={{ fontSize: 12, color: '#181512' }}>• {t.opacityDesc['semi-opaque']}</div>
+                  <div style={{ fontSize: 12, color: '#181512' }}>• {t.opacityDesc['semi-transparent']}</div>
+                  <div style={{ fontSize: 12, color: '#181512' }}>• {t.opacityDesc.transparent}</div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowGuideModal(false)}
+                style={{
+                  width: '100%',
+                  marginTop: 16,
+                  padding: '11px 16px',
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.18em',
+                  fontWeight: 700,
+                  backgroundColor: '#181512',
+                  color: '#F5F1EA',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {t.dossierClose}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* МОДАЛЬНЫЙ ПАСПОРТ ПИГМЕНТА (с расшифровкой укрывистости на коже, историей и брендами) */}
       <AnimatePresence>
         {inspectedPigmentId && inspectedLore && (
           <motion.div
@@ -1916,7 +2186,19 @@ export function ColorCalcPage({ lang, onBack }: ColorCalcPageProps) {
                     {inspectedLore.chemicalFamily[lang]}
                   </div>
                   <div style={{ fontSize: 12, color: '#4A433C', marginTop: 4 }}>
-                    {opacityLabel(inspectedLore.opacity)} · {inspectedLore.lightfastness} · {inspectedLore.tintingStrength[lang]}
+                    {inspectedLore.lightfastness} · {inspectedLore.tintingStrength[lang]}
+                  </div>
+                  {/* Понятная расшифровка типа укрывистости прямо в паспорте пигмента */}
+                  <div
+                    style={{
+                      marginTop: 8,
+                      paddingTop: 8,
+                      borderTop: '1px solid rgba(24,21,18,0.1)',
+                      fontSize: 12,
+                      color: '#181512',
+                    }}
+                  >
+                    <strong>{t.dossierOpacityMeaning}:</strong> {t.opacityDesc[inspectedLore.opacity]}
                   </div>
                 </div>
 
