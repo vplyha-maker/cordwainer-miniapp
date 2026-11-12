@@ -435,6 +435,29 @@ export function getTgWebApp(): TgWebAppExtended | undefined {
 }
 
 /**
+ * Определяет, запущено ли приложение внутри Telegram (Mini App или встроенный браузер Telegram)
+ * на любой платформе (как на Android, так и на iOS).
+ */
+function isTelegramEnvironment(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const win = window as unknown as {
+    TelegramWebview?: unknown;
+    TelegramWebviewProxy?: unknown;
+  };
+  const tg = getTgWebApp();
+
+  return (
+    Boolean(win.TelegramWebview) ||
+    Boolean(win.TelegramWebviewProxy) ||
+    Boolean(tg?.initData) ||
+    Boolean(tg?.initDataUnsafe?.user?.id) ||
+    (Boolean(tg?.platform) && tg?.platform !== 'unknown') ||
+    /Telegram/i.test(ua)
+  );
+}
+
+/**
  * Определяет, запущено ли приложение внутри Android WebView / встроенного браузера Telegram.
  * В Android WebView ссылки формата blob: не обрабатываются системным DownloadManager.
  */
@@ -444,24 +467,13 @@ function isAndroidTelegramOrWebView(): boolean {
   const isAndroid = /Android/i.test(ua);
   if (!isAndroid) return false;
 
-  const win = window as unknown as {
-    TelegramWebview?: unknown;
-    TelegramWebviewProxy?: unknown;
-  };
-  const tg = getTgWebApp();
-  const isTgWebApp =
-    Boolean(win.TelegramWebview) ||
-    Boolean(win.TelegramWebviewProxy) ||
-    Boolean(tg?.initData) ||
-    (Boolean(tg?.platform) && tg?.platform !== 'unknown');
-  const isAndroidWebView = /; wv\)|Version\/\d+\.\d+\s+Chrome\//i.test(ua) || /Telegram/i.test(ua);
-
-  return isTgWebApp || isAndroidWebView;
+  const isAndroidWebView = /; wv\)|Version\/\d+\.\d+\s+Chrome\//i.test(ua);
+  return isTelegramEnvironment() || isAndroidWebView;
 }
 
 /**
- * Вызывает нативное модальное окно скачивания файла в Telegram Mini App со сбросом
- * возможной зависшей блокировки `fileDownloadRequestedCallback` в `telegram-web-app.js`
+ * Вызывает нативное модальное окно скачивания файла в Telegram Mini App (работает и на iOS, и на Android)
+ * со сбросом возможной зависшей блокировки `fileDownloadRequestedCallback` в `telegram-web-app.js`
  * и прямым фолбэком в мост `web_app_request_file_download` (без редиректа через openLink).
  */
 function requestTelegramNativeFileDownload(url: string, fileName: string): boolean {
@@ -521,21 +533,102 @@ function requestTelegramNativeFileDownload(url: string, fileName: string): boole
   return false;
 }
 
+const TG_USER_ID_STORAGE_KEY = 'cardio_tg_user_id';
+
+/**
+ * Пытается извлечь Telegram ID пользователя из всех доступных источников:
+ * 1) Telegram WebApp initDataUnsafe
+ * 2) URL-параметры или hash (`tgWebAppData`, `chatId`, `tgId`, `userId`)
+ * 3) localStorage / sessionStorage (если пользователь ранее заходил через Telegram)
+ */
+function resolveStoredOrUrlTelegramUserId(): number | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  // 1. Прямой объект Telegram WebApp
+  try {
+    const directId = getTgWebApp()?.initDataUnsafe?.user?.id;
+    if (typeof directId === 'number' && directId > 0) {
+      try {
+        window.localStorage?.setItem(TG_USER_ID_STORAGE_KEY, String(directId));
+      } catch {}
+      return directId;
+    }
+  } catch {}
+
+  // 2. Поиск в URL query и hash (например, при открытии из Telegram в Safari / Chrome)
+  try {
+    const rawLocations = [window.location.search, window.location.hash.replace(/^#/, '?')];
+    for (const raw of rawLocations) {
+      if (!raw) continue;
+      const params = new URLSearchParams(raw);
+      for (const key of ['chatId', 'chat_id', 'tgId', 'tg_id', 'userId', 'user_id']) {
+        const val = params.get(key);
+        if (val && /^\d{5,15}$/.test(val.trim())) {
+          const parsed = Number(val.trim());
+          try {
+            window.localStorage?.setItem(TG_USER_ID_STORAGE_KEY, String(parsed));
+          } catch {}
+          return parsed;
+        }
+      }
+      const tgWebAppData = params.get('tgWebAppData');
+      if (tgWebAppData) {
+        const dataParams = new URLSearchParams(tgWebAppData);
+        const userJson = dataParams.get('user');
+        if (userJson) {
+          const userObj = JSON.parse(userJson) as { id?: number };
+          if (typeof userObj?.id === 'number' && userObj.id > 0) {
+            try {
+              window.localStorage?.setItem(TG_USER_ID_STORAGE_KEY, String(userObj.id));
+            } catch {}
+            return userObj.id;
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Сохранённый Telegram ID в localStorage / sessionStorage
+  try {
+    const saved =
+      window.localStorage?.getItem(TG_USER_ID_STORAGE_KEY) ||
+      window.sessionStorage?.getItem(TG_USER_ID_STORAGE_KEY);
+    if (saved && /^\d{5,15}$/.test(saved.trim())) {
+      return Number(saved.trim());
+    }
+
+    const initParamsRaw = window.sessionStorage?.getItem('__telegram__initParams');
+    if (initParamsRaw) {
+      const initParams = JSON.parse(initParamsRaw) as { tgWebAppData?: string };
+      if (initParams?.tgWebAppData) {
+        const dataParams = new URLSearchParams(initParams.tgWebAppData);
+        const userJson = dataParams.get('user');
+        if (userJson) {
+          const userObj = JSON.parse(userJson) as { id?: number };
+          if (typeof userObj?.id === 'number' && userObj.id > 0) {
+            return userObj.id;
+          }
+        }
+      }
+    }
+  } catch {}
+
+  return undefined;
+}
+
 /**
  * Извлекает Telegram ID клиента и формирует персональный код для водяных знаков.
  */
 export function getTelegramUserInfo(): { id?: number; clientCode: string; partnerCode: string } {
-  try {
-    const u = getTgWebApp()?.initDataUnsafe?.user;
-    if (u?.id) {
-      const code = 'CLIENT-' + String(u.id);
-      return {
-        id: u.id,
-        clientCode: code,
-        partnerCode: code,
-      };
-    }
-  } catch {}
+  const resolvedId = resolveStoredOrUrlTelegramUserId();
+  if (resolvedId) {
+    const code = 'CLIENT-' + String(resolvedId);
+    return {
+      id: resolvedId,
+      clientCode: code,
+      partnerCode: code,
+    };
+  }
   return {
     clientCode: 'CARDIO-OFFICIAL',
     partnerCode: 'CARDIO-OFFICIAL',
@@ -1241,8 +1334,12 @@ function triggerAnchorDownload(url: string, fileName: string): void {
 }
 
 /**
- * Сохранение готового PDF-файла без выброса во внешний браузер (без tg.openLink)
- * и со сбросом блокировки повторного вызова модального окна в Telegram на Android.
+ * Сохранение готового PDF-файла:
+ * - Внутри Telegram (и на iPhone, и на Android) использует нативное модальное окно Telegram
+ *   (`requestTelegramNativeFileDownload`) без перехода на `blob:` (который в iOS WKWebView просто
+ *   открывает PDF поверх приложения без сохранения) и без выброса через `tg.openLink`.
+ * - На iOS вне Telegram (Safari / Chrome) вызывает системный Share Sheet или штатную загрузку.
+ * - На Android Chrome и Desktop скачивает `localBlob` напрямую.
  */
 export async function triggerPdfDownload(status: {
   downloadUrl?: string;
@@ -1255,6 +1352,7 @@ export async function triggerPdfDownload(status: {
     (typeof navigator !== 'undefined' &&
       navigator.platform === 'MacIntel' &&
       navigator.maxTouchPoints > 1);
+  const isTgEnv = isTelegramEnvironment();
   const isAndroidWebViewEnv = isAndroidTelegramOrWebView();
 
   const stamp = String(Date.now()).slice(-4);
@@ -1270,7 +1368,18 @@ export async function triggerPdfDownload(status: {
     return baseFullUrl + (baseFullUrl.includes('?') ? '&' : '?') + '_dl=' + String(Date.now());
   };
 
-  // ——— 1. iOS: системный Share Sheet
+  // ——— 1. Внутри Telegram Mini App / Telegram WebView (и на iPhone, и на Android):
+  // На iPhone после 43 страниц рендеринга `navigator.share` теряет user gesture и выбрасывает NotAllowedError,
+  // а фолбэк `<a href="blob:...">` в iOS WKWebView просто открывает PDF на весь экран вместо скачивания.
+  // Поэтому внутри Telegram всегда вызываем нативный диалог загрузки Telegram (`downloadFile`).
+  if (isTgEnv && status.downloadUrl) {
+    const freshUrl = buildFreshServerUrl(status.downloadUrl);
+    if (requestTelegramNativeFileDownload(freshUrl, uniqueFileName)) {
+      return;
+    }
+  }
+
+  // ——— 2. iOS (Safari / Chrome или нажатие кнопки вручную, когда Share Sheet доступен)
   if (isIOS && status.localBlob) {
     try {
       const file = new File([status.localBlob], uniqueFileName, {
@@ -1285,12 +1394,13 @@ export async function triggerPdfDownload(status: {
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
+      // Если мы внутри iOS Telegram и Share Sheet отклонил автоматический вызов (NotAllowedError),
+      // НЕ переходим к triggerAnchorDownload(blobUrl), чтобы не открывать сырой PDF поверх приложения.
+      if (isTgEnv) return;
     }
   }
 
-  // ——— 2. Android Telegram Mini App / WebView:
-  // Вызываем нативное модальное окно Telegram со сбросом зависшего лока в telegram-web-app.js.
-  // ВАЖНО: никогда не вызываем tg.openLink(freshUrl), чтобы не выбрасывать пользователя на www.cordwainer.app.
+  // ——— 3. Android WebView (если не сработал пункт 1)
   if (isAndroidWebViewEnv && status.downloadUrl) {
     const freshUrl = buildFreshServerUrl(status.downloadUrl);
     if (requestTelegramNativeFileDownload(freshUrl, uniqueFileName)) {
@@ -1300,8 +1410,8 @@ export async function triggerPdfDownload(status: {
     return;
   }
 
-  // ——— 3. Стандартные браузеры (Desktop / Web Chrome / Safari) — localBlob
-  if (status.localBlob && !isAndroidWebViewEnv) {
+  // ——— 4. Стандартные браузеры (Desktop / Android Chrome / iOS Safari вне Telegram) — localBlob
+  if (status.localBlob && !isAndroidWebViewEnv && !(isIOS && isTgEnv)) {
     try {
       const blobUrl = URL.createObjectURL(status.localBlob);
       triggerAnchorDownload(blobUrl, uniqueFileName);
@@ -1312,13 +1422,15 @@ export async function triggerPdfDownload(status: {
     }
   }
 
-  // ——— 4. Запасной путь через серверный URL
+  // ——— 5. Запасной путь через серверный URL
   if (status.downloadUrl) {
     const freshUrl = buildFreshServerUrl(status.downloadUrl);
     if (requestTelegramNativeFileDownload(freshUrl, uniqueFileName)) {
       return;
     }
-    triggerAnchorDownload(freshUrl, uniqueFileName);
+    if (!(isIOS && isTgEnv)) {
+      triggerAnchorDownload(freshUrl, uniqueFileName);
+    }
   }
 }
 
@@ -2228,6 +2340,13 @@ export async function generateAndDeliverLookbookPdf(
     const pdfBase64 = uint8ArrayToBase64(pdfBytes);
     const fileName = 'CARDIO_LOOKBOOK_2026_' + lang.toUpperCase() + '.pdf';
 
+    // Определяем chatId даже если страница открыта во внешнем браузере после перехода из Telegram
+    const codeMatch = (tgUser.clientCode || tgUser.partnerCode || '').match(/CLIENT-(\d{5,15})/i);
+    const resolvedChatId =
+      tgUser.id ||
+      resolveStoredOrUrlTelegramUserId() ||
+      (codeMatch ? Number(codeMatch[1]) : undefined);
+
     let deliveryError: string | null = null;
 
     try {
@@ -2238,7 +2357,7 @@ export async function generateAndDeliverLookbookPdf(
           action: 'send_pdf',
           pdfBase64,
           fileName,
-          chatId: tgUser.id,
+          chatId: resolvedChatId,
           caption:
             '📘 CARDIO FOOTWEAR — OFFICIAL LOOKBOOK 2026 (' +
             String(totalPages) +
