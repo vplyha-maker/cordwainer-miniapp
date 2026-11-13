@@ -19,14 +19,13 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     direction: 'Основатели и креативный код',
     archiveVolume: 'В каталоге',
     modelsUnit: 'моделей',
-    officialSiteLabel: 'Официальный цифровой бутик Дома',
-    openOfficialSite: 'Перейти на официальный сайт',
+    curatedArchive: 'Кураторский архив',
+    officialSiteLabel: 'Официальное представительство Дома',
     iconicHeader: 'Культовые силуэты Дома',
-    iconicSub: 'Нажмите на силуэт, чтобы отфильтровать коллекцию (с быстрым возвратом в паспорт)',
+    iconicSub: 'Нажмите на силуэт, чтобы отфильтровать коллекцию',
     techSpecHeader: 'Материаловедение и инженерия подошвы',
     techSpecSub: 'Ключевые конструктивные узлы, кожи и запатентованные полимеры',
     backToShoes: 'Смотреть коллекцию',
-    quickBackShoes: '← К коллекции обуви',
   },
   uk: {
     founded: 'Рік заснування',
@@ -34,14 +33,13 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     direction: 'Засновники та креативний код',
     archiveVolume: 'У каталозі',
     modelsUnit: 'моделей',
-    officialSiteLabel: 'Офіційний цифровий бутік Дому',
-    openOfficialSite: 'Перейти на офіційний сайт',
+    curatedArchive: 'Кураторський архів',
+    officialSiteLabel: 'Офіційне представництво Дому',
     iconicHeader: 'Культові силуети Дому',
-    iconicSub: 'Натисніть на силует для фільтрації колекції (зі швидким поверненням у паспорт)',
+    iconicSub: 'Натисніть на силует, щоб відфільтрувати колекцію',
     techSpecHeader: 'Матеріалознавство та інженерія підошви',
     techSpecSub: 'Ключові конструктивні вузли, шкіри та запатентовані полімери',
     backToShoes: 'Дивитися колекцію',
-    quickBackShoes: '← До колекції взуття',
   },
   de: {
     founded: 'Gründungsjahr',
@@ -49,14 +47,13 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     direction: 'Gründer & Kreativcode',
     archiveVolume: 'Im Katalog',
     modelsUnit: 'Modelle',
-    officialSiteLabel: 'Offizielle digitale Boutique',
-    openOfficialSite: 'Offizielle Website öffnen',
+    curatedArchive: 'Kuratiertes Archiv',
+    officialSiteLabel: 'Offizielle Repräsentanz des Hauses',
     iconicHeader: 'Ikonische Silhouetten des Hauses',
     iconicSub: 'Tippen Sie auf eine Silhouette, um die Kollektion zu filtern',
     techSpecHeader: 'Materialkunde & Sohlentechnologie',
     techSpecSub: 'Konstruktionsmerkmale, Lederarten und Sohlensysteme',
     backToShoes: 'Kollektion ansehen',
-    quickBackShoes: '← Zur Schuhkollektion',
   },
 }
 
@@ -74,13 +71,7 @@ function openExternalUrl(url: string) {
 /**
  * Ювелирная обсидиановая витрина с анимированными векторными гербами и монограммами 25 типов
  */
-function AnimatedBrandEmblem({
-  dossier,
-  onOpenOfficialSite,
-}: {
-  dossier: BrandDossier
-  onOpenOfficialSite: () => void
-}) {
+function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
   const goldLight = '#FFF3D1'
   const goldMid = dossier.accentHex || '#D4AF37'
   const goldDeep = '#9A7B3E'
@@ -136,7 +127,7 @@ function AnimatedBrandEmblem({
         }}
       />
 
-      {/* Верхние телеметрические метки */}
+      {/* Телеметрические метки по углам витрины */}
       <div
         className="absolute top-3.5 left-4 text-[8px] font-sans uppercase tracking-[0.28em]"
         style={{ color: 'rgba(245, 242, 235, 0.5)' }}
@@ -149,26 +140,18 @@ function AnimatedBrandEmblem({
       >
         EST. {dossier.founded}
       </div>
-
-      {/* Нижние метки + интерактивная ссылка на официальный домен */}
       <div
-        className="absolute bottom-3 left-4 text-[8px] font-sans uppercase tracking-[0.24em]"
-        style={{ color: 'rgba(245, 242, 235, 0.45)' }}
+        className="absolute bottom-3.5 left-4 text-[8px] font-sans uppercase tracking-[0.24em]"
+        style={{ color: 'rgba(245, 242, 235, 0.42)' }}
       >
-        BESPOKE VECTOR CREST
+        HERITAGE CREST
       </div>
-      <button
-        type="button"
-        onClick={onOpenOfficialSite}
-        className="absolute bottom-2.5 right-3.5 px-2.5 py-1 text-[8px] font-sans uppercase tracking-[0.22em] cursor-pointer bg-transparent transition-opacity hover:opacity-100 opacity-85"
-        style={{
-          color: goldLight,
-          border: '1px solid rgba(212, 175, 55, 0.35)',
-          backgroundColor: 'rgba(212, 175, 55, 0.08)',
-        }}
+      <div
+        className="absolute bottom-3.5 right-4 text-[8px] font-sans uppercase tracking-[0.24em]"
+        style={{ color: 'rgba(245, 242, 235, 0.42)' }}
       >
-        {dossier.officialDomain.toUpperCase()} ↗
-      </button>
+        {dossier.monogram} · 1:1
+      </div>
 
       <svg
         viewBox="0 0 380 230"
@@ -275,11 +258,9 @@ function AnimatedBrandEmblem({
               strokeOpacity="0.55"
               strokeWidth="1.1"
             />
-            {/* Три фирменные угловые заклепки */}
             <circle cx="123" cy="67" r="2.2" fill={goldLight} />
             <circle cx="257" cy="67" r="2.2" fill={goldLight} />
             <circle cx="190" cy="169" r="2.2" fill={goldLight} />
-            {/* Савойский узел и корона над именем */}
             <path d="M 176 80 Q 190 73 204 80" stroke={goldMid} strokeWidth="1.3" />
             <circle cx="190" cy="77" r="2.5" stroke={goldLight} strokeWidth="1.2" />
             <text
@@ -322,7 +303,6 @@ function AnimatedBrandEmblem({
         {/* 2. SAINT LAURENT — Вертикальная переплетенная монограмма Cassandre YSL */}
         {dossier.emblem === 'ysl_cassandre' && (
           <g filter="url(#emblemGlow)">
-            {/* Октагональная парижская кутюрная плакетка */}
             <polygon
               points="152,48 228,48 256,76 256,154 228,182 152,182 124,154 124,76"
               fill="rgba(12, 12, 18, 0.85)"
@@ -335,14 +315,12 @@ function AnimatedBrandEmblem({
               strokeOpacity="0.35"
               strokeWidth="0.9"
             />
-            {/* Буква Y (вертикальная ось Cassandre) */}
             <path
               d="M 166 64 L 190 98 L 214 64 M 190 98 L 190 156 M 182 156 L 198 156"
               stroke="url(#platinumMetallic)"
               strokeWidth="3.6"
               strokeLinecap="square"
             />
-            {/* Буква S, обвивающая вертикальную мачту Y */}
             <path
               d="M 206 82 C 206 68, 172 68, 172 86 C 172 104, 210 104, 210 124 C 210 142, 172 142, 172 128"
               stroke="url(#goldMetallic)"
@@ -351,7 +329,6 @@ function AnimatedBrandEmblem({
               strokeDasharray="720"
               style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
             />
-            {/* Буква L у основания монограммы */}
             <path
               d="M 178 96 L 178 156 L 218 156 L 218 147"
               stroke="url(#goldMetallic)"
@@ -375,7 +352,6 @@ function AnimatedBrandEmblem({
         {/* 3. VALENTINO / VEJA — Архитектурный медальон VLogo Signature с шипами Rockstud */}
         {dossier.emblem === 'valentino_v' && (
           <g filter="url(#emblemGlow)">
-            {/* Ромб с пирамидальными гранями Rockstud */}
             <polygon
               points="190,44 264,115 190,186 116,115"
               stroke={goldMid}
@@ -387,7 +363,6 @@ function AnimatedBrandEmblem({
             <rect x="186" y="182" width="8" height="8" transform="rotate(45 190 186)" fill={goldLight} />
             <rect x="112" y="111" width="8" height="8" transform="rotate(45 116 115)" fill={goldLight} />
 
-            {/* Овальный обод VLogo */}
             <ellipse
               cx="190"
               cy="115"
@@ -407,7 +382,6 @@ function AnimatedBrandEmblem({
               strokeWidth="0.9"
             />
 
-            {/* Выразительная литера V с фирменной горизонтальной засечкой VLogo */}
             <path
               d="M 158 92 L 172 92 M 208 92 L 222 92 M 164 92 L 190 142 L 216 92"
               stroke="url(#goldMetallic)"
@@ -540,7 +514,6 @@ function AnimatedBrandEmblem({
         {/* 7. LOUIS VUITTON — Четырехлистная звезда Monogram и инициал LV */}
         {dossier.emblem === 'lv_fleur' && (
           <g filter="url(#emblemGlow)">
-            {/* Внешний вогнутый ромб Monogram */}
             <polygon
               points="190,46 212,93 258,115 212,137 190,184 168,137 122,115 168,93"
               fill="rgba(12, 12, 18, 0.85)"
@@ -569,7 +542,6 @@ function AnimatedBrandEmblem({
         {/* 8. DIOR — Решетка Cannage и овальный медальон Couture */}
         {dossier.emblem === 'dior_oblique' && (
           <g filter="url(#emblemGlow)">
-            {/* Линии плетения Cannage */}
             <line x1="130" y1="65" x2="250" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
             <line x1="250" y1="65" x2="130" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
             <ellipse
@@ -582,7 +554,6 @@ function AnimatedBrandEmblem({
               strokeWidth="2.8"
             />
             <ellipse cx="190" cy="115" rx="53" ry="35" stroke={goldLight} strokeOpacity="0.45" strokeWidth="1" />
-            {/* Верхний бант медальона Людовика XVI */}
             <path d="M 174 73 Q 190 62 206 73" stroke="url(#goldMetallic)" strokeWidth="2.2" />
             <text
               x="190"
@@ -618,7 +589,6 @@ function AnimatedBrandEmblem({
               stroke="url(#goldMetallic)"
               strokeWidth="2.6"
             />
-            {/* Сетка Intrecciato */}
             <line x1="157" y1="82" x2="223" y2="148" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
             <line x1="142" y1="97" x2="208" y2="163" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
             <line x1="172" y1="67" x2="238" y2="133" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
@@ -651,7 +621,6 @@ function AnimatedBrandEmblem({
         {/* 10. CELINE — Двойная арка цепи Triomphe (1973) */}
         {dossier.emblem === 'celine_triomphe' && (
           <g filter="url(#emblemGlow)">
-            {/* Левая и правая зеркальные дуги Triomphe */}
             <path
               d="M 184 76 C 142 72, 134 158, 184 154"
               stroke="url(#goldMetallic)"
@@ -694,7 +663,6 @@ function AnimatedBrandEmblem({
               stroke="url(#goldMetallic)"
               strokeWidth="2.4"
             />
-            {/* Четыре симметричных завитка Anagram */}
             <path
               d="M 186 111 C 186 80, 150 72, 154 98 C 156 112, 178 111, 186 111 Z"
               stroke="url(#goldMetallic)"
@@ -728,14 +696,12 @@ function AnimatedBrandEmblem({
               stroke="url(#goldMetallic)"
               strokeWidth="2.5"
             />
-            {/* Пунктир ручного седельного шва */}
             <polygon
               points="151,60 229,60 247,78 247,152 229,170 151,170 133,152 133,78"
               stroke={goldLight}
               strokeWidth="1.2"
               strokeDasharray="5 4"
             />
-            {/* Архитектурная пряжка H */}
             <path
               d="M 164 78 L 164 144 M 216 78 L 216 144 M 156 78 L 172 78 M 208 78 L 224 78 M 156 144 L 172 144 M 208 144 L 224 144 M 164 108 L 216 108 M 164 114 L 216 114"
               stroke="url(#goldMetallic)"
@@ -767,7 +733,6 @@ function AnimatedBrandEmblem({
               stroke="url(#goldMetallic)"
               strokeWidth="2.8"
             />
-            {/* Геометрическое кольцо меандра Greca */}
             <circle
               cx="190"
               cy="115"
@@ -831,7 +796,6 @@ function AnimatedBrandEmblem({
               stroke="url(#platinumMetallic)"
               strokeWidth="2"
             />
-            {/* Четыре фирменных угловых стежка Margiela */}
             <line x1="104" y1="66" x2="120" y2="50" stroke="#FFFFFF" strokeWidth="3" />
             <line x1="276" y1="66" x2="260" y2="50" stroke="#FFFFFF" strokeWidth="3" />
             <line x1="104" y1="164" x2="120" y2="180" stroke="#FFFFFF" strokeWidth="3" />
@@ -843,7 +807,6 @@ function AnimatedBrandEmblem({
               <text x="190" y="130" textAnchor="middle" letterSpacing="4.2">15 16 17 18 19 20 21</text>
               <text x="190" y="155" textAnchor="middle" letterSpacing="5.5">22 23</text>
             </g>
-            {/* Золотое кольцо вокруг номера 22 (обувная линия) */}
             <circle cx="174" cy="151" r="12" stroke="url(#goldMetallic)" strokeWidth="2.4" />
           </g>
         )}
@@ -884,7 +847,6 @@ function AnimatedBrandEmblem({
             />
             <line x1="150" y1="75" x2="230" y2="155" stroke="url(#platinumMetallic)" strokeWidth="5" />
             <line x1="230" y1="75" x2="150" y2="155" stroke="url(#platinumMetallic)" strokeWidth="5" />
-            {/* Наконечники стрел */}
             <polyline points="150,92 150,75 167,75" stroke="url(#goldMetallic)" strokeWidth="3.5" />
             <polyline points="213,75 230,75 230,92" stroke="url(#goldMetallic)" strokeWidth="3.5" />
             <polyline points="150,138 150,155 167,155" stroke="url(#goldMetallic)" strokeWidth="3.5" />
@@ -982,7 +944,7 @@ function AnimatedBrandEmblem({
           </g>
         )}
 
-        {/* 21. MOUNTAIN PEAK — Альпийский рельеф (Salomon, Arc'teryx, Hoka, Timberland, Merrell) */}
+        {/* 21. MOUNTAIN PEAK — Альпийский рельеф */}
         {dossier.emblem === 'mountain_peak' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -1196,7 +1158,7 @@ export default function BrandDossierView({
   const l = UI_LABELS[lang]
   const ch = dossier.chapters[lang]
 
-  // Разбиваем строку материаловедения на отдельные четкие инженерные пункты для идеальной читаемости на смартфоне
+  // Разбиваем строку материаловедения на отдельные четкие инженерные пункты
   const techPoints = dossier.materialsTech[lang]
     .split(',')
     .map((s) => s.trim())
@@ -1204,41 +1166,9 @@ export default function BrandDossierView({
 
   return (
     <section className="w-full max-w-3xl mx-auto pb-16">
-      {/* 0. ВЕРХНЯЯ ПАНЕЛЬ БЫСТРОЙ НАВИГАЦИИ И ОФИЦИАЛЬНОГО САЙТА */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <button
-          type="button"
-          onClick={onBackToCollection}
-          className="px-3.5 py-2 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer transition-opacity hover:opacity-90"
-          style={{
-            backgroundColor: themeColors.studioCanvas,
-            color: themeColors.text,
-            border: `1px solid ${themeColors.border}`,
-          }}
-        >
-          {l.quickBackShoes} {totalModelsCount !== null ? `(${totalModelsCount})` : ''}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => openExternalUrl(dossier.officialUrl)}
-          className="px-3.5 py-2 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer transition-opacity hover:opacity-90"
-          style={{
-            backgroundColor: themeColors.text,
-            color: themeColors.bg,
-            border: `1px solid ${themeColors.text}`,
-          }}
-        >
-          {dossier.officialDomain.toUpperCase()} ↗
-        </button>
-      </div>
-
       {/* 1. ОБСИДИАНОВЫЙ ЮВЕЛИРНЫЙ СТЕНД С АНИМИРОВАННЫМ ГЕРБОМ ДОМА */}
       <div className="w-full mb-7 relative overflow-hidden">
-        <AnimatedBrandEmblem
-          dossier={dossier}
-          onOpenOfficialSite={() => openExternalUrl(dossier.officialUrl)}
-        />
+        <AnimatedBrandEmblem dossier={dossier} />
       </div>
 
       {/* 2. ЦИТАТА-МАНИФЕСТ ДОМА */}
@@ -1249,7 +1179,7 @@ export default function BrandDossierView({
         {dossier.quote[lang]}
       </blockquote>
 
-      {/* 3. ТЕХНИЧЕСКИЙ ПАСПОРТ ДОМА + ОФИЦИАЛЬНЫЙ САЙТ */}
+      {/* 3. ТЕХНИЧЕСКИЙ ПАСПОРТ ДОМА (С ЕДИНСТВЕННОЙ ПРЕМИАЛЬНОЙ ССЫЛКОЙ НА ОФИЦИАЛЬНЫЙ САЙТ) */}
       <div
         className="mb-9 overflow-hidden"
         style={{
@@ -1300,37 +1230,51 @@ export default function BrandDossierView({
               {l.archiveVolume}
             </span>
             <span className="font-serif text-[19px] font-normal">
-              {totalModelsCount !== null ? `${totalModelsCount} ${l.modelsUnit}` : 'Archive'}
+              {totalModelsCount !== null && totalModelsCount > 0
+                ? `${totalModelsCount} ${l.modelsUnit}`
+                : l.curatedArchive}
             </span>
           </div>
         </div>
 
-        {/* Нижняя строка паспорта: прямой переход на официальный сайт бренда */}
+        {/* Единственная, красиво оформленная плашка официального сайта внутри паспорта */}
         <div
-          className="px-5 py-3.5 flex items-center justify-between gap-3"
+          className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
           style={{
             borderTop: `1px solid ${themeColors.borderFaint}`,
-            backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+            backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(17,17,17,0.025)',
           }}
         >
-          <span
-            className="text-[10px] font-sans uppercase tracking-[0.18em]"
-            style={{ color: themeColors.textMuted }}
-          >
-            {l.officialSiteLabel}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: dossier.accentHex || '#C5A880' }}
+            />
+            <span
+              className="text-[10px] font-sans uppercase tracking-[0.2em]"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.officialSiteLabel}
+            </span>
+          </div>
+
           <button
             type="button"
             onClick={() => openExternalUrl(dossier.officialUrl)}
-            className="text-[11px] font-sans font-semibold uppercase tracking-[0.18em] underline bg-transparent border-none cursor-pointer"
-            style={{ color: themeColors.text }}
+            className="w-full sm:w-auto px-4 py-2.5 flex items-center justify-center gap-2 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] whitespace-nowrap cursor-pointer transition-opacity hover:opacity-90"
+            style={{
+              backgroundColor: themeColors.text,
+              color: themeColors.bg,
+              border: 'none',
+            }}
           >
-            {dossier.officialDomain} ↗
+            <span>WWW.{dossier.officialDomain.toUpperCase()}</span>
+            <span>↗</span>
           </button>
         </div>
       </div>
 
-      {/* 4. КУЛЬТОВЫЕ СИЛУЭТЫ ДОМА (С СОХРАНЕНИЕМ БРЕНДА И ВОЗВРАТОМ В ПАСПОРТ) */}
+      {/* 4. КУЛЬТОВЫЕ СИЛУЭТЫ ДОМА */}
       <div
         className="p-5 mb-9"
         style={{
@@ -1483,31 +1427,18 @@ export default function BrandDossierView({
         </article>
       </div>
 
-      {/* 7. НИЖНИЙ БЛОК ДЕЙСТВИЙ: К КОЛЛЕКЦИИ + ОФИЦИАЛЬНЫЙ САЙТ */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+      {/* 7. НИЖНЯЯ КНОПКА ПЕРЕХОДА К КОЛЛЕКЦИИ ОБУВИ */}
+      <div className="text-center pt-2">
         <button
           type="button"
           onClick={onBackToCollection}
-          className="w-full sm:w-auto px-8 py-4 text-[10px] font-sans font-semibold uppercase tracking-[0.24em] cursor-pointer border-none transition-opacity hover:opacity-90"
+          className="w-full sm:w-auto px-9 py-4 text-[10px] font-sans font-semibold uppercase tracking-[0.26em] cursor-pointer border-none transition-opacity hover:opacity-90"
           style={{
             backgroundColor: themeColors.text,
             color: themeColors.bg,
           }}
         >
           {l.backToShoes} {dossier.name} →
-        </button>
-
-        <button
-          type="button"
-          onClick={() => openExternalUrl(dossier.officialUrl)}
-          className="w-full sm:w-auto px-8 py-4 text-[10px] font-sans font-semibold uppercase tracking-[0.24em] cursor-pointer bg-transparent transition-opacity hover:opacity-90"
-          style={{
-            color: themeColors.text,
-            border: `1px solid ${themeColors.border}`,
-            backgroundColor: themeColors.studioCanvas,
-          }}
-        >
-          {l.openOfficialSite} ({dossier.officialDomain}) ↗
         </button>
       </div>
     </section>
