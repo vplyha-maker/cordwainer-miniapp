@@ -1,5 +1,22 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { BrandDossier, DossierLang } from './brandHeritageData'
+
+export interface DossierPreviewSneaker {
+  id: string
+  brand: string
+  name: string
+  gender: string
+  retailPrice: number
+  sku?: string | null
+  releaseDate?: string | null
+  release_date?: string | null
+  publishedAt?: string | null
+  year?: string | number | null
+  releaseYear?: string | number | null
+  image?: {
+    original?: string | null
+  }
+}
 
 interface BrandDossierViewProps {
   dossier: BrandDossier
@@ -8,7 +25,8 @@ interface BrandDossierViewProps {
   themeColors: Record<string, string>
   totalModelsCount: number | null
   activeIconicModel?: string | null
-  onSelectModelQuery: (modelName: string) => void
+  onSelectModelQuery: (searchQuery: string, displayModelName: string) => void
+  onSelectSneakerCard?: (sneaker: DossierPreviewSneaker, imageUrl: string | null) => void
   onBackToCollection: () => void
 }
 
@@ -22,10 +40,20 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     curatedArchive: 'Кураторский архив',
     officialSiteLabel: 'Официальное представительство Дома',
     iconicHeader: 'Культовые силуэты Дома',
-    iconicSub: 'Нажмите на силуэт, чтобы отфильтровать коллекцию',
+    iconicSub: 'Нажмите на любой силуэт, чтобы открыть его архивную карточку и проверить наличие',
     techSpecHeader: 'Материаловедение и инженерия подошвы',
     techSpecSub: 'Ключевые конструктивные узлы, кожи и запатентованные полимеры',
     backToShoes: 'Смотреть коллекцию',
+    spotlightBadge: 'Архивный силуэт',
+    checkingCatalog: 'Проверяем наличие силуэта в каталоге...',
+    foundInCatalog: 'В вашем каталоге найдено',
+    openInCatalogBtn: 'Открыть все в каталоге',
+    notInLocalDbBadge: 'Музейный архив Дома · Справочное досье',
+    notInLocalDbText:
+      'Этот знаковый силуэт входит в исторический канон Дома, но сейчас не представлен в вашей локальной базе. Вы можете изучить его фотографии и котировки во внешнем архиве бутиков или перейти к доступной коллекции бренда.',
+    lookInBoutiquesBtn: 'Смотреть фото и бутики (Google / Farfetch) ↗',
+    viewAvailableBrandBtn: 'Смотреть доступные модели',
+    closeSpotlight: 'Закрыть',
   },
   uk: {
     founded: 'Рік заснування',
@@ -36,10 +64,20 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     curatedArchive: 'Кураторський архів',
     officialSiteLabel: 'Офіційне представництво Дому',
     iconicHeader: 'Культові силуети Дому',
-    iconicSub: 'Натисніть на силует, щоб відфільтрувати колекцію',
+    iconicSub: 'Натисніть на будь-який силует, щоб відкрити його архівне досьє та перевірити наявність',
     techSpecHeader: 'Матеріалознавство та інженерія підошви',
     techSpecSub: 'Ключові конструктивні вузли, шкіри та запатентовані полімери',
     backToShoes: 'Дивитися колекцію',
+    spotlightBadge: 'Архівний силует',
+    checkingCatalog: 'Перевіряємо наявність силуету в каталозі...',
+    foundInCatalog: 'У вашому каталозі знайдено',
+    openInCatalogBtn: 'Відкрити всі в каталозі',
+    notInLocalDbBadge: 'Музейний архів Дому · Довідкове досьє',
+    notInLocalDbText:
+      'Цей знаковий силует входить до історичного канону Дому, але наразі не представлений у вашій локальній базі. Ви можете переглянути його фотографії у зовнішньому архіві бутіків або перейти до доступної колекції бренду.',
+    lookInBoutiquesBtn: 'Дивитися фото та бутіки (Google / Farfetch) ↗',
+    viewAvailableBrandBtn: 'Дивитися доступні моделі',
+    closeSpotlight: 'Закрити',
   },
   de: {
     founded: 'Gründungsjahr',
@@ -50,10 +88,20 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     curatedArchive: 'Kuratiertes Archiv',
     officialSiteLabel: 'Offizielle Repräsentanz des Hauses',
     iconicHeader: 'Ikonische Silhouetten des Hauses',
-    iconicSub: 'Tippen Sie auf eine Silhouette, um die Kollektion zu filtern',
+    iconicSub: 'Tippen Sie auf eine Silhouette, um das Archiv-Dossier und die Verfügbarkeit zu prüfen',
     techSpecHeader: 'Materialkunde & Sohlentechnologie',
     techSpecSub: 'Konstruktionsmerkmale, Lederarten und Sohlensysteme',
     backToShoes: 'Kollektion ansehen',
+    spotlightBadge: 'Archiv-Silhouette',
+    checkingCatalog: 'Verfügbarkeit im Katalog wird geprüft...',
+    foundInCatalog: 'In Ihrem Katalog gefunden',
+    openInCatalogBtn: 'Alle im Katalog öffnen',
+    notInLocalDbBadge: 'Museumsarchiv des Hauses · Referenz-Dossier',
+    notInLocalDbText:
+      'Diese ikonische Silhouette gehört zum historischen Kanon des Modehauses, ist aber derzeit nicht in Ihrer lokalen Datenbank enthalten. Sehen Sie sich Fotos in externen Boutiquen an oder öffnen Sie die verfügbare Kollektion.',
+    lookInBoutiquesBtn: 'Fotos & Boutiquen ansehen (Google / Farfetch) ↗',
+    viewAvailableBrandBtn: 'Verfügbare Modelle ansehen',
+    closeSpotlight: 'Schließen',
   },
 }
 
@@ -66,6 +114,66 @@ function openExternalUrl(url: string) {
     }
   } catch {}
   window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Умное извлечение ключевого корня модели для точного поиска по базе Neon DB
+ * Например: "Tire Chelsea Boot" -> "Bottega Veneta Tire", "Pollex Clog (Salehe Bembury)" -> "Crocs Pollex"
+ */
+export function buildSmartModelSearchQuery(brandName: string, rawModel: string): string {
+  // 1. Убираем пояснения в скобках, например (Salehe Bembury), (OOO), (96)
+  let cleaned = rawModel.replace(/\([^)]*\)/g, ' ').trim()
+
+  // 2. Если это коллаборация через ×, берем вторую часть с кодом модели
+  if (cleaned.includes('×')) {
+    const parts = cleaned.split('×')
+    cleaned = parts[parts.length - 1].trim()
+  }
+
+  // 3. Заменяем сокращения брендов
+  cleaned = cleaned
+    .replace(/\bNB\b/gi, '')
+    .replace(/\bAF1\b/gi, 'Air Force 1')
+    .replace(/\bAJ1\b/gi, 'Jordan 1')
+
+  // 4. Убираем общие родовые слова обуви, которые часто отсутствуют в названиях карточек БД
+  const genericWords =
+    /\b(Sneaker|Sneakers|Boot|Boots|Chelsea|Chelseas|Loafer|Loafers|Mule|Mules|Sandal|Sandals|Platform|Heel|Pump|Flats|Flat|Ballet|Clog|Clogs|Slide|Slides|Slipper|Slippers|Shoe|Shoes|Hiker|Runner|Running|Basketball|Original|Originals|Edition|Collection|Classic|Retro|Harness|Cap-Toe|Two-Tone|Slingback|Tassel|Court|Trainer|8-Eye|6-Inch|Premium|Made in USA|Made in UK)\b/gi
+
+  const stripped = cleaned.replace(genericWords, ' ').replace(/\s{2,}/g, ' ').trim()
+  const coreTerm = stripped.length >= 2 ? stripped : cleaned
+
+  if (coreTerm.toLowerCase().includes(brandName.toLowerCase())) {
+    return coreTerm
+  }
+  return `${brandName} ${coreTerm}`.trim()
+}
+
+/**
+ * Генерирует энциклопедическое описание выбранного культового силуэта
+ */
+function getSilhouetteDescription(
+  dossier: BrandDossier,
+  modelName: string,
+  index: number,
+  lang: DossierLang
+): string {
+  const techParts = dossier.materialsTech[lang]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const primaryTech = techParts[index % techParts.length] || dossier.materialsTech[lang]
+  const secondaryTech = techParts[(index + 1) % techParts.length] || ''
+
+  if (lang === 'de') {
+    return `Die Silhouette „${modelName}“ zählt zu den wichtigsten Schlüsselentwürfen von ${dossier.name} (gegründet ${dossier.founded}). Das Modell verkörpert die charakteristische Handschrift des Hauses (${dossier.creativeCode.de}) und nutzt: ${primaryTech}${secondaryTech ? ` sowie ${secondaryTech}` : ''}.`
+  }
+  if (lang === 'uk') {
+    return `Силует «${modelName}» входить до золотого фонду Дому ${dossier.name} (заснованого у ${dossier.founded} році). Модель втілює архітектурний код бренду (${dossier.creativeCode.uk}) та фірмову інженерію: ${primaryTech.charAt(0).toLowerCase() + primaryTech.slice(1)}${secondaryTech ? `, а також ${secondaryTech}` : ''}.`
+  }
+  return `Силуэт «${modelName}» входит в золотой архивный фонд Дома ${dossier.name} (основанного в ${dossier.founded} году). Модель воплощает архитектурный код марки (${dossier.creativeCode.ru}) и ключевую инженерию ателье: ${
+    primaryTech.charAt(0).toLowerCase() + primaryTech.slice(1)
+  }${secondaryTech ? `, а также ${secondaryTech}` : ''}.`
 }
 
 /**
@@ -185,7 +293,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </filter>
         </defs>
 
-        {/* Центральное золотое свечение */}
         <circle
           cx="190"
           cy="115"
@@ -197,13 +304,11 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           }}
         />
 
-        {/* Координатные линии */}
         <line x1="18" y1="115" x2="84" y2="115" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
         <line x1="296" y1="115" x2="362" y2="115" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
         <line x1="190" y1="10" x2="190" y2="30" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
         <line x1="190" y1="200" x2="190" y2="220" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
 
-        {/* Внешний часовой гильошированный лимб */}
         <g style={{ transformOrigin: '190px 115px', animation: 'cadOrbitSlow 34s linear infinite' }}>
           <circle
             cx="190"
@@ -228,7 +333,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           <circle cx="278" cy="115" r="2" fill={goldMid} />
         </g>
 
-        {/* Внутреннее встречное кольцо */}
         <g style={{ transformOrigin: '190px 115px', animation: 'cadOrbitReverse 24s linear infinite' }}>
           <circle
             cx="190"
@@ -241,7 +345,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           />
         </g>
 
-        {/* 1. PRADA / PALACE — Эмалированный Савойский треугольник с заклепками и гербом */}
         {dossier.emblem === 'prada_triangle' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -300,7 +403,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 2. SAINT LAURENT — Вертикальная переплетенная монограмма Cassandre YSL */}
         {dossier.emblem === 'ysl_cassandre' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -349,7 +451,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 3. VALENTINO / VEJA — Архитектурный медальон VLogo Signature с шипами Rockstud */}
         {dossier.emblem === 'valentino_v' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -393,7 +494,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 4. CHANEL — Переплетенные ювелирные кольца Double C */}
         {dossier.emblem === 'chanel_cc' && (
           <g filter="url(#emblemGlow)">
             <path
@@ -424,7 +524,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 5. BALENCIAGA — Скульптурная двойная монограмма BB */}
         {dossier.emblem === 'balenciaga_bb' && (
           <g filter="url(#emblemGlow)">
             <rect
@@ -475,7 +574,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 6. GUCCI — Переплетенные кольца GG и трензель Horsebit */}
         {dossier.emblem === 'gucci_gg' && (
           <g filter="url(#emblemGlow)">
             <circle
@@ -511,7 +609,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 7. LOUIS VUITTON — Четырехлистная звезда Monogram и инициал LV */}
         {dossier.emblem === 'lv_fleur' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -539,7 +636,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 8. DIOR — Решетка Cannage и овальный медальон Couture */}
         {dossier.emblem === 'dior_oblique' && (
           <g filter="url(#emblemGlow)">
             <line x1="130" y1="65" x2="250" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
@@ -580,7 +676,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 9. BOTTEGA VENETA — Диагональное плетение кожи Intrecciato */}
         {dossier.emblem === 'bottega_intrecciato' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -618,7 +713,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 10. CELINE — Двойная арка цепи Triomphe (1973) */}
         {dossier.emblem === 'celine_triomphe' && (
           <g filter="url(#emblemGlow)">
             <path
@@ -650,7 +744,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 11. LOEWE — Четырехчастная каллиграфическая Анаграмма */}
         {dossier.emblem === 'loewe_anagram' && (
           <g filter="url(#emblemGlow)">
             <rect
@@ -687,7 +780,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 12. HERMÈS — Седельный шов Point Sellier и пряжка H */}
         {dossier.emblem === 'hermes_caleche' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -722,7 +814,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 13. VERSACE — Античный меандр Greca и золотой медальон */}
         {dossier.emblem === 'versace_greca' && (
           <g filter="url(#emblemGlow)">
             <circle
@@ -762,7 +853,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 14. GIVENCHY — Геометрический лабиринт 4G */}
         {dossier.emblem === 'givenchy_4g' && (
           <g filter="url(#emblemGlow)">
             <rect
@@ -784,7 +874,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 15. MAISON MARGIELA — Табличка с 4 белыми стежками и обведенной цифрой 22 */}
         {dossier.emblem === 'margiela_numbers' && (
           <g filter="url(#emblemGlow)">
             <rect
@@ -811,7 +900,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 16. RICK OWENS / CONVERSE — Архитектурная звезда в силовом кольце */}
         {dossier.emblem === 'rick_star' && (
           <g filter="url(#emblemGlow)">
             <circle
@@ -833,7 +921,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 17. OFF-WHITE — Индустриальный перекрестный знак Arrows */}
         {dossier.emblem === 'offwhite_arrows' && (
           <g filter="url(#emblemGlow)">
             <rect
@@ -854,7 +941,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 18. NIKE — Металлическое крыло Swoosh */}
         {dossier.emblem === 'nike_swoosh' && (
           <g filter="url(#emblemGlow)">
             <circle
@@ -886,7 +972,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 19. JORDAN — Эмблема крыльев Wings */}
         {dossier.emblem === 'jordan_wings' && (
           <g filter="url(#emblemGlow)">
             <path
@@ -915,7 +1000,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 20. ADIDAS / YEEZY — Три диагональных монолита */}
         {dossier.emblem === 'adidas_bars' && (
           <g filter="url(#emblemGlow)">
             <circle
@@ -944,7 +1028,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 21. MOUNTAIN PEAK — Альпийский рельеф */}
         {dossier.emblem === 'mountain_peak' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -975,7 +1058,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 22. HERITAGE SHIELD — Королевский геральдический щит мастерских */}
         {dossier.emblem === 'heritage_shield' && (
           <g filter="url(#emblemGlow)">
             <path
@@ -1016,7 +1098,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 23. SKATE HEXAGON — Индустриальный полигон */}
         {dossier.emblem === 'skate_hexagon' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -1057,7 +1138,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 24. SPORT VECTOR — Аэродинамический крылатый картуш */}
         {dossier.emblem === 'sport_vector' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -1099,7 +1179,6 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
           </g>
         )}
 
-        {/* 25. COUTURE CREST — Ювелирный восьмиугольник Вандомской площади */}
         {dossier.emblem === 'couture_crest' && (
           <g filter="url(#emblemGlow)">
             <polygon
@@ -1151,18 +1230,79 @@ export default function BrandDossierView({
   isDark,
   themeColors,
   totalModelsCount,
-  activeIconicModel,
   onSelectModelQuery,
+  onSelectSneakerCard,
   onBackToCollection,
 }: BrandDossierViewProps) {
   const l = UI_LABELS[lang]
   const ch = dossier.chapters[lang]
 
-  // Разбиваем строку материаловедения на отдельные четкие инженерные пункты
+  // Выбранный культовый силуэт для раскрытия карточки-досье прямо внутри Паспорта
+  const [spotlightModel, setSpotlightModel] = useState<{
+    name: string
+    index: number
+  } | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewShoes, setPreviewShoes] = useState<DossierPreviewSneaker[]>([])
+  const [previewTotal, setPreviewTotal] = useState<number>(0)
+  const [smartQuery, setSmartQuery] = useState<string>('')
+
+  // Сбрасываем открытую карточку силуэта при смене бренда
+  useEffect(() => {
+    setSpotlightModel(null)
+    setPreviewShoes([])
+    setPreviewTotal(0)
+  }, [dossier.id])
+
+  // Когда пользователь нажимает на культовый силуэт — проверяем наличие в БД прямо внутри Паспорта!
+  useEffect(() => {
+    if (!spotlightModel) return
+
+    const query = buildSmartModelSearchQuery(dossier.name, spotlightModel.name)
+    setSmartQuery(query)
+    setPreviewLoading(true)
+    setPreviewShoes([])
+    setPreviewTotal(0)
+
+    const controller = new AbortController()
+    fetch(`/api/get-top-sneakers?query=${encodeURIComponent(query)}&gender=all&limit=6&page=1`, {
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data)
+          ? data
+          : []
+        const valid = list.filter((item: any) => item?.image?.original)
+        setPreviewShoes(valid.slice(0, 4))
+        setPreviewTotal(typeof data?.total === 'number' ? data.total : valid.length)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setPreviewLoading(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [spotlightModel, dossier.name])
+
   const techPoints = dossier.materialsTech[lang]
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
+
+  const handleOpenExternalModelShowcase = (modelName: string) => {
+    const cleanModel = modelName.replace(/\([^)]*\)/g, '').trim()
+    const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
+      `${dossier.name} ${cleanModel} official lookbook shoe`
+    )}`
+    openExternalUrl(searchUrl)
+  }
 
   return (
     <section className="w-full max-w-3xl mx-auto pb-16">
@@ -1274,7 +1414,7 @@ export default function BrandDossierView({
         </div>
       </div>
 
-      {/* 4. КУЛЬТОВЫЕ СИЛУЭТЫ ДОМА */}
+      {/* 4. КУЛЬТОВЫЕ СИЛУЭТЫ ДОМА + РАСКРЫВАЮЩЕЕСЯ ДОСЬЕ СИЛУЭТА БЕЗ ПУСТЫХ ЭКРАНОВ */}
       <div
         className="p-5 mb-9"
         style={{
@@ -1298,13 +1438,19 @@ export default function BrandDossierView({
         </div>
 
         <div className="flex flex-wrap gap-2.5">
-          {dossier.iconicModels.map((model) => {
-            const isSelected = activeIconicModel === model
+          {dossier.iconicModels.map((model, idx) => {
+            const isSelected = spotlightModel?.name === model
             return (
               <button
                 key={model}
                 type="button"
-                onClick={() => onSelectModelQuery(model)}
+                onClick={() => {
+                  if (isSelected) {
+                    setSpotlightModel(null)
+                  } else {
+                    setSpotlightModel({ name: model, index: idx })
+                  }
+                }}
                 className="px-4 py-2.5 text-[11px] font-sans font-medium uppercase tracking-[0.16em] cursor-pointer transition-all active:scale-95"
                 style={{
                   color: isSelected ? themeColors.bg : themeColors.text,
@@ -1312,11 +1458,198 @@ export default function BrandDossierView({
                   border: `1px solid ${themeColors.text}`,
                 }}
               >
-                {model} →
+                <span>{model}</span>
+                <span className="ml-1.5 opacity-75">{isSelected ? '✕' : '✦'}</span>
               </button>
             )
           })}
         </div>
+
+        {/* ИНТЕРАКТИВНОЕ АРХИВНОЕ ДОСЬЕ ВЫБРАННОГО КУЛЬТОВОГО СИЛУЭТА */}
+        {spotlightModel && (
+          <div
+            className="mt-5 p-4 sm:p-6 transition-all"
+            style={{
+              backgroundColor: themeColors.bg,
+              border: `1px solid ${themeColors.text}`,
+            }}
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <span
+                  className="block text-[9px] font-sans font-semibold uppercase tracking-[0.22em] mb-1"
+                  style={{ color: dossier.accentHex || themeColors.textMuted }}
+                >
+                  {l.spotlightBadge} 0{spotlightModel.index + 1} / 0{dossier.iconicModels.length} ·{' '}
+                  {dossier.name}
+                </span>
+                <h4 className="font-serif text-[22px] sm:text-[25px] leading-tight">
+                  {spotlightModel.name}
+                </h4>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSpotlightModel(null)}
+                className="text-[10px] font-sans uppercase tracking-[0.18em] px-2.5 py-1 bg-transparent cursor-pointer"
+                style={{
+                  color: themeColors.textMuted,
+                  border: `1px solid ${themeColors.border}`,
+                }}
+              >
+                {l.closeSpotlight} ✕
+              </button>
+            </div>
+
+            {/* Энциклопедическая справка о конкретной модели */}
+            <p
+              className="text-[14px] sm:text-[15px] font-sans leading-relaxed mb-5"
+              style={{ color: themeColors.text }}
+            >
+              {getSilhouetteDescription(dossier, spotlightModel.name, spotlightModel.index, lang)}
+            </p>
+
+            {/* Результат живой проверки модели в базе */}
+            {previewLoading ? (
+              <div
+                className="py-4 px-4 text-[11px] font-sans uppercase tracking-[0.18em] flex items-center gap-2.5"
+                style={{
+                  backgroundColor: themeColors.studioCanvas,
+                  border: `1px solid ${themeColors.borderFaint}`,
+                  color: themeColors.textMuted,
+                }}
+              >
+                <span
+                  className="w-3.5 h-3.5 rounded-full border border-t-transparent animate-spin inline-block"
+                  style={{ borderColor: themeColors.text, borderTopColor: 'transparent' }}
+                />
+                <span>{l.checkingCatalog}</span>
+              </div>
+            ) : previewShoes.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span
+                    className="text-[10px] font-sans font-bold uppercase tracking-[0.2em]"
+                    style={{ color: themeColors.text }}
+                  >
+                    ● {l.foundInCatalog}: {previewTotal}
+                  </span>
+                </div>
+
+                {/* Мини-галерея найденных пар прямо внутри паспорта */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                  {previewShoes.map((shoe) => (
+                    <div
+                      key={shoe.id}
+                      onClick={() => {
+                        if (onSelectSneakerCard) {
+                          onSelectSneakerCard(shoe, shoe.image?.original || null)
+                        } else {
+                          onSelectModelQuery(smartQuery, spotlightModel.name)
+                        }
+                      }}
+                      className="p-2.5 cursor-pointer transition-transform active:scale-95 flex flex-col justify-between"
+                      style={{
+                        backgroundColor: themeColors.studioCanvas,
+                        border: `1px solid ${themeColors.borderFaint}`,
+                      }}
+                    >
+                      <div className="w-full aspect-[5/4] flex items-center justify-center overflow-hidden mb-2">
+                        {shoe.image?.original && (
+                          <img
+                            src={shoe.image.original}
+                            alt={shoe.name}
+                            className="w-[90%] h-[90%] object-contain"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-serif text-[12px] line-clamp-1">{shoe.name}</p>
+                        {shoe.retailPrice > 0 && (
+                          <p
+                            className="text-[10px] font-sans mt-0.5"
+                            style={{ color: themeColors.textMuted }}
+                          >
+                            ${shoe.retailPrice}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectModelQuery(smartQuery, spotlightModel.name)}
+                  className="w-full py-3.5 px-5 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none"
+                  style={{
+                    backgroundColor: themeColors.text,
+                    color: themeColors.bg,
+                  }}
+                >
+                  {l.openInCatalogBtn} ({previewTotal}) →
+                </button>
+              </div>
+            ) : (
+              /* Если этой редкой подиумной модели нет в текущей базе из 3788 кроссовок — красивый музейный режим! */
+              <div
+                className="p-4"
+                style={{
+                  backgroundColor: themeColors.studioCanvas,
+                  border: `1px solid ${themeColors.border}`,
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: dossier.accentHex || '#C5A880' }}
+                  />
+                  <span
+                    className="text-[10px] font-sans font-bold uppercase tracking-[0.18em]"
+                    style={{ color: themeColors.text }}
+                  >
+                    {l.notInLocalDbBadge}
+                  </span>
+                </div>
+
+                <p
+                  className="text-[13px] font-sans leading-relaxed mb-4"
+                  style={{ color: themeColors.textMuted }}
+                >
+                  {l.notInLocalDbText}
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenExternalModelShowcase(spotlightModel.name)}
+                    className="flex-1 py-3 px-4 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer border-none"
+                    style={{
+                      backgroundColor: themeColors.text,
+                      color: themeColors.bg,
+                    }}
+                  >
+                    {l.lookInBoutiquesBtn}
+                  </button>
+
+                  {totalModelsCount !== null && totalModelsCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={onBackToCollection}
+                      className="py-3 px-4 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer bg-transparent"
+                      style={{
+                        color: themeColors.text,
+                        border: `1px solid ${themeColors.border}`,
+                      }}
+                    >
+                      {l.viewAvailableBrandBtn} {dossier.name} ({totalModelsCount}) →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 5. ВЫСОКОКОНТРАСТНЫЙ ИНЖЕНЕРНЫЙ БЛОК: МАТЕРИАЛОВЕДЕНИЕ И ПОДОШВА */}
