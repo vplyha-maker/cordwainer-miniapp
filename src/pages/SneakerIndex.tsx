@@ -1484,11 +1484,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             themeColors={themeColors}
             totalModelsCount={totalInDb}
             activeIconicModel={selectedIconicModel}
-            onSelectSneakerCard={(item, imgUrl) => {
+            onSelectSneakerCard={(item: Sneaker, imgUrl: string | null) => {
               haptic('light')
               setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
             }}
-            onSelectModelQuery={(searchQuery, displayModelName) => {
+            onSelectModelQuery={(searchQuery: string, displayModelName?: string) => {
               haptic('light')
               setSelectedIconicModel(displayModelName || searchQuery)
               setHasSearched(false)
