@@ -124,7 +124,11 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     catSport: 'Спорт-кутюр',
     catOutdoor: 'Аутдор & Классика',
     tabCollection: 'Коллекция',
-    tabMaisonDossier: 'О Доме моды ✦',
+    tabMaisonDossier: 'Паспорт Дома ✦',
+    iconicFilterLabel: 'Культовый силуэт',
+    backToPassport: '← В паспорт Дома',
+    showAllBrandShoes: 'Все силуэты Дома',
+    officialSiteShort: 'Оф. сайт',
     all: 'Все',
     men: 'Мужское',
     women: 'Женское',
@@ -177,7 +181,11 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     catSport: 'Спорт-кутюр',
     catOutdoor: 'Аутдор & Класика',
     tabCollection: 'Колекція',
-    tabMaisonDossier: 'Про Дім моди ✦',
+    tabMaisonDossier: 'Паспорт Дому ✦',
+    iconicFilterLabel: 'Культовий силует',
+    backToPassport: '← У паспорт Дому',
+    showAllBrandShoes: 'Всі силуети Дому',
+    officialSiteShort: 'Оф. сайт',
     all: 'Всі',
     men: 'Чоловіче',
     women: 'Жіноче',
@@ -230,7 +238,11 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     catSport: 'Sport Couture',
     catOutdoor: 'Outdoor & Heritage',
     tabCollection: 'Kollektion',
-    tabMaisonDossier: 'Über das Haus ✦',
+    tabMaisonDossier: 'Haus-Pass ✦',
+    iconicFilterLabel: 'Ikonische Silhouette',
+    backToPassport: '← Zum Haus-Pass',
+    showAllBrandShoes: 'Alle Silhouetten',
+    officialSiteShort: 'Website',
     all: 'Alle',
     men: 'Herren',
     women: 'Damen',
@@ -711,6 +723,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const [searchText, setSearchText] = useState(initialQuery || '')
   const [activeQuery, setActiveQuery] = useState(initialQuery || 'prada')
+  const [selectedIconicModel, setSelectedIconicModel] = useState<string | null>(null)
 
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -952,6 +965,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const handleCategoryClick = (catId: CategoryId) => {
     haptic('light')
     setSelectedCategory(catId)
+    setSelectedIconicModel(null)
     setBrandSubTab('shoes')
     if (catId !== 'all') {
       const firstBrandInCat = BRANDS.find((b) => b.category === catId)
@@ -972,6 +986,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const handleBrandClick = (brandId: string) => {
     haptic('light')
     setSelectedBrand(brandId)
+    setSelectedIconicModel(null)
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
@@ -987,6 +1002,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     const text = searchText.trim()
     if (!text) return
     haptic('light')
+    setSelectedIconicModel(null)
     setHasSearched(true)
     setSelectedBrand('all')
     setBrandSubTab('shoes')
@@ -1006,6 +1022,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const clearSearch = () => {
     haptic('light')
     setSearchText('')
+    setSelectedIconicModel(null)
     if (hasSearched) {
       setHasSearched(false)
       const fallbackBrand = selectedBrand === 'all' ? 'prada' : selectedBrand
@@ -1017,6 +1034,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const handleResetAllFilters = () => {
     haptic('light')
+    setSelectedIconicModel(null)
     setSelectedCategory('all')
     setSelectedBrand('prada')
     setSelectedGender('all')
@@ -1174,21 +1192,39 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             type="button"
             onClick={() => {
               haptic('light')
-              if (viewState !== 'catalog') setViewState('catalog')
-              else if (brandSubTab === 'dossier') setBrandSubTab('shoes')
-              else if (onBack) onBack()
+              if (viewState !== 'catalog') {
+                setViewState('catalog')
+              } else if (selectedIconicModel && activeBrandMeta) {
+                setSelectedIconicModel(null)
+                setActiveQuery(activeBrandMeta.id)
+                setBrandSubTab('dossier')
+              } else if (brandSubTab === 'dossier') {
+                setBrandSubTab('shoes')
+              } else if (hasSearched) {
+                setHasSearched(false)
+                setSearchText('')
+                const fallback = selectedBrand === 'all' ? 'prada' : selectedBrand
+                setSelectedBrand(fallback)
+                setActiveQuery(fallback)
+              } else if (onBack) {
+                onBack()
+              }
             }}
             className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.22em] whitespace-nowrap outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100 py-1.5"
             style={{
               color: themeColors.textMuted,
               visibility:
-                viewState === 'catalog' && brandSubTab === 'shoes' && !onBack
+                viewState === 'catalog' &&
+                brandSubTab === 'shoes' &&
+                !selectedIconicModel &&
+                !hasSearched &&
+                !onBack
                   ? 'hidden'
                   : 'visible',
             }}
           >
             <span>←</span>
-            <span>{t.back}</span>
+            <span>{selectedIconicModel ? t.backToPassport.replace('← ', '') : t.back}</span>
           </button>
 
           <div className="flex items-center gap-6">
@@ -1267,51 +1303,75 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             </p>
           )}
 
-          {/* ПЕРЕКЛЮЧАТЕЛЬ ВНУТРИ БРЕНДА: [ КОЛЛЕКЦИЯ ] | [ О ДОМЕ МОДЫ ✦ ] */}
+          {/* ПЕРЕКЛЮЧАТЕЛЬ ВНУТРИ БРЕНДА: [ КОЛЛЕКЦИЯ ] | [ ПАСПОРТ ДОМА ✦ ] + ОФИЦИАЛЬНЫЙ САЙТ */}
           {viewState === 'catalog' && activeBrandMeta && (
-            <div
-              className="mt-5 inline-flex items-center p-1"
-              style={{
-                backgroundColor: themeColors.studioCanvas,
-                border: `1px solid ${themeColors.border}`,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  haptic('light')
-                  setBrandSubTab('shoes')
-                }}
-                className="px-5 py-2 text-[9px] font-sans uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <div
+                className="inline-flex items-center p-1"
                 style={{
-                  backgroundColor: brandSubTab === 'shoes' ? themeColors.text : 'transparent',
-                  color: brandSubTab === 'shoes' ? themeColors.bg : themeColors.textMuted,
+                  backgroundColor: themeColors.studioCanvas,
+                  border: `1px solid ${themeColors.border}`,
                 }}
               >
-                {t.tabCollection}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic('light')
+                    setBrandSubTab('shoes')
+                  }}
+                  className="px-4 sm:px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.2em] cursor-pointer border-none transition-all whitespace-nowrap"
+                  style={{
+                    backgroundColor: brandSubTab === 'shoes' ? themeColors.text : 'transparent',
+                    color: brandSubTab === 'shoes' ? themeColors.bg : themeColors.textMuted,
+                  }}
+                >
+                  {t.tabCollection}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  haptic('light')
-                  setBrandSubTab('dossier')
-                }}
-                className="px-5 py-2 text-[9px] font-sans uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
-                style={{
-                  backgroundColor: brandSubTab === 'dossier' ? themeColors.text : 'transparent',
-                  color: brandSubTab === 'dossier' ? themeColors.bg : themeColors.textMuted,
-                }}
-              >
-                {t.tabMaisonDossier}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic('light')
+                    setBrandSubTab('dossier')
+                  }}
+                  className="px-4 sm:px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.2em] cursor-pointer border-none transition-all whitespace-nowrap"
+                  style={{
+                    backgroundColor: brandSubTab === 'dossier' ? themeColors.text : 'transparent',
+                    color: brandSubTab === 'dossier' ? themeColors.bg : themeColors.textMuted,
+                  }}
+                >
+                  {t.tabMaisonDossier}
+                </button>
+              </div>
+
+              {currentBrandDossier && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic('light')
+                    const tg = (window as any).Telegram?.WebApp
+                    if (tg?.openLink) tg.openLink(currentBrandDossier.officialUrl)
+                    else window.open(currentBrandDossier.officialUrl, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="px-3.5 py-2.5 text-[9px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer transition-opacity hover:opacity-100 opacity-85 whitespace-nowrap"
+                  style={{
+                    backgroundColor: themeColors.studioCanvas,
+                    color: themeColors.text,
+                    border: `1px solid ${themeColors.border}`,
+                  }}
+                  title={currentBrandDossier.officialDomain}
+                >
+                  {t.officialSiteShort} · {currentBrandDossier.officialDomain} ↗
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {viewState === 'catalog' && (
           <>
-            {/* ПОИСКОВАЯ СТРОКА */}
+            {/* ПОИСКОВАЯ СТРОКА (показывается во вкладке Коллекция) */}
+            {brandSubTab === 'shoes' && (
             <div
               className="mb-5 flex items-center max-w-xl mx-auto"
               style={{ borderBottom: `1px solid ${themeColors.border}` }}
@@ -1359,6 +1419,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 {t.searchBtn}
               </button>
             </div>
+            )}
 
             {/* СЕГМЕНТЫ КОЛЛЕКЦИИ */}
             <div className="flex justify-start sm:justify-center gap-2 overflow-x-auto pb-2.5 scrollbar-none mb-2">
@@ -1433,7 +1494,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           </>
         )}
 
-        {/* ЕСЛИ ОТКРЫТА ВКЛАДКА "О ДОМЕ МОДЫ" — ПОКАЗЫВАЕМ ДОСЬЕ И АНИМИРОВАННЫЙ SVG ЛОГОТИП */}
+        {/* ЕСЛИ ОТКРЫТА ВКЛАДКА "ПАСПОРТ ДОМА" — ПОКАЗЫВАЕМ ДОСЬЕ И АНИМИРОВАННЫЙ SVG ЛОГОТИП */}
         {viewState === 'catalog' && brandSubTab === 'dossier' && currentBrandDossier ? (
           <BrandDossierView
             dossier={currentBrandDossier}
@@ -1441,15 +1502,28 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             isDark={isDark}
             themeColors={themeColors}
             totalModelsCount={totalInDb}
-            onSelectModelQuery={(q) => {
+            activeIconicModel={selectedIconicModel}
+            onSelectModelQuery={(modelName) => {
               haptic('light')
-              setSearchText(q)
-              setHasSearched(true)
-              setActiveQuery(q)
+              setSelectedIconicModel(modelName)
+              setHasSearched(false)
+              setSearchText('')
+              const brandPrefix = activeBrandMeta ? activeBrandMeta.name : currentBrandDossier.name
+              const cleanedModel = modelName.toLowerCase().includes(brandPrefix.toLowerCase())
+                ? modelName
+                : `${brandPrefix} ${modelName}`
+              setActiveQuery(cleanedModel)
               setBrandSubTab('shoes')
+              if (scrollRef.current) {
+                scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+              }
             }}
             onBackToCollection={() => {
               haptic('light')
+              if (selectedIconicModel && activeBrandMeta) {
+                setSelectedIconicModel(null)
+                setActiveQuery(activeBrandMeta.id)
+              }
               setBrandSubTab('shoes')
               if (scrollRef.current) {
                 scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1458,6 +1532,64 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           />
         ) : (
           <>
+            {/* ПАНЕЛЬ БЫСТРОГО ВОЗВРАТА В ПАСПОРТ ДОМА ПРИ ПРОСМОТРЕ КУЛЬТОВОЙ МОДЕЛИ */}
+            {viewState === 'catalog' && selectedIconicModel && activeBrandMeta && (
+              <div
+                className="p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                style={{
+                  backgroundColor: themeColors.studioCanvas,
+                  border: `1px solid ${themeColors.text}`,
+                }}
+              >
+                <div>
+                  <span
+                    className="block text-[9px] font-sans uppercase tracking-[0.22em] mb-0.5"
+                    style={{ color: themeColors.textMuted }}
+                  >
+                    {t.iconicFilterLabel} · {activeBrandMeta.name}
+                  </span>
+                  <span className="font-serif text-[18px] font-normal">
+                    «{selectedIconicModel}»
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic('light')
+                      setBrandSubTab('dossier')
+                      if (scrollRef.current) {
+                        scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+                      }
+                    }}
+                    className="px-4 py-2.5 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer border-none transition-opacity hover:opacity-90"
+                    style={{
+                      backgroundColor: themeColors.text,
+                      color: themeColors.bg,
+                    }}
+                  >
+                    {t.backToPassport}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic('light')
+                      setSelectedIconicModel(null)
+                      setActiveQuery(activeBrandMeta.id)
+                    }}
+                    className="px-3.5 py-2.5 text-[10px] font-sans uppercase tracking-[0.18em] cursor-pointer bg-transparent transition-opacity hover:opacity-90"
+                    style={{
+                      color: themeColors.text,
+                      border: `1px solid ${themeColors.border}`,
+                    }}
+                  >
+                    {t.showAllBrandShoes} ✕
+                  </button>
+                </div>
+              </div>
+            )}
             {/* ПАНЕЛЬ ФИЛЬТРОВ ОБУВИ */}
             {viewState === 'catalog' && (
               <div
@@ -1631,17 +1763,52 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                   {viewState === 'favorites' ? t.emptyArchive : t.notFound}
                 </p>
                 {viewState === 'catalog' && (
-                  <button
-                    type="button"
-                    onClick={handleResetAllFilters}
-                    className="px-6 py-3 text-[9px] font-sans uppercase tracking-[0.26em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
-                    style={{
-                      color: themeColors.text,
-                      border: `1px solid ${themeColors.border}`,
-                    }}
-                  >
-                    {t.resetFilters}
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    {selectedIconicModel && activeBrandMeta && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptic('light')
+                            setBrandSubTab('dossier')
+                          }}
+                          className="px-6 py-3.5 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-opacity hover:opacity-90"
+                          style={{
+                            backgroundColor: themeColors.text,
+                            color: themeColors.bg,
+                          }}
+                        >
+                          {t.backToPassport}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptic('light')
+                            setSelectedIconicModel(null)
+                            setActiveQuery(activeBrandMeta.id)
+                          }}
+                          className="px-6 py-3.5 text-[10px] font-sans uppercase tracking-[0.22em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
+                          style={{
+                            color: themeColors.text,
+                            border: `1px solid ${themeColors.border}`,
+                          }}
+                        >
+                          {t.showAllBrandShoes} ({activeBrandMeta.name})
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleResetAllFilters}
+                      className="px-6 py-3.5 text-[9px] font-sans uppercase tracking-[0.26em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
+                      style={{
+                        color: themeColors.text,
+                        border: `1px solid ${themeColors.border}`,
+                      }}
+                    >
+                      {t.resetFilters}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
