@@ -253,8 +253,52 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
 }
 
 /**
- * Грамотное склонение числительных ("92 силуэта в коллекции", "1 силуэт", "5 силуэтов")
+ * Мгновенное синхронное определение темы ДО первого рендера (убирает темную вспышку при входе)
  */
+function detectActiveTheme(propTheme?: 'light' | 'dark'): boolean {
+  if (propTheme === 'light') return false
+  if (propTheme === 'dark') return true
+  if (typeof window === 'undefined') return false
+
+  const html = document.documentElement
+  const body = document.body
+
+  if (html.classList.contains('light') || body?.classList.contains('light')) return false
+  if (html.classList.contains('dark') || body?.classList.contains('dark')) return true
+
+  const htmlAttr = html.getAttribute('data-theme') || body?.getAttribute('data-theme')
+  if (htmlAttr === 'light') return false
+  if (htmlAttr === 'dark') return true
+
+  try {
+    const keys = ['cordwainer_theme', 'theme', 'app-theme', 'color-theme', 'app_theme']
+    for (const k of keys) {
+      const val = localStorage.getItem(k)
+      if (val === 'light') return false
+      if (val === 'dark') return true
+    }
+  } catch {}
+
+  // Проверяем реальный цвет фона body (если родительский экран уже светлый)
+  try {
+    if (body) {
+      const bg = window.getComputedStyle(body).backgroundColor
+      const match = bg.match(/\d+/g)
+      if (match && match.length >= 3) {
+        const [r, g, b] = match.map(Number)
+        if ((r + g + b) / 3 > 140) return false
+        if ((r + g + b) / 3 > 0 && (r + g + b) / 3 <= 140) return true
+      }
+    }
+  } catch {}
+
+  const tgScheme = (window as any).Telegram?.WebApp?.colorScheme
+  if (tgScheme === 'light') return false
+  if (tgScheme === 'dark') return true
+
+  return false
+}
+
 function formatPiecesCount(count: number, lang: Lang): string {
   const formatted = count.toLocaleString('ru-RU')
   if (lang === 'de') {
@@ -401,7 +445,6 @@ function SneakerCard({
   const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // Отсекаем пустые заглушки 1x1 и битые миниатюры
     if (e.currentTarget.naturalWidth <= 10 || e.currentTarget.naturalHeight <= 10) {
       handleImageError()
     } else {
@@ -430,14 +473,13 @@ function SneakerCard({
   return (
     <article
       onClick={() => onSelect(sneaker, imgState === 'loaded' ? currentSrc : null)}
-      className={`group cursor-pointer flex flex-col justify-between transition-all duration-500 ${
+      className={`group cursor-pointer flex flex-col justify-between ${
         isFeatured && gridMode === 'boutique' ? 'col-span-2 my-2' : ''
       }`}
     >
       <div>
-        {/* ЧИСТЫЙ БЕЛЫЙ СТУДИЙНЫЙ ХОЛСТ В СВЕТЛОЙ ТЕМЕ (без серых рамок вокруг фото) */}
         <div
-          className={`w-full overflow-hidden relative flex items-center justify-center transition-all duration-700 ${
+          className={`w-full overflow-hidden relative flex items-center justify-center ${
             isFeatured
               ? 'aspect-[16/10] mb-4'
               : isCompact
@@ -451,7 +493,6 @@ function SneakerCard({
               : '0 2px 14px rgba(17,17,17,0.025)',
           }}
         >
-          {/* Номер лука */}
           <div className="absolute top-3 left-3.5 z-10 flex items-center gap-2 pointer-events-none">
             <span
               className="font-serif italic text-[11px] tracking-[0.06em] opacity-40"
@@ -469,7 +510,6 @@ function SneakerCard({
             )}
           </div>
 
-          {/* Избранное */}
           <button
             type="button"
             onClick={(e) => toggleFavorite(e, sneaker)}
@@ -521,7 +561,6 @@ function SneakerCard({
           )}
         </div>
 
-        {/* ТИПОГРАФИКА КАРТОЧКИ */}
         <div className={isFeatured ? 'px-2 text-center max-w-md mx-auto' : 'px-0.5'}>
           <div
             className={`flex items-baseline gap-2 mb-0.5 ${
@@ -665,7 +704,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const scrollRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const [isDark, setIsDark] = useState(propTheme === 'light' ? false : true)
+  // Инициализируем тему СИНХРОННО при создании компонента (без темной вспышки!)
+  const [isDark, setIsDark] = useState<boolean>(() => detectActiveTheme(propTheme))
   const cacheRef = useRef<Record<string, { items: Sneaker[]; total: number | null }>>({})
 
   useEffect(() => {
@@ -723,46 +763,24 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   }
 
   useEffect(() => {
-    if (propTheme) {
-      setIsDark(propTheme === 'dark')
-      return
-    }
-
-    const checkGlobalTheme = () => {
-      const html = document.documentElement
-      const body = document.body
-      if (html.classList.contains('light') || body.classList.contains('light')) return false
-      if (html.classList.contains('dark') || body.classList.contains('dark')) return true
-      if (html.getAttribute('data-theme') === 'light') return false
-      if (html.getAttribute('data-theme') === 'dark') return true
-
-      try {
-        const lsTheme =
-          localStorage.getItem('theme') ||
-          localStorage.getItem('app-theme') ||
-          localStorage.getItem('color-theme')
-        if (lsTheme === 'light') return false
-        if (lsTheme === 'dark') return true
-      } catch {}
-
-      return true
-    }
-
-    setIsDark(checkGlobalTheme())
+    setIsDark(detectActiveTheme(propTheme))
+    if (propTheme) return
 
     const observer = new MutationObserver(() => {
-      setIsDark(checkGlobalTheme())
+      setIsDark(detectActiveTheme(propTheme))
     })
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class', 'data-theme'],
     })
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    })
 
     return () => observer.disconnect()
   }, [propTheme])
 
-  // В светлой теме холст карточки чисто белый (#FFFFFF), чтобы белый фон студийных фото сливался без серых рамок
   const themeColors = {
     bg: isDark ? '#0A0A0C' : '#F6F4EF',
     studioCanvas: isDark ? '#141418' : '#FFFFFF',
@@ -1022,7 +1040,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     })
   }, [])
 
-  // Полностью скрываем битые карточки без фото из выдачи, чтобы не было пустых серых квадратов
   const processedCatalog = useMemo(() => {
     const filtered = sneakers.filter((sneaker) => {
       if (!sneaker.image?.original || brokenIds.has(sneaker.id)) return false
@@ -1090,11 +1107,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   return (
     <div
       ref={scrollRef}
-      className="h-[100dvh] w-full overflow-y-auto overflow-x-hidden px-4 sm:px-10 pt-4 pb-28 transition-colors duration-500 relative select-none"
+      className="h-[100dvh] w-full overflow-y-auto overflow-x-hidden px-4 sm:px-10 pt-4 pb-28 relative select-none"
       style={{ background: themeColors.bg, color: themeColors.text }}
     >
       <div className="max-w-5xl mx-auto w-full">
-        {/* ВЕРХНЯЯ НАВИГАЦИЯ: без лишней кнопки "О проекте", строго в одну линию без горизонтального скролла */}
+        {/* ВЕРХНЯЯ НАВИГАЦИЯ */}
         <div
           role="navigation"
           className="pt-1 pb-3.5 mb-7 flex items-center justify-between gap-2"
@@ -1316,7 +1333,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
               />
             </div>
 
-            {/* КОМПАКТНАЯ ДВУХУРОВНЕВАЯ ПАНЕЛЬ ФИЛЬТРОВ (без переноса слов на 2 строки) */}
+            {/* ПАНЕЛЬ ФИЛЬТРОВ */}
             <div
               className="py-2.5 mb-8 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between"
               style={{
@@ -1324,7 +1341,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 borderBottom: `1px solid ${themeColors.borderFaint}`,
               }}
             >
-              {/* Ряд 1 на мобильном: Все / Мужское / Женское слева и Журнал / Галерея справа */}
               <div className="flex items-center justify-between w-full sm:w-auto gap-4">
                 <div className="flex items-center gap-4">
                   {GENDERS.map((gender) => {
@@ -1380,7 +1396,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 </div>
               </div>
 
-              {/* Ряд 2 на мобильном: Сортировка */}
               <div className="flex items-center justify-between sm:justify-end gap-5">
                 <select
                   value={sortBy}
