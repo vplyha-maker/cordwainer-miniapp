@@ -1,4 +1,20 @@
 User-agent: *
 Allow: /
 
+# Основные разделы
+Allow: /forward-ortho-converter
+Allow: /calc
+Allow: /blog
+Allow: /colors
+Allow: /glossary
+Allow: /prices
+Allow: /styles
+Allow: /sneakers
+Allow: /materials
+
+# Служебные и API — не индексировать
+Disallow: /api/
+Disallow: /admin
+
 Sitemap: https://www.cordwaine.app/sitemap.xml
+Sitemap: https://www.cordwaine.app/sitemap-index.xml
