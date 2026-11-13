@@ -6,8 +6,8 @@ export type RockerType = 'forefoot' | 'heelToToe' | 'negative'
 
 export const HEEL_CONST = {
   STEP_TO_MM: 6.67,
-  FUNCTIONAL_ALLOWANCE: 8, // скорректированный декоративно-функциональный припуск по штихмассу
-  L_EFF_RATIO: 0.73,       // базовый коэффициент (используется как ориентир/фоллбэк)
+  FUNCTIONAL_ALLOWANCE: 8,
+  L_EFF_RATIO: 0.73,
   MAX_TOE: 80,
   MAX_LIFT: 50,
   CRITICAL_ANGLE: 18,
@@ -118,9 +118,11 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const lastLengthMm = Math.round(shoeSize * C.STEP_TO_MM + C.FUNCTIONAL_ALLOWANCE)
 
   // 2. Динамический эффективный рычаг L_eff от центра пятки (15%) до линии пучков (rockerStartPct)
-  // Коэффициент 1.18 учитывает переход от проекции переката к дуге свода колодки
   const clampedStartPct = Math.max(52, Math.min(78, rockerStartPct))
-  const dynamicLeverRatio = Math.max(0.58, Math.min(0.78, (clampedStartPct / 100 - C.HEEL_CENTER_RATIO) * 1.38))
+  const dynamicLeverRatio = Math.max(
+    0.58,
+    Math.min(0.78, (clampedStartPct / 100 - C.HEEL_CENTER_RATIO) * 1.38)
+  )
   const lEff = parseFloat((lastLengthMm * dynamicLeverRatio).toFixed(1))
 
   const netRise = heelHeight - toeThickness
@@ -132,7 +134,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   let loadCalc = 46 + (netRise / Math.max(lEff, 1)) * 105
   if (soleType === 'rocker') {
     const angleFactor = Math.min(1, Math.max(0, rockerAngle / C.MAX_ROCKER_ANGLE))
-    // Оптимум рокера лежит в зоне 58–62% длины колодки (сразу за головками M1–M5)
     const distFromOptimum = Math.abs(clampedStartPct - 60)
     const placementEfficiency = Math.max(0.25, 1 - distFromOptimum / 25)
     const factor = Math.min(1, angleFactor * placementEfficiency)
@@ -142,8 +143,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const heelLoad = 100 - forefootLoad
 
   // 4. Медиально-латеральный баланс в 3D (распределение между лучами M1 и M5)
-  // В нейтральном положении (0°) I луч берет ~56% нагрузки переднего отдела, наружные лучи (M2-M5) ~44%.
-  // Пронация (< 0°) смещает вектор внутрь на M1; супинация (> 0°) уводит на латеральный край M5.
   const clampedPronation = Math.max(-15, Math.min(15, pronationDeg))
   const m1Ratio = Math.max(0.2, Math.min(0.85, 0.56 - clampedPronation * 0.024))
   const loadM1Pct = Math.round(forefootLoad * m1Ratio)
@@ -168,7 +167,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const heelOffsetTooFarForward =
     soleType === 'flat' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
 
-  // 6. Расчет риска фронтальной инверсии (подворачивания) с учетом ширины набойки и угла супинации/пронации
+  // 6. Расчет риска фронтальной инверсии (подворачивания)
   const minSafeTipMm = parseFloat(computeMinSafeTip(heelType, netRise).toFixed(1))
   let inversionRisk = 0
   if (soleType === 'flat' && netRise > 0) {
@@ -187,12 +186,10 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
       inversionRisk = Math.min(100, Math.max(0, Math.round(narrow + heightBonus)))
     }
   }
-  // Латеральный или медиальный завал увеличивает опрокидывающий момент вокруг края набойки
   const rollInstabilityBonus = Math.round(Math.abs(clampedPronation) * (netRise > 45 ? 2.6 : 1.6))
   inversionRisk = Math.min(100, inversionRisk + rollInstabilityBonus)
 
   // 7. Истинный угол захода / скоса задней грани каблука (Pitch / Entry Angle)
-  // Отражает отклонение оси каблука от вертикали за счет смещения набойки и геометрии (рюмочка / трапеция)
   let entryAngleDeg = 0
   if (soleType === 'flat' && heelHeight > 0) {
     const geometricTaperMm =
@@ -210,7 +207,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const apexM1_Mm = Math.round(ballPos - 5)
   const apexM5_Mm = Math.round(apexM1_Mm - lastLengthMm * 0.045)
 
-  // 9. Пелот Зейца (Metatarsal Pad) — привязан строго проксимальнее линии апекса M1 (на 7 мм за головками плюсневых костей)
+  // 9. Пелот Зейца (Metatarsal Pad) — на 7 мм проксимальнее линии апекса M1
   const requiresMetatarsalPad = forefootLoad >= C.CRITICAL_LOAD
   let metatarsalPadPosMm: number | null = null
   let metatarsalPadHeightMm: number | null = null
@@ -219,13 +216,13 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     metatarsalPadHeightMm = netRise > 60 ? 6 : netRise > 30 ? 5 : 4
   }
 
-  // 10. Координаты 3D-вектора центра давления (CoP) на опорной поверхности
+  // 10. Координаты 3D-вектора центра давления (CoP)
   const copLongitudinalMm = Math.round(
     heelCenterPos + (ballPos - heelCenterPos) * (forefootLoad / 100)
   )
   const copLateralMm = parseFloat((clampedPronation * 1.45).toFixed(1))
 
-  // 11. Индекс жёсткости / минимальная толщина карбоновой пластины для рокерной подошвы
+  // 11. Минимальная толщина карбоновой пластины для рокерной подошвы
   const carbonInsertThicknessMm =
     soleType === 'rocker'
       ? parseFloat((1.2 + (heelHeight / 100) * 0.6).toFixed(1))
@@ -272,39 +269,30 @@ export function computeAudit(
   const C = HEEL_CONST
   const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-  // 1. Критично: завал каблука назад → риск усталостного излома супинатора
   if (eng.heelOffsetTooFarBack) {
     return { status: 'ERROR', titleKey: 'heelBackTitle', messageKey: 'heelBackDesc' }
   }
-  // 2. Критично: запредельный угол колодки (>= 18°) проверяется ДО пелота, чтобы не перекрываться им
   if (eng.internalSlope >= C.CRITICAL_ANGLE) {
     return { status: 'ERROR', titleKey: 'errTitle', messageKey: 'errDesc' }
   }
-  // 3. Критично: высокий риск инверсии (узкая набойка или сильный варусный/вальгусный завал)
   if (eng.highInversionRisk || eng.highPronationStress) {
     return { status: 'ERROR', titleKey: 'invertTitle', messageKey: 'invertDesc' }
   }
-  // 4. Критично: перегрузка переднего отдела стопы (>= 80%) → требуется пелот Зейца
   if (eng.requiresMetatarsalPad) {
     return { status: 'ERROR', titleKey: 'padTitle', messageKey: 'padDesc' }
   }
-  // 5. Предупреждение: смещение набойки вперёд > 5 мм
   if (eng.heelOffsetTooFarForward) {
     return { status: 'WARNING', titleKey: 'heelFwdTitle', messageKey: 'heelFwdDesc' }
   }
-  // 6. Информационное предупреждение: отрицательный дроп (платформа выше каблука)
   if (eng.internalSlope < 0) {
     return { status: 'WARNING', titleKey: 'negDropTitle', messageKey: 'negDropDesc' }
   }
-  // 7. Предупреждение: умеренный завал во фронтальной плоскости (пронация/супинация >= 4°)
   if (Math.abs(eng.pronationDeg) >= C.WARN_PRONATION_DEG) {
     return { status: 'WARNING', titleKey: 'warnTitle', messageKey: 'warn1Desc' }
   }
-  // 8. Предупреждение: угол выше комфортного (> 14°)
   if (eng.internalSlope > C.COMFORT_ANGLE) {
     return { status: 'WARNING', titleKey: 'warnTitle', messageKey: 'warn1Desc' }
   }
-  // 9. Предупреждение: чрезмерный угол рокера при низком каблуке
   if (heelHeight < 20 && activeRocker > 16) {
     return { status: 'WARNING', titleKey: 'warnTitle', messageKey: 'warn2Desc' }
   }
@@ -318,15 +306,9 @@ export function defaultTipWidth(heelType: HeelType): number {
   return 22
 }
 
-/**
- * Гарантированно выводит конфигурацию колодки из статуса ERROR в безопасную зону (SUCCESS / комфорт)
- */
 export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
   const C = HEEL_CONST
 
-  // Вычисляем максимально допустимый чистый подъём (netRise), при котором:
-  // 1) internalSlope <= SAFE_ANGLE (13.8°)
-  // 2) forefootLoad < CRITICAL_LOAD (80%) -> 46 + (netRise / lEff) * 105 <= 78 -> netRise <= lEff * 0.304
   const targetRad = (C.SAFE_ANGLE * Math.PI) / 180
   const maxRiseByAngle = eng.lEff * Math.sin(targetRad)
   const maxRiseByLoad = eng.lEff * ((C.CRITICAL_LOAD - 48) / 105)
@@ -353,16 +335,13 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
 
   const newNetRise = Math.max(0, heelHeight - toeThickness)
 
-  // Выравниваем смещение каблука
   if (eng.heelOffsetTooFarBack) heelTipOffsetMm = 0
   if (eng.heelOffsetTooFarForward) heelTipOffsetMm = C.MAX_HEEL_OFFSET_MM
 
-  // Сбрасываем критический фронтальный завал (пронацию/супинацию) в 0°
   if (Math.abs(pronationDeg) >= C.WARN_PRONATION_DEG) {
     pronationDeg = 0
   }
 
-  // Вычисляем точную безопасную ширину набойки под новый чистый подъём + 1 мм запаса
   const requiredSafeTip = Math.ceil(computeMinSafeTip(input.heelType, newNetRise)) + 1
   if (tipWidthMm < requiredSafeTip) {
     tipWidthMm = Math.min(45, Math.max(tipWidthMm, requiredSafeTip))
