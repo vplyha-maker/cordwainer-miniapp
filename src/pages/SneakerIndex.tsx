@@ -5,10 +5,8 @@ type CategoryId = 'all' | 'luxury' | 'streetwear' | 'sport' | 'outdoor'
 type SortOption = 'newest' | 'price_desc' | 'price_asc' | 'year_desc'
 type GridMode = 'editorial' | 'boutique'
 
-// Загружаем из БД по 48 текстовых записей, но фото рендерим порциями по 12 шт. по мере скролла
-const API_PAGE_LIMIT = 48
-const INITIAL_VISIBLE_CARDS = 12
-const VISIBLE_STEP = 12
+// Строго по 12 карточек за один шаг (и при выборе бренда, и по кнопке "Открыть еще 12")
+const PAGE_SIZE = 12
 
 export interface Sneaker {
   id: string
@@ -140,8 +138,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     buySearch: 'Найти в бутиках',
     copySku: 'Скопировать референс модели',
     copied: 'Скопировано',
-    loadMore: 'Открыть следующие силуэты',
-    loading: 'Синхронизация архива...',
+    loadMore: 'Открыть еще 12 силуэтов',
+    loading: 'Открываем следующие 12...',
+    shownOf: 'Показано',
+    ofTotal: 'из',
     errorLoad: 'Не удалось получить данные коллекции',
     errorSneakers: 'Временная пауза соединения с архивом',
     errorRateLimit: 'Слишком много обращений. Повторите через минуту.',
@@ -189,8 +189,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     buySearch: 'Знайти у бутиках',
     copySku: 'Скопіювати референс моделі',
     copied: 'Скопійовано',
-    loadMore: 'Відкрити наступні силуети',
-    loading: 'Синхронізація архіву...',
+    loadMore: 'Відкрити ще 12 силуетів',
+    loading: 'Відкриваємо наступні 12...',
+    shownOf: 'Показано',
+    ofTotal: 'з',
     errorLoad: 'Не вдалося отримати дані колекції',
     errorSneakers: 'Тимчасова пауза з’єднання з архівом',
     errorRateLimit: 'Забагато запитів. Повторіть за хвилину.',
@@ -238,8 +240,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     buySearch: 'In Boutiquen finden',
     copySku: 'Modellreferenz kopieren',
     copied: 'Kopiert',
-    loadMore: 'Weitere Silhouetten laden',
-    loading: 'Archiv wird geöffnet...',
+    loadMore: 'Weitere 12 Silhouetten laden',
+    loading: 'Nächste 12 werden geladen...',
+    shownOf: 'Gezeigt',
+    ofTotal: 'von',
     errorLoad: 'Fehler beim Laden der Kollektion',
     errorSneakers: 'Archivverbindung unterbrochen',
     errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie einen Moment.',
@@ -700,8 +704,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [activeQuery, setActiveQuery] = useState(initialQuery || 'prada')
 
   const [page, setPage] = useState(1)
-  // Сколько карточек реально отрендерено в DOM прямо сейчас (чтобы не грузить 60 фото разом)
-  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_CARDS)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -742,44 +744,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }, [tgUserId])
 
-  const processedCatalog = useMemo(() => {
-    const filtered = sneakers.filter((sneaker) => {
-      if (!sneaker.image?.original || brokenIds.has(sneaker.id)) return false
-
-      if (selectedGender !== 'all' && sneaker.gender) {
-        const g = sneaker.gender.toLowerCase()
-        if (
-          selectedGender === 'men' &&
-          !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))
-        ) {
-          return false
-        }
-        if (selectedGender === 'women' && !(g.includes('women') || g === 'unisex')) {
-          return false
-        }
-      }
-      return true
-    })
-
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'price_asc') {
-        const pa = a.retailPrice > 0 ? a.retailPrice : 999999
-        const pb = b.retailPrice > 0 ? b.retailPrice : 999999
-        return pa - pb
-      }
-      if (sortBy === 'price_desc') {
-        return (b.retailPrice || 0) - (a.retailPrice || 0)
-      }
-      if (sortBy === 'year_desc') {
-        const ya = Number(parseReleaseYear(a) || 0)
-        const yb = Number(parseReleaseYear(b) || 0)
-        return yb - ya
-      }
-      return 0
-    })
-  }, [sneakers, selectedGender, sortBy, brokenIds])
-
-  // Умная подгрузка карточек по 12 штук при скролле вниз
+  // Скролл отвечает ТОЛЬКО за кнопку "Наверх" (без автоподгрузки всех карточек!)
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -793,21 +758,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       } else {
         setButtonMode((prev) => (prev !== 'hidden' ? 'hidden' : prev))
       }
-
-      // Если пользователь долистал почти до конца текущих 12 карточек — открываем следующие 12 из памяти
-      if (
-        viewState === 'catalog' &&
-        container.scrollTop + container.clientHeight >= container.scrollHeight - 650
-      ) {
-        setVisibleCount((prev) =>
-          prev < processedCatalog.length ? prev + VISIBLE_STEP : prev
-        )
-      }
     }
 
     container.addEventListener('scroll', handleScroll, { passive: true })
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [viewState, processedCatalog.length])
+  }, [])
 
   const handleSmartScroll = () => {
     haptic('light')
@@ -857,17 +812,16 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const fetchSneakers = useCallback(
     async (query: string, genderFilter: string, pageNum: number, append: boolean = false) => {
-      const cacheKey = `${query}_${genderFilter}_p${pageNum}`
+      const cacheKey = `${query}_${genderFilter}_limit${PAGE_SIZE}_p${pageNum}`
 
       if (!append && cacheRef.current[cacheKey]) {
         setSneakers(cacheRef.current[cacheKey].items)
         setTotalInDb(cacheRef.current[cacheKey].total)
-        setVisibleCount(INITIAL_VISIBLE_CARDS)
+        setHasMore(cacheRef.current[cacheKey].items.length >= PAGE_SIZE)
         setLoading(false)
         return
       }
 
-      // Отменяем предыдущий незавершенный запрос, если человек быстро переключает бренды
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
@@ -878,14 +832,14 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         setLoadingMore(true)
       } else {
         setLoading(true)
-        setVisibleCount(INITIAL_VISIBLE_CARDS)
       }
       setError('')
 
       try {
+        // Запрашиваем у сервера СТРОГО 12 карточек (limit=12)
         const url = `/api/get-top-sneakers?query=${encodeURIComponent(
           query
-        )}&gender=${encodeURIComponent(genderFilter)}&limit=${API_PAGE_LIMIT}&page=${pageNum}`
+        )}&gender=${encodeURIComponent(genderFilter)}&limit=${PAGE_SIZE}&page=${pageNum}`
 
         const res = await fetch(url, { signal: controller.signal })
         const text = await res.text()
@@ -928,7 +882,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         const list = data.results || data.data || data || []
         const newItems: Sneaker[] = Array.isArray(list) ? list : []
 
-        setHasMore(newItems.length >= API_PAGE_LIMIT)
+        setHasMore(newItems.length >= PAGE_SIZE)
 
         setSneakers((prev) => {
           const merged = append ? [...prev, ...newItems] : newItems
@@ -943,10 +897,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           }
           return unique
         })
-
-        if (append) {
-          setVisibleCount((prev) => prev + VISIBLE_STEP)
-        }
       } catch (err: any) {
         if (err?.name === 'AbortError') return
         if (err instanceof Error && err.message === 'RATE_LIMIT') {
@@ -1055,11 +1005,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const handleLoadMore = () => {
     haptic('light')
-    // Если в памяти еще есть неоткрытые из 48 карточек — сначала открываем их без запроса к серверу
-    if (visibleCount < processedCatalog.length) {
-      setVisibleCount((prev) => prev + VISIBLE_STEP)
-      return
-    }
     const nextPage = page + 1
     setPage(nextPage)
     fetchSneakers(activeQuery, selectedGender, nextPage, true)
@@ -1124,18 +1069,44 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     })
   }, [])
 
-  // Отрезаем список до visibleCount, чтобы браузер качал только те фото, до которых долистал человек
-  const currentDisplayList = useMemo(() => {
-    if (viewState === 'favorites') return favorites
-    return processedCatalog.slice(0, visibleCount)
-  }, [viewState, favorites, processedCatalog, visibleCount])
+  const processedCatalog = useMemo(() => {
+    const filtered = sneakers.filter((sneaker) => {
+      if (!sneaker.image?.original || brokenIds.has(sneaker.id)) return false
 
-  const canShowMoreButton =
-    viewState === 'catalog' &&
-    !loading &&
-    !error &&
-    currentDisplayList.length > 0 &&
-    (visibleCount < processedCatalog.length || hasMore)
+      if (selectedGender !== 'all' && sneaker.gender) {
+        const g = sneaker.gender.toLowerCase()
+        if (
+          selectedGender === 'men' &&
+          !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))
+        ) {
+          return false
+        }
+        if (selectedGender === 'women' && !(g.includes('women') || g === 'unisex')) {
+          return false
+        }
+      }
+      return true
+    })
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'price_asc') {
+        const pa = a.retailPrice > 0 ? a.retailPrice : 999999
+        const pb = b.retailPrice > 0 ? b.retailPrice : 999999
+        return pa - pb
+      }
+      if (sortBy === 'price_desc') {
+        return (b.retailPrice || 0) - (a.retailPrice || 0)
+      }
+      if (sortBy === 'year_desc') {
+        const ya = Number(parseReleaseYear(a) || 0)
+        const yb = Number(parseReleaseYear(b) || 0)
+        return yb - ya
+      }
+      return 0
+    })
+  }, [sneakers, selectedGender, sortBy, brokenIds])
+
+  const currentDisplayList = viewState === 'favorites' ? favorites : processedCatalog
 
   const CATEGORIES: { id: CategoryId; label: string }[] = [
     { id: 'all', label: t.catAll },
@@ -1615,17 +1586,25 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           </div>
         )}
 
-        {/* КНОПКА ПАГИНАЦИИ */}
-        {canShowMoreButton && (
+        {/* КНОПКА ЗАГРУЗКИ СЛЕДУЮЩИХ 12 СИЛУЭТОВ */}
+        {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
           <div
-            className="pt-8 pb-14 text-center"
+            className="pt-8 pb-14 text-center flex flex-col items-center gap-3"
             style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
           >
+            {totalInDb !== null && totalInDb > 0 && (
+              <span
+                className="font-serif italic text-[12px]"
+                style={{ color: themeColors.textMuted }}
+              >
+                {t.shownOf} {currentDisplayList.length} {t.ofTotal} {totalInDb}
+              </span>
+            )}
             <button
               type="button"
               onClick={handleLoadMore}
               disabled={loadingMore}
-              className="px-8 py-4 text-[9px] font-sans uppercase tracking-[0.28em] outline-none bg-transparent cursor-pointer transition-all hover:opacity-100 opacity-80"
+              className="px-8 py-4 text-[9px] font-sans uppercase tracking-[0.28em] outline-none bg-transparent cursor-pointer transition-all hover:opacity-100 opacity-85"
               style={{
                 color: themeColors.text,
                 border: `1px solid ${themeColors.border}`,
