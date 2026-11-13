@@ -1,10 +1,12 @@
 // src/components/heel/HeelCanvas.tsx
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import type { HeelEngineering, HeelAudit, SoleType, HeelType } from '../../lib/heelCalc'
 import type { HeelGeometry } from '../../lib/heelGeometry'
 import { HEEL_CONST } from '../../lib/heelCalc'
+
 const HeelScene3D = React.lazy(() =>
-import('./HeelScene3D').then((m) => ({ default: m.HeelScene3D }))
+  import('./HeelScene3D').then((m) => ({ default: m.HeelScene3D }))
+)
 
 type Labels = {
   heelLbl: string
@@ -157,21 +159,29 @@ export function HeelCanvas({
         </div>
       </div>
 
-      {/* ВИЗУАЛЬНАЯ СЦЕНА: 3D THREE.JS ИЛИ 2D SVG ЧЕРТЕЖ */}
+      {/* ВИЗУАЛЬНАЯ СЦЕНА: 3D THREE.JS (LAZY CHUNK) ИЛИ 2D SVG ЧЕРТЕЖ */}
       {viewMode === '3d' ? (
-        <HeelScene3D
-          eng={eng}
-          soleType={soleType}
-          heelType={heelType}
-          heelHeight={heelHeight}
-          toeThickness={toeThickness}
-          rockerAngle={rockerAngle}
-          rockerStartPct={rockerStartPct}
-          heelTipOffsetMm={heelTipOffsetMm}
-          tipWidthMm={tipWidthMm}
-          pronationDeg={pronationDeg}
-          isDark={isDark}
-        />
+        <Suspense
+          fallback={
+            <div className="w-full h-[235px] flex items-center justify-center font-mono text-[9px] uppercase tracking-[0.25em] opacity-50">
+              INITIALIZING 3D ENGINE...
+            </div>
+          }
+        >
+          <HeelScene3D
+            eng={eng}
+            soleType={soleType}
+            heelType={heelType}
+            heelHeight={heelHeight}
+            toeThickness={toeThickness}
+            rockerAngle={rockerAngle}
+            rockerStartPct={rockerStartPct}
+            heelTipOffsetMm={heelTipOffsetMm}
+            tipWidthMm={tipWidthMm}
+            pronationDeg={pronationDeg}
+            isDark={isDark}
+          />
+        </Suspense>
       ) : (
         <div className="relative w-full px-2 py-3" style={{ height: g.svgHeight + 10 }}>
           <svg
