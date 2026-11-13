@@ -1,4 +1,3 @@
-```typescript
 export type DossierLang = 'ru' | 'uk' | 'de'
 
 export type EmblemKind =
