@@ -35,7 +35,6 @@ export function HeelScene3D({
   const mountRef = useRef<HTMLDivElement | null>(null)
   const [camPreset, setCamPreset] = useState<CameraPreset>('iso')
 
-  // Ссылки на динамические объекты Three.js для плавного обновления без пересоздания WebGLRenderer
   const sceneRef = useRef<{
     scene: THREE.Scene
     camera: THREE.PerspectiveCamera
@@ -56,7 +55,6 @@ export function HeelScene3D({
     currentSpherical: { theta: number; phi: number; radius: number; lookAtY: number }
   } | null>(null)
 
-  // Инициализация WebGL-сцены и обработчиков тач/мышь вращения
   useEffect(() => {
     const container = mountRef.current
     if (!container) return
@@ -78,7 +76,6 @@ export function HeelScene3D({
     container.innerHTML = ''
     container.appendChild(renderer.domElement)
 
-    // Освещение ателье
     const ambient = new THREE.AmbientLight(0xffffff, 0.78)
     scene.add(ambient)
 
@@ -100,7 +97,6 @@ export function HeelScene3D({
     const assembly = new THREE.Group()
     scene.add(assembly)
 
-    // Индикаторы зон плантарного давления (Пятка, Медиальный луч M1, Латеральный луч M5)
     const padHeel = new THREE.Mesh(
       new THREE.CylinderGeometry(0.25, 0.25, 0.03, 28),
       new THREE.MeshStandardMaterial({ color: 0xb46513, transparent: true, opacity: 0.72, roughness: 0.35 })
@@ -115,7 +111,6 @@ export function HeelScene3D({
     )
     assembly.add(padHeel, padM1, padM5)
 
-    // Метатарзальный пелот Зейца (показывается при перегрузке переднего отдела)
     const pelotteMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.16, 20, 14),
       new THREE.MeshStandardMaterial({ color: 0xe11d48, transparent: true, opacity: 0.85, roughness: 0.3 })
@@ -123,7 +118,6 @@ export function HeelScene3D({
     pelotteMesh.scale.set(1.2, 0.35, 0.9)
     assembly.add(pelotteMesh)
 
-    // Вектор центра давления (CoP — Center of Pressure)
     const copRing = new THREE.Mesh(
       new THREE.TorusGeometry(0.11, 0.018, 16, 36),
       new THREE.MeshBasicMaterial({ color: 0xe11d48 })
@@ -161,7 +155,6 @@ export function HeelScene3D({
       currentSpherical,
     }
 
-    // Встроенное управление вращением и зумом (Pointer Events для мобильного Telegram WebView и десктопа)
     let isDragging = false
     let prevX = 0
     let prevY = 0
@@ -227,7 +220,6 @@ export function HeelScene3D({
       const st = sceneRef.current
       if (!st) return
 
-      // Плавное экспоненциальное демпфирование камеры
       st.currentSpherical.theta += (st.targetSpherical.theta - st.currentSpherical.theta) * 0.14
       st.currentSpherical.phi += (st.targetSpherical.phi - st.currentSpherical.phi) * 0.14
       st.currentSpherical.radius += (st.targetSpherical.radius - st.currentSpherical.radius) * 0.14
@@ -256,7 +248,6 @@ export function HeelScene3D({
     }
   }, [])
 
-  // Переключение ракурсов камеры (3/4 Ателье, Профиль, Сверху, Ось пятки)
   useEffect(() => {
     const st = sceneRef.current
     if (!st) return
@@ -271,18 +262,15 @@ export function HeelScene3D({
     }
   }, [camPreset])
 
-  // Перестроение параметрической 3D-геометрии колодки, каблука, геленка и тепловых зон при изменении параметров
   useEffect(() => {
     const st = sceneRef.current
     if (!st) return
 
     const { assembly, padHeel, padM1, padM5, pelotteMesh, copRing, copStem, grid } = st
 
-    // Обновляем сетку под тему
     const gridHex = isDark ? 0x48423c : 0xb8b0a4
     ;(grid.material as THREE.LineBasicMaterial).color.setHex(gridHex)
 
-    // Очистка старых геометрий
     if (st.soleMesh) {
       assembly.remove(st.soleMesh)
       st.soleMesh.geometry.dispose()
@@ -304,14 +292,12 @@ export function HeelScene3D({
       ;(st.heelMesh.material as THREE.Material).dispose()
     }
 
-    // Масштабирование миллиметров в 3D-координаты сцены
     const mmToUnit = 2.6 / Math.max(220, eng.lastLengthMm)
     const h = heelHeight * mmToUnit
     const t = toeThickness * mmToUnit
     const ballRatio = Math.max(0.52, Math.min(0.78, rockerStartPct / 100))
     const activeRockerRad = soleType === 'rocker' ? (rockerAngle * Math.PI) / 180 : 0
 
-    // 1. Построение анатомической 3D-поверхности следа колодки с вершинным градиентом давления (Heatmap)
     const segsX = 40
     const segsZ = 16
     const soleGeom = new THREE.PlaneGeometry(2.6, 0.88, segsX, segsZ)
@@ -326,9 +312,8 @@ export function HeelScene3D({
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       const z = pos.getZ(i)
-      const u = (x + 1.3) / 2.6 // 0 = пятка, 1 = мысок
+      const u = (x + 1.3) / 2.6
 
-      // Анатомический контур ширины колодки (пятка -> геленочный перешеек -> пучки M1/M5 -> мысок)
       const widthFactor =
         u < 0.32
           ? 0.58 + 0.14 * Math.sin((u / 0.32) * Math.PI)
@@ -336,16 +321,13 @@ export function HeelScene3D({
           ? 0.54 + 0.48 * Math.sin(((u - 0.22) / 0.58) * Math.PI)
           : 0.98 * Math.cos(((u - 0.72) / 0.28) * (Math.PI * 0.44))
 
-      // Медиальный изгиб оси колодки
       const medialCurve = u > 0.25 && u < 0.8 ? 0.055 * Math.sin(((u - 0.25) / 0.55) * Math.PI) : 0
       const finalZ = z * Math.max(0.18, widthFactor) + medialCurve
       pos.setZ(i, finalZ)
 
-      // Высотный профиль продольного свода
       let y = 0
       if (u <= 0.17) {
-        // Пяточная площадка с лёгким ложементом
-        const cup = 0.012 * (1 - Math.cos(((u / 0.17) * Math.PI)))
+        const cup = 0.012 * (1 - Math.cos((u / 0.17) * Math.PI))
         y = h - cup
       } else if (u <= ballRatio) {
         const s = (u - 0.17) / Math.max(0.05, ballRatio - 0.17)
@@ -361,7 +343,6 @@ export function HeelScene3D({
       }
       pos.setY(i, y)
 
-      // Расчёт тепловой карты плантарного давления для вершины
       const distForefoot = Math.hypot(u - ballRatio, (finalZ - (pronationDeg < 0 ? 0.14 : -0.14)) * 0.8)
       const foreIntensity = Math.max(0, 1 - distForefoot * 3.2) * (eng.forefootLoad / 100)
       const vColor = baseColor.clone()
@@ -398,9 +379,8 @@ export function HeelScene3D({
     assembly.add(soleWire)
     st.soleWire = soleWire
 
-    // 2. Стальной геленок (супинатор 65Г) вдоль свода колодки
     const shankPts: THREE.Vector3[] = []
-    const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + (eng.shankLength / eng.lastLengthMm))
+    const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
     for (let i = 0; i <= 20; i++) {
       const u = 0.15 + (i / 20) * Math.max(0.1, shankEndRatio - 0.15)
       const x = -1.3 + u * 2.6
@@ -423,7 +403,6 @@ export function HeelScene3D({
     assembly.add(shankMesh)
     st.shankMesh = shankMesh
 
-    // 3. 3D-геометрия каблука / рокерной базы
     const xHeelCenter = -1.3 + 0.15 * 2.6
     const tipOffsetScene = soleType === 'flat' ? heelTipOffsetMm * mmToUnit : 0
     const heelHScene = Math.max(0.04, h)
@@ -447,11 +426,10 @@ export function HeelScene3D({
     }
 
     const heelGeom = new THREE.CylinderGeometry(topR, botR, heelHScene, 28, 8)
-    // Смещаем нижнюю площадку каблука на величину heelTipOffsetMm
     const hPos = heelGeom.attributes.position
     for (let i = 0; i < hPos.count; i++) {
       const py = hPos.getY(i)
-      const factor = (heelHScene / 2 - py) / heelHScene // 0 вверху, 1 у набойки
+      const factor = (heelHScene / 2 - py) / heelHScene
       hPos.setX(i, hPos.getX(i) + tipOffsetScene * factor)
     }
     heelGeom.computeVertexNormals()
@@ -468,7 +446,6 @@ export function HeelScene3D({
     assembly.add(heelMesh)
     st.heelMesh = heelMesh
 
-    // 4. Позиционирование и масштаб дисков нагрузки (Heel, M1, M5) и пелота Зейца
     const xM1 = -1.3 + ((eng.apexM1_Mm ?? eng.lastLengthMm * 0.6) / eng.lastLengthMm) * 2.6
     const xM5 = -1.3 + ((eng.apexM5_Mm ?? eng.lastLengthMm * 0.56) / eng.lastLengthMm) * 2.6
 
@@ -490,14 +467,12 @@ export function HeelScene3D({
       eng.loadM5Pct >= 40 ? 0xe11d48 : 0xd97706
     )
 
-    // Пелот Зейца проксимальнее линии пучков
     pelotteMesh.visible = eng.requiresMetatarsalPad
     if (eng.requiresMetatarsalPad && eng.metatarsalPadPosMm != null) {
       const xPelotte = -1.3 + (eng.metatarsalPadPosMm / eng.lastLengthMm) * 2.6
       pelotteMesh.position.set(xPelotte, t + 0.045, 0.02)
     }
 
-    // 5. Фронтальный наклон всей сборки (пронация / супинация) и вектор центра давления (CoP)
     const rollRad = (pronationDeg * Math.PI) / 180
     assembly.rotation.x = rollRad
 
@@ -522,10 +497,8 @@ export function HeelScene3D({
 
   return (
     <div className="relative w-full h-[235px] select-none overflow-hidden">
-      {/* 3D WebGL Viewport */}
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Верхние телеметрические плашки лучей M1 / M5 / Пятки */}
       <div className="pointer-events-none absolute top-2.5 left-3 right-3 flex items-center justify-between text-[9px] font-mono tracking-wider">
         <div className="px-2.5 py-1 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)]/80 backdrop-blur-sm">
           <span className="opacity-60 mr-1.5">HEEL:</span>
@@ -556,7 +529,6 @@ export function HeelScene3D({
         </div>
       </div>
 
-      {/* Нижняя панель быстрого выбора ракурса 3D-камеры */}
       <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
         <span className="text-[7.5px] font-mono uppercase tracking-[0.2em] opacity-45 pointer-events-none">
           3D BIOMECHANICS // DRAG TO ORBIT
@@ -588,4 +560,3 @@ export function HeelScene3D({
     </div>
   )
 }
-
