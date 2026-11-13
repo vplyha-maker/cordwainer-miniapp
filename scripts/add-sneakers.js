@@ -8,7 +8,6 @@ const R2_WORKER_URL = (
 ).replace(/\/$/, '')
 const R2_UPLOAD_SECRET = process.env.R2_UPLOAD_SECRET || 'cardio_secret_2026'
 
-// Сколько старых карточек (GOAT + ImgBB) переносить в R2 за один запуск скрипта
 const MIGRATION_BATCH_SIZE = 250
 const CONCURRENCY = 5
 
@@ -94,9 +93,6 @@ function pickSourceImageUrl(item) {
   return null
 }
 
-/**
- * Скачивает фото (с GOAT или с ImgBB) и загружает в ваш бакет Cloudflare R2
- */
 async function uploadToCloudflareR2(sourceUrl, sneakerId) {
   try {
     const imgRes = await axios.get(sourceUrl, {
@@ -113,7 +109,6 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
     const contentType = imgRes.headers['content-type'] || 'image/jpeg'
     const imgSize = imgRes.data?.byteLength || 0
 
-    // Если картинка весит меньше 3 КБ — это пустая заглушка («нет фото»)
     if (!contentType.includes('image') || imgSize < 3000) {
       return 'BROKEN_IMAGE'
     }
@@ -155,10 +150,6 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
   }
 }
 
-/**
- * Пакетная миграция старых ссылок (сначала GOAT, затем ImgBB) в ваш Cloudflare R2
- * и автоматическое удаление пустых/битых карточек (404)
- */
 async function migrateExistingPhotosToR2(client) {
   const statsRes = await client.query(`
     SELECT
@@ -175,7 +166,6 @@ async function migrateExistingPhotosToR2(client) {
   console.log(`   🐐 Осталось прямых ссылок GOAT: ${st.in_goat}`)
   console.log(`   🖼️ Хранится на стороннем ImgBB: ${st.in_imgbb}`)
 
-  // Берем сначала карточки с GOAT (приоритет 1), а затем с ImgBB (приоритет 2)
   const toMigrateRes = await client.query(
     `
     SELECT id, brand, name, image_url
@@ -208,7 +198,6 @@ async function migrateExistingPhotosToR2(client) {
         const result = await uploadToCloudflareR2(row.image_url, row.id)
 
         if (result === 'BROKEN_IMAGE') {
-          // Удаляем пустую карточку с мертвой картинкой, чтобы в каталоге не было пустых квадратов
           await client.query('DELETE FROM sneakers WHERE id = $1', [row.id])
           deletedBrokenCount++
           console.log(`  🗑️ Удалена битая карточка без фото: ${row.brand} | ${row.name}`)
@@ -237,16 +226,21 @@ async function run() {
   const client = new Client({ connectionString })
   await client.connect()
 
-  // Гарантируем наличие колонки sku и очищаем пустые строки
+  // Гарантируем наличие колонки sku, очищаем пустые записи и создаем скоростные индексы
   await client.query(`
     ALTER TABLE sneakers ADD COLUMN IF NOT EXISTS sku TEXT;
     DELETE FROM sneakers WHERE image_url IS NULL OR TRIM(image_url) = '' OR TRIM(image_url) = 'null';
-  `)
 
-  // ЭТАП 1: Турбо-перенос существующих карточек (GOAT и ImgBB -> Cloudflare R2)
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    CREATE INDEX IF NOT EXISTS idx_sneakers_brand_created ON sneakers (LOWER(brand), created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_sneakers_gender_created ON sneakers (gender, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_sneakers_name_trgm ON sneakers USING gin (LOWER(name) gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS idx_sneakers_brand_trgm ON sneakers USING gin (LOWER(brand) gin_trgm_ops);
+  `)
+  console.log('⚡ Скоростные SQL-индексы Neon проверены и активны!')
+
   await migrateExistingPhotosToR2(client)
 
-  // ЭТАП 2: Догрузка новых моделей из Algolia (10 шагов)
   for (let i = 0; i < 10; i++) {
     const randomBrand = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
     const randomPage = Math.floor(Math.random() * 6)
