@@ -5,6 +5,11 @@ type CategoryId = 'all' | 'luxury' | 'streetwear' | 'sport' | 'outdoor'
 type SortOption = 'newest' | 'price_desc' | 'price_asc' | 'year_desc'
 type GridMode = 'editorial' | 'boutique'
 
+// Загружаем из БД по 48 текстовых записей, но фото рендерим порциями по 12 шт. по мере скролла
+const API_PAGE_LIMIT = 48
+const INITIAL_VISIBLE_CARDS = 12
+const VISIBLE_STEP = 12
+
 export interface Sneaker {
   id: string
   brand: string
@@ -374,10 +379,6 @@ function formatLuxuryPrice(price: number): string {
   return `$${price.toLocaleString('en-US')}`
 }
 
-/**
- * Формирует цепочку URL, гарантированно совместимую с iPhone 11 / iOS Safari / WKWebView
- * (включая автоматическую перекодировку AVIF -> PNG/JPEG через wsrv.nl при необходимости)
- */
 function buildImageSources(rawUrl?: string | null): string[] {
   if (!rawUrl || typeof rawUrl !== 'string') return []
   const trimmed = rawUrl.trim()
@@ -399,7 +400,6 @@ function buildImageSources(rawUrl?: string | null): string[] {
     return sources
   }
 
-  // Прямая ссылка из вашего Cloudflare R2 + резервная перекодировка в PNG для iPhone 11 (если исходник был в AVIF)
   sources.push(httpsUrl)
   sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=88&output=png`)
   return sources
@@ -442,13 +442,11 @@ function SneakerCard({
 
   const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
 
-  // Сброс только при смене самой ссылки на картинку
   useEffect(() => {
     setAttempt(0)
     setImgState(sources.length > 0 ? 'loading' : 'error')
   }, [rawOriginal])
 
-  // Проверка для iOS WebKit: если картинка уже в кэше браузера, сразу ставим 'loaded'
   useEffect(() => {
     const el = imgRef.current
     if (el && el.complete && el.naturalWidth > 10) {
@@ -456,7 +454,6 @@ function SneakerCard({
     }
   }, [currentSrc])
 
-  // Страховочный таймер для iPhone 11: если за 3.5 сек прямой поток (например AVIF) не декодировался, переключаем на PNG-прокси
   useEffect(() => {
     if (imgState !== 'loading' || !currentSrc) return
     const timer = setTimeout(() => {
@@ -564,7 +561,6 @@ function SneakerCard({
             </div>
           )}
 
-          {/* Без loading="lazy", без opacity-0 и без mix-blend-mode, которые блокируют рендер в iOS WebKit */}
           {currentSrc && imgState !== 'error' && (
             <img
               ref={imgRef}
@@ -704,6 +700,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [activeQuery, setActiveQuery] = useState(initialQuery || 'prada')
 
   const [page, setPage] = useState(1)
+  // Сколько карточек реально отрендерено в DOM прямо сейчас (чтобы не грузить 60 фото разом)
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_CARDS)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -720,6 +718,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const returnYRef = useRef<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const [isDark, setIsDark] = useState<boolean>(() => detectActiveTheme(propTheme))
   const cacheRef = useRef<Record<string, { items: Sneaker[]; total: number | null }>>({})
@@ -743,6 +742,44 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }, [tgUserId])
 
+  const processedCatalog = useMemo(() => {
+    const filtered = sneakers.filter((sneaker) => {
+      if (!sneaker.image?.original || brokenIds.has(sneaker.id)) return false
+
+      if (selectedGender !== 'all' && sneaker.gender) {
+        const g = sneaker.gender.toLowerCase()
+        if (
+          selectedGender === 'men' &&
+          !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))
+        ) {
+          return false
+        }
+        if (selectedGender === 'women' && !(g.includes('women') || g === 'unisex')) {
+          return false
+        }
+      }
+      return true
+    })
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'price_asc') {
+        const pa = a.retailPrice > 0 ? a.retailPrice : 999999
+        const pb = b.retailPrice > 0 ? b.retailPrice : 999999
+        return pa - pb
+      }
+      if (sortBy === 'price_desc') {
+        return (b.retailPrice || 0) - (a.retailPrice || 0)
+      }
+      if (sortBy === 'year_desc') {
+        const ya = Number(parseReleaseYear(a) || 0)
+        const yb = Number(parseReleaseYear(b) || 0)
+        return yb - ya
+      }
+      return 0
+    })
+  }, [sneakers, selectedGender, sortBy, brokenIds])
+
+  // Умная подгрузка карточек по 12 штук при скролле вниз
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -756,11 +793,21 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       } else {
         setButtonMode((prev) => (prev !== 'hidden' ? 'hidden' : prev))
       }
+
+      // Если пользователь долистал почти до конца текущих 12 карточек — открываем следующие 12 из памяти
+      if (
+        viewState === 'catalog' &&
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 650
+      ) {
+        setVisibleCount((prev) =>
+          prev < processedCatalog.length ? prev + VISIBLE_STEP : prev
+        )
+      }
     }
 
     container.addEventListener('scroll', handleScroll, { passive: true })
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [viewState, processedCatalog.length])
 
   const handleSmartScroll = () => {
     haptic('light')
@@ -815,23 +862,32 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       if (!append && cacheRef.current[cacheKey]) {
         setSneakers(cacheRef.current[cacheKey].items)
         setTotalInDb(cacheRef.current[cacheKey].total)
+        setVisibleCount(INITIAL_VISIBLE_CARDS)
         setLoading(false)
         return
       }
+
+      // Отменяем предыдущий незавершенный запрос, если человек быстро переключает бренды
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      const controller = new AbortController()
+      abortControllerRef.current = controller
 
       if (append) {
         setLoadingMore(true)
       } else {
         setLoading(true)
+        setVisibleCount(INITIAL_VISIBLE_CARDS)
       }
       setError('')
 
       try {
         const url = `/api/get-top-sneakers?query=${encodeURIComponent(
           query
-        )}&gender=${encodeURIComponent(genderFilter)}&limit=60&page=${pageNum}`
+        )}&gender=${encodeURIComponent(genderFilter)}&limit=${API_PAGE_LIMIT}&page=${pageNum}`
 
-        const res = await fetch(url)
+        const res = await fetch(url, { signal: controller.signal })
         const text = await res.text()
 
         const upperText = text.toUpperCase()
@@ -872,7 +928,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         const list = data.results || data.data || data || []
         const newItems: Sneaker[] = Array.isArray(list) ? list : []
 
-        setHasMore(newItems.length >= 60)
+        setHasMore(newItems.length >= API_PAGE_LIMIT)
 
         setSneakers((prev) => {
           const merged = append ? [...prev, ...newItems] : newItems
@@ -887,15 +943,22 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
           }
           return unique
         })
-      } catch (err: unknown) {
+
+        if (append) {
+          setVisibleCount((prev) => prev + VISIBLE_STEP)
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return
         if (err instanceof Error && err.message === 'RATE_LIMIT') {
           setError(t.errorRateLimit)
         } else {
           setError(t.errorSneakers)
         }
       } finally {
-        setLoading(false)
-        setLoadingMore(false)
+        if (abortControllerRef.current === controller) {
+          setLoading(false)
+          setLoadingMore(false)
+        }
       }
     },
     [t]
@@ -992,6 +1055,11 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
 
   const handleLoadMore = () => {
     haptic('light')
+    // Если в памяти еще есть неоткрытые из 48 карточек — сначала открываем их без запроса к серверу
+    if (visibleCount < processedCatalog.length) {
+      setVisibleCount((prev) => prev + VISIBLE_STEP)
+      return
+    }
     const nextPage = page + 1
     setPage(nextPage)
     fetchSneakers(activeQuery, selectedGender, nextPage, true)
@@ -1056,44 +1124,18 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     })
   }, [])
 
-  const processedCatalog = useMemo(() => {
-    const filtered = sneakers.filter((sneaker) => {
-      if (!sneaker.image?.original || brokenIds.has(sneaker.id)) return false
+  // Отрезаем список до visibleCount, чтобы браузер качал только те фото, до которых долистал человек
+  const currentDisplayList = useMemo(() => {
+    if (viewState === 'favorites') return favorites
+    return processedCatalog.slice(0, visibleCount)
+  }, [viewState, favorites, processedCatalog, visibleCount])
 
-      if (selectedGender !== 'all' && sneaker.gender) {
-        const g = sneaker.gender.toLowerCase()
-        if (
-          selectedGender === 'men' &&
-          !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))
-        ) {
-          return false
-        }
-        if (selectedGender === 'women' && !(g.includes('women') || g === 'unisex')) {
-          return false
-        }
-      }
-      return true
-    })
-
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'price_asc') {
-        const pa = a.retailPrice > 0 ? a.retailPrice : 999999
-        const pb = b.retailPrice > 0 ? b.retailPrice : 999999
-        return pa - pb
-      }
-      if (sortBy === 'price_desc') {
-        return (b.retailPrice || 0) - (a.retailPrice || 0)
-      }
-      if (sortBy === 'year_desc') {
-        const ya = Number(parseReleaseYear(a) || 0)
-        const yb = Number(parseReleaseYear(b) || 0)
-        return yb - ya
-      }
-      return 0
-    })
-  }, [sneakers, selectedGender, sortBy, brokenIds])
-
-  const currentDisplayList = viewState === 'favorites' ? favorites : processedCatalog
+  const canShowMoreButton =
+    viewState === 'catalog' &&
+    !loading &&
+    !error &&
+    currentDisplayList.length > 0 &&
+    (visibleCount < processedCatalog.length || hasMore)
 
   const CATEGORIES: { id: CategoryId; label: string }[] = [
     { id: 'all', label: t.catAll },
@@ -1574,7 +1616,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         )}
 
         {/* КНОПКА ПАГИНАЦИИ */}
-        {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
+        {canShowMoreButton && (
           <div
             className="pt-8 pb-14 text-center"
             style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
