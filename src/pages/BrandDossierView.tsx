@@ -25,7 +25,7 @@ interface BrandDossierViewProps {
   themeColors: Record<string, string>
   totalModelsCount: number | null
   activeIconicModel?: string | null
-  onSelectModelQuery: (searchQuery: string, displayModelName: string) => void
+  onSelectModelQuery: (searchQuery: string, displayModelName?: string) => void
   onSelectSneakerCard?: (sneaker: DossierPreviewSneaker, imageUrl: string | null) => void
   onBackToCollection: () => void
 }
