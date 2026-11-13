@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react'
-import { BrandDossier, DossierLang } from './brandHeritageData'
-import { getIconicModelDossier } from './iconicModelsData'
+import { BrandDossier, DossierLang, getBrandDossier } from './brandHeritageData'
+import type { IconicModelDossier } from './iconicModelsData'
 
 export interface DossierPreviewSneaker {
   id: string
@@ -20,8 +19,16 @@ export interface DossierPreviewSneaker {
   }
 }
 
+export interface BrandMetaInput {
+  id: string
+  name: string
+  category: string
+  origin?: string
+}
+
 interface BrandDossierViewProps {
-  dossier: BrandDossier
+  dossier?: BrandDossier
+  brandMeta?: BrandMetaInput
   lang: DossierLang
   isDark: boolean
   themeColors: Record<string, string>
@@ -1201,7 +1208,8 @@ function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
 }
 
 export default function BrandDossierView({
-  dossier,
+  dossier: propDossier,
+  brandMeta,
   lang,
   isDark,
   themeColors,
@@ -1210,11 +1218,20 @@ export default function BrandDossierView({
   onSelectSneakerCard,
   onBackToCollection,
 }: BrandDossierViewProps) {
+  const dossier: BrandDossier = React.useMemo(() => {
+    if (propDossier) return propDossier
+    if (brandMeta) {
+      return getBrandDossier(brandMeta.id, brandMeta.name, brandMeta.origin, brandMeta.category)
+    }
+    return getBrandDossier('prada', 'Prada', 'MILANO · DAL 1913', 'luxury')
+  }, [propDossier, brandMeta])
+
   const l = UI_LABELS[lang]
   const ch = dossier.chapters[lang]
 
   // По умолчанию открываем первый культовый силуэт (индекс 0), чтобы человек сразу видел богатую карточку!
   const [selectedIdx, setSelectedIdx] = useState<number | null>(0)
+  const [activeModelDossier, setActiveModelDossier] = useState<IconicModelDossier | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewShoes, setPreviewShoes] = useState<DossierPreviewSneaker[]>([])
   const [previewTotal, setPreviewTotal] = useState<number>(0)
@@ -1233,10 +1250,26 @@ export default function BrandDossierView({
       ? dossier.iconicModels[selectedIdx]
       : null
 
-  // Получаем полное энциклопедическое досье выбранной культовой модели из iconicModelsData.ts
-  const activeModelDossier = activeModelName
-    ? getIconicModelDossier(dossier.id, dossier.name, activeModelName, lang)
-    : null
+  // Динамическая подгрузка энциклопедии культовых моделей (выносит iconicModelsData в отдельный чанк для Vite PWA)
+  useEffect(() => {
+    if (!activeModelName) {
+      setActiveModelDossier(null)
+      return
+    }
+    let cancelled = false
+    import('./iconicModelsData')
+      .then((mod) => {
+        if (!cancelled) {
+          setActiveModelDossier(
+            mod.getIconicModelDossier(dossier.id, dossier.name, activeModelName, lang)
+          )
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [dossier.id, dossier.name, activeModelName, lang])
 
   // Фоновая проверка наличия модели в Neon DB
   useEffect(() => {
