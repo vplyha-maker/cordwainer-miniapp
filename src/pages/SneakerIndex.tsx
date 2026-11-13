@@ -1484,16 +1484,16 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             themeColors={themeColors}
             totalModelsCount={totalInDb}
             activeIconicModel={selectedIconicModel}
-            onSelectModelQuery={(modelName) => {
+            onSelectSneakerCard={(item, imgUrl) => {
               haptic('light')
-              setSelectedIconicModel(modelName)
+              setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
+            }}
+            onSelectModelQuery={(searchQuery, displayModelName) => {
+              haptic('light')
+              setSelectedIconicModel(displayModelName || searchQuery)
               setHasSearched(false)
               setSearchText('')
-              const brandPrefix = activeBrandMeta ? activeBrandMeta.name : currentBrandDossier.name
-              const cleanedModel = modelName.toLowerCase().includes(brandPrefix.toLowerCase())
-                ? modelName
-                : `${brandPrefix} ${modelName}`
-              setActiveQuery(cleanedModel)
+              setActiveQuery(searchQuery)
               setBrandSubTab('shoes')
               if (scrollRef.current) {
                 scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
