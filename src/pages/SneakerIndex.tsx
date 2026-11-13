@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo, KeyboardEvent } from 'react'
+import { getBrandDossier } from './brandHeritageData'
+import BrandDossierView from './BrandDossierView'
 
 export type Lang = 'ru' | 'uk' | 'de'
 type CategoryId = 'all' | 'luxury' | 'streetwear' | 'sport' | 'outdoor'
 type SortOption = 'newest' | 'price_desc' | 'price_asc' | 'year_desc'
 type GridMode = 'editorial' | 'boutique'
+type BrandSubTab = 'shoes' | 'dossier'
 
-// Строго по 12 карточек за один шаг (и при выборе бренда, и по кнопке "Открыть еще 12")
 const PAGE_SIZE = 12
 
 export interface Sneaker {
@@ -121,6 +123,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     catStreet: 'Авангард & Стрит',
     catSport: 'Спорт-кутюр',
     catOutdoor: 'Аутдор & Классика',
+    tabCollection: 'Коллекция',
+    tabMaisonDossier: 'О Доме моды ✦',
     all: 'Все',
     men: 'Мужское',
     women: 'Женское',
@@ -172,6 +176,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     catStreet: 'Авангард & Стріт',
     catSport: 'Спорт-кутюр',
     catOutdoor: 'Аутдор & Класика',
+    tabCollection: 'Колекція',
+    tabMaisonDossier: 'Про Дім моди ✦',
     all: 'Всі',
     men: 'Чоловіче',
     women: 'Жіноче',
@@ -223,6 +229,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     catStreet: 'Avantgarde & Street',
     catSport: 'Sport Couture',
     catOutdoor: 'Outdoor & Heritage',
+    tabCollection: 'Kollektion',
+    tabMaisonDossier: 'Über das Haus ✦',
     all: 'Alle',
     men: 'Herren',
     women: 'Damen',
@@ -692,6 +700,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const [favorites, setFavorites] = useState<Sneaker[]>([])
   const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set())
   const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
+  const [brandSubTab, setBrandSubTab] = useState<BrandSubTab>('shoes')
   const [totalInDb, setTotalInDb] = useState<number | null>(null)
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('all')
@@ -744,7 +753,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     }
   }, [tgUserId])
 
-  // Скролл отвечает ТОЛЬКО за кнопку "Наверх" (без автоподгрузки всех карточек!)
   useEffect(() => {
     const container = scrollRef.current
     if (!container) return
@@ -836,7 +844,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
       setError('')
 
       try {
-        // Запрашиваем у сервера СТРОГО 12 карточек (limit=12)
         const url = `/api/get-top-sneakers?query=${encodeURIComponent(
           query
         )}&gender=${encodeURIComponent(genderFilter)}&limit=${PAGE_SIZE}&page=${pageNum}`
@@ -931,9 +938,21 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     return BRANDS.find((b) => b.id === selectedBrand) || null
   }, [selectedBrand, hasSearched])
 
+  // Досье текущего выбранного бренда
+  const currentBrandDossier = useMemo(() => {
+    if (!activeBrandMeta) return null
+    return getBrandDossier(
+      activeBrandMeta.id,
+      activeBrandMeta.name,
+      activeBrandMeta.origin,
+      activeBrandMeta.category
+    )
+  }, [activeBrandMeta])
+
   const handleCategoryClick = (catId: CategoryId) => {
     haptic('light')
     setSelectedCategory(catId)
+    setBrandSubTab('shoes')
     if (catId !== 'all') {
       const firstBrandInCat = BRANDS.find((b) => b.category === catId)
       if (firstBrandInCat) {
@@ -956,6 +975,9 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     setSearchText('')
     setHasSearched(false)
     setActiveQuery(brandId)
+    if (brandId === 'all') {
+      setBrandSubTab('shoes')
+    }
     if (typeof window !== 'undefined') {
       window.history.pushState({}, '', window.location.pathname)
     }
@@ -967,6 +989,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     haptic('light')
     setHasSearched(true)
     setSelectedBrand('all')
+    setBrandSubTab('shoes')
     setActiveQuery(text)
     setViewState('catalog')
     if (typeof window !== 'undefined') {
@@ -998,6 +1021,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     setSelectedBrand('prada')
     setSelectedGender('all')
     setSortBy('newest')
+    setBrandSubTab('shoes')
     setSearchText('')
     setHasSearched(false)
     setActiveQuery('prada')
@@ -1151,12 +1175,16 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             onClick={() => {
               haptic('light')
               if (viewState !== 'catalog') setViewState('catalog')
+              else if (brandSubTab === 'dossier') setBrandSubTab('shoes')
               else if (onBack) onBack()
             }}
             className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.22em] whitespace-nowrap outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100 py-1.5"
             style={{
               color: themeColors.textMuted,
-              visibility: viewState === 'catalog' && !onBack ? 'hidden' : 'visible',
+              visibility:
+                viewState === 'catalog' && brandSubTab === 'shoes' && !onBack
+                  ? 'hidden'
+                  : 'visible',
             }}
           >
             <span>←</span>
@@ -1208,7 +1236,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         </div>
 
         {/* ТИТУЛЬНЫЙ БЛОК МОДНОГО ДОМА */}
-        <div className="flex flex-col items-center text-center mb-8 px-2">
+        <div className="flex flex-col items-center text-center mb-6 px-2">
           <span
             className="text-[9px] font-sans uppercase tracking-[0.32em] mb-2 block"
             style={{ color: themeColors.textMuted }}
@@ -1237,6 +1265,47 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 ? formatPiecesCount(totalInDb, activeLang)
                 : t.curatedNote}
             </p>
+          )}
+
+          {/* ПЕРЕКЛЮЧАТЕЛЬ ВНУТРИ БРЕНДА: [ КОЛЛЕКЦИЯ ] | [ О ДОМЕ МОДЫ ✦ ] */}
+          {viewState === 'catalog' && activeBrandMeta && (
+            <div
+              className="mt-5 inline-flex items-center p-1"
+              style={{
+                backgroundColor: themeColors.studioCanvas,
+                border: `1px solid ${themeColors.border}`,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  haptic('light')
+                  setBrandSubTab('shoes')
+                }}
+                className="px-5 py-2 text-[9px] font-sans uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
+                style={{
+                  backgroundColor: brandSubTab === 'shoes' ? themeColors.text : 'transparent',
+                  color: brandSubTab === 'shoes' ? themeColors.bg : themeColors.textMuted,
+                }}
+              >
+                {t.tabCollection}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  haptic('light')
+                  setBrandSubTab('dossier')
+                }}
+                className="px-5 py-2 text-[9px] font-sans uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
+                style={{
+                  backgroundColor: brandSubTab === 'dossier' ? themeColors.text : 'transparent',
+                  color: brandSubTab === 'dossier' ? themeColors.bg : themeColors.textMuted,
+                }}
+              >
+                {t.tabMaisonDossier}
+              </button>
+            </div>
           )}
         </div>
 
@@ -1314,7 +1383,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             </div>
 
             {/* ЛЕНТА МОДНЫХ ДОМОВ */}
-            <div className="relative mb-5">
+            <div className="relative mb-6">
               <div className="flex gap-5 overflow-x-auto py-2.5 scrollbar-none pr-10">
                 <button
                   type="button"
@@ -1361,258 +1430,287 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 }}
               />
             </div>
-
-            {/* ПАНЕЛЬ ФИЛЬТРОВ */}
-            <div
-              className="py-2.5 mb-8 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between"
-              style={{
-                borderTop: `1px solid ${themeColors.borderFaint}`,
-                borderBottom: `1px solid ${themeColors.borderFaint}`,
-              }}
-            >
-              <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-                <div className="flex items-center gap-4">
-                  {GENDERS.map((gender) => {
-                    const isActive = selectedGender === gender.id
-                    return (
-                      <button
-                        key={gender.id}
-                        type="button"
-                        onClick={() => {
-                          haptic('light')
-                          setSelectedGender(gender.id)
-                        }}
-                        className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap cursor-pointer outline-none bg-transparent border-none transition-all"
-                        style={{
-                          color: isActive ? themeColors.text : themeColors.textFaint,
-                          fontWeight: isActive ? 600 : 400,
-                        }}
-                      >
-                        {gender.name}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="flex items-center gap-2.5 sm:hidden">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic('light')
-                      setGridMode('editorial')
-                    }}
-                    className="text-[9px] font-sans uppercase tracking-[0.18em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                    style={{
-                      color: gridMode === 'editorial' ? themeColors.text : themeColors.textFaint,
-                    }}
-                  >
-                    {t.editorialView}
-                  </button>
-                  <span className="opacity-20 text-[9px]">/</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic('light')
-                      setGridMode('boutique')
-                    }}
-                    className="text-[9px] font-sans uppercase tracking-[0.18em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                    style={{
-                      color: gridMode === 'boutique' ? themeColors.text : themeColors.textFaint,
-                    }}
-                  >
-                    {t.boutiqueView}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between sm:justify-end gap-5">
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    haptic('light')
-                    setSortBy(e.target.value as SortOption)
-                  }}
-                  className="text-[9px] font-sans uppercase tracking-[0.18em] bg-transparent outline-none border-none cursor-pointer"
-                  style={{ color: themeColors.textMuted }}
-                >
-                  <option value="newest" style={{ background: themeColors.bg, color: themeColors.text }}>
-                    {t.sortNewest}
-                  </option>
-                  <option value="price_desc" style={{ background: themeColors.bg, color: themeColors.text }}>
-                    {t.sortPriceDesc}
-                  </option>
-                  <option value="price_asc" style={{ background: themeColors.bg, color: themeColors.text }}>
-                    {t.sortPriceAsc}
-                  </option>
-                  <option value="year_desc" style={{ background: themeColors.bg, color: themeColors.text }}>
-                    {t.sortYearDesc}
-                  </option>
-                </select>
-
-                <div className="hidden sm:flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic('light')
-                      setGridMode('editorial')
-                    }}
-                    className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                    style={{
-                      color: gridMode === 'editorial' ? themeColors.text : themeColors.textFaint,
-                    }}
-                  >
-                    {t.editorialView}
-                  </button>
-                  <span className="opacity-20 text-[9px]">/</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic('light')
-                      setGridMode('boutique')
-                    }}
-                    className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                    style={{
-                      color: gridMode === 'boutique' ? themeColors.text : themeColors.textFaint,
-                    }}
-                  >
-                    {t.boutiqueView}
-                  </button>
-                </div>
-              </div>
-            </div>
           </>
         )}
 
-        {/* ОШИБКА */}
-        {error && viewState === 'catalog' && (
-          <div
-            className="p-4 mb-8 flex items-center justify-between"
-            style={{ border: `1px solid ${themeColors.border}` }}
-          >
-            <p className="text-[11px] font-sans uppercase tracking-widest opacity-80">
-              {error}
-            </p>
-            <button
-              type="button"
-              onClick={() => fetchSneakers(activeQuery, selectedGender, page, false)}
-              className="text-[10px] font-sans uppercase tracking-widest underline bg-transparent border-none cursor-pointer"
-              style={{ color: themeColors.text }}
-            >
-              Обновить
-            </button>
-          </div>
-        )}
-
-        {/* СКЕЛЕТОН */}
-        {loading && viewState === 'catalog' && sneakers.length === 0 && (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-10 pb-10 animate-pulse">
-            {[1, 2, 3, 4, 5].map((n, idx) => (
-              <div key={n} className={idx === 0 ? 'col-span-2' : ''}>
-                <div
-                  className={`w-full mb-3 ${idx === 0 ? 'aspect-[16/10]' : 'aspect-[5/4]'}`}
-                  style={{ backgroundColor: themeColors.studioCanvas }}
-                />
-                <div
-                  className="h-3 w-20 mb-2"
-                  style={{ backgroundColor: themeColors.studioCanvas }}
-                />
-                <div
-                  className="h-4 w-36"
-                  style={{ backgroundColor: themeColors.studioCanvas }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ПУСТОЕ СОСТОЯНИЕ */}
-        {!loading && currentDisplayList.length === 0 && (
-          <div className="py-24 text-center flex flex-col items-center justify-center gap-5">
-            <p
-              className="font-serif italic text-[16px]"
-              style={{ color: themeColors.textMuted }}
-            >
-              {viewState === 'favorites' ? t.emptyArchive : t.notFound}
-            </p>
+        {/* ЕСЛИ ОТКРЫТА ВКЛАДКА "О ДОМЕ МОДЫ" — ПОКАЗЫВАЕМ ДОСЬЕ И АНИМИРОВАННЫЙ SVG ЛОГОТИП */}
+        {viewState === 'catalog' && brandSubTab === 'dossier' && currentBrandDossier ? (
+          <BrandDossierView
+            dossier={currentBrandDossier}
+            lang={activeLang}
+            isDark={isDark}
+            themeColors={themeColors}
+            totalModelsCount={totalInDb}
+            onSelectModelQuery={(q) => {
+              haptic('light')
+              setSearchText(q)
+              setHasSearched(true)
+              setActiveQuery(q)
+              setBrandSubTab('shoes')
+            }}
+            onBackToCollection={() => {
+              haptic('light')
+              setBrandSubTab('shoes')
+              if (scrollRef.current) {
+                scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+              }
+            }}
+          />
+        ) : (
+          <>
+            {/* ПАНЕЛЬ ФИЛЬТРОВ ОБУВИ */}
             {viewState === 'catalog' && (
-              <button
-                type="button"
-                onClick={handleResetAllFilters}
-                className="px-6 py-3 text-[9px] font-sans uppercase tracking-[0.26em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
+              <div
+                className="py-2.5 mb-8 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between"
                 style={{
-                  color: themeColors.text,
-                  border: `1px solid ${themeColors.border}`,
+                  borderTop: `1px solid ${themeColors.borderFaint}`,
+                  borderBottom: `1px solid ${themeColors.borderFaint}`,
                 }}
               >
-                {t.resetFilters}
-              </button>
+                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                  <div className="flex items-center gap-4">
+                    {GENDERS.map((gender) => {
+                      const isActive = selectedGender === gender.id
+                      return (
+                        <button
+                          key={gender.id}
+                          type="button"
+                          onClick={() => {
+                            haptic('light')
+                            setSelectedGender(gender.id)
+                          }}
+                          className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap cursor-pointer outline-none bg-transparent border-none transition-all"
+                          style={{
+                            color: isActive ? themeColors.text : themeColors.textFaint,
+                            fontWeight: isActive ? 600 : 400,
+                          }}
+                        >
+                          {gender.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2.5 sm:hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic('light')
+                        setGridMode('editorial')
+                      }}
+                      className="text-[9px] font-sans uppercase tracking-[0.18em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
+                      style={{
+                        color: gridMode === 'editorial' ? themeColors.text : themeColors.textFaint,
+                      }}
+                    >
+                      {t.editorialView}
+                    </button>
+                    <span className="opacity-20 text-[9px]">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic('light')
+                        setGridMode('boutique')
+                      }}
+                      className="text-[9px] font-sans uppercase tracking-[0.18em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
+                      style={{
+                        color: gridMode === 'boutique' ? themeColors.text : themeColors.textFaint,
+                      }}
+                    >
+                      {t.boutiqueView}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-5">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => {
+                      haptic('light')
+                      setSortBy(e.target.value as SortOption)
+                    }}
+                    className="text-[9px] font-sans uppercase tracking-[0.18em] bg-transparent outline-none border-none cursor-pointer"
+                    style={{ color: themeColors.textMuted }}
+                  >
+                    <option value="newest" style={{ background: themeColors.bg, color: themeColors.text }}>
+                      {t.sortNewest}
+                    </option>
+                    <option value="price_desc" style={{ background: themeColors.bg, color: themeColors.text }}>
+                      {t.sortPriceDesc}
+                    </option>
+                    <option value="price_asc" style={{ background: themeColors.bg, color: themeColors.text }}>
+                      {t.sortPriceAsc}
+                    </option>
+                    <option value="year_desc" style={{ background: themeColors.bg, color: themeColors.text }}>
+                      {t.sortYearDesc}
+                    </option>
+                  </select>
+
+                  <div className="hidden sm:flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic('light')
+                        setGridMode('editorial')
+                      }}
+                      className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
+                      style={{
+                        color: gridMode === 'editorial' ? themeColors.text : themeColors.textFaint,
+                      }}
+                    >
+                      {t.editorialView}
+                    </button>
+                    <span className="opacity-20 text-[9px]">/</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic('light')
+                        setGridMode('boutique')
+                      }}
+                      className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
+                      style={{
+                        color: gridMode === 'boutique' ? themeColors.text : themeColors.textFaint,
+                      }}
+                    >
+                      {t.boutiqueView}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
-          </div>
-        )}
 
-        {/* СЕТКА ЛУКБУКА */}
-        {currentDisplayList.length > 0 && (
-          <div
-            className={
-              gridMode === 'boutique'
-                ? 'grid grid-cols-2 gap-x-3.5 sm:gap-x-7 gap-y-9 sm:gap-y-14 pb-12'
-                : 'grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-14 pb-12'
-            }
-          >
-            {currentDisplayList.map((sneaker, idx) => {
-              const isFav = favorites.some((f) => f.id === sneaker.id)
-              const isFeatured =
-                gridMode === 'boutique' && viewState === 'catalog' && idx % 5 === 0
-              return (
-                <SneakerCard
-                  key={sneaker.id}
-                  index={idx}
-                  isFeatured={isFeatured}
-                  sneaker={sneaker}
-                  isFav={isFav}
-                  toggleFavorite={toggleFavorite}
-                  t={t}
-                  themeColors={themeColors}
-                  isDark={isDark}
-                  gridMode={gridMode}
-                  onBrokenImage={handleBrokenImage}
-                  onSelect={(item, imgUrl) => {
-                    haptic('light')
-                    setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
-                  }}
-                />
-              )
-            })}
-          </div>
-        )}
-
-        {/* КНОПКА ЗАГРУЗКИ СЛЕДУЮЩИХ 12 СИЛУЭТОВ */}
-        {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
-          <div
-            className="pt-8 pb-14 text-center flex flex-col items-center gap-3"
-            style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
-          >
-            {totalInDb !== null && totalInDb > 0 && (
-              <span
-                className="font-serif italic text-[12px]"
-                style={{ color: themeColors.textMuted }}
+            {/* ОШИБКА */}
+            {error && viewState === 'catalog' && (
+              <div
+                className="p-4 mb-8 flex items-center justify-between"
+                style={{ border: `1px solid ${themeColors.border}` }}
               >
-                {t.shownOf} {currentDisplayList.length} {t.ofTotal} {totalInDb}
-              </span>
+                <p className="text-[11px] font-sans uppercase tracking-widest opacity-80">
+                  {error}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fetchSneakers(activeQuery, selectedGender, page, false)}
+                  className="text-[10px] font-sans uppercase tracking-widest underline bg-transparent border-none cursor-pointer"
+                  style={{ color: themeColors.text }}
+                >
+                  Обновить
+                </button>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              disabled={loadingMore}
-              className="px-8 py-4 text-[9px] font-sans uppercase tracking-[0.28em] outline-none bg-transparent cursor-pointer transition-all hover:opacity-100 opacity-85"
-              style={{
-                color: themeColors.text,
-                border: `1px solid ${themeColors.border}`,
-              }}
-            >
-              {loadingMore ? t.loading : t.loadMore}
-            </button>
-          </div>
+
+            {/* СКЕЛЕТОН */}
+            {loading && viewState === 'catalog' && sneakers.length === 0 && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-10 pb-10 animate-pulse">
+                {[1, 2, 3, 4, 5].map((n, idx) => (
+                  <div key={n} className={idx === 0 ? 'col-span-2' : ''}>
+                    <div
+                      className={`w-full mb-3 ${idx === 0 ? 'aspect-[16/10]' : 'aspect-[5/4]'}`}
+                      style={{ backgroundColor: themeColors.studioCanvas }}
+                    />
+                    <div
+                      className="h-3 w-20 mb-2"
+                      style={{ backgroundColor: themeColors.studioCanvas }}
+                    />
+                    <div
+                      className="h-4 w-36"
+                      style={{ backgroundColor: themeColors.studioCanvas }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ПУСТОЕ СОСТОЯНИЕ */}
+            {!loading && currentDisplayList.length === 0 && (
+              <div className="py-24 text-center flex flex-col items-center justify-center gap-5">
+                <p
+                  className="font-serif italic text-[16px]"
+                  style={{ color: themeColors.textMuted }}
+                >
+                  {viewState === 'favorites' ? t.emptyArchive : t.notFound}
+                </p>
+                {viewState === 'catalog' && (
+                  <button
+                    type="button"
+                    onClick={handleResetAllFilters}
+                    className="px-6 py-3 text-[9px] font-sans uppercase tracking-[0.26em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
+                    style={{
+                      color: themeColors.text,
+                      border: `1px solid ${themeColors.border}`,
+                    }}
+                  >
+                    {t.resetFilters}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* СЕТКА ЛУКБУКА (12 КАРТОЧЕК НА ШАГ) */}
+            {currentDisplayList.length > 0 && (
+              <div
+                className={
+                  gridMode === 'boutique'
+                    ? 'grid grid-cols-2 gap-x-3.5 sm:gap-x-7 gap-y-9 sm:gap-y-14 pb-12'
+                    : 'grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-14 pb-12'
+                }
+              >
+                {currentDisplayList.map((sneaker, idx) => {
+                  const isFav = favorites.some((f) => f.id === sneaker.id)
+                  const isFeatured =
+                    gridMode === 'boutique' && viewState === 'catalog' && idx % 5 === 0
+                  return (
+                    <SneakerCard
+                      key={sneaker.id}
+                      index={idx}
+                      isFeatured={isFeatured}
+                      sneaker={sneaker}
+                      isFav={isFav}
+                      toggleFavorite={toggleFavorite}
+                      t={t}
+                      themeColors={themeColors}
+                      isDark={isDark}
+                      gridMode={gridMode}
+                      onBrokenImage={handleBrokenImage}
+                      onSelect={(item, imgUrl) => {
+                        haptic('light')
+                        setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
+            {/* КНОПКА ЗАГРУЗКИ СЛЕДУЮЩИХ 12 СИЛУЭТОВ */}
+            {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
+              <div
+                className="pt-8 pb-14 text-center flex flex-col items-center gap-3"
+                style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
+              >
+                {totalInDb !== null && totalInDb > 0 && (
+                  <span
+                    className="font-serif italic text-[12px]"
+                    style={{ color: themeColors.textMuted }}
+                  >
+                    {t.shownOf} {currentDisplayList.length} {t.ofTotal} {totalInDb}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="px-8 py-4 text-[9px] font-sans uppercase tracking-[0.28em] outline-none bg-transparent cursor-pointer transition-all hover:opacity-100 opacity-85"
+                  style={{
+                    color: themeColors.text,
+                    border: `1px solid ${themeColors.border}`,
+                  }}
+                >
+                  {loadingMore ? t.loading : t.loadMore}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
