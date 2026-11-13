@@ -1224,7 +1224,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             }}
           >
             <span>←</span>
-            <span>{selectedIconicModel ? t.backToPassport.replace('← ', '') : t.back}</span>
+            <span>{t.back}</span>
           </button>
 
           <div className="flex items-center gap-6">
@@ -1303,67 +1303,48 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
             </p>
           )}
 
-          {/* ПЕРЕКЛЮЧАТЕЛЬ ВНУТРИ БРЕНДА: [ КОЛЛЕКЦИЯ ] | [ ПАСПОРТ ДОМА ✦ ] + ОФИЦИАЛЬНЫЙ САЙТ */}
+          {/* ПЕРЕКЛЮЧАТЕЛЬ ВНУТРИ БРЕНДА: [ КОЛЛЕКЦИЯ ] | [ ПАСПОРТ ДОМА ✦ ] */}
           {viewState === 'catalog' && activeBrandMeta && (
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <div
-                className="inline-flex items-center p-1"
+            <div
+              className="mt-5 inline-flex items-center p-1"
+              style={{
+                backgroundColor: themeColors.studioCanvas,
+                border: `1px solid ${themeColors.border}`,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  haptic('light')
+                  setBrandSubTab('shoes')
+                }}
+                className="px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
                 style={{
-                  backgroundColor: themeColors.studioCanvas,
-                  border: `1px solid ${themeColors.border}`,
+                  backgroundColor: brandSubTab === 'shoes' ? themeColors.text : 'transparent',
+                  color: brandSubTab === 'shoes' ? themeColors.bg : themeColors.textMuted,
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic('light')
-                    setBrandSubTab('shoes')
-                  }}
-                  className="px-4 sm:px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.2em] cursor-pointer border-none transition-all whitespace-nowrap"
-                  style={{
-                    backgroundColor: brandSubTab === 'shoes' ? themeColors.text : 'transparent',
-                    color: brandSubTab === 'shoes' ? themeColors.bg : themeColors.textMuted,
-                  }}
-                >
-                  {t.tabCollection}
-                </button>
+                {t.tabCollection}
+              </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic('light')
-                    setBrandSubTab('dossier')
-                  }}
-                  className="px-4 sm:px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.2em] cursor-pointer border-none transition-all whitespace-nowrap"
-                  style={{
-                    backgroundColor: brandSubTab === 'dossier' ? themeColors.text : 'transparent',
-                    color: brandSubTab === 'dossier' ? themeColors.bg : themeColors.textMuted,
-                  }}
-                >
-                  {t.tabMaisonDossier}
-                </button>
-              </div>
-
-              {currentBrandDossier && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic('light')
-                    const tg = (window as any).Telegram?.WebApp
-                    if (tg?.openLink) tg.openLink(currentBrandDossier.officialUrl)
-                    else window.open(currentBrandDossier.officialUrl, '_blank', 'noopener,noreferrer')
-                  }}
-                  className="px-3.5 py-2.5 text-[9px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer transition-opacity hover:opacity-100 opacity-85 whitespace-nowrap"
-                  style={{
-                    backgroundColor: themeColors.studioCanvas,
-                    color: themeColors.text,
-                    border: `1px solid ${themeColors.border}`,
-                  }}
-                  title={currentBrandDossier.officialDomain}
-                >
-                  {t.officialSiteShort} · {currentBrandDossier.officialDomain} ↗
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  haptic('light')
+                  if (selectedIconicModel && activeBrandMeta) {
+                    setSelectedIconicModel(null)
+                    setActiveQuery(activeBrandMeta.id)
+                  }
+                  setBrandSubTab('dossier')
+                }}
+                className="px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
+                style={{
+                  backgroundColor: brandSubTab === 'dossier' ? themeColors.text : 'transparent',
+                  color: brandSubTab === 'dossier' ? themeColors.bg : themeColors.textMuted,
+                }}
+              >
+                {t.tabMaisonDossier}
+              </button>
             </div>
           )}
         </div>
@@ -1558,6 +1539,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                     type="button"
                     onClick={() => {
                       haptic('light')
+                      setSelectedIconicModel(null)
+                      setActiveQuery(activeBrandMeta.id)
                       setBrandSubTab('dossier')
                       if (scrollRef.current) {
                         scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1770,6 +1753,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                           type="button"
                           onClick={() => {
                             haptic('light')
+                            setSelectedIconicModel(null)
+                            setActiveQuery(activeBrandMeta.id)
                             setBrandSubTab('dossier')
                           }}
                           className="px-6 py-3.5 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-opacity hover:opacity-90"
