@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo, KeyboardEvent } from 'react'
-import { getBrandDossier } from './brandHeritageData'
-import BrandDossierView from './BrandDossierView'
+import React, { useEffect, useState, useCallback, useRef, useMemo, Suspense, KeyboardEvent } from 'react'
+
+const BrandDossierView = React.lazy(() => import('./BrandDossierView'))
 
 export type Lang = 'ru' | 'uk' | 'de'
 type CategoryId = 'all' | 'luxury' | 'streetwear' | 'sport' | 'outdoor'
@@ -951,16 +951,7 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
     return BRANDS.find((b) => b.id === selectedBrand) || null
   }, [selectedBrand, hasSearched])
 
-  // Досье текущего выбранного бренда
-  const currentBrandDossier = useMemo(() => {
-    if (!activeBrandMeta) return null
-    return getBrandDossier(
-      activeBrandMeta.id,
-      activeBrandMeta.name,
-      activeBrandMeta.origin,
-      activeBrandMeta.category
-    )
-  }, [activeBrandMeta])
+
 
   const handleCategoryClick = (catId: CategoryId) => {
     haptic('light')
@@ -1476,41 +1467,49 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
         )}
 
         {/* ЕСЛИ ОТКРЫТА ВКЛАДКА "ПАСПОРТ ДОМА" — ПОКАЗЫВАЕМ ДОСЬЕ И АНИМИРОВАННЫЙ SVG ЛОГОТИП */}
-        {viewState === 'catalog' && brandSubTab === 'dossier' && currentBrandDossier ? (
-          <BrandDossierView
-            dossier={currentBrandDossier}
-            lang={activeLang}
-            isDark={isDark}
-            themeColors={themeColors}
-            totalModelsCount={totalInDb}
-            activeIconicModel={selectedIconicModel}
-            onSelectSneakerCard={(item: Sneaker, imgUrl: string | null) => {
-              haptic('light')
-              setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
-            }}
-            onSelectModelQuery={(searchQuery: string, displayModelName?: string) => {
-              haptic('light')
-              setSelectedIconicModel(displayModelName || searchQuery)
-              setHasSearched(false)
-              setSearchText('')
-              setActiveQuery(searchQuery)
-              setBrandSubTab('shoes')
-              if (scrollRef.current) {
-                scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-              }
-            }}
-            onBackToCollection={() => {
-              haptic('light')
-              if (selectedIconicModel && activeBrandMeta) {
-                setSelectedIconicModel(null)
-                setActiveQuery(activeBrandMeta.id)
-              }
-              setBrandSubTab('shoes')
-              if (scrollRef.current) {
-                scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-              }
-            }}
-          />
+        {viewState === 'catalog' && brandSubTab === 'dossier' && activeBrandMeta ? (
+          <Suspense
+            fallback={
+              <div className="py-20 text-center font-serif italic text-[15px]" style={{ color: themeColors.textMuted }}>
+                Открываем архивный паспорт {activeBrandMeta.name}...
+              </div>
+            }
+          >
+            <BrandDossierView
+              brandMeta={activeBrandMeta}
+              lang={activeLang}
+              isDark={isDark}
+              themeColors={themeColors}
+              totalModelsCount={totalInDb}
+              activeIconicModel={selectedIconicModel}
+              onSelectSneakerCard={(item: Sneaker, imgUrl: string | null) => {
+                haptic('light')
+                setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
+              }}
+              onSelectModelQuery={(searchQuery: string, displayModelName?: string) => {
+                haptic('light')
+                setSelectedIconicModel(displayModelName || searchQuery)
+                setHasSearched(false)
+                setSearchText('')
+                setActiveQuery(searchQuery)
+                setBrandSubTab('shoes')
+                if (scrollRef.current) {
+                  scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+              }}
+              onBackToCollection={() => {
+                haptic('light')
+                if (selectedIconicModel && activeBrandMeta) {
+                  setSelectedIconicModel(null)
+                  setActiveQuery(activeBrandMeta.id)
+                }
+                setBrandSubTab('shoes')
+                if (scrollRef.current) {
+                  scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+              }}
+            />
+          </Suspense>
         ) : (
           <>
             {/* ПАНЕЛЬ БЫСТРОГО ВОЗВРАТА В ПАСПОРТ ДОМА ПРИ ПРОСМОТРЕ КУЛЬТОВОЙ МОДЕЛИ */}
