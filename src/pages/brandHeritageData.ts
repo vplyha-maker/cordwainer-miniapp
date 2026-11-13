@@ -8,9 +8,18 @@ export type EmblemKind =
   | 'gucci_gg'
   | 'lv_fleur'
   | 'dior_oblique'
+  | 'ysl_cassandre'
+  | 'bottega_intrecciato'
+  | 'celine_triomphe'
+  | 'loewe_anagram'
+  | 'hermes_caleche'
+  | 'versace_greca'
+  | 'givenchy_4g'
   | 'margiela_numbers'
   | 'rick_star'
+  | 'offwhite_arrows'
   | 'nike_swoosh'
+  | 'jordan_wings'
   | 'adidas_bars'
   | 'mountain_peak'
   | 'heritage_shield'
@@ -22,6 +31,8 @@ export interface BrandDossier {
   id: string
   name: string
   founded: string
+  officialUrl: string
+  officialDomain: string
   headquarters: Record<DossierLang, string>
   creativeCode: Record<DossierLang, string>
   emblem: EmblemKind
@@ -46,6 +57,8 @@ export interface BrandDossier {
 interface RawBrandRecord {
   name: string
   founded: string
+  officialUrl: string
+  officialDomain: string
   hq: string
   founders: string
   emblem: EmblemKind
@@ -67,6 +80,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   prada: {
     name: 'PRADA',
     founded: '1913',
+    officialUrl: 'https://www.prada.com',
+    officialDomain: 'prada.com',
     hq: 'Милан, Италия · Galleria Vittorio Emanuele II',
     founders: 'Марио Прада · Миучча Прада & Раф Симонс',
     emblem: 'prada_triangle',
@@ -82,6 +97,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   balenciaga: {
     name: 'BALENCIAGA',
     founded: '1917',
+    officialUrl: 'https://www.balenciaga.com',
+    officialDomain: 'balenciaga.com',
     hq: 'Париж, Франция · 10 Avenue George V',
     founders: 'Кристобаль Баленсиага · Демна',
     emblem: 'balenciaga_bb',
@@ -97,6 +114,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   valentino: {
     name: 'VALENTINO',
     founded: '1960',
+    officialUrl: 'https://www.valentino.com',
+    officialDomain: 'valentino.com',
     hq: 'Рим, Италия · Piazza Mignanelli',
     founders: 'Валентино Гаравани · Алессандро Микеле',
     emblem: 'valentino_v',
@@ -112,6 +131,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   chanel: {
     name: 'CHANEL',
     founded: '1910',
+    officialUrl: 'https://www.chanel.com',
+    officialDomain: 'chanel.com',
     hq: 'Париж, Франция · 31 Rue Cambon',
     founders: 'Габриэль Шанель · Карл Лагерфельд',
     emblem: 'chanel_cc',
@@ -127,6 +148,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   gucci: {
     name: 'GUCCI',
     founded: '1921',
+    officialUrl: 'https://www.gucci.com',
+    officialDomain: 'gucci.com',
     hq: 'Флоренция, Италия · Via Tornabuoni',
     founders: 'Гуччио Гуччи · Сабато Де Сарно',
     emblem: 'gucci_gg',
@@ -142,6 +165,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'louis vuitton': {
     name: 'LOUIS VUITTON',
     founded: '1854',
+    officialUrl: 'https://www.louisvuitton.com',
+    officialDomain: 'louisvuitton.com',
     hq: 'Париж, Франция · 2 Rue du Pont-Neuf',
     founders: 'Луи Виттон · Вирджил Абло · Фаррелл Уильямс',
     emblem: 'lv_fleur',
@@ -157,6 +182,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   dior: {
     name: 'DIOR',
     founded: '1946',
+    officialUrl: 'https://www.dior.com',
+    officialDomain: 'dior.com',
     hq: 'Париж, Франция · 30 Avenue Montaigne',
     founders: 'Кристиан Диор · Ким Джонс · Мария Грация Кьюри',
     emblem: 'dior_oblique',
@@ -172,9 +199,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'saint laurent': {
     name: 'SAINT LAURENT',
     founded: '1961',
+    officialUrl: 'https://www.ysl.com',
+    officialDomain: 'ysl.com',
     hq: 'Париж, Франция · 37 Rue de Bellechasse',
     founders: 'Ив Сен-Лоран · Энтони Ваккарелло',
-    emblem: 'couture_crest',
+    emblem: 'ysl_cassandre',
     monogram: 'YSL',
     accent: '#D4C3A3',
     models: ['Wyatt Harness Boot', 'Opyum 110 Heel', 'SL/06 Court', 'Tribute Platform', 'Le Loafer'],
@@ -187,9 +216,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'bottega veneta': {
     name: 'BOTTEGA VENETA',
     founded: '1966',
+    officialUrl: 'https://www.bottegaveneta.com',
+    officialDomain: 'bottegaveneta.com',
     hq: 'Виченца / Милан, Италия · Palazzo San Fedele',
     founders: 'Микеле Таддеи · Матье Блази',
-    emblem: 'couture_crest',
+    emblem: 'bottega_intrecciato',
     monogram: 'BV',
     accent: '#789262',
     models: ['Tire Chelsea Boot', 'Lug Boot', 'Puddle Boot', 'Orbit Sneaker', 'Lido Mule'],
@@ -202,6 +233,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'miu miu': {
     name: 'MIU MIU',
     founded: '1993',
+    officialUrl: 'https://www.miumiu.com',
+    officialDomain: 'miumiu.com',
     hq: 'Милан / Париж · Via Sant’Andrea',
     founders: 'Миучча Прада',
     emblem: 'couture_crest',
@@ -217,9 +250,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   celine: {
     name: 'CELINE',
     founded: '1945',
+    officialUrl: 'https://www.celine.com',
+    officialDomain: 'celine.com',
     hq: 'Париж, Франция · 16 Rue Vivienne',
     founders: 'Селин Випиана · Эди Слиман',
-    emblem: 'couture_crest',
+    emblem: 'celine_triomphe',
     monogram: 'CL',
     accent: '#C8B08A',
     models: ['CT-02 Mid', 'Triomphe Loafer', 'Margaret Chelsea', 'Block Sneaker', 'Camargue Boot'],
@@ -232,9 +267,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   loewe: {
     name: 'LOEWE',
     founded: '1846',
+    officialUrl: 'https://www.loewe.com',
+    officialDomain: 'loewe.com',
     hq: 'Мадрид, Испания · Calle Serrano',
     founders: 'Энрике Лоэве · Джонатан Андерсон',
-    emblem: 'couture_crest',
+    emblem: 'loewe_anagram',
     monogram: 'LW',
     accent: '#D1B38A',
     models: ['Flow Runner', 'Loewe × On Cloudtilt', 'Terra Chelseas', 'Ballet Runner', 'Toy Pump'],
@@ -247,9 +284,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   hermes: {
     name: 'HERMÈS',
     founded: '1837',
+    officialUrl: 'https://www.hermes.com',
+    officialDomain: 'hermes.com',
     hq: 'Париж, Франция · 24 Rue du Faubourg Saint-Honoré',
     founders: 'Тьерри Эрмес · Пьер Арди',
-    emblem: 'heritage_shield',
+    emblem: 'hermes_caleche',
     monogram: 'H',
     accent: '#D97736',
     models: ['Oran Sandal', 'Chypre', 'Bouncing Sneaker', 'Izmir', 'Destin Loafer'],
@@ -262,6 +301,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'loro piana': {
     name: 'LORO PIANA',
     founded: '1924',
+    officialUrl: 'https://www.loropiana.com',
+    officialDomain: 'loropiana.com',
     hq: 'Куарона / Милан, Италия',
     founders: 'Пьетро Лоро Пьяна',
     emblem: 'heritage_shield',
@@ -277,6 +318,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'maison margiela': {
     name: 'MAISON MARGIELA',
     founded: '1988',
+    officialUrl: 'https://www.maisonmargiela.com',
+    officialDomain: 'maisonmargiela.com',
     hq: 'Париж, Франция · Place des États-Unis',
     founders: 'Мартин Маржела · Джон Гальяно',
     emblem: 'margiela_numbers',
@@ -292,6 +335,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'rick owens': {
     name: 'RICK OWENS',
     founded: '1994',
+    officialUrl: 'https://www.rickowens.eu',
+    officialDomain: 'rickowens.eu',
     hq: 'Париж, Франция · Place du Palais-Bourbon',
     founders: 'Рик Оуэнс',
     emblem: 'rick_star',
@@ -307,6 +352,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'alexander mcqueen': {
     name: 'ALEXANDER MCQUEEN',
     founded: '1992',
+    officialUrl: 'https://www.alexandermcqueen.com',
+    officialDomain: 'alexandermcqueen.com',
     hq: 'Лондон, Великобритания · Clerkenwell',
     founders: 'Ли Александр Маккуин · Шон Макгирр',
     emblem: 'couture_crest',
@@ -322,6 +369,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   lanvin: {
     name: 'LANVIN',
     founded: '1889',
+    officialUrl: 'https://www.lanvin.com',
+    officialDomain: 'lanvin.com',
     hq: 'Париж, Франция · 22 Rue du Faubourg Saint-Honoré',
     founders: 'Жанна Ланвен · Лукас Оссендрейвер',
     emblem: 'couture_crest',
@@ -337,9 +386,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   versace: {
     name: 'VERSACE',
     founded: '1978',
+    officialUrl: 'https://www.versace.com',
+    officialDomain: 'versace.com',
     hq: 'Милан, Италия · Via Gesù 12',
     founders: 'Джанни Версаче · Донателла Версаче',
-    emblem: 'couture_crest',
+    emblem: 'versace_greca',
     monogram: 'GV',
     accent: '#D4AF37',
     models: ['Chain Reaction', 'Trigreca', 'Odissea', 'Aevitas Platform', 'Medusa Loafer'],
@@ -352,9 +403,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   givenchy: {
     name: 'GIVENCHY',
     founded: '1952',
+    officialUrl: 'https://www.givenchy.com',
+    officialDomain: 'givenchy.com',
     hq: 'Париж, Франция · 3 Avenue George V',
     founders: 'Юбер де Живанши · Сара Бертон',
-    emblem: 'couture_crest',
+    emblem: 'givenchy_4g',
     monogram: '4G',
     accent: '#B0B0B8',
     models: ['TK-360', 'Shark Lock Boot', 'City Sport', 'Spectre Runner', 'Monumental Mallow'],
@@ -367,6 +420,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   dsquared2: {
     name: 'DSQUARED2',
     founded: '1995',
+    officialUrl: 'https://www.dsquared2.com',
+    officialDomain: 'dsquared2.com',
     hq: 'Милан, Италия · Via Ceresio',
     founders: 'Дин и Дэн Кейтен',
     emblem: 'heritage_shield',
@@ -382,6 +437,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'polo ralph lauren': {
     name: 'RALPH LAUREN',
     founded: '1967',
+    officialUrl: 'https://www.ralphlauren.com',
+    officialDomain: 'ralphlauren.com',
     hq: 'Нью-Йорк, США · Madison Avenue',
     founders: 'Ральф Лорен',
     emblem: 'heritage_shield',
@@ -397,6 +454,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   lacoste: {
     name: 'LACOSTE',
     founded: '1933',
+    officialUrl: 'https://www.lacoste.com',
+    officialDomain: 'lacoste.com',
     hq: 'Париж, Франция · Avenue Tony Garnier',
     founders: 'Рене Лакост',
     emblem: 'sport_vector',
@@ -412,6 +471,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'calvin klein': {
     name: 'CALVIN KLEIN',
     founded: '1968',
+    officialUrl: 'https://www.calvinklein.us',
+    officialDomain: 'calvinklein.com',
     hq: 'Нью-Йорк, США · 205 West 39th Street',
     founders: 'Кельвин Кляйн',
     emblem: 'couture_crest',
@@ -427,6 +488,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'tommy hilfiger': {
     name: 'TOMMY HILFIGER',
     founded: '1985',
+    officialUrl: 'https://usa.tommy.com',
+    officialDomain: 'tommy.com',
     hq: 'Нью-Йорк / Амстердам',
     founders: 'Томми Хилфигер',
     emblem: 'heritage_shield',
@@ -444,9 +507,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'off-white': {
     name: 'OFF-WHITE',
     founded: '2012',
+    officialUrl: 'https://www.off---white.com',
+    officialDomain: 'off---white.com',
     hq: 'Милан, Италия · Via Manzoni',
     founders: 'Вирджил Абло · Иб Камара',
-    emblem: 'skate_hexagon',
+    emblem: 'offwhite_arrows',
     monogram: 'OW',
     accent: '#D4A373',
     models: ['Out Of Office (OOO)', 'ODSY-1000', 'Vulcanized Low', 'Off-Court 3.0', 'Floating Arrow'],
@@ -459,6 +524,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'fear of god': {
     name: 'FEAR OF GOD',
     founded: '2013',
+    officialUrl: 'https://fearofgod.com',
+    officialDomain: 'fearofgod.com',
     hq: 'Лос-Анджелес, США · Hollywood',
     founders: 'Джерри Лоренцо',
     emblem: 'couture_crest',
@@ -474,6 +541,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   bape: {
     name: 'A BATHING APE',
     founded: '1993',
+    officialUrl: 'https://bape.com',
+    officialDomain: 'bape.com',
     hq: 'Токио, Япония · Ura-Harajuku',
     founders: 'Ниго (Томоаки Нагао)',
     emblem: 'skate_hexagon',
@@ -489,6 +558,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   supreme: {
     name: 'SUPREME',
     founded: '1994',
+    officialUrl: 'https://www.supremenewyork.com',
+    officialDomain: 'supremenewyork.com',
     hq: 'Нью-Йорк, США · 274 Lafayette Street',
     founders: 'Джеймс Джеббиа',
     emblem: 'skate_hexagon',
@@ -504,6 +575,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   kith: {
     name: 'KITH',
     founded: '2011',
+    officialUrl: 'https://kith.com',
+    officialDomain: 'kith.com',
     hq: 'Нью-Йорк, США · SoHo Broadway',
     founders: 'Ронни Файг',
     emblem: 'couture_crest',
@@ -519,6 +592,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   palace: {
     name: 'PALACE',
     founded: '2009',
+    officialUrl: 'https://www.palaceskateboards.com',
+    officialDomain: 'palaceskateboards.com',
     hq: 'Лондон, Великобритания · Soho Brewer St',
     founders: 'Лев Танджу & Гарет Скьюис',
     emblem: 'prada_triangle',
@@ -534,6 +609,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   autry: {
     name: 'AUTRY',
     founded: '1982',
+    officialUrl: 'https://www.autry-usa.com',
+    officialDomain: 'autry-usa.com',
     hq: 'Даллас, США / Венеция, Италия',
     founders: 'Джим Отри',
     emblem: 'sport_vector',
@@ -549,6 +626,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   veja: {
     name: 'VEJA',
     founded: '2005',
+    officialUrl: 'https://www.veja-store.com',
+    officialDomain: 'veja-store.com',
     hq: 'Париж, Франция · Rue de la Cerisaie',
     founders: 'Себастьен Копп & Франсуа-Гислен Морийон',
     emblem: 'valentino_v',
@@ -564,6 +643,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   converse: {
     name: 'CONVERSE',
     founded: '1908',
+    officialUrl: 'https://www.converse.com',
+    officialDomain: 'converse.com',
     hq: 'Бостон, США · Lovejoy Wharf',
     founders: 'Маркиз Миллс Конверс · Чак Тейлор',
     emblem: 'rick_star',
@@ -579,6 +660,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   vans: {
     name: 'VANS',
     founded: '1966',
+    officialUrl: 'https://www.vans.com',
+    officialDomain: 'vans.com',
     hq: 'Анахайм, Калифорния, США',
     founders: 'Пол и Джим Ван Дорен',
     emblem: 'skate_hexagon',
@@ -594,6 +677,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   etnies: {
     name: 'ETNIES',
     founded: '1986',
+    officialUrl: 'https://etnies.com',
+    officialDomain: 'etnies.com',
     hq: 'Лейк-Форест, Калифорния, США',
     founders: 'Пьер-Андре Сенизерг',
     emblem: 'skate_hexagon',
@@ -609,6 +694,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   osiris: {
     name: 'OSIRIS',
     founded: '1996',
+    officialUrl: 'https://osirisshoes.com',
+    officialDomain: 'osirisshoes.com',
     hq: 'Сан-Диего, Калифорния, США',
     founders: 'Тони Магнуссон, Брайан Рид, Дейв Мэйхью',
     emblem: 'skate_hexagon',
@@ -624,6 +711,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   dc: {
     name: 'DC SHOES',
     founded: '1994',
+    officialUrl: 'https://www.dcshoes.com',
+    officialDomain: 'dcshoes.com',
     hq: 'Виста, Калифорния, США',
     founders: 'Кен Блок & Дэймон Уэй',
     emblem: 'skate_hexagon',
@@ -641,6 +730,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   nike: {
     name: 'NIKE',
     founded: '1964',
+    officialUrl: 'https://www.nike.com',
+    officialDomain: 'nike.com',
     hq: 'Бивертон, Орегон, США',
     founders: 'Фил Найт & Билл Бауэрман · Тинкер Хэтфилд',
     emblem: 'nike_swoosh',
@@ -656,9 +747,11 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   jordan: {
     name: 'JORDAN BRAND',
     founded: '1984',
+    officialUrl: 'https://www.nike.com/jordan',
+    officialDomain: 'nike.com/jordan',
     hq: 'Чикаго / Бивертон, США',
     founders: 'Майкл Джордан · Питер Мур · Тинкер Хэтфилд',
-    emblem: 'couture_crest',
+    emblem: 'jordan_wings',
     monogram: 'AJ',
     accent: '#C94A4A',
     models: ['Air Jordan 1 High', 'Air Jordan 4 Retro', 'Air Jordan 3', 'Air Jordan 11', 'Travis Scott × AJ1'],
@@ -671,6 +764,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   adidas: {
     name: 'ADIDAS ORIGINALS',
     founded: '1949',
+    officialUrl: 'https://www.adidas.com',
+    officialDomain: 'adidas.com',
     hq: 'Херцогенаурах, Германия',
     founders: 'Адольф (Ади) Дасслер',
     emblem: 'adidas_bars',
@@ -686,6 +781,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   yeezy: {
     name: 'YEEZY',
     founded: '2015',
+    officialUrl: 'https://www.adidas.com',
+    officialDomain: 'adidas.com/yeezy',
     hq: 'Калабасас, Калифорния, США',
     founders: 'Канье Уэст · Стивен Смит',
     emblem: 'adidas_bars',
@@ -701,6 +798,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'new balance': {
     name: 'NEW BALANCE',
     founded: '1906',
+    officialUrl: 'https://www.newbalance.com',
+    officialDomain: 'newbalance.com',
     hq: 'Бостон, Массачусетс, США',
     founders: 'Уильям Райли · Тедди Сантис',
     emblem: 'sport_vector',
@@ -716,6 +815,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   asics: {
     name: 'ASICS',
     founded: '1949',
+    officialUrl: 'https://www.asics.com',
+    officialDomain: 'asics.com',
     hq: 'Кобе, Япония',
     founders: 'Кихачиро Оницука',
     emblem: 'sport_vector',
@@ -731,6 +832,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   on: {
     name: 'ON RUNNING',
     founded: '2010',
+    officialUrl: 'https://www.on.com',
+    officialDomain: 'on.com',
     hq: 'Цюрих, Швейцария',
     founders: 'Оливье Бернхард, Дэвид Аллеманн, Каспар Коппетти',
     emblem: 'sport_vector',
@@ -746,6 +849,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   hoka: {
     name: 'HOKA',
     founded: '2009',
+    officialUrl: 'https://www.hoka.com',
+    officialDomain: 'hoka.com',
     hq: 'Анси, Французские Альпы',
     founders: 'Николя Мерму & Жан-Люк Диар',
     emblem: 'mountain_peak',
@@ -761,6 +866,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   puma: {
     name: 'PUMA',
     founded: '1948',
+    officialUrl: 'https://us.puma.com',
+    officialDomain: 'puma.com',
     hq: 'Херцогенаурах, Германия',
     founders: 'Рудольф Дасслер',
     emblem: 'sport_vector',
@@ -776,6 +883,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   reebok: {
     name: 'REEBOK',
     founded: '1958',
+    officialUrl: 'https://www.reebok.com',
+    officialDomain: 'reebok.com',
     hq: 'Болтон, Англия / Бостон, США',
     founders: 'Джо и Джефф Фостер',
     emblem: 'heritage_shield',
@@ -791,6 +900,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   saucony: {
     name: 'SAUCONY',
     founded: '1898',
+    officialUrl: 'https://www.saucony.com',
+    officialDomain: 'saucony.com',
     hq: 'Кутцтаун / Бостон, США',
     founders: 'Уильям Донойер и партнеры',
     emblem: 'sport_vector',
@@ -806,6 +917,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   mizuno: {
     name: 'MIZUNO',
     founded: '1906',
+    officialUrl: 'https://global.mizuno.com',
+    officialDomain: 'mizuno.com',
     hq: 'Осака, Япония',
     founders: 'Рихачи и Ридзо Мидзуно',
     emblem: 'sport_vector',
@@ -821,6 +934,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'under armour': {
     name: 'UNDER ARMOUR',
     founded: '1996',
+    officialUrl: 'https://www.underarmour.com',
+    officialDomain: 'underarmour.com',
     hq: 'Балтимор, Мэриленд, США',
     founders: 'Кевин Планк',
     emblem: 'sport_vector',
@@ -836,6 +951,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   fila: {
     name: 'FILA',
     founded: '1911',
+    officialUrl: 'https://www.fila.com',
+    officialDomain: 'fila.com',
     hq: 'Бьелла, Италия',
     founders: 'Братья Фила · Пьерлуиджи Роландо',
     emblem: 'heritage_shield',
@@ -851,6 +968,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   skechers: {
     name: 'SKECHERS',
     founded: '1992',
+    officialUrl: 'https://www.skechers.com',
+    officialDomain: 'skechers.com',
     hq: 'Манхэттен-Бич, Калифорния, США',
     founders: 'Роберт Гринберг',
     emblem: 'sport_vector',
@@ -868,6 +987,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   salomon: {
     name: 'SALOMON',
     founded: '1947',
+    officialUrl: 'https://www.salomon.com',
+    officialDomain: 'salomon.com',
     hq: 'Анси, Французские Альпы',
     founders: 'Франсуа Саломон',
     emblem: 'mountain_peak',
@@ -883,6 +1004,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   arcteryx: {
     name: "ARC'TERYX",
     founded: '1989',
+    officialUrl: 'https://arcteryx.com',
+    officialDomain: 'arcteryx.com',
     hq: 'Северный Ванкувер, Канада · Береговой хребет',
     founders: 'Дэйв Лейн & Джереми Гард',
     emblem: 'mountain_peak',
@@ -898,6 +1021,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   birkenstock: {
     name: 'BIRKENSTOCK',
     founded: '1774',
+    officialUrl: 'https://www.birkenstock.com',
+    officialDomain: 'birkenstock.com',
     hq: 'Нойштадт / Линц-на-Рейне, Германия',
     founders: 'Иоганн Адам Биркеншток · Карл Биркеншток',
     emblem: 'heritage_shield',
@@ -913,6 +1038,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   'dr. martens': {
     name: 'DR. MARTENS',
     founded: '1947',
+    officialUrl: 'https://www.drmartens.com',
+    officialDomain: 'drmartens.com',
     hq: 'Уолластон, Нортгемптоншир, Англия',
     founders: 'Доктор Клаус Мертенс · Семья Григгс',
     emblem: 'heritage_shield',
@@ -928,6 +1055,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   clarks: {
     name: 'CLARKS ORIGINALS',
     founded: '1825',
+    officialUrl: 'https://www.clarks.com',
+    officialDomain: 'clarks.com',
     hq: 'Стрит, графство Сомерсет, Англия',
     founders: 'Сайрус и Джеймс Кларк · Натан Кларк',
     emblem: 'heritage_shield',
@@ -943,6 +1072,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   timberland: {
     name: 'TIMBERLAND',
     founded: '1952',
+    officialUrl: 'https://www.timberland.com',
+    officialDomain: 'timberland.com',
     hq: 'Сatham / Абингтон, Нью-Гэмпшир, США',
     founders: 'Натан Шварц',
     emblem: 'mountain_peak',
@@ -958,6 +1089,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   ugg: {
     name: 'UGG',
     founded: '1978',
+    officialUrl: 'https://www.ugg.com',
+    officialDomain: 'ugg.com',
     hq: 'Голета / Санта-Барбара, Калифорния, США',
     founders: 'Брайан Смит',
     emblem: 'couture_crest',
@@ -973,6 +1106,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   oakley: {
     name: 'OAKLEY FACTORY TEAM',
     founded: '1975',
+    officialUrl: 'https://www.oakley.com',
+    officialDomain: 'oakley.com',
     hq: 'Футхилл-Ранч, Калифорния, США',
     founders: 'Джим Джаннард · Brain Dead (Кайл Нг)',
     emblem: 'skate_hexagon',
@@ -988,6 +1123,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   merrell: {
     name: 'MERRELL 1TRL',
     founded: '1981',
+    officialUrl: 'https://www.merrell.com',
+    officialDomain: 'merrell.com',
     hq: 'Вермонт / Рокфорд, США',
     founders: 'Рэнди Меррелл',
     emblem: 'mountain_peak',
@@ -1003,6 +1140,8 @@ const RAW_BRANDS_DB: Record<string, RawBrandRecord> = {
   crocs: {
     name: 'CROCS',
     founded: '2002',
+    officialUrl: 'https://www.crocs.com',
+    officialDomain: 'crocs.com',
     hq: 'Брумфилд, Колорадо, США',
     founders: 'Скотт Симанс, Линдон Хансон, Джордж Бодекер · Салехе Бембери',
     emblem: 'skate_hexagon',
@@ -1034,6 +1173,8 @@ export function getBrandDossier(
       id: key,
       name: rec.name,
       founded: rec.founded,
+      officialUrl: rec.officialUrl,
+      officialDomain: rec.officialDomain,
       headquarters: {
         ru: rec.hq,
         uk: rec.hq,
@@ -1093,6 +1234,8 @@ export function getBrandDossier(
     id: key,
     name: brandName.toUpperCase(),
     founded: originParts[1]?.replace(/[^0-9]/g, '') || 'ARCHIVE',
+    officialUrl: `https://www.google.com/search?q=${encodeURIComponent(brandName + ' official site')}`,
+    officialDomain: `${key.replace(/\s+/g, '')}.com`,
     headquarters: { ru: origin || brandName, uk: origin || brandName, de: origin || brandName },
     creativeCode: { ru: brandName, uk: brandName, de: brandName },
     emblem: category === 'luxury' ? 'couture_crest' : 'sport_vector',
@@ -1129,4 +1272,3 @@ export function getBrandDossier(
     },
   }
 }
-
