@@ -1,16 +1,8 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo, KeyboardEvent } from 'react'
-import { getBrandDossier } from './brandHeritageData'
-import BrandDossierView from './BrandDossierView'
+import React, { useState, useEffect, useRef } from 'react'
+import { BrandDossier, DossierLang } from './brandHeritageData'
+import { getIconicModelDossier } from './iconicModelsData'
 
-export type Lang = 'ru' | 'uk' | 'de'
-type CategoryId = 'all' | 'luxury' | 'streetwear' | 'sport' | 'outdoor'
-type SortOption = 'newest' | 'price_desc' | 'price_asc' | 'year_desc'
-type GridMode = 'editorial' | 'boutique'
-type BrandSubTab = 'shoes' | 'dossier'
-
-const PAGE_SIZE = 12
-
-export interface Sneaker {
+export interface DossierPreviewSneaker {
   id: string
   brand: string
   name: string
@@ -27,2057 +19,1847 @@ export interface Sneaker {
   }
 }
 
-interface BrandItem {
-  id: string
-  name: string
-  category: CategoryId
-  origin?: string
+interface BrandDossierViewProps {
+  dossier: BrandDossier
+  lang: DossierLang
+  isDark: boolean
+  themeColors: Record<string, string>
+  totalModelsCount: number | null
+  activeIconicModel?: string | null
+  onSelectModelQuery: (searchQuery: string, displayModelName?: string) => void
+  onSelectSneakerCard?: (sneaker: DossierPreviewSneaker, imageUrl: string | null) => void
+  onBackToCollection: () => void
 }
 
-const BRANDS: BrandItem[] = [
-  // Luxury & High Fashion
-  { id: 'prada', name: 'Prada', category: 'luxury', origin: 'MILANO · DAL 1913' },
-  { id: 'balenciaga', name: 'Balenciaga', category: 'luxury', origin: 'PARIS · COUTURE HOUSE' },
-  { id: 'valentino', name: 'Valentino', category: 'luxury', origin: 'ROMA · ATELIER GARAVANI' },
-  { id: 'chanel', name: 'Chanel', category: 'luxury', origin: 'PARIS · 31 RUE CAMBON' },
-  { id: 'gucci', name: 'Gucci', category: 'luxury', origin: 'FIRENZE · DAL 1921' },
-  { id: 'louis vuitton', name: 'Louis Vuitton', category: 'luxury', origin: 'PARIS · MAISON FONDEE EN 1854' },
-  { id: 'dior', name: 'Dior', category: 'luxury', origin: 'PARIS · AVENUE MONTAIGNE' },
-  { id: 'saint laurent', name: 'Saint Laurent', category: 'luxury', origin: 'PARIS · RIVE GAUCHE' },
-  { id: 'bottega veneta', name: 'Bottega Veneta', category: 'luxury', origin: 'VICENZA · ARTISANAL ATELIER' },
-  { id: 'miu miu', name: 'Miu Miu', category: 'luxury', origin: 'MILANO · RUNWAY ARCHIVE' },
-  { id: 'celine', name: 'Celine', category: 'luxury', origin: 'PARIS · RUE VIVIENNE' },
-  { id: 'loewe', name: 'Loewe', category: 'luxury', origin: 'MADRID · CASA LOEWE' },
-  { id: 'hermes', name: 'Hermès', category: 'luxury', origin: 'PARIS · FAUBOURG SAINT-HONORÉ' },
-  { id: 'loro piana', name: 'Loro Piana', category: 'luxury', origin: 'QUARONA · ITALIAN EXCELLENCE' },
-  { id: 'maison margiela', name: 'Maison Margiela', category: 'luxury', origin: 'PARIS · AVANT-GARDE ARCHIVE' },
-  { id: 'rick owens', name: 'Rick Owens', category: 'luxury', origin: 'PARIS · CONCORDIA' },
-  { id: 'alexander mcqueen', name: 'Alexander McQueen', category: 'luxury', origin: 'LONDON · SAVILE ROW HERITAGE' },
-  { id: 'lanvin', name: 'Lanvin', category: 'luxury', origin: 'PARIS · JEANNE LANVIN 1889' },
-  { id: 'versace', name: 'Versace', category: 'luxury', origin: 'MILANO · VIA GESÙ' },
-  { id: 'givenchy', name: 'Givenchy', category: 'luxury', origin: 'PARIS · AVENUE GEORGE V' },
-  { id: 'dsquared2', name: 'Dsquared2', category: 'luxury', origin: 'MILANO · RUNWAY COLLECTION' },
-  { id: 'polo ralph lauren', name: 'Ralph Lauren', category: 'luxury', origin: 'NEW YORK · MADISON AVE' },
-  { id: 'lacoste', name: 'Lacoste', category: 'luxury', origin: 'PARIS · TENNIS HERITAGE' },
-  { id: 'calvin klein', name: 'Calvin Klein', category: 'luxury', origin: 'NEW YORK · MINIMALIST STUDIO' },
-  { id: 'tommy hilfiger', name: 'Tommy Hilfiger', category: 'luxury', origin: 'NEW YORK · ARCHIVE' },
-
-  // Streetwear & Avant-Garde
-  { id: 'off-white', name: 'Off-White', category: 'streetwear', origin: 'MILANO · VIRGIL ABLOH ARCHIVE' },
-  { id: 'fear of god', name: 'Fear of God', category: 'streetwear', origin: 'LOS ANGELES · ETERNAL LINE' },
-  { id: 'bape', name: 'A Bathing Ape', category: 'streetwear', origin: 'TOKYO · URA-HARAJUKU' },
-  { id: 'supreme', name: 'Supreme', category: 'streetwear', origin: 'NEW YORK · LAFAYETTE ST' },
-  { id: 'kith', name: 'Kith', category: 'streetwear', origin: 'NEW YORK · RONNIE FIEG STUDIO' },
-  { id: 'palace', name: 'Palace', category: 'streetwear', origin: 'LONDON · SOHO ARCHIVE' },
-  { id: 'autry', name: 'Autry', category: 'streetwear', origin: 'DALLAS · ACTION SHOES' },
-  { id: 'veja', name: 'Veja', category: 'streetwear', origin: 'PARIS · STUDIO EDITION' },
-  { id: 'converse', name: 'Converse', category: 'streetwear', origin: 'BOSTON · ARCHIVE DIVISION' },
-  { id: 'vans', name: 'Vans', category: 'streetwear', origin: 'CALIFORNIA · VAULT ARCHIVE' },
-  { id: 'etnies', name: 'Etnies', category: 'streetwear', origin: 'CALIFORNIA · SKATE HERITAGE' },
-  { id: 'osiris', name: 'Osiris', category: 'streetwear', origin: 'SAN DIEGO · MILLENNIUM ARCHIVE' },
-  { id: 'dc', name: 'DC Shoes', category: 'streetwear', origin: 'CALIFORNIA · STUDIO ARCHIVE' },
-
-  // Sport & Performance Icons
-  { id: 'nike', name: 'Nike', category: 'sport', origin: 'BEAVERTON · ARCHIVE & LAB' },
-  { id: 'jordan', name: 'Jordan', category: 'sport', origin: 'CHICAGO · FLIGHT ARCHIVE' },
-  { id: 'adidas', name: 'Adidas', category: 'sport', origin: 'HERZOGENAURACH · ORIGINALS' },
-  { id: 'yeezy', name: 'Yeezy', category: 'sport', origin: 'CALABASAS · DESIGN ARCHIVE' },
-  { id: 'new balance', name: 'New Balance', category: 'sport', origin: 'BOSTON · MADE IN USA / UK' },
-  { id: 'asics', name: 'Asics', category: 'sport', origin: 'KOBE · SPORTSTYLE LAB' },
-  { id: 'on', name: 'On Running', category: 'sport', origin: 'ZÜRICH · SWISS ENGINEERING' },
-  { id: 'hoka', name: 'Hoka', category: 'sport', origin: 'ANNECY · PERFORMANCE STUDIO' },
-  { id: 'puma', name: 'Puma', category: 'sport', origin: 'HERZOGENAURACH · SELECT' },
-  { id: 'reebok', name: 'Reebok', category: 'sport', origin: 'BOLTON · HERITAGE ARCHIVE' },
-  { id: 'saucony', name: 'Saucony', category: 'sport', origin: 'PENNSYLVANIA · ORIGINALS' },
-  { id: 'mizuno', name: 'Mizuno', category: 'sport', origin: 'OSAKA · WAVE STUDIO' },
-  { id: 'under armour', name: 'Under Armour', category: 'sport', origin: 'BALTIMORE · PERFORMANCE' },
-  { id: 'fila', name: 'Fila', category: 'sport', origin: 'BIELLA · ITALIAN SPORTSWEAR' },
-  { id: 'skechers', name: 'Skechers', category: 'sport', origin: 'MANHATTAN BEACH · STUDIO' },
-
-  // Outdoor & Artisanal Casual
-  { id: 'salomon', name: 'Salomon', category: 'outdoor', origin: 'ANNECY · ADVANCED LAB' },
-  { id: 'arcteryx', name: "Arc'teryx", category: 'outdoor', origin: 'VANCOUVER · SYSTEM_A' },
-  { id: 'birkenstock', name: 'Birkenstock 1774', category: 'outdoor', origin: 'NEUSTADT · TRADITION SEIT 1774' },
-  { id: 'dr. martens', name: 'Dr. Martens', category: 'outdoor', origin: 'WOLLASTON · MADE IN ENGLAND' },
-  { id: 'clarks', name: 'Clarks Originals', category: 'outdoor', origin: 'SOMERSET · EST. 1825' },
-  { id: 'timberland', name: 'Timberland', category: 'outdoor', origin: 'NEW HAMPSHIRE · HERITAGE' },
-  { id: 'ugg', name: 'UGG', category: 'outdoor', origin: 'CALIFORNIA · COLLECTIVE' },
-  { id: 'oakley', name: 'Oakley Factory Team', category: 'outdoor', origin: 'FOOTHILL RANCH · CONCEPT LAB' },
-  { id: 'merrell', name: 'Merrell 1TRL', category: 'outdoor', origin: 'VERMONT · TRAIL ARCHIVE' },
-  { id: 'crocs', name: 'Crocs Pollex', category: 'outdoor', origin: 'COLORADO · DESIGN COLLABORATIONS' },
-]
-
-const TRANSLATIONS: Record<Lang, Record<string, string>> = {
+const UI_LABELS: Record<DossierLang, Record<string, string>> = {
   ru: {
-    back: 'Назад',
-    catalog: 'Подиум',
-    archive: 'Избранное',
-    savedArchive: 'Частный архив',
-    sneakerIndex: 'The Lookbook',
-    editorialSub: 'CURATED FOOTWEAR & HIGH-FASHION ARCHIVE',
-    searchPlaceholder: 'Силуэт, Дом моды или оттенок...',
-    searchBtn: 'Искать',
-    allBrands: 'Все Дома',
-    catAll: 'Все коллекции',
-    catLuxury: 'Высокая мода',
-    catStreet: 'Авангард & Стрит',
-    catSport: 'Спорт-кутюр',
-    catOutdoor: 'Аутдор & Классика',
-    tabCollection: 'Коллекция',
-    tabMaisonDossier: 'Паспорт Дома ✦',
-    iconicFilterLabel: 'Культовый силуэт',
-    backToPassport: '← В паспорт Дома',
-    showAllBrandShoes: 'Все силуэты Дома',
-    officialSiteShort: 'Оф. сайт',
-    all: 'Все',
-    men: 'Мужское',
-    women: 'Женское',
-    menLine: 'Мужская линия',
-    womenLine: 'Женская линия',
-    sortNewest: 'Новые поступления',
-    sortPriceDesc: 'Сначала дорогие',
-    sortPriceAsc: 'Сначала доступные',
-    sortYearDesc: 'По году коллекции',
-    emptyArchive: 'В вашем частном архиве пока нет сохраненных силуэтов',
-    notFound: 'Силуэты по данному запросу не найдены в архиве',
-    resetFilters: 'Вернуться ко всей коллекции',
-    priceUnav: 'По запросу',
-    retail: 'Бутик',
-    buySearch: 'Найти в бутиках',
-    copySku: 'Скопировать референс модели',
-    copied: 'Скопировано',
-    loadMore: 'Открыть еще 12 силуэтов',
-    loading: 'Открываем следующие 12...',
-    shownOf: 'Показано',
-    ofTotal: 'из',
-    errorLoad: 'Не удалось получить данные коллекции',
-    errorSneakers: 'Временная пауза соединения с архивом',
-    errorRateLimit: 'Слишком много обращений. Повторите через минуту.',
-    scrollTop: 'Наверх',
-    scrollReturn: 'Вернуться',
-    searchSuffix: 'купить оригинал',
-    noPhoto: 'Ателье готовит снимок',
-    releaseYearLabel: 'Сезон / Год',
-    skuLabel: 'Референс',
-    genderLabel: 'Линия',
-    close: 'Закрыть',
-    editorialView: 'Журнал',
-    boutiqueView: 'Галерея',
-    curatedNote: 'Архивная селекция подиумных моделей, культовых коллабораций и классических силуэтов.',
+    founded: 'Год основания',
+    hq: 'Штаб-квартира',
+    direction: 'Основатели и креативный код',
+    archiveVolume: 'В каталоге',
+    modelsUnit: 'моделей',
+    curatedArchive: 'Кураторский архив',
+    officialSiteLabel: 'Официальное представительство Дома',
+    iconicHeader: 'Культовые силуэты Дома · Энциклопедия',
+    iconicSub: 'Выберите модель, чтобы прочитать историю создания, роль в кино и секреты конструкции',
+    techSpecHeader: 'Материаловедение и инженерия подошвы',
+    techSpecSub: 'Ключевые конструктивные узлы, кожи и запатентованные полимеры',
+    backToShoes: 'Смотреть коллекцию',
+    spotlightBadge: 'Архивное досье силуэта',
+    debutYearLabel: 'Год дебюта',
+    creatorLabel: 'Автор / Эпоха',
+    storyHeader: 'История и архитектура модели',
+    cultureHeader: '✦ В кино, музыке и поп-культуре',
+    factHeader: '◈ Инженерный секрет и факт для коллекционеров',
+    checkingCatalog: 'Проверяем наличие в каталоге...',
+    foundInCatalog: 'Доступно в вашем каталоге',
+    openInCatalogBtn: 'Открыть эти модели в каталоге',
+    lookPhotosBtn: 'Смотреть фотографии силуэта в архиве ↗',
+    prevSilhouette: '← Пред. силуэт',
+    nextSilhouette: 'След. силуэт →',
+    closeSpotlight: 'Свернуть',
   },
   uk: {
-    back: 'Назад',
-    catalog: 'Подіум',
-    archive: 'Обране',
-    savedArchive: 'Приватний архів',
-    sneakerIndex: 'The Lookbook',
-    editorialSub: 'CURATED FOOTWEAR & HIGH-FASHION ARCHIVE',
-    searchPlaceholder: 'Силует, Дім моди або відтінок...',
-    searchBtn: 'Шукати',
-    allBrands: 'Всі Доми',
-    catAll: 'Всі колекції',
-    catLuxury: 'Висока мода',
-    catStreet: 'Авангард & Стріт',
-    catSport: 'Спорт-кутюр',
-    catOutdoor: 'Аутдор & Класика',
-    tabCollection: 'Колекція',
-    tabMaisonDossier: 'Паспорт Дому ✦',
-    iconicFilterLabel: 'Культовий силует',
-    backToPassport: '← У паспорт Дому',
-    showAllBrandShoes: 'Всі силуети Дому',
-    officialSiteShort: 'Оф. сайт',
-    all: 'Всі',
-    men: 'Чоловіче',
-    women: 'Жіноче',
-    menLine: 'Чоловіча лінія',
-    womenLine: 'Жіноча лінія',
-    sortNewest: 'Нові надходження',
-    sortPriceDesc: 'Спочатку дорожчі',
-    sortPriceAsc: 'Спочатку доступніші',
-    sortYearDesc: 'За роком колекції',
-    emptyArchive: 'У вашому приватному архіві поки немає збережених силуетів',
-    notFound: 'Силуети за цим запитом не знайдені в архіві',
-    resetFilters: 'Повернутися до всієї колекції',
-    priceUnav: 'За запитом',
-    retail: 'Бутик',
-    buySearch: 'Знайти у бутиках',
-    copySku: 'Скопіювати референс моделі',
-    copied: 'Скопійовано',
-    loadMore: 'Відкрити ще 12 силуетів',
-    loading: 'Відкриваємо наступні 12...',
-    shownOf: 'Показано',
-    ofTotal: 'з',
-    errorLoad: 'Не вдалося отримати дані колекції',
-    errorSneakers: 'Тимчасова пауза з’єднання з архівом',
-    errorRateLimit: 'Забагато запитів. Повторіть за хвилину.',
-    scrollTop: 'Вгору',
-    scrollReturn: 'Повернутися',
-    searchSuffix: 'купити в Україні',
-    noPhoto: 'Ательє готує знімок',
-    releaseYearLabel: 'Сезон / Рік',
-    skuLabel: 'Референс',
-    genderLabel: 'Лінія',
-    close: 'Закрити',
-    editorialView: 'Журнал',
-    boutiqueView: 'Галерея',
-    curatedNote: 'Архівна селекція подіумних моделей, культових колаборацій та класичних силуетів.',
+    founded: 'Рік заснування',
+    hq: 'Штаб-квартира',
+    direction: 'Засновники та креативний код',
+    archiveVolume: 'У каталозі',
+    modelsUnit: 'моделей',
+    curatedArchive: 'Кураторський архів',
+    officialSiteLabel: 'Офіційне представництво Дому',
+    iconicHeader: 'Культові силуети Дому · Енциклопедія',
+    iconicSub: 'Оберіть модель, щоб прочитати історію створення, роль у кіно та секрети конструкції',
+    techSpecHeader: 'Матеріалознавство та інженерія підошви',
+    techSpecSub: 'Ключові конструктивні вузли, шкіри та запатентовані полімери',
+    backToShoes: 'Дивитися колекцію',
+    spotlightBadge: 'Архівне досьє силуету',
+    debutYearLabel: 'Рік дебюту',
+    creatorLabel: 'Автор / Епоха',
+    storyHeader: 'Історія та архітектура моделі',
+    cultureHeader: '✦ У кіно, музиці та поп-культурі',
+    factHeader: '◈ Інженерний секрет та факт для колекціонерів',
+    checkingCatalog: 'Перевіряємо наявність у каталозі...',
+    foundInCatalog: 'Доступно у вашому каталозі',
+    openInCatalogBtn: 'Відкрити ці моделі в каталозі',
+    lookPhotosBtn: 'Дивитися фотографії силуету в архіві ↗',
+    prevSilhouette: '← Попередній',
+    nextSilhouette: 'Наступний →',
+    closeSpotlight: 'Згорнути',
   },
   de: {
-    back: 'Zurück',
-    catalog: 'Runway',
-    archive: 'Archiv',
-    savedArchive: 'Privates Archiv',
-    sneakerIndex: 'The Lookbook',
-    editorialSub: 'CURATED FOOTWEAR & HIGH-FASHION ARCHIVE',
-    searchPlaceholder: 'Silhouette, Modehaus oder Farbton...',
-    searchBtn: 'Suchen',
-    allBrands: 'Alle Häuser',
-    catAll: 'Alle Kollektionen',
-    catLuxury: 'Haute Couture',
-    catStreet: 'Avantgarde & Street',
-    catSport: 'Sport Couture',
-    catOutdoor: 'Outdoor & Heritage',
-    tabCollection: 'Kollektion',
-    tabMaisonDossier: 'Haus-Pass ✦',
-    iconicFilterLabel: 'Ikonische Silhouette',
-    backToPassport: '← Zum Haus-Pass',
-    showAllBrandShoes: 'Alle Silhouetten',
-    officialSiteShort: 'Website',
-    all: 'Alle',
-    men: 'Herren',
-    women: 'Damen',
-    menLine: 'Herrenlinie',
-    womenLine: 'Damenlinie',
-    sortNewest: 'Neuheiten',
-    sortPriceDesc: 'Preis absteigend',
-    sortPriceAsc: 'Preis aufsteigend',
-    sortYearDesc: 'Nach Kollektionsjahr',
-    emptyArchive: 'Ihr privates Archiv enthält noch keine Silhouetten',
-    notFound: 'Keine Silhouetten für diese Anfrage gefunden',
-    resetFilters: 'Zur gesamten Kollektion',
-    priceUnav: 'Auf Anfrage',
-    retail: 'Boutique',
-    buySearch: 'In Boutiquen finden',
-    copySku: 'Modellreferenz kopieren',
-    copied: 'Kopiert',
-    loadMore: 'Weitere 12 Silhouetten laden',
-    loading: 'Nächste 12 werden geladen...',
-    shownOf: 'Gezeigt',
-    ofTotal: 'von',
-    errorLoad: 'Fehler beim Laden der Kollektion',
-    errorSneakers: 'Archivverbindung unterbrochen',
-    errorRateLimit: 'Zu viele Anfragen. Bitte warten Sie einen Moment.',
-    scrollTop: 'Nach oben',
-    scrollReturn: 'Zurück',
-    searchSuffix: 'kaufen',
-    noPhoto: 'Atelieraufnahme folgt',
-    releaseYearLabel: 'Saison / Jahr',
-    skuLabel: 'Referenz',
-    genderLabel: 'Linie',
-    close: 'Schließen',
-    editorialView: 'Lookbook',
-    boutiqueView: 'Galerie',
-    curatedNote: 'Kuratierte Auswahl an Runway-Modellen, ikonischen Kollaborationen und Klassikern.',
+    founded: 'Gründungsjahr',
+    hq: 'Stammhaus',
+    direction: 'Gründer & Kreativcode',
+    archiveVolume: 'Im Katalog',
+    modelsUnit: 'Modelle',
+    curatedArchive: 'Kuratiertes Archiv',
+    officialSiteLabel: 'Offizielle Repräsentanz des Hauses',
+    iconicHeader: 'Ikonische Silhouetten · Enzyklopädie',
+    iconicSub: 'Wählen Sie ein Modell, um Entstehungsgeschichte, Filmauftritte und Geheimnisse zu lesen',
+    techSpecHeader: 'Materialkunde & Sohlentechnologie',
+    techSpecSub: 'Konstruktionsmerkmale, Lederarten und Sohlensysteme',
+    backToShoes: 'Kollektion ansehen',
+    spotlightBadge: 'Archiv-Dossier der Silhouette',
+    debutYearLabel: 'Debütjahr',
+    creatorLabel: 'Designer / Ära',
+    storyHeader: 'Geschichte & Architektur',
+    cultureHeader: '✦ In Kino, Musik & Popkultur',
+    factHeader: '◈ Sammlerfakt & Konstruktionsgeheimnis',
+    checkingCatalog: 'Katalog wird geprüft...',
+    foundInCatalog: 'In Ihrem Katalog verfügbar',
+    openInCatalogBtn: 'Im Katalog öffnen',
+    lookPhotosBtn: 'Archivfotos der Silhouette ansehen ↗',
+    prevSilhouette: '← Vorherige',
+    nextSilhouette: 'Nächste →',
+    closeSpotlight: 'Schließen',
   },
 }
 
-function detectActiveTheme(propTheme?: 'light' | 'dark'): boolean {
-  if (propTheme === 'light') return false
-  if (propTheme === 'dark') return true
-  if (typeof window === 'undefined') return false
-
-  const html = document.documentElement
-  const body = document.body
-
-  if (html.classList.contains('light') || body?.classList.contains('light')) return false
-  if (html.classList.contains('dark') || body?.classList.contains('dark')) return true
-
-  const htmlAttr = html.getAttribute('data-theme') || body?.getAttribute('data-theme')
-  if (htmlAttr === 'light') return false
-  if (htmlAttr === 'dark') return true
-
+function openExternalUrl(url: string) {
   try {
-    const keys = ['cordwainer_theme', 'theme', 'app-theme', 'color-theme', 'app_theme']
-    for (const k of keys) {
-      const val = localStorage.getItem(k)
-      if (val === 'light') return false
-      if (val === 'dark') return true
-    }
-  } catch {}
-
-  try {
-    if (body) {
-      const bg = window.getComputedStyle(body).backgroundColor
-      const match = bg.match(/\d+/g)
-      if (match && match.length >= 3) {
-        const [r, g, b] = match.map(Number)
-        if ((r + g + b) / 3 > 140) return false
-        if ((r + g + b) / 3 > 0 && (r + g + b) / 3 <= 140) return true
-      }
-    }
-  } catch {}
-
-  const tgScheme = (window as any).Telegram?.WebApp?.colorScheme
-  if (tgScheme === 'light') return false
-  if (tgScheme === 'dark') return true
-
-  return false
-}
-
-function formatPiecesCount(count: number, lang: Lang): string {
-  const formatted = count.toLocaleString('ru-RU')
-  if (lang === 'de') {
-    return `${formatted} ${count === 1 ? 'Silhouette in der Auswahl' : 'Silhouetten in der Auswahl'}`
-  }
-  const mod10 = count % 10
-  const mod100 = count % 100
-  if (lang === 'uk') {
-    if (mod10 === 1 && mod100 !== 11) return `${formatted} силует у колекції`
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${formatted} силуети у колекції`
-    return `${formatted} силуетів у колекції`
-  }
-  if (mod10 === 1 && mod100 !== 11) return `${formatted} силуэт в коллекции`
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${formatted} силуэта в коллекции`
-  return `${formatted} силуэтов в коллекции`
-}
-
-function haptic(kind: 'light' | 'medium' = 'light') {
-  try {
-    const tg = (window as any).Telegram?.WebApp
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(kind)
-    else if (navigator.vibrate) navigator.vibrate(kind === 'light' ? 15 : 35)
-  } catch {}
-}
-
-function parseEditorialTitle(brand: string, rawName: string): {
-  silhouette: string
-  colorway: string | null
-} {
-  if (!rawName) return { silhouette: 'Archive Silhouette', colorway: null }
-  let cleaned = rawName.trim()
-
-  const escapedBrand = brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  cleaned = cleaned.replace(new RegExp(`^${escapedBrand}\\s+`, 'i'), '')
-
-  cleaned = cleaned
-    .replace(/\b(Wmns|Womens|Women's|Mens|Men's|Big Kids|Little Kids|Youth|GS|PS|TD)\b\s*/gi, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-
-  let colorway: string | null = null
-  const quoteMatch = cleaned.match(/['"«“]([^'"»”]+)['"»”]\s*$/)
-  if (quoteMatch) {
-    colorway = quoteMatch[1].trim()
-    cleaned = cleaned.slice(0, quoteMatch.index).trim().replace(/[-–—]\s*$/, '').trim()
-  }
-
-  return {
-    silhouette: cleaned || rawName,
-    colorway,
-  }
-}
-
-function parseReleaseYear(sneaker: Sneaker): string | null {
-  const rawDate = sneaker.releaseDate || sneaker.release_date || sneaker.publishedAt
-  if (rawDate && typeof rawDate === 'string' && rawDate.length >= 4) {
-    const yearMatch = rawDate.match(/\b(19[7-9]\d|20[0-2]\d)\b/)
-    if (yearMatch) return yearMatch[1]
-  }
-
-  const rawYear = sneaker.year ?? sneaker.releaseYear
-  if (rawYear !== null && rawYear !== undefined) {
-    const numYear = Number(rawYear)
-    if (!Number.isNaN(numYear) && numYear >= 1970 && numYear <= 2027 && numYear !== 2024) {
-      return String(numYear)
-    }
-  }
-
-  const nameYearMatch = sneaker.name?.match(/\b(19[8-9]\d|20[0-2]\d)\b/)
-  if (nameYearMatch) return nameYearMatch[1]
-
-  return null
-}
-
-function formatLuxuryPrice(price: number): string {
-  if (!price || price <= 0) return ''
-  return `$${price.toLocaleString('en-US')}`
-}
-
-function buildImageSources(rawUrl?: string | null): string[] {
-  if (!rawUrl || typeof rawUrl !== 'string') return []
-  const trimmed = rawUrl.trim()
-  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return []
-
-  const httpsUrl = trimmed.replace(/^http:\/\//i, 'https://')
-  const sources: string[] = []
-
-  if (httpsUrl.includes('stockx.com')) {
-    const base = httpsUrl.split('?')[0]
-    sources.push(`${base}?fit=fill&bg=FFFFFF&w=800&h=560&fm=jpg&q=85&trim=color`)
-    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(base)}&w=800&q=85&output=png`)
-    return sources
-  }
-
-  if (httpsUrl.includes('goat.com') || httpsUrl.includes('flightclub.com')) {
-    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=85&output=png`)
-    sources.push(httpsUrl)
-    return sources
-  }
-
-  sources.push(httpsUrl)
-  sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=88&output=png`)
-  return sources
-}
-
-interface SneakerCardProps {
-  sneaker: Sneaker
-  index: number
-  isFeatured: boolean
-  isFav: boolean
-  toggleFavorite: (e: React.MouseEvent, sneaker: Sneaker) => void
-  t: Record<string, string>
-  themeColors: Record<string, string>
-  isDark: boolean
-  gridMode: GridMode
-  onSelect: (sneaker: Sneaker, activeImageUrl: string | null) => void
-  onBrokenImage?: (id: string) => void
-}
-
-function SneakerCard({
-  sneaker,
-  index,
-  isFeatured,
-  isFav,
-  toggleFavorite,
-  t,
-  themeColors,
-  isDark,
-  gridMode,
-  onSelect,
-  onBrokenImage,
-}: SneakerCardProps) {
-  const rawOriginal = sneaker.image?.original || null
-  const sources = useMemo(() => buildImageSources(rawOriginal), [rawOriginal])
-  const [attempt, setAttempt] = useState(0)
-  const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>(
-    sources.length > 0 ? 'loading' : 'error'
-  )
-  const imgRef = useRef<HTMLImageElement | null>(null)
-
-  const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
-
-  useEffect(() => {
-    setAttempt(0)
-    setImgState(sources.length > 0 ? 'loading' : 'error')
-  }, [rawOriginal])
-
-  useEffect(() => {
-    const el = imgRef.current
-    if (el && el.complete && el.naturalWidth > 10) {
-      setImgState('loaded')
-    }
-  }, [currentSrc])
-
-  useEffect(() => {
-    if (imgState !== 'loading' || !currentSrc) return
-    const timer = setTimeout(() => {
-      const el = imgRef.current
-      if (el && el.complete && el.naturalWidth > 10) {
-        setImgState('loaded')
-      } else if (attempt < sources.length - 1) {
-        setAttempt((prev) => prev + 1)
-      }
-    }, 3500)
-    return () => clearTimeout(timer)
-  }, [imgState, currentSrc, attempt, sources.length])
-
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    if (e.currentTarget.naturalWidth <= 10 || e.currentTarget.naturalHeight <= 10) {
-      handleImageError()
-    } else {
-      setImgState('loaded')
-    }
-  }
-
-  const handleImageError = () => {
-    if (attempt < sources.length - 1) {
-      setAttempt((prev) => prev + 1)
-    } else {
-      setImgState('error')
-      if (onBrokenImage) onBrokenImage(sneaker.id)
-    }
-  }
-
-  const releaseYear = useMemo(() => parseReleaseYear(sneaker), [sneaker])
-  const { silhouette, colorway } = useMemo(
-    () => parseEditorialTitle(sneaker.brand, sneaker.name),
-    [sneaker.brand, sneaker.name]
-  )
-
-  const lookNumber = String(index + 1).padStart(2, '0')
-  const isCompact = gridMode === 'boutique' && !isFeatured
-
-  return (
-    <article
-      onClick={() => onSelect(sneaker, imgState === 'loaded' ? currentSrc : rawOriginal)}
-      className={`group cursor-pointer flex flex-col justify-between ${
-        isFeatured && gridMode === 'boutique' ? 'col-span-2 my-2' : ''
-      }`}
-    >
-      <div>
-        <div
-          className={`w-full overflow-hidden relative flex items-center justify-center ${
-            isFeatured
-              ? 'aspect-[16/10] mb-4'
-              : isCompact
-              ? 'aspect-[5/4] mb-3'
-              : 'aspect-[16/10] mb-4'
-          }`}
-          style={{
-            backgroundColor: themeColors.studioCanvas,
-            boxShadow: isDark
-              ? 'inset 0 0 0 1px rgba(255,255,255,0.04)'
-              : '0 2px 14px rgba(17,17,17,0.025)',
-          }}
-        >
-          <div className="absolute top-3 left-3.5 z-10 flex items-center gap-2 pointer-events-none">
-            <span
-              className="font-serif italic text-[11px] tracking-[0.06em] opacity-40"
-              style={{ color: themeColors.text }}
-            >
-              Look {lookNumber}
-            </span>
-            {releaseYear && (
-              <span
-                className="text-[8px] font-sans uppercase tracking-[0.2em] opacity-35"
-                style={{ color: themeColors.text }}
-              >
-                · {releaseYear}
-              </span>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={(e) => toggleFavorite(e, sneaker)}
-            aria-label="Save to archive"
-            className="absolute top-2 right-2.5 z-20 w-8 h-8 flex items-center justify-center rounded-full outline-none bg-transparent border-none cursor-pointer transition-transform active:scale-90"
-            style={{ color: isFav ? themeColors.text : themeColors.textMuted }}
-          >
-            <svg
-              width={isCompact ? '14' : '16'}
-              height={isCompact ? '14' : '16'}
-              viewBox="0 0 24 24"
-              fill={isFav ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              strokeWidth="1.2"
-            >
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-          </button>
-
-          {imgState === 'loading' && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-              <div
-                className="w-6 h-6 rounded-full border border-t-transparent animate-spin opacity-20"
-                style={{ borderColor: themeColors.textMuted, borderTopColor: 'transparent' }}
-              />
-            </div>
-          )}
-
-          {currentSrc && imgState !== 'error' && (
-            <img
-              ref={imgRef}
-              src={currentSrc}
-              alt={sneaker.name}
-              decoding="async"
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-              className="relative z-10 w-[92%] h-[92%] object-contain transition-transform duration-500 ease-out group-hover:scale-105"
-            />
-          )}
-        </div>
-
-        <div className={isFeatured ? 'px-2 text-center max-w-md mx-auto' : 'px-0.5'}>
-          <div
-            className={`flex items-baseline gap-2 mb-0.5 ${
-              isFeatured ? 'justify-center' : 'justify-between'
-            }`}
-          >
-            <span
-              className="text-[9px] font-sans font-semibold uppercase tracking-[0.24em] truncate"
-              style={{ color: themeColors.text }}
-            >
-              {sneaker.brand}
-            </span>
-
-            {!isFeatured && sneaker.retailPrice > 0 && (
-              <span
-                className="text-[10px] font-sans tracking-[0.08em] shrink-0"
-                style={{ color: themeColors.textMuted }}
-              >
-                {formatLuxuryPrice(sneaker.retailPrice)}
-              </span>
-            )}
-          </div>
-
-          <h3
-            className={`font-serif font-normal leading-[1.22] tracking-[-0.01em] ${
-              isFeatured
-                ? 'text-[22px] sm:text-[26px] mb-1'
-                : isCompact
-                ? 'text-[14px] line-clamp-1 mb-0.5'
-                : 'text-[19px] mb-1'
-            }`}
-            style={{ color: themeColors.text }}
-          >
-            {silhouette}
-          </h3>
-
-          {colorway && (
-            <p
-              className={`font-serif italic leading-snug ${
-                isCompact ? 'text-[11px] line-clamp-1' : 'text-[13px]'
-              }`}
-              style={{ color: themeColors.textMuted }}
-            >
-              {colorway}
-            </p>
-          )}
-
-          {isFeatured && sneaker.retailPrice > 0 && (
-            <p
-              className="text-[10px] font-sans uppercase tracking-[0.22em] mt-1.5"
-              style={{ color: themeColors.textMuted }}
-            >
-              {formatLuxuryPrice(sneaker.retailPrice)}
-            </p>
-          )}
-        </div>
-      </div>
-    </article>
-  )
-}
-
-interface SneakerIndexProps {
-  onBack?: () => void
-  theme?: 'light' | 'dark'
-  lang?: Lang
-}
-
-export default function SneakerIndex({ onBack, theme: propTheme, lang }: SneakerIndexProps) {
-  const tgUserId =
-    typeof window !== 'undefined'
-      ? (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id || null
-      : null
-
-  const getActiveLang = (): Lang => {
-    if (lang) return lang
-    if (typeof window !== 'undefined') {
-      try {
-        const savedLang =
-          localStorage.getItem('cordwainer_lang') || localStorage.getItem('app_lang')
-        if (savedLang === 'ru' || savedLang === 'uk' || savedLang === 'de') return savedLang
-      } catch {}
-      const tg = (window as any).Telegram?.WebApp
-      const tgLang = tg?.initDataUnsafe?.user?.language_code
-      if (tgLang === 'uk' || tgLang === 'ukr') return 'uk'
-      if (tgLang === 'de') return 'de'
-    }
-    return 'ru'
-  }
-
-  const activeLang = getActiveLang()
-  const t = TRANSLATIONS[activeLang]
-
-  const getInitialQuery = (): string | null => {
-    if (typeof window === 'undefined') return null
-    const params = new URLSearchParams(window.location.search)
-    const q = params.get('q')
-    if (q) return q.trim()
-
-    const tg = (window as any).Telegram?.WebApp
-    const startParam =
-      tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam') || null
-
-    if (startParam && typeof startParam === 'string' && startParam.startsWith('search_')) {
-      return startParam.slice('search_'.length).replace(/_/g, ' ').trim()
-    }
-    return null
-  }
-
-  const initialQuery = getInitialQuery()
-
-  const [sneakers, setSneakers] = useState<Sneaker[]>([])
-  const [favorites, setFavorites] = useState<Sneaker[]>([])
-  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set())
-  const [viewState, setViewState] = useState<'catalog' | 'favorites'>('catalog')
-  const [brandSubTab, setBrandSubTab] = useState<BrandSubTab>('shoes')
-  const [totalInDb, setTotalInDb] = useState<number | null>(null)
-
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId>('all')
-  const [selectedBrand, setSelectedBrand] = useState<string>(initialQuery ? 'all' : 'prada')
-  const [selectedGender, setSelectedGender] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<SortOption>('newest')
-  const [gridMode, setGridMode] = useState<GridMode>('boutique')
-
-  const [searchText, setSearchText] = useState(initialQuery || '')
-  const [activeQuery, setActiveQuery] = useState(initialQuery || 'prada')
-  const [selectedIconicModel, setSelectedIconicModel] = useState<string | null>(null)
-
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [error, setError] = useState('')
-  const [hasSearched, setHasSearched] = useState(!!initialQuery)
-
-  const [selectedModalSneaker, setSelectedModalSneaker] = useState<{
-    sneaker: Sneaker
-    imageUrl: string | null
-  } | null>(null)
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-
-  const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
-  const returnYRef = useRef<number | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  const [isDark, setIsDark] = useState<boolean>(() => detectActiveTheme(propTheme))
-  const cacheRef = useRef<Record<string, { items: Sneaker[]; total: number | null }>>({})
-
-  useEffect(() => {
-    if (tgUserId) {
-      fetch(`/api/favorites?user_id=${tgUserId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (Array.isArray(data.favorites)) {
-            setFavorites(data.favorites)
-            localStorage.setItem('lookbook_favorites', JSON.stringify(data.favorites))
-          }
-        })
-        .catch(() => {})
-    } else {
-      try {
-        const savedFavs = localStorage.getItem('lookbook_favorites')
-        if (savedFavs) setFavorites(JSON.parse(savedFavs))
-      } catch {}
-    }
-  }, [tgUserId])
-
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      const currentY = container.scrollTop
-      if (currentY > 600) {
-        setButtonMode((prev) => (prev !== 'up' ? 'up' : prev))
-      } else if (currentY < 100 && returnYRef.current !== null) {
-        setButtonMode((prev) => (prev !== 'down' ? 'down' : prev))
-      } else {
-        setButtonMode((prev) => (prev !== 'hidden' ? 'hidden' : prev))
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  const handleSmartScroll = () => {
-    haptic('light')
-    const container = scrollRef.current
-    if (!container) return
-
-    if (buttonMode === 'up') {
-      returnYRef.current = container.scrollTop
-      container.scrollTo({ top: 0, behavior: 'smooth' })
-    } else if (buttonMode === 'down' && returnYRef.current !== null) {
-      container.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
-      setTimeout(() => {
-        returnYRef.current = null
-      }, 1000)
-    }
-  }
-
-  useEffect(() => {
-    setIsDark(detectActiveTheme(propTheme))
-    if (propTheme) return
-
-    const observer = new MutationObserver(() => {
-      setIsDark(detectActiveTheme(propTheme))
-    })
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    })
-
-    return () => observer.disconnect()
-  }, [propTheme])
-
-  const themeColors = {
-    bg: isDark ? '#0A0A0C' : '#F6F4EF',
-    studioCanvas: isDark ? '#141418' : '#FFFFFF',
-    modalBg: isDark ? '#111114' : '#FAF8F4',
-    text: isDark ? '#F5F2EB' : '#111111',
-    textMuted: isDark ? 'rgba(245, 242, 235, 0.52)' : 'rgba(17, 17, 17, 0.52)',
-    textFaint: isDark ? 'rgba(245, 242, 235, 0.32)' : 'rgba(17, 17, 17, 0.32)',
-    border: isDark ? 'rgba(245, 242, 235, 0.15)' : 'rgba(17, 17, 17, 0.14)',
-    borderFaint: isDark ? 'rgba(245, 242, 235, 0.07)' : 'rgba(17, 17, 17, 0.07)',
-  }
-
-  const fetchSneakers = useCallback(
-    async (query: string, genderFilter: string, pageNum: number, append: boolean = false) => {
-      const cacheKey = `${query}_${genderFilter}_limit${PAGE_SIZE}_p${pageNum}`
-
-      if (!append && cacheRef.current[cacheKey]) {
-        setSneakers(cacheRef.current[cacheKey].items)
-        setTotalInDb(cacheRef.current[cacheKey].total)
-        setHasMore(cacheRef.current[cacheKey].items.length >= PAGE_SIZE)
-        setLoading(false)
-        return
-      }
-
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-      const controller = new AbortController()
-      abortControllerRef.current = controller
-
-      if (append) {
-        setLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      setError('')
-
-      try {
-        const url = `/api/get-top-sneakers?query=${encodeURIComponent(
-          query
-        )}&gender=${encodeURIComponent(genderFilter)}&limit=${PAGE_SIZE}&page=${pageNum}`
-
-        const res = await fetch(url, { signal: controller.signal })
-        const text = await res.text()
-
-        const upperText = text.toUpperCase()
-        if (
-          upperText.includes('<HTML') ||
-          upperText.includes('TOO MANY REQUESTS') ||
-          upperText.includes('RATE LIMIT')
-        ) {
-          throw new Error('RATE_LIMIT')
-        }
-
-        let data: any
-        try {
-          data = JSON.parse(text)
-        } catch {
-          throw new Error('PARSE_ERROR')
-        }
-
-        if (data.ERROR === 'RATE LIMIT EXCEEDED' || data.error === 'RATE LIMIT EXCEEDED') {
-          throw new Error('RATE_LIMIT')
-        }
-
-        if (!res.ok) {
-          throw new Error(data.details || data.error || data.message || t.errorLoad)
-        }
-
-        const resolvedTotal =
-          data.total !== undefined
-            ? data.total
-            : data.totalCount !== undefined
-            ? data.totalCount
-            : null
-
-        if (resolvedTotal !== null) {
-          setTotalInDb(resolvedTotal)
-        }
-
-        const list = data.results || data.data || data || []
-        const newItems: Sneaker[] = Array.isArray(list) ? list : []
-
-        setHasMore(newItems.length >= PAGE_SIZE)
-
-        setSneakers((prev) => {
-          const merged = append ? [...prev, ...newItems] : newItems
-          const seen = new Set<string>()
-          const unique = merged.filter((item) => {
-            if (seen.has(item.id)) return false
-            seen.add(item.id)
-            return true
-          })
-          if (!append) {
-            cacheRef.current[cacheKey] = { items: unique, total: resolvedTotal }
-          }
-          return unique
-        })
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return
-        if (err instanceof Error && err.message === 'RATE_LIMIT') {
-          setError(t.errorRateLimit)
-        } else {
-          setError(t.errorSneakers)
-        }
-      } finally {
-        if (abortControllerRef.current === controller) {
-          setLoading(false)
-          setLoadingMore(false)
-        }
-      }
-    },
-    [t]
-  )
-
-  useEffect(() => {
-    if (viewState === 'catalog') {
-      setPage(1)
-      fetchSneakers(activeQuery, selectedGender, 1, false)
-    }
-  }, [activeQuery, selectedGender, fetchSneakers, viewState])
-
-  const visibleBrands = useMemo(() => {
-    if (selectedCategory === 'all') return BRANDS
-    return BRANDS.filter((b) => b.category === selectedCategory)
-  }, [selectedCategory])
-
-  const activeBrandMeta = useMemo(() => {
-    if (hasSearched || selectedBrand === 'all') return null
-    return BRANDS.find((b) => b.id === selectedBrand) || null
-  }, [selectedBrand, hasSearched])
-
-  // Досье текущего выбранного бренда
-  const currentBrandDossier = useMemo(() => {
-    if (!activeBrandMeta) return null
-    return getBrandDossier(
-      activeBrandMeta.id,
-      activeBrandMeta.name,
-      activeBrandMeta.origin,
-      activeBrandMeta.category
-    )
-  }, [activeBrandMeta])
-
-  const handleCategoryClick = (catId: CategoryId) => {
-    haptic('light')
-    setSelectedCategory(catId)
-    setSelectedIconicModel(null)
-    setBrandSubTab('shoes')
-    if (catId !== 'all') {
-      const firstBrandInCat = BRANDS.find((b) => b.category === catId)
-      if (firstBrandInCat) {
-        setSelectedBrand(firstBrandInCat.id)
-        setSearchText('')
-        setHasSearched(false)
-        setActiveQuery(firstBrandInCat.id)
-      }
-    } else {
-      setSelectedBrand('all')
-      setSearchText('')
-      setHasSearched(false)
-      setActiveQuery('all')
-    }
-  }
-
-  const handleBrandClick = (brandId: string) => {
-    haptic('light')
-    setSelectedBrand(brandId)
-    setSelectedIconicModel(null)
-    setSearchText('')
-    setHasSearched(false)
-    setActiveQuery(brandId)
-    if (brandId === 'all') {
-      setBrandSubTab('shoes')
-    }
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', window.location.pathname)
-    }
-  }
-
-  const triggerSearch = () => {
-    const text = searchText.trim()
-    if (!text) return
-    haptic('light')
-    setSelectedIconicModel(null)
-    setHasSearched(true)
-    setSelectedBrand('all')
-    setBrandSubTab('shoes')
-    setActiveQuery(text)
-    setViewState('catalog')
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', window.location.pathname)
-    }
-  }
-
-  const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      triggerSearch()
-    }
-  }
-
-  const clearSearch = () => {
-    haptic('light')
-    setSearchText('')
-    setSelectedIconicModel(null)
-    if (hasSearched) {
-      setHasSearched(false)
-      const fallbackBrand = selectedBrand === 'all' ? 'prada' : selectedBrand
-      setSelectedBrand(fallbackBrand)
-      setActiveQuery(fallbackBrand)
-    }
-    if (searchInputRef.current) searchInputRef.current.focus()
-  }
-
-  const handleResetAllFilters = () => {
-    haptic('light')
-    setSelectedIconicModel(null)
-    setSelectedCategory('all')
-    setSelectedBrand('prada')
-    setSelectedGender('all')
-    setSortBy('newest')
-    setBrandSubTab('shoes')
-    setSearchText('')
-    setHasSearched(false)
-    setActiveQuery('prada')
-  }
-
-  const handleLoadMore = () => {
-    haptic('light')
-    const nextPage = page + 1
-    setPage(nextPage)
-    fetchSneakers(activeQuery, selectedGender, nextPage, true)
-  }
-
-  const handleExternalBuySearch = (sneaker: Sneaker) => {
-    haptic('light')
-    let cleanName = sneaker.name.trim()
-    const brandRegex = new RegExp(`^${sneaker.brand}\\s*`, 'i')
-    if (brandRegex.test(cleanName)) {
-      cleanName = cleanName.replace(brandRegex, '')
-    }
-
-    const searchQuery = `${sneaker.brand} ${cleanName} ${sneaker.sku || ''} ${t.searchSuffix}`.trim()
-    const url = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`
-
     const tg = (window as any).Telegram?.WebApp
     if (tg?.openLink) {
       tg.openLink(url)
-    } else {
-      window.open(url, '_blank')
+      return
     }
+  } catch {}
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Умное извлечение ключевого корня модели для точного поиска по базе Neon DB
+ */
+export function buildSmartModelSearchQuery(brandName: string, rawModel: string): string {
+  let cleaned = rawModel.replace(/\([^)]*\)/g, ' ').trim()
+
+  if (cleaned.includes('×')) {
+    const parts = cleaned.split('×')
+    cleaned = parts[parts.length - 1].trim()
   }
 
-  const handleCopyModel = (sneaker: Sneaker) => {
-    haptic('light')
-    const fullTitle = `${sneaker.brand} ${sneaker.name}${sneaker.sku ? ` (${sneaker.sku})` : ''}`
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(fullTitle).catch(() => {})
-    }
-    setCopiedId(sneaker.id)
-    setTimeout(() => setCopiedId(null), 1800)
+  cleaned = cleaned
+    .replace(/\bNB\b/gi, '')
+    .replace(/\bAF1\b/gi, 'Air Force 1')
+    .replace(/\bAJ1\b/gi, 'Jordan 1')
+
+  const genericWords =
+    /\b(Sneaker|Sneakers|Boot|Boots|Chelsea|Chelseas|Loafer|Loafers|Mule|Mules|Sandal|Sandals|Platform|Heel|Pump|Flats|Flat|Ballet|Clog|Clogs|Slide|Slides|Slipper|Slippers|Shoe|Shoes|Hiker|Runner|Running|Basketball|Original|Originals|Edition|Collection|Classic|Retro|Harness|Cap-Toe|Two-Tone|Slingback|Tassel|Court|Trainer|8-Eye|6-Inch|Premium|Made in USA|Made in UK)\b/gi
+
+  const stripped = cleaned.replace(genericWords, ' ').replace(/\s{2,}/g, ' ').trim()
+  const coreTerm = stripped.length >= 2 ? stripped : cleaned
+
+  if (coreTerm.toLowerCase().includes(brandName.toLowerCase())) {
+    return coreTerm
   }
+  return `${brandName} ${coreTerm}`.trim()
+}
 
-  const toggleFavorite = (e: React.MouseEvent, sneaker: Sneaker) => {
-    e.stopPropagation()
-    haptic('medium')
-    setFavorites((prev) => {
-      const isFav = prev.some((item) => item.id === sneaker.id)
-      const newFavs = isFav ? prev.filter((item) => item.id !== sneaker.id) : [...prev, sneaker]
-      try {
-        localStorage.setItem('lookbook_favorites', JSON.stringify(newFavs))
-      } catch {}
-      return newFavs
-    })
-
-    if (tgUserId) {
-      fetch('/api/favorites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: tgUserId, sneaker_id: sneaker.id }),
-      }).catch(() => {})
-    }
-  }
-
-  const handleBrokenImage = useCallback((id: string) => {
-    setBrokenIds((prev) => {
-      if (prev.has(id)) return prev
-      const next = new Set(prev)
-      next.add(id)
-      return next
-    })
-  }, [])
-
-  const processedCatalog = useMemo(() => {
-    const filtered = sneakers.filter((sneaker) => {
-      if (!sneaker.image?.original || brokenIds.has(sneaker.id)) return false
-
-      if (selectedGender !== 'all' && sneaker.gender) {
-        const g = sneaker.gender.toLowerCase()
-        if (
-          selectedGender === 'men' &&
-          !(g === 'men' || g === 'unisex' || (g.includes('men') && !g.includes('women')))
-        ) {
-          return false
-        }
-        if (selectedGender === 'women' && !(g.includes('women') || g === 'unisex')) {
-          return false
-        }
-      }
-      return true
-    })
-
-    return [...filtered].sort((a, b) => {
-      if (sortBy === 'price_asc') {
-        const pa = a.retailPrice > 0 ? a.retailPrice : 999999
-        const pb = b.retailPrice > 0 ? b.retailPrice : 999999
-        return pa - pb
-      }
-      if (sortBy === 'price_desc') {
-        return (b.retailPrice || 0) - (a.retailPrice || 0)
-      }
-      if (sortBy === 'year_desc') {
-        const ya = Number(parseReleaseYear(a) || 0)
-        const yb = Number(parseReleaseYear(b) || 0)
-        return yb - ya
-      }
-      return 0
-    })
-  }, [sneakers, selectedGender, sortBy, brokenIds])
-
-  const currentDisplayList = viewState === 'favorites' ? favorites : processedCatalog
-
-  const CATEGORIES: { id: CategoryId; label: string }[] = [
-    { id: 'all', label: t.catAll },
-    { id: 'luxury', label: t.catLuxury },
-    { id: 'streetwear', label: t.catStreet },
-    { id: 'sport', label: t.catSport },
-    { id: 'outdoor', label: t.catOutdoor },
-  ]
-
-  const GENDERS = [
-    { id: 'all', name: t.all },
-    { id: 'men', name: t.men },
-    { id: 'women', name: t.women },
-  ]
-
-  const modalDetails = useMemo(() => {
-    if (!selectedModalSneaker) return null
-    const s = selectedModalSneaker.sneaker
-    const { silhouette, colorway } = parseEditorialTitle(s.brand, s.name)
-    const year = parseReleaseYear(s)
-    const isFav = favorites.some((f) => f.id === s.id)
-    const genderLabel =
-      s.gender === 'men' ? t.menLine : s.gender === 'women' ? t.womenLine : null
-    return { silhouette, colorway, year, isFav, genderLabel }
-  }, [selectedModalSneaker, favorites, t])
+/**
+ * Ювелирная обсидиановая витрина с анимированными векторными гербами и монограммами 25 типов
+ */
+function AnimatedBrandEmblem({ dossier }: { dossier: BrandDossier }) {
+  const goldLight = '#FFF3D1'
+  const goldMid = dossier.accentHex || '#D4AF37'
+  const goldDeep = '#9A7B3E'
+  const platinum = '#F5F2EB'
 
   return (
     <div
-      ref={scrollRef}
-      className="h-[100dvh] w-full overflow-y-auto overflow-x-hidden px-4 sm:px-10 pt-4 pb-28 relative select-none"
-      style={{ background: themeColors.bg, color: themeColors.text }}
+      className="relative w-full aspect-[16/10] sm:aspect-[21/9] flex items-center justify-center overflow-hidden select-none"
+      style={{
+        background:
+          'radial-gradient(circle at 50% 48%, #1C1A24 0%, #0E0E14 62%, #07070A 100%)',
+        boxShadow: 'inset 0 0 0 1px rgba(212, 175, 55, 0.25), 0 16px 40px rgba(0,0,0,0.22)',
+      }}
     >
-      <div className="max-w-5xl mx-auto w-full">
-        {/* ВЕРХНЯЯ НАВИГАЦИЯ */}
-        <div
-          role="navigation"
-          className="pt-1 pb-3.5 mb-7 flex items-center justify-between gap-2"
-          style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              haptic('light')
-              if (viewState !== 'catalog') {
-                setViewState('catalog')
-              } else if (selectedIconicModel && activeBrandMeta) {
-                setSelectedIconicModel(null)
-                setActiveQuery(activeBrandMeta.id)
-                setBrandSubTab('dossier')
-              } else if (brandSubTab === 'dossier') {
-                setBrandSubTab('shoes')
-              } else if (hasSearched) {
-                setHasSearched(false)
-                setSearchText('')
-                const fallback = selectedBrand === 'all' ? 'prada' : selectedBrand
-                setSelectedBrand(fallback)
-                setActiveQuery(fallback)
-              } else if (onBack) {
-                onBack()
-              }
-            }}
-            className="flex items-center gap-2 text-[10px] font-sans uppercase tracking-[0.22em] whitespace-nowrap outline-none border-0 bg-transparent cursor-pointer transition-opacity hover:opacity-100 py-1.5"
-            style={{
-              color: themeColors.textMuted,
-              visibility:
-                viewState === 'catalog' &&
-                brandSubTab === 'shoes' &&
-                !selectedIconicModel &&
-                !hasSearched &&
-                !onBack
-                  ? 'hidden'
-                  : 'visible',
-            }}
-          >
-            <span>←</span>
-            <span>{t.back}</span>
-          </button>
+      <style>{`
+        @keyframes cadOrbitSlow {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes cadOrbitReverse {
+          0% { transform: rotate(360deg); }
+          100% { transform: rotate(0deg); }
+        }
+        @keyframes cadDrawLuxury {
+          0% { stroke-dashoffset: 720; opacity: 0.55; }
+          60% { stroke-dashoffset: 0; opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 0.95; }
+        }
+        @keyframes cadPulseAura {
+          0%, 100% { opacity: 0.28; transform: scale(0.96); }
+          50% { opacity: 0.65; transform: scale(1.05); }
+        }
+        @keyframes cadLaserSweep {
+          0% { transform: translateY(-110%); opacity: 0; }
+          35% { opacity: 0.5; }
+          100% { transform: translateY(110%); opacity: 0; }
+        }
+      `}</style>
 
-          <div className="flex items-center gap-6">
-            <button
-              type="button"
-              onClick={() => {
-                haptic('light')
-                setViewState('catalog')
-              }}
-              className="py-1.5 text-[10px] font-sans uppercase tracking-[0.22em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer transition-all"
-              style={{
-                color: viewState === 'catalog' ? themeColors.text : themeColors.textMuted,
-                borderBottom:
-                  viewState === 'catalog'
-                    ? `1px solid ${themeColors.text}`
-                    : '1px solid transparent',
-              }}
-            >
-              {t.catalog}
-            </button>
+      <div
+        className="absolute inset-2.5 pointer-events-none"
+        style={{ border: '1px solid rgba(245, 242, 235, 0.08)' }}
+      />
 
-            <button
-              type="button"
-              onClick={() => {
-                haptic('light')
-                setViewState(viewState === 'favorites' ? 'catalog' : 'favorites')
-              }}
-              className="py-1.5 flex items-center gap-1.5 text-[10px] font-sans uppercase tracking-[0.22em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer transition-all"
-              style={{
-                color: viewState === 'favorites' ? themeColors.text : themeColors.textMuted,
-                borderBottom:
-                  viewState === 'favorites'
-                    ? `1px solid ${themeColors.text}`
-                    : '1px solid transparent',
-              }}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(180deg, transparent 0%, rgba(212, 175, 55, 0.11) 50%, transparent 100%)',
+          animation: 'cadLaserSweep 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+        }}
+      />
+
+      <div
+        className="absolute top-3.5 left-4 text-[8px] font-sans uppercase tracking-[0.28em]"
+        style={{ color: 'rgba(245, 242, 235, 0.5)' }}
+      >
+        MAISON ARCHIVE // {dossier.id.toUpperCase()}
+      </div>
+      <div
+        className="absolute top-3.5 right-4 text-[8px] font-sans uppercase tracking-[0.28em]"
+        style={{ color: goldLight }}
+      >
+        EST. {dossier.founded}
+      </div>
+      <div
+        className="absolute bottom-3.5 left-4 text-[8px] font-sans uppercase tracking-[0.24em]"
+        style={{ color: 'rgba(245, 242, 235, 0.42)' }}
+      >
+        HERITAGE CREST
+      </div>
+      <div
+        className="absolute bottom-3.5 right-4 text-[8px] font-sans uppercase tracking-[0.24em]"
+        style={{ color: 'rgba(245, 242, 235, 0.42)' }}
+      >
+        {dossier.monogram} · 1:1
+      </div>
+
+      <svg
+        viewBox="0 0 380 230"
+        className="w-full h-full max-w-[380px] max-h-[230px]"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="goldMetallic" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={goldLight} />
+            <stop offset="45%" stopColor={goldMid} />
+            <stop offset="80%" stopColor={goldDeep} />
+            <stop offset="100%" stopColor={goldLight} />
+          </linearGradient>
+
+          <linearGradient id="platinumMetallic" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="50%" stopColor="#D4D4D8" />
+            <stop offset="100%" stopColor={goldLight} />
+          </linearGradient>
+
+          <radialGradient id="obsidianGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={goldMid} stopOpacity="0.34" />
+            <stop offset="65%" stopColor={goldMid} stopOpacity="0.08" />
+            <stop offset="100%" stopColor={goldMid} stopOpacity="0" />
+          </radialGradient>
+
+          <filter id="emblemGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2.2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        <circle
+          cx="190"
+          cy="115"
+          r="92"
+          fill="url(#obsidianGlow)"
+          style={{
+            animation: 'cadPulseAura 4.2s ease-in-out infinite',
+            transformOrigin: '190px 115px',
+          }}
+        />
+
+        <line x1="18" y1="115" x2="84" y2="115" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+        <line x1="296" y1="115" x2="362" y2="115" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+        <line x1="190" y1="10" x2="190" y2="30" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+        <line x1="190" y1="200" x2="190" y2="220" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+
+        <g style={{ transformOrigin: '190px 115px', animation: 'cadOrbitSlow 34s linear infinite' }}>
+          <circle
+            cx="190"
+            cy="115"
+            r="88"
+            stroke="url(#goldMetallic)"
+            strokeOpacity="0.32"
+            strokeWidth="1"
+            strokeDasharray="2 6"
+          />
+          <circle
+            cx="190"
+            cy="115"
+            r="82"
+            stroke={platinum}
+            strokeOpacity="0.14"
+            strokeWidth="0.7"
+          />
+          <circle cx="190" cy="27" r="2.6" fill={goldLight} />
+          <circle cx="190" cy="203" r="2.6" fill={goldLight} />
+          <circle cx="102" cy="115" r="2" fill={goldMid} />
+          <circle cx="278" cy="115" r="2" fill={goldMid} />
+        </g>
+
+        <g style={{ transformOrigin: '190px 115px', animation: 'cadOrbitReverse 24s linear infinite' }}>
+          <circle
+            cx="190"
+            cy="115"
+            r="72"
+            stroke="url(#goldMetallic)"
+            strokeOpacity="0.42"
+            strokeWidth="1.1"
+            strokeDasharray="22 10 3 10"
+          />
+        </g>
+
+        {dossier.emblem === 'prada_triangle' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="114,62 266,62 190,178"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.5s ease-out infinite alternate' }}
+            />
+            <polygon
+              points="123,68 257,68 190,168"
+              stroke={goldLight}
+              strokeOpacity="0.55"
+              strokeWidth="1.1"
+            />
+            <circle cx="123" cy="67" r="2.2" fill={goldLight} />
+            <circle cx="257" cy="67" r="2.2" fill={goldLight} />
+            <circle cx="190" cy="169" r="2.2" fill={goldLight} />
+            <path d="M 176 80 Q 190 73 204 80" stroke={goldMid} strokeWidth="1.3" />
+            <circle cx="190" cy="77" r="2.5" stroke={goldLight} strokeWidth="1.2" />
+            <text
+              x="190"
+              y="104"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize="19"
+              letterSpacing="5"
             >
-              <span>{t.archive}</span>
-              {favorites.length > 0 && (
-                <span className="font-serif italic text-[11px]" style={{ color: themeColors.text }}>
-                  ({favorites.length})
-                </span>
-              )}
-            </button>
+              {dossier.name.slice(0, 8)}
+            </text>
+            <text
+              x="190"
+              y="120"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7.5"
+              letterSpacing="4"
+            >
+              MILANO
+            </text>
+            <text
+              x="190"
+              y="136"
+              textAnchor="middle"
+              fill={goldMid}
+              fontFamily="serif"
+              fontSize="7"
+              letterSpacing="2.5"
+            >
+              DAL {dossier.founded}
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'ysl_cassandre' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="152,48 228,48 256,76 256,154 228,182 152,182 124,154 124,76"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <polygon
+              points="156,54 224,54 250,80 250,150 224,176 156,176 130,150 130,80"
+              stroke={goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="0.9"
+            />
+            <path
+              d="M 166 64 L 190 98 L 214 64 M 190 98 L 190 156 M 182 156 L 198 156"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="3.6"
+              strokeLinecap="square"
+            />
+            <path
+              d="M 206 82 C 206 68, 172 68, 172 86 C 172 104, 210 104, 210 124 C 210 142, 172 142, 172 128"
+              stroke="url(#goldMetallic)"
+              strokeWidth="3.4"
+              strokeLinecap="round"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
+            />
+            <path
+              d="M 178 96 L 178 156 L 218 156 L 218 147"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+              strokeLinecap="square"
+            />
+            <text
+              x="190"
+              y="170"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="6.5"
+              letterSpacing="4"
+            >
+              SAINT LAURENT PARIS
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'valentino_v' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="190,44 264,115 190,186 116,115"
+              stroke={goldMid}
+              strokeOpacity="0.45"
+              strokeWidth="1.2"
+            />
+            <rect x="186" y="40" width="8" height="8" transform="rotate(45 190 44)" fill={goldLight} />
+            <rect x="260" y="111" width="8" height="8" transform="rotate(45 264 115)" fill={goldLight} />
+            <rect x="186" y="182" width="8" height="8" transform="rotate(45 190 186)" fill={goldLight} />
+            <rect x="112" y="111" width="8" height="8" transform="rotate(45 116 115)" fill={goldLight} />
+
+            <ellipse
+              cx="190"
+              cy="115"
+              rx="56"
+              ry="38"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <ellipse
+              cx="190"
+              cy="115"
+              rx="50"
+              ry="32"
+              stroke={goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="0.9"
+            />
+
+            <path
+              d="M 158 92 L 172 92 M 208 92 L 222 92 M 164 92 L 190 142 L 216 92"
+              stroke="url(#goldMetallic)"
+              strokeWidth="4.2"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+            />
+            <line x1="176" y1="115" x2="204" y2="115" stroke={platinum} strokeWidth="2.6" />
+          </g>
+        )}
+
+        {dossier.emblem === 'chanel_cc' && (
+          <g filter="url(#emblemGlow)">
+            <path
+              d="M 206 80 A 36 36 0 1 0 206 150"
+              stroke="url(#goldMetallic)"
+              strokeWidth="6.5"
+              strokeLinecap="butt"
+            />
+            <path
+              d="M 174 80 A 36 36 0 1 1 174 150"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="6.5"
+              strokeLinecap="butt"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
+            />
+            <text
+              x="190"
+              y="176"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="8"
+              letterSpacing="5"
+            >
+              CHANEL · PARIS
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'balenciaga_bb' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="120"
+              y="58"
+              width="140"
+              height="114"
+              rx="4"
+              fill="rgba(12, 12, 18, 0.86)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2.2"
+            />
+            <rect
+              x="126"
+              y="64"
+              width="128"
+              height="102"
+              rx="2"
+              stroke={goldMid}
+              strokeOpacity="0.4"
+              strokeWidth="0.9"
+            />
+            <text
+              x="190"
+              y="124"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize="48"
+              letterSpacing="6"
+            >
+              BB
+            </text>
+            <line x1="144" y1="136" x2="236" y2="136" stroke="url(#goldMetallic)" strokeWidth="1.2" />
+            <text
+              x="190"
+              y="152"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="5"
+            >
+              BALENCIAGA
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'gucci_gg' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="170"
+              cy="110"
+              r="32"
+              stroke="url(#goldMetallic)"
+              strokeWidth="4.8"
+              strokeDasharray="155 48"
+            />
+            <circle
+              cx="210"
+              cy="110"
+              r="32"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="4.8"
+              strokeDasharray="155 48"
+              transform="rotate(180 210 110)"
+            />
+            <line x1="170" y1="110" x2="192" y2="110" stroke={goldLight} strokeWidth="4.2" />
+            <line x1="188" y1="110" x2="210" y2="110" stroke={platinum} strokeWidth="4.2" />
+            <text
+              x="190"
+              y="168"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontSize="8.5"
+              letterSpacing="5"
+            >
+              GUCCI · FIRENZE 1921
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'lv_fleur' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="190,46 212,93 258,115 212,137 190,184 168,137 122,115 168,93"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.6"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.5s ease-out infinite alternate' }}
+            />
+            <circle cx="190" cy="115" r="24" stroke={goldLight} strokeOpacity="0.6" strokeWidth="1.3" />
+            <text
+              x="190"
+              y="124"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontStyle="italic"
+              fontWeight="bold"
+              fontSize="24"
+              letterSpacing="1"
+            >
+              LV
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'dior_oblique' && (
+          <g filter="url(#emblemGlow)">
+            <line x1="130" y1="65" x2="250" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
+            <line x1="250" y1="65" x2="130" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
+            <ellipse
+              cx="190"
+              cy="115"
+              rx="60"
+              ry="42"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <ellipse cx="190" cy="115" rx="53" ry="35" stroke={goldLight} strokeOpacity="0.45" strokeWidth="1" />
+            <path d="M 174 73 Q 190 62 206 73" stroke="url(#goldMetallic)" strokeWidth="2.2" />
+            <text
+              x="190"
+              y="122"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="Georgia, serif"
+              fontSize="27"
+              letterSpacing="6"
+            >
+              DIOR
+            </text>
+            <text
+              x="190"
+              y="139"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="6.5"
+              letterSpacing="3.5"
+            >
+              30 AVENUE MONTAIGNE
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'bottega_intrecciato' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="190,48 256,115 190,182 124,115"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.6"
+            />
+            <line x1="157" y1="82" x2="223" y2="148" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="142" y1="97" x2="208" y2="163" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="172" y1="67" x2="238" y2="133" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="223" y1="82" x2="157" y2="148" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="208" y1="67" x2="142" y2="133" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="238" y1="97" x2="172" y2="163" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <rect
+              x="156"
+              y="93"
+              width="68"
+              height="44"
+              fill="#0D0D12"
+              stroke="url(#goldMetallic)"
+              strokeWidth="1.8"
+            />
+            <text
+              x="190"
+              y="122"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="Georgia, serif"
+              fontSize="22"
+              letterSpacing="5"
+            >
+              BV
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'celine_triomphe' && (
+          <g filter="url(#emblemGlow)">
+            <path
+              d="M 184 76 C 142 72, 134 158, 184 154"
+              stroke="url(#goldMetallic)"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 196 76 C 238 72, 246 158, 196 154"
+              stroke="url(#goldMetallic)"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+            />
+            <line x1="158" y1="115" x2="222" y2="115" stroke={platinum} strokeWidth="3.8" />
+            <line x1="190" y1="68" x2="190" y2="162" stroke={goldLight} strokeWidth="2.2" />
+            <text
+              x="190"
+              y="178"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="6"
+            >
+              CELINE PARIS
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'loewe_anagram' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="136"
+              y="61"
+              width="108"
+              height="108"
+              rx="14"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <path
+              d="M 186 111 C 186 80, 150 72, 154 98 C 156 112, 178 111, 186 111 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 194 111 C 194 80, 230 72, 226 98 C 224 112, 202 111, 194 111 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 186 119 C 186 150, 150 158, 154 132 C 156 118, 178 119, 186 119 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 194 119 C 194 150, 230 158, 226 132 C 224 118, 202 119, 194 119 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <circle cx="190" cy="115" r="4" fill={platinum} />
+          </g>
+        )}
+
+        {dossier.emblem === 'hermes_caleche' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="146,54 234,54 254,74 254,156 234,176 146,176 126,156 126,74"
+              fill="rgba(18, 14, 12, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.5"
+            />
+            <polygon
+              points="151,60 229,60 247,78 247,152 229,170 151,170 133,152 133,78"
+              stroke={goldLight}
+              strokeWidth="1.2"
+              strokeDasharray="5 4"
+            />
+            <path
+              d="M 164 78 L 164 144 M 216 78 L 216 144 M 156 78 L 172 78 M 208 78 L 224 78 M 156 144 L 172 144 M 208 144 L 224 144 M 164 108 L 216 108 M 164 114 L 216 114"
+              stroke="url(#goldMetallic)"
+              strokeWidth="3.8"
+              strokeLinecap="square"
+            />
+            <text
+              x="190"
+              y="162"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              HERMÈS PARIS 1837
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'versace_greca' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="58"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <circle
+              cx="190"
+              cy="115"
+              r="49"
+              stroke={goldLight}
+              strokeWidth="4.5"
+              strokeDasharray="8 4 2 4"
+            />
+            <circle cx="190" cy="115" r="41" stroke="url(#goldMetallic)" strokeWidth="1.5" />
+            <polygon
+              points="170,94 190,140 210,94"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="4"
+              fill="none"
+            />
+            <text
+              x="190"
+              y="110"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontSize="8"
+              letterSpacing="3"
+            >
+              MILANO
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'givenchy_4g' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="134"
+              y="59"
+              width="112"
+              height="112"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2.6"
+            />
+            <line x1="190" y1="59" x2="190" y2="171" stroke={goldMid} strokeWidth="1.6" />
+            <line x1="134" y1="115" x2="246" y2="115" stroke={goldMid} strokeWidth="1.6" />
+            <rect x="144" y="69" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <rect x="200" y="69" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <rect x="144" y="125" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <rect x="200" y="125" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <circle cx="190" cy="115" r="6" fill={platinum} />
+          </g>
+        )}
+
+        {dossier.emblem === 'margiela_numbers' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="110"
+              y="56"
+              width="160"
+              height="118"
+              fill="rgba(16, 16, 22, 0.94)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2"
+            />
+            <line x1="104" y1="66" x2="120" y2="50" stroke="#FFFFFF" strokeWidth="3" />
+            <line x1="276" y1="66" x2="260" y2="50" stroke="#FFFFFF" strokeWidth="3" />
+            <line x1="104" y1="164" x2="120" y2="180" stroke="#FFFFFF" strokeWidth="3" />
+            <line x1="276" y1="164" x2="260" y2="180" stroke="#FFFFFF" strokeWidth="3" />
+
+            <g fontFamily="Georgia, serif" fontSize="10.5" fill={platinum}>
+              <text x="190" y="82" textAnchor="middle" letterSpacing="4.5">0 1 2 3 4 5 6 7</text>
+              <text x="190" y="106" textAnchor="middle" letterSpacing="4.5">8 9 10 11 12 13 14</text>
+              <text x="190" y="130" textAnchor="middle" letterSpacing="4.2">15 16 17 18 19 20 21</text>
+              <text x="190" y="155" textAnchor="middle" letterSpacing="5.5">22 23</text>
+            </g>
+            <circle cx="174" cy="151" r="12" stroke="url(#goldMetallic)" strokeWidth="2.4" />
+          </g>
+        )}
+
+        {dossier.emblem === 'rick_star' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="56"
+              fill="rgba(12, 12, 18, 0.88)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2.4"
+            />
+            <polygon
+              points="190,52 208,162 134,88 246,88 172,162"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.6"
+              strokeLinejoin="miter"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
+            />
+          </g>
+        )}
+
+        {dossier.emblem === 'offwhite_arrows' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="132"
+              y="57"
+              width="116"
+              height="116"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <line x1="150" y1="75" x2="230" y2="155" stroke="url(#platinumMetallic)" strokeWidth="5" />
+            <line x1="230" y1="75" x2="150" y2="155" stroke="url(#platinumMetallic)" strokeWidth="5" />
+            <polyline points="150,92 150,75 167,75" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+            <polyline points="213,75 230,75 230,92" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+            <polyline points="150,138 150,155 167,155" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+            <polyline points="213,155 230,155 230,138" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+          </g>
+        )}
+
+        {dossier.emblem === 'nike_swoosh' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="58"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.2"
+            />
+            <path
+              d="M 136 126 C 150 150, 186 142, 252 88 C 204 118, 166 122, 150 98 C 143 106, 137 116, 136 126 Z"
+              fill="url(#goldMetallic)"
+              stroke={platinum}
+              strokeWidth="1.5"
+            />
+            <text
+              x="190"
+              y="156"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="5"
+            >
+              NIKE ARCHIVE
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'jordan_wings' && (
+          <g filter="url(#emblemGlow)">
+            <path
+              d="M 112 92 L 164 92 L 174 115 L 164 138 L 126 138 Z M 268 92 L 216 92 L 206 115 L 216 138 L 254 138 Z"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <line x1="120" y1="104" x2="162" y2="104" stroke={goldLight} strokeWidth="1.5" />
+            <line x1="124" y1="116" x2="166" y2="116" stroke={goldLight} strokeWidth="1.5" />
+            <line x1="260" y1="104" x2="218" y2="104" stroke={goldLight} strokeWidth="1.5" />
+            <line x1="256" y1="116" x2="214" y2="116" stroke={goldLight} strokeWidth="1.5" />
+            <circle cx="190" cy="115" r="22" fill="#0E0E14" stroke="url(#platinumMetallic)" strokeWidth="2.6" />
+            <text
+              x="190"
+              y="122"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize="16"
+              letterSpacing="2"
+            >
+              23
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'adidas_bars' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="58"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.2"
+            />
+            <polygon points="148,140 162,140 176,100 162,100" fill="url(#goldMetallic)" />
+            <polygon points="174,140 188,140 206,84 192,84" fill="url(#platinumMetallic)" />
+            <polygon points="200,140 214,140 236,68 222,68" fill="url(#goldMetallic)" />
+            <text
+              x="190"
+              y="158"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="4.5"
+            >
+              {dossier.name.slice(0, 12)}
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'mountain_peak' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="190,48 254,82 254,148 190,182 126,148 126,82"
+              fill="rgba(12, 12, 18, 0.88)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <polyline
+              points="138,140 172,78 196,114 214,86 242,140"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="3.2"
+              strokeLinejoin="round"
+            />
+            <line x1="136" y1="140" x2="244" y2="140" stroke="url(#goldMetallic)" strokeWidth="2" />
+            <text
+              x="190"
+              y="160"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="4"
+            >
+              {dossier.monogram}
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'heritage_shield' && (
+          <g filter="url(#emblemGlow)">
+            <path
+              d="M 140 58 L 240 58 L 240 116 C 240 150, 190 176, 190 176 C 190 176, 140 150, 140 116 Z"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 147 65 L 233 65 L 233 114 C 233 143, 190 166, 190 166 C 190 166, 147 143, 147 114 Z"
+              stroke={goldLight}
+              strokeOpacity="0.4"
+              strokeWidth="1"
+            />
+            <text
+              x="190"
+              y="116"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 3 ? '20' : '28'}
+              letterSpacing="3"
+            >
+              {dossier.monogram}
+            </text>
+            <text
+              x="190"
+              y="138"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              EST. {dossier.founded}
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'skate_hexagon' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="190,50 246,82 246,148 190,180 134,148 134,82"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <polygon
+              points="190,58 238,86 238,144 190,172 142,144 142,86"
+              stroke={platinum}
+              strokeOpacity="0.3"
+              strokeWidth="1"
+            />
+            <text
+              x="190"
+              y="121"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 3 ? '19' : '26'}
+              letterSpacing="4"
+            >
+              {dossier.monogram}
+            </text>
+            <text
+              x="190"
+              y="144"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              ARCHIVE {dossier.founded}
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'sport_vector' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="126,148 152,70 254,70 228,148"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <polygon
+              points="135,142 157,76 245,76 223,142"
+              stroke={goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="1"
+            />
+            <text
+              x="190"
+              y="118"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontStyle="italic"
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 2 ? '23' : '30'}
+              letterSpacing="3"
+            >
+              {dossier.monogram}
+            </text>
+            <text
+              x="190"
+              y="168"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7.5"
+              letterSpacing="4"
+            >
+              {dossier.name}
+            </text>
+          </g>
+        )}
+
+        {dossier.emblem === 'couture_crest' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="154,50 226,50 256,80 256,150 226,180 154,180 124,150 124,80"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <polygon
+              points="159,57 221,57 249,85 249,145 221,173 159,173 131,145 131,85"
+              stroke={goldLight}
+              strokeOpacity="0.45"
+              strokeWidth="1.1"
+            />
+            <text
+              x="190"
+              y="120"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 2 ? '22' : '32'}
+              letterSpacing="5"
+            >
+              {dossier.monogram}
+            </text>
+            <line x1="154" y1="134" x2="226" y2="134" stroke="url(#goldMetallic)" strokeWidth="1" />
+            <text
+              x="190"
+              y="150"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              {dossier.name.slice(0, 15)}
+            </text>
+          </g>
+        )}
+      </svg>
+    </div>
+  )
+}
+
+export default function BrandDossierView({
+  dossier,
+  lang,
+  isDark,
+  themeColors,
+  totalModelsCount,
+  onSelectModelQuery,
+  onSelectSneakerCard,
+  onBackToCollection,
+}: BrandDossierViewProps) {
+  const l = UI_LABELS[lang]
+  const ch = dossier.chapters[lang]
+
+  // По умолчанию открываем первый культовый силуэт (индекс 0), чтобы человек сразу видел богатую карточку!
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(0)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewShoes, setPreviewShoes] = useState<DossierPreviewSneaker[]>([])
+  const [previewTotal, setPreviewTotal] = useState<number>(0)
+  const [smartQuery, setSmartQuery] = useState<string>('')
+  const spotlightCardRef = useRef<HTMLDivElement>(null)
+
+  // При переключении бренда открываем его первую культовую модель (01)
+  useEffect(() => {
+    setSelectedIdx(0)
+    setPreviewShoes([])
+    setPreviewTotal(0)
+  }, [dossier.id])
+
+  const activeModelName =
+    selectedIdx !== null && dossier.iconicModels[selectedIdx]
+      ? dossier.iconicModels[selectedIdx]
+      : null
+
+  // Получаем полное энциклопедическое досье выбранной культовой модели из iconicModelsData.ts
+  const activeModelDossier = activeModelName
+    ? getIconicModelDossier(dossier.id, dossier.name, activeModelName, lang)
+    : null
+
+  // Фоновая проверка наличия модели в Neon DB
+  useEffect(() => {
+    if (!activeModelName) return
+
+    const query = buildSmartModelSearchQuery(dossier.name, activeModelName)
+    setSmartQuery(query)
+    setPreviewLoading(true)
+    setPreviewShoes([])
+    setPreviewTotal(0)
+
+    const controller = new AbortController()
+    fetch(`/api/get-top-sneakers?query=${encodeURIComponent(query)}&gender=all&limit=6&page=1`, {
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data)
+          ? data
+          : []
+        const valid = list.filter((item: any) => item?.image?.original)
+        setPreviewShoes(valid.slice(0, 4))
+        setPreviewTotal(typeof data?.total === 'number' ? data.total : valid.length)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setPreviewLoading(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [activeModelName, dossier.name])
+
+  const techPoints = dossier.materialsTech[lang]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  const handleOpenExternalModelShowcase = (modelName: string) => {
+    const cleanModel = modelName.replace(/\([^)]*\)/g, '').trim()
+    const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(
+      `${dossier.name} ${cleanModel} shoe lookbook`
+    )}`
+    openExternalUrl(searchUrl)
+  }
+
+  const handleSelectModelIndex = (idx: number, scrollIntoCard: boolean = false) => {
+    setSelectedIdx(idx)
+    if (scrollIntoCard && spotlightCardRef.current) {
+      setTimeout(() => {
+        spotlightCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }, 60)
+    }
+  }
+
+  return (
+    <section className="w-full max-w-3xl mx-auto pb-16">
+      {/* 1. ОБСИДИАНОВЫЙ ЮВЕЛИРНЫЙ СТЕНД С АНИМИРОВАННЫМ ГЕРБОМ ДОМА */}
+      <div className="w-full mb-7 relative overflow-hidden">
+        <AnimatedBrandEmblem dossier={dossier} />
+      </div>
+
+      {/* 2. ЦИТАТА-МАНИФЕСТ ДОМА */}
+      <blockquote
+        className="text-center px-3 sm:px-10 mb-8 font-serif italic text-[18px] sm:text-[21px] leading-relaxed"
+        style={{ color: themeColors.text }}
+      >
+        {dossier.quote[lang]}
+      </blockquote>
+
+      {/* 3. ТЕХНИЧЕСКИЙ ПАСПОРТ ДОМА (С ЕДИНСТВЕННОЙ ПРЕМИАЛЬНОЙ ССЫЛКОЙ НА ОФИЦИАЛЬНЫЙ САЙТ) */}
+      <div
+        className="mb-9 overflow-hidden"
+        style={{
+          backgroundColor: themeColors.studioCanvas,
+          border: `1px solid ${themeColors.border}`,
+        }}
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5">
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.founded}
+            </span>
+            <span className="font-serif text-[19px] font-normal">{dossier.founded}</span>
+          </div>
+
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.hq}
+            </span>
+            <span className="text-[13px] font-sans leading-snug block font-medium">
+              {dossier.headquarters[lang]}
+            </span>
+          </div>
+
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.direction}
+            </span>
+            <span className="text-[13px] font-sans leading-snug block font-medium">
+              {dossier.creativeCode[lang]}
+            </span>
+          </div>
+
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.archiveVolume}
+            </span>
+            <span className="font-serif text-[19px] font-normal">
+              {totalModelsCount !== null && totalModelsCount > 0
+                ? `${totalModelsCount} ${l.modelsUnit}`
+                : l.curatedArchive}
+            </span>
           </div>
         </div>
 
-        {/* ТИТУЛЬНЫЙ БЛОК МОДНОГО ДОМА */}
-        <div className="flex flex-col items-center text-center mb-6 px-2">
-          <span
-            className="text-[9px] font-sans uppercase tracking-[0.32em] mb-2 block"
-            style={{ color: themeColors.textMuted }}
-          >
-            {viewState === 'favorites'
-              ? 'PRIVATE CURATION'
-              : activeBrandMeta?.origin || t.editorialSub}
-          </span>
-
-          <h1 className="font-serif font-normal text-4xl sm:text-6xl leading-[1.04] tracking-[-0.02em] uppercase mb-2 break-words max-w-full">
-            {viewState === 'favorites'
-              ? t.savedArchive
-              : activeBrandMeta
-              ? activeBrandMeta.name
-              : hasSearched
-              ? `«${activeQuery}»`
-              : t.sneakerIndex}
-          </h1>
-
-          {viewState === 'catalog' && (
-            <p
-              className="font-serif italic text-[13px] sm:text-[15px] max-w-md leading-relaxed"
+        <div
+          className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{
+            borderTop: `1px solid ${themeColors.borderFaint}`,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(17,17,17,0.025)',
+          }}
+        >
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: dossier.accentHex || '#C5A880' }}
+            />
+            <span
+              className="text-[10px] font-sans uppercase tracking-[0.2em]"
               style={{ color: themeColors.textMuted }}
             >
-              {totalInDb !== null && totalInDb > 0
-                ? formatPiecesCount(totalInDb, activeLang)
-                : t.curatedNote}
-            </p>
-          )}
+              {l.officialSiteLabel}
+            </span>
+          </div>
 
-          {/* ПЕРЕКЛЮЧАТЕЛЬ ВНУТРИ БРЕНДА: [ КОЛЛЕКЦИЯ ] | [ ПАСПОРТ ДОМА ✦ ] */}
-          {viewState === 'catalog' && activeBrandMeta && (
-            <div
-              className="mt-5 inline-flex items-center p-1"
-              style={{
-                backgroundColor: themeColors.studioCanvas,
-                border: `1px solid ${themeColors.border}`,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  haptic('light')
-                  setBrandSubTab('shoes')
-                }}
-                className="px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
-                style={{
-                  backgroundColor: brandSubTab === 'shoes' ? themeColors.text : 'transparent',
-                  color: brandSubTab === 'shoes' ? themeColors.bg : themeColors.textMuted,
-                }}
-              >
-                {t.tabCollection}
-              </button>
+          <button
+            type="button"
+            onClick={() => openExternalUrl(dossier.officialUrl)}
+            className="w-full sm:w-auto px-4 py-2.5 flex items-center justify-center gap-2 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] whitespace-nowrap cursor-pointer transition-opacity hover:opacity-90"
+            style={{
+              backgroundColor: themeColors.text,
+              color: themeColors.bg,
+              border: 'none',
+            }}
+          >
+            <span>WWW.{dossier.officialDomain.toUpperCase()}</span>
+            <span>↗</span>
+          </button>
+        </div>
+      </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  haptic('light')
-                  if (selectedIconicModel && activeBrandMeta) {
-                    setSelectedIconicModel(null)
-                    setActiveQuery(activeBrandMeta.id)
-                  }
-                  setBrandSubTab('dossier')
-                }}
-                className="px-5 py-2 text-[9px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-all whitespace-nowrap"
-                style={{
-                  backgroundColor: brandSubTab === 'dossier' ? themeColors.text : 'transparent',
-                  color: brandSubTab === 'dossier' ? themeColors.bg : themeColors.textMuted,
-                }}
-              >
-                {t.tabMaisonDossier}
-              </button>
-            </div>
-          )}
+      {/* 4. ИНТЕРАКТИВНАЯ ЭНЦИКЛОПЕДИЯ КУЛЬТОВЫХ СИЛУЭТОВ ДОМА */}
+      <div
+        className="p-5 sm:p-6 mb-9"
+        style={{
+          backgroundColor: themeColors.studioCanvas,
+          border: `1px solid ${themeColors.border}`,
+        }}
+      >
+        <div className="mb-4">
+          <span
+            className="block text-[11px] font-sans font-bold uppercase tracking-[0.22em] mb-1"
+            style={{ color: themeColors.text }}
+          >
+            {l.iconicHeader}
+          </span>
+          <span
+            className="block text-[12px] font-sans leading-snug"
+            style={{ color: themeColors.textMuted }}
+          >
+            {l.iconicSub}
+          </span>
         </div>
 
-        {viewState === 'catalog' && (
-          <>
-            {/* ПОИСКОВАЯ СТРОКА (показывается во вкладке Коллекция) */}
-            {brandSubTab === 'shoes' && (
-            <div
-              className="mb-5 flex items-center max-w-xl mx-auto"
-              style={{ borderBottom: `1px solid ${themeColors.border}` }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                className="opacity-45 shrink-0 mr-2.5"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder={t.searchPlaceholder}
-                className="w-full min-w-0 py-2.5 text-[13px] font-serif italic outline-none bg-transparent"
-                style={{ color: themeColors.text }}
-              />
-              {searchText && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="p-2 outline-none bg-transparent border-none cursor-pointer opacity-50 hover:opacity-100 shrink-0"
-                  style={{ color: themeColors.text }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+        {/* Горизонтально-компактная сетка тегов культовых моделей с номерами 01..05 */}
+        <div className="flex flex-wrap gap-2">
+          {dossier.iconicModels.map((model, idx) => {
+            const isSelected = selectedIdx === idx
+            const numStr = `0${idx + 1}`
+            return (
               <button
+                key={model}
                 type="button"
-                onClick={triggerSearch}
-                className="pl-2.5 py-2 text-[9px] font-sans uppercase tracking-[0.22em] outline-none bg-transparent border-none cursor-pointer shrink-0 opacity-75 hover:opacity-100 whitespace-nowrap"
-                style={{ color: themeColors.text }}
-              >
-                {t.searchBtn}
-              </button>
-            </div>
-            )}
-
-            {/* СЕГМЕНТЫ КОЛЛЕКЦИИ */}
-            <div className="flex justify-start sm:justify-center gap-2 overflow-x-auto pb-2.5 scrollbar-none mb-2">
-              {CATEGORIES.map((cat) => {
-                const active = selectedCategory === cat.id
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handleCategoryClick(cat.id)}
-                    className="px-3.5 py-1.5 text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap cursor-pointer outline-none transition-all shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: active ? themeColors.text : 'transparent',
-                      color: active ? themeColors.bg : themeColors.textMuted,
-                      border: `1px solid ${active ? themeColors.text : themeColors.borderFaint}`,
-                    }}
-                  >
-                    {cat.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* ЛЕНТА МОДНЫХ ДОМОВ */}
-            <div className="relative mb-6">
-              <div className="flex gap-5 overflow-x-auto py-2.5 scrollbar-none pr-10">
-                <button
-                  type="button"
-                  onClick={() => handleBrandClick('all')}
-                  className="text-[10px] font-sans uppercase tracking-[0.2em] whitespace-nowrap cursor-pointer outline-none bg-transparent transition-all shrink-0 pb-1"
-                  style={{
-                    color:
-                      selectedBrand === 'all' && !hasSearched
-                        ? themeColors.text
-                        : themeColors.textMuted,
-                    borderBottom:
-                      selectedBrand === 'all' && !hasSearched
-                        ? `1px solid ${themeColors.text}`
-                        : '1px solid transparent',
-                  }}
-                >
-                  {t.allBrands}
-                </button>
-
-                {visibleBrands.map((brand) => {
-                  const isActive = selectedBrand === brand.id && !hasSearched
-                  return (
-                    <button
-                      key={brand.id}
-                      type="button"
-                      onClick={() => handleBrandClick(brand.id)}
-                      className="text-[10px] font-sans uppercase tracking-[0.2em] whitespace-nowrap cursor-pointer outline-none bg-transparent transition-all shrink-0 pb-1"
-                      style={{
-                        color: isActive ? themeColors.text : themeColors.textMuted,
-                        borderBottom: isActive
-                          ? `1px solid ${themeColors.text}`
-                          : '1px solid transparent',
-                      }}
-                    >
-                      {brand.name}
-                    </button>
-                  )
-                })}
-              </div>
-              <div
-                className="absolute top-0 right-0 bottom-0 w-8 pointer-events-none"
-                style={{
-                  background: `linear-gradient(to left, ${themeColors.bg} 20%, transparent 100%)`,
+                onClick={() => {
+                  if (isSelected) {
+                    setSelectedIdx(null)
+                  } else {
+                    handleSelectModelIndex(idx, true)
+                  }
                 }}
-              />
-            </div>
-          </>
-        )}
-
-        {/* ЕСЛИ ОТКРЫТА ВКЛАДКА "ПАСПОРТ ДОМА" — ПОКАЗЫВАЕМ ДОСЬЕ И АНИМИРОВАННЫЙ SVG ЛОГОТИП */}
-        {viewState === 'catalog' && brandSubTab === 'dossier' && currentBrandDossier ? (
-          <BrandDossierView
-            dossier={currentBrandDossier}
-            lang={activeLang}
-            isDark={isDark}
-            themeColors={themeColors}
-            totalModelsCount={totalInDb}
-            activeIconicModel={selectedIconicModel}
-            onSelectSneakerCard={(item: Sneaker, imgUrl: string | null) => {
-              haptic('light')
-              setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
-            }}
-            onSelectModelQuery={(searchQuery: string, displayModelName?: string) => {
-              haptic('light')
-              setSelectedIconicModel(displayModelName || searchQuery)
-              setHasSearched(false)
-              setSearchText('')
-              setActiveQuery(searchQuery)
-              setBrandSubTab('shoes')
-              if (scrollRef.current) {
-                scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-              }
-            }}
-            onBackToCollection={() => {
-              haptic('light')
-              if (selectedIconicModel && activeBrandMeta) {
-                setSelectedIconicModel(null)
-                setActiveQuery(activeBrandMeta.id)
-              }
-              setBrandSubTab('shoes')
-              if (scrollRef.current) {
-                scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-              }
-            }}
-          />
-        ) : (
-          <>
-            {/* ПАНЕЛЬ БЫСТРОГО ВОЗВРАТА В ПАСПОРТ ДОМА ПРИ ПРОСМОТРЕ КУЛЬТОВОЙ МОДЕЛИ */}
-            {viewState === 'catalog' && selectedIconicModel && activeBrandMeta && (
-              <div
-                className="p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                className="px-3.5 py-2.5 text-[11px] font-sans font-medium uppercase tracking-[0.14em] cursor-pointer transition-all active:scale-95 flex items-center gap-2"
                 style={{
-                  backgroundColor: themeColors.studioCanvas,
+                  color: isSelected ? themeColors.bg : themeColors.text,
+                  backgroundColor: isSelected ? themeColors.text : themeColors.bg,
                   border: `1px solid ${themeColors.text}`,
                 }}
               >
-                <div>
-                  <span
-                    className="block text-[9px] font-sans uppercase tracking-[0.22em] mb-0.5"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    {t.iconicFilterLabel} · {activeBrandMeta.name}
-                  </span>
-                  <span className="font-serif text-[18px] font-normal">
-                    «{selectedIconicModel}»
-                  </span>
-                </div>
+                <span className="opacity-55 text-[9px] font-bold">{numStr}</span>
+                <span>{model}</span>
+              </button>
+            )
+          })}
+        </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic('light')
-                      setSelectedIconicModel(null)
-                      setActiveQuery(activeBrandMeta.id)
-                      setBrandSubTab('dossier')
-                      if (scrollRef.current) {
-                        scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-                      }
-                    }}
-                    className="px-4 py-2.5 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer border-none transition-opacity hover:opacity-90"
-                    style={{
-                      backgroundColor: themeColors.text,
-                      color: themeColors.bg,
-                    }}
-                  >
-                    {t.backToPassport}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic('light')
-                      setSelectedIconicModel(null)
-                      setActiveQuery(activeBrandMeta.id)
-                    }}
-                    className="px-3.5 py-2.5 text-[10px] font-sans uppercase tracking-[0.18em] cursor-pointer bg-transparent transition-opacity hover:opacity-90"
-                    style={{
-                      color: themeColors.text,
-                      border: `1px solid ${themeColors.border}`,
-                    }}
-                  >
-                    {t.showAllBrandShoes} ✕
-                  </button>
-                </div>
-              </div>
-            )}
-            {/* ПАНЕЛЬ ФИЛЬТРОВ ОБУВИ */}
-            {viewState === 'catalog' && (
-              <div
-                className="py-2.5 mb-8 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between"
-                style={{
-                  borderTop: `1px solid ${themeColors.borderFaint}`,
-                  borderBottom: `1px solid ${themeColors.borderFaint}`,
-                }}
+        {/* КАРТОЧКА-ДОСЬЕ ВЫБРАННОГО КУЛЬТОВОГО СИЛУЭТА (ИСТОРИЯ + КИНО + ИНЖЕНЕРИЯ) */}
+        {selectedIdx !== null && activeModelDossier && (
+          <div
+            ref={spotlightCardRef}
+            className="mt-5 p-4 sm:p-6 transition-all"
+            style={{
+              backgroundColor: themeColors.bg,
+              border: `1px solid ${themeColors.text}`,
+            }}
+          >
+            {/* Верхняя шапка карточки с быстрым переключением 01..05 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4" style={{ borderBottom: `1px solid ${themeColors.borderFaint}` }}>
+              <span
+                className="text-[9px] font-sans font-bold uppercase tracking-[0.22em]"
+                style={{ color: dossier.accentHex || themeColors.textMuted }}
               >
-                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-                  <div className="flex items-center gap-4">
-                    {GENDERS.map((gender) => {
-                      const isActive = selectedGender === gender.id
-                      return (
-                        <button
-                          key={gender.id}
-                          type="button"
-                          onClick={() => {
-                            haptic('light')
-                            setSelectedGender(gender.id)
-                          }}
-                          className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap cursor-pointer outline-none bg-transparent border-none transition-all"
-                          style={{
-                            color: isActive ? themeColors.text : themeColors.textFaint,
-                            fontWeight: isActive ? 600 : 400,
-                          }}
-                        >
-                          {gender.name}
-                        </button>
-                      )
-                    })}
-                  </div>
+                {l.spotlightBadge} · 0{selectedIdx + 1} / 0{dossier.iconicModels.length}
+              </span>
 
-                  <div className="flex items-center gap-2.5 sm:hidden">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptic('light')
-                        setGridMode('editorial')
-                      }}
-                      className="text-[9px] font-sans uppercase tracking-[0.18em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                      style={{
-                        color: gridMode === 'editorial' ? themeColors.text : themeColors.textFaint,
-                      }}
-                    >
-                      {t.editorialView}
-                    </button>
-                    <span className="opacity-20 text-[9px]">/</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptic('light')
-                        setGridMode('boutique')
-                      }}
-                      className="text-[9px] font-sans uppercase tracking-[0.18em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                      style={{
-                        color: gridMode === 'boutique' ? themeColors.text : themeColors.textFaint,
-                      }}
-                    >
-                      {t.boutiqueView}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-5">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => {
-                      haptic('light')
-                      setSortBy(e.target.value as SortOption)
+              <div className="flex items-center gap-1.5">
+                {dossier.iconicModels.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelectModelIndex(i, false)}
+                    className="w-6 h-6 text-[9px] font-sans font-bold flex items-center justify-center cursor-pointer border-none"
+                    style={{
+                      backgroundColor: i === selectedIdx ? themeColors.text : themeColors.studioCanvas,
+                      color: i === selectedIdx ? themeColors.bg : themeColors.textMuted,
                     }}
-                    className="text-[9px] font-sans uppercase tracking-[0.18em] bg-transparent outline-none border-none cursor-pointer"
-                    style={{ color: themeColors.textMuted }}
                   >
-                    <option value="newest" style={{ background: themeColors.bg, color: themeColors.text }}>
-                      {t.sortNewest}
-                    </option>
-                    <option value="price_desc" style={{ background: themeColors.bg, color: themeColors.text }}>
-                      {t.sortPriceDesc}
-                    </option>
-                    <option value="price_asc" style={{ background: themeColors.bg, color: themeColors.text }}>
-                      {t.sortPriceAsc}
-                    </option>
-                    <option value="year_desc" style={{ background: themeColors.bg, color: themeColors.text }}>
-                      {t.sortYearDesc}
-                    </option>
-                  </select>
-
-                  <div className="hidden sm:flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptic('light')
-                        setGridMode('editorial')
-                      }}
-                      className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                      style={{
-                        color: gridMode === 'editorial' ? themeColors.text : themeColors.textFaint,
-                      }}
-                    >
-                      {t.editorialView}
-                    </button>
-                    <span className="opacity-20 text-[9px]">/</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptic('light')
-                        setGridMode('boutique')
-                      }}
-                      className="text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap outline-none bg-transparent border-none cursor-pointer"
-                      style={{
-                        color: gridMode === 'boutique' ? themeColors.text : themeColors.textFaint,
-                      }}
-                    >
-                      {t.boutiqueView}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ОШИБКА */}
-            {error && viewState === 'catalog' && (
-              <div
-                className="p-4 mb-8 flex items-center justify-between"
-                style={{ border: `1px solid ${themeColors.border}` }}
-              >
-                <p className="text-[11px] font-sans uppercase tracking-widest opacity-80">
-                  {error}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => fetchSneakers(activeQuery, selectedGender, page, false)}
-                  className="text-[10px] font-sans uppercase tracking-widest underline bg-transparent border-none cursor-pointer"
-                  style={{ color: themeColors.text }}
-                >
-                  Обновить
-                </button>
-              </div>
-            )}
-
-            {/* СКЕЛЕТОН */}
-            {loading && viewState === 'catalog' && sneakers.length === 0 && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-10 pb-10 animate-pulse">
-                {[1, 2, 3, 4, 5].map((n, idx) => (
-                  <div key={n} className={idx === 0 ? 'col-span-2' : ''}>
-                    <div
-                      className={`w-full mb-3 ${idx === 0 ? 'aspect-[16/10]' : 'aspect-[5/4]'}`}
-                      style={{ backgroundColor: themeColors.studioCanvas }}
-                    />
-                    <div
-                      className="h-3 w-20 mb-2"
-                      style={{ backgroundColor: themeColors.studioCanvas }}
-                    />
-                    <div
-                      className="h-4 w-36"
-                      style={{ backgroundColor: themeColors.studioCanvas }}
-                    />
-                  </div>
+                    0{i + 1}
+                  </button>
                 ))}
-              </div>
-            )}
-
-            {/* ПУСТОЕ СОСТОЯНИЕ */}
-            {!loading && currentDisplayList.length === 0 && (
-              <div className="py-24 text-center flex flex-col items-center justify-center gap-5">
-                <p
-                  className="font-serif italic text-[16px]"
-                  style={{ color: themeColors.textMuted }}
-                >
-                  {viewState === 'favorites' ? t.emptyArchive : t.notFound}
-                </p>
-                {viewState === 'catalog' && (
-                  <div className="flex flex-wrap items-center justify-center gap-3">
-                    {selectedIconicModel && activeBrandMeta && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            haptic('light')
-                            setSelectedIconicModel(null)
-                            setActiveQuery(activeBrandMeta.id)
-                            setBrandSubTab('dossier')
-                          }}
-                          className="px-6 py-3.5 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none transition-opacity hover:opacity-90"
-                          style={{
-                            backgroundColor: themeColors.text,
-                            color: themeColors.bg,
-                          }}
-                        >
-                          {t.backToPassport}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            haptic('light')
-                            setSelectedIconicModel(null)
-                            setActiveQuery(activeBrandMeta.id)
-                          }}
-                          className="px-6 py-3.5 text-[10px] font-sans uppercase tracking-[0.22em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
-                          style={{
-                            color: themeColors.text,
-                            border: `1px solid ${themeColors.border}`,
-                          }}
-                        >
-                          {t.showAllBrandShoes} ({activeBrandMeta.name})
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleResetAllFilters}
-                      className="px-6 py-3.5 text-[9px] font-sans uppercase tracking-[0.26em] cursor-pointer bg-transparent transition-opacity hover:opacity-80"
-                      style={{
-                        color: themeColors.text,
-                        border: `1px solid ${themeColors.border}`,
-                      }}
-                    >
-                      {t.resetFilters}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* СЕТКА ЛУКБУКА (12 КАРТОЧЕК НА ШАГ) */}
-            {currentDisplayList.length > 0 && (
-              <div
-                className={
-                  gridMode === 'boutique'
-                    ? 'grid grid-cols-2 gap-x-3.5 sm:gap-x-7 gap-y-9 sm:gap-y-14 pb-12'
-                    : 'grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-14 pb-12'
-                }
-              >
-                {currentDisplayList.map((sneaker, idx) => {
-                  const isFav = favorites.some((f) => f.id === sneaker.id)
-                  const isFeatured =
-                    gridMode === 'boutique' && viewState === 'catalog' && idx % 5 === 0
-                  return (
-                    <SneakerCard
-                      key={sneaker.id}
-                      index={idx}
-                      isFeatured={isFeatured}
-                      sneaker={sneaker}
-                      isFav={isFav}
-                      toggleFavorite={toggleFavorite}
-                      t={t}
-                      themeColors={themeColors}
-                      isDark={isDark}
-                      gridMode={gridMode}
-                      onBrokenImage={handleBrokenImage}
-                      onSelect={(item, imgUrl) => {
-                        haptic('light')
-                        setSelectedModalSneaker({ sneaker: item, imageUrl: imgUrl })
-                      }}
-                    />
-                  )
-                })}
-              </div>
-            )}
-
-            {/* КНОПКА ЗАГРУЗКИ СЛЕДУЮЩИХ 12 СИЛУЭТОВ */}
-            {!loading && !error && hasMore && viewState === 'catalog' && currentDisplayList.length > 0 && (
-              <div
-                className="pt-8 pb-14 text-center flex flex-col items-center gap-3"
-                style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
-              >
-                {totalInDb !== null && totalInDb > 0 && (
-                  <span
-                    className="font-serif italic text-[12px]"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    {t.shownOf} {currentDisplayList.length} {t.ofTotal} {totalInDb}
-                  </span>
-                )}
                 <button
                   type="button"
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="px-8 py-4 text-[9px] font-sans uppercase tracking-[0.28em] outline-none bg-transparent cursor-pointer transition-all hover:opacity-100 opacity-85"
+                  onClick={() => setSelectedIdx(null)}
+                  className="ml-1 px-2 h-6 text-[9px] font-sans uppercase tracking-[0.14em] bg-transparent cursor-pointer"
                   style={{
-                    color: themeColors.text,
+                    color: themeColors.textMuted,
                     border: `1px solid ${themeColors.border}`,
                   }}
                 >
-                  {loadingMore ? t.loading : t.loadMore}
+                  ✕
                 </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
 
-      {/* МОДАЛЬНАЯ КАРТОЧКА СИЛУЭТА */}
-      {selectedModalSneaker && modalDetails && (
-        <div
-          onClick={() => setSelectedModalSneaker(null)}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 backdrop-blur-md transition-opacity"
-          style={{ backgroundColor: 'rgba(0,0,0,0.72)' }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto px-6 pt-4 pb-8 sm:p-9 relative rounded-t-2xl sm:rounded-none"
-            style={{
-              backgroundColor: themeColors.modalBg,
-              color: themeColors.text,
-              borderTop: `1px solid ${themeColors.border}`,
-            }}
-          >
-            <div
-              className="w-10 h-1 rounded-full mx-auto mb-4 sm:hidden opacity-20"
-              style={{ backgroundColor: themeColors.text }}
-            />
+            {/* Название модели + паспорт дебюта и автора */}
+            <div className="mb-5">
+              <h4 className="font-serif text-[24px] sm:text-[28px] leading-tight mb-3">
+                {activeModelDossier.modelName}
+              </h4>
 
-            <div className="flex items-center justify-between mb-4">
+              <div className="grid grid-cols-2 gap-3 p-3.5" style={{ backgroundColor: themeColors.studioCanvas, border: `1px solid ${themeColors.borderFaint}` }}>
+                <div>
+                  <span
+                    className="block text-[8px] font-sans uppercase tracking-[0.2em] mb-0.5"
+                    style={{ color: themeColors.textMuted }}
+                  >
+                    {l.debutYearLabel}
+                  </span>
+                  <span className="font-serif text-[17px] font-normal">
+                    {activeModelDossier.debutYear}
+                  </span>
+                </div>
+                <div>
+                  <span
+                    className="block text-[8px] font-sans uppercase tracking-[0.2em] mb-0.5"
+                    style={{ color: themeColors.textMuted }}
+                  >
+                    {l.creatorLabel}
+                  </span>
+                  <span className="text-[12px] font-sans font-medium leading-snug block">
+                    {activeModelDossier.creator}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Блок 1: История создания и архитектура силуэта */}
+            <div className="mb-4">
               <span
-                className="text-[10px] font-sans font-semibold uppercase tracking-[0.28em]"
+                className="block text-[10px] font-sans font-bold uppercase tracking-[0.2em] mb-1.5"
                 style={{ color: themeColors.text }}
               >
-                {selectedModalSneaker.sneaker.brand}
+                {l.storyHeader}
               </span>
-
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={(e) => toggleFavorite(e, selectedModalSneaker.sneaker)}
-                  className="p-1 bg-transparent border-none cursor-pointer"
-                  style={{ color: modalDetails.isFav ? themeColors.text : themeColors.textMuted }}
-                >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill={modalDetails.isFav ? 'currentColor' : 'none'}
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                  >
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedModalSneaker(null)}
-                  className="text-[9px] font-sans uppercase tracking-[0.24em] bg-transparent border-none cursor-pointer"
-                  style={{ color: themeColors.textMuted }}
-                >
-                  {t.close} ✕
-                </button>
-              </div>
+              <p
+                className="text-[14px] sm:text-[15px] font-sans font-normal leading-relaxed"
+                style={{ color: themeColors.text }}
+              >
+                {activeModelDossier.story}
+              </p>
             </div>
 
-            {selectedModalSneaker.imageUrl && (
+            {/* Блок 2: В кино, музыке и поп-культуре */}
+            <div
+              className="p-4 mb-4"
+              style={{
+                backgroundColor: themeColors.studioCanvas,
+                borderLeft: `3px solid ${dossier.accentHex || themeColors.text}`,
+              }}
+            >
+              <span
+                className="block text-[10px] font-sans font-bold uppercase tracking-[0.2em] mb-1.5"
+                style={{ color: themeColors.text }}
+              >
+                {l.cultureHeader}
+              </span>
+              <p
+                className="text-[14px] font-sans font-normal leading-relaxed"
+                style={{ color: themeColors.text }}
+              >
+                {activeModelDossier.culture}
+              </p>
+            </div>
+
+            {/* Блок 3: Инженерный секрет и факт для коллекционеров */}
+            <div
+              className="p-4 mb-5"
+              style={{
+                backgroundColor: themeColors.studioCanvas,
+                border: `1px solid ${themeColors.borderFaint}`,
+              }}
+            >
+              <span
+                className="block text-[10px] font-sans font-bold uppercase tracking-[0.2em] mb-1.5"
+                style={{ color: themeColors.text }}
+              >
+                {l.factHeader}
+              </span>
+              <p
+                className="text-[14px] font-sans font-normal leading-relaxed"
+                style={{ color: themeColors.text }}
+              >
+                {activeModelDossier.fact}
+              </p>
+            </div>
+
+            {/* Блок 4: Живые карточки из базы (если есть) ИЛИ лаконичная кнопка просмотра фото */}
+            {previewLoading ? (
               <div
-                className="w-full aspect-[16/10] mb-6 flex items-center justify-center overflow-hidden"
+                className="py-3 px-4 mb-4 text-[10px] font-sans uppercase tracking-[0.18em] flex items-center gap-2"
                 style={{
                   backgroundColor: themeColors.studioCanvas,
-                  boxShadow: isDark
-                    ? 'inset 0 0 0 1px rgba(255,255,255,0.04)'
-                    : '0 2px 14px rgba(17,17,17,0.03)',
+                  color: themeColors.textMuted,
                 }}
               >
-                <img
-                  src={selectedModalSneaker.imageUrl}
-                  alt={selectedModalSneaker.sneaker.name}
-                  decoding="async"
-                  className="w-[92%] h-[92%] object-contain"
+                <span
+                  className="w-3 h-3 rounded-full border border-t-transparent animate-spin inline-block"
+                  style={{ borderColor: themeColors.text, borderTopColor: 'transparent' }}
                 />
+                <span>{l.checkingCatalog}</span>
+              </div>
+            ) : previewShoes.length > 0 ? (
+              <div className="mb-4">
+                <span
+                  className="block text-[10px] font-sans font-bold uppercase tracking-[0.2em] mb-2.5"
+                  style={{ color: themeColors.text }}
+                >
+                  ● {l.foundInCatalog} ({previewTotal}):
+                </span>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
+                  {previewShoes.map((shoe) => (
+                    <div
+                      key={shoe.id}
+                      onClick={() => {
+                        if (onSelectSneakerCard) {
+                          onSelectSneakerCard(shoe, shoe.image?.original || null)
+                        } else {
+                          onSelectModelQuery(smartQuery, activeModelDossier.modelName)
+                        }
+                      }}
+                      className="p-2.5 cursor-pointer transition-transform active:scale-95 flex flex-col justify-between"
+                      style={{
+                        backgroundColor: themeColors.studioCanvas,
+                        border: `1px solid ${themeColors.borderFaint}`,
+                      }}
+                    >
+                      <div className="w-full aspect-[5/4] flex items-center justify-center overflow-hidden mb-1.5">
+                        {shoe.image?.original && (
+                          <img
+                            src={shoe.image.original}
+                            alt={shoe.name}
+                            className="w-[90%] h-[90%] object-contain"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-serif text-[12px] line-clamp-1">{shoe.name}</p>
+                        {shoe.retailPrice > 0 && (
+                          <p
+                            className="text-[10px] font-sans mt-0.5"
+                            style={{ color: themeColors.textMuted }}
+                          >
+                            ${shoe.retailPrice}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onSelectModelQuery(smartQuery, activeModelDossier.modelName)}
+                  className="w-full py-3.5 px-5 text-[10px] font-sans font-semibold uppercase tracking-[0.22em] cursor-pointer border-none"
+                  style={{
+                    backgroundColor: themeColors.text,
+                    color: themeColors.bg,
+                  }}
+                >
+                  {l.openInCatalogBtn} ({previewTotal}) →
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => handleOpenExternalModelShowcase(activeModelDossier.modelName)}
+                  className="w-full py-3.5 px-5 text-[10px] font-sans font-semibold uppercase tracking-[0.2em] cursor-pointer border-none"
+                  style={{
+                    backgroundColor: themeColors.text,
+                    color: themeColors.bg,
+                  }}
+                >
+                  {l.lookPhotosBtn}
+                </button>
               </div>
             )}
 
-            <div className="mb-5">
-              <h2 className="font-serif font-normal text-2xl sm:text-3xl leading-tight mb-1">
-                {modalDetails.silhouette}
-              </h2>
-              {modalDetails.colorway && (
-                <p
-                  className="font-serif italic text-[16px]"
-                  style={{ color: themeColors.textMuted }}
-                >
-                  {modalDetails.colorway}
-                </p>
-              )}
-            </div>
-
+            {/* Нижний навигатор: Предыдущий силуэт / Следующий силуэт (без прокрутки вверх) */}
             <div
-              className="flex flex-wrap items-center gap-x-8 gap-y-3 py-4 my-4"
-              style={{
-                borderTop: `1px solid ${themeColors.borderFaint}`,
-                borderBottom: `1px solid ${themeColors.borderFaint}`,
-              }}
+              className="pt-3 flex items-center justify-between gap-2"
+              style={{ borderTop: `1px solid ${themeColors.borderFaint}` }}
             >
-              <div>
-                <span
-                  className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-                  style={{ color: themeColors.textMuted }}
-                >
-                  {t.retail}
-                </span>
-                <span className="font-serif text-[19px]">
-                  {selectedModalSneaker.sneaker.retailPrice > 0
-                    ? formatLuxuryPrice(selectedModalSneaker.sneaker.retailPrice)
-                    : t.priceUnav}
-                </span>
-              </div>
-
-              {modalDetails.genderLabel && (
-                <div>
-                  <span
-                    className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    {t.genderLabel}
-                  </span>
-                  <span className="text-[11px] font-sans uppercase tracking-[0.16em]">
-                    {modalDetails.genderLabel}
-                  </span>
-                </div>
-              )}
-
-              {modalDetails.year && (
-                <div>
-                  <span
-                    className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    {t.releaseYearLabel}
-                  </span>
-                  <span className="font-serif text-[17px]">{modalDetails.year}</span>
-                </div>
-              )}
-
-              {selectedModalSneaker.sneaker.sku && (
-                <div>
-                  <span
-                    className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-                    style={{ color: themeColors.textMuted }}
-                  >
-                    {t.skuLabel}
-                  </span>
-                  <span className="text-[11px] font-sans uppercase tracking-[0.14em]">
-                    {selectedModalSneaker.sneaker.sku}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2.5 mt-6">
               <button
                 type="button"
-                onClick={() => handleExternalBuySearch(selectedModalSneaker.sneaker)}
-                className="w-full py-4 px-5 text-[10px] font-sans uppercase tracking-[0.26em] whitespace-nowrap cursor-pointer border-none transition-opacity hover:opacity-90"
+                onClick={() => {
+                  const prev =
+                    (selectedIdx - 1 + dossier.iconicModels.length) % dossier.iconicModels.length
+                  handleSelectModelIndex(prev, false)
+                }}
+                className="px-3.5 py-2 text-[10px] font-sans font-semibold uppercase tracking-[0.16em] bg-transparent cursor-pointer"
                 style={{
-                  backgroundColor: themeColors.text,
-                  color: themeColors.bg,
+                  color: themeColors.text,
+                  border: `1px solid ${themeColors.border}`,
                 }}
               >
-                {t.buySearch} ↗
+                {l.prevSilhouette}
               </button>
+
+              <span
+                className="text-[10px] font-serif italic"
+                style={{ color: themeColors.textMuted }}
+              >
+                0{selectedIdx + 1} / 0{dossier.iconicModels.length}
+              </span>
+
               <button
                 type="button"
-                onClick={() => handleCopyModel(selectedModalSneaker.sneaker)}
-                className="w-full py-3.5 px-5 text-[9px] font-sans uppercase tracking-[0.22em] whitespace-nowrap cursor-pointer bg-transparent"
+                onClick={() => {
+                  const next = (selectedIdx + 1) % dossier.iconicModels.length
+                  handleSelectModelIndex(next, false)
+                }}
+                className="px-3.5 py-2 text-[10px] font-sans font-semibold uppercase tracking-[0.16em] bg-transparent cursor-pointer"
                 style={{
-                  color: themeColors.textMuted,
-                  border: `1px solid ${themeColors.borderFaint}`,
+                  color: themeColors.text,
+                  border: `1px solid ${themeColors.border}`,
                 }}
               >
-                {copiedId === selectedModalSneaker.sneaker.id ? t.copied : t.copySku}
+                {l.nextSilhouette}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* ПЛАВАЮЩАЯ КНОПКА ПРОКРУТКИ */}
-      <button
-        type="button"
-        onClick={handleSmartScroll}
-        className={`fixed bottom-6 right-5 z-40 flex items-center justify-center w-10 h-10 rounded-full outline-none shadow-md transition-all duration-500 cursor-pointer backdrop-blur-md ${
-          buttonMode !== 'hidden'
-            ? 'opacity-100 translate-y-0 pointer-events-auto'
-            : 'opacity-0 translate-y-4 pointer-events-none'
-        }`}
+      {/* 5. ВЫСОКОКОНТРАСТНЫЙ ИНЖЕНЕРНЫЙ БЛОК: МАТЕРИАЛОВЕДЕНИЕ И ПОДОШВА */}
+      <div
+        className="p-5 sm:p-7 mb-9"
         style={{
-          background: isDark ? 'rgba(20, 20, 24, 0.85)' : 'rgba(255, 255, 255, 0.9)',
+          backgroundColor: themeColors.studioCanvas,
           border: `1px solid ${themeColors.border}`,
-          color: themeColors.text,
+          borderLeft: `3px solid ${dossier.accentHex || themeColors.text}`,
         }}
-        title={buttonMode === 'up' ? t.scrollTop : t.scrollReturn}
       >
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="square"
-          className={`transition-transform duration-500 ${
-            buttonMode === 'down' ? 'rotate-180' : 'rotate-0'
-          }`}
+        <div className="mb-4">
+          <span
+            className="block text-[11px] font-sans font-bold uppercase tracking-[0.22em] mb-1"
+            style={{ color: themeColors.text }}
+          >
+            {l.techSpecHeader}
+          </span>
+          <span
+            className="block text-[12px] font-sans"
+            style={{ color: themeColors.textMuted }}
+          >
+            {l.techSpecSub}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {techPoints.map((point, idx) => {
+            const formattedPoint = point.charAt(0).toUpperCase() + point.slice(1).replace(/\.$/, '')
+            return (
+              <div
+                key={idx}
+                className="p-3.5 flex items-start gap-3"
+                style={{
+                  backgroundColor: themeColors.bg,
+                  border: `1px solid ${themeColors.borderFaint}`,
+                }}
+              >
+                <span
+                  className="text-[10px] font-sans font-bold px-2 py-0.5 shrink-0 mt-0.5"
+                  style={{
+                    backgroundColor: themeColors.text,
+                    color: themeColors.bg,
+                  }}
+                >
+                  0{idx + 1}
+                </span>
+                <span
+                  className="text-[14px] sm:text-[15px] font-sans font-normal leading-snug"
+                  style={{ color: themeColors.text }}
+                >
+                  {formattedPoint}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 6. РЕДАКЦИОННАЯ СТАТЬЯ О ДОМЕ МОДЫ (3 ГЛАВЫ С КРУПНОЙ ТИПОГРАФИКОЙ) */}
+      <div className="space-y-5 mb-10">
+        <article
+          className="p-6 sm:p-8"
+          style={{
+            backgroundColor: themeColors.studioCanvas,
+            borderLeft: `2px solid ${themeColors.text}`,
+          }}
         >
-          <path d="M18 15l-6-6-6 6" />
-        </svg>
-      </button>
-    </div>
+          <h3 className="font-serif text-[20px] sm:text-[22px] mb-3">{ch.originsTitle}</h3>
+          <p
+            className="text-[15px] sm:text-[16px] font-sans font-normal leading-relaxed"
+            style={{ color: themeColors.text }}
+          >
+            {ch.originsText}
+          </p>
+        </article>
+
+        <article
+          className="p-6 sm:p-8"
+          style={{
+            backgroundColor: themeColors.studioCanvas,
+            borderLeft: `2px solid ${themeColors.border}`,
+          }}
+        >
+          <h3 className="font-serif text-[20px] sm:text-[22px] mb-3">{ch.craftTitle}</h3>
+          <p
+            className="text-[15px] sm:text-[16px] font-sans font-normal leading-relaxed"
+            style={{ color: themeColors.text }}
+          >
+            {ch.craftText}
+          </p>
+        </article>
+
+        <article
+          className="p-6 sm:p-8"
+          style={{
+            backgroundColor: themeColors.studioCanvas,
+            borderLeft: `2px solid ${themeColors.border}`,
+          }}
+        >
+          <h3 className="font-serif text-[20px] sm:text-[22px] mb-3">{ch.legacyTitle}</h3>
+          <p
+            className="text-[15px] sm:text-[16px] font-sans font-normal leading-relaxed"
+            style={{ color: themeColors.text }}
+          >
+            {ch.legacyText}
+          </p>
+        </article>
+      </div>
+
+      {/* 7. НИЖНЯЯ КНОПКА ПЕРЕХОДА К КОЛЛЕКЦИИ ОБУВИ */}
+      <div className="text-center pt-2">
+        <button
+          type="button"
+          onClick={onBackToCollection}
+          className="w-full sm:w-auto px-9 py-4 text-[10px] font-sans font-semibold uppercase tracking-[0.26em] cursor-pointer border-none transition-opacity hover:opacity-90"
+          style={{
+            backgroundColor: themeColors.text,
+            color: themeColors.bg,
+          }}
+        >
+          {l.backToShoes} {dossier.name} →
+        </button>
+      </div>
+    </section>
   )
 }
