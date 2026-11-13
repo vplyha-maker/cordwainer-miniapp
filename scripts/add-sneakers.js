@@ -15,7 +15,6 @@ const ALGOLIA_URL =
   'https://2fwotdvm2o-dsn.algolia.net/1/indexes/*/queries?x-algolia-application-id=2FWOTDVM2O&x-algolia-api-key=ac96de6fef0e02bb95d433d8d5c7038a'
 
 const SEARCH_TERMS = [
-  // 1. Высокая мода и Подиумные Дома
   'Chanel', 'Chanel sneakers', 'Chanel loafers', 'Chanel boots', 'Chanel sandals', 'Chanel ballet flats',
   'Prada', 'Prada loafers', 'Prada boots', 'Prada heels', 'Prada mules', 'Prada America Cup',
   'Valentino', 'Valentino Garavani', 'Valentino heels', 'Valentino boots', 'Valentino sneakers',
@@ -36,18 +35,12 @@ const SEARCH_TERMS = [
   'Lanvin', 'Lanvin Curb', 'Lanvin sneakers', 'Lanvin boots',
   'Versace', 'Versace loafers', 'Versace heels', 'Versace Chain Reaction',
   'Givenchy', 'Givenchy boots', 'Givenchy slides',
-
-  // 2. Премиум кэжуал и Авангард
   'Off-White', 'Fear of God', 'BAPE', 'Supreme', 'Kith', 'Palace',
   "Arc'teryx", 'Veja', 'Autry',
   'Lacoste', 'Calvin Klein', 'Tommy Hilfiger', 'Polo Ralph Lauren', 'Dsquared2',
-
-  // 3. Культовые спортивные и беговые линейки
   'Nike', 'Jordan', 'Adidas', 'Yeezy', 'New Balance', 'Asics', 'Converse',
   'Vans', 'Puma', 'Reebok', 'Saucony', 'Mizuno', 'Salomon', 'Hoka', 'On',
   'Under Armour', 'Fila', 'Skechers', 'Etnies', 'Osiris', 'DC',
-
-  // 4. Аутдор и Классика
   'Timberland', 'Timberland boots', 'UGG', 'UGG Tasman',
   'Crocs', 'Dr. Martens', 'Birkenstock', 'Birkenstock Boston',
   'Clarks', 'Clarks Wallabee', 'Merrell', 'Oakley',
@@ -93,6 +86,9 @@ function pickSourceImageUrl(item) {
   return null
 }
 
+/**
+ * Запрашивает строго JPEG/PNG (без AVIF), чтобы iPhone 11 и старые WebKit открывали 100% файлов напрямую
+ */
 async function uploadToCloudflareR2(sourceUrl, sneakerId) {
   try {
     const imgRes = await axios.get(sourceUrl, {
@@ -100,8 +96,8 @@ async function uploadToCloudflareR2(sourceUrl, sneakerId) {
       timeout: 12000,
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        Accept: 'image/png,image/jpeg,image/webp;q=0.9,*/*;q=0.8',
         Referer: sourceUrl.includes('goat.com') ? 'https://www.goat.com/' : undefined,
       },
     })
@@ -183,10 +179,6 @@ async function migrateExistingPhotosToR2(client) {
     return
   }
 
-  console.log(
-    `\n🚀 Запускаем турбо-перенос ${rows.length} карточек в Cloudflare R2 (по ${CONCURRENCY} параллельно)...`
-  )
-
   let migratedCount = 0
   let deletedBrokenCount = 0
 
@@ -200,11 +192,9 @@ async function migrateExistingPhotosToR2(client) {
         if (result === 'BROKEN_IMAGE') {
           await client.query('DELETE FROM sneakers WHERE id = $1', [row.id])
           deletedBrokenCount++
-          console.log(`  🗑️ Удалена битая карточка без фото: ${row.brand} | ${row.name}`)
         } else if (result && result.includes('workers.dev')) {
           await client.query('UPDATE sneakers SET image_url = $1 WHERE id = $2', [result, row.id])
           migratedCount++
-          console.log(`  ☁️ [${migratedCount}] Перенесено в R2: ${row.brand} | ${row.name}`)
         }
       })
     )
@@ -222,11 +212,9 @@ async function run() {
     process.exit(1)
   }
 
-  console.log('🔌 Подключаемся к базе Neon...')
   const client = new Client({ connectionString })
   await client.connect()
 
-  // Гарантируем наличие колонки sku, очищаем пустые записи и создаем скоростные индексы
   await client.query(`
     ALTER TABLE sneakers ADD COLUMN IF NOT EXISTS sku TEXT;
     DELETE FROM sneakers WHERE image_url IS NULL OR TRIM(image_url) = '' OR TRIM(image_url) = 'null';
@@ -237,16 +225,12 @@ async function run() {
     CREATE INDEX IF NOT EXISTS idx_sneakers_name_trgm ON sneakers USING gin (LOWER(name) gin_trgm_ops);
     CREATE INDEX IF NOT EXISTS idx_sneakers_brand_trgm ON sneakers USING gin (LOWER(brand) gin_trgm_ops);
   `)
-  console.log('⚡ Скоростные SQL-индексы Neon проверены и активны!')
 
   await migrateExistingPhotosToR2(client)
 
   for (let i = 0; i < 10; i++) {
     const randomBrand = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)]
     const randomPage = Math.floor(Math.random() * 6)
-
-    console.log(`\n=========================================`)
-    console.log(`📡 ШАГ ${i + 1}/10 | БРЕНД: "${randomBrand}" (Страница ${randomPage})`)
 
     const queryData = {
       requests: [
@@ -337,7 +321,6 @@ async function run() {
   }
 
   await client.end()
-  console.log('\n🏁 СИНХРОНИЗАЦИЯ И МИГРАЦИЯ ЗАВЕРШЕНЫ!')
 }
 
 run()
