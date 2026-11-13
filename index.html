@@ -13,6 +13,97 @@
     />
     <title>Cordwainer — Энциклопедия сапожного ремесла</title>
 
+    <!-- ===== Open Graph ===== -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Cordwainer" />
+    <meta property="og:title" content="Cordwainer — Энциклопедия сапожного ремесла" />
+    <meta property="og:description" content="Справочник, калькуляторы размеров, полноты колодки, каблука, цвета, глоссарий и цены для обувщиков, дизайнеров и ортопедов." />
+    <meta property="og:url" content="https://www.cordwaine.app/" />
+    <meta property="og:image" content="https://www.cordwaine.app/hero-cover.webp" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Cordwainer — энциклопедия сапожного ремесла" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:locale:alternate" content="uk_UA" />
+    <meta property="og:locale:alternate" content="de_DE" />
+
+    <!-- ===== Twitter Card ===== -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cordwainer — Энциклопедия сапожного ремесла" />
+    <meta name="twitter:description" content="Справочник, калькуляторы размеров, полноты колодки, каблука, цвета, глоссарий и цены для обувщиков, дизайнеров и ортопедов." />
+    <meta name="twitter:image" content="https://www.cordwaine.app/hero-cover.webp" />
+    <meta name="twitter:image:alt" content="Cordwainer — энциклопедия сапожного ремесла" />
+
+    <!-- ===== Schema.org JSON-LD ===== -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://www.cordwaine.app/#website",
+          "url": "https://www.cordwaine.app/",
+          "name": "Cordwainer",
+          "alternateName": ["Cordwainer Mini App", "Кордвейн"],
+          "description": "Энциклопедия сапожного ремесла: калькуляторы размеров, полноты колодки, каблука, цвета, глоссарий, цены на материалы и блог для обувщиков, дизайнеров и ортопедов.",
+          "inLanguage": ["ru", "uk", "de"],
+          "publisher": {
+            "@id": "https://www.cordwaine.app/#organization"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://www.cordwaine.app/#organization",
+          "name": "Cordwainer",
+          "url": "https://www.cordwaine.app/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://www.cordwaine.app/icon-512.png",
+            "width": 512,
+            "height": 512
+          },
+          "sameAs": [
+            "https://t.me/Cordwainer_bot"
+          ],
+          "description": "Telegram Mini App и веб-энциклопедия сапожного ремесла"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://www.cordwaine.app/#app",
+          "name": "Cordwainer",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Web, Telegram",
+          "url": "https://www.cordwaine.app/",
+          "description": "Справочник и профессиональные калькуляторы для обувщиков, колодочников, ортопедов и дизайнеров обуви.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "author": {
+            "@id": "https://www.cordwaine.app/#organization"
+          },
+          "inLanguage": ["ru", "uk", "de"]
+        },
+        {
+          "@type": "WebApplication",
+          "name": "Калькулятор полноты колодки — Cordwainer",
+          "url": "https://www.cordwaine.app/forward-ortho-converter",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Web",
+          "description": "Бесплатный онлайн-калькулятор полноты колодки и конвертер маркировок ГОСТ / US / UK / EU. Расчёт обхватов плюсны, подъёма и пятки.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "inLanguage": ["ru", "uk", "de"]
+        }
+      ]
+    }
+    </script>
+    <!-- ============================== -->
+
     <!-- ===== GOOGLE ANALYTICS 4 ===== -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-2GF60PJ1C5"></script>
     <script>
@@ -92,4 +183,4 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
-</html>
+      </html>
