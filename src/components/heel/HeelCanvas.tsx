@@ -4,7 +4,7 @@ import type { HeelEngineering, HeelAudit, SoleType, HeelType } from '../../lib/h
 import type { HeelGeometry } from '../../lib/heelGeometry'
 import { HEEL_CONST } from '../../lib/heelCalc'
 const HeelScene3D = React.lazy(() =>
-  import('./HeelScene3D').then((m) => ({ default: m.HeelScene3D }))
+import('./HeelScene3D').then((m) => ({ default: m.HeelScene3D }))
 
 type Labels = {
   heelLbl: string
