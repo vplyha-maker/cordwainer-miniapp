@@ -93,7 +93,7 @@ export function HeelCanvas({
 
   const rearLabel = t.rearfoot ?? t.heelLbl
   const foreLabel = t.forefoot ?? t.toeLbl
-  const entryLabel = t.entryAngle ?? 'Угол захода'
+  const entryLabel = t.entryAngle ?? 'Угол скоса'
   const dropMm = heelHeight - toeThickness
 
   const offsetColor = eng.heelOffsetTooFarBack
@@ -127,7 +127,6 @@ export function HeelCanvas({
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-          {/* Переключатель 3D WebGL / 2D Чертёж */}
           <div className="flex items-center rounded-[9px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]">
             {(['3d', '2d'] as const).map((mode) => (
               <button
@@ -181,7 +180,6 @@ export function HeelCanvas({
             preserveAspectRatio="xMidYMid meet"
             className="overflow-visible"
           >
-            {/* Сетка чертежа (миллиметровка ателье) */}
             <defs>
               <pattern id="atelier-grid" width="20" height="20" patternUnits="userSpaceOnUse">
                 <path
@@ -195,7 +193,6 @@ export function HeelCanvas({
             </defs>
             <rect width="100%" height="100%" fill="url(#atelier-grid)" />
 
-            {/* МЕТРИКИ МАССЫ И ВЕКТОРЫ ВЫШЕ ЧЕРТЕЖА */}
             <g transform="translate(0, 4)">
               <text
                 x={Math.max(8, g.xHeel - 4)}
@@ -265,7 +262,6 @@ export function HeelCanvas({
               )}
             </g>
 
-            {/* БАЗОВАЯ ЛИНИЯ ПОЛА (GROUND LINE) */}
             <line
               x1="10"
               y1={g.yGround + 6}
@@ -287,7 +283,6 @@ export function HeelCanvas({
               LINEA BASALIS // FLOOR
             </text>
 
-            {/* ЛИНИЯ СТОПЫ */}
             <line
               x1={g.xHeel - 8}
               y1={g.yFootBall + 6}
@@ -299,7 +294,6 @@ export function HeelCanvas({
               opacity="0.4"
             />
 
-            {/* ОСЬ ЦЕНТРА ПЯТКИ */}
             {soleType === 'flat' && (
               <>
                 <line
@@ -315,7 +309,6 @@ export function HeelCanvas({
               </>
             )}
 
-            {/* ПОКАЗАТЕЛЬ ПЕРЕПАДА (DROP) */}
             <g transform="translate(0, 6)">
               {soleType === 'rocker' ? (
                 <text
@@ -342,10 +335,8 @@ export function HeelCanvas({
               )}
             </g>
 
-            {/* КОНТУР КАБЛУКА */}
             <path d={g.heelPath} fill="var(--color-ink)" opacity="0.9" transform="translate(0, 6)" />
 
-            {/* КОНТУР ПОДОШВЫ / КОЛОДКИ */}
             <path
               d={g.solePath}
               fill="var(--color-surface-2)"
@@ -355,8 +346,79 @@ export function HeelCanvas({
               transform="translate(0, 6)"
             />
 
-            {/* СУПИНАТОР (STEEL SHANK) */}
-            {soleType === 'flat' && (
+            {/* МЕТАТАРЗАЛЬНЫЙ ПЕЛОТ ЗЕЙЦА */}
+            {eng.requiresMetatarsalPad && (
+              <g transform="translate(0, 6)">
+                <path
+                  d={g.pelottePath}
+                  fill="#E11D48"
+                  fillOpacity="0.28"
+                  stroke="#E11D48"
+                  strokeWidth="1.2"
+                />
+                <text
+                  x={g.xPelotte}
+                  y={g.yFootPelotte - 10}
+                  textAnchor="middle"
+                  fill="#E11D48"
+                  fontSize="6.5"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  PELOTTE
+                </text>
+              </g>
+            )}
+
+            {/* ДИАГОНАЛЬНЫЙ КОРИДОР АПЕКСА ПУЧКОВ M5 – M1 */}
+            <g transform="translate(0, 6)">
+              <line
+                x1={g.xApexM5}
+                y1={g.yFootBall - 4}
+                x2={g.xApexM5}
+                y2={g.yGround}
+                stroke="var(--color-accent)"
+                strokeWidth="0.9"
+                strokeDasharray="2 2"
+                opacity="0.75"
+              />
+              <circle cx={g.xApexM5} cy={g.yFootBall} r="2" fill="var(--color-accent)" />
+              <text
+                x={g.xApexM5 - 3}
+                y={g.yGround + 9}
+                textAnchor="end"
+                fill="var(--color-muted)"
+                fontSize="6"
+                fontFamily="monospace"
+              >
+                M5
+              </text>
+
+              <line
+                x1={g.xApexM1}
+                y1={g.yFootBall - 4}
+                x2={g.xApexM1}
+                y2={g.yGround}
+                stroke="#10B981"
+                strokeWidth="1"
+                strokeDasharray="2 2"
+                opacity="0.85"
+              />
+              <circle cx={g.xApexM1} cy={g.yFootBall} r="2.2" fill="#10B981" />
+              <text
+                x={g.xApexM1 + 3}
+                y={g.yGround + 9}
+                textAnchor="start"
+                fill="#10B981"
+                fontSize="6"
+                fontFamily="monospace"
+                fontWeight="bold"
+              >
+                M1
+              </text>
+            </g>
+
+            {soleType === 'flat' ? (
               <path
                 d={g.shankCurve}
                 fill="none"
@@ -365,9 +427,18 @@ export function HeelCanvas({
                 strokeLinecap="round"
                 transform="translate(0, 6)"
               />
+            ) : (
+              <path
+                d={g.carbonPath}
+                fill="none"
+                stroke="#10B981"
+                strokeWidth={Math.max(1.8, eng.carbonInsertThicknessMm * (g.scale * 0.85))}
+                strokeDasharray="6 2"
+                strokeLinecap="round"
+                transform="translate(0, 6)"
+              />
             )}
 
-            {/* ТОЧКА РОКЕРА */}
             {soleType === 'rocker' && (
               <g transform="translate(0, 6)">
                 <circle cx={g.xBall} cy={g.yFootBall} r="3" fill="#E11D48" />
@@ -386,7 +457,6 @@ export function HeelCanvas({
         </div>
       )}
 
-      {/* ТЕХНИЧЕСКИЙ ФУТЕР ЧЕРТЕЖА */}
       <div
         className="px-5 py-3 flex items-center justify-between text-[11px] font-mono tracking-wider"
         style={{
