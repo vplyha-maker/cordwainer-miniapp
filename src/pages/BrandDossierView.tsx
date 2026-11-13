@@ -7,7 +7,8 @@ interface BrandDossierViewProps {
   isDark: boolean
   themeColors: Record<string, string>
   totalModelsCount: number | null
-  onSelectModelQuery: (modelQuery: string) => void
+  activeIconicModel?: string | null
+  onSelectModelQuery: (modelName: string) => void
   onBackToCollection: () => void
 }
 
@@ -18,9 +19,14 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     direction: 'Основатели и креативный код',
     archiveVolume: 'В каталоге',
     modelsUnit: 'моделей',
-    iconicHeader: 'Культовые силуэты Дома (нажмите для поиска в каталоге)',
-    techSpecHeader: 'Материаловедение и технологии подошвы',
+    officialSiteLabel: 'Официальный цифровой бутик Дома',
+    openOfficialSite: 'Перейти на официальный сайт',
+    iconicHeader: 'Культовые силуэты Дома',
+    iconicSub: 'Нажмите на силуэт, чтобы отфильтровать коллекцию (с быстрым возвратом в паспорт)',
+    techSpecHeader: 'Материаловедение и инженерия подошвы',
+    techSpecSub: 'Ключевые конструктивные узлы, кожи и запатентованные полимеры',
     backToShoes: 'Смотреть коллекцию',
+    quickBackShoes: '← К коллекции обуви',
   },
   uk: {
     founded: 'Рік заснування',
@@ -28,9 +34,14 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     direction: 'Засновники та креативний код',
     archiveVolume: 'У каталозі',
     modelsUnit: 'моделей',
-    iconicHeader: 'Культові силуети Дому (натисніть для пошуку в каталозі)',
-    techSpecHeader: 'Матеріалознавство та технології підошви',
+    officialSiteLabel: 'Офіційний цифровий бутік Дому',
+    openOfficialSite: 'Перейти на офіційний сайт',
+    iconicHeader: 'Культові силуети Дому',
+    iconicSub: 'Натисніть на силует для фільтрації колекції (зі швидким поверненням у паспорт)',
+    techSpecHeader: 'Матеріалознавство та інженерія підошви',
+    techSpecSub: 'Ключові конструктивні вузли, шкіри та запатентовані полімери',
     backToShoes: 'Дивитися колекцію',
+    quickBackShoes: '← До колекції взуття',
   },
   de: {
     founded: 'Gründungsjahr',
@@ -38,27 +49,52 @@ const UI_LABELS: Record<DossierLang, Record<string, string>> = {
     direction: 'Gründer & Kreativcode',
     archiveVolume: 'Im Katalog',
     modelsUnit: 'Modelle',
-    iconicHeader: 'Ikonische Silhouetten (zum Filtern antippen)',
+    officialSiteLabel: 'Offizielle digitale Boutique',
+    openOfficialSite: 'Offizielle Website öffnen',
+    iconicHeader: 'Ikonische Silhouetten des Hauses',
+    iconicSub: 'Tippen Sie auf eine Silhouette, um die Kollektion zu filtern',
     techSpecHeader: 'Materialkunde & Sohlentechnologie',
+    techSpecSub: 'Konstruktionsmerkmale, Lederarten und Sohlensysteme',
     backToShoes: 'Kollektion ansehen',
+    quickBackShoes: '← Zur Schuhkollektion',
   },
 }
 
+function openExternalUrl(url: string) {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.openLink) {
+      tg.openLink(url)
+      return
+    }
+  } catch {}
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 /**
- * Высокотехнологичный анимированный векторный SVG-стенд с 16 типами эмблем для всех 63 брендов
+ * Ювелирная обсидиановая витрина с анимированными векторными гербами и монограммами 25 типов
  */
 function AnimatedBrandEmblem({
   dossier,
-  isDark,
+  onOpenOfficialSite,
 }: {
   dossier: BrandDossier
-  isDark: boolean
+  onOpenOfficialSite: () => void
 }) {
-  const strokeMain = isDark ? '#F5F2EB' : '#111111'
-  const strokeAccent = dossier.accentHex || (isDark ? '#D4C3A3' : '#7A684B')
+  const goldLight = '#FFF3D1'
+  const goldMid = dossier.accentHex || '#D4AF37'
+  const goldDeep = '#9A7B3E'
+  const platinum = '#F5F2EB'
 
   return (
-    <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] flex items-center justify-center overflow-hidden select-none">
+    <div
+      className="relative w-full aspect-[16/10] sm:aspect-[21/9] flex items-center justify-center overflow-hidden select-none"
+      style={{
+        background:
+          'radial-gradient(circle at 50% 48%, #1C1A24 0%, #0E0E14 62%, #07070A 100%)',
+        boxShadow: 'inset 0 0 0 1px rgba(212, 175, 55, 0.25), 0 16px 40px rgba(0,0,0,0.22)',
+      }}
+    >
       <style>{`
         @keyframes cadOrbitSlow {
           0% { transform: rotate(0deg); }
@@ -68,431 +104,1077 @@ function AnimatedBrandEmblem({
           0% { transform: rotate(360deg); }
           100% { transform: rotate(0deg); }
         }
-        @keyframes cadDrawPath {
-          0% { stroke-dashoffset: 600; opacity: 0.35; }
-          50% { stroke-dashoffset: 0; opacity: 1; }
-          100% { stroke-dashoffset: 0; opacity: 0.92; }
+        @keyframes cadDrawLuxury {
+          0% { stroke-dashoffset: 720; opacity: 0.55; }
+          60% { stroke-dashoffset: 0; opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 0.95; }
         }
-        @keyframes cadPulseGlow {
-          0%, 100% { opacity: 0.2; transform: scale(0.97); }
-          50% { opacity: 0.55; transform: scale(1.04); }
+        @keyframes cadPulseAura {
+          0%, 100% { opacity: 0.28; transform: scale(0.96); }
+          50% { opacity: 0.65; transform: scale(1.05); }
         }
-        @keyframes cadScanLine {
-          0% { transform: translateY(-100%); opacity: 0; }
-          40% { opacity: 0.35; }
-          100% { transform: translateY(100%); opacity: 0; }
+        @keyframes cadLaserSweep {
+          0% { transform: translateY(-110%); opacity: 0; }
+          35% { opacity: 0.5; }
+          100% { transform: translateY(110%); opacity: 0; }
         }
       `}</style>
+
+      {/* Внутренняя тонкая ювелирная рамка */}
+      <div
+        className="absolute inset-2.5 pointer-events-none"
+        style={{ border: '1px solid rgba(245, 242, 235, 0.08)' }}
+      />
 
       {/* Лазерный сканирующий луч */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `linear-gradient(180deg, transparent 0%, ${
-            isDark ? 'rgba(212, 195, 163, 0.08)' : 'rgba(17, 17, 17, 0.04)'
-          } 50%, transparent 100%)`,
-          animation: 'cadScanLine 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+          background:
+            'linear-gradient(180deg, transparent 0%, rgba(212, 175, 55, 0.11) 50%, transparent 100%)',
+          animation: 'cadLaserSweep 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
         }}
       />
 
-      {/* Инженерные телеметрические метки по углам */}
-      <div className="absolute top-3 left-4 text-[8px] font-sans uppercase tracking-[0.26em] opacity-35">
-        CAD // {dossier.id.toUpperCase()}
+      {/* Верхние телеметрические метки */}
+      <div
+        className="absolute top-3.5 left-4 text-[8px] font-sans uppercase tracking-[0.28em]"
+        style={{ color: 'rgba(245, 242, 235, 0.5)' }}
+      >
+        MAISON ARCHIVE // {dossier.id.toUpperCase()}
       </div>
-      <div className="absolute top-3 right-4 text-[8px] font-sans uppercase tracking-[0.26em] opacity-35">
+      <div
+        className="absolute top-3.5 right-4 text-[8px] font-sans uppercase tracking-[0.28em]"
+        style={{ color: goldLight }}
+      >
         EST. {dossier.founded}
       </div>
-      <div className="absolute bottom-3 left-4 text-[8px] font-sans uppercase tracking-[0.26em] opacity-35">
-        HERITAGE ARCHIVE SPEC
+
+      {/* Нижние метки + интерактивная ссылка на официальный домен */}
+      <div
+        className="absolute bottom-3 left-4 text-[8px] font-sans uppercase tracking-[0.24em]"
+        style={{ color: 'rgba(245, 242, 235, 0.45)' }}
+      >
+        BESPOKE VECTOR CREST
       </div>
-      <div className="absolute bottom-3 right-4 text-[8px] font-sans uppercase tracking-[0.26em] opacity-35">
-        {dossier.monogram} · VECTOR 1:1
-      </div>
+      <button
+        type="button"
+        onClick={onOpenOfficialSite}
+        className="absolute bottom-2.5 right-3.5 px-2.5 py-1 text-[8px] font-sans uppercase tracking-[0.22em] cursor-pointer bg-transparent transition-opacity hover:opacity-100 opacity-85"
+        style={{
+          color: goldLight,
+          border: '1px solid rgba(212, 175, 55, 0.35)',
+          backgroundColor: 'rgba(212, 175, 55, 0.08)',
+        }}
+      >
+        {dossier.officialDomain.toUpperCase()} ↗
+      </button>
 
       <svg
-        viewBox="0 0 360 220"
-        className="w-full h-full max-w-[360px] max-h-[220px]"
+        viewBox="0 0 380 230"
+        className="w-full h-full max-w-[380px] max-h-[230px]"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id="luxuryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={strokeMain} stopOpacity="1" />
-            <stop offset="55%" stopColor={strokeAccent} stopOpacity="0.95" />
-            <stop offset="100%" stopColor={strokeMain} stopOpacity="0.8" />
+          <linearGradient id="goldMetallic" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={goldLight} />
+            <stop offset="45%" stopColor={goldMid} />
+            <stop offset="80%" stopColor={goldDeep} />
+            <stop offset="100%" stopColor={goldLight} />
           </linearGradient>
-          <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={strokeAccent} stopOpacity={isDark ? '0.24' : '0.14'} />
-            <stop offset="100%" stopColor={strokeAccent} stopOpacity="0" />
+
+          <linearGradient id="platinumMetallic" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="50%" stopColor="#D4D4D8" />
+            <stop offset="100%" stopColor={goldLight} />
+          </linearGradient>
+
+          <radialGradient id="obsidianGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={goldMid} stopOpacity="0.34" />
+            <stop offset="65%" stopColor={goldMid} stopOpacity="0.08" />
+            <stop offset="100%" stopColor={goldMid} stopOpacity="0" />
           </radialGradient>
+
+          <filter id="emblemGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2.2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
 
+        {/* Центральное золотое свечение */}
         <circle
-          cx="180"
-          cy="110"
-          r="88"
-          fill="url(#centerGlow)"
-          style={{ animation: 'cadPulseGlow 4s ease-in-out infinite', transformOrigin: '180px 110px' }}
+          cx="190"
+          cy="115"
+          r="92"
+          fill="url(#obsidianGlow)"
+          style={{
+            animation: 'cadPulseAura 4.2s ease-in-out infinite',
+            transformOrigin: '190px 115px',
+          }}
         />
 
-        {/* Осевые координатные линии */}
-        <line x1="20" y1="110" x2="75" y2="110" stroke={strokeMain} strokeOpacity="0.12" strokeWidth="0.75" />
-        <line x1="285" y1="110" x2="340" y2="110" stroke={strokeMain} strokeOpacity="0.12" strokeWidth="0.75" />
-        <line x1="180" y1="12" x2="180" y2="32" stroke={strokeMain} strokeOpacity="0.12" strokeWidth="0.75" />
-        <line x1="180" y1="188" x2="180" y2="208" stroke={strokeMain} strokeOpacity="0.12" strokeWidth="0.75" />
+        {/* Координатные линии */}
+        <line x1="18" y1="115" x2="84" y2="115" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+        <line x1="296" y1="115" x2="362" y2="115" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+        <line x1="190" y1="10" x2="190" y2="30" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
+        <line x1="190" y1="200" x2="190" y2="220" stroke={goldLight} strokeOpacity="0.18" strokeWidth="0.8" />
 
-        {/* Внешнее вращающееся кольцо */}
-        <g style={{ transformOrigin: '180px 110px', animation: 'cadOrbitSlow 28s linear infinite' }}>
+        {/* Внешний часовой гильошированный лимб */}
+        <g style={{ transformOrigin: '190px 115px', animation: 'cadOrbitSlow 34s linear infinite' }}>
           <circle
-            cx="180"
-            cy="110"
-            r="84"
-            stroke={strokeMain}
-            strokeOpacity="0.18"
-            strokeWidth="0.8"
-            strokeDasharray="4 6"
+            cx="190"
+            cy="115"
+            r="88"
+            stroke="url(#goldMetallic)"
+            strokeOpacity="0.32"
+            strokeWidth="1"
+            strokeDasharray="2 6"
           />
-          <circle cx="180" cy="26" r="2" fill={strokeAccent} />
-          <circle cx="180" cy="194" r="2" fill={strokeAccent} />
+          <circle
+            cx="190"
+            cy="115"
+            r="82"
+            stroke={platinum}
+            strokeOpacity="0.14"
+            strokeWidth="0.7"
+          />
+          <circle cx="190" cy="27" r="2.6" fill={goldLight} />
+          <circle cx="190" cy="203" r="2.6" fill={goldLight} />
+          <circle cx="102" cy="115" r="2" fill={goldMid} />
+          <circle cx="278" cy="115" r="2" fill={goldMid} />
         </g>
 
         {/* Внутреннее встречное кольцо */}
-        <g style={{ transformOrigin: '180px 110px', animation: 'cadOrbitReverse 20s linear infinite' }}>
+        <g style={{ transformOrigin: '190px 115px', animation: 'cadOrbitReverse 24s linear infinite' }}>
           <circle
-            cx="180"
-            cy="110"
-            r="68"
-            stroke={strokeAccent}
-            strokeOpacity="0.3"
-            strokeWidth="0.9"
-            strokeDasharray="18 10 2 10"
+            cx="190"
+            cy="115"
+            r="72"
+            stroke="url(#goldMetallic)"
+            strokeOpacity="0.42"
+            strokeWidth="1.1"
+            strokeDasharray="22 10 3 10"
           />
         </g>
 
-        {/* 1. Треугольный герб (Prada, Palace) */}
+        {/* 1. PRADA / PALACE — Эмалированный Савойский треугольник с заклепками и гербом */}
         {dossier.emblem === 'prada_triangle' && (
-          <g>
+          <g filter="url(#emblemGlow)">
             <polygon
-              points="116,66 244,66 180,168"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2.2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.2s ease-out infinite alternate' }}
+              points="114,62 266,62 190,178"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.5s ease-out infinite alternate' }}
             />
-            <polygon points="126,72 234,72 180,158" stroke={strokeMain} strokeOpacity="0.35" strokeWidth="0.9" />
-            <text x="180" y="99" textAnchor="middle" fill={strokeMain} fontFamily="Georgia, serif" fontSize="15" letterSpacing="4">
+            <polygon
+              points="123,68 257,68 190,168"
+              stroke={goldLight}
+              strokeOpacity="0.55"
+              strokeWidth="1.1"
+            />
+            {/* Три фирменные угловые заклепки */}
+            <circle cx="123" cy="67" r="2.2" fill={goldLight} />
+            <circle cx="257" cy="67" r="2.2" fill={goldLight} />
+            <circle cx="190" cy="169" r="2.2" fill={goldLight} />
+            {/* Савойский узел и корона над именем */}
+            <path d="M 176 80 Q 190 73 204 80" stroke={goldMid} strokeWidth="1.3" />
+            <circle cx="190" cy="77" r="2.5" stroke={goldLight} strokeWidth="1.2" />
+            <text
+              x="190"
+              y="104"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize="19"
+              letterSpacing="5"
+            >
               {dossier.name.slice(0, 8)}
             </text>
-            <text x="180" y="122" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="7" letterSpacing="3">
-              EST. {dossier.founded}
+            <text
+              x="190"
+              y="120"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7.5"
+              letterSpacing="4"
+            >
+              MILANO
+            </text>
+            <text
+              x="190"
+              y="136"
+              textAnchor="middle"
+              fill={goldMid}
+              fontFamily="serif"
+              fontSize="7"
+              letterSpacing="2.5"
+            >
+              DAL {dossier.founded}
             </text>
           </g>
         )}
 
-        {/* 2. Переплетенные кольца Chanel CC */}
+        {/* 2. SAINT LAURENT — Вертикальная переплетенная монограмма Cassandre YSL */}
+        {dossier.emblem === 'ysl_cassandre' && (
+          <g filter="url(#emblemGlow)">
+            {/* Октагональная парижская кутюрная плакетка */}
+            <polygon
+              points="152,48 228,48 256,76 256,154 228,182 152,182 124,154 124,76"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <polygon
+              points="156,54 224,54 250,80 250,150 224,176 156,176 130,150 130,80"
+              stroke={goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="0.9"
+            />
+            {/* Буква Y (вертикальная ось Cassandre) */}
+            <path
+              d="M 166 64 L 190 98 L 214 64 M 190 98 L 190 156 M 182 156 L 198 156"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="3.6"
+              strokeLinecap="square"
+            />
+            {/* Буква S, обвивающая вертикальную мачту Y */}
+            <path
+              d="M 206 82 C 206 68, 172 68, 172 86 C 172 104, 210 104, 210 124 C 210 142, 172 142, 172 128"
+              stroke="url(#goldMetallic)"
+              strokeWidth="3.4"
+              strokeLinecap="round"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
+            />
+            {/* Буква L у основания монограммы */}
+            <path
+              d="M 178 96 L 178 156 L 218 156 L 218 147"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+              strokeLinecap="square"
+            />
+            <text
+              x="190"
+              y="170"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="6.5"
+              letterSpacing="4"
+            >
+              SAINT LAURENT PARIS
+            </text>
+          </g>
+        )}
+
+        {/* 3. VALENTINO / VEJA — Архитектурный медальон VLogo Signature с шипами Rockstud */}
+        {dossier.emblem === 'valentino_v' && (
+          <g filter="url(#emblemGlow)">
+            {/* Ромб с пирамидальными гранями Rockstud */}
+            <polygon
+              points="190,44 264,115 190,186 116,115"
+              stroke={goldMid}
+              strokeOpacity="0.45"
+              strokeWidth="1.2"
+            />
+            <rect x="186" y="40" width="8" height="8" transform="rotate(45 190 44)" fill={goldLight} />
+            <rect x="260" y="111" width="8" height="8" transform="rotate(45 264 115)" fill={goldLight} />
+            <rect x="186" y="182" width="8" height="8" transform="rotate(45 190 186)" fill={goldLight} />
+            <rect x="112" y="111" width="8" height="8" transform="rotate(45 116 115)" fill={goldLight} />
+
+            {/* Овальный обод VLogo */}
+            <ellipse
+              cx="190"
+              cy="115"
+              rx="56"
+              ry="38"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <ellipse
+              cx="190"
+              cy="115"
+              rx="50"
+              ry="32"
+              stroke={goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="0.9"
+            />
+
+            {/* Выразительная литера V с фирменной горизонтальной засечкой VLogo */}
+            <path
+              d="M 158 92 L 172 92 M 208 92 L 222 92 M 164 92 L 190 142 L 216 92"
+              stroke="url(#goldMetallic)"
+              strokeWidth="4.2"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+            />
+            <line x1="176" y1="115" x2="204" y2="115" stroke={platinum} strokeWidth="2.6" />
+          </g>
+        )}
+
+        {/* 4. CHANEL — Переплетенные ювелирные кольца Double C */}
         {dossier.emblem === 'chanel_cc' && (
-          <g>
+          <g filter="url(#emblemGlow)">
             <path
-              d="M 192 78 A 34 34 0 1 0 192 142"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="5.2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3s ease-out infinite alternate' }}
+              d="M 206 80 A 36 36 0 1 0 206 150"
+              stroke="url(#goldMetallic)"
+              strokeWidth="6.5"
+              strokeLinecap="butt"
             />
             <path
-              d="M 168 78 A 34 34 0 1 1 168 142"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="5.2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3s ease-out infinite alternate' }}
+              d="M 174 80 A 36 36 0 1 1 174 150"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="6.5"
+              strokeLinecap="butt"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
             />
-            <text x="180" y="168" textAnchor="middle" fill={strokeMain} fontFamily="sans-serif" fontSize="7.5" letterSpacing="4.5" opacity="0.75">
-              31 RUE CAMBON
+            <text
+              x="190"
+              y="176"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="8"
+              letterSpacing="5"
+            >
+              CHANEL · PARIS
             </text>
           </g>
         )}
 
-        {/* 3. Архитектурная монограмма BB (Balenciaga) */}
+        {/* 5. BALENCIAGA — Скульптурная двойная монограмма BB */}
         {dossier.emblem === 'balenciaga_bb' && (
-          <g>
-            <rect x="126" y="66" width="108" height="88" rx="2" stroke={strokeMain} strokeOpacity="0.22" strokeWidth="1" />
-            <text x="180" y="118" textAnchor="middle" fill="url(#luxuryGrad)" fontFamily="Georgia, serif" fontSize="36" letterSpacing="6">
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="120"
+              y="58"
+              width="140"
+              height="114"
+              rx="4"
+              fill="rgba(12, 12, 18, 0.86)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2.2"
+            />
+            <rect
+              x="126"
+              y="64"
+              width="128"
+              height="102"
+              rx="2"
+              stroke={goldMid}
+              strokeOpacity="0.4"
+              strokeWidth="0.9"
+            />
+            <text
+              x="190"
+              y="124"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize="48"
+              letterSpacing="6"
+            >
               BB
             </text>
-            <text x="180" y="142" textAnchor="middle" fill={strokeMain} fontFamily="sans-serif" fontSize="7" letterSpacing="4" opacity="0.7">
-              PARIS · 1917
+            <line x1="144" y1="136" x2="236" y2="136" stroke="url(#goldMetallic)" strokeWidth="1.2" />
+            <text
+              x="190"
+              y="152"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="5"
+            >
+              BALENCIAGA
             </text>
           </g>
         )}
 
-        {/* 4. Литера V в ромбе/овале (Valentino, Veja) */}
-        {dossier.emblem === 'valentino_v' && (
-          <g>
-            <polygon points="180,52 238,110 180,168 122,110" stroke={strokeAccent} strokeOpacity="0.4" strokeWidth="1" />
-            <ellipse cx="180" cy="110" rx="42" ry="28" stroke="url(#luxuryGrad)" strokeWidth="2" />
-            <polyline
-              points="160,92 180,130 200,92"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="3.2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3s ease-out infinite alternate' }}
-            />
-          </g>
-        )}
-
-        {/* 5. Двойные кольца GG (Gucci) */}
+        {/* 6. GUCCI — Переплетенные кольца GG и трензель Horsebit */}
         {dossier.emblem === 'gucci_gg' && (
-          <g>
-            <circle cx="164" cy="110" r="28" stroke="url(#luxuryGrad)" strokeWidth="3.2" strokeDasharray="135 45" />
-            <circle cx="196" cy="110" r="28" stroke="url(#luxuryGrad)" strokeWidth="3.2" strokeDasharray="135 45" transform="rotate(180 196 110)" />
-            <line x1="164" y1="110" x2="182" y2="110" stroke={strokeAccent} strokeWidth="3" />
-            <line x1="178" y1="110" x2="196" y2="110" stroke={strokeAccent} strokeWidth="3" />
-            <text x="180" y="162" textAnchor="middle" fill={strokeMain} fontFamily="Georgia, serif" fontSize="7.5" letterSpacing="4.5" opacity="0.7">
-              FIRENZE 1921
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="170"
+              cy="110"
+              r="32"
+              stroke="url(#goldMetallic)"
+              strokeWidth="4.8"
+              strokeDasharray="155 48"
+            />
+            <circle
+              cx="210"
+              cy="110"
+              r="32"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="4.8"
+              strokeDasharray="155 48"
+              transform="rotate(180 210 110)"
+            />
+            <line x1="170" y1="110" x2="192" y2="110" stroke={goldLight} strokeWidth="4.2" />
+            <line x1="188" y1="110" x2="210" y2="110" stroke={platinum} strokeWidth="4.2" />
+            <text
+              x="190"
+              y="168"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontSize="8.5"
+              letterSpacing="5"
+            >
+              GUCCI · FIRENZE 1921
             </text>
           </g>
         )}
 
-        {/* 6. Четырехлистная звезда Monogram (Louis Vuitton) */}
+        {/* 7. LOUIS VUITTON — Четырехлистная звезда Monogram и инициал LV */}
         {dossier.emblem === 'lv_fleur' && (
-          <g>
+          <g filter="url(#emblemGlow)">
+            {/* Внешний вогнутый ромб Monogram */}
             <polygon
-              points="180,56 195,95 234,110 195,125 180,164 165,125 126,110 165,95"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.2s ease-out infinite alternate' }}
+              points="190,46 212,93 258,115 212,137 190,184 168,137 122,115 168,93"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.6"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.5s ease-out infinite alternate' }}
             />
-            <circle cx="180" cy="110" r="12" stroke={strokeAccent} strokeWidth="1.4" />
-            <text x="180" y="113" textAnchor="middle" fill={strokeMain} fontFamily="Georgia, serif" fontSize="9" letterSpacing="1">
+            <circle cx="190" cy="115" r="24" stroke={goldLight} strokeOpacity="0.6" strokeWidth="1.3" />
+            <text
+              x="190"
+              y="124"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontStyle="italic"
+              fontWeight="bold"
+              fontSize="24"
+              letterSpacing="1"
+            >
               LV
             </text>
           </g>
         )}
 
-        {/* 7. Архитектурный медальон Oblique (Dior) */}
+        {/* 8. DIOR — Решетка Cannage и овальный медальон Couture */}
         {dossier.emblem === 'dior_oblique' && (
-          <g>
+          <g filter="url(#emblemGlow)">
+            {/* Линии плетения Cannage */}
+            <line x1="130" y1="65" x2="250" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
+            <line x1="250" y1="65" x2="130" y2="165" stroke={goldMid} strokeOpacity="0.28" strokeWidth="1" />
             <ellipse
-              cx="180"
-              cy="110"
-              rx="52"
-              ry="38"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.2s ease-out infinite alternate' }}
+              cx="190"
+              cy="115"
+              rx="60"
+              ry="42"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
             />
-            <ellipse cx="180" cy="110" rx="46" ry="32" stroke={strokeAccent} strokeOpacity="0.4" strokeWidth="0.9" />
-            <text x="180" y="117" textAnchor="middle" fill={strokeMain} fontFamily="Georgia, serif" fontSize="24" letterSpacing="5">
+            <ellipse cx="190" cy="115" rx="53" ry="35" stroke={goldLight} strokeOpacity="0.45" strokeWidth="1" />
+            {/* Верхний бант медальона Людовика XVI */}
+            <path d="M 174 73 Q 190 62 206 73" stroke="url(#goldMetallic)" strokeWidth="2.2" />
+            <text
+              x="190"
+              y="122"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="Georgia, serif"
+              fontSize="27"
+              letterSpacing="6"
+            >
               DIOR
             </text>
-            <text x="180" y="134" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="6" letterSpacing="3">
-              30 MONTAIGNE
+            <text
+              x="190"
+              y="139"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="6.5"
+              letterSpacing="3.5"
+            >
+              30 AVENUE MONTAIGNE
             </text>
           </g>
         )}
 
-        {/* 8. Числовая матрица 0–23 (Maison Margiela) */}
-        {dossier.emblem === 'margiela_numbers' && (
-          <g fontFamily="Georgia, serif" fontSize="9.5" fill={strokeMain} opacity="0.8">
-            <text x="180" y="78" textAnchor="middle" letterSpacing="4">0 1 2 3 4 5 6 7</text>
-            <text x="180" y="102" textAnchor="middle" letterSpacing="4">8 9 10 11 12 13 14</text>
-            <text x="180" y="126" textAnchor="middle" letterSpacing="4">15 16 17 18 19 20 21</text>
-            <circle cx="213" cy="146" r="11" stroke={strokeAccent} strokeWidth="1.8" />
-            <text x="180" y="150" textAnchor="middle" letterSpacing="5">22 23</text>
-          </g>
-        )}
-
-        {/* 9. Геометрическая звезда (Rick Owens, Converse) */}
-        {dossier.emblem === 'rick_star' && (
-          <g>
+        {/* 9. BOTTEGA VENETA — Диагональное плетение кожи Intrecciato */}
+        {dossier.emblem === 'bottega_intrecciato' && (
+          <g filter="url(#emblemGlow)">
             <polygon
-              points="180,54 196,158 130,88 230,88 164,158"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="1.9"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.2s ease-out infinite alternate' }}
+              points="190,48 256,115 190,182 124,115"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.6"
             />
-            <text x="180" y="172" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="6.5" letterSpacing="4">
-              {dossier.name}
-            </text>
-          </g>
-        )}
-
-        {/* 10. Векторное крыло Swoosh (Nike) */}
-        {dossier.emblem === 'nike_swoosh' && (
-          <g>
-            <path
-              d="M 130 122 C 144 144, 178 136, 240 86 C 194 114, 158 118, 144 96 C 137 104, 131 114, 130 122 Z"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2.3"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 2.8s ease-out infinite alternate' }}
-            />
-            <text x="180" y="156" textAnchor="middle" fill={strokeMain} fontFamily="sans-serif" fontSize="7.5" letterSpacing="5" opacity="0.65">
-              BEAVERTON · 1964
-            </text>
-          </g>
-        )}
-
-        {/* 11. Три диагональные полосы (Adidas, Yeezy) */}
-        {dossier.emblem === 'adidas_bars' && (
-          <g>
-            <polygon
-              points="142,138 154,138 168,98 156,98"
-              stroke="url(#luxuryGrad)"
+            {/* Сетка Intrecciato */}
+            <line x1="157" y1="82" x2="223" y2="148" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="142" y1="97" x2="208" y2="163" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="172" y1="67" x2="238" y2="133" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="223" y1="82" x2="157" y2="148" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="208" y1="67" x2="142" y2="133" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <line x1="238" y1="97" x2="172" y2="163" stroke={goldMid} strokeOpacity="0.45" strokeWidth="1.4" />
+            <rect
+              x="156"
+              y="93"
+              width="68"
+              height="44"
+              fill="#0D0D12"
+              stroke="url(#goldMetallic)"
               strokeWidth="1.8"
-            />
-            <polygon
-              points="166,138 178,138 196,82 184,82"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="1.8"
-            />
-            <polygon
-              points="190,138 202,138 224,66 212,66"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="1.8"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3s ease-out infinite alternate' }}
-            />
-            <text x="180" y="158" textAnchor="middle" fill={strokeMain} fontFamily="sans-serif" fontSize="8" letterSpacing="4.5" opacity="0.8">
-              {dossier.name}
-            </text>
-          </g>
-        )}
-
-        {/* 12. Горные вершины Альп (Salomon, Arc'teryx, Hoka, Timberland, Merrell) */}
-        {dossier.emblem === 'mountain_peak' && (
-          <g>
-            <polyline
-              points="122,140 162,72 188,112 208,82 238,140"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2.2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.2s ease-out infinite alternate' }}
-            />
-            <line x1="116" y1="140" x2="244" y2="140" stroke={strokeAccent} strokeWidth="1.2" />
-            <text x="180" y="158" textAnchor="middle" fill={strokeMain} fontFamily="sans-serif" fontSize="8" letterSpacing="4" opacity="0.85">
-              {dossier.name}
-            </text>
-          </g>
-        )}
-
-        {/* 13. Геральдический щит мастерских (Hermès, Loro Piana, Birkenstock, Dr. Martens, Clarks, Fila, Reebok) */}
-        {dossier.emblem === 'heritage_shield' && (
-          <g>
-            <path
-              d="M 136 64 L 224 64 L 224 114 C 224 142, 180 164, 180 164 C 180 164, 136 142, 136 114 Z"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.4s ease-out infinite alternate' }}
             />
             <text
-              x="180"
-              y="112"
+              x="190"
+              y="122"
               textAnchor="middle"
-              fill={strokeMain}
+              fill={platinum}
               fontFamily="Georgia, serif"
-              fontSize={dossier.monogram.length > 3 ? '17' : '24'}
+              fontSize="22"
+              letterSpacing="5"
+            >
+              BV
+            </text>
+          </g>
+        )}
+
+        {/* 10. CELINE — Двойная арка цепи Triomphe (1973) */}
+        {dossier.emblem === 'celine_triomphe' && (
+          <g filter="url(#emblemGlow)">
+            {/* Левая и правая зеркальные дуги Triomphe */}
+            <path
+              d="M 184 76 C 142 72, 134 158, 184 154"
+              stroke="url(#goldMetallic)"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 196 76 C 238 72, 246 158, 196 154"
+              stroke="url(#goldMetallic)"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+            />
+            <line x1="158" y1="115" x2="222" y2="115" stroke={platinum} strokeWidth="3.8" />
+            <line x1="190" y1="68" x2="190" y2="162" stroke={goldLight} strokeWidth="2.2" />
+            <text
+              x="190"
+              y="178"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="6"
+            >
+              CELINE PARIS
+            </text>
+          </g>
+        )}
+
+        {/* 11. LOEWE — Четырехчастная каллиграфическая Анаграмма */}
+        {dossier.emblem === 'loewe_anagram' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="136"
+              y="61"
+              width="108"
+              height="108"
+              rx="14"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            {/* Четыре симметричных завитка Anagram */}
+            <path
+              d="M 186 111 C 186 80, 150 72, 154 98 C 156 112, 178 111, 186 111 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 194 111 C 194 80, 230 72, 226 98 C 224 112, 202 111, 194 111 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 186 119 C 186 150, 150 158, 154 132 C 156 118, 178 119, 186 119 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 194 119 C 194 150, 230 158, 226 132 C 224 118, 202 119, 194 119 Z"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <circle cx="190" cy="115" r="4" fill={platinum} />
+          </g>
+        )}
+
+        {/* 12. HERMÈS — Седельный шов Point Sellier и пряжка H */}
+        {dossier.emblem === 'hermes_caleche' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="146,54 234,54 254,74 254,156 234,176 146,176 126,156 126,74"
+              fill="rgba(18, 14, 12, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.5"
+            />
+            {/* Пунктир ручного седельного шва */}
+            <polygon
+              points="151,60 229,60 247,78 247,152 229,170 151,170 133,152 133,78"
+              stroke={goldLight}
+              strokeWidth="1.2"
+              strokeDasharray="5 4"
+            />
+            {/* Архитектурная пряжка H */}
+            <path
+              d="M 164 78 L 164 144 M 216 78 L 216 144 M 156 78 L 172 78 M 208 78 L 224 78 M 156 144 L 172 144 M 208 144 L 224 144 M 164 108 L 216 108 M 164 114 L 216 114"
+              stroke="url(#goldMetallic)"
+              strokeWidth="3.8"
+              strokeLinecap="square"
+            />
+            <text
+              x="190"
+              y="162"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              HERMÈS PARIS 1837
+            </text>
+          </g>
+        )}
+
+        {/* 13. VERSACE — Античный меандр Greca и золотой медальон */}
+        {dossier.emblem === 'versace_greca' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="58"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            {/* Геометрическое кольцо меандра Greca */}
+            <circle
+              cx="190"
+              cy="115"
+              r="49"
+              stroke={goldLight}
+              strokeWidth="4.5"
+              strokeDasharray="8 4 2 4"
+            />
+            <circle cx="190" cy="115" r="41" stroke="url(#goldMetallic)" strokeWidth="1.5" />
+            <polygon
+              points="170,94 190,140 210,94"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="4"
+              fill="none"
+            />
+            <text
+              x="190"
+              y="110"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontSize="8"
+              letterSpacing="3"
+            >
+              MILANO
+            </text>
+          </g>
+        )}
+
+        {/* 14. GIVENCHY — Геометрический лабиринт 4G */}
+        {dossier.emblem === 'givenchy_4g' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="134"
+              y="59"
+              width="112"
+              height="112"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2.6"
+            />
+            <line x1="190" y1="59" x2="190" y2="171" stroke={goldMid} strokeWidth="1.6" />
+            <line x1="134" y1="115" x2="246" y2="115" stroke={goldMid} strokeWidth="1.6" />
+            <rect x="144" y="69" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <rect x="200" y="69" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <rect x="144" y="125" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <rect x="200" y="125" width="36" height="36" stroke="url(#goldMetallic)" strokeWidth="3" />
+            <circle cx="190" cy="115" r="6" fill={platinum} />
+          </g>
+        )}
+
+        {/* 15. MAISON MARGIELA — Табличка с 4 белыми стежками и обведенной цифрой 22 */}
+        {dossier.emblem === 'margiela_numbers' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="110"
+              y="56"
+              width="160"
+              height="118"
+              fill="rgba(16, 16, 22, 0.94)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2"
+            />
+            {/* Четыре фирменных угловых стежка Margiela */}
+            <line x1="104" y1="66" x2="120" y2="50" stroke="#FFFFFF" strokeWidth="3" />
+            <line x1="276" y1="66" x2="260" y2="50" stroke="#FFFFFF" strokeWidth="3" />
+            <line x1="104" y1="164" x2="120" y2="180" stroke="#FFFFFF" strokeWidth="3" />
+            <line x1="276" y1="164" x2="260" y2="180" stroke="#FFFFFF" strokeWidth="3" />
+
+            <g fontFamily="Georgia, serif" fontSize="10.5" fill={platinum}>
+              <text x="190" y="82" textAnchor="middle" letterSpacing="4.5">0 1 2 3 4 5 6 7</text>
+              <text x="190" y="106" textAnchor="middle" letterSpacing="4.5">8 9 10 11 12 13 14</text>
+              <text x="190" y="130" textAnchor="middle" letterSpacing="4.2">15 16 17 18 19 20 21</text>
+              <text x="190" y="155" textAnchor="middle" letterSpacing="5.5">22 23</text>
+            </g>
+            {/* Золотое кольцо вокруг номера 22 (обувная линия) */}
+            <circle cx="174" cy="151" r="12" stroke="url(#goldMetallic)" strokeWidth="2.4" />
+          </g>
+        )}
+
+        {/* 16. RICK OWENS / CONVERSE — Архитектурная звезда в силовом кольце */}
+        {dossier.emblem === 'rick_star' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="56"
+              fill="rgba(12, 12, 18, 0.88)"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="2.4"
+            />
+            <polygon
+              points="190,52 208,162 134,88 246,88 172,162"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.6"
+              strokeLinejoin="miter"
+              strokeDasharray="720"
+              style={{ animation: 'cadDrawLuxury 3.2s ease-out infinite alternate' }}
+            />
+          </g>
+        )}
+
+        {/* 17. OFF-WHITE — Индустриальный перекрестный знак Arrows */}
+        {dossier.emblem === 'offwhite_arrows' && (
+          <g filter="url(#emblemGlow)">
+            <rect
+              x="132"
+              y="57"
+              width="116"
+              height="116"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <line x1="150" y1="75" x2="230" y2="155" stroke="url(#platinumMetallic)" strokeWidth="5" />
+            <line x1="230" y1="75" x2="150" y2="155" stroke="url(#platinumMetallic)" strokeWidth="5" />
+            {/* Наконечники стрел */}
+            <polyline points="150,92 150,75 167,75" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+            <polyline points="213,75 230,75 230,92" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+            <polyline points="150,138 150,155 167,155" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+            <polyline points="213,155 230,155 230,138" stroke="url(#goldMetallic)" strokeWidth="3.5" />
+          </g>
+        )}
+
+        {/* 18. NIKE — Металлическое крыло Swoosh */}
+        {dossier.emblem === 'nike_swoosh' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="58"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.2"
+            />
+            <path
+              d="M 136 126 C 150 150, 186 142, 252 88 C 204 118, 166 122, 150 98 C 143 106, 137 116, 136 126 Z"
+              fill="url(#goldMetallic)"
+              stroke={platinum}
+              strokeWidth="1.5"
+            />
+            <text
+              x="190"
+              y="156"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="5"
+            >
+              NIKE ARCHIVE
+            </text>
+          </g>
+        )}
+
+        {/* 19. JORDAN — Эмблема крыльев Wings */}
+        {dossier.emblem === 'jordan_wings' && (
+          <g filter="url(#emblemGlow)">
+            <path
+              d="M 112 92 L 164 92 L 174 115 L 164 138 L 126 138 Z M 268 92 L 216 92 L 206 115 L 216 138 L 254 138 Z"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <line x1="120" y1="104" x2="162" y2="104" stroke={goldLight} strokeWidth="1.5" />
+            <line x1="124" y1="116" x2="166" y2="116" stroke={goldLight} strokeWidth="1.5" />
+            <line x1="260" y1="104" x2="218" y2="104" stroke={goldLight} strokeWidth="1.5" />
+            <line x1="256" y1="116" x2="214" y2="116" stroke={goldLight} strokeWidth="1.5" />
+            <circle cx="190" cy="115" r="22" fill="#0E0E14" stroke="url(#platinumMetallic)" strokeWidth="2.6" />
+            <text
+              x="190"
+              y="122"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize="16"
+              letterSpacing="2"
+            >
+              23
+            </text>
+          </g>
+        )}
+
+        {/* 20. ADIDAS / YEEZY — Три диагональных монолита */}
+        {dossier.emblem === 'adidas_bars' && (
+          <g filter="url(#emblemGlow)">
+            <circle
+              cx="190"
+              cy="115"
+              r="58"
+              fill="rgba(12, 12, 18, 0.85)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.2"
+            />
+            <polygon points="148,140 162,140 176,100 162,100" fill="url(#goldMetallic)" />
+            <polygon points="174,140 188,140 206,84 192,84" fill="url(#platinumMetallic)" />
+            <polygon points="200,140 214,140 236,68 222,68" fill="url(#goldMetallic)" />
+            <text
+              x="190"
+              y="158"
+              textAnchor="middle"
+              fill={platinum}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="4.5"
+            >
+              {dossier.name.slice(0, 12)}
+            </text>
+          </g>
+        )}
+
+        {/* 21. MOUNTAIN PEAK — Альпийский рельеф (Salomon, Arc'teryx, Hoka, Timberland, Merrell) */}
+        {dossier.emblem === 'mountain_peak' && (
+          <g filter="url(#emblemGlow)">
+            <polygon
+              points="190,48 254,82 254,148 190,182 126,148 126,82"
+              fill="rgba(12, 12, 18, 0.88)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.4"
+            />
+            <polyline
+              points="138,140 172,78 196,114 214,86 242,140"
+              stroke="url(#platinumMetallic)"
+              strokeWidth="3.2"
+              strokeLinejoin="round"
+            />
+            <line x1="136" y1="140" x2="244" y2="140" stroke="url(#goldMetallic)" strokeWidth="2" />
+            <text
+              x="190"
+              y="160"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              fontSize="8.5"
+              letterSpacing="4"
+            >
+              {dossier.monogram}
+            </text>
+          </g>
+        )}
+
+        {/* 22. HERITAGE SHIELD — Королевский геральдический щит мастерских */}
+        {dossier.emblem === 'heritage_shield' && (
+          <g filter="url(#emblemGlow)">
+            <path
+              d="M 140 58 L 240 58 L 240 116 C 240 150, 190 176, 190 176 C 190 176, 140 150, 140 116 Z"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <path
+              d="M 147 65 L 233 65 L 233 114 C 233 143, 190 166, 190 166 C 190 166, 147 143, 147 114 Z"
+              stroke={goldLight}
+              strokeOpacity="0.4"
+              strokeWidth="1"
+            />
+            <text
+              x="190"
+              y="116"
+              textAnchor="middle"
+              fill="url(#platinumMetallic)"
+              fontFamily="Georgia, serif"
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 3 ? '20' : '28'}
               letterSpacing="3"
             >
               {dossier.monogram}
             </text>
-            <text x="180" y="132" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="6.5" letterSpacing="3">
+            <text
+              x="190"
+              y="138"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
               EST. {dossier.founded}
             </text>
           </g>
         )}
 
-        {/* 14. Индустриальный гексагон стритвира (Off-White, BAPE, Supreme, Vans, Oakley, DC, Osiris, Etnies, Crocs) */}
+        {/* 23. SKATE HEXAGON — Индустриальный полигон */}
         {dossier.emblem === 'skate_hexagon' && (
-          <g>
+          <g filter="url(#emblemGlow)">
             <polygon
-              points="180,54 228,82 228,138 180,166 132,138 132,82"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.2s ease-out infinite alternate' }}
+              points="190,50 246,82 246,148 190,180 134,148 134,82"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
             />
-            <line x1="132" y1="82" x2="228" y2="138" stroke={strokeAccent} strokeOpacity="0.22" strokeWidth="0.9" />
-            <line x1="228" y1="82" x2="132" y2="138" stroke={strokeAccent} strokeOpacity="0.22" strokeWidth="0.9" />
+            <polygon
+              points="190,58 238,86 238,144 190,172 142,144 142,86"
+              stroke={platinum}
+              strokeOpacity="0.3"
+              strokeWidth="1"
+            />
             <text
-              x="180"
-              y="116"
+              x="190"
+              y="121"
               textAnchor="middle"
-              fill={strokeMain}
+              fill="url(#platinumMetallic)"
               fontFamily="sans-serif"
-              fontWeight="600"
-              fontSize={dossier.monogram.length > 3 ? '16' : '22'}
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 3 ? '19' : '26'}
               letterSpacing="4"
             >
               {dossier.monogram}
             </text>
-            <text x="180" y="136" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="6" letterSpacing="3">
-              {dossier.founded}
+            <text
+              x="190"
+              y="144"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              ARCHIVE {dossier.founded}
             </text>
           </g>
         )}
 
-        {/* 15. Динамический аэродинамический ромб спорта (New Balance, Asics, On, Puma, Saucony, Mizuno, Autry, Lacoste) */}
+        {/* 24. SPORT VECTOR — Аэродинамический крылатый картуш */}
         {dossier.emblem === 'sport_vector' && (
-          <g>
+          <g filter="url(#emblemGlow)">
             <polygon
-              points="134,142 156,74 226,74 204,142"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="2"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3s ease-out infinite alternate' }}
+              points="126,148 152,70 254,70 228,148"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
+            />
+            <polygon
+              points="135,142 157,76 245,76 223,142"
+              stroke={goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="1"
             />
             <text
-              x="180"
-              y="115"
+              x="190"
+              y="118"
               textAnchor="middle"
-              fill={strokeMain}
+              fill="url(#platinumMetallic)"
               fontFamily="Georgia, serif"
               fontStyle="italic"
-              fontSize={dossier.monogram.length > 2 ? '20' : '26'}
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 2 ? '23' : '30'}
               letterSpacing="3"
             >
               {dossier.monogram}
             </text>
-            <text x="180" y="158" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="6.5" letterSpacing="3.5">
+            <text
+              x="190"
+              y="168"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7.5"
+              letterSpacing="4"
+            >
               {dossier.name}
             </text>
           </g>
         )}
 
-        {/* 16. Восьмиугольный кутюрный картуш Вандомской площади (Saint Laurent, Bottega Veneta, Miu Miu, Celine, Loewe, McQueen, Lanvin, Versace, Givenchy, Fear of God, Kith, Jordan, UGG) */}
+        {/* 25. COUTURE CREST — Ювелирный восьмиугольник Вандомской площади */}
         {dossier.emblem === 'couture_crest' && (
-          <g>
+          <g filter="url(#emblemGlow)">
             <polygon
-              points="154,56 206,56 238,88 238,132 206,164 154,164 122,132 122,88"
-              stroke="url(#luxuryGrad)"
-              strokeWidth="1.9"
-              strokeDasharray="600"
-              style={{ animation: 'cadDrawPath 3.4s ease-out infinite alternate' }}
+              points="154,50 226,50 256,80 256,150 226,180 154,180 124,150 124,80"
+              fill="rgba(12, 12, 18, 0.9)"
+              stroke="url(#goldMetallic)"
+              strokeWidth="2.8"
             />
             <polygon
-              points="158,62 202,62 232,92 232,128 202,158 158,158 128,128 128,92"
-              stroke={strokeMain}
-              strokeOpacity="0.25"
-              strokeWidth="0.8"
+              points="159,57 221,57 249,85 249,145 221,173 159,173 131,145 131,85"
+              stroke={goldLight}
+              strokeOpacity="0.45"
+              strokeWidth="1.1"
             />
             <text
-              x="180"
-              y="116"
+              x="190"
+              y="120"
               textAnchor="middle"
-              fill={strokeMain}
+              fill="url(#platinumMetallic)"
               fontFamily="Georgia, serif"
-              fontSize={dossier.monogram.length > 2 ? '20' : '28'}
-              letterSpacing="4"
+              fontWeight="bold"
+              fontSize={dossier.monogram.length > 2 ? '22' : '32'}
+              letterSpacing="5"
             >
               {dossier.monogram}
             </text>
-            <text x="180" y="142" textAnchor="middle" fill={strokeAccent} fontFamily="sans-serif" fontSize="6" letterSpacing="3">
-              {dossier.name.slice(0, 16)}
+            <line x1="154" y1="134" x2="226" y2="134" stroke="url(#goldMetallic)" strokeWidth="1" />
+            <text
+              x="190"
+              y="150"
+              textAnchor="middle"
+              fill={goldLight}
+              fontFamily="sans-serif"
+              fontSize="7"
+              letterSpacing="3.5"
+            >
+              {dossier.name.slice(0, 15)}
             </text>
           </g>
         )}
@@ -507,117 +1189,251 @@ export default function BrandDossierView({
   isDark,
   themeColors,
   totalModelsCount,
+  activeIconicModel,
   onSelectModelQuery,
   onBackToCollection,
 }: BrandDossierViewProps) {
   const l = UI_LABELS[lang]
   const ch = dossier.chapters[lang]
 
+  // Разбиваем строку материаловедения на отдельные четкие инженерные пункты для идеальной читаемости на смартфоне
+  const techPoints = dossier.materialsTech[lang]
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
   return (
     <section className="w-full max-w-3xl mx-auto pb-16">
-      {/* 1. АНИМИРОВАННЫЙ ВЕКТОРНЫЙ СТЕНД С ЭМБЛЕМОЙ МОДНОГО ДОМА */}
-      <div
-        className="w-full mb-8 relative overflow-hidden"
-        style={{
-          backgroundColor: themeColors.studioCanvas,
-          border: `1px solid ${themeColors.border}`,
-        }}
-      >
-        <AnimatedBrandEmblem dossier={dossier} isDark={isDark} />
+      {/* 0. ВЕРХНЯЯ ПАНЕЛЬ БЫСТРОЙ НАВИГАЦИИ И ОФИЦИАЛЬНОГО САЙТА */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <button
+          type="button"
+          onClick={onBackToCollection}
+          className="px-3.5 py-2 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer transition-opacity hover:opacity-90"
+          style={{
+            backgroundColor: themeColors.studioCanvas,
+            color: themeColors.text,
+            border: `1px solid ${themeColors.border}`,
+          }}
+        >
+          {l.quickBackShoes} {totalModelsCount !== null ? `(${totalModelsCount})` : ''}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => openExternalUrl(dossier.officialUrl)}
+          className="px-3.5 py-2 text-[10px] font-sans font-semibold uppercase tracking-[0.18em] cursor-pointer transition-opacity hover:opacity-90"
+          style={{
+            backgroundColor: themeColors.text,
+            color: themeColors.bg,
+            border: `1px solid ${themeColors.text}`,
+          }}
+        >
+          {dossier.officialDomain.toUpperCase()} ↗
+        </button>
+      </div>
+
+      {/* 1. ОБСИДИАНОВЫЙ ЮВЕЛИРНЫЙ СТЕНД С АНИМИРОВАННЫМ ГЕРБОМ ДОМА */}
+      <div className="w-full mb-7 relative overflow-hidden">
+        <AnimatedBrandEmblem
+          dossier={dossier}
+          onOpenOfficialSite={() => openExternalUrl(dossier.officialUrl)}
+        />
       </div>
 
       {/* 2. ЦИТАТА-МАНИФЕСТ ДОМА */}
       <blockquote
-        className="text-center px-4 sm:px-10 mb-9 font-serif italic text-lg sm:text-xl leading-relaxed"
+        className="text-center px-3 sm:px-10 mb-8 font-serif italic text-[18px] sm:text-[21px] leading-relaxed"
         style={{ color: themeColors.text }}
       >
         {dossier.quote[lang]}
       </blockquote>
 
-      {/* 3. ТЕХНИЧЕСКИЙ ПАСПОРТ ДОМА */}
+      {/* 3. ТЕХНИЧЕСКИЙ ПАСПОРТ ДОМА + ОФИЦИАЛЬНЫЙ САЙТ */}
       <div
-        className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 mb-9"
+        className="mb-9 overflow-hidden"
         style={{
           backgroundColor: themeColors.studioCanvas,
-          border: `1px solid ${themeColors.borderFaint}`,
+          border: `1px solid ${themeColors.border}`,
         }}
       >
-        <div>
-          <span
-            className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-            style={{ color: themeColors.textMuted }}
-          >
-            {l.founded}
-          </span>
-          <span className="font-serif text-[17px]">{dossier.founded}</span>
-        </div>
-
-        <div>
-          <span
-            className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-            style={{ color: themeColors.textMuted }}
-          >
-            {l.hq}
-          </span>
-          <span className="text-[11px] font-sans leading-snug block">
-            {dossier.headquarters[lang]}
-          </span>
-        </div>
-
-        <div>
-          <span
-            className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-            style={{ color: themeColors.textMuted }}
-          >
-            {l.direction}
-          </span>
-          <span className="text-[11px] font-sans leading-snug block">
-            {dossier.creativeCode[lang]}
-          </span>
-        </div>
-
-        <div>
-          <span
-            className="block text-[8px] font-sans uppercase tracking-[0.22em] mb-1"
-            style={{ color: themeColors.textMuted }}
-          >
-            {l.archiveVolume}
-          </span>
-          <span className="font-serif text-[17px]">
-            {totalModelsCount !== null ? `${totalModelsCount} ${l.modelsUnit}` : 'Archive'}
-          </span>
-        </div>
-      </div>
-
-      {/* 4. ИНТЕРАКТИВНЫЕ ТЕГИ ЗНАКОВЫХ СИЛУЭТОВ */}
-      <div className="mb-10">
-        <span
-          className="block text-[9px] font-sans uppercase tracking-[0.24em] mb-3"
-          style={{ color: themeColors.textMuted }}
-        >
-          {l.iconicHeader}
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {dossier.iconicModels.map((model) => (
-            <button
-              key={model}
-              type="button"
-              onClick={() => onSelectModelQuery(`${dossier.name} ${model}`)}
-              className="px-3.5 py-2 text-[10px] font-sans uppercase tracking-[0.18em] cursor-pointer bg-transparent transition-all hover:opacity-100 opacity-85"
-              style={{
-                color: themeColors.text,
-                border: `1px solid ${themeColors.border}`,
-                backgroundColor: themeColors.studioCanvas,
-              }}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5">
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
             >
-              {model} ↗
-            </button>
-          ))}
+              {l.founded}
+            </span>
+            <span className="font-serif text-[19px] font-normal">{dossier.founded}</span>
+          </div>
+
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.hq}
+            </span>
+            <span className="text-[13px] font-sans leading-snug block font-medium">
+              {dossier.headquarters[lang]}
+            </span>
+          </div>
+
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.direction}
+            </span>
+            <span className="text-[13px] font-sans leading-snug block font-medium">
+              {dossier.creativeCode[lang]}
+            </span>
+          </div>
+
+          <div>
+            <span
+              className="block text-[9px] font-sans uppercase tracking-[0.2em] mb-1"
+              style={{ color: themeColors.textMuted }}
+            >
+              {l.archiveVolume}
+            </span>
+            <span className="font-serif text-[19px] font-normal">
+              {totalModelsCount !== null ? `${totalModelsCount} ${l.modelsUnit}` : 'Archive'}
+            </span>
+          </div>
+        </div>
+
+        {/* Нижняя строка паспорта: прямой переход на официальный сайт бренда */}
+        <div
+          className="px-5 py-3.5 flex items-center justify-between gap-3"
+          style={{
+            borderTop: `1px solid ${themeColors.borderFaint}`,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+          }}
+        >
+          <span
+            className="text-[10px] font-sans uppercase tracking-[0.18em]"
+            style={{ color: themeColors.textMuted }}
+          >
+            {l.officialSiteLabel}
+          </span>
+          <button
+            type="button"
+            onClick={() => openExternalUrl(dossier.officialUrl)}
+            className="text-[11px] font-sans font-semibold uppercase tracking-[0.18em] underline bg-transparent border-none cursor-pointer"
+            style={{ color: themeColors.text }}
+          >
+            {dossier.officialDomain} ↗
+          </button>
         </div>
       </div>
 
-      {/* 5. РЕДАКЦИОННАЯ СТАТЬЯ О ДОМЕ МОДЫ (3 ГЛАВЫ) */}
-      <div className="space-y-6 mb-10">
+      {/* 4. КУЛЬТОВЫЕ СИЛУЭТЫ ДОМА (С СОХРАНЕНИЕМ БРЕНДА И ВОЗВРАТОМ В ПАСПОРТ) */}
+      <div
+        className="p-5 mb-9"
+        style={{
+          backgroundColor: themeColors.studioCanvas,
+          border: `1px solid ${themeColors.border}`,
+        }}
+      >
+        <div className="mb-3.5">
+          <span
+            className="block text-[11px] font-sans font-semibold uppercase tracking-[0.22em] mb-1"
+            style={{ color: themeColors.text }}
+          >
+            {l.iconicHeader}
+          </span>
+          <span
+            className="block text-[12px] font-sans leading-snug"
+            style={{ color: themeColors.textMuted }}
+          >
+            {l.iconicSub}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2.5">
+          {dossier.iconicModels.map((model) => {
+            const isSelected = activeIconicModel === model
+            return (
+              <button
+                key={model}
+                type="button"
+                onClick={() => onSelectModelQuery(model)}
+                className="px-4 py-2.5 text-[11px] font-sans font-medium uppercase tracking-[0.16em] cursor-pointer transition-all active:scale-95"
+                style={{
+                  color: isSelected ? themeColors.bg : themeColors.text,
+                  backgroundColor: isSelected ? themeColors.text : themeColors.bg,
+                  border: `1px solid ${themeColors.text}`,
+                }}
+              >
+                {model} →
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 5. ВЫСОКОКОНТРАСТНЫЙ ИНЖЕНЕРНЫЙ БЛОК: МАТЕРИАЛОВЕДЕНИЕ И ПОДОШВА */}
+      <div
+        className="p-5 sm:p-7 mb-9"
+        style={{
+          backgroundColor: themeColors.studioCanvas,
+          border: `1px solid ${themeColors.border}`,
+          borderLeft: `3px solid ${dossier.accentHex || themeColors.text}`,
+        }}
+      >
+        <div className="mb-4">
+          <span
+            className="block text-[11px] font-sans font-bold uppercase tracking-[0.22em] mb-1"
+            style={{ color: themeColors.text }}
+          >
+            {l.techSpecHeader}
+          </span>
+          <span
+            className="block text-[12px] font-sans"
+            style={{ color: themeColors.textMuted }}
+          >
+            {l.techSpecSub}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {techPoints.map((point, idx) => {
+            const formattedPoint = point.charAt(0).toUpperCase() + point.slice(1).replace(/\.$/, '')
+            return (
+              <div
+                key={idx}
+                className="p-3.5 flex items-start gap-3"
+                style={{
+                  backgroundColor: themeColors.bg,
+                  border: `1px solid ${themeColors.borderFaint}`,
+                }}
+              >
+                <span
+                  className="text-[10px] font-sans font-bold px-2 py-0.5 shrink-0 mt-0.5"
+                  style={{
+                    backgroundColor: themeColors.text,
+                    color: themeColors.bg,
+                  }}
+                >
+                  0{idx + 1}
+                </span>
+                <span
+                  className="text-[14px] sm:text-[15px] font-sans font-normal leading-snug"
+                  style={{ color: themeColors.text }}
+                >
+                  {formattedPoint}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 6. РЕДАКЦИОННАЯ СТАТЬЯ О ДОМЕ МОДЫ (3 ГЛАВЫ С КРУПНОЙ ТИПОГРАФИКОЙ) */}
+      <div className="space-y-5 mb-10">
         <article
           className="p-6 sm:p-8"
           style={{
@@ -625,10 +1441,10 @@ export default function BrandDossierView({
             borderLeft: `2px solid ${themeColors.text}`,
           }}
         >
-          <h3 className="font-serif text-lg sm:text-xl mb-2.5">{ch.originsTitle}</h3>
+          <h3 className="font-serif text-[20px] sm:text-[22px] mb-3">{ch.originsTitle}</h3>
           <p
-            className="text-[13px] sm:text-[14px] font-sans font-light leading-relaxed"
-            style={{ color: isDark ? 'rgba(245,242,235,0.82)' : 'rgba(17,17,17,0.82)' }}
+            className="text-[15px] sm:text-[16px] font-sans font-normal leading-relaxed"
+            style={{ color: themeColors.text }}
           >
             {ch.originsText}
           </p>
@@ -641,25 +1457,13 @@ export default function BrandDossierView({
             borderLeft: `2px solid ${themeColors.border}`,
           }}
         >
-          <h3 className="font-serif text-lg sm:text-xl mb-2.5">{ch.craftTitle}</h3>
+          <h3 className="font-serif text-[20px] sm:text-[22px] mb-3">{ch.craftTitle}</h3>
           <p
-            className="text-[13px] sm:text-[14px] font-sans font-light leading-relaxed mb-4"
-            style={{ color: isDark ? 'rgba(245,242,235,0.82)' : 'rgba(17,17,17,0.82)' }}
+            className="text-[15px] sm:text-[16px] font-sans font-normal leading-relaxed"
+            style={{ color: themeColors.text }}
           >
             {ch.craftText}
           </p>
-          <div
-            className="pt-3 mt-3 text-[12px] font-serif italic leading-relaxed"
-            style={{
-              borderTop: `1px solid ${themeColors.borderFaint}`,
-              color: themeColors.textMuted,
-            }}
-          >
-            <strong className="not-italic font-sans uppercase text-[9px] tracking-[0.2em] mr-2">
-              {l.techSpecHeader}:
-            </strong>
-            {dossier.materialsTech[lang]}
-          </div>
         </article>
 
         <article
@@ -669,22 +1473,22 @@ export default function BrandDossierView({
             borderLeft: `2px solid ${themeColors.border}`,
           }}
         >
-          <h3 className="font-serif text-lg sm:text-xl mb-2.5">{ch.legacyTitle}</h3>
+          <h3 className="font-serif text-[20px] sm:text-[22px] mb-3">{ch.legacyTitle}</h3>
           <p
-            className="text-[13px] sm:text-[14px] font-sans font-light leading-relaxed"
-            style={{ color: isDark ? 'rgba(245,242,235,0.82)' : 'rgba(17,17,17,0.82)' }}
+            className="text-[15px] sm:text-[16px] font-sans font-normal leading-relaxed"
+            style={{ color: themeColors.text }}
           >
             {ch.legacyText}
           </p>
         </article>
       </div>
 
-      {/* 6. КНОПКА ПЕРЕХОДА К КОЛЛЕКЦИИ ОБУВИ */}
-      <div className="text-center pt-2">
+      {/* 7. НИЖНИЙ БЛОК ДЕЙСТВИЙ: К КОЛЛЕКЦИИ + ОФИЦИАЛЬНЫЙ САЙТ */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
         <button
           type="button"
           onClick={onBackToCollection}
-          className="px-9 py-4 text-[10px] font-sans uppercase tracking-[0.28em] cursor-pointer border-none transition-opacity hover:opacity-90"
+          className="w-full sm:w-auto px-8 py-4 text-[10px] font-sans font-semibold uppercase tracking-[0.24em] cursor-pointer border-none transition-opacity hover:opacity-90"
           style={{
             backgroundColor: themeColors.text,
             color: themeColors.bg,
@@ -692,8 +1496,20 @@ export default function BrandDossierView({
         >
           {l.backToShoes} {dossier.name} →
         </button>
+
+        <button
+          type="button"
+          onClick={() => openExternalUrl(dossier.officialUrl)}
+          className="w-full sm:w-auto px-8 py-4 text-[10px] font-sans font-semibold uppercase tracking-[0.24em] cursor-pointer bg-transparent transition-opacity hover:opacity-90"
+          style={{
+            color: themeColors.text,
+            border: `1px solid ${themeColors.border}`,
+            backgroundColor: themeColors.studioCanvas,
+          }}
+        >
+          {l.openOfficialSite} ({dossier.officialDomain}) ↗
+        </button>
       </div>
     </section>
   )
 }
-
