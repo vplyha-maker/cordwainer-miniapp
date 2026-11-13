@@ -252,9 +252,6 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
   },
 }
 
-/**
- * Мгновенное синхронное определение темы ДО первого рендера (убирает темную вспышку при входе)
- */
 function detectActiveTheme(propTheme?: 'light' | 'dark'): boolean {
   if (propTheme === 'light') return false
   if (propTheme === 'dark') return true
@@ -279,7 +276,6 @@ function detectActiveTheme(propTheme?: 'light' | 'dark'): boolean {
     }
   } catch {}
 
-  // Проверяем реальный цвет фона body (если родительский экран уже светлый)
   try {
     if (body) {
       const bg = window.getComputedStyle(body).backgroundColor
@@ -378,6 +374,10 @@ function formatLuxuryPrice(price: number): string {
   return `$${price.toLocaleString('en-US')}`
 }
 
+/**
+ * Формирует цепочку URL, гарантированно совместимую с iPhone 11 / iOS Safari / WKWebView
+ * (включая автоматическую перекодировку AVIF -> PNG/JPEG через wsrv.nl при необходимости)
+ */
 function buildImageSources(rawUrl?: string | null): string[] {
   if (!rawUrl || typeof rawUrl !== 'string') return []
   const trimmed = rawUrl.trim()
@@ -388,19 +388,20 @@ function buildImageSources(rawUrl?: string | null): string[] {
 
   if (httpsUrl.includes('stockx.com')) {
     const base = httpsUrl.split('?')[0]
-    sources.push(`${base}?fit=fill&bg=FFFFFF&w=900&h=640&auto=format,compress&q=88&trim=color`)
-    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(base)}&w=900&q=88&output=webp`)
+    sources.push(`${base}?fit=fill&bg=FFFFFF&w=800&h=560&fm=jpg&q=85&trim=color`)
+    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(base)}&w=800&q=85&output=png`)
     return sources
   }
 
   if (httpsUrl.includes('goat.com') || httpsUrl.includes('flightclub.com')) {
-    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=900&q=88&output=webp`)
+    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=85&output=png`)
     sources.push(httpsUrl)
     return sources
   }
 
+  // Прямая ссылка из вашего Cloudflare R2 + резервная перекодировка в PNG для iPhone 11 (если исходник был в AVIF)
   sources.push(httpsUrl)
-  sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=900&q=88&output=webp`)
+  sources.push(`https://wsrv.nl/?url=${encodeURIComponent(httpsUrl)}&w=800&q=88&output=png`)
   return sources
 }
 
@@ -431,18 +432,43 @@ function SneakerCard({
   onSelect,
   onBrokenImage,
 }: SneakerCardProps) {
-  const sources = useMemo(() => buildImageSources(sneaker.image?.original), [sneaker.image?.original])
+  const rawOriginal = sneaker.image?.original || null
+  const sources = useMemo(() => buildImageSources(rawOriginal), [rawOriginal])
   const [attempt, setAttempt] = useState(0)
   const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>(
     sources.length > 0 ? 'loading' : 'error'
   )
+  const imgRef = useRef<HTMLImageElement | null>(null)
 
+  const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
+
+  // Сброс только при смене самой ссылки на картинку
   useEffect(() => {
     setAttempt(0)
     setImgState(sources.length > 0 ? 'loading' : 'error')
-  }, [sneaker.id, sources])
+  }, [rawOriginal])
 
-  const currentSrc = sources.length > 0 && attempt < sources.length ? sources[attempt] : null
+  // Проверка для iOS WebKit: если картинка уже в кэше браузера, сразу ставим 'loaded'
+  useEffect(() => {
+    const el = imgRef.current
+    if (el && el.complete && el.naturalWidth > 10) {
+      setImgState('loaded')
+    }
+  }, [currentSrc])
+
+  // Страховочный таймер для iPhone 11: если за 3.5 сек прямой поток (например AVIF) не декодировался, переключаем на PNG-прокси
+  useEffect(() => {
+    if (imgState !== 'loading' || !currentSrc) return
+    const timer = setTimeout(() => {
+      const el = imgRef.current
+      if (el && el.complete && el.naturalWidth > 10) {
+        setImgState('loaded')
+      } else if (attempt < sources.length - 1) {
+        setAttempt((prev) => prev + 1)
+      }
+    }, 3500)
+    return () => clearTimeout(timer)
+  }, [imgState, currentSrc, attempt, sources.length])
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     if (e.currentTarget.naturalWidth <= 10 || e.currentTarget.naturalHeight <= 10) {
@@ -472,7 +498,7 @@ function SneakerCard({
 
   return (
     <article
-      onClick={() => onSelect(sneaker, imgState === 'loaded' ? currentSrc : null)}
+      onClick={() => onSelect(sneaker, imgState === 'loaded' ? currentSrc : rawOriginal)}
       className={`group cursor-pointer flex flex-col justify-between ${
         isFeatured && gridMode === 'boutique' ? 'col-span-2 my-2' : ''
       }`}
@@ -530,7 +556,7 @@ function SneakerCard({
           </button>
 
           {imgState === 'loading' && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
               <div
                 className="w-6 h-6 rounded-full border border-t-transparent animate-spin opacity-20"
                 style={{ borderColor: themeColors.textMuted, borderTopColor: 'transparent' }}
@@ -538,25 +564,16 @@ function SneakerCard({
             </div>
           )}
 
+          {/* Без loading="lazy", без opacity-0 и без mix-blend-mode, которые блокируют рендер в iOS WebKit */}
           {currentSrc && imgState !== 'error' && (
             <img
+              ref={imgRef}
               src={currentSrc}
               alt={sneaker.name}
-              loading="lazy"
-              referrerPolicy="no-referrer"
+              decoding="async"
               onLoad={handleImageLoad}
               onError={handleImageError}
-              className={`w-[86%] h-[86%] object-contain transition-all duration-700 ease-out ${
-                isFeatured
-                  ? 'scale-[1.16] group-hover:scale-[1.22]'
-                  : isCompact
-                  ? 'scale-[1.14] group-hover:scale-[1.20]'
-                  : 'scale-[1.16] group-hover:scale-[1.22]'
-              } ${imgState === 'loading' ? 'opacity-0' : 'opacity-100'}`}
-              style={{
-                mixBlendMode: isDark ? 'normal' : 'multiply',
-                filter: isDark ? 'drop-shadow(0 16px 26px rgba(0,0,0,0.6))' : 'none',
-              }}
+              className="relative z-10 w-[92%] h-[92%] object-contain transition-transform duration-500 ease-out group-hover:scale-105"
             />
           )}
         </div>
@@ -704,7 +721,6 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
   const scrollRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Инициализируем тему СИНХРОННО при создании компонента (без темной вспышки!)
   const [isDark, setIsDark] = useState<boolean>(() => detectActiveTheme(propTheme))
   const cacheRef = useRef<Record<string, { items: Sneaker[]; total: number | null }>>({})
 
@@ -1650,11 +1666,8 @@ export default function SneakerIndex({ onBack, theme: propTheme, lang }: Sneaker
                 <img
                   src={selectedModalSneaker.imageUrl}
                   alt={selectedModalSneaker.sneaker.name}
-                  className="w-[86%] h-[86%] object-contain scale-[1.18]"
-                  style={{
-                    mixBlendMode: isDark ? 'normal' : 'multiply',
-                    filter: isDark ? 'drop-shadow(0 20px 30px rgba(0,0,0,0.65))' : 'none',
-                  }}
+                  decoding="async"
+                  className="w-[92%] h-[92%] object-contain"
                 />
               </div>
             )}
