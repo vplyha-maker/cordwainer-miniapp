@@ -1,7 +1,8 @@
 // src/lib/heelGeometry.ts
-import { HEEL_CONST, type SoleType, type HeelType } from './heelCalc'
+import { HEEL_CONST, type SoleType, type HeelType, type Gender } from './heelCalc'
 
 export interface GeometryInput {
+  gender?: Gender
   shoeSize: number
   heelHeight: number
   toeThickness: number
@@ -12,6 +13,8 @@ export interface GeometryInput {
   heelTipOffsetMm: number
   tipWidthMm: number
   shankLength: number
+  thomasExtensionMm?: number
+  instepBuildUpMm?: number
 }
 
 export interface HeelGeometry {
@@ -19,6 +22,9 @@ export interface HeelGeometry {
   svgHeight: number
   solePath: string
   heelPath: string
+  thomasExtensionPath: string
+  lastUpperPath: string
+  instepBuildUpPath: string
   shankCurve: string
   pelottePath: string
   carbonPath: string
@@ -30,21 +36,16 @@ export interface HeelGeometry {
   xApexM1: number
   xApexM5: number
   xPelotte: number
+  xInstep: number
   yGround: number
   yFootHeel: number
   yFootBall: number
   yFootPelotte: number
+  yInstepTop: number
   scale: number
 }
 
-/** Кубическая интерполяция точки на кривой Безье (свода стопы) при параметре t in [0, 1] */
-function evalCubicBezier(
-  t: number,
-  p0: number,
-  p1: number,
-  p2: number,
-  p3: number
-): number {
+function evalCubicBezier(t: number, p0: number, p1: number, p2: number, p3: number): number {
   const mt = 1 - t
   return (
     mt * mt * mt * p0 +
@@ -57,6 +58,7 @@ function evalCubicBezier(
 export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const C = HEEL_CONST
   const {
+    gender = 'female',
     shoeSize,
     heelHeight,
     toeThickness,
@@ -67,13 +69,16 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     heelTipOffsetMm,
     tipWidthMm,
     shankLength,
+    thomasExtensionMm = 16,
+    instepBuildUpMm = 0,
   } = input
 
-  const totalLength = shoeSize * C.STEP_TO_MM + C.FUNCTIONAL_ALLOWANCE
-  const scale = 0.78
+  const allowance = gender === 'male' ? 10 : C.FUNCTIONAL_ALLOWANCE
+  const totalLength = shoeSize * C.STEP_TO_MM + allowance
+  const scale = 0.76
   const padding = 36
   const svgWidth = totalLength * scale + padding * 2
-  const svgHeight = 148
+  const svgHeight = 158
 
   const xHeel = padding
   const xBall = padding + totalLength * (rockerStartPct / 100) * scale
@@ -82,7 +87,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const offsetPx = soleType === 'flat' ? heelTipOffsetMm * scale : 0
   const xTipCenter = xHeelCenter + offsetPx
 
-  const yGround = 122
+  const yGround = 130
   const hScaled = heelHeight * scale
   const tScaled = toeThickness * scale
   const yFootHeel = yGround - hScaled
@@ -122,6 +127,32 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   `
   const solePath = topPath + bottomPath
 
+  // Контур силуэта самой колодки (гребень прямого взъема + мысок + пятка) для наглядности обхватов
+  const xInstep = padding + totalLength * 0.52 * scale
+  const yInstepFoot = evalCubicBezier(0.55, yFootHeel, c1y, c2y, yFootBall)
+  const instepHeightPx = (gender === 'male' ? 62 : 56) * scale
+  const yInstepTop = yInstepFoot - instepHeightPx
+
+  const lastUpperPath = `
+    M ${xHeel - 2} ${yFootHeel - 3}
+    Q ${xHeel - 5} ${yFootHeel - 34 * scale}, ${xHeel + 8} ${yFootHeel - 52 * scale}
+    L ${xInstep - 22} ${yInstepTop - 8}
+    Q ${xInstep + 6} ${yInstepTop + 4}, ${xBall + 4} ${yFootBall - 24 * scale}
+    Q ${xToe - 8} ${yFootToe - 15 * scale}, ${xToe} ${yFootToe - 3}
+  `
+
+  // Контур налепки на гребень взъема (если instepBuildUpMm > 0)
+  const buildUpPx = Math.max(0, instepBuildUpMm) * scale * 1.4
+  const instepBuildUpPath =
+    buildUpPx > 0.5
+      ? `
+    M ${xInstep - 18} ${yInstepTop - 5}
+    Q ${xInstep} ${yInstepTop - 5 - buildUpPx * 1.8}, ${xBall} ${yFootBall - 24 * scale}
+    Q ${xInstep} ${yInstepTop + 1}, ${xInstep - 18} ${yInstepTop - 5}
+    Z
+  `
+      : ''
+
   const tipW = Math.max(2, tipWidthMm * scale)
   const heelPath = buildHeelPath({
     soleType,
@@ -137,7 +168,26 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     c2x,
   })
 
-  // 1. Супинатор (геленок) по алгоритму де Кастельжо вдоль кривой свода
+  // Выступ (грудь) каблука Томаса вперед под свод стопы
+  const baseBlockHalf = Math.max(11, (Math.max(tipWidthMm, 28) * scale) / 2)
+  const xFrontHeel = xHeelCenter + baseBlockHalf
+  const xThomasFront = xFrontHeel + thomasExtensionMm * scale
+  const tThomas = Math.max(0, Math.min(1, (xThomasFront - archStartX) / archSpanX))
+  const yThomasArch = evalCubicBezier(tThomas, yFootHeel, c1y, c2y, yFootBall) + 2
+
+  const thomasExtensionPath =
+    soleType === 'thomas'
+      ? `
+    M ${xFrontHeel - 2} ${yHeelSeat + 1}
+    L ${xFrontHeel - 2} ${yGround}
+    L ${xThomasFront} ${yGround}
+    L ${xThomasFront} ${yThomasArch}
+    Q ${(xFrontHeel + xThomasFront) / 2} ${yHeelSeat + 2}, ${xFrontHeel - 2} ${yHeelSeat + 1}
+    Z
+  `
+      : ''
+
+  // Супинатор (геленок)
   const tt = Math.max(0, Math.min(1, (shankLength * scale) / archSpanX))
   const mt = 1 - tt
   const q1x = mt * archStartX + tt * c1x
@@ -152,13 +202,11 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     C ${q1x} ${q1y + sOff}, ${q2x} ${q2y + sOff}, ${q3x} ${q3y + sOff}
   `
 
-  // 2. Координаты диагонального апекса M1 и M5 на 2D-профиле
   const apexM1_Mm = totalLength * (rockerStartPct / 100) - 5
   const apexM5_Mm = apexM1_Mm - totalLength * 0.045
   const xApexM1 = padding + apexM1_Mm * scale
   const xApexM5 = padding + apexM5_Mm * scale
 
-  // 3. Купол метатарзального пелота Зейца (располагается на 7 мм проксимальнее апекса M1)
   const pelottePosMm = apexM1_Mm - 7
   const xPelotte = padding + pelottePosMm * scale
   const tPelotte = Math.max(0, Math.min(1, (xPelotte - archStartX) / archSpanX))
@@ -178,7 +226,6 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     Z
   `
 
-  // 4. Карбоновая пластина жёсткости для рокерной подошвы
   const carbonYOff = 3.2
   const carbonPath = `
     M ${xHeelCenter} ${yFootHeel + carbonYOff}
@@ -191,6 +238,9 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     svgHeight,
     solePath,
     heelPath,
+    thomasExtensionPath,
+    lastUpperPath,
+    instepBuildUpPath,
     shankCurve,
     pelottePath,
     carbonPath,
@@ -202,10 +252,12 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     xApexM1,
     xApexM5,
     xPelotte,
+    xInstep,
     yGround,
     yFootHeel,
     yFootBall,
     yFootPelotte,
+    yInstepTop,
     scale,
   }
 }
@@ -233,6 +285,11 @@ function buildHeelPath(p: {
       C ${xHeel + 12} ${yGround}, ${xHeel - 2} ${yGround - hScaled * 0.25}, ${xHeel} ${yHeelSeat}
       Z
     `
+  }
+
+  if (soleType === 'thomas') {
+    const half = Math.max(11, tipW / 2)
+    return `M ${xTipCenter - half} ${yHeelSeat} L ${xTipCenter - half * 0.96} ${yGround} L ${xTipCenter + half} ${yGround} L ${xTipCenter + half} ${yHeelSeat} Z`
   }
 
   switch (heelType) {
