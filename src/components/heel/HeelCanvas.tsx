@@ -1,6 +1,6 @@
 // src/components/heel/HeelCanvas.tsx
 import React, { useState, Suspense } from 'react'
-import type { HeelEngineering, HeelAudit, SoleType, HeelType } from '../../lib/heelCalc'
+import type { HeelEngineering, HeelAudit, SoleType, HeelType, Gender } from '../../lib/heelCalc'
 import type { HeelGeometry } from '../../lib/heelGeometry'
 import { HEEL_CONST } from '../../lib/heelCalc'
 
@@ -28,6 +28,7 @@ type Props = {
   audit: HeelAudit
   auditTitle: string
   auditMessage: string
+  gender?: Gender
   soleType: SoleType
   heelType: HeelType
   heelHeight: number
@@ -47,7 +48,7 @@ const AUDIT_STYLES: Record<string, { color: string; bg: string; border: string; 
     color: 'var(--color-ink)',
     bg: 'color-mix(in srgb, var(--color-surface) 90%, var(--color-ink) 4%)',
     border: 'var(--color-border)',
-    badge: '✦ CERTIFIED BALANCE',
+    badge: '✦ CERTIFIED ORTHO BALANCE',
   },
   WARNING: {
     color: 'var(--color-accent, #B46513)',
@@ -75,6 +76,7 @@ export function HeelCanvas({
   audit,
   auditTitle,
   auditMessage,
+  gender = 'female',
   soleType,
   heelType,
   heelHeight,
@@ -163,13 +165,14 @@ export function HeelCanvas({
       {viewMode === '3d' ? (
         <Suspense
           fallback={
-            <div className="w-full h-[235px] flex items-center justify-center font-mono text-[9px] uppercase tracking-[0.25em] opacity-50">
-              INITIALIZING 3D ENGINE...
+            <div className="w-full h-[245px] flex items-center justify-center font-mono text-[9px] uppercase tracking-[0.25em] opacity-50">
+              INITIALIZING 3D ORTHO ENGINE...
             </div>
           }
         >
           <HeelScene3D
             eng={eng}
+            gender={gender}
             soleType={soleType}
             heelType={heelType}
             heelHeight={heelHeight}
@@ -273,6 +276,7 @@ export function HeelCanvas({
               )}
             </g>
 
+            {/* БАЗОВАЯ ЛИНИЯ ПОЛА */}
             <line
               x1="10"
               y1={g.yGround + 6}
@@ -294,60 +298,63 @@ export function HeelCanvas({
               LINEA BASALIS // FLOOR
             </text>
 
-            <line
-              x1={g.xHeel - 8}
-              y1={g.yFootBall + 6}
-              x2={g.xToe + 8}
-              y2={g.yFootBall + 6}
-              stroke="var(--color-accent)"
-              strokeWidth="1"
-              strokeDasharray="2 2"
-              opacity="0.4"
-            />
-
-            {soleType === 'flat' && (
-              <>
-                <line
-                  x1={g.xHeelCenter}
-                  y1={g.yFootHeel - 4}
-                  x2={g.xHeelCenter}
-                  y2={g.yGround + 6}
-                  stroke={offsetColor}
-                  strokeWidth="1"
-                  strokeDasharray="3 3"
-                />
-                <circle cx={g.xTipCenter} cy={g.yGround + 6} r="2.5" fill={offsetColor} />
-              </>
-            )}
-
+            {/* СИЛУЭТ КОЛОДКИ И НАЛЕПКА ВЗЪЕМА */}
             <g transform="translate(0, 6)">
-              {soleType === 'rocker' ? (
-                <text
-                  x={g.xBall + 8}
-                  y={Math.min(g.yFootBall - 8, g.yGround - 10)}
-                  fill="var(--color-accent)"
-                  fontSize="8"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  {t.dropLbl.toUpperCase()}: {dropMm} {t.mm || 'mm'}
-                </text>
-              ) : (
-                <text
-                  x={g.xHeelCenter + 12}
-                  y={g.yGround - 6}
-                  fill="var(--color-accent)"
-                  fontSize="8"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                >
-                  {t.dropLbl.toUpperCase()}: {dropMm} {t.mm || 'mm'}
-                </text>
+              <path
+                d={g.lastUpperPath}
+                fill="none"
+                stroke="var(--color-ink)"
+                strokeWidth="0.9"
+                strokeDasharray="3 3"
+                opacity="0.35"
+              />
+              {g.instepBuildUpPath && (
+                <path
+                  d={g.instepBuildUpPath}
+                  fill="#10B981"
+                  fillOpacity="0.28"
+                  stroke="#10B981"
+                  strokeWidth="1"
+                />
               )}
+              {/* Линия косого обхвата через пятку и взъем (45°) */}
+              <line
+                x1={g.xHeel + 2}
+                y1={g.yFootHeel}
+                x2={g.xInstep - 8}
+                y2={g.yInstepTop}
+                stroke="var(--color-accent)"
+                strokeWidth="0.85"
+                strokeDasharray="2 2"
+                opacity="0.6"
+              />
             </g>
 
+            {/* КОНТУР КАБЛУКА И УДЛИНЕНИЯ ТОМАСА */}
             <path d={g.heelPath} fill="var(--color-ink)" opacity="0.9" transform="translate(0, 6)" />
+            {soleType === 'thomas' && g.thomasExtensionPath && (
+              <g transform="translate(0, 6)">
+                <path
+                  d={g.thomasExtensionPath}
+                  fill="#10B981"
+                  fillOpacity="0.35"
+                  stroke="#10B981"
+                  strokeWidth="1.25"
+                />
+                <text
+                  x={g.xHeelCenter + 22}
+                  y={g.yGround - 6}
+                  fill="#10B981"
+                  fontSize="6.5"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                >
+                  THOMAS +{eng.rx.thomasExtensionMm}mm
+                </text>
+              </g>
+            )}
 
+            {/* КОНТУР ПОДОШВЫ / СТЕЛЬКИ */}
             <path
               d={g.solePath}
               fill="var(--color-surface-2)"
@@ -429,7 +436,7 @@ export function HeelCanvas({
               </text>
             </g>
 
-            {soleType === 'flat' ? (
+            {soleType !== 'rocker' ? (
               <path
                 d={g.shankCurve}
                 fill="none"
@@ -448,21 +455,6 @@ export function HeelCanvas({
                 strokeLinecap="round"
                 transform="translate(0, 6)"
               />
-            )}
-
-            {soleType === 'rocker' && (
-              <g transform="translate(0, 6)">
-                <circle cx={g.xBall} cy={g.yFootBall} r="3" fill="#E11D48" />
-                <line
-                  x1={g.xBall}
-                  y1={g.yFootBall}
-                  x2={g.xBall}
-                  y2={g.yGround}
-                  stroke="#E11D48"
-                  strokeWidth="1"
-                  strokeDasharray="2 2"
-                />
-              </g>
             )}
           </svg>
         </div>
