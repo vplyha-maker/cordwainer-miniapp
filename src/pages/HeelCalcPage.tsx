@@ -5,10 +5,12 @@ import type { Lang } from '../App'
 import {
   HEEL_CONST,
   ROCKER_PRESETS,
+  getStandardGirths,
   computeEngineering,
   computeAudit,
   defaultTipWidth,
   suggestAutoFix,
+  type Gender,
   type SoleType,
   type HeelType,
   type RockerType,
@@ -36,6 +38,8 @@ type InfoKey =
   | 'pronation'
   | 'loadM1M5'
   | 'shankMoment'
+  | 'thomasHeel'
+  | 'girths'
 
 function haptic(style: 'light' | 'medium' = 'light') {
   try {
@@ -60,17 +64,23 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     return () => observer.disconnect()
   }, [])
 
+  const [gender, setGender] = useState<Gender>('female')
   const [shoeSize, setShoeSize] = useState(38)
-  const [heelHeight, setHeelHeight] = useState(55)
+  const [heelHeight, setHeelHeight] = useState(45)
   const [toeThickness, setToeThickness] = useState(10)
   const [rockerAngle, setRockerAngle] = useState(12)
-  const [rockerStartPct, setRockerStartPct] = useState(65)
+  const [rockerStartPct, setRockerStartPct] = useState(62)
   const [soleType, setSoleType] = useState<SoleType>('flat')
-  const [heelType, setHeelType] = useState<HeelType>('stiletto')
+  const [heelType, setHeelType] = useState<HeelType>('block')
   const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
-  const [tipWidthMm, setTipWidthMm] = useState(10)
+  const [tipWidthMm, setTipWidthMm] = useState(28)
   const [rockerType, setRockerType] = useState<RockerType>('forefoot')
-  const [pronationDeg, setPronationDeg] = useState(0)
+  const [pronationDeg, setPronationDeg] = useState(-4)
+
+  // Антропометрические обмеры стопы клиента (мм)
+  const [ballGirthMm, setBallGirthMm] = useState(226)
+  const [instepGirthMm, setInstepGirthMm] = useState(235)
+  const [obliqueGirthMm, setObliqueGirthMm] = useState(298)
 
   const [showSpecs, setShowSpecs] = useState(false)
   const [activeInfo, setActiveInfo] = useState<InfoKey | null>(null)
@@ -82,7 +92,38 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   const t = useMemo(() => getLabels(lang), [lang])
   const infos = useMemo(() => getInfoTexts(lang), [lang])
 
+  // При смене пола или размера обновляем эталонные обмеры с сохранением текущей дельты полноты
+  const handleGenderChange = (newGender: Gender) => {
+    haptic('light')
+    const newSize = newGender === 'male' ? 42 : 38
+    const std = getStandardGirths(newGender, newSize)
+    setGender(newGender)
+    setShoeSize(newSize)
+    setBallGirthMm(std.ballGirthMm)
+    setInstepGirthMm(std.instepGirthMm)
+    setObliqueGirthMm(std.obliqueGirthMm)
+    if (newGender === 'male') {
+      setHeelType('block')
+      setHeelHeight(28)
+      setToeThickness(10)
+      setTipWidthMm(32)
+    } else {
+      setHeelHeight(45)
+      setTipWidthMm(defaultTipWidth(heelType, 'female'))
+    }
+  }
+
+  const handleSizeChange = (newSize: number) => {
+    const oldStd = getStandardGirths(gender, shoeSize)
+    const newStd = getStandardGirths(gender, newSize)
+    setShoeSize(newSize)
+    setBallGirthMm(newStd.ballGirthMm + (ballGirthMm - oldStd.ballGirthMm))
+    setInstepGirthMm(newStd.instepGirthMm + (instepGirthMm - oldStd.instepGirthMm))
+    setObliqueGirthMm(newStd.obliqueGirthMm + (obliqueGirthMm - oldStd.obliqueGirthMm))
+  }
+
   const input = {
+    gender,
     shoeSize,
     heelHeight,
     toeThickness,
@@ -94,11 +135,15 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     tipWidthMm,
     rockerType,
     pronationDeg,
+    ballGirthMm,
+    instepGirthMm,
+    obliqueGirthMm,
   }
 
   const eng = useMemo(
     () => computeEngineering(input),
     [
+      gender,
       shoeSize,
       heelHeight,
       toeThickness,
@@ -110,6 +155,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       tipWidthMm,
       rockerType,
       pronationDeg,
+      ballGirthMm,
+      instepGirthMm,
+      obliqueGirthMm,
     ]
   )
 
@@ -119,8 +167,15 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   )
 
   const geometry = useMemo(
-    () => buildHeelGeometry({ ...input, shankLength: eng.shankLength }),
+    () =>
+      buildHeelGeometry({
+        ...input,
+        shankLength: eng.shankLength,
+        thomasExtensionMm: eng.rx.thomasExtensionMm,
+        instepBuildUpMm: eng.rx.instepBuildUpMm,
+      }),
     [
+      gender,
       shoeSize,
       heelHeight,
       toeThickness,
@@ -131,6 +186,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       heelTipOffsetMm,
       tipWidthMm,
       eng.shankLength,
+      eng.rx.thomasExtensionMm,
+      eng.rx.instepBuildUpMm,
     ]
   )
 
@@ -141,13 +198,17 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       const preset = ROCKER_PRESETS[rockerType]
       setRockerAngle(preset.angle)
       setRockerStartPct(preset.startPct)
+    } else if (type === 'thomas') {
+      setHeelType('block')
+      setTipWidthMm(Math.max(tipWidthMm, 28))
+      if (heelHeight > 40) setHeelHeight(32)
     }
   }
 
   const handleHeelTypeChange = (type: HeelType) => {
     haptic('light')
     setHeelType(type)
-    setTipWidthMm(defaultTipWidth(type))
+    setTipWidthMm(defaultTipWidth(type, gender))
   }
 
   const handleRockerType = (type: RockerType) => {
@@ -161,12 +222,13 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   const handleFix = () => {
     haptic('medium')
     const fix = suggestAutoFix(input, eng)
+    setSoleType(fix.soleType)
+    setHeelType(fix.heelType)
     setToeThickness(fix.toeThickness)
     setHeelHeight(fix.heelHeight)
     setHeelTipOffsetMm(fix.heelTipOffsetMm)
     setTipWidthMm(fix.tipWidthMm)
     setRockerAngle(fix.rockerAngle)
-    setPronationDeg(fix.pronationDeg)
   }
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
@@ -206,31 +268,51 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           <span>ATELIER INDEX</span>
         </button>
         <span className="font-mono text-[8px] uppercase tracking-[0.3em] opacity-40">
-          ARCHIVE // CALC N° 03
+          ORTHO LAST & INSOLE // N° 03
         </span>
       </header>
 
       {/* CONTENT */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-24 scrollbar-hide w-full">
-        {/* Title */}
-        <div className="stagger-item my-7 w-full" style={{ animationDelay: '0.05s' }}>
-          <p className={`text-[8.5px] font-sans uppercase tracking-[0.35em] mb-2 ${cTextMuted}`}>
-            {t.desc}
-          </p>
-          <h1 className="font-serif text-4xl sm:text-5xl font-light tracking-tight">{t.title}</h1>
+        {/* Title & Gender Switch */}
+        <div className="stagger-item my-6 flex items-end justify-between gap-4 w-full" style={{ animationDelay: '0.05s' }}>
+          <div>
+            <p className={`text-[8.5px] font-sans uppercase tracking-[0.35em] mb-2 ${cTextMuted}`}>
+              {t.desc}
+            </p>
+            <h1 className="font-serif text-3xl sm:text-4xl font-light tracking-tight">{t.title}</h1>
+          </div>
+
+          {/* Переключатель Женская / Мужская колодка */}
+          <div className="flex items-center rounded-[10px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)] shrink-0">
+            {(['female', 'male'] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => handleGenderChange(g)}
+                className={`px-3 py-1.5 rounded-[8px] text-[9px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
+                  gender === g
+                    ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
+                    : 'bg-transparent text-[var(--color-ink)] opacity-55'
+                }`}
+              >
+                {g === 'female' ? t.female : t.male}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Mode & Type Toggles */}
-        <div className="stagger-item mb-7 space-y-3" style={{ animationDelay: '0.1s' }}>
-          <div className={`flex gap-6 pb-2.5 border-b ${cLine}`}>
-            {(['flat', 'rocker'] as const).map((type) => (
+        {/* Mode & Type Toggles (Стандарт / Каблук Томаса / Рокер) */}
+        <div className="stagger-item mb-6 space-y-3" style={{ animationDelay: '0.1s' }}>
+          <div className={`flex gap-6 pb-2.5 border-b ${cLine} overflow-x-auto scrollbar-hide`}>
+            {(['flat', 'thomas', 'rocker'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => handleSoleTypeChange(type)}
-                className={`text-[9px] font-sans uppercase tracking-[0.25em] transition-all outline-none border-none bg-transparent p-1 -m-1 cursor-pointer touch-manipulation ${
+                className={`text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all outline-none border-none bg-transparent p-1 -m-1 cursor-pointer touch-manipulation ${
                   soleType === type
-                    ? `italic ${cText} underline underline-offset-8 opacity-100`
+                    ? `italic ${cText} underline underline-offset-8 opacity-100 font-semibold`
                     : `${cTextMuted} opacity-50 hover:opacity-100`
                 }`}
               >
@@ -241,7 +323,10 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
           <div className="flex overflow-x-auto gap-5 pb-1 scrollbar-hide items-center">
             {soleType === 'flat' ? (
-              (['stiletto', 'kitten', 'block', 'flared'] as const).map((type) => (
+              (gender === 'male'
+                ? (['block', 'flared'] as const)
+                : (['stiletto', 'kitten', 'block', 'flared'] as const)
+              ).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -255,6 +340,12 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   {t[type]}
                 </button>
               ))
+            ) : soleType === 'thomas' ? (
+              <span className={`text-[11px] font-serif italic ${cTextMuted}`}>
+                {eng.rx.thomasHeelType === 'lateral'
+                  ? `${t.thomasLateral} (+${eng.rx.thomasExtensionMm} mm)`
+                  : `${t.thomasMedial} (+${eng.rx.thomasExtensionMm} mm)`}
+              </span>
             ) : (
               (
                 [
@@ -281,13 +372,14 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
 
         {/* Visualizer Canvas (3D Lab + 2D CAD Blueprint) */}
-        <div className="stagger-item w-full mb-8" style={{ animationDelay: '0.15s' }}>
+        <div className="stagger-item w-full mb-6" style={{ animationDelay: '0.15s' }}>
           <HeelCanvas
             geometry={geometry}
             eng={eng}
             audit={audit}
             auditTitle={(t as any)[audit.titleKey]}
             auditMessage={(t as any)[audit.messageKey]}
+            gender={gender}
             soleType={soleType}
             heelType={heelType}
             heelHeight={heelHeight}
@@ -303,21 +395,199 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           />
         </div>
 
-        {/* Controls Grid */}
-        <div className="stagger-item grid grid-cols-2 gap-4 mb-10" style={{ animationDelay: '0.2s' }}>
+        {/* ТЕХНОЛОГИЧЕСКАЯ КАРТА МАСТЕРА (Подбор колодки, стельки и подошвы по меркам клиента) */}
+        <div
+          className={`stagger-item mb-8 rounded-[16px] border ${cLine} p-4 bg-[var(--color-surface)] space-y-3`}
+          style={{ animationDelay: '0.18s' }}
+        >
+          <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+            <span className="font-mono text-[9px] uppercase tracking-[0.22em] font-semibold">
+              {t.masterCardTitle}
+            </span>
+            <span className="font-mono text-[8.5px] px-2 py-0.5 rounded bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]">
+              {eng.footLengthMm} mm // {eng.rx.widthCode}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]">
+            {/* 1. КОЛОДКА */}
+            <div className={`p-3 rounded-[12px] border ${cLine} space-y-1`}>
+              <div className="font-mono text-[8px] uppercase tracking-widest opacity-55">
+                1. {t.rxLastTitle}
+              </div>
+              <div className="font-serif text-sm font-medium">
+                {t.rxWidth}: {eng.rx.widthCode}
+              </div>
+              <div className="opacity-80">
+                • {t.ballGirth}:{' '}
+                <strong>
+                  {eng.rx.ballBuildUpMm > 0
+                    ? `+${eng.rx.ballBuildUpMm} mm (налепка)`
+                    : eng.rx.ballBuildUpMm < 0
+                    ? `${eng.rx.ballBuildUpMm} mm (утяжка)`
+                    : '0 mm (база)'}
+                </strong>
+              </div>
+              <div className="opacity-80">
+                • {t.instepGirth}:{' '}
+                <strong>
+                  {eng.rx.instepBuildUpMm > 0
+                    ? `+${eng.rx.instepBuildUpMm} mm (на гребень)`
+                    : eng.rx.instepBuildUpMm < 0
+                    ? `${eng.rx.instepBuildUpMm} mm`
+                    : '0 mm (база)'}
+                </strong>
+              </div>
+              <div className={eng.rx.requiresZipOrLaceWarning ? 'text-[#E11D48] font-medium' : 'opacity-75'}>
+                • {t.obliqueGirth}:{' '}
+                {eng.rx.requiresZipOrLaceWarning
+                  ? `+${eng.rx.obliqueEntryDeltaMm} mm (нужна молния/шнурок!)`
+                  : 'Вход стопы свободный'}
+              </div>
+            </div>
+
+            {/* 2. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА */}
+            <div className={`p-3 rounded-[12px] border ${cLine} space-y-1`}>
+              <div className="font-mono text-[8px] uppercase tracking-widest opacity-55">
+                2. {t.rxInsoleTitle}
+              </div>
+              <div className="font-serif text-sm font-medium">
+                {eng.rx.insoleType === 'supinator'
+                  ? t.insoleSupinator
+                  : eng.rx.insoleType === 'pronator'
+                  ? t.insolePronator
+                  : t.insoleNeutral}
+              </div>
+              <div className="opacity-80">
+                • {t.rxArch}: <strong>{eng.rx.archSupportHeightMm} mm</strong>
+              </div>
+              {eng.rx.medialHeelWedgeMm > 0 && (
+                <div className="text-[#10B981] font-medium">
+                  • {t.rxMedialWedge}: <strong>+{eng.rx.medialHeelWedgeMm} mm (внутр.)</strong>
+                </div>
+              )}
+              {eng.rx.lateralWedgeMm > 0 && (
+                <div className="text-[#D97706] font-medium">
+                  • {t.rxLateralWedge}: <strong>+{eng.rx.lateralWedgeMm} mm (наруж.)</strong>
+                </div>
+              )}
+              <div className="opacity-80">
+                • {t.padPos}:{' '}
+                <strong>
+                  {eng.requiresMetatarsalPad
+                    ? `${eng.metatarsalPadHeightMm} mm (на ${eng.metatarsalPadPosMm} mm)`
+                    : 'Не требуется'}
+                </strong>
+              </div>
+            </div>
+
+            {/* 3. ПОДОШВА И КАБЛУК */}
+            <div className={`p-3 rounded-[12px] border ${cLine} space-y-1`}>
+              <div className="font-mono text-[8px] uppercase tracking-widest opacity-55">
+                3. {t.rxSoleTitle}
+              </div>
+              <div className="font-serif text-sm font-medium">
+                {soleType === 'thomas'
+                  ? t.thomas
+                  : soleType === 'rocker'
+                  ? `${t.rocker} (${rockerAngle}°)`
+                  : eng.rx.recommendThomasHeel
+                  ? 'Рекомендован Каблук Томаса!'
+                  : 'Стандартная сборка'}
+              </div>
+              {eng.rx.thomasHeelType !== 'none' && (
+                <div className="text-[#10B981] font-medium">
+                  • Выступ Томаса:{' '}
+                  <strong>
+                    +{eng.rx.thomasExtensionMm} mm (
+                    {eng.rx.thomasHeelType === 'medial' ? 'внутр.' : 'наруж.'})
+                  </strong>
+                </div>
+              )}
+              <div className="opacity-80">
+                • Апексы пучков: <strong>M1={eng.apexM1_Mm} / M5={eng.apexM5_Mm} mm</strong>
+              </div>
+              <div className="opacity-80">
+                • Геленок 65Г: <strong>{eng.shankLength} mm ({eng.steelThickness} mm)</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* БЛОК 1: АНТРОПОМЕТРИЯ СТОПЫ КЛИЕНТА (Обмеры) */}
+        <div className="stagger-item mb-3" style={{ animationDelay: '0.2s' }}>
+          <span className={`text-[8.5px] font-mono uppercase tracking-[0.25em] ${cTextMuted}`}>
+            I. АНТРОПОМЕТРИЯ СТОПЫ КЛИЕНТА (МЕРКИ В ММ И ОСЬ ПЯТКИ)
+          </span>
+        </div>
+        <div className="stagger-item grid grid-cols-2 gap-3.5 mb-7" style={{ animationDelay: '0.22s' }}>
           <JournalStepper
             label={t.size}
             value={shoeSize}
-            min={33}
-            max={48}
-            onChange={setShoeSize}
+            min={gender === 'male' ? 38 : 33}
+            max={gender === 'male' ? 48 : 43}
+            onChange={handleSizeChange}
             isDark={isDark}
           />
+          <JournalStepper
+            label={t.pronation}
+            value={pronationDeg}
+            min={-12}
+            max={12}
+            onChange={setPronationDeg}
+            unit="°"
+            isDark={isDark}
+          />
+          <JournalStepper
+            label={t.ballGirth}
+            value={ballGirthMm}
+            min={185}
+            max={295}
+            onChange={setBallGirthMm}
+            unit={t.mm}
+            isDark={isDark}
+          />
+          <JournalStepper
+            label={t.instepGirth}
+            value={instepGirthMm}
+            min={190}
+            max={310}
+            onChange={setInstepGirthMm}
+            unit={t.mm}
+            isDark={isDark}
+          />
+          <JournalStepper
+            label={t.obliqueGirth}
+            value={obliqueGirthMm}
+            min={250}
+            max={390}
+            onChange={setObliqueGirthMm}
+            unit={t.mm}
+            isDark={isDark}
+          />
+          <JournalStepper
+            label={t.start}
+            value={rockerStartPct}
+            min={55}
+            max={75}
+            onChange={setRockerStartPct}
+            unit="%"
+            isDark={isDark}
+          />
+        </div>
+
+        {/* БЛОК 2: ПАРАМЕТРЫ КАБЛУКА И ПОДОШВЫ */}
+        <div className="stagger-item mb-3" style={{ animationDelay: '0.24s' }}>
+          <span className={`text-[8.5px] font-mono uppercase tracking-[0.25em] ${cTextMuted}`}>
+            II. КОНСТРУКЦИЯ КАБЛУКА И ПОДОШВЫ
+          </span>
+        </div>
+        <div className="stagger-item grid grid-cols-2 gap-3.5 mb-10" style={{ animationDelay: '0.25s' }}>
           <JournalStepper
             label={t.heel}
             value={heelHeight}
             min={10}
-            max={130}
+            max={gender === 'male' ? 60 : 130}
             onChange={setHeelHeight}
             unit={t.mm}
             isDark={isDark}
@@ -329,15 +599,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
             max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)}
             onChange={setToeThickness}
             unit={t.mm}
-            isDark={isDark}
-          />
-          <JournalStepper
-            label={t.start}
-            value={rockerStartPct}
-            min={55}
-            max={75}
-            onChange={setRockerStartPct}
-            unit="%"
             isDark={isDark}
           />
 
@@ -373,21 +634,10 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               />
             </>
           )}
-
-          {/* Пронация (−) / Супинация (+) */}
-          <JournalStepper
-            label={t.pronation}
-            value={pronationDeg}
-            min={-12}
-            max={12}
-            onChange={setPronationDeg}
-            unit="°"
-            isDark={isDark}
-          />
         </div>
 
         {/* Specs Accordion */}
-        <div className="stagger-item w-full pt-2" style={{ animationDelay: '0.25s' }}>
+        <div className="stagger-item w-full pt-2" style={{ animationDelay: '0.28s' }}>
           <button
             type="button"
             onClick={() => {
@@ -416,34 +666,25 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 <div className="py-6 space-y-4 border-b border-[var(--color-border)]">
                   <div className="grid grid-cols-2 gap-x-4 gap-y-5">
                     <SpecCell
-                      label={t.specПерекат}
-                      value={`${rockerStartPct}%`}
-                      infoKey="перекат"
-                      onInfo={() => setActiveInfo('перекат')}
+                      label={t.specGirthDelta}
+                      value={`${eng.rx.ballBuildUpMm > 0 ? `+${eng.rx.ballBuildUpMm}` : eng.rx.ballBuildUpMm} / ${
+                        eng.rx.instepBuildUpMm > 0 ? `+${eng.rx.instepBuildUpMm}` : eng.rx.instepBuildUpMm
+                      }`}
+                      unit={t.mm}
+                      infoKey="girths"
+                      onInfo={() => setActiveInfo('girths')}
                       isDark={isDark}
                     />
                     <SpecCell
-                      label={t.specГеленок}
-                      value={`${eng.shankLength}`}
+                      label={t.specThomas}
+                      value={
+                        eng.rx.thomasHeelType === 'none'
+                          ? '0'
+                          : `+${eng.rx.thomasExtensionMm} (${eng.rx.thomasHeelType === 'medial' ? 'Med' : 'Lat'})`
+                      }
                       unit={t.mm}
-                      infoKey="геленок"
-                      onInfo={() => setActiveInfo('геленок')}
-                      isDark={isDark}
-                    />
-                    <SpecCell
-                      label={t.specСталь}
-                      value={`${eng.steelThickness.toFixed(1)}`}
-                      unit={t.mm}
-                      infoKey="сталь"
-                      onInfo={() => setActiveInfo('сталь')}
-                      isDark={isDark}
-                    />
-                    <SpecCell
-                      label="L_eff"
-                      value={`${eng.lEff.toFixed(1)}`}
-                      unit={t.mm}
-                      infoKey="lEff"
-                      onInfo={() => setActiveInfo('lEff')}
+                      infoKey="thomasHeel"
+                      onInfo={() => setActiveInfo('thomasHeel')}
                       isDark={isDark}
                     />
                     <SpecCell
@@ -465,61 +706,37 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                       isDark={isDark}
                     />
                     <SpecCell
-                      label={t.pronation}
-                      value={`${eng.pronationDeg > 0 ? `+${eng.pronationDeg}` : eng.pronationDeg}°`}
-                      danger={eng.highPronationStress}
-                      infoKey="pronation"
-                      onInfo={() => setActiveInfo('pronation')}
+                      label={t.specГеленок}
+                      value={`${eng.shankLength}`}
+                      unit={t.mm}
+                      infoKey="геленок"
+                      onInfo={() => setActiveInfo('геленок')}
                       isDark={isDark}
                     />
                     <SpecCell
-                      label="Heel Center"
-                      value={`${HEEL_CONST.HEEL_CENTER_RATIO * 100}%`}
-                      infoKey="heelCenter"
-                      onInfo={() => setActiveInfo('heelCenter')}
+                      label={t.specСталь}
+                      value={`${eng.steelThickness.toFixed(1)}`}
+                      unit={t.mm}
+                      infoKey="сталь"
+                      onInfo={() => setActiveInfo('сталь')}
                       isDark={isDark}
                     />
-
-                    {soleType === 'flat' && (
-                      <>
-                        <SpecCell
-                          label={t.specСмещение}
-                          value={`${heelTipOffsetMm}`}
-                          unit={t.mm}
-                          danger={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
-                          infoKey="смещение"
-                          onInfo={() => setActiveInfo('смещение')}
-                          isDark={isDark}
-                        />
-                        <SpecCell
-                          label={t.specНабойка}
-                          value={`${tipWidthMm}`}
-                          unit={t.mm}
-                          danger={tipWidthMm < eng.minSafeTipMm}
-                          infoKey="набойка"
-                          onInfo={() => setActiveInfo('набойка')}
-                          isDark={isDark}
-                        />
-                        <SpecCell
-                          label={t.invertRisk}
-                          value={`${eng.inversionRisk}%`}
-                          danger={eng.inversionRisk >= 55}
-                          infoKey="invertRisk"
-                          onInfo={() => setActiveInfo('invertRisk')}
-                          isDark={isDark}
-                        />
-                        {(heelType === 'kitten' || heelType === 'flared') && (
-                          <SpecCell
-                            label={t.entryAngle}
-                            value={`${eng.entryAngleDeg}°`}
-                            infoKey="entryAngle"
-                            onInfo={() => setActiveInfo('entryAngle')}
-                            isDark={isDark}
-                          />
-                        )}
-                      </>
-                    )}
-
+                    <SpecCell
+                      label={t.apexM1}
+                      value={`${eng.apexM1_Mm}`}
+                      unit={t.mm}
+                      infoKey="apexM1"
+                      onInfo={() => setActiveInfo('apexM1')}
+                      isDark={isDark}
+                    />
+                    <SpecCell
+                      label={t.apexM5}
+                      value={`${eng.apexM5_Mm}`}
+                      unit={t.mm}
+                      infoKey="apexM5"
+                      onInfo={() => setActiveInfo('apexM5')}
+                      isDark={isDark}
+                    />
                     {eng.requiresMetatarsalPad && eng.metatarsalPadPosMm != null && (
                       <>
                         <SpecCell
@@ -540,44 +757,22 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                         />
                       </>
                     )}
-
-                    {eng.apexM1_Mm != null && (
-                      <>
-                        <SpecCell
-                          label={t.apexM1}
-                          value={`${eng.apexM1_Mm}`}
-                          unit={t.mm}
-                          infoKey="apexM1"
-                          onInfo={() => setActiveInfo('apexM1')}
-                          isDark={isDark}
-                        />
-                        <SpecCell
-                          label={t.apexM5}
-                          value={`${eng.apexM5_Mm}`}
-                          unit={t.mm}
-                          infoKey="apexM5"
-                          onInfo={() => setActiveInfo('apexM5')}
-                          isDark={isDark}
-                        />
-                      </>
-                    )}
-
-                    {soleType === 'rocker' && eng.carbonInsertThicknessMm > 0 && (
-                      <SpecCell
-                        label={t.carbonInsert}
-                        value={`${eng.carbonInsertThicknessMm}`}
-                        unit={t.mm}
-                        infoKey="carbonInsert"
-                        onInfo={() => setActiveInfo('carbonInsert')}
-                        isDark={isDark}
-                      />
-                    )}
-                  </div>
-
-                  <div className={`pt-3 border-t ${cLine} text-center opacity-60`}>
-                    <span className="font-mono text-[8px] uppercase tracking-widest">
-                      Angle = arcsin((H − T) / L_eff) // 3D CoP Tensor
-                    </span>
+                    <SpecCell
+                      label={t.invertRisk}
+                      value={`${eng.inversionRisk}%`}
+                      danger={eng.inversionRisk >= 55}
+                      infoKey="invertRisk"
+                      onInfo={() => setActiveInfo('invertRisk')}
+                      isDark={isDark}
+                    />
+                    <SpecCell
+                      label="L_eff"
+                      value={`${eng.lEff.toFixed(1)}`}
+                      unit={t.mm}
+                      infoKey="lEff"
+                      onInfo={() => setActiveInfo('lEff')}
+                      isDark={isDark}
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -606,7 +801,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="font-mono text-[8px] uppercase tracking-[0.3em] opacity-50">
-                  SPECIFICATION ARCHIVE
+                  ORTHOPEDIC SPECIFICATION
                 </span>
                 <button
                   type="button"
@@ -639,10 +834,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   )
 }
 
-// ------------------------------------------------------------------
-// ЖУРНАЛЬНЫЕ КОМПОНЕНТЫ УПРАВЛЕНИЯ
-// ------------------------------------------------------------------
-
 function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }: any) {
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
@@ -653,7 +844,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
       className={`flex flex-col border ${cLine} rounded-[14px] p-3.5 bg-[var(--color-surface)] justify-between shadow-[0_4px_20px_rgb(0,0,0,0.02)]`}
     >
       <span
-        className={`text-[8px] uppercase tracking-[0.25em] mb-2 ${cTextMuted} truncate pr-1 font-mono`}
+        className={`text-[8px] uppercase tracking-[0.22em] mb-2 ${cTextMuted} truncate pr-1 font-mono`}
       >
         {label}
       </span>
@@ -673,7 +864,7 @@ function JournalStepper({ label, value, min, max, onChange, unit = '', isDark }:
           −
         </button>
         <span className={`font-serif text-2xl tabular-nums ${cText}`}>
-          {value}
+          {value > 0 && label.includes('Пронация') ? `+${value}` : value}
           <span className="font-sans text-[9px] ml-0.5 opacity-60">{unit}</span>
         </span>
         <button
@@ -731,43 +922,48 @@ function SpecCell({ label, value, unit = '', danger = false, onInfo, isDark }: a
   )
 }
 
-// ------------------------------------------------------------------
-// ТЕКСТОВЫЕ ДАННЫЕ И ЛОКАЛИЗАЦИЯ
-// ------------------------------------------------------------------
-
 function getLabels(lang: Lang) {
   const C = HEEL_CONST
   const ru = {
-    title: 'Инженерия каблука',
-    desc: '3D Биомеханический баланс & Аудит профиля',
-    size: 'Размер',
-    heel: 'Каблук',
-    toe: 'Платформа',
-    angle: 'Угол',
-    start: 'Перекат',
-    fixBtn: 'Автобаланс',
-    offset: 'Смещение',
-    tipW: 'Набойка',
-    pronation: 'Пронация / Суп.',
+    title: 'Колодка & Ортопедия',
+    desc: 'Подбор колодки, стельки, каблука Томаса и рокера',
+    female: 'ЖЕН',
+    male: 'МУЖ',
+    size: 'Размер (Штихмасс)',
+    heel: 'Высота каблука',
+    toe: 'Платформа носка',
+    angle: 'Угол рокера',
+    start: 'Линия пучков',
+    fixBtn: 'Автоподбор',
+    offset: 'Смещение набойки',
+    tipW: 'Ширина набойки',
+    pronation: 'Пронация(−) / Суп.(+)',
+    ballGirth: 'Обхват пучков (Oп)',
+    instepGirth: 'Прямой взъем (Oв)',
+    obliqueGirth: 'Косой обхват (Oк)',
     internalSlope: 'Наклон колодки:',
     loadLbl: 'Нагрузка на плюсну:',
-    successTitle: 'БАЛАНС В НОРМЕ',
-    successDesc: 'Физиологическая нагрузка по лучам M1/M5 и пятке сбалансирована.',
-    warnTitle: 'ВЫСОКИЙ ПОДЪЕМ / ЗАВАЛ',
-    warn1Desc: `Угол колодки > ${C.COMFORT_ANGLE}° или фронтальный завал ≥ ${C.WARN_PRONATION_DEG}°.`,
+    successTitle: 'КОНСТРУКЦИЯ СБАЛАНСИРОВАНА',
+    successDesc: 'Колодка, стелька и опора соответствуют антропометрии стопы.',
+    warnTitle: 'ТРЕБУЕТСЯ КОРРЕКЦИЯ',
+    warn1Desc: `Высокий наклон (> ${C.COMFORT_ANGLE}°) или завал стопы. Проверьте карту мастера ниже.`,
     warn2Desc: 'Чрезмерный рокер при низком каблуке.',
-    errTitle: 'КРИТИЧЕСКИЙ НАКЛОН',
-    errDesc: `Угол колодки ≥ ${C.CRITICAL_ANGLE}°. Требуется утолщение платформы или снижение каблука.`,
-    padTitle: 'КРИТИЧЕСКАЯ НАГРУЗКА НА ПЛЮСНУ',
-    padDesc: 'Требуется обязательная установка встроенного метатарзального пелота Зейца.',
+    girthWarnTitle: 'ВЫСОКИЙ ВЗЪЕМ / КОСОЙ ОБХВАТ',
+    girthWarnDesc: 'Стопа не пройдет в закрытое голенище без молнии/шнуровки. Нужна налепка на взъем колодки.',
+    thomasNeedTitle: 'НУЖЕН КАБЛУК ТОМАСА',
+    thomasNeedDesc: 'При выраженной пронации/супинации и высоком каблуке свод продавливается. Нажмите «Автоподбор».',
+    errTitle: 'КРИТИЧЕСКИЙ НАКЛОН КОЛОДКИ',
+    errDesc: `Угол колодки ≥ ${C.CRITICAL_ANGLE}°. Увеличьте платформу или снизьте каблук.`,
+    padTitle: 'ПЕРЕГРУЗКА ПЕРЕДНЕГО ОТДЕЛА',
+    padDesc: 'Обязательна установка метатарзального пелота Зейца за головками M1–M5.',
     negDropTitle: 'ОБРАТНЫЙ УКЛОН',
     negDropDesc: 'Платформа выше каблука. Отрицательный дроп.',
     heelBackTitle: 'КАБЛУК ЗАВАЛЕН НАЗАД',
-    heelBackDesc: 'Ошибка: Каблук завален назад, критический риск излома супинатора.',
+    heelBackDesc: 'Критично: произойдет перелом геленка и провал пятки.',
     heelFwdTitle: 'СМЕЩЕНИЕ ВПЕРЁД',
-    heelFwdDesc: `Набойка смещена вперёд больше чем на ${C.MAX_HEEL_OFFSET_MM} мм. Снижена стабильность.`,
-    invertTitle: 'РИСК ИНВЕРСИИ / ЗАВАЛА',
-    invertDesc: 'Узкая набойка или критический фронтальный завал — высокий риск подворачивания.',
+    heelFwdDesc: `Набойка смещена вперёд > ${C.MAX_HEEL_OFFSET_MM} мм.`,
+    invertTitle: 'РИСК ВЫВИХА / ИНВЕРСИИ',
+    invertDesc: 'Узкая опора при завале стопы. Нажмите «Автоподбор» для перехода на каблук Томаса.',
     heelLbl: 'ПЯТКА',
     toeLbl: 'НОСОК',
     stiletto: 'Шпилька',
@@ -775,8 +971,22 @@ function getLabels(lang: Lang) {
     kitten: 'Рюмочка',
     flared: 'Трапеция',
     flat: 'Стандарт',
+    thomas: 'Подошва Томаса',
     rocker: 'Рокер',
-    specsBtn: 'Техническая спецификация ↗',
+    thomasMedial: 'Прямой каблук Томаса (медиальный упор под свод)',
+    thomasLateral: 'Обратный каблук Томаса (латеральный упор от варуса)',
+    masterCardTitle: 'ТЕХКАРТА МАСТЕРА: КОЛОДКА, СТЕЛЬКА, ПОДОШВА',
+    rxLastTitle: 'КОЛОДКА (ОБМЕРЫ)',
+    rxWidth: 'Полнота',
+    rxInsoleTitle: 'ОРТО-СТЕЛЬКА',
+    insoleNeutral: 'Анатомическая (нейтраль)',
+    insoleSupinator: 'Супинаторная (антивальгус)',
+    insolePronator: 'Пронаторная (антиварус)',
+    rxArch: 'Выкладка свода',
+    rxMedialWedge: 'Клин пятки',
+    rxLateralWedge: 'Клин пучка/пятки',
+    rxSoleTitle: 'ПОДОШВА & КАБЛУК',
+    specsBtn: 'Полная инженерная спецификация ↗',
     dropLbl: 'Перепад',
     massTitle: 'Распределение массы',
     forefoot: 'Плюсна',
@@ -791,142 +1001,79 @@ function getLabels(lang: Lang) {
     rockerForefoot: 'Метатарзалгия',
     rockerHeelToToe: 'Артроз',
     rockerNegative: 'Диабет. стопа',
-    specПерекат: 'Перекат',
+    specGirthDelta: 'Налепка (Пуч/Взъем)',
+    specThomas: 'Выступ Томаса',
     specГеленок: 'Геленок',
     specСталь: 'Сталь 65Г',
-    specСмещение: 'Смещение',
-    specНабойка: 'Набойка',
     specLoadM1M5: 'Лучи M1 / M5',
     specShankMoment: 'Момент геленка',
     mm: 'mm',
   }
   const uk = {
     ...ru,
-    title: 'Інженерія каблука',
-    desc: '3D Біомеханічний баланс & Аудит профілю',
-    size: 'Розмір',
-    heel: 'Підбір',
-    toe: 'Платформа',
-    angle: 'Кут',
-    start: 'Перекат',
-    fixBtn: 'Автобаланс',
-    offset: 'Зміщення',
-    tipW: 'Набійка',
-    pronation: 'Пронація / Суп.',
+    title: 'Колодка & Ортопедія',
+    desc: 'Підбір колодки, устілки, каблука Томаса та рокера',
+    female: 'ЖІН',
+    male: 'ЧОЛ',
+    size: 'Розмір (Штихмас)',
+    heel: 'Висота підбора',
+    toe: 'Платформа носка',
+    angle: 'Кут рокера',
+    start: 'Лінія пучків',
+    fixBtn: 'Автопідбір',
+    offset: 'Зміщення набійки',
+    tipW: 'Ширина набійки',
+    pronation: 'Пронація(−) / Суп.(+)',
+    ballGirth: 'Обхват пучків (Oп)',
+    instepGirth: 'Прямий підйом (Oв)',
+    obliqueGirth: 'Косий обхват (Oк)',
     internalSlope: 'Нахил колодки:',
     loadLbl: 'Навантаження на плюсну:',
-    successTitle: 'БАЛАНС У НОРМІ',
-    successDesc: 'Фізіологічне навантаження по променях M1/M5 та пʼятці збалансоване.',
-    warnTitle: 'ВИСОКИЙ ПІДЙОМ / ЗАВАЛ',
-    warn1Desc: `Кут колодки > ${C.COMFORT_ANGLE}° або фронтальний завал ≥ ${C.WARN_PRONATION_DEG}°.`,
-    warn2Desc: 'Надмірний рокер при низькому підборі.',
-    errTitle: 'КРИТИЧНИЙ НАХИЛ',
-    errDesc: `Кут колодки ≥ ${C.CRITICAL_ANGLE}°. Потрібне потовщення платформи або зниження підбора.`,
-    padTitle: 'КРИТИЧНЕ НАВАНТАЖЕННЯ НА ПЛЮСНУ',
-    padDesc: 'Потрібна обовʼязкова установка вбудованого метатарзального пелота Зейца.',
-    negDropTitle: 'ЗВОРОТНІЙ УХИЛ',
-    negDropDesc: 'Платформа вища за підбор. Негативний дроп.',
-    heelBackTitle: 'ПІДБОР ЗАВАЛЕНИЙ НАЗАД',
-    heelBackDesc: 'Помилка: Підбор завалений назад, критичний ризик зламу супінатора.',
-    heelFwdTitle: 'ЗМІЩЕННЯ ВПЕРЕД',
-    heelFwdDesc: `Набійка зміщена вперед більше ніж на ${C.MAX_HEEL_OFFSET_MM} мм. Знижена стабільність.`,
-    invertTitle: 'РИЗИК ІНВЕРСІЇ / ЗАВАЛУ',
-    invertDesc: 'Вузька набійка або критичний фронтальний завал — високий ризик підвертання.',
-    heelLbl: "П'ЯТКА",
-    toeLbl: 'НОСОК',
-    stiletto: 'Шпилька',
-    block: 'Блок',
-    kitten: 'Чарочка',
-    flared: 'Трапеція',
+    successTitle: 'КОНСТРУКЦІЯ ЗБАЛАНСОВАНА',
+    successDesc: 'Колодка, устілка та опора відповідають антропометрії стопи.',
+    warnTitle: 'ПОТРІБНА КОРЕКЦІЯ',
+    warn1Desc: `Високий нахил (> ${C.COMFORT_ANGLE}°) або завал стопи. Перевірте техкарту майстра.`,
+    girthWarnTitle: 'ВИСОКИЙ ПІДЙОМ / КОСИЙ ОБХВАТ',
+    girthWarnDesc: 'Стопа не пройде в закриту халяву без блискавки/шнурівки. Потрібна наліпка на підйом.',
+    thomasNeedTitle: 'ПОТРІБЕН КАБЛУК ТОМАСА',
+    thomasNeedDesc: 'При вираженій пронації/супінації склепіння продавлюється. Натисніть «Автопідбір».',
     flat: 'Стандарт',
+    thomas: 'Підошва Томаса',
     rocker: 'Рокер',
-    specsBtn: 'Технічна специфікація ↗',
-    dropLbl: 'Перепад',
-    massTitle: 'Розподіл маси',
-    forefoot: 'Плюсна',
-    rearfoot: "П'ятка",
-    invertRisk: 'Ризик інверсії',
-    entryAngle: 'Кут скосу',
-    padPos: 'Пелот Зейца',
-    padHeight: 'Висота пелота',
-    apexM1: 'Апекс M1',
-    apexM5: 'Апекс M5',
-    carbonInsert: 'Карбон (товщ.)',
-    rockerForefoot: 'Метатарзалгія',
-    rockerHeelToToe: 'Артроз',
-    rockerNegative: 'Діабет. стопа',
-    specПерекат: 'Перекат',
-    specГеленок: 'Геленк',
-    specСталь: 'Сталь 65Г',
-    specСмещение: 'Зміщення',
-    specНабойка: 'Набійка',
-    specLoadM1M5: 'Промені M1 / M5',
-    specShankMoment: 'Момент геленка',
-    mm: 'mm',
+    masterCardTitle: 'ТЕХКАРТА МАЙСТРА: КОЛОДКА, УСТІЛКА, ПІДОШВА',
+    rxLastTitle: 'КОЛОДКА (ОБМІРИ)',
+    rxWidth: 'Повнота',
+    rxInsoleTitle: 'ОРТО-УСТІЛКА',
+    insoleNeutral: 'Анатомічна (нейтраль)',
+    insoleSupinator: 'Супінаторна (антивальгус)',
+    insolePronator: 'Пронаторна (антиварус)',
+    rxArch: 'Викладка склепіння',
+    rxMedialWedge: 'Клин пʼятки',
+    rxLateralWedge: 'Клин пучка/пʼятки',
+    rxSoleTitle: 'ПІДОШВА & ПІДБІР',
+    specGirthDelta: 'Наліпка (Пуч/Підйом)',
+    specThomas: 'Виступ Томаса',
   }
   const de = {
     ...ru,
-    title: 'Absatz-Engineering',
-    desc: '3D-Biokinetische Balance & Profil-Audit',
-    size: 'Größe',
-    heel: 'Absatz',
+    title: 'Leisten & Orthopädie',
+    desc: 'Leistenanpassung, Einlage, Thomas-Absatz & Rolle',
+    female: 'DAMEN',
+    male: 'HERREN',
+    size: 'Größe (Stichmaß)',
+    heel: 'Absatzhöhe',
     toe: 'Plateau',
-    angle: 'Winkel',
-    start: 'Rolle',
-    fixBtn: 'Autobalan.',
-    offset: 'Versatz',
-    tipW: 'Fleck',
-    pronation: 'Pronation / Sup.',
-    internalSlope: 'Leistenneigung:',
-    loadLbl: 'Vorfußbelastung:',
-    successTitle: 'BALANCE OPTIMAL',
-    successDesc: 'Physiologische Belastung auf M1/M5 und Ferse im Gleichgewicht.',
-    warnTitle: 'HOHE SPRENGUNG / KIPPUNG',
-    warn1Desc: `Winkel > ${C.COMFORT_ANGLE}° oder Frontalkippung ≥ ${C.WARN_PRONATION_DEG}°.`,
-    warn2Desc: 'Zu starker Rocker bei niedrigem Absatz.',
-    errTitle: 'KRITISCHE NEIGUNG',
-    errDesc: `Leistenwinkel ≥ ${C.CRITICAL_ANGLE}°. Plateaudicke erhöhen oder Absatz verringern.`,
-    padTitle: 'KRITISCHE VORFUẞBELASTUNG',
-    padDesc: 'Einbau einer retrokapitalen Pelotte zwingend erforderlich.',
-    negDropTitle: 'NEGATIVE SPRENGUNG',
-    negDropDesc: 'Plateau höher als Absatz.',
-    heelBackTitle: 'ABSATZ NACH HINTEN GENEIGT',
-    heelBackDesc: 'Fehler: Absatz zu weit hinten. Gelenkfederbruchgefahr.',
-    heelFwdTitle: 'ABSATZ NACH VORNE VERLAGERT',
-    heelFwdDesc: `Absatzfleck > ${C.MAX_HEEL_OFFSET_MM} mm nach vorne.`,
-    invertTitle: 'INVERSIONSRISIKO',
-    invertDesc: 'Absatzfleck zu schmal oder starke Achsenabweichung — Umknickgefahr.',
-    heelLbl: 'FERSE',
-    toeLbl: 'SPITZE',
-    stiletto: 'Stiletto',
-    block: 'Block',
-    kitten: 'Kitten',
-    flared: 'Ausgestellt',
+    angle: 'Rollenwinkel',
+    start: 'Ballenlinie',
+    fixBtn: 'Auto-Konfig',
+    pronation: 'Pronation(−) / Sup.(+)',
+    ballGirth: 'Ballenmaß (Oп)',
+    instepGirth: 'Spannmaß (Oв)',
+    obliqueGirth: 'Fersenmaß (Oк)',
     flat: 'Standard',
-    rocker: 'Rocker',
-    specsBtn: 'Technische Spezifikation ↗',
-    dropLbl: 'Sprengung',
-    massTitle: 'Gewichtsverteilung',
-    forefoot: 'Vorfuß',
-    rearfoot: 'Ferse',
-    invertRisk: 'Inversionsrisiko',
-    entryAngle: 'Eintrittswinkel',
-    padPos: 'Pelotte Pos.',
-    padHeight: 'Pelottenhöhe',
-    apexM1: 'Apex M1',
-    apexM5: 'Apex M5',
-    carbonInsert: 'Carbon (Dicke)',
-    rockerForefoot: 'Metatarsalgie',
-    rockerHeelToToe: 'Arthrose',
-    rockerNegative: 'Diabet. Fuß',
-    specПерекат: 'Rolle',
-    specГеленок: 'Gelenk',
-    specСталь: 'Stahlfeder',
-    specСмещение: 'Versatz',
-    specНабойка: 'Fleck',
-    specLoadM1M5: 'Strahlen M1 / M5',
-    specShankMoment: 'Gelenkmoment',
-    mm: 'mm',
+    thomas: 'Thomas-Absatz',
+    rocker: 'Rocker-Sohle',
+    masterCardTitle: 'MEISTERKARTE: LEISTEN, EINLAGE & BODENBAU',
   }
 
   if (lang === 'uk') return uk
@@ -935,116 +1082,44 @@ function getLabels(lang: Lang) {
 }
 
 function getInfoTexts(lang: Lang): Record<InfoKey, string> {
-  if (lang === 'uk') {
-    return {
-      перекат:
-        'Точка початку перекату (rocker start) — відсоток довжини колодки, з якого починається підйом підошви. Напряму впливає на ефективний важіль L_eff.',
-      геленок:
-        'Жорстка вставка (супінатор/shank) від центру пʼятки до зони плюсни. Не дає підошві прогинатися під навантаженням і стабілізує каблук.',
-      сталь:
-        'Рекомендована товщина сталевої пластини 65Г за величиною перепаду та згинального моменту.',
-      lEff:
-        'Динамічна ефективна довжина важеля від центру пʼятки (15%) до пучкової лінії перекату. Від неї залежить внутрішній нахил і навантаження на плюсну.',
-      heelCenter:
-        'Умовний центр опори пʼятки (15% довжини колодки від задника). Від цієї точки рахується довжина геленка та вектор CoP.',
-      смещение:
-        'Зміщення набійки відносно осі каблука. Занадто назад — ризик поломки супінатора; занадто вперед — нестабільність посадки.',
-      набойка:
-        'Ширина контактної площадки каблука з підлогою. Вузька набійка при високому каблуці різко підвищує ризик інверсії.',
-      invertRisk:
-        'Імовірність підвертання щиколотки з урахуванням ширини набійки, висоти каблука та кута фронтального завалу (пронації/супінації).',
-      entryAngle:
-        'Істинний кут скосу задньої грані каблука (pitch angle) з урахуванням геометрії чарочки/трапеції та зміщення набійки.',
-      padPos:
-        'Позиція метатарзального пелота Зейца від пʼятки (на 7 мм проксимальніше лінії апекса M1). Розвантажує головки плюсневих кісток.',
-      padHeight:
-        'Висота пелота (4–6 мм) залежить від перепаду: чим вищий підйом, тим вищий пелот для адекватної розгрузки.',
-      apexM1:
-        'Апекс M1 — внутрішня точка суглобової лінії плюсни (I промінь). Орієнтир для рокера і пелота.',
-      apexM5:
-        'Апекс M5 — зовнішня точка (V промінь). Зсунута проксимально відносно M1 на ~4.5% довжини колодки.',
-      carbonInsert:
-        'Мінімальна товщина карбонової пластини в зоні плюсни. Рокер працює лише якщо підошва не згинається в пучках.',
-      pronation:
-        'Кут завалу стопи у фронтальній площині: відʼємні значення (−) — гіперпронація (вальгус, перевантаження M1), додатні (+) — супінація (варус, перевантаження M5 та ризик інверсії).',
-      loadM1M5:
-        'Розподіл тиску переднього відділу стопи між медіальним променем (M1, великий палець) та латеральним краєм (M5).',
-      shankMoment:
-        'Розрахунковий згинальний момент (Н·м) на сталевий супінатор у фазі опори при масі тіла 70 кг.',
-    }
-  }
-  if (lang === 'de') {
-    return {
-      перекат:
-        'Ballenrolle (rocker start) — Prozentsatz der Leistenlänge, bei dem die Sohlenbiegung beginnt. Bestimmt direkt den effektiven Hebelarm L_eff.',
-      геленок:
-        'Die Gelenkfeder (Shank) von der Fersenmitte bis zur Ballenlinie. Verhindert das Durchbiegen der Sohle unter Belastung.',
-      сталь:
-        'Empfohlene Dicke der Stahlfeder (65G) basierend auf Sprengung und Biegemoment.',
-      lEff:
-        'Dynamische effektive Hebellänge von der Fersenmitte (15%) bis zur Ballenlinie.',
-      heelCenter:
-        'Fersenauflagepunkt (15% der Leistenlänge von der Ferse entfernt).',
-      смещение:
-        'Versatz des Absatzflecks relativ zur Absatzachse. Zu weit hinten — Gefahr des Gelenkfederbruchs.',
-      набойка:
-        'Breite der Kontaktfläche des Absatzes. Ein schmaler Fleck erhöht das Inversionsrisiko drastisch.',
-      invertRisk:
-        'Wahrscheinlichkeit des Umknickens im Sprunggelenk unter Berücksichtigung von Fleckbreite, Absatzhöhe und Pronations-/Supinationswinkel.',
-      entryAngle:
-        'Realer Auftrittswinkel der hinteren Absatzkante unter Berücksichtigung von Absatzform und Fleckversatz.',
-      padPos:
-        'Position der retrokapitalen Pelotte (7 mm proximal zum Apex M1) zur Entlastung der Metatarsalköpfchen.',
-      padHeight:
-        'Pelottenhöhe (4–6 mm) in Abhängigkeit von der effektiven Sprengung.',
-      apexM1:
-        'Apex M1 — innerer Punkt der Ballenlinie (1. Strahl / Großzehengrundgelenk).',
-      apexM5:
-        'Apex M5 — äußerer Punkt (5. Strahl), ca. 4.5% der Leistenlänge proximal zu M1.',
-      carbonInsert:
-        'Mindestdicke der Carbonfasereinlage im Ballenbereich zur Sicherstellung der Abrollfunktion.',
-      pronation:
-        'Frontale Achsenabweichung: negativ (−) = Pronation/Valgus (Mehrbelastung M1), positiv (+) = Supination/Varus (Mehrbelastung M5).',
-      loadM1M5:
-        'Verteilung der Vorfußlast zwischen dem medialen Strahl (M1) und dem lateralen Strahl (M5).',
-      shankMoment:
-        'Berechnetes Biegemoment (N·m) auf die Gelenkfeder bei einer Referenzlast von 700 N.',
-    }
-  }
   return {
+    girths:
+      'Разница между обмерами стопы клиента (пучки Oп, прямой взъем Oв) и эталонной колодкой полноты F(6). Положительное число (+мм) показывает, сколько миллиметров кожи нужно налепить на колодку; при большом косом обхвате Oк требуется молния или шнуровка.',
+    thomasHeel:
+      'Каблук Томаса имеет удлиненную переднюю грудь (+12..25 мм). Прямой (Med) удлиняется с внутренней стороны и подпирает геленок и ладьевидную кость при пронации/вальгусе. Обратный (Lat) удлиняется снаружи при варусе/супинации.',
     перекат:
-      'Точка начала переката (rocker start) — процент длины колодки, с которого начинается подъём подошвы. Напрямую определяет эффективный рычаг L_eff.',
+      'Точка начала переката (линия пучков) — процент длины колодки, с которого начинается подъём подошвы.',
     геленок:
-      'Жёсткая вставка (супинатор/shank) от центра пятки до зоны плюсни. Не даёт подошве прогибаться под нагрузкой и стабилизирует каблук.',
+      'Стальной супинатор 65Г от центра пятки до зоны плюсни. Не даёт подошве прогибаться под сводом.',
     сталь:
-      'Рекомендуемая толщина стальной пластины 65Г по величине перепада и изгибающего момента.',
+      'Рекомендуемая толщина стальной пластины 65Г с учетом пола (муж/жен), высоты каблука и момента.',
     lEff:
-      'Динамическая эффективная длина рычага от центра пятки (15%) до линии пучков (переката). От неё зависят внутренний наклон и нагрузка на плюсну.',
+      'Динамическая эффективная длина рычага от центра пятки (15%) до линии пучков.',
     heelCenter:
-      'Условный центр опоры пятки (15% длины колодки от задника). От этой точки считается длина геленка и вектор CoP.',
+      'Центр опоры пятки (15% длины колодки от задника).',
     смещение:
-      'Смещение набойки относительно оси каблука. Слишком назад — риск поломки супинатора; слишком вперёд — нестабильность посадки.',
+      'Смещение набойки относительно оси пятки.',
     набойка:
-      'Ширина контактной площадки каблука с полом. Узкая набойка при высоком каблуке резко повышает риск инверсии.',
+      'Ширина контактной площадки каблука с полом.',
     invertRisk:
-      'Вероятность подворачивания лодыжки с учётом ширины набойки, высоты каблука и угла фронтального завала (пронации/супинации).',
+      'Вероятность подворачивания лодыжки. При переходе на каблук Томаса риск резко снижается за счет широкой базы.',
     entryAngle:
-      'Истинный угол скоса задней грани каблука (pitch angle) с учётом геометрии рюмочки/трапеции и смещения набойки.',
+      'Угол скоса задней грани каблука.',
     padPos:
-      'Позиция метатарзального пелота Зейца от пятки (на 7 мм проксимальнее линии апекса M1). Разгружает головки плюсневых костей.',
+      'Позиция метатарзального пелота Зейца от пятки (на 7 мм проксимальнее линии апекса M1). Назначается при высоком подъеме или поперечном распластывании пучков.',
     padHeight:
-      'Высота пелота (4–6 мм) зависит от перепада: чем выше подъём, тем выше пелот для адекватной разгрузки.',
+      'Высота купола пелота Зейца (4–6 мм).',
     apexM1:
-      'Апекс M1 — внутренняя точка суставной линии плюсен (I луч). Ориентир для рокера и пелота.',
+      'Апекс M1 — проекция головки I плюсневой кости (внутренний пучок).',
     apexM5:
-      'Апекс M5 — наружная точка (V луч). Смещена проксимально относительно M1 на ~4.5% длины колодки.',
+      'Апекс M5 — проекция головки V плюсневой кости (наружный пучок, смещен к пятке на 4.5% длины колодки).',
     carbonInsert:
-      'Минимальная толщина карбоновой пластины в зоне плюсен. Рокер работает только если подошва не гнётся в пучках.',
+      'Толщина карбоновой пластины для обеспечения жесткости рокерной подошвы.',
     pronation:
-      'Угол завала стопы во фронтальной плоскости: отрицательные значения (−) — гиперпронация (вальгус, перегрузка луча M1), положительные (+) — супинация (варус, перегрузка M5 и рост риска инверсии).',
+      'Отрицательные значения (−) — гиперпронация (вальгус, стопа валится внутрь -> нужен супинатор, медиальный клин и прямой каблук Томаса). Положительные (+) — супинация (варус, стопа валится наружу -> нужен пронаторный клин снаружи и обратный каблук Томаса).',
     loadM1M5:
-      'Распределение давления переднего отдела стопы между медиальным лучом (M1, первый палец) и латеральным краем (M5).',
+      'Распределение нагрузки между внутренним (M1) и наружным (M5) лучами переднего отдела стопы.',
     shankMoment:
-      'Расчётный изгибающий момент (Н·м) на стальной супинатор 65Г в фазе опоры при массе тела 70 кг.',
+      'Изгибающий момент (Н·м) на стальной геленок (при каблуке Томаса момент снижается за счет опоры под сводом).',
   }
 }
