@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import type { HeelEngineering, SoleType, HeelType, Gender } from '../../lib/heelCalc'
 
 type CameraPreset = 'iso' | 'side' | 'top' | 'rear'
-type LayerMode = 'shoe' | 'xray' | 'insole'
+type ViewLevel = 'design' | 'engineering' | 'biomechanics'
 
 type Props = {
   eng: HeelEngineering
@@ -37,7 +37,7 @@ export function HeelScene3D({
 }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const [camPreset, setCamPreset] = useState<CameraPreset>('iso')
-  const [layerMode, setLayerMode] = useState<LayerMode>('xray')
+  const [viewLevel, setViewLevel] = useState<ViewLevel>('design')
 
   const sceneRef = useRef<{
     scene: THREE.Scene
@@ -64,7 +64,7 @@ export function HeelScene3D({
     const height = container.clientHeight || 255
 
     const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100)
+    const camera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100)
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -77,19 +77,23 @@ export function HeelScene3D({
     container.innerHTML = ''
     container.appendChild(renderer.domElement)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.8))
-    const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.05)
-    keyLight.position.set(4, 7, 5)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.78))
+    const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.25)
+    keyLight.position.set(5, 8, 5.5)
     scene.add(keyLight)
 
-    const rimLight = new THREE.DirectionalLight(0x9dd2ff, 0.45)
-    rimLight.position.set(-4, 3, -4)
+    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.55)
+    fillLight.position.set(-5, 4, -4)
+    scene.add(fillLight)
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.45)
+    rimLight.position.set(0, -3, 5)
     scene.add(rimLight)
 
     const gridColor = isDark ? 0x3a3632 : 0xc8c2b8
     const grid = new THREE.GridHelper(4.2, 12, gridColor, gridColor)
     const gridMat = grid.material as THREE.Material
-    gridMat.opacity = 0.22
+    gridMat.opacity = 0.2
     gridMat.transparent = true
     scene.add(grid)
 
@@ -100,41 +104,40 @@ export function HeelScene3D({
     assembly.add(dynamicGroup)
 
     const padHeel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.24, 0.24, 0.03, 28),
+      new THREE.CylinderGeometry(0.22, 0.22, 0.03, 32),
       new THREE.MeshStandardMaterial({ color: 0xb46513, transparent: true, opacity: 0.75, roughness: 0.35 })
     )
     const padM1 = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 0.22, 0.03, 28),
+      new THREE.CylinderGeometry(0.2, 0.2, 0.03, 32),
       new THREE.MeshStandardMaterial({ color: 0x10b981, transparent: true, opacity: 0.8, roughness: 0.35 })
     )
     const padM5 = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.20, 0.20, 0.03, 28),
+      new THREE.CylinderGeometry(0.18, 0.18, 0.03, 32),
       new THREE.MeshStandardMaterial({ color: 0xd97706, transparent: true, opacity: 0.8, roughness: 0.35 })
     )
     assembly.add(padHeel, padM1, padM5)
 
     const pelotteMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.15, 20, 14),
+      new THREE.SphereGeometry(0.14, 24, 16),
       new THREE.MeshStandardMaterial({ color: 0xe11d48, transparent: true, opacity: 0.88, roughness: 0.3 })
     )
-    pelotteMesh.scale.set(1.2, 0.38, 0.9)
+    pelotteMesh.scale.set(1.2, 0.35, 0.9)
     assembly.add(pelotteMesh)
 
     const copRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.11, 0.018, 16, 36),
+      new THREE.TorusGeometry(0.1, 0.016, 16, 36),
       new THREE.MeshBasicMaterial({ color: 0xe11d48 })
     )
     copRing.rotation.x = Math.PI / 2
-    copRing.position.y = 0.015
-    scene.add(copRing)
+    assembly.add(copRing)
 
     const copStem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.016, 0.016, 0.85, 14),
+      new THREE.CylinderGeometry(0.014, 0.014, 0.85, 14),
       new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0.85 })
     )
-    scene.add(copStem)
+    assembly.add(copStem)
 
-    const targetSpherical = { theta: 0.72, phi: 1.12, radius: 4.35, lookAtY: 0.46 }
+    const targetSpherical = { theta: 0.78, phi: 1.05, radius: 4.2, lookAtY: 0.42 }
     const currentSpherical = { ...targetSpherical }
 
     sceneRef.current = {
@@ -176,7 +179,7 @@ export function HeelScene3D({
 
       sceneRef.current.targetSpherical.theta -= dx * 0.0085
       sceneRef.current.targetSpherical.phi = Math.max(
-        0.18,
+        0.15,
         Math.min(Math.PI * 0.48, sceneRef.current.targetSpherical.phi - dy * 0.0075)
       )
     }
@@ -192,8 +195,8 @@ export function HeelScene3D({
       e.preventDefault()
       if (!sceneRef.current) return
       sceneRef.current.targetSpherical.radius = Math.max(
-        2.6,
-        Math.min(6.4, sceneRef.current.targetSpherical.radius + e.deltaY * 0.0025)
+        2.4,
+        Math.min(6.2, sceneRef.current.targetSpherical.radius + e.deltaY * 0.0025)
       )
     }
 
@@ -227,7 +230,7 @@ export function HeelScene3D({
       const { theta, phi, radius, lookAtY } = st.currentSpherical
       st.camera.position.set(
         radius * Math.sin(phi) * Math.sin(theta),
-        radius * Math.cos(phi) + lookAtY * 0.3,
+        radius * Math.cos(phi) + lookAtY * 0.25,
         radius * Math.sin(phi) * Math.cos(theta)
       )
       st.camera.lookAt(0, lookAtY, 0)
@@ -243,21 +246,48 @@ export function HeelScene3D({
       dom.removeEventListener('pointerup', onPointerUp)
       dom.removeEventListener('pointercancel', onPointerUp)
       dom.removeEventListener('wheel', onWheel)
+
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          if (object.geometry) object.geometry.dispose()
+          if (object.material) {
+            if (Array.isArray(object.material)) {
+              object.material.forEach((m) => m.dispose())
+            } else {
+              object.material.dispose()
+            }
+          }
+        }
+      })
+
       renderer.dispose()
     }
   }, [])
+
+  // Автоматическая адаптация камеры при смене уровня визуализации
+  useEffect(() => {
+    const st = sceneRef.current
+    if (!st) return
+
+    if (viewLevel === 'biomechanics') {
+      // Для биомеханики удобнее верхне-боковой ракурс для анализа стельки и COP
+      st.targetSpherical = { theta: 0.5, phi: 0.65, radius: 4.4, lookAtY: 0.3 }
+    } else if (camPreset === 'iso') {
+      st.targetSpherical = { theta: 0.78, phi: 1.05, radius: 4.2, lookAtY: 0.42 }
+    }
+  }, [viewLevel])
 
   useEffect(() => {
     const st = sceneRef.current
     if (!st) return
     if (camPreset === 'iso') {
-      st.targetSpherical = { theta: 0.72, phi: 1.12, radius: 4.35, lookAtY: 0.46 }
+      st.targetSpherical = { theta: 0.78, phi: 1.05, radius: 4.2, lookAtY: 0.42 }
     } else if (camPreset === 'side') {
-      st.targetSpherical = { theta: 0.0, phi: 1.44, radius: 4.2, lookAtY: 0.46 }
+      st.targetSpherical = { theta: 0.0, phi: 1.48, radius: 4.0, lookAtY: 0.42 }
     } else if (camPreset === 'top') {
-      st.targetSpherical = { theta: 0.0, phi: 0.22, radius: 4.6, lookAtY: 0.25 }
+      st.targetSpherical = { theta: 0.0, phi: 0.18, radius: 4.5, lookAtY: 0.2 }
     } else if (camPreset === 'rear') {
-      st.targetSpherical = { theta: -Math.PI / 2, phi: 1.38, radius: 3.9, lookAtY: 0.4 }
+      st.targetSpherical = { theta: -Math.PI / 2, phi: 1.38, radius: 3.8, lookAtY: 0.38 }
     }
   }, [camPreset])
 
@@ -280,52 +310,87 @@ export function HeelScene3D({
       }
     }
 
-    const mmToUnit = 2.6 / Math.max(220, eng.lastLengthMm)
+    const mmToUnit = 2.5 / Math.max(220, eng.lastLengthMm)
     const h = heelHeight * mmToUnit
     const t = toeThickness * mmToUnit
     const ballRatio = Math.max(0.52, Math.min(0.78, rockerStartPct / 100))
     const activeRockerRad = soleType === 'rocker' ? (rockerAngle * Math.PI) / 180 : 0
-    const baseSoleW = (gender === 'male' ? 0.96 : 0.86) + eng.rx.ballBuildUpMm * 0.012
-    const isPump = gender === 'female' && heelHeight >= 50 && soleType === 'flat'
+    const baseSoleW = (gender === 'male' ? 0.94 : 0.82) + eng.rx.ballBuildUpMm * 0.01
 
-    const getFootProfile = (u: number) => {
-      if (u <= 0.17) {
-        const cup = 0.012 * (1 - Math.cos((u / 0.17) * Math.PI))
-        return h - cup
+    const getSoleProfileY = (u: number) => {
+      if (u <= 0.18) {
+        const heelCup = 0.016 * (1 - Math.cos((u / 0.18) * Math.PI))
+        return h - heelCup
       }
       if (u <= ballRatio) {
-        const s = (u - 0.17) / Math.max(0.05, ballRatio - 0.17)
-        const ease = s * s * (3 - 2 * s)
-        return h * (1 - ease) + t * ease
+        const s = (u - 0.18) / Math.max(0.05, ballRatio - 0.18)
+        const smoothStep = s * s * (3 - 2 * s)
+        const archDip = 0.075 * Math.sin(s * Math.PI)
+        return h * (1 - smoothStep) + t * smoothStep - archDip * (1 - smoothStep)
       }
       const r = (u - ballRatio) / Math.max(0.05, 1 - ballRatio)
-      const rockerLift =
-        soleType === 'rocker' ? Math.sin(activeRockerRad) * 0.65 * r * r : 0.07 * r * r
-      return t + rockerLift
+      const rockerLift = soleType === 'rocker' ? Math.sin(activeRockerRad) * 0.55 * r * r : 0.055 * r * r
+      return t + rockerLift + 0.022 * Math.pow(r, 2.2)
     }
 
     const getHalfWidth = (u: number) => {
-      const factor =
-        u < 0.32
-          ? 0.58 + 0.14 * Math.sin((u / 0.32) * Math.PI)
-          : u < 0.72
-          ? 0.54 + 0.48 * Math.sin(((u - 0.22) / 0.58) * Math.PI)
-          : 0.98 * Math.cos(((u - 0.72) / 0.28) * (Math.PI * 0.44))
-      return Math.max(0.1, baseSoleW * 0.5 * factor)
+      let factor = 1.0
+      if (u < 0.28) {
+        factor = 0.56 + 0.14 * Math.sin((u / 0.28) * Math.PI)
+      } else if (u < 0.65) {
+        const waist = (u - 0.28) / 0.37
+        factor = 0.52 + 0.46 * Math.sin(waist * Math.PI)
+      } else {
+        const toe = (u - 0.65) / 0.35
+        factor = 0.97 * Math.cos(toe * (Math.PI * 0.46))
+      }
+      return Math.max(0.09, (baseSoleW * 0.5) * factor)
     }
 
-    const getMedialCurve = (u: number) =>
-      u > 0.25 && u < 0.8 ? 0.055 * Math.sin(((u - 0.25) / 0.55) * Math.PI) : 0
+    const getMedialCurve = (u: number) => {
+      if (u > 0.22 && u < 0.85) {
+        return 0.045 * Math.sin(((u - 0.22) / 0.63) * Math.PI)
+      }
+      return 0
+    }
 
-    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА С ТЕПЛОВОЙ КАРТОЙ И КЛИНОМ
-    const segsX = 40
+    // 1. ПОДОШВА И РАНТ
+    const soleGeom = new THREE.BoxGeometry(2.52, 0.038, baseSoleW * 1.12, 52, 1, 16)
+    const sPos = soleGeom.attributes.position
+    for (let i = 0; i < sPos.count; i++) {
+      const x = sPos.getX(i)
+      const z = sPos.getZ(i)
+      const originalY = sPos.getY(i)
+      const u = (x + 1.26) / 2.52
+      const hw = getHalfWidth(u)
+      const zNorm = z / (baseSoleW * 0.56)
+      
+      sPos.setZ(i, zNorm * hw + getMedialCurve(u))
+      sPos.setY(i, getSoleProfileY(u) - 0.016 + originalY)
+    }
+    soleGeom.computeVertexNormals()
+
+    const outsoleMesh = new THREE.Mesh(
+      soleGeom,
+      new THREE.MeshStandardMaterial({
+        color: isDark ? 0x221c16 : 0xd2c4b0,
+        roughness: 0.42,
+        metalness: 0.12,
+        transparent: viewLevel === 'engineering',
+        opacity: viewLevel === 'engineering' ? 0.45 : 1.0,
+      })
+    )
+    dynamicGroup.add(outsoleMesh)
+
+    // 2. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (активна всегда, в биомеханике — с тепловой картой)
+    const segsX = 44
     const segsZ = 16
-    const soleGeom = new THREE.PlaneGeometry(2.6, baseSoleW, segsX, segsZ)
-    soleGeom.rotateX(-Math.PI / 2)
+    const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
+    insoleGeom.rotateX(-Math.PI / 2)
 
-    const pos = soleGeom.attributes.position
+    const pos = insoleGeom.attributes.position
     const colors = new Float32Array(pos.count * 3)
-    const baseColor = new THREE.Color(isDark ? 0xd8cfc2 : 0x2c2520)
+    const baseColor = new THREE.Color(isDark ? 0xd4c9bc : 0x2a2420)
     const archColor = new THREE.Color(0x10b981)
     const warnColor = new THREE.Color(0xd97706)
     const critColor = new THREE.Color(0xe11d48)
@@ -333,17 +398,17 @@ export function HeelScene3D({
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       const zNorm = pos.getZ(i) / (baseSoleW * 0.5)
-      const u = (x + 1.3) / 2.6
+      const u = (x + 1.24) / 2.48
 
       const finalZ = zNorm * getHalfWidth(u) + getMedialCurve(u)
       pos.setZ(i, finalZ)
 
-      let y = getFootProfile(u)
+      let y = getSoleProfileY(u)
 
       let orthoLift = 0
-      if (u > 0.2 && u < 0.58 && zNorm > 0) {
-        const archWave = Math.sin(((u - 0.2) / 0.38) * Math.PI)
-        orthoLift += archWave * zNorm * (eng.rx.archSupportHeightMm * mmToUnit * 1.1)
+      if (u > 0.22 && u < 0.6 && zNorm > 0) {
+        const archWave = Math.sin(((u - 0.22) / 0.38) * Math.PI)
+        orthoLift += archWave * zNorm * (eng.rx.archSupportHeightMm * mmToUnit * 1.15)
       }
       if (u < 0.28) {
         if (eng.rx.medialHeelWedgeMm > 0 && zNorm > 0) {
@@ -353,98 +418,94 @@ export function HeelScene3D({
         }
       }
 
-      pos.setY(i, y + orthoLift)
+      pos.setY(i, y + orthoLift + 0.012)
 
-      const distForefoot = Math.hypot(u - ballRatio, (finalZ - (pronationDeg < 0 ? 0.14 : -0.14)) * 0.8)
-      const foreIntensity = Math.max(0, 1 - distForefoot * 3.2) * (eng.forefootLoad / 100)
+      const distForefoot = Math.hypot(u - ballRatio, (finalZ - (pronationDeg < 0 ? 0.12 : -0.12)) * 0.8)
+      const foreIntensity = Math.max(0, 1 - distForefoot * 3.4) * (eng.forefootLoad / 100)
       const vColor = baseColor.clone()
-      if (orthoLift > 0.03) {
-        vColor.lerp(archColor, Math.min(0.85, orthoLift * 8))
-      }
-      if (foreIntensity > 0.42) {
-        vColor.lerp(eng.forefootLoad >= 78 ? critColor : warnColor, Math.min(1, (foreIntensity - 0.35) * 1.8))
+      
+      // Тепловая карта активна в режиме биомеханики или инженерии
+      if (viewLevel === 'biomechanics' || viewLevel === 'engineering') {
+        if (orthoLift > 0.03) {
+          vColor.lerp(archColor, Math.min(0.85, orthoLift * 8))
+        }
+        if (foreIntensity > 0.4) {
+          vColor.lerp(eng.forefootLoad >= 78 ? critColor : warnColor, Math.min(1, (foreIntensity - 0.35) * 1.8))
+        }
       }
       colors[i * 3] = vColor.r
       colors[i * 3 + 1] = vColor.g
       colors[i * 3 + 2] = vColor.b
     }
 
-    soleGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    soleGeom.computeVertexNormals()
+    insoleGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    insoleGeom.computeVertexNormals()
 
-    const soleMesh = new THREE.Mesh(
-      soleGeom,
+    const insoleMesh = new THREE.Mesh(
+      insoleGeom,
       new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.42,
-        metalness: 0.12,
+        roughness: 0.38,
+        metalness: 0.1,
         transparent: true,
-        opacity: layerMode === 'shoe' ? 0.9 : 0.72,
+        opacity: viewLevel === 'biomechanics' ? 1.0 : viewLevel === 'engineering' ? 0.85 : 0.65,
         side: THREE.DoubleSide,
       })
     )
-    dynamicGroup.add(soleMesh)
+    dynamicGroup.add(insoleMesh)
 
-    // 2. ОБЪЕМНЫЙ 3D-ВЕРХ ГОТОВОГО ИЗДЕЛИЯ (КОЖАНЫЙ ВЕРХ / РЕНТГЕН КОЛОДКИ)
-    if (layerMode !== 'insole') {
+    // 3. ВЕРХ ОБУВИ (Скрыт в биомеханике, полупрозрачный каркас в инженерии, непрозрачная кожа в дизайне)
+    if (viewLevel !== 'biomechanics') {
       const upperGeom = new THREE.BufferGeometry()
-      const uSegs = 44
-      const vSegs = 24
+      const uSegs = 52
+      const vSegs = 28
       const verts: number[] = []
       const uColors: number[] = []
       const indices: number[] = []
 
       const leatherColor = new THREE.Color(
-        gender === 'male' ? (isDark ? 0x523422 : 0x3b2316) : isDark ? 0xc8b59e : 0x261f1d
+        gender === 'male' ? (isDark ? 0x4a3222 : 0x362214) : isDark ? 0xbaab96 : 0x2b2320
       )
-      const buildUpHighlight = new THREE.Color(0x3186ff)
+      const xrayHighlight = new THREE.Color(0x3186ff)
       const instepAdd = Math.max(0, eng.rx.instepBuildUpMm)
 
       for (let iu = 0; iu <= uSegs; iu++) {
         const u = iu / uSegs
-        const x = -1.3 + u * 2.6
-        const ySole = getFootProfile(u)
+        const x = -1.24 + u * 2.48
+        const ySole = getSoleProfileY(u)
         const hw = getHalfWidth(u)
         const mShift = getMedialCurve(u)
 
-        let hTop = 0.38
-        if (u < 0.24) {
-          hTop = (isPump ? 0.48 : 0.62) - (u / 0.24) * 0.06
-        } else if (u < 0.56) {
-          const tInstep = (u - 0.24) / 0.32
-          if (isPump) {
-            hTop = 0.15 * (1 - Math.sin(tInstep * Math.PI * 0.85)) + 0.08
-          } else {
-            hTop = 0.56 * (1 - tInstep * 0.48) + instepAdd * 0.012 * Math.sin(tInstep * Math.PI)
-          }
+        let hTop = 0.42
+        if (u < 0.2) {
+          hTop = 0.6 - (u / 0.2) * 0.08
+        } else if (u < 0.6) {
+          const tInstep = (u - 0.2) / 0.4
+          hTop = 0.52 * (1 - 0.42 * Math.sin(tInstep * Math.PI)) + instepAdd * 0.012 * Math.sin(tInstep * Math.PI)
         } else {
-          const tToe = (u - 0.56) / 0.44
-          const baseToeH = isPump ? 0.19 : 0.28
-          hTop =
-            baseToeH * Math.pow(Math.max(0, 1 - tToe * 0.96), 0.58) +
-            Math.max(0, eng.rx.ballBuildUpMm) * 0.005 * (1 - tToe)
+          const tToe = (u - 0.6) / 0.4
+          hTop = 0.25 * Math.pow(Math.max(0, 1 - tToe * 0.95), 0.58) + Math.max(0, eng.rx.ballBuildUpMm) * 0.005
         }
 
-        const isCollarZone = isPump ? u > 0.06 && u < 0.6 : u > 0.06 && u < 0.34
+        const isCollarOpening = u > 0.12 && u < 0.38
 
         for (let iv = 0; iv <= vSegs; iv++) {
           const v = iv / vSegs
           const angle = v * Math.PI
-          let zLocal = -Math.cos(angle) * hw
+          let zLocal = -Math.cos(angle) * hw * 0.98
           let yLocal = Math.sin(angle) * hTop
 
-          if (isCollarZone && Math.sin(angle) > 0.72) {
-            yLocal = hTop * 0.72
-            zLocal *= 0.82
+          if (isCollarOpening && Math.sin(angle) > 0.66) {
+            yLocal = hTop * 0.66
+            zLocal *= 0.83
           }
 
-          verts.push(x, ySole + yLocal, zLocal + mShift)
+          verts.push(x, ySole + yLocal + 0.016, zLocal + mShift)
 
-          const isBuildUpArea =
-            u > 0.32 && u < 0.68 && Math.sin(angle) > 0.45 && (instepAdd > 0 || eng.rx.ballBuildUpMm > 0)
+          const isBuildUpArea = u > 0.28 && u < 0.68 && Math.sin(angle) > 0.38 && (instepAdd > 0 || eng.rx.ballBuildUpMm > 0)
           const c = leatherColor.clone()
-          if (layerMode === 'xray' && isBuildUpArea) {
-            c.lerp(buildUpHighlight, 0.75)
+          if (viewLevel === 'engineering' && isBuildUpArea) {
+            c.lerp(xrayHighlight, 0.72)
           }
           uColors.push(c.r, c.g, c.b)
         }
@@ -465,72 +526,75 @@ export function HeelScene3D({
       upperGeom.setIndex(indices)
       upperGeom.computeVertexNormals()
 
+      const isEng = viewLevel === 'engineering'
       const upperMat = new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: isPump ? 0.25 : 0.36,
-        metalness: 0.16,
-        transparent: layerMode === 'xray',
-        opacity: layerMode === 'xray' ? 0.32 : 0.96,
+        roughness: 0.3,
+        metalness: 0.15,
+        transparent: true,
+        opacity: isEng ? 0.24 : 0.96,
         side: THREE.DoubleSide,
       })
       dynamicGroup.add(new THREE.Mesh(upperGeom, upperMat))
 
-      if (layerMode === 'xray') {
+      if (isEng) {
         const wireColor = isDark ? 0xf4f0e8 : 0x1c1816
         dynamicGroup.add(
           new THREE.LineSegments(
             new THREE.WireframeGeometry(upperGeom),
-            new THREE.LineBasicMaterial({ color: wireColor, transparent: true, opacity: 0.15 })
+            new THREE.LineBasicMaterial({ color: wireColor, transparent: true, opacity: 0.14 })
           )
         )
       }
     }
 
-    // 3. Стальной геленок (супинатор 65Г)
-    const shankPts: THREE.Vector3[] = []
-    const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
-    for (let i = 0; i <= 20; i++) {
-      const u = 0.15 + (i / 20) * Math.max(0.1, shankEndRatio - 0.15)
-      shankPts.push(new THREE.Vector3(-1.3 + u * 2.6, getFootProfile(u) + 0.015, getMedialCurve(u)))
+    // 4. СТАЛЬНОЙ ГЕЛЕНОК (Виден в инженерии и биомеханике)
+    if (viewLevel !== 'design') {
+      const shankPts: THREE.Vector3[] = []
+      const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
+      for (let i = 0; i <= 20; i++) {
+        const u = 0.14 + (i / 20) * Math.max(0.1, shankEndRatio - 0.14)
+        shankPts.push(new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) + 0.024, getMedialCurve(u)))
+      }
+      const shankRadius = 0.015 + (eng.steelThickness - 1.2) * 0.01
+      const shankMesh = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
+        new THREE.MeshStandardMaterial({
+          color: eng.heelOffsetTooFarBack ? 0xe11d48 : 0xd97706,
+          roughness: 0.22,
+          metalness: 0.85,
+        })
+      )
+      dynamicGroup.add(shankMesh)
     }
-    const shankRadius = 0.016 + (eng.steelThickness - 1.2) * 0.012
-    const shankMesh = new THREE.Mesh(
-      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
-      new THREE.MeshStandardMaterial({
-        color: eng.heelOffsetTooFarBack ? 0xe11d48 : 0xd97706,
-        roughness: 0.25,
-        metalness: 0.75,
-      })
-    )
-    dynamicGroup.add(shankMesh)
 
-    // 4. Каблук и Г-образный выступ Томаса
-    const xHeelCenter = -1.3 + 0.15 * 2.6
+    // 5. КАБЛУК И ТОМАС
+    const xHeelCenter = -1.24 + 0.14 * 2.48
     const tipOffsetScene = soleType === 'flat' ? heelTipOffsetMm * mmToUnit : 0
     const heelHScene = Math.max(0.04, h)
     const tipRadius = Math.max(0.035, (tipWidthMm * mmToUnit) / 2)
 
-    let topR = 0.22
+    let topR = 0.21
     let botR = tipRadius
     if (soleType === 'rocker') {
-      topR = 0.29
-      botR = 0.27
+      topR = 0.28
+      botR = 0.26
     } else if (soleType === 'thomas') {
-      topR = 0.25
-      botR = 0.25
+      topR = 0.24
+      botR = 0.24
     } else if (heelType === 'stiletto') {
-      topR = Math.max(0.16, tipRadius * 1.7)
+      topR = Math.max(0.15, tipRadius * 1.6)
     } else if (heelType === 'kitten') {
-      topR = Math.max(0.19, tipRadius * 1.45)
+      topR = Math.max(0.18, tipRadius * 1.4)
     } else if (heelType === 'flared') {
-      topR = Math.max(0.13, tipRadius * 0.68)
-      botR = Math.max(0.18, tipRadius * 1.15)
+      topR = Math.max(0.12, tipRadius * 0.65)
+      botR = Math.max(0.17, tipRadius * 1.1)
     } else {
-      topR = Math.max(0.24, tipRadius)
-      botR = Math.max(0.22, tipRadius * 0.95)
+      topR = Math.max(0.23, tipRadius)
+      botR = Math.max(0.21, tipRadius * 0.95)
     }
 
-    const heelGeom = new THREE.CylinderGeometry(topR, botR, heelHScene, 28, 8)
+    const heelGeom = new THREE.CylinderGeometry(topR, botR, heelHScene, 32, 8)
     const hPos = heelGeom.attributes.position
     for (let i = 0; i < hPos.count; i++) {
       const py = hPos.getY(i)
@@ -551,11 +615,11 @@ export function HeelScene3D({
     dynamicGroup.add(heelMesh)
 
     if (soleType === 'thomas' || eng.rx.thomasHeelType !== 'none') {
-      const extLen = Math.max(0.16, eng.rx.thomasExtensionMm * mmToUnit)
+      const extLen = Math.max(0.15, eng.rx.thomasExtensionMm * mmToUnit)
       const isLateral = eng.rx.thomasHeelType === 'lateral'
-      const zSide = isLateral ? -0.11 : 0.11
+      const zSide = isLateral ? -0.1 : 0.1
       const thomasMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(extLen + 0.14, heelHScene * 0.96, 0.22),
+        new THREE.BoxGeometry(extLen + 0.12, heelHScene * 0.95, 0.2),
         new THREE.MeshStandardMaterial({
           color: soleType === 'thomas' ? 0x10b981 : 0xd97706,
           transparent: true,
@@ -563,50 +627,65 @@ export function HeelScene3D({
           roughness: 0.35,
         })
       )
-      thomasMesh.position.set(xHeelCenter + topR * 0.65 + extLen / 2, heelHScene * 0.48, zSide)
+      thomasMesh.position.set(xHeelCenter + topR * 0.6 + extLen / 2, heelHScene * 0.48, zSide)
       dynamicGroup.add(thomasMesh)
     }
 
-    // 5. Индикаторы давления и Пелот Зейца
-    const xM1 = -1.3 + ((eng.apexM1_Mm ?? eng.lastLengthMm * 0.6) / eng.lastLengthMm) * 2.6
-    const xM5 = -1.3 + ((eng.apexM5_Mm ?? eng.lastLengthMm * 0.56) / eng.lastLengthMm) * 2.6
+    // 6. ИНДИКАТОРЫ ДАВЛЕНИЯ И ПЕЛОТ (Активны в биомеханике и инженерии)
+    const showBioMarkers = viewLevel === 'biomechanics' || viewLevel === 'engineering'
+    padHeel.visible = showBioMarkers
+    padM1.visible = showBioMarkers
+    padM5.visible = showBioMarkers
 
-    padHeel.position.set(xHeelCenter, h + 0.022, 0)
-    padM1.position.set(xM1, t + 0.022, 0.21)
-    padM5.position.set(xM5, t + 0.022, -0.21)
+    if (showBioMarkers) {
+      const xM1 = -1.24 + ((eng.apexM1_Mm ?? eng.lastLengthMm * 0.6) / eng.lastLengthMm) * 2.48
+      const xM5 = -1.24 + ((eng.apexM5_Mm ?? eng.lastLengthMm * 0.56) / eng.lastLengthMm) * 2.48
 
-    const sHeel = 0.65 + (eng.heelLoad / 60) * 0.65
-    const sM1 = 0.65 + (eng.loadM1Pct / 50) * 0.75
-    const sM5 = 0.65 + (eng.loadM5Pct / 50) * 0.75
-    padHeel.scale.set(sHeel, 1, sHeel)
-    padM1.scale.set(sM1, 1, sM1)
-    padM5.scale.set(sM5, 1, sM5)
+      padHeel.position.set(xHeelCenter, h + 0.032, 0)
+      padM1.position.set(xM1, t + 0.032, 0.2)
+      padM5.position.set(xM5, t + 0.032, -0.2)
 
-    ;(padM1.material as THREE.MeshStandardMaterial).color.setHex(
-      eng.loadM1Pct >= 45 ? 0xe11d48 : 0x10b981
-    )
-    ;(padM5.material as THREE.MeshStandardMaterial).color.setHex(
-      eng.loadM5Pct >= 40 ? 0xe11d48 : 0xd97706
-    )
+      const sHeel = 0.65 + (eng.heelLoad / 60) * 0.65
+      const sM1 = 0.65 + (eng.loadM1Pct / 50) * 0.75
+      const sM5 = 0.65 + (eng.loadM5Pct / 50) * 0.75
+      padHeel.scale.set(sHeel, 1, sHeel)
+      padM1.scale.set(sM1, 1, sM1)
+      padM5.scale.set(sM5, 1, sM5)
 
-    pelotteMesh.visible = eng.requiresMetatarsalPad
-    if (eng.requiresMetatarsalPad && eng.metatarsalPadPosMm != null) {
-      const xPelotte = -1.3 + (eng.metatarsalPadPosMm / eng.lastLengthMm) * 2.6
-      pelotteMesh.position.set(xPelotte, t + 0.045, 0.02)
+      ;(padM1.material as THREE.MeshStandardMaterial).color.setHex(
+        eng.loadM1Pct >= 45 ? 0xe11d48 : 0x10b981
+      )
+      ;(padM5.material as THREE.MeshStandardMaterial).color.setHex(
+        eng.loadM5Pct >= 40 ? 0xe11d48 : 0xd97706
+      )
     }
 
+    pelotteMesh.visible = eng.requiresMetatarsalPad && (viewLevel === 'biomechanics' || viewLevel === 'engineering')
+    if (pelotteMesh.visible && eng.metatarsalPadPosMm != null) {
+      const xPelotte = -1.24 + (eng.metatarsalPadPosMm / eng.lastLengthMm) * 2.48
+      pelotteMesh.position.set(xPelotte, t + 0.052, 0.02)
+    }
+
+    // Пронационный крен сборки
     const rollRad = (pronationDeg * Math.PI) / 180
     assembly.rotation.x = rollRad
 
-    const copX = -1.3 + (eng.copLongitudinalMm / eng.lastLengthMm) * 2.6
-    const copZ = -(eng.copLateralMm * mmToUnit * 2.2)
-    copRing.position.set(copX, 0.015, copZ)
-    copStem.position.set(copX, 0.42, copZ)
-    copStem.rotation.x = rollRad
+    // COP (Центр давления) виден в биомеханике
+    const showCop = viewLevel === 'biomechanics'
+    copRing.visible = showCop
+    copStem.visible = showCop
+
+    if (showCop) {
+      const copX = -1.24 + (eng.copLongitudinalMm / eng.lastLengthMm) * 2.48
+      const copZ = -(eng.copLateralMm * mmToUnit * 2.2)
+      copRing.position.set(copX, 0.02, copZ)
+      copStem.position.set(copX, 0.42, copZ)
+      copRing.rotation.x = Math.PI / 2
+    }
   }, [
     eng,
     gender,
-    layerMode,
+    viewLevel,
     soleType,
     heelType,
     heelHeight,
@@ -623,46 +702,27 @@ export function HeelScene3D({
     <div className="relative w-full h-[255px] select-none overflow-hidden">
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Верхняя панель: телеметрия + переключатель слоев (Готовая обувь / Рентген / Стелька) */}
-      <div className=" absolute top-2.5 left-3 right-3 flex items-center justify-between gap-2 text-[9px] font-mono tracking-wider">
-        <div className="pointer-events-none px-2.5 py-1 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)]/80 backdrop-blur-sm">
-          <span className="opacity-60 mr-1">M1:</span>
-          <strong
-            className="font-serif text-[11px]"
-            style={{ color: eng.loadM1Pct >= 45 ? '#E11D48' : '#10B981' }}
-          >
-            {eng.loadM1Pct}%
-          </strong>
-          <span className="mx-1 opacity-30">|</span>
-          <span className="opacity-60 mr-1">M5:</span>
-          <strong
-            className="font-serif text-[11px]"
-            style={{ color: eng.loadM5Pct >= 40 ? '#E11D48' : '#D97706' }}
-          >
-            {eng.loadM5Pct}%
-          </strong>
-        </div>
-
-        {/* Переключатель слоев 3D-изделия */}
-        <div className="flex items-center gap-1 rounded-[8px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur-sm">
+      {/* Верхняя панель: переключатель уровней визуализации (Дизайн / Инженерия / Биомеханика) */}
+      <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between gap-2 text-[9px] font-mono tracking-wider">
+        <div className="flex items-center gap-1 rounded-[8px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur-sm w-full justify-between">
           {(
             [
-              { id: 'shoe', label: 'ОБУВЬ' },
-              { id: 'xray', label: 'РЕНТГЕН' },
-              { id: 'insole', label: 'СТЕЛЬКА' },
+              { id: 'design', label: 'ДИЗАЙН' },
+              { id: 'engineering', label: 'ИНЖЕНЕРИЯ' },
+              { id: 'biomechanics', label: 'БИОМЕХАНИКА' },
             ] as const
-          ).map((m) => (
+          ).map((lvl) => (
             <button
-              key={m.id}
+              key={lvl.id}
               type="button"
-              onClick={() => setLayerMode(m.id)}
-              className={`px-2 py-0.5 rounded-[6px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
-                layerMode === m.id
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
+              onClick={() => setViewLevel(lvl.id)}
+              className={`px-2 py-1 rounded-[6px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none flex-1 text-center ${
+                viewLevel === lvl.id
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold shadow-sm'
                   : 'bg-transparent text-[var(--color-ink)] opacity-60 hover:opacity-100'
               }`}
             >
-              {m.label}
+              {lvl.label}
             </button>
           ))}
         </div>
@@ -671,7 +731,7 @@ export function HeelScene3D({
       {/* Нижняя панель ракурсов камеры */}
       <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
         <span className="text-[7.5px] font-mono uppercase tracking-[0.2em] opacity-45 pointer-events-none">
-          {eng.rx.widthCode.split(' ')[0]} // DRAG TO ORBIT
+          {eng.rx.widthCode.split(' ')[0]} // {viewLevel.toUpperCase()}
         </span>
         <div className="flex items-center gap-1">
           {(
