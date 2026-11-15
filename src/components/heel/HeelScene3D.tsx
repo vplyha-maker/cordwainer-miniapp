@@ -165,6 +165,9 @@ function createBezierHeelGeometry(params: {
   return geom
 }
 
+/**
+ * Строит 3D рокерную подошву-танкетку со скругленной пяточной чашкой и мыском (без квадратных углов на виде сзади!)
+ */
 function createFullRockerWedgeGeometry(params: {
   baseSoleW: number
   ballRatio: number
@@ -175,7 +178,7 @@ function createFullRockerWedgeGeometry(params: {
 }): THREE.BufferGeometry {
   const { baseSoleW, ballRatio, activeRockerRad, getSoleProfileY, getHalfWidth, getMedialCurve } = params
 
-  const geom = new THREE.BoxGeometry(2.48, 1.0, baseSoleW, 96, 8, 16)
+  const geom = new THREE.BoxGeometry(2.48, 1.0, baseSoleW, 96, 8, 20)
   const pos = geom.attributes.position
 
   for (let i = 0; i < pos.count; i++) {
@@ -184,8 +187,17 @@ function createFullRockerWedgeGeometry(params: {
     const z = pos.getZ(i)
 
     const u = Math.max(0, Math.min(1, (x + 1.24) / 2.48))
-    const hw = getHalfWidth(u) * (1.03 - yNorm * 0.03)
     const zNorm = z / (baseSoleW * 0.5)
+
+    // Скругление задника пятки и носка по параболе zNorm^2, чтобы на виде СЗАДИ не было плоского прямоугольника
+    let endRoundX = x
+    if (u < 0.08) {
+      endRoundX += zNorm * zNorm * 0.065 * (1 - u / 0.08)
+    } else if (u > 0.92) {
+      endRoundX -= zNorm * zNorm * 0.065 * ((u - 0.92) / 0.08)
+    }
+
+    const hw = getHalfWidth(u) * (1.03 - yNorm * 0.03)
     const finalZ = zNorm * hw + getMedialCurve(u)
 
     const yTop = Math.max(0.04, getSoleProfileY(u) - 0.004)
@@ -200,6 +212,7 @@ function createFullRockerWedgeGeometry(params: {
     }
 
     const finalY = yBottom + yNorm * Math.max(0.03, yTop - yBottom)
+    pos.setX(i, endRoundX)
     pos.setY(i, finalY)
     pos.setZ(i, finalZ)
   }
@@ -351,6 +364,11 @@ export function HeelScene3D({
       prevX = e.clientX
       prevY = e.clientY
 
+      // Если пользователь вращает сцену вручную на заметный угол — выходим из заблокированного режима 'rear', чтобы показать все маркеры!
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        setCamPreset((prev) => (prev === 'rear' ? 'iso' : prev))
+      }
+
       sceneRef.current.targetSpherical.theta -= dx * 0.0085
       sceneRef.current.targetSpherical.phi = Math.max(
         0.15,
@@ -424,19 +442,20 @@ export function HeelScene3D({
     }
   }, [])
 
-  useEffect(() => {
+  const applyCameraPreset = (preset: CameraPreset) => {
+    setCamPreset(preset)
     const st = sceneRef.current
     if (!st) return
-    if (camPreset === 'iso') {
+    if (preset === 'iso') {
       st.targetSpherical = { theta: 0.58, phi: 0.95, radius: 4.05, lookAtY: 0.3 }
-    } else if (camPreset === 'side') {
+    } else if (preset === 'side') {
       st.targetSpherical = { theta: 0.0, phi: 1.48, radius: 3.85, lookAtY: 0.3 }
-    } else if (camPreset === 'bottom') {
+    } else if (preset === 'bottom') {
       st.targetSpherical = { theta: 0.0, phi: 0.18, radius: 4.2, lookAtY: 0.18 }
-    } else if (camPreset === 'rear') {
+    } else if (preset === 'rear') {
       st.targetSpherical = { theta: -Math.PI / 2, phi: 1.44, radius: 3.4, lookAtY: 0.28 }
     }
-  }, [camPreset])
+  }
 
   useEffect(() => {
     const st = sceneRef.current
@@ -495,7 +514,7 @@ export function HeelScene3D({
     }
     const getMedialAtX = (x: number) => getMedialCurve(Math.max(0, Math.min(1, (x + 1.24) / 2.48)))
 
-    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (БЕЗ ИСКУССТВЕННОГО ВЫПИРАНИЯ ВБОК НА ВИДЕ СЗАДИ)
+    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА
     const segsX = 96
     const segsZ = 24
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -524,7 +543,6 @@ export function HeelScene3D({
       let wedgeIntensity = 0
       let archIntensity = 0
 
-      // Выкладка продольного свода строго внутри контура подошвы (с плавным сведением к кромке edgeTaper)
       if (u > 0.22 && u < 0.58 && zNorm > 0 && eng.rx.archSupportHeightMm > 0) {
         const archWave = Math.sin(((u - 0.22) / 0.36) * Math.PI)
         const medialDome = Math.sin(Math.min(1, zNorm) * Math.PI) * edgeTaper
@@ -533,7 +551,6 @@ export function HeelScene3D({
         archIntensity = archWave * medialDome
       }
 
-      // Пяточный клин (появляется ТОЛЬКО когда medialHeelWedgeMm > 0 или lateralWedgeMm > 0, т.е. при реальном завале пятки!)
       if (u < 0.34) {
         const smoothFade = 0.5 * (1 + Math.cos((u / 0.34) * Math.PI))
         const rimFade = 0.2 + 0.8 * edgeTaper
@@ -619,19 +636,22 @@ export function HeelScene3D({
         )
       )
 
-      const carbonPts: THREE.Vector3[] = []
-      for (let i = 0; i <= 28; i++) {
-        const u = 0.08 + (i / 28) * 0.88
-        carbonPts.push(
-          new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) - 0.004, getMedialCurve(u))
+      // ИСПРАВЛЕНО: Карбоновая пластина утоплена внутрь толщи рокерной подошвы (-0.024) и не пробивает стельку!
+      if (!isRearView) {
+        const carbonPts: THREE.Vector3[] = []
+        for (let i = 0; i <= 26; i++) {
+          const u = 0.14 + (i / 26) * 0.78
+          carbonPts.push(
+            new THREE.Vector3(-1.24 + u * 2.48, Math.max(0.02, getSoleProfileY(u) - 0.024), getMedialCurve(u))
+          )
+        }
+        dynamicGroup.add(
+          new THREE.Mesh(
+            new THREE.TubeGeometry(new THREE.CatmullRomCurve3(carbonPts), 24, 0.011, 8, false),
+            new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.2, metalness: 0.8 })
+          )
         )
       }
-      dynamicGroup.add(
-        new THREE.Mesh(
-          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(carbonPts), 28, 0.016, 10, false),
-          new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.2, metalness: 0.8 })
-        )
-      )
     } else {
       const outsoleGeom = new THREE.BoxGeometry(2.48, 0.026, baseSoleW, 80, 1, 14)
       const sPos = outsoleGeom.attributes.position
@@ -705,28 +725,30 @@ export function HeelScene3D({
         )
       )
 
-      const shankPts: THREE.Vector3[] = []
-      const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
-      for (let i = 0; i <= 20; i++) {
-        const u = 0.14 + (i / 20) * Math.max(0.1, shankEndRatio - 0.14)
-        shankPts.push(
-          new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) + 0.022, getMedialCurve(u))
+      if (!isRearView) {
+        const shankPts: THREE.Vector3[] = []
+        const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
+        for (let i = 0; i <= 20; i++) {
+          const u = 0.14 + (i / 20) * Math.max(0.1, shankEndRatio - 0.14)
+          shankPts.push(
+            new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) - 0.015, getMedialCurve(u))
+          )
+        }
+        const shankRadius = 0.013 + (eng.steelThickness - 1.2) * 0.01
+        dynamicGroup.add(
+          new THREE.Mesh(
+            new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
+            new THREE.MeshStandardMaterial({
+              color: eng.heelOffsetTooFarBack || eng.shankOverloaded ? 0xe11d48 : 0xf59e0b,
+              roughness: 0.22,
+              metalness: 0.85,
+            })
+          )
         )
       }
-      const shankRadius = 0.015 + (eng.steelThickness - 1.2) * 0.012
-      dynamicGroup.add(
-        new THREE.Mesh(
-          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
-          new THREE.MeshStandardMaterial({
-            color: eng.heelOffsetTooFarBack || eng.shankOverloaded ? 0xe11d48 : 0xf59e0b,
-            roughness: 0.22,
-            metalness: 0.85,
-          })
-        )
-      )
     }
 
-    // 3. СИНИЕ АНАТОМИЧЕСКИЕ ОСИ И АПЕКС (СКРЫВАЕМ НА ВИДЕ СЗАДИ, ЧТОБЫ НЕ ЗАСОРЯТЬ ПЯТКУ!)
+    // 3. СИНИЕ АНАТОМИЧЕСКИЕ ОСИ И АПЕКС
     const xHeelCenter = -1.24 + 0.15 * 2.48
     const uM1 = eng.apexM1_Mm / eng.lastLengthMm
     const uM5 = eng.apexM5_Mm / eng.lastLengthMm
@@ -755,7 +777,6 @@ export function HeelScene3D({
       dynamicGroup.add(apexToeMarker)
     }
 
-    // Ось завала пятки
     const achillesPivot = new THREE.Group()
     achillesPivot.position.set(xHeelCenter, h + 0.025, 0)
     const residualRollDeg =
@@ -772,7 +793,7 @@ export function HeelScene3D({
     achillesPivot.add(achillesAxis)
     dynamicGroup.add(achillesPivot)
 
-    // 4. ЗОНЫ ДАВЛЕНИЯ И ПЕЛОТ ЗЕЙЦА (СКРЫВАЮТСЯ НА ВИДЕ ПЯТКИ И КОГДА ПЕЛОТ НЕ НУЖЕН!)
+    // 4. ЗОНЫ ДАВЛЕНИЯ И ПЕЛОТ ЗЕЙЦА
     padHeel.visible = !isRearView
     padM1.visible = !isRearView
     padM5.visible = !isRearView
@@ -877,7 +898,7 @@ export function HeelScene3D({
               <button
                 key={preset.id}
                 type="button"
-                onClick={() => setCamPreset(preset.id)}
+                onClick={() => applyCameraPreset(preset.id)}
                 className={`px-2 py-0.5 rounded-[5px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border ${
                   camPreset === preset.id
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
@@ -891,7 +912,6 @@ export function HeelScene3D({
         </div>
       </div>
 
-      {/* СТРОГАЯ 4-ЦВЕТНАЯ МАРКИРОВКА ПРОТОКОЛА */}
       <div className="px-3 py-1.5 flex items-center justify-between flex-wrap gap-x-2 gap-y-1 text-[8px] font-mono border-t border-[var(--color-border)] bg-[var(--color-surface)]/40">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#E11D48] inline-block" />
