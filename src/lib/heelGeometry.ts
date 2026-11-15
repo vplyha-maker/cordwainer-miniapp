@@ -65,7 +65,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     rockerStartPct,
     heelTipOffsetMm,
     shankLength,
-    thomasExtensionMm = 16,
+    thomasExtensionMm = 0,
     instepBuildUpMm = 0,
   } = input
 
@@ -112,7 +112,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   `
 
   const yHeelSeat = yFootHeel + Math.min(hScaled * 0.14, 7 * scale)
-  const yBottomToe = soleType === 'rocker' ? yFootToe + Math.max(tScaled, 2) : yGround - 1
+  const yBottomToe = soleType === 'rocker' ? yFootToe + Math.max(tScaled, 4) : yGround - 1
 
   const bottomPath = `
     L ${xToe} ${yBottomToe}
@@ -123,7 +123,6 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   `
   const solePath = topPath + bottomPath
 
-  // Контур антропометрии колодки (взъем и косой обхват)
   const xInstep = padding + totalLength * 0.52 * scale
   const yInstepFoot = evalCubicBezier(0.55, yFootHeel, c1y, c2y, yFootBall)
   const instepHeightPx = (gender === 'male' ? 60 : 54) * scale
@@ -148,7 +147,6 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   `
       : ''
 
-  // Анатомический каблук с плавной кривой Безье по заднику и груди каблука
   const heelHalfW = (gender === 'male' ? 32 : 28) * scale * 0.5
   const xBackTop = xHeel - 2
   const xBackBot = xTipCenter - heelHalfW * 0.92
@@ -156,14 +154,16 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
 
   let heelPath = ''
   if (soleType === 'rocker') {
+    // В режиме РОКЕР: сплошная клиновидная рокерная база со скошенным задником (Heel Rocker) до пучков!
     heelPath = `
       M ${xBackTop} ${yHeelSeat}
       C ${c1x} ${yHeelSeat}, ${c2x} ${yGround}, ${xBall} ${yGround}
-      L ${xHeel + 22} ${yGround}
-      C ${xHeel + 8} ${yGround}, ${xBackTop - 3} ${yGround - hScaled * 0.35}, ${xBackTop} ${yHeelSeat}
+      L ${xHeel + 16} ${yGround}
+      C ${xHeel + 4} ${yGround}, ${xBackTop - 2} ${yGround - hScaled * 0.4}, ${xBackTop} ${yHeelSeat}
       Z
     `
   } else {
+    // В режимах СТАНДАРТ и ТОМАСА: классический каблук
     heelPath = `
       M ${xBackTop} ${yHeelSeat}
       C ${xBackTop - 2} ${yHeelSeat + hScaled * 0.45}, ${xBackBot - 1} ${yGround - hScaled * 0.2}, ${xBackBot} ${yGround}
@@ -173,24 +173,23 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     `
   }
 
-  // Плавный S-образный выступ каблука Томаса на кривых Безье под свод стопы
-  const xThomasFront = xFrontHeel + thomasExtensionMm * scale
-  const tThomas = Math.max(0, Math.min(1, (xThomasFront - archStartX) / archSpanX))
-  const yThomasArch = evalCubicBezier(tThomas, yFootHeel, c1y, c2y, yFootBall) + 2
+  // СТРОГОЕ УСЛОВИЕ: Выступ Томаса рисуется ТОЛЬКО когда soleType === 'thomas'!
+  let thomasExtensionPath = ''
+  if (soleType === 'thomas' && thomasExtensionMm > 0) {
+    const xThomasFront = xFrontHeel + thomasExtensionMm * scale
+    const tThomas = Math.max(0, Math.min(1, (xThomasFront - archStartX) / archSpanX))
+    const yThomasArch = evalCubicBezier(tThomas, yFootHeel, c1y, c2y, yFootBall) + 2
 
-  const thomasExtensionPath =
-    soleType === 'thomas' || thomasExtensionMm > 0
-      ? `
-    M ${xFrontHeel - 1} ${yHeelSeat + 1}
-    L ${xFrontHeel - 1} ${yGround}
-    L ${xThomasFront} ${yGround}
-    C ${xThomasFront + 2} ${yGround - (yGround - yThomasArch) * 0.45}, ${xThomasFront - 1} ${yThomasArch + 4}, ${xThomasFront - 2} ${yThomasArch}
-    C ${(xFrontHeel + xThomasFront) * 0.5} ${yHeelSeat + 2}, ${xFrontHeel + 2} ${yHeelSeat + 1}, ${xFrontHeel - 1} ${yHeelSeat + 1}
-    Z
-  `
-      : ''
+    thomasExtensionPath = `
+      M ${xFrontHeel - 1} ${yHeelSeat + 1}
+      L ${xFrontHeel - 1} ${yGround}
+      L ${xThomasFront} ${yGround}
+      C ${xThomasFront + 2} ${yGround - (yGround - yThomasArch) * 0.45}, ${xThomasFront - 1} ${yThomasArch + 4}, ${xThomasFront - 2} ${yThomasArch}
+      C ${(xFrontHeel + xThomasFront) * 0.5} ${yHeelSeat + 2}, ${xFrontHeel + 2} ${yHeelSeat + 1}, ${xFrontHeel - 1} ${yHeelSeat + 1}
+      Z
+    `
+  }
 
-  // Супинатор (геленок 65Г)
   const tt = Math.max(0, Math.min(1, (shankLength * scale) / archSpanX))
   const mt = 1 - tt
   const q1x = mt * archStartX + tt * c1x
