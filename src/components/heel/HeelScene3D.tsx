@@ -662,7 +662,8 @@ export function HeelScene3D({
       const xHeelBack = -1.24
       const xFrontBase = -1.24 + 0.25 * 2.48
       const heelHScene = Math.max(0.04, h)
-      const tipOffsetScene = soleType !== 'rocker' ? heelTipOffsetMm * mmToUnit : 0
+      const tipOffsetScene = heelTipOffsetMm * mmToUnit
+
 
       const isThomasMode = soleType === 'thomas'
       const activeThomasType = isThomasMode ? eng.rx.thomasHeelType : 'none'
