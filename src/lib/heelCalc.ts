@@ -9,23 +9,25 @@ export const HEEL_CONST = {
   FUNCTIONAL_ALLOWANCE: 8,
   MAX_TOE: 60,
   MAX_LIFT: 50,
+  MAX_THOMAS_HEEL_MM: 35, // Максимальная ортопедически допустимая высота каблука Томаса
+  MAX_SHANK_MOMENT_NM: 28, // Предельный безопасный изгибающий момент на стальной геленок 65Г
   CRITICAL_ANGLE: 16,
   COMFORT_ANGLE: 12,
-  SAFE_ANGLE: 11.0,
+  SAFE_ANGLE: 10.5,
   CRITICAL_LOAD: 75,
   CRITICAL_KPA: 245,
   MAX_ROCKER_ANGLE: 28,
   ROCKER_MITIGATION_CAP: 0.32,
   HEEL_CENTER_RATIO: 0.15,
   MAX_HEEL_OFFSET_MM: 5,
-  CRITICAL_PRONATION_DEG: 6,
+  CRITICAL_PRONATION_DEG: 5.5,
   WARN_PRONATION_DEG: 3,
 } as const
 
 export const ROCKER_PRESETS: Record<RockerType, { angle: number; startPct: number }> = {
-  forefoot:  { angle: 15, startPct: 60 }, // Метатарзалгия
-  heelToToe: { angle: 18, startPct: 56 }, // Артроз / Полный перекат
-  negative:  { angle: 10, startPct: 65 }, // Диабетическая стопа
+  forefoot:  { angle: 15, startPct: 60 },
+  heelToToe: { angle: 18, startPct: 56 },
+  negative:  { angle: 10, startPct: 65 },
 }
 
 export interface HeelInput {
@@ -56,13 +58,9 @@ export interface MasterPrescription {
   medialHeelWedgeMm: number
   lateralWedgeMm: number
   shoreA: string
-  /** Клиническая рекомендация: нужен ли каблук Томаса по завалу стопы */
   recommendThomasHeel: boolean
-  /** Фактически установленный выступ Томаса (активен ТОЛЬКО когда выбран режим soleType === 'thomas') */
   thomasHeelType: 'none' | 'medial' | 'lateral'
-  /** Фактическая длина выступа Томаса в текущей сборке (0 мм для flat и rocker) */
   thomasExtensionMm: number
-  /** Расчетная рекомендуемая длина выступа Томаса для справки в техкарте, мм */
   recommendedThomasMm: number
 }
 
@@ -81,6 +79,8 @@ export interface HeelEngineering {
   copLongitudinalMm: number
   copLateralMm: number
   shankBendingMomentNm: number
+  shankOverloaded: boolean
+  thomasTooHigh: boolean
   shankLength: number
   steelThickness: number
   heelOffsetTooFarBack: boolean
@@ -146,12 +146,10 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
 
   const clampedWeight = Math.max(35, Math.min(160, weightKg))
 
-  // 1. Длина стопы и конструктивная длина колодки
   const footLengthMm = Math.round((shoeSize - 1.5) * C.STEP_TO_MM)
   const allowance = gender === 'male' ? 10 : C.FUNCTIONAL_ALLOWANCE
   const lastLengthMm = Math.round(shoeSize * C.STEP_TO_MM + allowance)
 
-  // 2. Полнота и налепки по обмерам стопы
   const std = getStandardGirths(gender, shoeSize)
   const ballBuildUpMm = ballGirthMm - std.ballGirthMm
   const instepBuildUpMm = instepGirthMm - std.instepGirthMm
@@ -173,7 +171,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const widthCode = widthMap[clampedW] || `F (${clampedW})`
   const requiresZipOrLaceWarning = obliqueEntryDeltaMm >= 12 || instepBuildUpMm >= 10
 
-  // 3. Подбор твердости стельки по Шору А от веса пациента
   let shoreA = '40–45 Shore A (Средняя EVA)'
   if (clampedWeight < 60) {
     shoreA = '30–35 Shore A (Мягкая EVA/PPT)'
@@ -183,7 +180,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     shoreA = '60–65 Shore A (Жесткий карбон/термопласт)'
   }
 
-  // 4. Ортопедический расчет стельки и СТРОГОЕ разделение режимов (Стандарт / Томаса / Рокер)
   const clampedPronation = Math.max(-15, Math.min(15, pronationDeg))
   const weightScale = 0.85 + (clampedWeight - 70) / 220
 
@@ -197,22 +193,21 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   if (clampedPronation <= -2) {
     const valgusAbs = Math.abs(clampedPronation)
     insoleType = 'supinator'
-    archSupportHeightMm = Math.min(18, Math.round(10 + valgusAbs * 0.7))
-    medialHeelWedgeMm = Math.min(8, Math.max(2, Math.round(valgusAbs * 0.55 * weightScale)))
+    archSupportHeightMm = Math.min(16, Math.round(9 + valgusAbs * 0.55))
+    medialHeelWedgeMm = Math.min(7, Math.max(2, Math.round(valgusAbs * 0.5 * weightScale)))
     recommendThomasHeel = valgusAbs >= 3
-    recommendedThomasMm = Math.round((14 + Math.min(12, valgusAbs * 1.15)) * Math.min(1.2, weightScale))
+    recommendedThomasMm = Math.min(26, Math.round((13 + valgusAbs * 0.95) * Math.min(1.15, weightScale)))
   } else if (clampedPronation >= 2) {
     const varusAbs = Math.abs(clampedPronation)
     insoleType = 'pronator'
     archSupportHeightMm = Math.max(0, Math.round(4 - varusAbs * 0.4))
-    lateralWedgeMm = Math.min(8, Math.max(2, Math.round(varusAbs * 0.55 * weightScale)))
+    lateralWedgeMm = Math.min(7, Math.max(2, Math.round(varusAbs * 0.5 * weightScale)))
     recommendThomasHeel = varusAbs >= 3
-    recommendedThomasMm = Math.round((12 + Math.min(10, varusAbs * 1.05)) * Math.min(1.2, weightScale))
+    recommendedThomasMm = Math.min(24, Math.round((12 + varusAbs * 0.9) * Math.min(1.15, weightScale)))
   } else {
-    recommendedThomasMm = Math.round(16 * Math.min(1.15, weightScale))
+    recommendedThomasMm = Math.round(15 * Math.min(1.15, weightScale))
   }
 
-  // ВАЖНО: Каблук Томаса физически присутствует ТОЛЬКО тогда, когда выбран режим soleType === 'thomas'!
   let thomasHeelType: 'none' | 'medial' | 'lateral' = 'none'
   let thomasExtensionMm = 0
   if (soleType === 'thomas') {
@@ -220,7 +215,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     thomasExtensionMm = recommendedThomasMm
   }
 
-  // 5. Эффективный рычаг L_eff и продольный уклон
   const clampedStartPct = Math.max(52, Math.min(78, rockerStartPct))
   const dynamicLeverRatio = Math.max(
     0.58,
@@ -232,7 +226,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
   const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-  // 6. Продольное распределение нагрузки (Пятка / Пучки)
   let loadCalc = 44 + (netRise / Math.max(lEff, 1)) * 102
   if (soleType === 'rocker') {
     const angleFactor = Math.min(1, Math.max(0, rockerAngle / C.MAX_ROCKER_ANGLE))
@@ -241,25 +234,25 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     const factor = Math.min(1, angleFactor * placementEfficiency)
     loadCalc *= 1 - C.ROCKER_MITIGATION_CAP * factor
   } else if (soleType === 'thomas') {
-    loadCalc *= 0.91 // каблук Томаса берет на себя нагрузку свода
+    loadCalc *= 0.91
   }
   const forefootLoad = Math.min(100, Math.max(0, Math.round(loadCalc)))
   const heelLoad = 100 - forefootLoad
 
-  // 7. Медиально-латеральный баланс M1 / M5
-  // В режиме Томаса и Рокера широкая база и клин стельки компенсируют до 65% завала
+  // Компенсация завала каблуком Томаса эффективна только тогда, когда сам каблук не выше 35 мм!
+  const thomasHeightEfficiency =
+    soleType === 'thomas' ? Math.max(0.2, 1 - Math.max(0, heelHeight - 30) * 0.025) : 0
   const orthoStabilization =
     soleType === 'thomas'
-      ? clampedPronation * 0.65
+      ? clampedPronation * 0.52 * thomasHeightEfficiency
       : soleType === 'rocker'
-      ? clampedPronation * 0.55
-      : clampedPronation * 0.2
+      ? clampedPronation * 0.42
+      : clampedPronation * 0.15
   const effectiveRoll = clampedPronation - orthoStabilization
-  const m1Ratio = Math.max(0.22, Math.min(0.82, 0.55 - effectiveRoll * 0.022))
+  const m1Ratio = Math.max(0.22, Math.min(0.82, 0.55 - effectiveRoll * 0.024))
   const loadM1Pct = Math.round(forefootLoad * m1Ratio)
   const loadM5Pct = Math.max(0, forefootLoad - loadM1Pct)
 
-  // 8. Апексы M1–M5 и Пелот Зейца
   const heelCenterPos = lastLengthMm * C.HEEL_CENTER_RATIO
   const ballPos = lastLengthMm * (clampedStartPct / 100)
   const apexM1_Mm = Math.round(ballPos - 5)
@@ -280,58 +273,54 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
       clampedWeight >= 100 || ballBuildUpMm >= 10 ? 6 : netRise > 25 ? 5 : 4
   }
 
-  // 9. Реальное плантарное давление (кПа) с учетом разгрузки полноконтактной орто-стелькой и пелотом Зейца!
-  // Когда стоят каблук Томаса или Рокер + пелот Зейца + жесткий свод по Шору, площадь опоры свода растет на 42%
   const contactAreaScale = (footLengthMm / 245) * (1 + ballBuildUpMm * 0.008)
   const orthoReliefFactor =
-    soleType === 'rocker'
-      ? 1.52
-      : soleType === 'thomas'
-      ? 1.44
-      : 1.0
+    soleType === 'rocker' ? 1.52 : soleType === 'thomas' ? 1.42 : 1.0
   const foreAreaCm2 = Math.max(30, 46 * contactAreaScale * orthoReliefFactor)
   const heelAreaCm2 = Math.max(22, 33 * contactAreaScale * (soleType !== 'flat' ? 1.32 : 1.0))
 
   const totalForceN = clampedWeight * 9.81 * 1.15
   const foreForceN = totalForceN * (forefootLoad / 100)
   const heelForceN = totalForceN * (heelLoad / 100)
-  const rollConcentration = 1 + Math.abs(effectiveRoll) * 0.025
+  const rollConcentration = 1 + Math.abs(effectiveRoll) * 0.028
 
   const peakForefootPressureKpa = Math.round(
     (foreForceN / foreAreaCm2) * 10 * 1.55 * rollConcentration
   )
   const peakHeelPressureKpa = Math.round((heelForceN / heelAreaCm2) * 10 * 1.45)
 
-  // 10. Геленок и изгибающий момент (в рокере сплошная подошва лежит на полу, поэтому изгибающий момент минимален)
   const shankLength = Math.round(Math.max(40, ballPos - heelCenterPos - 5))
   const supportReductionMm =
     soleType === 'rocker'
-      ? shankLength * 0.35
+      ? shankLength * 0.42
       : soleType === 'thomas'
-      ? thomasExtensionMm * 0.75
+      ? thomasExtensionMm * 0.85
       : 0
-  const offsetPenaltyMm = soleType === 'flat' ? Math.max(0, -heelTipOffsetMm) * 2.2 : 0
+  const offsetPenaltyMm = soleType !== 'rocker' ? Math.max(0, -heelTipOffsetMm) * 2.2 : 0
   const effectiveMomentArmM = Math.max(
-    0.015,
-    (shankLength * 0.5 - supportReductionMm + offsetPenaltyMm) / 1000
+    0.014,
+    (shankLength * 0.48 - supportReductionMm + offsetPenaltyMm) / 1000
   )
-  const slopeLoadFactor = 0.32 + Math.max(0, Math.sin((internalSlope * Math.PI) / 180)) * 0.8
+  const slopeLoadFactor = 0.25 + Math.max(0, Math.sin((internalSlope * Math.PI) / 180)) * 0.95
   const shankBendingMomentNm = parseFloat(
     (totalForceN * effectiveMomentArmM * slopeLoadFactor).toFixed(1)
   )
 
+  const shankOverloaded = shankBendingMomentNm > C.MAX_SHANK_MOMENT_NM
+  const thomasTooHigh = soleType === 'thomas' && heelHeight > C.MAX_THOMAS_HEEL_MM
+
   let steelThickness = clampedWeight >= 85 || gender === 'male' ? 1.5 : 1.2
   if (netRise > 35 || shankBendingMomentNm > 20) steelThickness = Math.max(steelThickness, 1.5)
-  if (netRise > 55 || shankBendingMomentNm > 28 || clampedWeight >= 105) steelThickness = 2.0
+  if (netRise > 55 || shankBendingMomentNm > 25 || clampedWeight >= 105) steelThickness = 2.0
 
-  const heelOffsetTooFarBack = soleType === 'flat' && heelTipOffsetMm < -0.5
+  // ИСПРАВЛЕНО: Смещение пятки проверяется и в режиме СТАНДАРТ, и в режиме ТОМАСА!
+  const heelOffsetTooFarBack = soleType !== 'rocker' && heelTipOffsetMm < -1
   const heelOffsetTooFarForward =
-    soleType === 'flat' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
+    soleType !== 'rocker' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
 
-  // 11. Риск инверсии
-  const baseStabilityFactor = soleType === 'thomas' ? 0.45 : soleType === 'rocker' ? 0.5 : 1.0
+  const baseStabilityFactor = soleType === 'thomas' ? 0.5 : soleType === 'rocker' ? 0.55 : 1.0
   const heightRisk = Math.max(0, netRise) * 0.55
-  const rollRisk = Math.abs(effectiveRoll) * (2.6 + (clampedWeight / 75) * 1.1)
+  const rollRisk = Math.abs(effectiveRoll) * (2.6 + (clampedWeight / 75) * 1.15)
   const inversionRisk = Math.min(100, Math.round((heightRisk + rollRisk) * baseStabilityFactor))
 
   const copLongitudinalMm = Math.round(
@@ -361,6 +350,8 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     copLongitudinalMm,
     copLateralMm,
     shankBendingMomentNm,
+    shankOverloaded,
+    thomasTooHigh,
     shankLength,
     steelThickness,
     heelOffsetTooFarBack,
@@ -406,10 +397,15 @@ export function computeAudit(
   if (eng.heelOffsetTooFarBack) {
     return { status: 'ERROR', titleKey: 'heelBackTitle', messageKey: 'heelBackDesc' }
   }
-  if (eng.internalSlope >= C.CRITICAL_ANGLE) {
+  if (eng.heelOffsetTooFarForward) {
+    return { status: 'ERROR', titleKey: 'heelFwdTitle', messageKey: 'heelFwdDesc' }
+  }
+  if (eng.thomasTooHigh) {
     return { status: 'ERROR', titleKey: 'errTitle', messageKey: 'errDesc' }
   }
-  // Если выраженный вальгус/варус, а выбран обычный каблук (flat) — требуем Томаса
+  if (eng.internalSlope >= C.CRITICAL_ANGLE || eng.shankOverloaded) {
+    return { status: 'ERROR', titleKey: 'errTitle', messageKey: 'errDesc' }
+  }
   if (eng.rx.recommendThomasHeel && soleType === 'flat') {
     return { status: 'ERROR', titleKey: 'thomasNeedTitle', messageKey: 'thomasNeedDesc' }
   }
@@ -418,9 +414,6 @@ export function computeAudit(
   }
   if (eng.peakForefootPressureKpa >= C.CRITICAL_KPA || eng.forefootLoad >= C.CRITICAL_LOAD) {
     return { status: 'ERROR', titleKey: 'padTitle', messageKey: 'padDesc' }
-  }
-  if (eng.heelOffsetTooFarForward) {
-    return { status: 'WARNING', titleKey: 'heelFwdTitle', messageKey: 'heelFwdDesc' }
   }
   if (eng.internalSlope < 0) {
     return { status: 'WARNING', titleKey: 'negDropTitle', messageKey: 'negDropDesc' }
@@ -437,36 +430,38 @@ export function computeAudit(
   return { status: 'SUCCESS', titleKey: 'successTitle', messageKey: 'successDesc' }
 }
 
-/**
- * Автоподбор, который ГАРАНТИРОВАННО выводит систему в зелёный статус (SUCCESS) при любом весе (даже 120–150 кг)
- */
 export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
   let soleType: SoleType = input.soleType
   let heelHeight = input.heelHeight
   let toeThickness = input.toeThickness
-  let heelTipOffsetMm = 0
+  const heelTipOffsetMm = 0
   let rockerAngle = input.rockerAngle
 
-  // 1. Если большой вес (>= 95 кг) и высокое давление в пучках — выбираем между Рокером и Томасом с минимальным перепадом (дроп 12–14 мм)
-  if (input.weightKg >= 95 && eng.peakForefootPressureKpa >= HEEL_CONST.CRITICAL_KPA) {
-    soleType = Math.abs(input.pronationDeg) >= 3 ? 'thomas' : 'rocker'
-    heelHeight = 26
-    toeThickness = 14 // чистый перепад всего 12 мм -> нагрузка уходит с пучков на всю стопу!
-    rockerAngle = 16
-  } else if (eng.rx.recommendThomasHeel && soleType === 'flat') {
+  // 1. При выраженном завале пятки (>= 3°) обязательно включаем каблук Томаса и снижаем высоту каблука до ортопедического стандарта (24–28 мм)
+  if (Math.abs(input.pronationDeg) >= 3) {
     soleType = 'thomas'
-    heelHeight = input.gender === 'male' ? 26 : 28
-    toeThickness = 12
-  } else if (eng.peakForefootPressureKpa >= HEEL_CONST.CRITICAL_KPA) {
+    heelHeight = 24
+    toeThickness = 14 // перепад 10 мм -> момент падает ниже 24 Н·м даже при 150 кг!
+  } else if (
+    eng.peakForefootPressureKpa >= HEEL_CONST.CRITICAL_KPA ||
+    eng.shankOverloaded ||
+    input.weightKg >= 95
+  ) {
     if (soleType === 'flat') soleType = 'rocker'
-    heelHeight = 26
+    heelHeight = 24
     toeThickness = 14
     rockerAngle = 15
   }
 
-  // 2. Если наклон всё ещё выше безопасного 11° — выравниваем платформой
+  // 2. Если выбран Томас и каблук выше 35 мм — снижаем до 28 мм
+  if (soleType === 'thomas' && heelHeight > HEEL_CONST.MAX_THOMAS_HEEL_MM) {
+    heelHeight = 28
+    toeThickness = Math.max(toeThickness, 12)
+  }
+
+  // 3. Проверка по углу и моменту геленка
   const targetRad = (HEEL_CONST.SAFE_ANGLE * Math.PI) / 180
-  const maxSafeNet = Math.floor(eng.lEff * Math.sin(targetRad))
+  const maxSafeNet = Math.min(14, Math.floor(eng.lEff * Math.sin(targetRad)))
   if (heelHeight - toeThickness > maxSafeNet) {
     toeThickness = Math.min(HEEL_CONST.MAX_TOE, Math.max(0, Math.ceil(heelHeight - maxSafeNet)))
   } else if (heelHeight < toeThickness) {
