@@ -69,8 +69,9 @@ const getMedialShift = (u: number) => {
 }
 
 /**
- * Строит 2D-контур подошвы каблука (или Г-образного каблука Томаса) на кривых Безье
- * и выдавливает его в 3D, подрезая верхнюю грань точно под кривую свода стопы!
+ * 1) Для СТАНДАРТ и ТОМАСА: строит каблук на кривых Безье
+ * При soleType === 'flat' — грудь каблука строго прямая (thomasExtScene = 0)
+ * При soleType === 'thomas' — грудь каблука S-образной кривой Безье вытягивается под свод стопы
  */
 function createBezierHeelGeometry(params: {
   xHeelBack: number
@@ -97,14 +98,12 @@ function createBezierHeelGeometry(params: {
   const rBack = halfW
   const xCenterBack = xHeelBack + rBack
 
-  // Точки передней груди каблука: медиальная (+Z) и латеральная (-Z)
   const extMedial = thomasType === 'medial' ? thomasExtScene : 0
   const extLateral = thomasType === 'lateral' ? thomasExtScene : 0
 
   const xMedFront = xFrontBase + extMedial
   const xLatFront = xFrontBase + extLateral
 
-  // Начинаем с задней центральной точки пятки и идем по латеральной дуге к груди каблука
   shape.moveTo(xHeelBack, 0)
   shape.bezierCurveTo(
     xHeelBack,
@@ -114,21 +113,23 @@ function createBezierHeelGeometry(params: {
     xCenterBack,
     -rBack
   )
-  // Латеральный борт к латеральному углу груди каблука
-  shape.lineTo(xLatFront, -rBack * 0.95)
+  shape.lineTo(xLatFront, -rBack * 0.96)
 
-  // S-образная кривая Безье передней груди каблука Томаса!
-  // Если каблук Томаса медиальный — грудь плавно изгибается вперед к внутреннему своду (+Z)
-  shape.bezierCurveTo(
-    xLatFront + (xMedFront - xLatFront) * 0.15,
-    -rBack * 0.25,
-    xMedFront - (xMedFront - xLatFront) * 0.15,
-    rBack * 0.25,
-    xMedFront,
-    rBack * 0.98
-  )
+  if (thomasType === 'none' || thomasExtScene <= 0.001) {
+    // СТАНДАРТНЫЙ КАБЛУК: абсолютно ровный прямой срез груди каблука!
+    shape.lineTo(xMedFront, rBack * 0.96)
+  } else {
+    // КАБЛУК ТОМАСА: глубокая S-образная дуга Безье с выступом под ладьевидную кость / геленок
+    shape.bezierCurveTo(
+      xLatFront + (xMedFront - xLatFront) * 0.1,
+      -rBack * 0.15,
+      xMedFront - (xMedFront - xLatFront) * 0.1,
+      rBack * 0.15,
+      xMedFront,
+      rBack * 0.98
+    )
+  }
 
-  // Медиальный борт обратно к пятке
   shape.lineTo(xCenterBack, rBack)
   shape.bezierCurveTo(
     xCenterBack - rBack * 0.45,
@@ -143,34 +144,81 @@ function createBezierHeelGeometry(params: {
     steps: 10,
     depth: heelHScene,
     bevelEnabled: true,
-    bevelThickness: 0.012,
-    bevelSize: 0.012,
-    bevelSegments: 3,
+    bevelThickness: 0.01,
+    bevelSize: 0.01,
+    bevelSegments: 2,
   }
 
   const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-  // Поворачиваем так, чтобы ось выдавливания стала вертикальной осью Y, а контур лежал в плоскости XZ
   geom.rotateX(-Math.PI / 2)
 
-  // Подгоняем верхнюю поверхность каблука точно под изгиб свода колодки и наклон задника
   const pos = geom.attributes.position
   for (let i = 0; i < pos.count; i++) {
     const vx = pos.getX(i)
     const vy = pos.getY(i)
     const vz = pos.getZ(i)
-    // Инвертируем Z после поворота X на -90°, чтобы +Z соответствовал медиальной стороне
     const zMedial = -vz
     const heightRatio = Math.max(0, Math.min(1, vy / Math.max(0.02, heelHScene)))
-    const archTopY = Math.max(0.03, getArchYAtX(vx) - 0.012)
+    const archTopY = Math.max(0.03, getArchYAtX(vx) - 0.01)
 
-    // Нижняя площадка стоит ровно на полу (y = 0), а верхняя повторяет свод стопы
     const adjustedY = heightRatio * archTopY
-    // Скос набойки у пола
     const bottomShift = (1 - heightRatio) * tipOffsetScene
 
     pos.setX(i, vx + bottomShift)
     pos.setY(i, adjustedY)
     pos.setZ(i, zMedial)
+  }
+
+  geom.computeVertexNormals()
+  return geom
+}
+
+/**
+ * 2) Для РОКЕРА (soleType === 'rocker'): строит настоящую сплошную 3D-подошву-танкетку (Full Rocker Wedge Sole)
+ * от пятки до самого мыска без каблука, со скошенным задним перекатом (Heel Rocker) и передним перекатом (Forefoot Rocker)
+ */
+function createFullRockerWedgeGeometry(params: {
+  baseSoleW: number
+  ballRatio: number
+  activeRockerRad: number
+  getSoleProfileY: (u: number) => number
+  getHalfWidth: (u: number) => number
+  getMedialCurve: (u: number) => number
+}): THREE.BufferGeometry {
+  const { baseSoleW, ballRatio, activeRockerRad, getSoleProfileY, getHalfWidth, getMedialCurve } = params
+
+  const geom = new THREE.BoxGeometry(2.48, 1.0, baseSoleW, 96, 8, 16)
+  const pos = geom.attributes.position
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i)
+    const yNorm = pos.getY(i) + 0.5 // 0 = низ подошвы у пола, 1 = верх под стелькой
+    const z = pos.getZ(i)
+
+    const u = Math.max(0, Math.min(1, (x + 1.24) / 2.48))
+    const hw = getHalfWidth(u) * (1.04 - yNorm * 0.04) // легкий трапециевидный развал базы книзу для устойчивости
+    const zNorm = z / (baseSoleW * 0.5)
+    const finalZ = zNorm * hw + getMedialCurve(u)
+
+    // Верхняя граница танкетки повторяет профиль свода колодки
+    const yTop = Math.max(0.04, getSoleProfileY(u) - 0.008)
+
+    // Нижняя граница танкетки (перекат по полу):
+    // 1) Задний перекат пятки (Heel Bevel / Heel Rocker, u < 0.14)
+    // 2) Опорная перекатная площадка от пятки до линии апекса пучков (0.14 <= u <= ballRatio) лежит на полу (y = 0)
+    // 3) Передний перекат пучков (Forefoot Rocker, u > ballRatio) плавно поднимается вверх под углом рокера!
+    let yBottom = 0
+    if (u < 0.14) {
+      const heelRockerRatio = (0.14 - u) / 0.14
+      yBottom = 0.085 * Math.pow(heelRockerRatio, 1.8)
+    } else if (u > ballRatio) {
+      const r = (u - ballRatio) / Math.max(0.05, 1 - ballRatio)
+      yBottom = Math.sin(activeRockerRad) * 0.62 * Math.pow(r, 1.65)
+    }
+
+    const finalY = yBottom + yNorm * Math.max(0.03, yTop - yBottom)
+    pos.setY(i, finalY)
+    pos.setZ(i, finalZ)
   }
 
   geom.computeVertexNormals()
@@ -398,7 +446,6 @@ export function HeelScene3D({
     }
   }, [])
 
-  // Ракурсы камеры (включая вид СНИЗУ на подошву и Г-образный каблук Томаса!)
   useEffect(() => {
     const st = sceneRef.current
     if (!st) return
@@ -407,7 +454,6 @@ export function HeelScene3D({
     } else if (camPreset === 'side') {
       st.targetSpherical = { theta: 0.0, phi: 1.46, radius: 3.9, lookAtY: 0.34 }
     } else if (camPreset === 'bottom') {
-      // Вид со стороны подошвы / сверху-вниз на профиль каблука Томаса и стельки
       st.targetSpherical = { theta: 0.25, phi: 0.22, radius: 4.3, lookAtY: 0.2 }
     } else if (camPreset === 'rear') {
       st.targetSpherical = { theta: -Math.PI / 2, phi: 1.38, radius: 3.7, lookAtY: 0.34 }
@@ -453,7 +499,7 @@ export function HeelScene3D({
       }
       const r = (clampedU - ballRatio) / Math.max(0.05, 1 - ballRatio)
       const rockerLift =
-        soleType === 'rocker' ? Math.sin(activeRockerRad) * 0.62 * Math.pow(r, 1.7) : 0.055 * r * r
+        soleType === 'rocker' ? Math.sin(activeRockerRad) * 0.62 * Math.pow(r, 1.65) : 0.055 * r * r
       return t + rockerLift
     }
 
@@ -465,7 +511,7 @@ export function HeelScene3D({
     const getHalfWidth = (u: number) => Math.max(0.05, baseSoleW * 0.5 * getAnatomicWidth(u))
     const getMedialCurve = (u: number) => getMedialShift(u)
 
-    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (С ВЫКЛАДКОЙ СВОДА И ПЯТОЧНЫМ КЛИНОМ)
+    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА
     const segsX = 88
     const segsZ = 18
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -491,12 +537,10 @@ export function HeelScene3D({
       let orthoLift = 0
       let isWedge = false
 
-      // Выкладка продольного свода (супинатор)
       if (u > 0.2 && u < 0.6 && zNorm > 0) {
         const archWave = Math.sin(((u - 0.2) / 0.4) * Math.PI)
         orthoLift += archWave * zNorm * (eng.rx.archSupportHeightMm * mmToUnit * 1.15)
       }
-      // Медиальный или латеральный клин пятки
       if (u < 0.28) {
         if (eng.rx.medialHeelWedgeMm > 0 && zNorm > 0) {
           orthoLift += zNorm * (eng.rx.medialHeelWedgeMm * mmToUnit * 1.5)
@@ -517,7 +561,7 @@ export function HeelScene3D({
       if (orthoLift > 0.025) vColor.lerp(archColor, Math.min(0.85, orthoLift * 8))
       if (foreIntensity > 0.4) {
         vColor.lerp(
-          eng.peakForefootPressureKpa >= 240 ? critColor : warnColor,
+          eng.peakForefootPressureKpa >= 245 ? critColor : warnColor,
           Math.min(1, (foreIntensity - 0.35) * 1.8)
         )
       }
@@ -530,18 +574,19 @@ export function HeelScene3D({
     insoleGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     insoleGeom.computeVertexNormals()
 
-    const insoleMesh = new THREE.Mesh(
-      insoleGeom,
-      new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: 0.38,
-        metalness: 0.1,
-        transparent: true,
-        opacity: 0.88,
-        side: THREE.DoubleSide,
-      })
+    dynamicGroup.add(
+      new THREE.Mesh(
+        insoleGeom,
+        new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.38,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.9,
+          side: THREE.DoubleSide,
+        })
+      )
     )
-    dynamicGroup.add(insoleMesh)
 
     const wireColor = isDark ? 0xf4f0e8 : 0x1c1816
     dynamicGroup.add(
@@ -551,104 +596,136 @@ export function HeelScene3D({
       )
     )
 
-    // 2. ОБЪЕМНАЯ ПОДОШВА ПОД СТЕЛЬКОЙ
-    const outsoleGeom = new THREE.BoxGeometry(2.48, 0.032, baseSoleW * 1.06, 80, 1, 14)
-    const sPos = outsoleGeom.attributes.position
-    for (let i = 0; i < sPos.count; i++) {
-      const x = sPos.getX(i)
-      const z = sPos.getZ(i)
-      const origY = sPos.getY(i)
-      const u = (x + 1.24) / 2.48
-      const hw = getHalfWidth(u)
-      const zNorm = z / (baseSoleW * 0.53)
-      sPos.setZ(i, zNorm * hw + getMedialCurve(u))
-      sPos.setY(i, getSoleProfileY(u) - 0.012 + origY)
-    }
-    outsoleGeom.computeVertexNormals()
-    dynamicGroup.add(
-      new THREE.Mesh(
-        outsoleGeom,
-        new THREE.MeshStandardMaterial({
-          color: isDark ? 0x26201a : 0xc4b5a0,
-          roughness: 0.5,
-          transparent: true,
-          opacity: 0.72,
-        })
+    // 2. РАЗДЕЛЕНИЕ ПОДОШВЫ И КАБЛУКА ПО РЕЖИМАМ: РОКЕР vs ТОМАС vs СТАНДАРТ
+    if (soleType === 'rocker') {
+      // РЕЖИМ РОКЕР: Сплошная 3D подошва-танкетка (Wedge Rocker Sole) от пятки до носка + Карбоновая пластина!
+      const rockerWedgeGeom = createFullRockerWedgeGeometry({
+        baseSoleW,
+        ballRatio,
+        activeRockerRad,
+        getSoleProfileY,
+        getHalfWidth,
+        getMedialCurve,
+      })
+
+      const rockerMat = new THREE.MeshStandardMaterial({
+        color: isDark ? 0x3b4d5e : 0x475569,
+        roughness: 0.4,
+        metalness: 0.15,
+        transparent: true,
+        opacity: 0.85,
+      })
+      dynamicGroup.add(new THREE.Mesh(rockerWedgeGeom, rockerMat))
+
+      // Изумрудная карбоновая пластина жесткости по всей длине рокера
+      const carbonPts: THREE.Vector3[] = []
+      for (let i = 0; i <= 28; i++) {
+        const u = 0.08 + (i / 28) * 0.88
+        carbonPts.push(
+          new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) - 0.004, getMedialCurve(u))
+        )
+      }
+      dynamicGroup.add(
+        new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(carbonPts), 28, 0.016, 10, false),
+          new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.2, metalness: 0.8 })
+        )
       )
-    )
+    } else {
+      // РЕЖИМЫ СТАНДАРТ И ТОМАСА: Тонкая подошва + Отдельный каблук
+      const outsoleGeom = new THREE.BoxGeometry(2.48, 0.03, baseSoleW * 1.05, 80, 1, 14)
+      const sPos = outsoleGeom.attributes.position
+      for (let i = 0; i < sPos.count; i++) {
+        const x = sPos.getX(i)
+        const z = sPos.getZ(i)
+        const origY = sPos.getY(i)
+        const u = (x + 1.24) / 2.48
+        const hw = getHalfWidth(u)
+        const zNorm = z / (baseSoleW * 0.525)
+        sPos.setZ(i, zNorm * hw + getMedialCurve(u))
+        sPos.setY(i, getSoleProfileY(u) - 0.012 + origY)
+      }
+      outsoleGeom.computeVertexNormals()
+      dynamicGroup.add(
+        new THREE.Mesh(
+          outsoleGeom,
+          new THREE.MeshStandardMaterial({
+            color: isDark ? 0x26201a : 0xc4b5a0,
+            roughness: 0.5,
+            transparent: true,
+            opacity: 0.75,
+          })
+        )
+      )
 
-    // 3. МОНОЛИТНЫЙ 3D-КАБЛУК И КАБЛУК ТОМАСА НА КРИВЫХ БЕЗЬЕ (THREE.Shape + ExtrudeGeometry)
-    const xHeelBack = -1.24
-    const heelHalfW = getHalfWidth(0.14) * 0.96
-    const xFrontBase = -1.24 + 0.25 * 2.48
-    const heelHScene = Math.max(0.04, h)
-    const tipOffsetScene = soleType === 'flat' ? heelTipOffsetMm * mmToUnit : 0
+      const xHeelBack = -1.24
+      const heelHalfW = getHalfWidth(0.14) * 0.96
+      const xFrontBase = -1.24 + 0.25 * 2.48
+      const heelHScene = Math.max(0.04, h)
+      const tipOffsetScene = soleType === 'flat' ? heelTipOffsetMm * mmToUnit : 0
 
-    const activeThomasType =
-      soleType === 'thomas'
-        ? eng.rx.thomasHeelType === 'none'
-          ? 'medial'
-          : eng.rx.thomasHeelType
-        : eng.rx.thomasHeelType
-
-    const thomasExtScene =
-      soleType === 'thomas' || eng.rx.recommendThomasHeel
-        ? Math.max(0.18, eng.rx.thomasExtensionMm * mmToUnit * 1.15)
+      // СТРОГОЕ РАЗДЕЛЕНИЕ:
+      // При soleType === 'flat' — thomasType = 'none', thomasExtScene = 0 (обычный классический каблук!)
+      // При soleType === 'thomas' — строим Г-образный выступ Томаса!
+      const isThomasMode = soleType === 'thomas'
+      const activeThomasType = isThomasMode ? eng.rx.thomasHeelType : 'none'
+      const thomasExtScene = isThomasMode
+        ? Math.max(0.2, eng.rx.thomasExtensionMm * mmToUnit * 1.2)
         : 0
 
-    const bezierHeelGeom = createBezierHeelGeometry({
-      xHeelBack,
-      xFrontBase,
-      thomasExtScene,
-      thomasType: activeThomasType,
-      halfW: heelHalfW,
-      heelHScene,
-      tipOffsetScene,
-      getArchYAtX,
-    })
-
-    const isThomasActive = soleType === 'thomas' || thomasExtScene > 0
-    const heelMat = new THREE.MeshStandardMaterial({
-      color: isThomasActive ? 0x0d9488 : isDark ? 0xdfd7cb : 0x241e1a,
-      roughness: 0.32,
-      metalness: 0.2,
-      transparent: true,
-      opacity: 0.92,
-    })
-    const heelMesh = new THREE.Mesh(bezierHeelGeom, heelMat)
-    dynamicGroup.add(heelMesh)
-
-    // Контурная подсветка кривой Безье каблука Томаса на полу
-    const heelEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(bezierHeelGeom, 25),
-      new THREE.LineBasicMaterial({
-        color: isThomasActive ? 0x10b981 : wireColor,
-        transparent: true,
-        opacity: 0.55,
+      const bezierHeelGeom = createBezierHeelGeometry({
+        xHeelBack,
+        xFrontBase,
+        thomasExtScene,
+        thomasType: activeThomasType,
+        halfW: heelHalfW,
+        heelHScene,
+        tipOffsetScene,
+        getArchYAtX,
       })
-    )
-    dynamicGroup.add(heelEdges)
 
-    // 4. СТАЛЬНОЙ ГЕЛЕНОК (СУПИНАТОР 65Г) И АНТРОПОМЕТРИЧЕСКИЕ ДУГИ СТОПЫ (ВЗЪЕМ И ПУЧКИ)
-    const shankPts: THREE.Vector3[] = []
-    const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
-    for (let i = 0; i <= 20; i++) {
-      const u = 0.14 + (i / 20) * Math.max(0.1, shankEndRatio - 0.14)
-      shankPts.push(new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) + 0.024, getMedialCurve(u)))
-    }
-    const shankRadius = 0.015 + (eng.steelThickness - 1.2) * 0.012
-    dynamicGroup.add(
-      new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
-        new THREE.MeshStandardMaterial({
-          color: eng.heelOffsetTooFarBack ? 0xe11d48 : 0xd97706,
-          roughness: 0.22,
-          metalness: 0.85,
+      const heelMat = new THREE.MeshStandardMaterial({
+        color: isThomasMode ? 0x0d9488 : isDark ? 0x8c7a6b : 0x3d312a,
+        roughness: 0.35,
+        metalness: 0.2,
+        transparent: true,
+        opacity: 0.92,
+      })
+      dynamicGroup.add(new THREE.Mesh(bezierHeelGeom, heelMat))
+
+      const heelEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(bezierHeelGeom, 25),
+        new THREE.LineBasicMaterial({
+          color: isThomasMode ? 0x10b981 : wireColor,
+          transparent: true,
+          opacity: 0.6,
         })
       )
-    )
+      dynamicGroup.add(heelEdges)
 
-    // Дуги обхватов стопы (Пучки O_п и Прямой взъем O_в)
+      // Стальной геленок 65Г
+      const shankPts: THREE.Vector3[] = []
+      const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
+      for (let i = 0; i <= 20; i++) {
+        const u = 0.14 + (i / 20) * Math.max(0.1, shankEndRatio - 0.14)
+        shankPts.push(
+          new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) + 0.024, getMedialCurve(u))
+        )
+      }
+      const shankRadius = 0.015 + (eng.steelThickness - 1.2) * 0.012
+      dynamicGroup.add(
+        new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
+          new THREE.MeshStandardMaterial({
+            color: eng.heelOffsetTooFarBack ? 0xe11d48 : 0xd97706,
+            roughness: 0.22,
+            metalness: 0.85,
+          })
+        )
+      )
+    }
+
+    // 3. АНТРОПОМЕТРИЧЕСКИЕ ДУГИ СТОПЫ (ПУЧКИ И ПРЯМОЙ ВЗЪЕМ)
     const createGirthArc = (uPos: number, heightAddMm: number, colorHex: number) => {
       const xArc = -1.24 + uPos * 2.48
       const yBase = getSoleProfileY(uPos) + 0.02
@@ -659,11 +736,7 @@ export function HeelScene3D({
       for (let k = 0; k <= 24; k++) {
         const ang = (k / 24) * Math.PI
         pts.push(
-          new THREE.Vector3(
-            xArc,
-            yBase + Math.sin(ang) * hArc,
-            med - Math.cos(ang) * hw
-          )
+          new THREE.Vector3(xArc, yBase + Math.sin(ang) * hArc, med - Math.cos(ang) * hw)
         )
       }
       return new THREE.Mesh(
@@ -672,7 +745,6 @@ export function HeelScene3D({
       )
     }
 
-    // Дуга пучков (O_п) и дуга прямого взъема (O_в)
     dynamicGroup.add(
       createGirthArc(ballRatio, eng.rx.ballBuildUpMm, eng.rx.ballBuildUpMm !== 0 ? 0xd97706 : wireColor)
     )
@@ -680,7 +752,7 @@ export function HeelScene3D({
       createGirthArc(0.48, eng.rx.instepBuildUpMm, eng.rx.instepBuildUpMm > 0 ? 0x10b981 : wireColor)
     )
 
-    // 5. ЗОНЫ ДАВЛЕНИЯ M1 / M5 / ПЯТКА, ПЕЛОТ ЗЕЙЦА И ВЕКТОР CoP
+    // 4. ЗОНЫ ДАВЛЕНИЯ, ПЕЛОТ ЗЕЙЦА И ВЕКТОР CoP
     const xHeelCenter = -1.24 + 0.15 * 2.48
     const xM1 = -1.24 + (eng.apexM1_Mm / eng.lastLengthMm) * 2.48
     const xM5 = -1.24 + (eng.apexM5_Mm / eng.lastLengthMm) * 2.48
@@ -747,18 +819,34 @@ export function HeelScene3D({
           </strong>
           <span className="mx-1.5 opacity-30">|</span>
           <span className="opacity-60">ПИК: </span>
-          <strong style={{ color: eng.peakForefootPressureKpa >= 240 ? '#E11D48' : 'inherit' }}>
+          <strong style={{ color: eng.peakForefootPressureKpa >= 245 ? '#E11D48' : 'inherit' }}>
             {eng.peakForefootPressureKpa} кПа
           </strong>
         </div>
 
         <div className="px-2 py-1 rounded-[7px] border border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur-sm">
-          <span className="opacity-60">ТОМАС: </span>
-          <strong className="text-[#10B981]">
-            {eng.rx.thomasHeelType === 'none'
-              ? 'НЕТ'
-              : `+${eng.rx.thomasExtensionMm}мм (${eng.rx.thomasHeelType === 'medial' ? 'Внутр' : 'Наруж'})`}
-          </strong>
+          {soleType === 'thomas' ? (
+            <>
+              <span className="opacity-60">ТОМАС: </span>
+              <strong className="text-[#10B981]">
+                +{eng.rx.thomasExtensionMm}мм ({eng.rx.thomasHeelType === 'medial' ? 'Внутр' : 'Наруж'})
+              </strong>
+            </>
+          ) : soleType === 'rocker' ? (
+            <>
+              <span className="opacity-60">РОКЕР: </span>
+              <strong className="text-[#10B981]">
+                {rockerAngle}° (Карбон {eng.carbonInsertThicknessMm}мм)
+              </strong>
+            </>
+          ) : (
+            <>
+              <span className="opacity-60">ОПОРА: </span>
+              <strong className={eng.rx.recommendThomasHeel ? 'text-[#E11D48]' : ''}>
+                СТАНДАРТ {eng.rx.recommendThomasHeel ? '(Нужен Томас!)' : ''}
+              </strong>
+            </>
+          )}
         </div>
       </div>
 
