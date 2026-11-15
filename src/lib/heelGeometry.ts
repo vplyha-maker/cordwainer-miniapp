@@ -1,5 +1,5 @@
 // src/lib/heelGeometry.ts
-import { HEEL_CONST, type SoleType, type HeelType, type Gender } from './heelCalc'
+import { HEEL_CONST, type SoleType, type Gender } from './heelCalc'
 
 export interface GeometryInput {
   gender?: Gender
@@ -7,11 +7,9 @@ export interface GeometryInput {
   heelHeight: number
   toeThickness: number
   soleType: SoleType
-  heelType: HeelType
   rockerAngle: number
   rockerStartPct: number
   heelTipOffsetMm: number
-  tipWidthMm: number
   shankLength: number
   thomasExtensionMm?: number
   instepBuildUpMm?: number
@@ -63,11 +61,9 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     heelHeight,
     toeThickness,
     soleType,
-    heelType,
     rockerAngle,
     rockerStartPct,
     heelTipOffsetMm,
-    tipWidthMm,
     shankLength,
     thomasExtensionMm = 16,
     instepBuildUpMm = 0,
@@ -76,9 +72,9 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const allowance = gender === 'male' ? 10 : C.FUNCTIONAL_ALLOWANCE
   const totalLength = shoeSize * C.STEP_TO_MM + allowance
   const scale = 0.76
-  const padding = 36
+  const padding = 32
   const svgWidth = totalLength * scale + padding * 2
-  const svgHeight = 158
+  const svgHeight = 144
 
   const xHeel = padding
   const xBall = padding + totalLength * (rockerStartPct / 100) * scale
@@ -87,7 +83,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const offsetPx = soleType === 'flat' ? heelTipOffsetMm * scale : 0
   const xTipCenter = xHeelCenter + offsetPx
 
-  const yGround = 130
+  const yGround = 120
   const hScaled = heelHeight * scale
   const tScaled = toeThickness * scale
   const yFootHeel = yGround - hScaled
@@ -115,7 +111,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     Q ${xBall + rockerZone * 0.45} ${yFootBall}, ${xToe} ${yFootToe}
   `
 
-  const yHeelSeat = yFootHeel + Math.min(hScaled * 0.12, 7 * scale)
+  const yHeelSeat = yFootHeel + Math.min(hScaled * 0.14, 7 * scale)
   const yBottomToe = soleType === 'rocker' ? yFootToe + Math.max(tScaled, 2) : yGround - 1
 
   const bottomPath = `
@@ -127,67 +123,74 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   `
   const solePath = topPath + bottomPath
 
-  // Контур силуэта самой колодки (гребень прямого взъема + мысок + пятка) для наглядности обхватов
+  // Контур антропометрии колодки (взъем и косой обхват)
   const xInstep = padding + totalLength * 0.52 * scale
   const yInstepFoot = evalCubicBezier(0.55, yFootHeel, c1y, c2y, yFootBall)
-  const instepHeightPx = (gender === 'male' ? 62 : 56) * scale
+  const instepHeightPx = (gender === 'male' ? 60 : 54) * scale
   const yInstepTop = yInstepFoot - instepHeightPx
 
   const lastUpperPath = `
     M ${xHeel - 2} ${yFootHeel - 3}
-    Q ${xHeel - 5} ${yFootHeel - 34 * scale}, ${xHeel + 8} ${yFootHeel - 52 * scale}
-    L ${xInstep - 22} ${yInstepTop - 8}
-    Q ${xInstep + 6} ${yInstepTop + 4}, ${xBall + 4} ${yFootBall - 24 * scale}
-    Q ${xToe - 8} ${yFootToe - 15 * scale}, ${xToe} ${yFootToe - 3}
+    Q ${xHeel - 5} ${yFootHeel - 32 * scale}, ${xHeel + 8} ${yFootHeel - 48 * scale}
+    L ${xInstep - 20} ${yInstepTop - 6}
+    Q ${xInstep + 6} ${yInstepTop + 4}, ${xBall + 4} ${yFootBall - 22 * scale}
+    Q ${xToe - 8} ${yFootToe - 14 * scale}, ${xToe} ${yFootToe - 3}
   `
 
-  // Контур налепки на гребень взъема (если instepBuildUpMm > 0)
   const buildUpPx = Math.max(0, instepBuildUpMm) * scale * 1.4
   const instepBuildUpPath =
     buildUpPx > 0.5
       ? `
-    M ${xInstep - 18} ${yInstepTop - 5}
-    Q ${xInstep} ${yInstepTop - 5 - buildUpPx * 1.8}, ${xBall} ${yFootBall - 24 * scale}
-    Q ${xInstep} ${yInstepTop + 1}, ${xInstep - 18} ${yInstepTop - 5}
+    M ${xInstep - 18} ${yInstepTop - 4}
+    Q ${xInstep} ${yInstepTop - 4 - buildUpPx * 1.8}, ${xBall} ${yFootBall - 22 * scale}
+    Q ${xInstep} ${yInstepTop + 1}, ${xInstep - 18} ${yInstepTop - 4}
     Z
   `
       : ''
 
-  const tipW = Math.max(2, tipWidthMm * scale)
-  const heelPath = buildHeelPath({
-    soleType,
-    heelType,
-    xHeel,
-    xBall,
-    xTipCenter,
-    yHeelSeat,
-    yGround,
-    hScaled,
-    tipW,
-    c1x,
-    c2x,
-  })
+  // Анатомический каблук с плавной кривой Безье по заднику и груди каблука
+  const heelHalfW = (gender === 'male' ? 32 : 28) * scale * 0.5
+  const xBackTop = xHeel - 2
+  const xBackBot = xTipCenter - heelHalfW * 0.92
+  const xFrontHeel = xTipCenter + heelHalfW
 
-  // Выступ (грудь) каблука Томаса вперед под свод стопы
-  const baseBlockHalf = Math.max(11, (Math.max(tipWidthMm, 28) * scale) / 2)
-  const xFrontHeel = xHeelCenter + baseBlockHalf
+  let heelPath = ''
+  if (soleType === 'rocker') {
+    heelPath = `
+      M ${xBackTop} ${yHeelSeat}
+      C ${c1x} ${yHeelSeat}, ${c2x} ${yGround}, ${xBall} ${yGround}
+      L ${xHeel + 22} ${yGround}
+      C ${xHeel + 8} ${yGround}, ${xBackTop - 3} ${yGround - hScaled * 0.35}, ${xBackTop} ${yHeelSeat}
+      Z
+    `
+  } else {
+    heelPath = `
+      M ${xBackTop} ${yHeelSeat}
+      C ${xBackTop - 2} ${yHeelSeat + hScaled * 0.45}, ${xBackBot - 1} ${yGround - hScaled * 0.2}, ${xBackBot} ${yGround}
+      L ${xFrontHeel} ${yGround}
+      C ${xFrontHeel - 1} ${yGround - hScaled * 0.3}, ${xFrontHeel + 1} ${yHeelSeat + hScaled * 0.3}, ${xFrontHeel + 2} ${yHeelSeat + 1}
+      Z
+    `
+  }
+
+  // Плавный S-образный выступ каблука Томаса на кривых Безье под свод стопы
   const xThomasFront = xFrontHeel + thomasExtensionMm * scale
   const tThomas = Math.max(0, Math.min(1, (xThomasFront - archStartX) / archSpanX))
   const yThomasArch = evalCubicBezier(tThomas, yFootHeel, c1y, c2y, yFootBall) + 2
 
   const thomasExtensionPath =
-    soleType === 'thomas'
+    soleType === 'thomas' || thomasExtensionMm > 0
       ? `
-    M ${xFrontHeel - 2} ${yHeelSeat + 1}
-    L ${xFrontHeel - 2} ${yGround}
+    M ${xFrontHeel - 1} ${yHeelSeat + 1}
+    L ${xFrontHeel - 1} ${yGround}
     L ${xThomasFront} ${yGround}
-    L ${xThomasFront} ${yThomasArch}
-    Q ${(xFrontHeel + xThomasFront) / 2} ${yHeelSeat + 2}, ${xFrontHeel - 2} ${yHeelSeat + 1}
+    C ${xThomasFront + 2} ${yGround - (yGround - yThomasArch) * 0.45}, ${xThomasFront - 1} ${yThomasArch + 4}, ${xThomasFront - 2} ${yThomasArch}
+    C ${(xFrontHeel + xThomasFront) * 0.5} ${yHeelSeat + 2}, ${xFrontHeel + 2} ${yHeelSeat + 1}, ${xFrontHeel - 1} ${yHeelSeat + 1}
     Z
   `
       : ''
 
-  // Супинатор (геленок)
+  // Супинатор (геленок 65Г)
   const tt = Math.max(0, Math.min(1, (shankLength * scale) / archSpanX))
   const mt = 1 - tt
   const q1x = mt * archStartX + tt * c1x
@@ -259,61 +262,5 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     yFootPelotte,
     yInstepTop,
     scale,
-  }
-}
-
-function buildHeelPath(p: {
-  soleType: SoleType
-  heelType: HeelType
-  xHeel: number
-  xBall: number
-  xTipCenter: number
-  yHeelSeat: number
-  yGround: number
-  hScaled: number
-  tipW: number
-  c1x: number
-  c2x: number
-}): string {
-  const { soleType, heelType, xHeel, xBall, xTipCenter, yHeelSeat, yGround, hScaled, tipW, c1x, c2x } = p
-
-  if (soleType === 'rocker') {
-    return `
-      M ${xHeel} ${yHeelSeat}
-      C ${c1x} ${yHeelSeat}, ${c2x} ${yGround}, ${xBall} ${yGround}
-      L ${xHeel + 24} ${yGround}
-      C ${xHeel + 12} ${yGround}, ${xHeel - 2} ${yGround - hScaled * 0.25}, ${xHeel} ${yHeelSeat}
-      Z
-    `
-  }
-
-  if (soleType === 'thomas') {
-    const half = Math.max(11, tipW / 2)
-    return `M ${xTipCenter - half} ${yHeelSeat} L ${xTipCenter - half * 0.96} ${yGround} L ${xTipCenter + half} ${yGround} L ${xTipCenter + half} ${yHeelSeat} Z`
-  }
-
-  switch (heelType) {
-    case 'stiletto': {
-      const top = Math.max(2, tipW * 0.9)
-      const bot = Math.max(1.1, tipW / 2)
-      return `M ${xTipCenter - top} ${yHeelSeat} L ${xTipCenter - bot} ${yGround} L ${xTipCenter + bot} ${yGround} L ${xTipCenter + top} ${yHeelSeat} Z`
-    }
-    case 'kitten': {
-      const top = Math.max(3.5, tipW * 0.85)
-      const bot = Math.max(1.8, tipW / 2)
-      const midY = yHeelSeat + (yGround - yHeelSeat) * 0.55
-      return `M ${xTipCenter - top} ${yHeelSeat} Q ${xTipCenter - bot * 0.4} ${midY} ${xTipCenter - bot} ${yGround} L ${xTipCenter + bot} ${yGround} Q ${xTipCenter + bot * 0.4} ${midY} ${xTipCenter + top} ${yHeelSeat} Z`
-    }
-    case 'block': {
-      const half = Math.max(4.5, tipW / 2)
-      return `M ${xTipCenter - half} ${yHeelSeat} L ${xTipCenter - half * 0.92} ${yGround} L ${xTipCenter + half * 0.92} ${yGround} L ${xTipCenter + half} ${yHeelSeat} Z`
-    }
-    case 'flared': {
-      const top = Math.max(2.2, tipW * 0.32)
-      const bot = Math.max(4.5, tipW / 2)
-      return `M ${xTipCenter - top} ${yHeelSeat} L ${xTipCenter - bot} ${yGround} L ${xTipCenter + bot} ${yGround} L ${xTipCenter + top} ${yHeelSeat} Z`
-    }
-    default:
-      return ''
   }
 }
