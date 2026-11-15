@@ -22,9 +22,8 @@ type Props = {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
- * Профили колодки (u: 0 = пятка, 1 = носок).
- * Все кривые — кубические Эрмитовы сплайны (Catmull-Rom тангенты) → C1-гладкость,
- * без ступенек и пиков; концы закрыты эллиптическими «колпачками».
+ * Анатомическая колодка (Last Geometry)
+ * Асимметричные сплайны колодки с медиальным сдвигом и правильным объёмом пучков.
  * ────────────────────────────────────────────────────────────────────────── */
 type Pts = ReadonlyArray<readonly [number, number]>
 
@@ -33,13 +32,6 @@ const sstep = (a: number, b: number, x: number) => {
   const t = clamp01((x - a) / (b - a))
   return t * t * (3 - 2 * t)
 }
-// C1-гладкий «колокол» на отрезке [a, b]
-const bump = (u: number, a: number, b: number) => {
-  const s = clamp01((u - a) / (b - a))
-  const v = Math.sin(Math.PI * s)
-  return v * v
-}
-const roundCap = (t: number) => Math.sqrt(Math.max(0, 1 - t * t))
 
 const hermiteProfile = (pts: Pts, u: number) => {
   const n = pts.length
@@ -66,83 +58,43 @@ const hermiteProfile = (pts: Pts, u: number) => {
   )
 }
 
-// Относительная полуширина: пятка → талия (свод) → пучки (max) → сужение к носку
-const WIDTH_PTS: Pts = [
-  [0.0, 0.62],
-  [0.08, 0.64],
-  [0.2, 0.62],
-  [0.32, 0.56],
-  [0.45, 0.68],
-  [0.58, 0.92],
-  [0.66, 1.0],
-  [0.76, 0.96],
-  [0.86, 0.74],
-  [0.94, 0.46],
-  [1.0, 0.3],
-]
-const widthFactor = (u: number) =>
-  hermiteProfile(WIDTH_PTS, u) *
-  (u < 0.07 ? roundCap((0.07 - u) / 0.07) : 1) *
-  (u > 0.93 ? roundCap((u - 0.93) / 0.07) : 1)
-
-// Высота гребня верха: задник → мягкий спуск → подъём → пучки → носок
-const HEIGHT_PTS: Pts = [
-  [0.0, 0.4],
-  [0.03, 0.5],
+// Продольный анатомический профиль ширины колодки (u: 0 = пятка, 1 = носок)
+const LAST_WIDTH_PTS: Pts = [
+  [0.0, 0.58],
   [0.08, 0.62],
-  [0.18, 0.62],
-  [0.3, 0.52],
-  [0.45, 0.46],
-  [0.56, 0.42],
-  [0.66, 0.31],
-  [0.78, 0.22],
-  [0.9, 0.15],
-  [1.0, 0.08],
+  [0.2, 0.56],
+  [0.32, 0.52],
+  [0.46, 0.68],
+  [0.58, 0.94],
+  [0.68, 1.0], // Пучки (Ball) - максимальная ширина
+  [0.78, 0.88],
+  [0.88, 0.60],
+  [0.96, 0.35],
+  [1.0, 0.12],
 ]
-const heightCaps = (u: number) =>
-  (u < 0.04 ? roundCap((0.04 - u) / 0.04) : 1) * (u > 0.9 ? roundCap((u - 0.9) / 0.1) : 1)
 
-// Полуугол выреза горловины (рад) — гладкая дуга от задника до союзки
-const COLLAR_PHI_MAX = 0.88
-const collarPhi = (u: number) => COLLAR_PHI_MAX * sstep(0.04, 0.15, u) * (1 - sstep(0.46, 0.58, u))
+// Профиль высоты гребня колодки
+const LAST_HEIGHT_PTS: Pts = [
+  [0.0, 0.35],
+  [0.05, 0.52],
+  [0.12, 0.65],
+  [0.25, 0.68], // Подъем (Instep)
+  [0.42, 0.55],
+  [0.58, 0.44],
+  [0.72, 0.32],
+  [0.88, 0.18],
+  [1.0, 0.06],
+]
 
-type Sec = {
-  u: number
-  x: number
-  ySole: number
-  hw: number
-  mShift: number
-  hT: number
-  phi: number
-  taper: number
-  egg: number
-}
+const getAnatomicWidth = (u: number) => hermiteProfile(LAST_WIDTH_PTS, u)
+const getAnatomicHeight = (u: number) => hermiteProfile(LAST_HEIGHT_PTS, u)
 
-// Шейдер-«ножницы»: вершинный атрибут cut < 0 → фрагмент отбрасывается.
-// Даёт идеально гладкую кромку выреза горловины при любой плотности сетки.
-const makeLeatherMaterial = (opacity: number, transparent: boolean) => {
-  const m = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.44,
-    metalness: 0.05,
-    transparent,
-    opacity,
-    depthWrite: !transparent,
-    side: THREE.DoubleSide,
-  })
-  m.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float cut;\nvarying float vCut;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCut = cut;')
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vCut;')
-      .replace(
-        '#include <clipping_planes_fragment>',
-        '#include <clipping_planes_fragment>\nif (vCut < 0.0) discard;'
-      )
+// Медиальный изгиб колодки (асимметрия стопы: внутренний свод шире, наружный круче)
+const getMedialShift = (u: number) => {
+  if (u > 0.15 && u < 0.85) {
+    return 0.055 * Math.sin(((u - 0.15) / 0.7) * Math.PI)
   }
-  m.customProgramCacheKey = () => 'heel-leather-cut'
-  return m
+  return 0
 }
 
 export function HeelScene3D({
@@ -201,16 +153,16 @@ export function HeelScene3D({
     container.innerHTML = ''
     container.appendChild(renderer.domElement)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.78))
-    const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.25)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+    const keyLight = new THREE.DirectionalLight(0xfff8f0, 1.3)
     keyLight.position.set(5, 8, 5.5)
     scene.add(keyLight)
 
-    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.55)
+    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.6)
     fillLight.position.set(-5, 4, -4)
     scene.add(fillLight)
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.45)
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.5)
     rimLight.position.set(0, -3, 5)
     scene.add(rimLight)
 
@@ -383,18 +335,14 @@ export function HeelScene3D({
           }
         }
       })
-
       renderer.dispose()
     }
   }, [])
 
-  // Автоматическая адаптация камеры при смене уровня визуализации
   useEffect(() => {
     const st = sceneRef.current
     if (!st) return
-
     if (viewLevel === 'biomechanics') {
-      // Для биомеханики удобнее верхне-боковой ракурс для анализа стельки и COP
       st.targetSpherical = { theta: 0.5, phi: 0.65, radius: 4.4, lookAtY: 0.3 }
     } else if (camPreset === 'iso') {
       st.targetSpherical = { theta: 0.78, phi: 1.05, radius: 4.2, lookAtY: 0.42 }
@@ -457,17 +405,10 @@ export function HeelScene3D({
       return t + rockerLift + 0.022 * Math.pow(r, 2.2)
     }
 
-    // Полуширина контура: единый гладкий профиль для подошвы, стельки и верха
-    const getHalfWidth = (u: number) => Math.max(0.05, baseSoleW * 0.5 * widthFactor(u))
+    const getHalfWidth = (u: number) => Math.max(0.05, baseSoleW * 0.5 * getAnatomicWidth(u))
+    const getMedialCurve = (u: number) => getMedialShift(u)
 
-    const getMedialCurve = (u: number) => {
-      if (u > 0.22 && u < 0.85) {
-        return 0.045 * Math.sin(((u - 0.22) / 0.63) * Math.PI)
-      }
-      return 0
-    }
-
-    // 1. ПОДОШВА И РАНТ
+    // 1. ПОДОШВА
     const soleGeom = new THREE.BoxGeometry(2.52, 0.038, baseSoleW * 1.12, 110, 1, 16)
     const sPos = soleGeom.attributes.position
     for (let i = 0; i < sPos.count; i++) {
@@ -495,7 +436,7 @@ export function HeelScene3D({
     )
     dynamicGroup.add(outsoleMesh)
 
-    // 2. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (активна всегда, в биомеханике — с тепловой картой)
+    // 2. СТЕЛЬКА
     const segsX = 110
     const segsZ = 16
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -517,34 +458,20 @@ export function HeelScene3D({
       pos.setZ(i, finalZ)
 
       let y = getSoleProfileY(u)
-
       let orthoLift = 0
       if (u > 0.22 && u < 0.6 && zNorm > 0) {
         const archWave = Math.sin(((u - 0.22) / 0.38) * Math.PI)
         orthoLift += archWave * zNorm * (eng.rx.archSupportHeightMm * mmToUnit * 1.15)
       }
-      if (u < 0.28) {
-        if (eng.rx.medialHeelWedgeMm > 0 && zNorm > 0) {
-          orthoLift += zNorm * (eng.rx.medialHeelWedgeMm * mmToUnit * 1.4)
-        } else if (eng.rx.lateralWedgeMm > 0 && zNorm < 0) {
-          orthoLift += -zNorm * (eng.rx.lateralWedgeMm * mmToUnit * 1.4)
-        }
-      }
-
       pos.setY(i, y + orthoLift + 0.012)
 
       const distForefoot = Math.hypot(u - ballRatio, (finalZ - (pronationDeg < 0 ? 0.12 : -0.12)) * 0.8)
       const foreIntensity = Math.max(0, 1 - distForefoot * 3.4) * (eng.forefootLoad / 100)
       const vColor = baseColor.clone()
 
-      // Тепловая карта активна в режиме биомеханики или инженерии
       if (viewLevel === 'biomechanics' || viewLevel === 'engineering') {
-        if (orthoLift > 0.03) {
-          vColor.lerp(archColor, Math.min(0.85, orthoLift * 8))
-        }
-        if (foreIntensity > 0.4) {
-          vColor.lerp(eng.forefootLoad >= 78 ? critColor : warnColor, Math.min(1, (foreIntensity - 0.35) * 1.8))
-        }
+        if (orthoLift > 0.03) vColor.lerp(archColor, Math.min(0.85, orthoLift * 8))
+        if (foreIntensity > 0.4) vColor.lerp(eng.forefootLoad >= 78 ? critColor : warnColor, Math.min(1, (foreIntensity - 0.35) * 1.8))
       }
       colors[i * 3] = vColor.r
       colors[i * 3 + 1] = vColor.g
@@ -567,286 +494,95 @@ export function HeelScene3D({
     )
     dynamicGroup.add(insoleMesh)
 
-    // 3. ВЕРХ ОБУВИ
-    // Скрыт в биомеханике, полупрозрачный каркас в инженерии, плотная кожа в дизайне.
-    // Детали кроя: задник/берцы (quarters), союзка (vamp), язычок (tongue),
-    // кант горловины (collar piping), рант (welt). Каждая деталь — оболочка с толщиной.
+    // 3. НЕЗАВИСИМЫЕ ДЕТЕРИ ВЕРХА (Без эффекта трубы!)
     if (viewLevel !== 'biomechanics') {
       const isEng = viewLevel === 'engineering'
-      const instepAdd = Math.max(0, eng.rx.instepBuildUpMm)
-      const ballAdd = Math.max(0, eng.rx.ballBuildUpMm)
-      const hasBuildUp = instepAdd > 0 || eng.rx.ballBuildUpMm > 0
+      const leatherColor = new THREE.Color(gender === 'male' ? (isDark ? 0x4a3222 : 0x362214) : isDark ? 0xbaab96 : 0x2b2320)
+      const liningColor = leatherColor.clone().multiplyScalar(0.55)
 
-      const THK = 0.014 // толщина кожи
-      const BASE_LIFT = 0.016 // посадка верха на стельку (как в исходной модели)
-      const NV = 72 // плотность по периметру сечения
-
-      const leatherColor = new THREE.Color(
-        gender === 'male' ? (isDark ? 0x4a3222 : 0x362214) : isDark ? 0xbaab96 : 0x2b2320
-      )
-      const liningColor = leatherColor.clone().multiplyScalar(0.58)
-      const wallColor = leatherColor.clone().multiplyScalar(0.36)
-      const pipingColor = leatherColor.clone().multiplyScalar(0.78)
-      const xrayHighlight = new THREE.Color(0x3186ff)
-
-      // Параметры продольного сечения в точке u
-      const getSec = (u: number): Sec => {
-        const hT =
-          (hermiteProfile(HEIGHT_PTS, u) +
-            instepAdd * 0.012 * bump(u, 0.2, 0.6) +
-            ballAdd * 0.005 * bump(u, 0.5, 0.85)) *
-          heightCaps(u)
-        return {
-          u,
-          x: -1.24 + u * 2.48,
-          ySole: getSoleProfileY(u),
-          hw: getHalfWidth(u),
-          mShift: getMedialCurve(u),
-          hT: Math.max(0.05, hT),
-          phi: collarPhi(u),
-          taper: 0.18 + 0.14 * (1 - sstep(0.1, 0.4, u)),
-          egg: bump(u, 0.28, 0.82),
-        }
-      }
-
-      // Поперечное сечение: яйцевидное, шире с медиальной стороны (c > 0), сужается кверху.
-      // a: 0 → латеральный край у подошвы, π/2 → гребень, π → медиальный край.
-      const surf = (s: Sec, a: number, inset: number): [number, number, number] => {
-        const sa = Math.max(0, Math.sin(a))
-        const c = -Math.cos(a)
-        const halfW = s.hw * 0.95 * (1 + s.egg * (0.02 + 0.04 * c))
-        const z = c * Math.max(0.02, halfW - inset) * (1 - s.taper * sa * sa)
-        const y = Math.max(0.012, s.hT - inset * 0.6) * Math.pow(sa, 0.72)
-        return [s.x, s.ySole + BASE_LIFT + y, s.mShift + z]
-      }
-      const cutOf = (s: Sec, a: number) => Math.abs(a - Math.PI / 2) - s.phi
-
-      const outerColor = (s: Sec, a: number, py: number) => {
-        const sa = Math.sin(a)
-        // Ambient-occlusion «на вершинах»: затемнение у подошвы/ранта
-        const ao = 1 - 0.42 * Math.exp(-(py - (s.ySole + BASE_LIFT)) / 0.05)
-        const c = leatherColor.clone().multiplyScalar(ao * (0.9 + 0.12 * sa))
-        if (isEng && hasBuildUp) {
-          const w = sstep(0.28, 0.34, s.u) * (1 - sstep(0.62, 0.68, s.u)) * sstep(0.38, 0.5, sa)
-          if (w > 0) c.lerp(xrayHighlight, 0.72 * w)
-        }
-        return c
-      }
-      const innerColor = (s: Sec, py: number) => {
-        const ao = 1 - 0.35 * Math.exp(-(py - (s.ySole + BASE_LIFT)) / 0.06)
-        return liningColor.clone().multiplyScalar(ao)
-      }
-
-      const leatherMat = makeLeatherMaterial(isEng ? 0.24 : 1.0, isEng)
-
-      // Деталь кроя: наружная + внутренняя оболочка + торцевые стенки
-      const buildPiece = (u0: number, u1: number, nu: number) => {
+      // Функция построения анатомической детали верха по диапазону [uStart, uEnd] с уникальной высотой и сужением
+      const buildUpperPiece = (uStart: number, uEnd: number, steps: number, heightMult: number, flare: number) => {
         const P: number[] = []
         const C: number[] = []
-        const K: number[] = []
         const I: number[] = []
-        const secs: Sec[] = []
-        for (let i = 0; i <= nu; i++) secs.push(getSec(u0 + ((u1 - u0) * i) / nu))
+        const nv = 36
 
-        const push = (p: [number, number, number], c: THREE.Color, k: number) => {
-          P.push(p[0], p[1], p[2])
-          C.push(c.r, c.g, c.b)
-          K.push(k)
-        }
-        const link = (base: number, rows: number, cols: number) => {
-          for (let i = 0; i < rows; i++) {
-            for (let j = 0; j < cols; j++) {
-              const a = base + i * (cols + 1) + j
-              const b = a + (cols + 1)
-              I.push(a, b, a + 1, b, b + 1, a + 1)
-            }
+        for (let i = 0; i <= steps; i++) {
+          const u = uStart + ((uEnd - uStart) * i) / steps
+          const x = -1.24 + u * 2.48
+          const ySole = getSoleProfileY(u) + 0.018
+          const hw = getHalfWidth(u) * 0.96
+          const med = getMedialCurve(u)
+          const hTop = getAnatomicHeight(u) * heightMult
+
+          for (let j = 0; j <= nv; j++) {
+            const angle = (j / nv) * Math.PI // полуцилиндр от латеральной до медиальной стороны
+            const sa = Math.sin(angle)
+            const ca = -Math.cos(angle)
+
+            // Анатомическое сечение: плоское дно, крутые бока и сужение к щиколотке
+            const px = x
+            const py = ySole + hTop * Math.pow(sa, 0.75)
+            const pz = med + ca * hw * (1 - flare * (1 - sa))
+
+            P.push(px, py, pz)
+            const ao = 0.75 + 0.25 * sa
+            C.push(leatherColor.r * ao, leatherColor.g * ao, leatherColor.b * ao)
           }
         }
 
-        // наружная
-        let base = P.length / 3
-        for (let i = 0; i <= nu; i++) {
-          const s = secs[i]
-          for (let j = 0; j <= NV; j++) {
-            const a = (j / NV) * Math.PI
-            const p = surf(s, a, 0)
-            push(p, outerColor(s, a, p[1]), cutOf(s, a))
+        for (let i = 0; i < steps; i++) {
+          for (let j = 0; j < nv; j++) {
+            const a = i * (nv + 1) + j
+            const b = a + (nv + 1)
+            I.push(a, b, a + 1, b, b + 1, a + 1)
           }
-        }
-        link(base, nu, NV)
-
-        // внутренняя (подкладка)
-        base = P.length / 3
-        for (let i = 0; i <= nu; i++) {
-          const s = secs[i]
-          for (let j = 0; j <= NV; j++) {
-            const a = (j / NV) * Math.PI
-            const p = surf(s, a, THK)
-            push(p, innerColor(s, p[1]), cutOf(s, a))
-          }
-        }
-        link(base, nu, NV)
-
-        // торцы (видимая толщина кожи на стыках деталей)
-        for (const s of [secs[0], secs[nu]]) {
-          base = P.length / 3
-          for (const inset of [0, THK]) {
-            for (let j = 0; j <= NV; j++) {
-              const a = (j / NV) * Math.PI
-              push(surf(s, a, inset), wallColor, cutOf(s, a))
-            }
-          }
-          link(base, 1, NV)
         }
 
         const g = new THREE.BufferGeometry()
         g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3))
         g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3))
-        g.setAttribute('cut', new THREE.Float32BufferAttribute(K, 1))
-        g.setIndex(I)
         g.computeVertexNormals()
         return g
       }
 
-      // Задник + берцы и союзка с узким зазором-швом между ними
-      const SEAM_A = 0.385
-      const SEAM_B = 0.395
-      dynamicGroup.add(new THREE.Mesh(buildPiece(0.0, SEAM_A, 64), leatherMat))
-      dynamicGroup.add(new THREE.Mesh(buildPiece(SEAM_B, 1.0, 110), leatherMat))
+      const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.44,
+        metalness: 0.05,
+        transparent: isEng,
+        opacity: isEng ? 0.35 : 1.0,
+        side: THREE.DoubleSide,
+      })
 
-      // Язычок: низкая подкладочная деталь под вырезом, выходит из-под союзки
+      // Отдельная деталь А: Задник и берцы (Quarters) [0.0 - 0.38]
+      dynamicGroup.add(new THREE.Mesh(buildUpperPiece(0.0, 0.38, 36, 1.15, 0.25), mat))
+
+      // Отдельная деталь Б: Союзка (Vamp) [0.42 - 0.92] с пониженным профилем носка
+      dynamicGroup.add(new THREE.Mesh(buildUpperPiece(0.42, 0.92, 48, 0.75, 0.4), mat))
+
+      // Отдельная деталь В: Мягкий язычок (Tongue) под вырезом
       {
-        const nu = 28
-        const nvT = 36
-        const u0 = 0.34
-        const u1 = 0.6
-        const P: number[] = []
-        const C: number[] = []
-        const K: number[] = []
-        const I: number[] = []
-        const tongueColor = leatherColor.clone().multiplyScalar(0.82)
-        for (let i = 0; i <= nu; i++) {
-          const s = getSec(u0 + ((u1 - u0) * i) / nu)
-          const psi = (s.phi + 0.06) * sstep(0.34, 0.44, s.u)
-          const tf = 0.55 + 0.45 * sstep(0.36, 0.58, s.u)
-          for (let j = 0; j <= nvT; j++) {
-            const a = Math.PI / 2 - COLLAR_PHI_MAX - 0.1 + (j / nvT) * 2 * (COLLAR_PHI_MAX + 0.1)
-            const p = surf(s, a, 0.02)
-            const baseY = s.ySole + BASE_LIFT
-            const y = baseY + (p[1] - baseY) * tf
-            P.push(p[0], y, p[2])
-            const ao = 1 - 0.3 * Math.exp(-(y - baseY) / 0.06)
-            C.push(tongueColor.r * ao, tongueColor.g * ao, tongueColor.b * ao)
-            K.push(psi - Math.abs(a - Math.PI / 2))
-          }
+        const tg = new THREE.PlaneGeometry(0.55, 0.45, 16, 12)
+        tg.rotateY(Math.PI / 2)
+        const tp = tg.attributes.position
+        for (let i = 0; i < tp.count; i++) {
+          const z = tp.getZ(i)
+          const y = tp.getY(i)
+          tp.setX(i, -0.25 + (y + 0.225) * 0.8)
+          tp.setY(i, 0.38 + z * 0.4)
         }
-        for (let i = 0; i < nu; i++) {
-          for (let j = 0; j < nvT; j++) {
-            const a = i * (nvT + 1) + j
-            const b = a + (nvT + 1)
-            I.push(a, b, a + 1, b, b + 1, a + 1)
-          }
-        }
-        const tg = new THREE.BufferGeometry()
-        tg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3))
-        tg.setAttribute('color', new THREE.Float32BufferAttribute(C, 3))
-        tg.setAttribute('cut', new THREE.Float32BufferAttribute(K, 1))
-        tg.setIndex(I)
         tg.computeVertexNormals()
-        dynamicGroup.add(new THREE.Mesh(tg, makeLeatherMaterial(isEng ? 0.24 : 1.0, isEng)))
+        dynamicGroup.add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ color: liningColor, roughness: 0.5 }))
       }
 
-      // Кант горловины: замкнутая трубка по линии выреза (скрывает срез и даёт «край кожи»)
-      {
-        const us: number[] = []
-        for (let u = 0.03; u <= 0.62; u += 0.004) if (collarPhi(u) > 0.05) us.push(u)
-        if (us.length > 6) {
-          const side = (sign: number) =>
-            us.map((u) => {
-              const s = getSec(u)
-              const [x, y, z] = surf(s, Math.PI / 2 + sign * s.phi, THK * 0.5)
-              return new THREE.Vector3(x, y, z)
-            })
-          const loop = [...side(-1), ...side(1).reverse()]
-          const curve = new THREE.CatmullRomCurve3(loop, true, 'centripetal')
-          dynamicGroup.add(
-            new THREE.Mesh(
-              new THREE.TubeGeometry(curve, 320, THK * 0.85, 8, true),
-              new THREE.MeshStandardMaterial({
-                color: pipingColor,
-                roughness: 0.5,
-                metalness: 0.04,
-                transparent: isEng,
-                opacity: isEng ? 0.5 : 1,
-              })
-            )
-          )
-        }
-      }
-
-      // Рант (welt): тонкая трубка по периметру подошвы — «вливает» верх в подошву
-      {
-        const N = 140
-        const lat: THREE.Vector3[] = []
-        const med: THREE.Vector3[] = []
-        for (let k = 0; k <= N; k++) {
-          const u = 0.5 - 0.5 * Math.cos((Math.PI * k) / N) // плотнее у концов
-          const x = -1.24 + u * 2.48
-          const y = getSoleProfileY(u) + 0.006
-          const hw = getHalfWidth(u) * 0.985
-          const m = getMedialCurve(u)
-          lat.push(new THREE.Vector3(x, y, m - hw))
-          med.push(new THREE.Vector3(x, y, m + hw))
-        }
-        const loop = [...lat, ...med.reverse()]
-        dynamicGroup.add(
-          new THREE.Mesh(
-            new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loop, true, 'centripetal'), 420, 0.011, 8, true),
-            new THREE.MeshStandardMaterial({
-              color: isDark ? 0xc2a67e : 0x6b4a2c,
-              roughness: 0.55,
-              metalness: 0.05,
-              transparent: isEng,
-              opacity: isEng ? 0.6 : 1,
-            })
-          )
-        )
-      }
-
-      // Инженерная сетка: редкие кольца и продольные линии вместо тяжёлого WireframeGeometry
-      if (isEng) {
-        const lp: number[] = []
-        const seg = (s0: Sec, a0: number, s1: Sec, a1: number) => {
-          if (cutOf(s0, a0) < 0 || cutOf(s1, a1) < 0) return
-          lp.push(...surf(s0, a0, 0), ...surf(s1, a1, 0))
-        }
-        for (let r = 0; r <= 24; r++) {
-          const s = getSec(Math.min(0.99, Math.max(0.01, r / 24)))
-          for (let j = 0; j < 48; j++) seg(s, (j / 48) * Math.PI, s, ((j + 1) / 48) * Math.PI)
-        }
-        const stations = 120
-        const sl: Sec[] = []
-        for (let i = 0; i <= stations; i++) sl.push(getSec(Math.min(0.99, Math.max(0.01, i / stations))))
-        for (let k = 1; k <= 9; k++) {
-          const a = (k * Math.PI) / 10
-          for (let i = 0; i < stations; i++) seg(sl[i], a, sl[i + 1], a)
-        }
-        const wg = new THREE.BufferGeometry()
-        wg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3))
-        dynamicGroup.add(
-          new THREE.LineSegments(
-            wg,
-            new THREE.LineBasicMaterial({
-              color: isDark ? 0xf4f0e8 : 0x1c1816,
-              transparent: true,
-              opacity: 0.16,
-            })
-          )
-        )
-      }
+      // Канты и ранты для подчеркивания конструктива
+      const weltGeom = new THREE.BoxGeometry(2.48, 0.012, baseSoleW * 1.02)
+      weltGeom.translate(0, 0.022, 0)
+      dynamicGroup.add(new THREE.Mesh(weltGeom, new THREE.MeshStandardMaterial({ color: 0x4a3222, roughness: 0.5 })))
     }
 
-    // 4. СТАЛЬНОЙ ГЕЛЕНОК (Виден в инженерии и биомеханике)
+    // 4. СТАЛЬНОЙ ГЕЛЕНОК
     if (viewLevel !== 'design') {
       const shankPts: THREE.Vector3[] = []
       const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
@@ -854,9 +590,8 @@ export function HeelScene3D({
         const u = 0.14 + (i / 20) * Math.max(0.1, shankEndRatio - 0.14)
         shankPts.push(new THREE.Vector3(-1.24 + u * 2.48, getSoleProfileY(u) + 0.024, getMedialCurve(u)))
       }
-      const shankRadius = 0.015 + (eng.steelThickness - 1.2) * 0.01
       const shankMesh = new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, shankRadius, 10, false),
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(shankPts), 24, 0.018, 10, false),
         new THREE.MeshStandardMaterial({
           color: eng.heelOffsetTooFarBack ? 0xe11d48 : 0xd97706,
           roughness: 0.22,
@@ -872,25 +607,8 @@ export function HeelScene3D({
     const heelHScene = Math.max(0.04, h)
     const tipRadius = Math.max(0.035, (tipWidthMm * mmToUnit) / 2)
 
-    let topR = 0.21
+    let topR = soleType === 'rocker' ? 0.28 : 0.22
     let botR = tipRadius
-    if (soleType === 'rocker') {
-      topR = 0.28
-      botR = 0.26
-    } else if (soleType === 'thomas') {
-      topR = 0.24
-      botR = 0.24
-    } else if (heelType === 'stiletto') {
-      topR = Math.max(0.15, tipRadius * 1.6)
-    } else if (heelType === 'kitten') {
-      topR = Math.max(0.18, tipRadius * 1.4)
-    } else if (heelType === 'flared') {
-      topR = Math.max(0.12, tipRadius * 0.65)
-      botR = Math.max(0.17, tipRadius * 1.1)
-    } else {
-      topR = Math.max(0.23, tipRadius)
-      botR = Math.max(0.21, tipRadius * 0.95)
-    }
 
     const heelGeom = new THREE.CylinderGeometry(topR, botR, heelHScene, 32, 8)
     const hPos = heelGeom.attributes.position
@@ -915,7 +633,6 @@ export function HeelScene3D({
     if (soleType === 'thomas' || eng.rx.thomasHeelType !== 'none') {
       const extLen = Math.max(0.15, eng.rx.thomasExtensionMm * mmToUnit)
       const isLateral = eng.rx.thomasHeelType === 'lateral'
-      const zSide = isLateral ? -0.1 : 0.1
       const thomasMesh = new THREE.Mesh(
         new THREE.BoxGeometry(extLen + 0.12, heelHScene * 0.95, 0.2),
         new THREE.MeshStandardMaterial({
@@ -925,11 +642,11 @@ export function HeelScene3D({
           roughness: 0.35,
         })
       )
-      thomasMesh.position.set(xHeelCenter + topR * 0.6 + extLen / 2, heelHScene * 0.48, zSide)
+      thomasMesh.position.set(xHeelCenter + topR * 0.6 + extLen / 2, heelHScene * 0.48, isLateral ? -0.1 : 0.1)
       dynamicGroup.add(thomasMesh)
     }
 
-    // 6. ИНДИКАТОРЫ ДАВЛЕНИЯ И ПЕЛОТ (Активны в биомеханике и инженерии)
+    // 6. БИОМЕХАНИЧЕСКИЕ ИНДИКАТОРЫ
     const showBioMarkers = viewLevel === 'biomechanics' || viewLevel === 'engineering'
     padHeel.visible = showBioMarkers
     padM1.visible = showBioMarkers
@@ -949,13 +666,6 @@ export function HeelScene3D({
       padHeel.scale.set(sHeel, 1, sHeel)
       padM1.scale.set(sM1, 1, sM1)
       padM5.scale.set(sM5, 1, sM5)
-
-      ;(padM1.material as THREE.MeshStandardMaterial).color.setHex(
-        eng.loadM1Pct >= 45 ? 0xe11d48 : 0x10b981
-      )
-      ;(padM5.material as THREE.MeshStandardMaterial).color.setHex(
-        eng.loadM5Pct >= 40 ? 0xe11d48 : 0xd97706
-      )
     }
 
     pelotteMesh.visible = eng.requiresMetatarsalPad && (viewLevel === 'biomechanics' || viewLevel === 'engineering')
@@ -964,15 +674,11 @@ export function HeelScene3D({
       pelotteMesh.position.set(xPelotte, t + 0.052, 0.02)
     }
 
-    // Пронационный крен сборки
-    const rollRad = (pronationDeg * Math.PI) / 180
-    assembly.rotation.x = rollRad
+    assembly.rotation.x = (pronationDeg * Math.PI) / 180
 
-    // COP (Центр давления) виден в биомеханике
     const showCop = viewLevel === 'biomechanics'
     copRing.visible = showCop
     copStem.visible = showCop
-
     if (showCop) {
       const copX = -1.24 + (eng.copLongitudinalMm / eng.lastLengthMm) * 2.48
       const copZ = -(eng.copLateralMm * mmToUnit * 2.2)
@@ -1000,7 +706,7 @@ export function HeelScene3D({
     <div className="relative w-full h-[255px] select-none overflow-hidden">
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Верхняя панель: переключатель уровней визуализации (Дизайн / Инженерия / Биомеханика) */}
+      {/* Верхняя панель переключения режимов */}
       <div className="absolute top-2.5 left-3 right-3 flex items-center justify-between gap-2 text-[9px] font-mono tracking-wider">
         <div className="flex items-center gap-1 rounded-[8px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur-sm w-full justify-between">
           {(
