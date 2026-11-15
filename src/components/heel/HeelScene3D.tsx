@@ -21,17 +21,9 @@ type Props = {
   isDark?: boolean
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * Анатомическая колодка (Last Geometry)
- * Асимметричные сплайны колодки с медиальным сдвигом и правильным объёмом пучков.
- * ────────────────────────────────────────────────────────────────────────── */
 type Pts = ReadonlyArray<readonly [number, number]>
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
-const sstep = (a: number, b: number, x: number) => {
-  const t = clamp01((x - a) / (b - a))
-  return t * t * (3 - 2 * t)
-}
 
 const hermiteProfile = (pts: Pts, u: number) => {
   const n = pts.length
@@ -58,7 +50,6 @@ const hermiteProfile = (pts: Pts, u: number) => {
   )
 }
 
-// Продольный анатомический профиль ширины колодки (u: 0 = пятка, 1 = носок)
 const LAST_WIDTH_PTS: Pts = [
   [0.0, 0.58],
   [0.08, 0.62],
@@ -66,19 +57,18 @@ const LAST_WIDTH_PTS: Pts = [
   [0.32, 0.52],
   [0.46, 0.68],
   [0.58, 0.94],
-  [0.68, 1.0], // Пучки (Ball) - максимальная ширина
+  [0.68, 1.0],
   [0.78, 0.88],
   [0.88, 0.60],
   [0.96, 0.35],
   [1.0, 0.12],
 ]
 
-// Профиль высоты гребня колодки
 const LAST_HEIGHT_PTS: Pts = [
   [0.0, 0.35],
   [0.05, 0.52],
   [0.12, 0.65],
-  [0.25, 0.68], // Подъем (Instep)
+  [0.25, 0.68],
   [0.42, 0.55],
   [0.58, 0.44],
   [0.72, 0.32],
@@ -89,7 +79,6 @@ const LAST_HEIGHT_PTS: Pts = [
 const getAnatomicWidth = (u: number) => hermiteProfile(LAST_WIDTH_PTS, u)
 const getAnatomicHeight = (u: number) => hermiteProfile(LAST_HEIGHT_PTS, u)
 
-// Медиальный изгиб колодки (асимметрия стопы: внутренний свод шире, наружный круче)
 const getMedialShift = (u: number) => {
   if (u > 0.15 && u < 0.85) {
     return 0.055 * Math.sin(((u - 0.15) / 0.7) * Math.PI)
@@ -168,9 +157,8 @@ export function HeelScene3D({
 
     const gridColor = isDark ? 0x3a3632 : 0xc8c2b8
     const grid = new THREE.GridHelper(4.2, 12, gridColor, gridColor)
-    const gridMat = grid.material as THREE.Material
-    gridMat.opacity = 0.2
-    gridMat.transparent = true
+    ;(grid.material as THREE.Material).opacity = 0.2
+    ;(grid.material as THREE.Material).transparent = true
     scene.add(grid)
 
     const assembly = new THREE.Group()
@@ -327,11 +315,8 @@ export function HeelScene3D({
         if (object instanceof THREE.Mesh) {
           if (object.geometry) object.geometry.dispose()
           if (object.material) {
-            if (Array.isArray(object.material)) {
-              object.material.forEach((m) => m.dispose())
-            } else {
-              object.material.dispose()
-            }
+            if (Array.isArray(object.material)) object.material.forEach((m) => m.dispose())
+            else object.material.dispose()
           }
         }
       })
@@ -389,6 +374,7 @@ export function HeelScene3D({
     const activeRockerRad = soleType === 'rocker' ? (rockerAngle * Math.PI) / 180 : 0
     const baseSoleW = (gender === 'male' ? 0.94 : 0.82) + eng.rx.ballBuildUpMm * 0.01
 
+    // Усовершенствованный профиль подошвы с анатомическим рокером
     const getSoleProfileY = (u: number) => {
       if (u <= 0.18) {
         const heelCup = 0.016 * (1 - Math.cos((u / 0.18) * Math.PI))
@@ -401,7 +387,8 @@ export function HeelScene3D({
         return h * (1 - smoothStep) + t * smoothStep - archDip * (1 - smoothStep)
       }
       const r = (u - ballRatio) / Math.max(0.05, 1 - ballRatio)
-      const rockerLift = soleType === 'rocker' ? Math.sin(activeRockerRad) * 0.55 * r * r : 0.055 * r * r
+      // Плавный перекат рокера
+      const rockerLift = soleType === 'rocker' ? Math.sin(activeRockerRad) * 0.65 * Math.pow(r, 1.8) : 0.055 * r * r
       return t + rockerLift + 0.022 * Math.pow(r, 2.2)
     }
 
@@ -494,57 +481,58 @@ export function HeelScene3D({
     )
     dynamicGroup.add(insoleMesh)
 
-    // 3. НЕЗАВИСИМЫЕ ДЕТАЛИ ВЕРХА
+    // 3. ЕДИНЫЙ АНАТОМИЧЕСКИЙ ВЕРХ (без артефактов)
     if (viewLevel !== 'biomechanics') {
       const isEng = viewLevel === 'engineering'
       const leatherColor = new THREE.Color(gender === 'male' ? (isDark ? 0x4a3222 : 0x362214) : isDark ? 0xbaab96 : 0x2b2320)
-      const liningColor = leatherColor.clone().multiplyScalar(0.55)
 
-      const buildUpperPiece = (uStart: number, uEnd: number, steps: number, heightMult: number, flare: number) => {
-        const P: number[] = []
-        const C: number[] = []
-        const I: number[] = []
-        const nv = 36
+      const P: number[] = []
+      const C: number[] = []
+      const I: number[] = []
+      const steps = 70
+      const nv = 36
 
-        for (let i = 0; i <= steps; i++) {
-          const u = uStart + ((uEnd - uStart) * i) / steps
-          const x = -1.24 + u * 2.48
-          const ySole = getSoleProfileY(u) + 0.018
-          const hw = getHalfWidth(u) * 0.96
-          const med = getMedialCurve(u)
-          const hTop = getAnatomicHeight(u) * heightMult
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps
+        const x = -1.24 + u * 2.48
+        const ySole = getSoleProfileY(u) + 0.018
+        const hw = getHalfWidth(u) * 0.96
+        const med = getMedialCurve(u)
+        const hTop = getAnatomicHeight(u) * (u < 0.4 ? 1.15 : 0.75)
 
-          for (let j = 0; j <= nv; j++) {
-            const angle = (j / nv) * Math.PI
-            const sa = Math.sin(angle)
-            const ca = -Math.cos(angle)
+        for (let j = 0; j <= nv; j++) {
+          const angle = (j / nv) * Math.PI
+          const sa = Math.sin(angle)
+          const ca = -Math.cos(angle)
 
-            const px = x
-            const py = ySole + hTop * Math.pow(sa, 0.75)
-            const pz = med + ca * hw * (1 - flare * (1 - sa))
+          const collarCut = (u > 0.15 && u < 0.45) 
+            ? (1 - 0.4 * Math.sin(((u - 0.15) / 0.3) * Math.PI) * (1 - Math.abs(angle - Math.PI / 2) / (Math.PI / 2))) 
+            : 1
 
-            P.push(px, py, pz)
-            const ao = 0.75 + 0.25 * sa
-            C.push(leatherColor.r * ao, leatherColor.g * ao, leatherColor.b * ao)
-          }
+          const px = x
+          const py = ySole + hTop * Math.pow(sa, 0.75) * collarCut
+          const pz = med + ca * hw
+
+          P.push(px, py, pz)
+          const ao = 0.75 + 0.25 * sa
+          C.push(leatherColor.r * ao, leatherColor.g * ao, leatherColor.b * ao)
         }
-
-        for (let i = 0; i < steps; i++) {
-          for (let j = 0; j < nv; j++) {
-            const a = i * (nv + 1) + j
-            const b = a + (nv + 1)
-            I.push(a, b, a + 1, b, b + 1, a + 1)
-          }
-        }
-
-        const g = new THREE.BufferGeometry()
-        g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3))
-        g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3))
-        g.computeVertexNormals()
-        return g
       }
 
-      const mat = new THREE.MeshStandardMaterial({
+      for (let i = 0; i < steps; i++) {
+        for (let j = 0; j < nv; j++) {
+          const a = i * (nv + 1) + j
+          const b = a + (nv + 1)
+          I.push(a, b, a + 1, b, b + 1, a + 1)
+        }
+      }
+
+      const upperGeom = new THREE.BufferGeometry()
+      upperGeom.setAttribute('position', new THREE.Float32BufferAttribute(P, 3))
+      upperGeom.setAttribute('color', new THREE.Float32BufferAttribute(C, 3))
+      upperGeom.computeVertexNormals()
+
+      const upperMat = new THREE.MeshStandardMaterial({
         vertexColors: true,
         roughness: 0.44,
         metalness: 0.05,
@@ -553,28 +541,7 @@ export function HeelScene3D({
         side: THREE.DoubleSide,
       })
 
-      dynamicGroup.add(new THREE.Mesh(buildUpperPiece(0.0, 0.38, 36, 1.15, 0.25), mat))
-      dynamicGroup.add(new THREE.Mesh(buildUpperPiece(0.42, 0.92, 48, 0.75, 0.4), mat))
-
-      // Язычок (исправлены закрывающие скобки)
-      {
-        const tg = new THREE.PlaneGeometry(0.55, 0.45, 16, 12)
-        tg.rotateY(Math.PI / 2)
-        const tp = tg.attributes.position
-        for (let i = 0; i < tp.count; i++) {
-          const z = tp.getZ(i)
-          const y = tp.getY(i)
-          tp.setX(i, -0.25 + (y + 0.225) * 0.8)
-          tp.setY(i, 0.38 + z * 0.4)
-        }
-        tg.computeVertexNormals()
-        dynamicGroup.add(
-          new THREE.Mesh(
-            tg,
-            new THREE.MeshStandardMaterial({ color: liningColor, roughness: 0.5 })
-          )
-        )
-      }
+      dynamicGroup.add(new THREE.Mesh(upperGeom, upperMat))
 
       const weltGeom = new THREE.BoxGeometry(2.48, 0.012, baseSoleW * 1.02)
       weltGeom.translate(0, 0.022, 0)
@@ -600,7 +567,7 @@ export function HeelScene3D({
       dynamicGroup.add(shankMesh)
     }
 
-    // 5. КАБЛУК И ТОМАС
+    // 5. УСОВЕРШЕНСТВОВАННЫЙ КАБЛУК И ТОМАС
     const xHeelCenter = -1.24 + 0.14 * 2.48
     const tipOffsetScene = soleType === 'flat' ? heelTipOffsetMm * mmToUnit : 0
     const heelHScene = Math.max(0.04, h)
@@ -609,6 +576,7 @@ export function HeelScene3D({
     let topR = soleType === 'rocker' ? 0.28 : 0.22
     let botR = tipRadius
 
+    // Создаем более изящную форму каблука в зависимости от типа
     const heelGeom = new THREE.CylinderGeometry(topR, botR, heelHScene, 32, 8)
     const hPos = heelGeom.attributes.position
     for (let i = 0; i < hPos.count; i++) {
@@ -622,26 +590,27 @@ export function HeelScene3D({
       heelGeom,
       new THREE.MeshStandardMaterial({
         color: isDark ? 0xe6dfd5 : 0x1c1816,
-        roughness: 0.35,
-        metalness: 0.2,
+        roughness: 0.32,
+        metalness: 0.25,
       })
     )
     heelMesh.position.set(xHeelCenter, heelHScene / 2, 0)
     dynamicGroup.add(heelMesh)
 
+    // Усовершенствованный каблук Томаса с удлинением под свод
     if (soleType === 'thomas' || eng.rx.thomasHeelType !== 'none') {
-      const extLen = Math.max(0.15, eng.rx.thomasExtensionMm * mmToUnit)
+      const extLen = Math.max(0.18, eng.rx.thomasExtensionMm * mmToUnit * 1.2)
       const isLateral = eng.rx.thomasHeelType === 'lateral'
       const thomasMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(extLen + 0.12, heelHScene * 0.95, 0.2),
+        new THREE.BoxGeometry(extLen + 0.14, heelHScene * 0.96, 0.22),
         new THREE.MeshStandardMaterial({
           color: soleType === 'thomas' ? 0x10b981 : 0xd97706,
           transparent: true,
-          opacity: soleType === 'thomas' ? 0.92 : 0.45,
-          roughness: 0.35,
+          opacity: soleType === 'thomas' ? 0.95 : 0.5,
+          roughness: 0.3,
         })
       )
-      thomasMesh.position.set(xHeelCenter + topR * 0.6 + extLen / 2, heelHScene * 0.48, isLateral ? -0.1 : 0.1)
+      thomasMesh.position.set(xHeelCenter + topR * 0.5 + extLen / 2, heelHScene * 0.48, isLateral ? -0.1 : 0.1)
       dynamicGroup.add(thomasMesh)
     }
 
