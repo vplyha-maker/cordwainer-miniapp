@@ -279,35 +279,35 @@ export function HeelScene3D({
     scene.add(dynamicGroup)
 
     const padHeel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.19, 0.19, 0.024, 32),
-      new THREE.MeshStandardMaterial({ color: 0x3186ff, transparent: true, opacity: 0.8, roughness: 0.35 })
+      new THREE.CylinderGeometry(0.18, 0.18, 0.02, 32),
+      new THREE.MeshStandardMaterial({ color: 0x3186ff, transparent: true, opacity: 0.78, roughness: 0.35 })
     )
     const padM1 = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.18, 0.024, 32),
-      new THREE.MeshStandardMaterial({ color: 0x3186ff, transparent: true, opacity: 0.85, roughness: 0.35 })
+      new THREE.CylinderGeometry(0.17, 0.17, 0.02, 32),
+      new THREE.MeshStandardMaterial({ color: 0x3186ff, transparent: true, opacity: 0.82, roughness: 0.35 })
     )
     const padM5 = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.16, 0.16, 0.024, 32),
-      new THREE.MeshStandardMaterial({ color: 0x3186ff, transparent: true, opacity: 0.85, roughness: 0.35 })
+      new THREE.CylinderGeometry(0.15, 0.15, 0.02, 32),
+      new THREE.MeshStandardMaterial({ color: 0x3186ff, transparent: true, opacity: 0.82, roughness: 0.35 })
     )
     scene.add(padHeel, padM1, padM5)
 
     const pelotteMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.13, 24, 16),
+      new THREE.SphereGeometry(0.12, 24, 16),
       new THREE.MeshStandardMaterial({ color: 0xe11d48, transparent: true, opacity: 0.9, roughness: 0.3 })
     )
-    pelotteMesh.scale.set(1.25, 0.34, 0.9)
+    pelotteMesh.scale.set(1.2, 0.3, 0.88)
     scene.add(pelotteMesh)
 
     const copRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.085, 0.015, 16, 36),
+      new THREE.TorusGeometry(0.08, 0.014, 16, 36),
       new THREE.MeshBasicMaterial({ color: 0xe11d48 })
     )
     copRing.rotation.x = Math.PI / 2
     scene.add(copRing)
 
     const copStem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, 0.55, 14),
+      new THREE.CylinderGeometry(0.011, 0.011, 0.52, 14),
       new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0.85 })
     )
     scene.add(copStem)
@@ -434,7 +434,7 @@ export function HeelScene3D({
     } else if (camPreset === 'bottom') {
       st.targetSpherical = { theta: 0.0, phi: 0.18, radius: 4.2, lookAtY: 0.18 }
     } else if (camPreset === 'rear') {
-      st.targetSpherical = { theta: -Math.PI / 2, phi: 1.42, radius: 3.5, lookAtY: 0.32 }
+      st.targetSpherical = { theta: -Math.PI / 2, phi: 1.44, radius: 3.4, lookAtY: 0.28 }
     }
   }, [camPreset])
 
@@ -457,6 +457,8 @@ export function HeelScene3D({
       }
     }
 
+    const isRearView = camPreset === 'rear'
+
     const mmToUnit = 2.48 / Math.max(220, eng.lastLengthMm)
     const h = heelHeight * mmToUnit
     const t = toeThickness * mmToUnit
@@ -469,7 +471,7 @@ export function HeelScene3D({
     const getSoleProfileY = (u: number) => {
       const clampedU = Math.max(0, Math.min(1, u))
       if (clampedU <= 0.18) {
-        const heelCup = 0.01 * (1 - Math.cos((clampedU / 0.18) * Math.PI))
+        const heelCup = 0.008 * (1 - Math.cos((clampedU / 0.18) * Math.PI))
         return h - heelCup
       }
       if (clampedU <= ballRatio) {
@@ -493,8 +495,7 @@ export function HeelScene3D({
     }
     const getMedialAtX = (x: number) => getMedialCurve(Math.max(0, Math.min(1, (x + 1.24) / 2.48)))
 
-    // 1. СТЕЛЬКА С 4-ЦВЕТНОЙ ИНЖЕНЕРНОЙ КОДИРОВКОЙ МАСТЕРА:
-    // Красный = давление, Зеленый = свободный припуск мыска, Синий = анатомические ориентиры, Желтый = модификации/налепки
+    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (БЕЗ ИСКУССТВЕННОГО ВЫПИРАНИЯ ВБОК НА ВИДЕ СЗАДИ)
     const segsX = 96
     const segsZ = 24
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -517,53 +518,51 @@ export function HeelScene3D({
       pos.setZ(i, finalZ)
 
       const y = getSoleProfileY(u)
-      const edgeTaper = Math.max(0, 1 - Math.pow(Math.abs(zNorm), 3.5))
+      const edgeTaper = Math.max(0, 1 - Math.pow(Math.abs(zNorm), 2.8))
 
       let orthoLift = 0
       let wedgeIntensity = 0
       let archIntensity = 0
 
-      if (u > 0.18 && u < 0.62 && zNorm > 0) {
-        const archWave = Math.sin(((u - 0.18) / 0.44) * Math.PI)
-        const medialDome = Math.sin(Math.min(1, zNorm) * (Math.PI * 0.82))
-        const lift = archWave * medialDome * (eng.rx.archSupportHeightMm * mmToUnit * 0.72)
+      // Выкладка продольного свода строго внутри контура подошвы (с плавным сведением к кромке edgeTaper)
+      if (u > 0.22 && u < 0.58 && zNorm > 0 && eng.rx.archSupportHeightMm > 0) {
+        const archWave = Math.sin(((u - 0.22) / 0.36) * Math.PI)
+        const medialDome = Math.sin(Math.min(1, zNorm) * Math.PI) * edgeTaper
+        const lift = archWave * medialDome * (eng.rx.archSupportHeightMm * mmToUnit * 0.55)
         orthoLift += lift
         archIntensity = archWave * medialDome
       }
 
-      if (u < 0.36) {
-        const smoothFade = 0.5 * (1 + Math.cos((u / 0.36) * Math.PI))
-        const rimFade = 0.25 + 0.75 * edgeTaper
-        if (eng.rx.medialHeelWedgeMm > 0 && zNorm > -0.1) {
-          const medFactor = Math.max(0, Math.min(1, (zNorm + 0.1) / 1.1))
-          const lift = smoothFade * medFactor * rimFade * (eng.rx.medialHeelWedgeMm * mmToUnit * 0.75)
+      // Пяточный клин (появляется ТОЛЬКО когда medialHeelWedgeMm > 0 или lateralWedgeMm > 0, т.е. при реальном завале пятки!)
+      if (u < 0.34) {
+        const smoothFade = 0.5 * (1 + Math.cos((u / 0.34) * Math.PI))
+        const rimFade = 0.2 + 0.8 * edgeTaper
+        if (eng.rx.medialHeelWedgeMm > 0 && zNorm > 0) {
+          const medFactor = Math.min(1, zNorm)
+          const lift = smoothFade * medFactor * rimFade * (eng.rx.medialHeelWedgeMm * mmToUnit * 0.65)
           orthoLift += lift
           wedgeIntensity = smoothFade * medFactor
-        } else if (eng.rx.lateralWedgeMm > 0 && zNorm < 0.1) {
-          const latFactor = Math.max(0, Math.min(1, (-zNorm + 0.1) / 1.1))
-          const lift = smoothFade * latFactor * rimFade * (eng.rx.lateralWedgeMm * mmToUnit * 0.75)
+        } else if (eng.rx.lateralWedgeMm > 0 && zNorm < 0) {
+          const latFactor = Math.min(1, -zNorm)
+          const lift = smoothFade * latFactor * rimFade * (eng.rx.lateralWedgeMm * mmToUnit * 0.65)
           orthoLift += lift
           wedgeIntensity = smoothFade * latFactor
         }
       }
 
-      pos.setY(i, y + orthoLift + 0.012)
+      pos.setY(i, y + orthoLift + 0.01)
 
       const distForefoot = Math.hypot(u - ballRatio, (finalZ - (pronationDeg < 0 ? 0.12 : -0.12)) * 0.8)
       const foreIntensity = Math.max(0, 1 - distForefoot * 3.4) * (eng.forefootLoad / 100)
       const vColor = baseColor.clone()
 
-      // Желтый = конструктивные изменения (клин пятки и расширение пучков)
       if (wedgeIntensity > 0.15) vColor.lerp(yellowModify, Math.min(0.85, wedgeIntensity * 1.1))
-      // Синий = выкладка анатомического свода
-      if (archIntensity > 0.2) vColor.lerp(blueAnatomy, Math.min(0.8, archIntensity * 0.95))
-      // Красный = зона избыточного плантарного давления
-      if (foreIntensity > 0.42) {
-        vColor.lerp(redPressure, Math.min(0.9, (foreIntensity - 0.35) * 1.7))
+      if (archIntensity > 0.2) vColor.lerp(blueAnatomy, Math.min(0.75, archIntensity * 0.9))
+      if (foreIntensity > 0.45 && eng.peakForefootPressureKpa >= 215) {
+        vColor.lerp(redPressure, Math.min(0.85, (foreIntensity - 0.4) * 1.6))
       }
-      // Зеленый = рекомендуемая зона свободного пространства перед пальцами (u > 0.88)
       if (u > 0.88) {
-        vColor.lerp(greenFreeZone, Math.min(0.85, ((u - 0.88) / 0.12) * 0.9))
+        vColor.lerp(greenFreeZone, Math.min(0.8, ((u - 0.88) / 0.12) * 0.85))
       }
 
       colors[i * 3] = vColor.r
@@ -727,7 +726,7 @@ export function HeelScene3D({
       )
     }
 
-    // 3. СИНИЕ АНАТОМИЧЕСКИЕ ОСИ (M1–M5) И ЖЕЛТАЯ ТОЧКА АПЕКСА КОЛОДКИ
+    // 3. СИНИЕ АНАТОМИЧЕСКИЕ ОСИ И АПЕКС (СКРЫВАЕМ НА ВИДЕ СЗАДИ, ЧТОБЫ НЕ ЗАСОРЯТЬ ПЯТКУ!)
     const xHeelCenter = -1.24 + 0.15 * 2.48
     const uM1 = eng.apexM1_Mm / eng.lastLengthMm
     const uM5 = eng.apexM5_Mm / eng.lastLengthMm
@@ -736,25 +735,25 @@ export function HeelScene3D({
     const zM1 = getHalfWidth(uM1) * 0.78 + getMedialCurve(uM1)
     const zM5 = -getHalfWidth(uM5) * 0.78 + getMedialCurve(uM5)
 
-    // Синяя линия анатомического метатарзального изгиба M1–M5
-    const metBreakPts = [
-      new THREE.Vector3(xM5, getSoleProfileY(uM5) + 0.032, zM5),
-      new THREE.Vector3(xM1, getSoleProfileY(uM1) + 0.032, zM1),
-    ]
-    dynamicGroup.add(
-      new THREE.Mesh(
-        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(metBreakPts), 8, 0.009, 8, false),
-        new THREE.MeshBasicMaterial({ color: 0x3186ff })
+    if (!isRearView) {
+      const metBreakPts = [
+        new THREE.Vector3(xM5, getSoleProfileY(uM5) + 0.032, zM5),
+        new THREE.Vector3(xM1, getSoleProfileY(uM1) + 0.032, zM1),
+      ]
+      dynamicGroup.add(
+        new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(metBreakPts), 8, 0.009, 8, false),
+          new THREE.MeshBasicMaterial({ color: 0x3186ff })
+        )
       )
-    )
 
-    // Желтая сфера — геометрический апекс скорректированной колодки
-    const apexToeMarker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.036, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xf59e0b })
-    )
-    apexToeMarker.position.set(1.22, getSoleProfileY(0.99) + 0.025, getMedialCurve(0.99))
-    dynamicGroup.add(apexToeMarker)
+      const apexToeMarker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.036, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+      )
+      apexToeMarker.position.set(1.22, getSoleProfileY(0.99) + 0.025, getMedialCurve(0.99))
+      dynamicGroup.add(apexToeMarker)
+    }
 
     // Ось завала пятки
     const achillesPivot = new THREE.Group()
@@ -764,19 +763,23 @@ export function HeelScene3D({
     achillesPivot.rotation.x = (residualRollDeg * Math.PI) / 180
 
     const achillesAxis = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.011, 0.011, 0.46, 12),
+      new THREE.CylinderGeometry(0.012, 0.012, 0.48, 12),
       new THREE.MeshBasicMaterial({
-        color: Math.abs(residualRollDeg) >= 5.5 ? 0xe11d48 : 0x3186ff,
+        color: Math.abs(residualRollDeg) >= 3.5 ? 0xe11d48 : 0x10b981,
       })
     )
-    achillesAxis.position.y = 0.23
+    achillesAxis.position.y = 0.24
     achillesPivot.add(achillesAxis)
     dynamicGroup.add(achillesPivot)
 
-    // 4. ЗОНЫ ДАВЛЕНИЯ И ПЕЛОТ ЗЕЙЦА (СКРЫВАЕТСЯ, КОГДА НЕ НУЖЕН!)
-    padHeel.position.set(xHeelCenter, h + 0.024, 0)
-    padM1.position.set(xM1, getSoleProfileY(uM1) + 0.024, zM1 * 0.85)
-    padM5.position.set(xM5, getSoleProfileY(uM5) + 0.024, zM5 * 0.85)
+    // 4. ЗОНЫ ДАВЛЕНИЯ И ПЕЛОТ ЗЕЙЦА (СКРЫВАЮТСЯ НА ВИДЕ ПЯТКИ И КОГДА ПЕЛОТ НЕ НУЖЕН!)
+    padHeel.visible = !isRearView
+    padM1.visible = !isRearView
+    padM5.visible = !isRearView
+
+    padHeel.position.set(xHeelCenter, h + 0.022, 0)
+    padM1.position.set(xM1, getSoleProfileY(uM1) + 0.022, zM1 * 0.85)
+    padM5.position.set(xM5, getSoleProfileY(uM5) + 0.022, zM5 * 0.85)
 
     const sHeel = 0.65 + (eng.heelLoad / 60) * 0.65
     const sM1 = 0.65 + (eng.loadM1Pct / 50) * 0.75
@@ -785,7 +788,6 @@ export function HeelScene3D({
     padM1.scale.set(sM1, 1, sM1)
     padM5.scale.set(sM5, 1, sM5)
 
-    // Красный = перегрузка, Синий = нормальный анатомический ориентир
     ;(padM1.material as THREE.MeshStandardMaterial).color.setHex(
       eng.loadM1Pct >= 42 ? 0xe11d48 : 0x3186ff
     )
@@ -793,12 +795,14 @@ export function HeelScene3D({
       eng.loadM5Pct >= 38 ? 0xe11d48 : 0x3186ff
     )
 
-    pelotteMesh.visible = eng.requiresMetatarsalPad
+    pelotteMesh.visible = eng.requiresMetatarsalPad && !isRearView
     if (pelotteMesh.visible && eng.metatarsalPadPosMm != null) {
       const xPelotte = -1.24 + (eng.metatarsalPadPosMm / eng.lastLengthMm) * 2.48
-      pelotteMesh.position.set(xPelotte, t + 0.042, 0.02)
+      pelotteMesh.position.set(xPelotte, t + 0.04, 0.02)
     }
 
+    copRing.visible = !isRearView
+    copStem.visible = !isRearView
     const copX = -1.24 + (eng.copLongitudinalMm / eng.lastLengthMm) * 2.48
     const copZ = -(eng.copLateralMm * mmToUnit * 2.2)
     copRing.position.set(copX, 0.015, copZ)
@@ -814,6 +818,7 @@ export function HeelScene3D({
     rockerStartPct,
     heelTipOffsetMm,
     pronationDeg,
+    camPreset,
     isDark,
   ])
 
@@ -866,7 +871,7 @@ export function HeelScene3D({
                 { id: 'iso', label: '3/4' },
                 { id: 'side', label: 'СБОКУ' },
                 { id: 'bottom', label: 'СВЕРХУ' },
-                { id: 'rear', label: 'СЗАДИ' },
+                { id: 'rear', label: 'ПЯТКА' },
               ] as const
             ).map((preset) => (
               <button
