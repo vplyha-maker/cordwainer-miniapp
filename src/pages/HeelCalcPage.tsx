@@ -45,16 +45,15 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   const [gender, setGender] = useState<Gender>('female')
   const [shoeSize, setShoeSize] = useState(38)
   const [weightKg, setWeightKg] = useState(68)
-  const [heelHeight, setHeelHeight] = useState(30)
-  const [toeThickness, setToeThickness] = useState(10)
-  const [rockerAngle, setRockerAngle] = useState(14)
+  const [heelHeight, setHeelHeight] = useState(28)
+  const [toeThickness, setToeThickness] = useState(12)
+  const [rockerAngle, setRockerAngle] = useState(15)
   const [rockerStartPct, setRockerStartPct] = useState(60)
   const [soleType, setSoleType] = useState<SoleType>('thomas')
   const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
   const [rockerType, setRockerType] = useState<RockerType>('forefoot')
   const [pronationDeg, setPronationDeg] = useState(-5)
 
-  // Антропометрические обмеры стопы клиента (мм)
   const [ballGirthMm, setBallGirthMm] = useState(226)
   const [instepGirthMm, setInstepGirthMm] = useState(235)
   const [obliqueGirthMm, setObliqueGirthMm] = useState(296)
@@ -75,8 +74,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
     setBallGirthMm(std.ballGirthMm)
     setInstepGirthMm(std.instepGirthMm)
     setObliqueGirthMm(std.obliqueGirthMm)
-    setHeelHeight(newGender === 'male' ? 26 : 30)
-    setToeThickness(10)
+    setHeelHeight(newGender === 'male' ? 26 : 28)
+    setToeThickness(12)
   }
 
   const handleSizeChange = (newSize: number) => {
@@ -161,7 +160,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
       setRockerAngle(preset.angle)
       setRockerStartPct(preset.startPct)
     } else if (type === 'thomas' && heelHeight > 40) {
-      setHeelHeight(30)
+      setHeelHeight(28)
     }
   }
 
@@ -185,7 +184,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/55' : 'text-[#1C1816]/55'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/60' : 'text-[#1C1816]/60'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
 
   return (
@@ -198,29 +197,28 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 1. КОМПАКТНАЯ ВЕРХНЯЯ ШАПКА + ПЕРЕКЛЮЧАТЕЛЬ ЖЕН / МУЖ */}
-      <header className="px-4 pt-3 pb-2 flex items-center justify-between shrink-0 border-b border-[var(--color-border)]">
+      {/* 1. ВЕРХНЯЯ ШАПКА: ВЫХОД + РЕЖИМ ПОДОШВЫ (СТАНДАРТ / ТОМАСА / РОКЕР) + ПОЛ */}
+      <header className="px-3.5 pt-2.5 pb-2 flex items-center justify-between gap-2 shrink-0 border-b border-[var(--color-border)]">
         <button
           type="button"
           onClick={() => {
             haptic('light')
             onBack()
           }}
-          className={`flex items-center gap-2 text-[9px] font-mono uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer py-1 ${cTextMuted}`}
+          className={`flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider outline-none border-none bg-transparent cursor-pointer py-1 shrink-0 ${cTextMuted}`}
         >
           <span>←</span>
-          <span>ОРТО-ЛАБОРАТОРИЯ</span>
+          <span>НАЗАД</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          {/* Тип подошвы прямо в шапке */}
+        <div className="flex items-center gap-1.5">
           <div className="flex items-center rounded-[8px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]">
             {(['flat', 'thomas', 'rocker'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => handleSoleTypeChange(type)}
-                className={`px-2 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
+                className={`px-2.5 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
                   soleType === type
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
                     : 'bg-transparent text-[var(--color-ink)] opacity-60'
@@ -231,7 +229,6 @@ export function HeelCalcPage({ onBack, lang }: Props) {
             ))}
           </div>
 
-          {/* Пол ЖЕН / МУЖ */}
           <div className="flex items-center rounded-[8px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]">
             {(['female', 'male'] as const).map((g) => (
               <button
@@ -251,8 +248,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
       </header>
 
-      {/* 2. ЗАКРЕПЛЕННАЯ СЦЕНА 3D / 2D (ВСЕГДА ПЕРЕД ГЛАЗАМИ ПРИ ВВОДЕ ПАРАМЕТРОВ!) */}
-      <div className="px-3.5 pt-2 pb-1.5 shrink-0">
+      {/* 2. ЗАКРЕПЛЕННАЯ СЦЕНА 3D / 2D */}
+      <div className="px-3 pt-2 pb-1.5 shrink-0">
         <HeelCanvas
           geometry={geometry}
           eng={eng}
@@ -273,8 +270,8 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         />
       </div>
 
-      {/* 3. ВКЛАДКИ ПАНЕЛИ УПРАВЛЕНИЯ МАСТЕРА */}
-      <div className="px-3.5 shrink-0">
+      {/* 3. ПЕРЕКЛЮЧАТЕЛЬ ВКЛАДОК НИЖНЕЙ ПАНЕЛИ */}
+      <div className="px-3 shrink-0">
         <div className={`grid grid-cols-3 gap-1 p-1 rounded-[10px] border ${cLine} bg-[var(--color-surface)]`}>
           {(
             [
@@ -290,7 +287,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 haptic('light')
                 setActiveTab(tab.id)
               }}
-              className={`py-2 rounded-[8px] text-[8.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
+              className={`py-1.5 rounded-[7px] text-[8.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
                 activeTab === tab.id
                   ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold shadow-sm'
                   : 'bg-transparent text-[var(--color-ink)] opacity-60'
@@ -302,22 +299,22 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         </div>
       </div>
 
-      {/* 4. НИЖНЯЯ ОБЛАСТЬ КОНТРОЛОВ (СКРОЛЛИТСЯ НЕЗАВИСИМО ПОД 3D-МОДЕЛЬЮ) */}
-      <div className="flex-1 overflow-y-auto px-3.5 pt-2.5 pb-8 scrollbar-hide">
+      {/* 4. НИЖНЯЯ ПАНЕЛЬ (ЧИСТАЯ ЧИТАЕМОСТЬ БЕЗ МНОГОТОЧИЙ И СКРОЛЛА В ТЕХКАРТЕ) */}
+      <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 scrollbar-hide">
         {activeTab === 'foot' && (
-          <div className="grid grid-cols-2 gap-2.5">
-            <CompactStepper
-              label={t.size}
-              sub={`${eng.footLengthMm} мм стопа`}
+          <div className="grid grid-cols-2 gap-2">
+            <CleanStepper
+              label="РАЗМЕР СТОПЫ"
+              badge={`Стопа ${eng.footLengthMm} мм · ${eng.rx.widthCode.split(' ')[0]}`}
               value={shoeSize}
               min={gender === 'male' ? 38 : 33}
               max={gender === 'male' ? 48 : 43}
               onChange={handleSizeChange}
               isDark={isDark}
             />
-            <CompactStepper
-              label={t.weight}
-              sub={eng.rx.shoreA.split(' ')[0] + ' Shore A'}
+            <CleanStepper
+              label="ВЕС ЧЕЛОВЕКА"
+              badge={`Стелька ${eng.rx.shoreA.split(' ')[0]} Шор`}
               value={weightKg}
               min={40}
               max={150}
@@ -326,25 +323,32 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               unit="кг"
               isDark={isDark}
             />
-            <CompactStepper
-              label={t.pronation}
-              sub={
+            <CleanStepper
+              label="ЗАВАЛ ПЯТКИ"
+              badge={
                 pronationDeg <= -2
-                  ? 'Вальгус (внутрь)'
+                  ? `Вальгус · Клин +${eng.rx.medialHeelWedgeMm}мм`
                   : pronationDeg >= 2
-                  ? 'Варус (наружу)'
-                  : 'Нейтраль'
+                  ? `Варус · Клин +${eng.rx.lateralWedgeMm}мм`
+                  : 'Нейтральная ось'
               }
               value={pronationDeg}
               min={-12}
               max={12}
               onChange={setPronationDeg}
               unit="°"
+              showPlus
               isDark={isDark}
             />
-            <CompactStepper
-              label={t.ballGirth}
-              sub={`Налепка: ${eng.rx.ballBuildUpMm > 0 ? `+${eng.rx.ballBuildUpMm}` : eng.rx.ballBuildUpMm} мм`}
+            <CleanStepper
+              label="ПУЧКИ (ОБХВАТ Oп)"
+              badge={
+                eng.rx.ballBuildUpMm > 0
+                  ? `Налепка +${eng.rx.ballBuildUpMm} мм`
+                  : eng.rx.ballBuildUpMm < 0
+                  ? `Утяжка ${eng.rx.ballBuildUpMm} мм`
+                  : 'Базовая колодка 0 мм'
+              }
               value={ballGirthMm}
               min={185}
               max={295}
@@ -352,9 +356,15 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               unit="мм"
               isDark={isDark}
             />
-            <CompactStepper
-              label={t.instepGirth}
-              sub={`На взъем: ${eng.rx.instepBuildUpMm > 0 ? `+${eng.rx.instepBuildUpMm}` : eng.rx.instepBuildUpMm} мм`}
+            <CleanStepper
+              label="ПРЯМОЙ ВЗЪЕМ (Oв)"
+              badge={
+                eng.rx.instepBuildUpMm > 0
+                  ? `На гребень +${eng.rx.instepBuildUpMm} мм`
+                  : eng.rx.instepBuildUpMm < 0
+                  ? `Вкладыш ${eng.rx.instepBuildUpMm} мм`
+                  : 'Взъем в норме 0 мм'
+              }
               value={instepGirthMm}
               min={190}
               max={310}
@@ -362,9 +372,14 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               unit="мм"
               isDark={isDark}
             />
-            <CompactStepper
-              label={t.obliqueGirth}
-              sub={eng.rx.requiresZipOrLaceWarning ? 'Нужна молния/шнур!' : 'Вход свободный'}
+            <CleanStepper
+              label="КОСОЙ ОБХВАТ (Oк)"
+              badge={
+                eng.rx.requiresZipOrLaceWarning
+                  ? `+${eng.rx.obliqueEntryDeltaMm}мм · Нужен замок/шнур!`
+                  : 'Вход пятки свободный'
+              }
+              dangerBadge={eng.rx.requiresZipOrLaceWarning}
               value={obliqueGirthMm}
               min={250}
               max={390}
@@ -376,7 +391,7 @@ export function HeelCalcPage({ onBack, lang }: Props) {
         )}
 
         {activeTab === 'sole' && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {soleType === 'rocker' && (
               <div className="grid grid-cols-3 gap-1.5">
                 {(
@@ -390,10 +405,10 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                     key={r.type}
                     type="button"
                     onClick={() => handleRockerType(r.type)}
-                    className={`py-2 px-1 rounded-[8px] text-[9px] font-mono border cursor-pointer ${
+                    className={`py-1.5 px-1 rounded-[8px] text-[8.5px] font-mono border cursor-pointer ${
                       rockerType === r.type
                         ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
-                        : `${cLine} bg-[var(--color-surface)] ${cText} opacity-70`
+                        : `${cLine} bg-[var(--color-surface)] ${cText} opacity-75`
                     }`}
                   >
                     {r.label}
@@ -402,10 +417,10 @@ export function HeelCalcPage({ onBack, lang }: Props) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <CompactStepper
-                label={t.heel}
-                sub={`Дроп: ${eng.netRise} мм`}
+            <div className="grid grid-cols-2 gap-2">
+              <CleanStepper
+                label="ВЫСОТА КАБЛУКА"
+                badge={`Чистый перепад: ${eng.netRise} мм`}
                 value={heelHeight}
                 min={10}
                 max={gender === 'male' ? 55 : 85}
@@ -413,9 +428,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 unit="мм"
                 isDark={isDark}
               />
-              <CompactStepper
-                label={t.toe}
-                sub={`Угол: ${eng.internalSlope.toFixed(1)}°`}
+              <CleanStepper
+                label="ПЛАТФОРМА НОСКА"
+                badge={`Уклон стопы: ${eng.internalSlope.toFixed(1)}°`}
                 value={toeThickness}
                 min={0}
                 max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)}
@@ -423,9 +438,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 unit="мм"
                 isDark={isDark}
               />
-              <CompactStepper
-                label={t.start}
-                sub={`Апекс M1: ${eng.apexM1_Mm} мм`}
+              <CleanStepper
+                label="ЛИНИЯ ПУЧКОВ"
+                badge={`M1: ${eng.apexM1_Mm}мм · M5: ${eng.apexM5_Mm}мм`}
                 value={rockerStartPct}
                 min={55}
                 max={75}
@@ -434,9 +449,9 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                 isDark={isDark}
               />
               {soleType === 'rocker' ? (
-                <CompactStepper
-                  label={t.angle}
-                  sub={`Карбон: ${eng.carbonInsertThicknessMm} мм`}
+                <CleanStepper
+                  label="УГОЛ РОКЕРА"
+                  badge={`Карбон пластина: ${eng.carbonInsertThicknessMm} мм`}
                   value={rockerAngle}
                   min={5}
                   max={28}
@@ -445,18 +460,19 @@ export function HeelCalcPage({ onBack, lang }: Props) {
                   isDark={isDark}
                 />
               ) : (
-                <CompactStepper
-                  label={t.offset}
-                  sub={
+                <CleanStepper
+                  label="ПОСАДКА ПЯТКИ"
+                  badge={
                     soleType === 'thomas'
-                      ? `Выступ Томаса: +${eng.rx.thomasExtensionMm} мм`
-                      : 'Посадка пятки'
+                      ? `Томас +${eng.rx.thomasExtensionMm}мм (${eng.rx.thomasHeelType === 'medial' ? 'Внутр' : 'Наруж'})`
+                      : 'Ось набойки от центра'
                   }
                   value={heelTipOffsetMm}
-                  min={-10}
-                  max={10}
+                  min={-8}
+                  max={8}
                   onChange={setHeelTipOffsetMm}
                   unit="мм"
+                  showPlus
                   isDark={isDark}
                 />
               )}
@@ -464,107 +480,100 @@ export function HeelCalcPage({ onBack, lang }: Props) {
           </div>
         )}
 
+        {/* ВКЛАДКА 3: НАГЛЯДНЫЙ ПАСПОРТ ЗАКАЗА МАСТЕРА НА ОДИН ЭКРАН (2x3 КАРТОЧКИ БЕЗ СКРОЛЛА!) */}
         {activeTab === 'rx' && (
-          <div className={`rounded-[14px] border ${cLine} p-3.5 bg-[var(--color-surface)] space-y-2.5 text-[11px]`}>
-            <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-              <span className="font-mono text-[8.5px] uppercase tracking-wider font-semibold">
-                {t.masterCardTitle}
-              </span>
-              <span className="font-mono text-[8px] opacity-70">
-                {weightKg} кг // {eng.footLengthMm} мм
-              </span>
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            <RxCard
+              step="01 // КОЛОДКА"
+              title={eng.rx.widthCode}
+              line1={`Стопа: ${eng.footLengthMm} мм (След ${eng.lastLengthMm} мм)`}
+              line2={`Пучки: ${eng.rx.ballBuildUpMm > 0 ? `+${eng.rx.ballBuildUpMm}` : eng.rx.ballBuildUpMm} мм · Взъем: ${
+                eng.rx.instepBuildUpMm > 0 ? `+${eng.rx.instepBuildUpMm}` : eng.rx.instepBuildUpMm
+              } мм`}
+              accent={eng.rx.ballBuildUpMm !== 0 || eng.rx.instepBuildUpMm !== 0}
+              isDark={isDark}
+            />
 
-            <div className="grid grid-cols-1 gap-2">
-              <div className={`p-2.5 rounded-[10px] border ${cLine}`}>
-                <div className="font-mono text-[8px] uppercase opacity-55 mb-0.5">
-                  1. ДОРАБОТКА КОЛОДКИ
-                </div>
-                <div className="font-serif text-sm font-medium">{eng.rx.widthCode}</div>
-                <div className="opacity-85">
-                  • Пучки (Oп):{' '}
-                  <strong>
-                    {eng.rx.ballBuildUpMm > 0
-                      ? `+${eng.rx.ballBuildUpMm} мм (налепка)`
-                      : `${eng.rx.ballBuildUpMm} мм`}
-                  </strong>{' '}
-                  | Взъем (Oв):{' '}
-                  <strong>
-                    {eng.rx.instepBuildUpMm > 0
-                      ? `+${eng.rx.instepBuildUpMm} мм (гребень)`
-                      : `${eng.rx.instepBuildUpMm} мм`}
-                  </strong>
-                </div>
-                <div className={eng.rx.requiresZipOrLaceWarning ? 'text-[#E11D48] font-medium' : 'opacity-80'}>
-                  • Косой обхват (Oк):{' '}
-                  {eng.rx.requiresZipOrLaceWarning
-                    ? `+${eng.rx.obliqueEntryDeltaMm} мм (Обязательна шнуровка или молния!)`
-                    : 'Проходимость пятки в норме'}
-                </div>
-              </div>
+            <RxCard
+              step="02 // ПРОХОДИМОСТЬ (Oк)"
+              title={eng.rx.requiresZipOrLaceWarning ? 'Нужна молния/шнур' : 'Вход свободный'}
+              line1={`Косой обхват: ${obliqueGirthMm} мм`}
+              line2={`Отклонение от базы: ${
+                eng.rx.obliqueEntryDeltaMm > 0 ? `+${eng.rx.obliqueEntryDeltaMm}` : eng.rx.obliqueEntryDeltaMm
+              } мм`}
+              danger={eng.rx.requiresZipOrLaceWarning}
+              isDark={isDark}
+            />
 
-              <div className={`p-2.5 rounded-[10px] border ${cLine}`}>
-                <div className="font-mono text-[8px] uppercase opacity-55 mb-0.5">
-                  2. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (ПО ВЕСУ {weightKg} КГ)
-                </div>
-                <div className="font-serif text-sm font-medium">
-                  {eng.rx.insoleType === 'supinator'
-                    ? 'Супинаторная (антивальгус)'
-                    : eng.rx.insoleType === 'pronator'
-                    ? 'Пронаторная (антиварус)'
-                    : 'Анатомическая поддержка'}
-                </div>
-                <div className="opacity-85">
-                  • Жесткость базы: <strong>{eng.rx.shoreA}</strong>
-                </div>
-                <div className="opacity-85">
-                  • Выкладка свода: <strong>{eng.rx.archSupportHeightMm} мм</strong>
-                  {eng.rx.medialHeelWedgeMm > 0 && (
-                    <span className="text-[#10B981] font-semibold">
-                      {' '}
-                      | Медиальный клин пятки: +{eng.rx.medialHeelWedgeMm} мм
-                    </span>
-                  )}
-                  {eng.rx.lateralWedgeMm > 0 && (
-                    <span className="text-[#D97706] font-semibold">
-                      {' '}
-                      | Латеральный клин: +{eng.rx.lateralWedgeMm} мм
-                    </span>
-                  )}
-                </div>
-                <div className="opacity-85">
-                  • Пелот Зейца:{' '}
-                  <strong>
-                    {eng.requiresMetatarsalPad
-                      ? `Высота ${eng.metatarsalPadHeightMm} мм (на ${eng.metatarsalPadPosMm} мм от пятки)`
-                      : 'Не требуется'}
-                  </strong>
-                </div>
-              </div>
+            <RxCard
+              step="03 // ТИП СТЕЛЬКИ"
+              title={
+                eng.rx.insoleType === 'supinator'
+                  ? 'Супинатор (Вальгус)'
+                  : eng.rx.insoleType === 'pronator'
+                  ? 'Пронатор (Варус)'
+                  : 'Анатомическая'
+              }
+              line1={`Выкладка свода: ${eng.rx.archSupportHeightMm} мм`}
+              line2={
+                eng.rx.medialHeelWedgeMm > 0
+                  ? `Внутр. клин пятки: +${eng.rx.medialHeelWedgeMm} мм`
+                  : eng.rx.lateralWedgeMm > 0
+                  ? `Наруж. клин: +${eng.rx.lateralWedgeMm} мм`
+                  : 'Клин пятки: 0 мм'
+              }
+              accent={eng.rx.insoleType !== 'neutral'}
+              isDark={isDark}
+            />
 
-              <div className={`p-2.5 rounded-[10px] border ${cLine}`}>
-                <div className="font-mono text-[8px] uppercase opacity-55 mb-0.5">
-                  3. ПОДОШВА, ГЕЛЕНОК 65Г И КАБЛУК ТОМАСА
-                </div>
-                <div className="opacity-85">
-                  • Выступ каблука Томаса:{' '}
-                  <strong className="text-[#10B981]">
-                    {eng.rx.thomasHeelType === 'none'
-                      ? 'Не требуется'
-                      : `+${eng.rx.thomasExtensionMm} мм (${
-                          eng.rx.thomasHeelType === 'medial' ? 'внутренний упор' : 'наружный упор'
-                        })`}
-                  </strong>
-                </div>
-                <div className="opacity-85">
-                  • Апексы пучков: <strong>M1 = {eng.apexM1_Mm} мм / M5 = {eng.apexM5_Mm} мм</strong>
-                </div>
-                <div className="opacity-85">
-                  • Геленок 65Г: <strong>{eng.shankLength} мм (толщина {eng.steelThickness} мм)</strong> | Пик:{' '}
-                  <strong>{eng.peakForefootPressureKpa} кПа</strong>
-                </div>
-              </div>
-            </div>
+            <RxCard
+              step={`04 // ШОР & ПЕЛОТ (${weightKg} КГ)`}
+              title={eng.rx.shoreA.split('(')[0].trim()}
+              line1={
+                eng.requiresMetatarsalPad
+                  ? `Пелот Зейца: ${eng.metatarsalPadHeightMm} мм`
+                  : 'Пелот Зейца: Не нужен'
+              }
+              line2={
+                eng.requiresMetatarsalPad
+                  ? `Позиция: ${eng.metatarsalPadPosMm} мм от пятки`
+                  : `Пик пучков: ${eng.peakForefootPressureKpa} кПа`
+              }
+              accent={eng.requiresMetatarsalPad}
+              isDark={isDark}
+            />
+
+            <RxCard
+              step="05 // КАБЛУК & ПОДОШВА"
+              title={
+                soleType === 'thomas'
+                  ? `Томас +${eng.rx.thomasExtensionMm} мм`
+                  : soleType === 'rocker'
+                  ? `Рокер ${rockerAngle}°`
+                  : 'Стандартный каблук'
+              }
+              line1={
+                soleType === 'thomas'
+                  ? `Упор: ${eng.rx.thomasHeelType === 'medial' ? 'Внутренний (Med)' : 'Наружный (Lat)'}`
+                  : soleType === 'rocker'
+                  ? `Карбон пластина: ${eng.carbonInsertThicknessMm} мм`
+                  : eng.rx.recommendThomasHeel
+                  ? `Рекомендован Томас +${eng.rx.recommendedThomasMm}мм!`
+                  : `Перепад высот: ${eng.netRise} мм`
+              }
+              line2={`Нагрузка M1/M5: ${eng.loadM1Pct}% / ${eng.loadM5Pct}%`}
+              danger={soleType === 'flat' && eng.rx.recommendThomasHeel}
+              accent={soleType !== 'flat'}
+              isDark={isDark}
+            />
+
+            <RxCard
+              step="06 // ГЕЛЕНОК & АПЕКСЫ"
+              title={`Сталь 65Г: ${eng.steelThickness} мм`}
+              line1={`Длина: ${eng.shankLength} мм (Момент ${eng.shankBendingMomentNm} Н·м)`}
+              line2={`Пучки: M1=${eng.apexM1_Mm} / M5=${eng.apexM5_Mm} мм`}
+              isDark={isDark}
+            />
           </div>
         )}
       </div>
@@ -572,22 +581,35 @@ export function HeelCalcPage({ onBack, lang }: Props) {
   )
 }
 
-function CompactStepper({ label, sub, value, min, max, step = 1, onChange, unit = '', isDark }: any) {
+/** Чистая карточка ввода без обрезанных заголовков */
+function CleanStepper({
+  label,
+  badge,
+  dangerBadge = false,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  unit = '',
+  showPlus = false,
+  isDark,
+}: any) {
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/55' : 'text-[#1C1816]/55'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/60' : 'text-[#1C1816]/60'
+
+  const dispVal = showPlus && value > 0 ? `+${value}` : `${value}`
 
   return (
     <div
-      className={`flex flex-col border ${cLine} rounded-[12px] px-3 py-2 bg-[var(--color-surface)] justify-between`}
+      className={`flex flex-col border ${cLine} rounded-[12px] px-2.5 py-2 bg-[var(--color-surface)] justify-between`}
     >
-      <div className="flex items-center justify-between gap-1 mb-1">
-        <span className={`text-[7.5px] uppercase tracking-[0.15em] ${cTextMuted} truncate font-mono`}>
-          {label}
-        </span>
-        {sub && <span className="text-[7.5px] font-mono text-[#10B981] truncate">{sub}</span>}
+      <div className={`text-[8px] uppercase tracking-wider font-mono font-semibold ${cTextMuted}`}>
+        {label}
       </div>
-      <div className="flex items-center justify-between">
+
+      <div className="flex items-center justify-between my-1">
         <button
           type="button"
           onClick={() => {
@@ -602,10 +624,12 @@ function CompactStepper({ label, sub, value, min, max, step = 1, onChange, unit 
         >
           −
         </button>
-        <span className={`font-serif text-xl tabular-nums ${cText}`}>
-          {value > 0 && label.includes('Пронация') ? `+${value}` : value}
-          <span className="font-sans text-[9px] ml-0.5 opacity-60">{unit}</span>
+
+        <span className={`font-serif text-xl font-medium tabular-nums ${cText}`}>
+          {dispVal}
+          <span className="font-sans text-[9px] ml-0.5 opacity-65">{unit}</span>
         </span>
+
         <button
           type="button"
           onClick={() => {
@@ -621,6 +645,40 @@ function CompactStepper({ label, sub, value, min, max, step = 1, onChange, unit 
           +
         </button>
       </div>
+
+      <div
+        className={`text-[8.5px] font-mono leading-tight ${
+          dangerBadge ? 'text-[#E11D48] font-semibold' : 'text-[#10B981]'
+        }`}
+      >
+        {badge}
+      </div>
+    </div>
+  )
+}
+
+/** Компактная плашка Техкарты Мастера (6 карточек ровно в один экран) */
+function RxCard({ step, title, line1, line2, accent = false, danger = false, isDark }: any) {
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/55' : 'text-[#1C1816]/55'
+
+  return (
+    <div
+      className={`flex flex-col justify-between rounded-[11px] border p-2.5 bg-[var(--color-surface)] ${cLine}`}
+    >
+      <div className={`text-[7.5px] font-mono uppercase tracking-wider ${cTextMuted}`}>
+        {step}
+      </div>
+      <div
+        className="font-serif text-[14px] font-semibold leading-tight my-0.5"
+        style={{
+          color: danger ? '#E11D48' : accent ? '#10B981' : 'inherit',
+        }}
+      >
+        {title}
+      </div>
+      <div className="text-[9.5px] font-sans leading-snug opacity-85">{line1}</div>
+      <div className="text-[9px] font-mono leading-snug opacity-75 mt-0.5">{line2}</div>
     </div>
   )
 }
@@ -630,18 +688,7 @@ function getLabels(lang: Lang) {
   const ru = {
     female: 'ЖЕН',
     male: 'МУЖ',
-    size: 'Размер (Штихмасс)',
-    weight: 'Вес пациента',
-    heel: 'Высота каблука',
-    toe: 'Платформа носка',
-    angle: 'Угол рокера',
-    start: 'Линия пучков',
     fixBtn: 'Автоподбор',
-    offset: 'Смещение пятки',
-    pronation: 'Пронация(−) / Суп.(+)',
-    ballGirth: 'Обхват пучков (Oп)',
-    instepGirth: 'Прямой взъем (Oв)',
-    obliqueGirth: 'Косой обхват (Oк)',
     internalSlope: 'УКЛОН:',
     loadLbl: 'ПЛЮСНА:',
     successTitle: 'БИОМЕХАНИКА СБАЛАНСИРОВАНА',
@@ -652,11 +699,11 @@ function getLabels(lang: Lang) {
     girthWarnTitle: 'ВЫСОКИЙ ВЗЪЕМ / КОСОЙ ОБХВАТ',
     girthWarnDesc: 'Нужна налепка на гребень колодки и обязательная шнуровка/молния.',
     thomasNeedTitle: 'ТРЕБУЕТСЯ КАБЛУК ТОМАСА',
-    thomasNeedDesc: 'Завал стопы продавливает свод. Нажмите «Автоподбор» для каблука Томаса.',
+    thomasNeedDesc: 'Завал стопы продавливает свод. Нажмите «Автоподбор».',
     errTitle: 'КРИТИЧЕСКИЙ НАКЛОН КОЛОДКИ',
     errDesc: `Угол ≥ ${C.CRITICAL_ANGLE}°. Уменьшите каблук или добавьте платформу.`,
-    padTitle: 'ПЕРЕГРУЗКА ПУЧКОВ (> 240 кПа)',
-    padDesc: 'Высокое давление под M1–M5! Добавлен пелот Зейца, рекомендуется Рокер.',
+    padTitle: 'ПЕРЕГРУЗКА ПУЧКОВ (> 245 кПа)',
+    padDesc: 'Высокое давление под M1–M5! Нажмите «Автоподбор» для разгрузки.',
     negDropTitle: 'ОТРИЦАТЕЛЬНЫЙ ДРОП',
     negDropDesc: 'Платформа выше каблука.',
     heelBackTitle: 'СМЕЩЕНИЕ КАБЛУКА НАЗАД',
@@ -664,13 +711,12 @@ function getLabels(lang: Lang) {
     heelFwdTitle: 'СМЕЩЕНИЕ КАБЛУКА ВПЕРЕД',
     heelFwdDesc: `Смещение > ${C.MAX_HEEL_OFFSET_MM} мм.`,
     invertTitle: 'РИСК ВЫВИХА / ИНВЕРСИИ',
-    invertDesc: 'Критический боковой завал при текущем весе. Нажмите «Автоподбор».',
+    invertDesc: 'Боковой завал при текущем весе. Нажмите «Автоподбор».',
     heelLbl: 'ПЯТКА',
     toeLbl: 'ПУЧКИ',
     flat: 'Стандарт',
     thomas: 'Томаса',
     rocker: 'Рокер',
-    masterCardTitle: 'РЕЦЕПТ МАСТЕРА: КОЛОДКА, СТЕЛЬКА, ОПОРА',
     dropLbl: 'Дроп',
     forefoot: 'Пучки',
     rearfoot: 'Пятка',
@@ -683,20 +729,10 @@ function getLabels(lang: Lang) {
     ...ru,
     female: 'ЖІН',
     male: 'ЧОЛ',
-    size: 'Розмір (Штихмас)',
-    weight: 'Вага пацієнта',
-    heel: 'Висота підбора',
-    toe: 'Платформа носка',
-    angle: 'Кут рокера',
-    start: 'Лінія пучків',
     fixBtn: 'Автопідбір',
-    pronation: 'Пронація(−) / Суп.(+)',
-    ballGirth: 'Обхват пучків (Oп)',
-    instepGirth: 'Прямий підйом (Oв)',
-    obliqueGirth: 'Косий обхват (Oк)',
     successTitle: 'БІОМЕХАНІКА ЗБАЛАНСОВАНА',
     thomasNeedTitle: 'ПОТРІБЕН КАБЛУК ТОМАСА',
-    padTitle: 'ПЕРЕВАНТАЖЕННЯ ПУЧКІВ (> 240 кПа)',
+    padTitle: 'ПЕРЕВАНТАЖЕННЯ ПУЧКІВ (> 245 кПа)',
     flat: 'Стандарт',
     thomas: 'Томаса',
     rocker: 'Рокер',
@@ -705,10 +741,6 @@ function getLabels(lang: Lang) {
     ...ru,
     female: 'DAM',
     male: 'HER',
-    size: 'Größe (Stichmaß)',
-    weight: 'Körpergewicht',
-    heel: 'Absatzhöhe',
-    toe: 'Plateau',
     fixBtn: 'Auto-Fix',
     flat: 'Standard',
     thomas: 'Thomas',
