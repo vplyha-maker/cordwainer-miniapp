@@ -1,1 +1,46 @@
+name: Photo to 3D Shoe Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      photo_name:
+        description: 'Имя файла фото в репозитории (например, shoe.jpg)'
+        required: true
+        default: 'shoe.jpg'
+
+jobs:
+  convert-2d-to-3d:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install TripoSR and dependencies
+        run: |
+          git clone https://github.com/VAST-AI-Research/TripoSR.git
+          cd TripoSR
+          pip install -r requirements.txt
+          pip install open3d
+
+      - name: Run 3D Generation from Photo
+        run: |
+          cd TripoSR
+          # Запускаем генерацию 3D-модели по вашему фото
+          python run.py ../${{ github.event.inputs.photo_name }} --output-dir ../output_model
+
+      - name: Commit generated 3D model back to repo
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "bot@github.com"
+          # TripoSR сохраняет модель как mesh.obj или mesh.glb
+          cp output_model/0/mesh.glb ../shoe_from_photo.glb
+          cd ..
+          git add shoe_from_photo.glb
+          git commit -m "Auto-generated 3D model from photo"
+          git push
 
