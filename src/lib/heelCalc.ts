@@ -75,12 +75,9 @@ export interface MasterPrescription {
   widthIndexPct: number
   lastApexType: LastApexType
   lastApexLabel: string
-  /** Положение анатомического апекса стопы от центральной оси (+ внутрь к I пальцу, - к II/III пальцам), мм */
   anatomicalFootApexOffsetMm: number
-  /** Положение геометрического апекса колодки от центральной оси, мм */
   toeBoxShiftMedialMm: number
   toeBoxHeightMm: number
-  /** Свободный функциональный припуск перед пальцами (зеленая зона), мм */
   toeFreeSpaceMm: number
   medialBunionPocketMm: number
   compensatoryInsoleHalfPairMm: number
@@ -189,7 +186,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
 
   const footLengthMm = Math.round((shoeSize - 1.5) * C.STEP_TO_MM + asymMm * 0.5)
   const toeShapeAllowance = toeShape === 'greek' ? 11 : toeShape === 'roman' ? 9 : 8
-  const toeFreeSpaceMm = 10 + ( gender === 'male' ? 2 : 0 ) + (toeShapeAllowance - 8)
+  const toeFreeSpaceMm = 10 + (gender === 'male' ? 2 : 0) + (toeShapeAllowance - 8)
   const lastLengthMm = Math.round(footLengthMm + toeFreeSpaceMm + 6)
 
   const std = getStandardGirths(gender, shoeSize)
@@ -219,7 +216,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const requiresZipOrLaceWarning =
     obliqueEntryDeltaMm >= 12 || instepBuildUpMm >= 10 || archType === 'cavus'
 
-  // Разделение Анатомического апекса стопы и Геометрического апекса колодки
   const anatomicalFootApexOffsetMm =
     toeShape === 'egyptian' ? 9 : toeShape === 'greek' ? -2 : 3
 
@@ -268,28 +264,35 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     ballBuildUpMm >= 6 ||
     clampedWeight >= 90
 
+  // ИСПРАВЛЕНО: Пяточный клин и Каблук Томаса зависят ТОЛЬКО от реального угла завала пятки (clampedPronation)!
+  // Если Завал пятки = 0° (Нейтраль), то пяточный клин = 0 мм и каблук Томаса НЕ требуется!
   let insoleType: 'neutral' | 'supinator' | 'pronator' = 'neutral'
-  let archSupportHeightMm = archType === 'cavus' ? 14 : archType === 'flat' ? 12 : 8
+  let archSupportHeightMm = archType === 'cavus' ? 12 : archType === 'flat' ? 11 : 7
   let medialHeelWedgeMm = 0
   let lateralWedgeMm = 0
   let recommendThomasHeel = false
   let recommendedThomasMm = 0
 
-  if (clampedPronation <= -2 || archType === 'flat') {
-    const valgusAbs = Math.max(Math.abs(clampedPronation), archType === 'flat' ? 3 : 0)
+  if (clampedPronation <= -2) {
+    const valgusAbs = Math.abs(clampedPronation)
     insoleType = 'supinator'
-    archSupportHeightMm = Math.min(16, Math.round(10 + valgusAbs * 0.5))
+    archSupportHeightMm = Math.min(15, Math.round(9 + valgusAbs * 0.45))
     medialHeelWedgeMm = Math.min(7, Math.max(2, Math.round(valgusAbs * 0.5 * weightScale)))
-    recommendThomasHeel = valgusAbs >= 3
+    recommendThomasHeel = valgusAbs >= 3.5
     recommendedThomasMm = Math.min(26, Math.round((13 + valgusAbs * 0.95) * Math.min(1.15, weightScale)))
-  } else if (clampedPronation >= 2 || archType === 'cavus') {
-    const varusAbs = Math.max(Math.abs(clampedPronation), archType === 'cavus' ? 3 : 0)
+  } else if (clampedPronation >= 2) {
+    const varusAbs = Math.abs(clampedPronation)
     insoleType = 'pronator'
     archSupportHeightMm = Math.max(0, Math.round(4 - varusAbs * 0.4))
     lateralWedgeMm = Math.min(7, Math.max(2, Math.round(varusAbs * 0.5 * weightScale)))
-    recommendThomasHeel = varusAbs >= 3
+    recommendThomasHeel = varusAbs >= 3.5
     recommendedThomasMm = Math.min(24, Math.round((12 + varusAbs * 0.9) * Math.min(1.15, weightScale)))
   } else {
+    // Завал пятки 0°..±1° (Нейтральная ось пятки!)
+    insoleType = archType === 'flat' ? 'supinator' : 'neutral'
+    medialHeelWedgeMm = 0
+    lateralWedgeMm = 0
+    recommendThomasHeel = false
     recommendedThomasMm = Math.round(15 * Math.min(1.15, weightScale))
   }
 
@@ -361,15 +364,12 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   )
   const peakHeelPressureKpa = Math.round((heelForceN / heelAreaCm2) * 10 * 1.45)
 
-  // ИСПРАВЛЕНО: Пелот Зейца назначается ТОЛЬКО при реальных показаниях поперечного отдела!
-  // Он больше НЕ включается автоматически при выборе подошвы Томаса или Рокера!
+  // Пелот Зейца включается только при реальной перегрузке переднего отдела или Hallux Valgus >= 12°
   const requiresMetatarsalPad =
     forefootLoad >= 68 ||
     peakForefootPressureKpa >= 215 ||
     ballBuildUpMm >= 6 ||
-    hvDeg >= 12 ||
-    archType === 'flat' ||
-    archType === 'cavus'
+    hvDeg >= 12
 
   let metatarsalPadPosMm: number | null = null
   let metatarsalPadHeightMm: number | null = null
@@ -582,7 +582,7 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
   const heelTipOffsetMm = 0
   let rockerAngle = input.rockerAngle
 
-  if (Math.abs(input.pronationDeg) >= 3) {
+  if (Math.abs(input.pronationDeg) >= 3.5) {
     soleType = 'thomas'
     heelHeight = 24
     toeThickness = 14
