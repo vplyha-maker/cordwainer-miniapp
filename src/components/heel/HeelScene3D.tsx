@@ -68,11 +68,6 @@ const getMedialShift = (u: number) => {
   return 0
 }
 
-/**
- * Строит монолитный 3D-каблук (Стандарт или Г-образный Томас на кривых Безье),
- * верхняя грань которого плотно (без воздушного зазора!) входит в подошву,
- * а ширина точно совпадает с пяточной частью подошвы.
- */
 function createBezierHeelGeometry(params: {
   xHeelBack: number
   xFrontBase: number
@@ -140,7 +135,6 @@ function createBezierHeelGeometry(params: {
     0
   )
 
-  // Отключаем bevel, чтобы каблук не раздувался шире подошвы и не создавал ступеньку под сводом
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     steps: 14,
     depth: heelHScene,
@@ -158,7 +152,6 @@ function createBezierHeelGeometry(params: {
     const zMedial = -vz + getMedialAtX(vx)
 
     const heightRatio = Math.max(0, Math.min(1, vy / Math.max(0.02, heelHScene)))
-    // ИСПРАВЛЕНО: Верхняя плоскость каблука поднимается вплотную в тело подошвы (без воздушной щели!)
     const soleUndersideY = Math.max(0.02, getArchYAtX(vx) - 0.005)
     const adjustedY = heightRatio * soleUndersideY
     const bottomShift = (1 - heightRatio) * tipOffsetScene
@@ -319,7 +312,6 @@ export function HeelScene3D({
     )
     scene.add(copStem)
 
-    // Настоящий изометрический ракурс 3/4 сверху-сбоку (а не плоский профиль)
     const targetSpherical = { theta: 0.58, phi: 0.95, radius: 4.05, lookAtY: 0.3 }
     const currentSpherical = { ...targetSpherical }
 
@@ -472,6 +464,9 @@ export function HeelScene3D({
     const activeRockerRad = soleType === 'rocker' ? (rockerAngle * Math.PI) / 180 : 0
     const baseSoleW = (gender === 'male' ? 0.94 : 0.82) + eng.rx.ballBuildUpMm * 0.01
 
+    // Смещение носочного апекса в зависимости от морфотипа пальцев (Египетская/Греческая/Римская)
+    const apexToeZShift = eng.rx.toeBoxShiftMedialMm * 0.012
+
     const getSoleProfileY = (u: number) => {
       const clampedU = Math.max(0, Math.min(1, u))
       if (clampedU <= 0.18) {
@@ -492,10 +487,14 @@ export function HeelScene3D({
     const getArchYAtX = (x: number) => getSoleProfileY((x + 1.24) / 2.48)
     const getHalfWidth = (u: number) => Math.max(0.05, baseSoleW * 0.5 * getAnatomicWidth(u))
     const getHalfWidthAtX = (x: number) => getHalfWidth(Math.max(0, Math.min(1, (x + 1.24) / 2.48)))
-    const getMedialCurve = (u: number) => getMedialShift(u)
+    const getMedialCurve = (u: number) => {
+      const baseShift = getMedialShift(u)
+      const toeShift = u > 0.7 ? Math.pow((u - 0.7) / 0.3, 1.4) * apexToeZShift : 0
+      return baseShift + toeShift
+    }
     const getMedialAtX = (x: number) => getMedialCurve(Math.max(0, Math.min(1, (x + 1.24) / 2.48)))
 
-    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА (КРАЯ ПЛОТНО ЛЕЖАТ НА ПОДОШВЕ, А СВОД И КЛИН ОТФОРМОВАНЫ ПЛАВНЫМ РЕЛЬЕФОМ!)
+    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА
     const segsX = 96
     const segsZ = 24
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -511,21 +510,19 @@ export function HeelScene3D({
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
-      const zNorm = pos.getZ(i) / (baseSoleW * 0.5) // от -1 (наружный край) до +1 (внутренний край)
+      const zNorm = pos.getZ(i) / (baseSoleW * 0.5)
       const u = (x + 1.24) / 2.48
 
       const finalZ = zNorm * getHalfWidth(u) + getMedialCurve(u)
       pos.setZ(i, finalZ)
 
       const y = getSoleProfileY(u)
-      // Мягкая привязка самого бортика стельки к подошве, чтобы край не задирался в воздух!
       const edgeTaper = Math.max(0, 1 - Math.pow(Math.abs(zNorm), 3.5))
 
       let orthoLift = 0
       let wedgeIntensity = 0
       let archIntensity = 0
 
-      // Выкладка продольного свода (плавный купол с максимумом на zNorm ~ 0.65 и сведением в 0 на самом краю)
       if (u > 0.18 && u < 0.62 && zNorm > 0) {
         const archWave = Math.sin(((u - 0.18) / 0.44) * Math.PI)
         const medialDome = Math.sin(Math.min(1, zNorm) * (Math.PI * 0.82))
@@ -534,7 +531,6 @@ export function HeelScene3D({
         archIntensity = archWave * medialDome
       }
 
-      // Пяточный клин (плавный внутренний или наружный уклон ложа пятки без задирания кромки)
       if (u < 0.36) {
         const smoothFade = 0.5 * (1 + Math.cos((u / 0.36) * Math.PI))
         const rimFade = 0.25 + 0.75 * edgeTaper
@@ -596,7 +592,7 @@ export function HeelScene3D({
       )
     )
 
-    // 2. ПОДОШВА И КАБЛУК (ПЛОТНОЕ СОПРЯЖЕНИЕ БЕЗ ВОЗДУШНОЙ ЩЕЛИ)
+    // 2. ПОДОШВА И КАБЛУК
     if (soleType === 'rocker') {
       const rockerWedgeGeom = createFullRockerWedgeGeometry({
         baseSoleW,
@@ -662,8 +658,8 @@ export function HeelScene3D({
       const xHeelBack = -1.24
       const xFrontBase = -1.24 + 0.25 * 2.48
       const heelHScene = Math.max(0.04, h)
+      // ИСПРАВЛЕНО TS2367: внутри этой ветки soleType уже гарантированно 'flat' | 'thomas'
       const tipOffsetScene = heelTipOffsetMm * mmToUnit
-
 
       const isThomasMode = soleType === 'thomas'
       const activeThomasType = isThomasMode ? eng.rx.thomasHeelType : 'none'
@@ -707,7 +703,6 @@ export function HeelScene3D({
         )
       )
 
-      // Стальной геленок 65Г
       const shankPts: THREE.Vector3[] = []
       const shankEndRatio = Math.min(ballRatio - 0.02, 0.15 + eng.shankLength / eng.lastLengthMm)
       for (let i = 0; i <= 20; i++) {
@@ -729,8 +724,36 @@ export function HeelScene3D({
       )
     }
 
-    // 3. ОСЬ ЗАВАЛА ПЯТКИ (АХИЛЛОВО СУХОЖИЛИЕ)
+    // 3. МАРКЕРЫ 3D-СКАНЕРА XPOD: КОСАЯ ЛИНИЯ M1–M5 И ТОЧКА ГЕОМЕТРИЧЕСКОГО АПЕКСА КОЛОДКИ
     const xHeelCenter = -1.24 + 0.15 * 2.48
+    const uM1 = eng.apexM1_Mm / eng.lastLengthMm
+    const uM5 = eng.apexM5_Mm / eng.lastLengthMm
+    const xM1 = -1.24 + uM1 * 2.48
+    const xM5 = -1.24 + uM5 * 2.48
+    const zM1 = getHalfWidth(uM1) * 0.78 + getMedialCurve(uM1)
+    const zM5 = -getHalfWidth(uM5) * 0.78 + getMedialCurve(uM5)
+
+    // Оранжевая линия косого метатарзального изгиба между M1 и M5 (как на скане XPOD)
+    const metBreakPts = [
+      new THREE.Vector3(xM5, getSoleProfileY(uM5) + 0.032, zM5),
+      new THREE.Vector3(xM1, getSoleProfileY(uM1) + 0.032, zM1),
+    ]
+    dynamicGroup.add(
+      new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(metBreakPts), 8, 0.008, 8, false),
+        new THREE.MeshBasicMaterial({ color: 0xf97316 })
+      )
+    )
+
+    // Изумрудная точка геометрического апекса мыска колодки (Косой или Прямой апекс)
+    const apexToeMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0x22c55e })
+    )
+    apexToeMarker.position.set(1.22, getSoleProfileY(0.99) + 0.025, getMedialCurve(0.99))
+    dynamicGroup.add(apexToeMarker)
+
+    // Ось завала пятки
     const achillesPivot = new THREE.Group()
     achillesPivot.position.set(xHeelCenter, h + 0.025, 0)
     const residualRollDeg =
@@ -748,12 +771,9 @@ export function HeelScene3D({
     dynamicGroup.add(achillesPivot)
 
     // 4. ЗОНЫ ДАВЛЕНИЯ M1 / M5 / ПЯТКА, ПЕЛОТ ЗЕЙЦА И ВЕКТОР CoP
-    const xM1 = -1.24 + (eng.apexM1_Mm / eng.lastLengthMm) * 2.48
-    const xM5 = -1.24 + (eng.apexM5_Mm / eng.lastLengthMm) * 2.48
-
     padHeel.position.set(xHeelCenter, h + 0.024, 0)
-    padM1.position.set(xM1, t + 0.024, 0.2)
-    padM5.position.set(xM5, t + 0.024, -0.2)
+    padM1.position.set(xM1, getSoleProfileY(uM1) + 0.024, zM1 * 0.85)
+    padM5.position.set(xM5, getSoleProfileY(uM5) + 0.024, zM5 * 0.85)
 
     const sHeel = 0.65 + (eng.heelLoad / 60) * 0.65
     const sM1 = 0.65 + (eng.loadM1Pct / 50) * 0.75
@@ -798,7 +818,6 @@ export function HeelScene3D({
       <div className="relative w-full h-[195px]">
         <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-        {/* Верхние плашки */}
         <div className="pointer-events-none absolute top-2 left-2.5 right-2.5 flex items-center justify-between gap-1 text-[8.5px] font-mono">
           <div className="px-2 py-1 rounded-[7px] border border-[var(--color-border)] bg-[var(--color-surface)]/85 backdrop-blur-sm">
             <span className="opacity-65">M1/M5: </span>
@@ -833,10 +852,9 @@ export function HeelScene3D({
           </div>
         </div>
 
-        {/* Ракурсы камеры */}
         <div className="absolute bottom-1.5 left-2.5 right-2.5 flex items-center justify-between">
           <span className="text-[8px] font-mono uppercase tracking-wider opacity-65 pointer-events-none">
-            {eng.rx.widthCode}
+            {eng.rx.widthCode} // Ось пучков {eng.rx.metatarsalObliqueAngleDeg}°
           </span>
           <div className="flex items-center gap-1">
             {(
@@ -871,8 +889,8 @@ export function HeelScene3D({
           M1/Свод/Томас
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-[#D97706] inline-block" />
-          M5/Геленок 65Г
+          <span className="w-2 h-2 rounded-full bg-[#F97316] inline-block" />
+          Косая ось M1–M5
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#3186FF] inline-block" />
