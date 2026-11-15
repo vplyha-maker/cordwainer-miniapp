@@ -2,7 +2,6 @@
 import React, { useState, Suspense } from 'react'
 import type { HeelEngineering, HeelAudit, SoleType, Gender } from '../../lib/heelCalc'
 import type { HeelGeometry } from '../../lib/heelGeometry'
-import { HEEL_CONST } from '../../lib/heelCalc'
 
 const HeelScene3D = React.lazy(() =>
   import('./HeelScene3D').then((m) => ({ default: m.HeelScene3D }))
@@ -70,8 +69,8 @@ export function HeelCanvas({
   soleType,
   heelHeight,
   toeThickness,
-  rockerAngle = 12,
-  rockerStartPct = 62,
+  rockerAngle = 14,
+  rockerStartPct = 60,
   heelTipOffsetMm = 0,
   pronationDeg = 0,
   isDark = true,
@@ -244,14 +243,21 @@ export function HeelCanvas({
               />
             </g>
 
-            {/* КАБЛУК И КРИВАЯ БЕЗЬЕ ВЫСТУПА ТОМАСА */}
-            <path d={g.heelPath} fill="var(--color-ink)" opacity="0.9" transform="translate(0, 6)" />
-            {(soleType === 'thomas' || eng.rx.thomasHeelType !== 'none') && g.thomasExtensionPath && (
+            {/* КАБЛУК / РОКЕРНАЯ БАЗА */}
+            <path
+              d={g.heelPath}
+              fill={soleType === 'rocker' ? '#475569' : 'var(--color-ink)'}
+              opacity="0.9"
+              transform="translate(0, 6)"
+            />
+
+            {/* ВЫСТУП ТОМАСА РИСУЕТСЯ СТРОГО ТОЛЬКО ПРИ soleType === 'thomas' */}
+            {soleType === 'thomas' && g.thomasExtensionPath && (
               <g transform="translate(0, 6)">
                 <path
                   d={g.thomasExtensionPath}
                   fill="#10B981"
-                  fillOpacity="0.42"
+                  fillOpacity="0.45"
                   stroke="#10B981"
                   strokeWidth="1.25"
                 />
