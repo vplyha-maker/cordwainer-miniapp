@@ -90,18 +90,13 @@ export function HeelCanvas({
         borderColor: styleObj.border,
       }}
     >
-      {/* Компактная шапка статуса + кнопка Автоподбор + переключатель 3D/2D */}
-      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-[var(--color-border)]">
+      {/* Шапка статуса без обрезки заголовка */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[var(--color-border)]">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[7.5px] uppercase tracking-[0.2em] opacity-65">
-              {styleObj.badge}
-            </span>
-          </div>
-          <div className="font-serif text-[13.5px] font-medium leading-tight truncate">
+          <div className="font-serif text-[13px] font-semibold leading-snug">
             {auditTitle}
           </div>
-          <div className="text-[10px] font-sans font-light leading-snug opacity-80 line-clamp-1">
+          <div className="text-[10px] font-sans leading-tight opacity-80">
             {auditMessage}
           </div>
         </div>
@@ -136,7 +131,7 @@ export function HeelCanvas({
         </div>
       </div>
 
-      {/* СЦЕНА: 3D БИОМЕХАНИКА ИЛИ 2D ЧЕРТЕЖ */}
+      {/* СЦЕНА: 3D ИЛИ 2D */}
       {viewMode === '3d' ? (
         <Suspense
           fallback={
@@ -212,7 +207,6 @@ export function HeelCanvas({
               strokeDasharray="4 4"
             />
 
-            {/* СИЛУЭТ КОЛОДКИ, НАЛЕПКА ВЗЪЕМА И КОСОЙ ОБХВАТ */}
             <g transform="translate(0, 6)">
               <path
                 d={g.lastUpperPath}
@@ -243,7 +237,6 @@ export function HeelCanvas({
               />
             </g>
 
-            {/* КАБЛУК / РОКЕРНАЯ БАЗА */}
             <path
               d={g.heelPath}
               fill={soleType === 'rocker' ? '#475569' : 'var(--color-ink)'}
@@ -251,7 +244,6 @@ export function HeelCanvas({
               transform="translate(0, 6)"
             />
 
-            {/* ВЫСТУП ТОМАСА РИСУЕТСЯ СТРОГО ТОЛЬКО ПРИ soleType === 'thomas' */}
             {soleType === 'thomas' && g.thomasExtensionPath && (
               <g transform="translate(0, 6)">
                 <path
@@ -274,7 +266,6 @@ export function HeelCanvas({
               </g>
             )}
 
-            {/* ПОДОШВА / СТЕЛЬКА */}
             <path
               d={g.solePath}
               fill="var(--color-surface-2)"
@@ -284,7 +275,6 @@ export function HeelCanvas({
               transform="translate(0, 6)"
             />
 
-            {/* ПЕЛОТ ЗЕЙЦА */}
             {eng.requiresMetatarsalPad && (
               <g transform="translate(0, 6)">
                 <path
@@ -297,7 +287,6 @@ export function HeelCanvas({
               </g>
             )}
 
-            {/* АПЕКСЫ ПУЧКОВ M5 – M1 */}
             <g transform="translate(0, 6)">
               <line
                 x1={g.xApexM5}
@@ -345,7 +334,7 @@ export function HeelCanvas({
 
       {/* Компактный технический футер */}
       <div
-        className="px-3.5 py-1.5 flex items-center justify-between text-[10px] font-mono"
+        className="px-3 py-1.5 flex items-center justify-between text-[9.5px] font-mono"
         style={{
           borderTop: '1px solid var(--color-border)',
           backgroundColor: 'color-mix(in srgb, var(--color-surface) 65%, transparent)',
