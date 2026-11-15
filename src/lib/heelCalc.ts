@@ -48,13 +48,9 @@ export interface HeelInput {
   ballGirthMm: number
   instepGirthMm: number
   obliqueGirthMm: number
-  /** Форма пальцев стопы: египетская (I > II), греческая (II > I), римская (I ≈ II ≈ III) */
   toeShape?: ToeShape
-  /** Угол вальгусного отклонения первого пальца (Hallux Valgus, 0..35°) */
   halluxValgusDeg?: number
-  /** Морфология продольного свода: плоскостопие ('flat'), норма ('normal'), полая ('cavus') */
   archType?: ArchMorphology
-  /** Разница длины между левой и правой стопой (асимметрия L/R), мм */
   lengthAsymmetryMm?: number
 }
 
@@ -73,18 +69,21 @@ export interface MasterPrescription {
   instepBuildUpMm: number
   obliqueEntryDeltaMm: number
   requiresZipOrLaceWarning: boolean
-  /** Расчетная анатомическая ширина пучков и пятки (как в 3D сканере XPOD) */
   forefootWidthMm: number
+  standardForefootWidthMm: number
   heelWidthMm: number
   widthIndexPct: number
-  /** Геометрия носочной части и апекса колодки */
   lastApexType: LastApexType
   lastApexLabel: string
+  /** Положение анатомического апекса стопы от центральной оси (+ внутрь к I пальцу, - к II/III пальцам), мм */
+  anatomicalFootApexOffsetMm: number
+  /** Положение геометрического апекса колодки от центральной оси, мм */
   toeBoxShiftMedialMm: number
   toeBoxHeightMm: number
+  /** Свободный функциональный припуск перед пальцами (зеленая зона), мм */
+  toeFreeSpaceMm: number
   medialBunionPocketMm: number
   compensatoryInsoleHalfPairMm: number
-  /** Показания к ортезированию (не назначается автоматически без показаний!) */
   orthoticIndicated: boolean
   insoleType: 'neutral' | 'supinator' | 'pronator'
   archSupportHeightMm: number
@@ -96,9 +95,7 @@ export interface MasterPrescription {
   thomasHeelType: 'none' | 'medial' | 'lateral'
   thomasExtensionMm: number
   recommendedThomasMm: number
-  /** Скос метатарзальной линии сгиба (угол между M1 и M5 относительно поперечной оси), град */
   metatarsalObliqueAngleDeg: number
-  /** Пошаговые инженерные расчеты с формулами для протокола A–H */
   calculations: MathFormulaStep[]
 }
 
@@ -190,18 +187,17 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const hvDeg = Math.max(0, Math.min(40, halluxValgusDeg))
   const asymMm = Math.max(0, Math.min(15, lengthAsymmetryMm))
 
-  // 1. Длина стопы и индивидуальный припуск колодки (с учетом формы пальцев и асимметрии L/R)
   const footLengthMm = Math.round((shoeSize - 1.5) * C.STEP_TO_MM + asymMm * 0.5)
   const toeShapeAllowance = toeShape === 'greek' ? 11 : toeShape === 'roman' ? 9 : 8
-  const allowance = (gender === 'male' ? 2 : 0) + toeShapeAllowance
-  const lastLengthMm = Math.round(footLengthMm + 10 + allowance)
+  const toeFreeSpaceMm = 10 + ( gender === 'male' ? 2 : 0 ) + (toeShapeAllowance - 8)
+  const lastLengthMm = Math.round(footLengthMm + toeFreeSpaceMm + 6)
 
-  // 2. Полнота, ширина пучков и пятки (как в 3D-сканере XPOD: ForeFoot Width ≈ 0.415 * BallGirth, Heel Width ≈ 0.275 * BallGirth)
   const std = getStandardGirths(gender, shoeSize)
   const ballBuildUpMm = ballGirthMm - std.ballGirthMm
   const instepBuildUpMm = instepGirthMm - std.instepGirthMm
   const obliqueEntryDeltaMm = obliqueGirthMm - std.obliqueGirthMm
 
+  const standardForefootWidthMm = parseFloat((std.ballGirthMm * 0.415).toFixed(1))
   const forefootWidthMm = parseFloat((ballGirthMm * 0.415).toFixed(1))
   const heelWidthMm = parseFloat((ballGirthMm * 0.274).toFixed(1))
   const widthIndexPct = parseFloat(((forefootWidthMm / footLengthMm) * 100).toFixed(1))
@@ -220,37 +216,34 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   }
   const clampedW = Math.max(3, Math.min(11, widthIndex))
   const widthCode = widthMap[clampedW] || `F (${clampedW})`
-  const requiresZipOrLaceWarning = obliqueEntryDeltaMm >= 12 || instepBuildUpMm >= 10 || archType === 'cavus'
+  const requiresZipOrLaceWarning =
+    obliqueEntryDeltaMm >= 12 || instepBuildUpMm >= 10 || archType === 'cavus'
 
-  // 3. Инженерия носочной части и апекса колодки (Разделяем анатомические оси и геометрический апекс колодки!)
-  // При египетской стопе или Hallux Valgus >= 10° нужен Прямой/Медиальный апекс (Straight Medial Apex), чтобы не отклонять I палец снаружи!
-  // При греческой стопе (II палец длиннее I) нужен Косой анатомический апекс (Oblique Apex), смещенный к оси II луча.
-  // При римской (квадратной) стопе — широкий трапециевидный апекс (Wide Square Apex).
+  // Разделение Анатомического апекса стопы и Геометрического апекса колодки
+  const anatomicalFootApexOffsetMm =
+    toeShape === 'egyptian' ? 9 : toeShape === 'greek' ? -2 : 3
+
   let lastApexType: LastApexType = 'medial_straight'
-  let lastApexLabel = 'Прямой медиальный апекс (по оси I луча)'
-  let toeBoxShiftMedialMm = 4
+  let lastApexLabel = 'Прямой апекс (Straight Medial Apex — по оси I луча)'
+  let toeBoxShiftMedialMm = 5
   if (toeShape === 'greek' && hvDeg < 12) {
     lastApexType = 'oblique_anatomical'
-    lastApexLabel = 'Косой апекс (Oblique Apex по оси II луча)'
+    lastApexLabel = 'Косой апекс (Oblique Apex — вершина по II лучу)'
     toeBoxShiftMedialMm = 0
   } else if (toeShape === 'roman') {
     lastApexType = 'wide_square'
-    lastApexLabel = 'Широкий анатомический апекс (I–III лучи)'
-    toeBoxShiftMedialMm = 2
+    lastApexLabel = 'Широкий трапециевидный апекс (I–III лучи)'
+    toeBoxShiftMedialMm = 3
   } else if (hvDeg >= 10) {
     lastApexType = 'medial_straight'
-    lastApexLabel = 'Орто-прямой медиальный апекс (анти-HV)'
-    toeBoxShiftMedialMm = Math.round(4 + (hvDeg - 8) * 0.25)
+    lastApexLabel = 'Орто-прямой медиальный апекс (разгрузка I луча)'
+    toeBoxShiftMedialMm = Math.round(5 + (hvDeg - 8) * 0.25)
   }
 
-  // Локальная выемка (карман) на колодке под головку I плюсневой кости при Hallux Valgus (> 10°)
   const medialBunionPocketMm = hvDeg >= 10 ? Math.min(8, Math.round((hvDeg - 8) * 0.35)) : 0
-  // Необходимая высота носочной коробки (Toe Box Height): при полой стопе и молоткообразных пальцах увеличиваем до 26–30 мм
   const toeBoxHeightMm = archType === 'cavus' ? 28 : hvDeg >= 15 ? 25 : 22
-  // Компенсация асимметрии длины стоп вкладным полустелечным компенсатором для меньшей стопы
   const compensatoryInsoleHalfPairMm = asymMm >= 4 ? Math.round(asymMm * 0.75) : 0
 
-  // 4. Подбор твердости базы стельки по Шору А и жесткости задника (Counter Stiffness)
   let shoreA = '40–45 Shore A (Средняя EVA)'
   if (clampedWeight < 60) {
     shoreA = '30–35 Shore A (Мягкая EVA/PPT)'
@@ -263,13 +256,11 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const clampedPronation = Math.max(-15, Math.min(15, pronationDeg))
   const weightScale = 0.85 + (clampedWeight - 70) / 220
 
-  // Жесткость задника (фурнитура пятки)
   const counterStiffness =
     Math.abs(clampedPronation) >= 4 || clampedWeight >= 95
-      ? 'Усиленный жесткий термопласт 2.2 мм (с удлиненным крылом до пучков)'
-      : 'Стандартный формоустойчивый задник 1.6 мм'
+      ? 'Жесткий удлиненный задник 2.2 мм (до пучков)'
+      : 'Формоустойчивый задник 1.6 мм'
 
-  // 5. Ортопедический консилиум: оцениваем реальные показания к ортопедической стельке (НЕ назначаем автоматически!)
   const orthoticIndicated =
     Math.abs(clampedPronation) >= 2 ||
     archType !== 'normal' ||
@@ -309,7 +300,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     thomasExtensionMm = recommendedThomasMm
   }
 
-  // 6. Рычаг L_eff и продольный уклон
   const clampedStartPct = Math.max(52, Math.min(78, rockerStartPct))
   const dynamicLeverRatio = Math.max(
     0.58,
@@ -347,31 +337,13 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const loadM1Pct = Math.round(forefootLoad * m1Ratio)
   const loadM5Pct = Math.max(0, forefootLoad - loadM1Pct)
 
-  // 7. Анатомические ориентиры пучков M1–M5 и угол косого метатарзального изгиба
   const heelCenterPos = lastLengthMm * C.HEEL_CENTER_RATIO
   const ballPos = lastLengthMm * (clampedStartPct / 100)
   const apexM1_Mm = Math.round(ballPos - 5)
-  // Как на сканере XPOD: 1 Met = 71.8%, 5 Met = 63.0% (разница ~8.8% от длины стопы)
   const apexM5_Mm = Math.round(apexM1_Mm - footLengthMm * 0.082)
   const metatarsalObliqueAngleDeg = parseFloat(
     (Math.atan2(apexM1_Mm - apexM5_Mm, forefootWidthMm * 0.82) * (180 / Math.PI)).toFixed(1)
   )
-
-  const requiresMetatarsalPad =
-    forefootLoad >= C.CRITICAL_LOAD ||
-    clampedWeight >= 85 ||
-    ballBuildUpMm >= 6 ||
-    hvDeg >= 10 ||
-    soleType === 'thomas' ||
-    soleType === 'rocker'
-
-  let metatarsalPadPosMm: number | null = null
-  let metatarsalPadHeightMm: number | null = null
-  if (requiresMetatarsalPad) {
-    metatarsalPadPosMm = Math.round(apexM1_Mm - 7)
-    metatarsalPadHeightMm =
-      clampedWeight >= 100 || ballBuildUpMm >= 10 || hvDeg >= 15 ? 6 : netRise > 25 ? 5 : 4
-  }
 
   const contactAreaScale = (footLengthMm / 245) * (1 + ballBuildUpMm * 0.008)
   const orthoReliefFactor =
@@ -388,6 +360,24 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     (foreForceN / foreAreaCm2) * 10 * 1.55 * rollConcentration
   )
   const peakHeelPressureKpa = Math.round((heelForceN / heelAreaCm2) * 10 * 1.45)
+
+  // ИСПРАВЛЕНО: Пелот Зейца назначается ТОЛЬКО при реальных показаниях поперечного отдела!
+  // Он больше НЕ включается автоматически при выборе подошвы Томаса или Рокера!
+  const requiresMetatarsalPad =
+    forefootLoad >= 68 ||
+    peakForefootPressureKpa >= 215 ||
+    ballBuildUpMm >= 6 ||
+    hvDeg >= 12 ||
+    archType === 'flat' ||
+    archType === 'cavus'
+
+  let metatarsalPadPosMm: number | null = null
+  let metatarsalPadHeightMm: number | null = null
+  if (requiresMetatarsalPad) {
+    metatarsalPadPosMm = Math.round(apexM1_Mm - 7)
+    metatarsalPadHeightMm =
+      clampedWeight >= 100 || ballBuildUpMm >= 10 || hvDeg >= 15 ? 6 : netRise > 25 ? 5 : 4
+  }
 
   const shankLength = Math.round(Math.max(40, ballPos - heelCenterPos - 5))
   const supportReductionMm =
@@ -434,42 +424,43 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
         )
       : 0
 
-  // 8. Пошаговые доказательные формулы с подстановкой (Раздел 6 и Раздел E Экспертного Протокола)
   const calculations: MathFormulaStep[] = [
     {
       title: '1. Конструктивная длина следа колодки (L_last)',
-      given: `Размер = ${shoeSize} (Штихмасс), Длина стопы L_ст = ${footLengthMm} мм, Форма пальцев = ${toeShape}`,
-      formula: 'L_last = L_ст + Δ_движ(10 мм) + Δ_фасон',
-      substitution: `${footLengthMm} + 10 + ${allowance}`,
+      given: `Размер = ${shoeSize}, Стопа L_ст = ${footLengthMm} мм, Припуск Движ+Фасон = ${toeFreeSpaceMm + 6} мм`,
+      formula: 'L_last = L_ст + Δ_свободн + Δ_фасон',
+      substitution: `${footLengthMm} + ${toeFreeSpaceMm} + 6`,
       result: `${lastLengthMm} мм`,
-      meaning: `Обеспечивает биомеханический запас ${10 + allowance} мм при удлинении свода в фазе опоры и защищает пальцы от упора в носок.`,
+      meaning: `Зеленая зона свободного пространства перед пальцами равна ${toeFreeSpaceMm} мм.`,
     },
     {
-      title: '2. Индекс ширины и корректировка полноты колодки в пучках (ΔO_п)',
-      given: `Обхват пучков клиента O_п = ${ballGirthMm} мм, Эталон ГОСТ/WMS = ${std.ballGirthMm} мм, Ширина пучков W_п = ${forefootWidthMm} мм`,
-      formula: 'ΔO_п = O_п − O_эталон;  I_w = (W_п / L_ст) × 100%',
-      substitution: `ΔO_п = ${ballGirthMm} − ${std.ballGirthMm};  I_w = (${forefootWidthMm} / ${footLengthMm}) × 100%`,
-      result: `ΔO_п = ${ballBuildUpMm > 0 ? `+${ballBuildUpMm}` : ballBuildUpMm} мм (Полнота ${widthCode}, Индекс ширины ${widthIndexPct}%)`,
+      title: '2. Расширение пучков и карман под I луч (Желтая зона доработки)',
+      given: `Обхват клиента O_п = ${ballGirthMm} мм, База = ${std.ballGirthMm} мм, HV = ${hvDeg}°`,
+      formula: 'ΔO_п = O_п − O_база;  ΔW_пуч = (O_п − O_база) × 0.415',
+      substitution: `${ballGirthMm} − ${std.ballGirthMm} = ${ballBuildUpMm} мм`,
+      result: `Налепка пучков: ${ballBuildUpMm >= 0 ? `+${ballBuildUpMm}` : ballBuildUpMm} мм (Ширина ${forefootWidthMm} мм vs база ${standardForefootWidthMm} мм)`,
       meaning:
-        ballBuildUpMm > 0
-          ? `Требуется налепка на колодку в зоне головок M1–M5 толщиной +${ballBuildUpMm} мм${medialBunionPocketMm > 0 ? ` и локальный карман +${medialBunionPocketMm} мм под сустав I пальца (HV)` : ''}.`
-          : 'Базовый объем пучков колодки соответствует морфологии стопы.',
+        ballBuildUpMm > 0 || medialBunionPocketMm > 0
+          ? `Желтая зона модификации: расширить пучки на +${Math.max(0, ballBuildUpMm)} мм, карман M1 +${medialBunionPocketMm} мм.`
+          : 'Стандартная ширина пучков колодки.',
     },
     {
-      title: '3. Косая метатарзальная ось (M1–M5) и угол внутреннего наклона (θ_slope)',
-      given: `H = ${heelHeight} мм, T = ${toeThickness} мм, Рычаг L_eff = ${lEff} мм`,
-      formula: 'ΔH = H − T;  θ_slope = arcsin(ΔH / L_eff) × (180 / π);  φ_met = arctan((X_M1 − X_M5) / W_эфф)',
-      substitution: `ΔH = ${heelHeight} − ${toeThickness} = ${netRise} мм;  arcsin(${netRise} / ${lEff})`,
-      result: `θ_slope = ${internalSlope.toFixed(1)}°;  Косой угол пучков φ_met = ${metatarsalObliqueAngleDeg}° (M1=${apexM1_Mm} мм, M5=${apexM5_Mm} мм)`,
-      meaning: `Задает линию переката подошвы под углом ${metatarsalObliqueAngleDeg}° к продольной оси и положение ретрокапитального пелота Зейца на ${metatarsalPadPosMm ?? apexM1_Mm - 7} мм от пятки.`,
+      title: '3. Положение апекса и косой линии сгиба (Синие ориентиры)',
+      given: `M1 = ${apexM1_Mm} мм, M5 = ${apexM5_Mm} мм, Ширина = ${forefootWidthMm} мм`,
+      formula: 'φ_изгиба = arctan((X_M1 − X_M5) / (0.82 × W_пуч))',
+      substitution: `arctan((${apexM1_Mm} − ${apexM5_Mm}) / ${(forefootWidthMm * 0.82).toFixed(1)})`,
+      result: `Угол сгиба φ = ${metatarsalObliqueAngleDeg}°; Смещение апекса мыска = +${toeBoxShiftMedialMm} мм`,
+      meaning: `${lastApexLabel}.`,
     },
     {
-      title: '4. Пиковое плантарное давление (P_peak) и изгибающий момент геленка (M_shank)',
-      given: `Масса M = ${clampedWeight} кг (F_дин = ${Math.round(totalForceN)} Н), Нагрузка на пучки = ${forefootLoad}%, Плечо рычага = ${(effectiveMomentArmM * 1000).toFixed(0)} мм`,
-      formula: 'P_peak = (F_fore / S_конт) × k_конц;  M_shank = F_дин × L_рычага × k_уклона',
-      substitution: `P_peak = (${Math.round(foreForceN)} Н / ${foreAreaCm2.toFixed(1)} см²) × ${(1.55 * rollConcentration).toFixed(2)};  M = ${Math.round(totalForceN)} × ${effectiveMomentArmM.toFixed(3)} × ${slopeLoadFactor.toFixed(2)}`,
-      result: `P_peak = ${peakForefootPressureKpa} кПа (Пятка: ${peakHeelPressureKpa} кПа);  M_shank = ${shankBendingMomentNm} Н·м`,
-      meaning: `Определяет марку стали геленка 65Г (толщина ${steelThickness} мм, длина ${shankLength} мм) и твердость базового слоя стельки (${shoreA}).`,
+      title: '4. Пиковое давление (Красная зона) и момент геленка 65Г',
+      given: `Вес = ${clampedWeight} кг, Нагрузка пучков = ${forefootLoad}%, Наклон = ${internalSlope.toFixed(1)}°`,
+      formula: 'P_peak = (F_пуч / S_оп) × k;  M_гел = F_дин × L_рычага × k_укл',
+      substitution: `P = ${peakForefootPressureKpa} кПа;  M = ${shankBendingMomentNm} Н·м`,
+      result: `Давление ${peakForefootPressureKpa} кПа · Момент ${shankBendingMomentNm} Н·м (Сталь ${steelThickness} мм)`,
+      meaning: requiresMetatarsalPad
+        ? `Требуется пелот Зейца ${metatarsalPadHeightMm} мм на расстоянии ${metatarsalPadPosMm} мм от пятки.`
+        : 'Перегрузки поперечного свода нет — пелот Зейца не требуется.',
     },
   ]
 
@@ -511,12 +502,15 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
       obliqueEntryDeltaMm,
       requiresZipOrLaceWarning,
       forefootWidthMm,
+      standardForefootWidthMm,
       heelWidthMm,
       widthIndexPct,
       lastApexType,
       lastApexLabel,
+      anatomicalFootApexOffsetMm,
       toeBoxShiftMedialMm,
       toeBoxHeightMm,
+      toeFreeSpaceMm,
       medialBunionPocketMm,
       compensatoryInsoleHalfPairMm,
       orthoticIndicated,
