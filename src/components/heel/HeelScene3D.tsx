@@ -494,13 +494,12 @@ export function HeelScene3D({
     )
     dynamicGroup.add(insoleMesh)
 
-    // 3. НЕЗАВИСИМЫЕ ДЕТЕРИ ВЕРХА (Без эффекта трубы!)
+    // 3. НЕЗАВИСИМЫЕ ДЕТАЛИ ВЕРХА
     if (viewLevel !== 'biomechanics') {
       const isEng = viewLevel === 'engineering'
       const leatherColor = new THREE.Color(gender === 'male' ? (isDark ? 0x4a3222 : 0x362214) : isDark ? 0xbaab96 : 0x2b2320)
       const liningColor = leatherColor.clone().multiplyScalar(0.55)
 
-      // Функция построения анатомической детали верха по диапазону [uStart, uEnd] с уникальной высотой и сужением
       const buildUpperPiece = (uStart: number, uEnd: number, steps: number, heightMult: number, flare: number) => {
         const P: number[] = []
         const C: number[] = []
@@ -516,11 +515,10 @@ export function HeelScene3D({
           const hTop = getAnatomicHeight(u) * heightMult
 
           for (let j = 0; j <= nv; j++) {
-            const angle = (j / nv) * Math.PI // полуцилиндр от латеральной до медиальной стороны
+            const angle = (j / nv) * Math.PI
             const sa = Math.sin(angle)
             const ca = -Math.cos(angle)
 
-            // Анатомическое сечение: плоское дно, крутые бока и сужение к щиколотке
             const px = x
             const py = ySole + hTop * Math.pow(sa, 0.75)
             const pz = med + ca * hw * (1 - flare * (1 - sa))
@@ -555,13 +553,10 @@ export function HeelScene3D({
         side: THREE.DoubleSide,
       })
 
-      // Отдельная деталь А: Задник и берцы (Quarters) [0.0 - 0.38]
       dynamicGroup.add(new THREE.Mesh(buildUpperPiece(0.0, 0.38, 36, 1.15, 0.25), mat))
-
-      // Отдельная деталь Б: Союзка (Vamp) [0.42 - 0.92] с пониженным профилем носка
       dynamicGroup.add(new THREE.Mesh(buildUpperPiece(0.42, 0.92, 48, 0.75, 0.4), mat))
 
-      // Отдельная деталь В: Мягкий язычок (Tongue) под вырезом
+      // Язычок (исправлены закрывающие скобки)
       {
         const tg = new THREE.PlaneGeometry(0.55, 0.45, 16, 12)
         tg.rotateY(Math.PI / 2)
@@ -573,10 +568,14 @@ export function HeelScene3D({
           tp.setY(i, 0.38 + z * 0.4)
         }
         tg.computeVertexNormals()
-        dynamicGroup.add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ color: liningColor, roughness: 0.5 }))
+        dynamicGroup.add(
+          new THREE.Mesh(
+            tg,
+            new THREE.MeshStandardMaterial({ color: liningColor, roughness: 0.5 })
+          )
+        )
       }
 
-      // Канты и ранты для подчеркивания конструктива
       const weltGeom = new THREE.BoxGeometry(2.48, 0.012, baseSoleW * 1.02)
       weltGeom.translate(0, 0.022, 0)
       dynamicGroup.add(new THREE.Mesh(weltGeom, new THREE.MeshStandardMaterial({ color: 0x4a3222, roughness: 0.5 })))
