@@ -13,9 +13,10 @@ export const HEEL_CONST = {
   MAX_TOE: 60,
   MAX_LIFT: 50,
   MAX_THOMAS_HEEL_MM: 35,
+  MAX_ROCKER_HEEL_MM: 45, // Максимальная безопасная высота пятки для рокерной подошвы
   MAX_SHANK_MOMENT_NM: 28,
   CRITICAL_ANGLE: 16,
-  COMFORT_ANGLE: 12,
+  COMFORT_ANGLE: 11.5,
   SAFE_ANGLE: 10.5,
   CRITICAL_LOAD: 75,
   CRITICAL_KPA: 245,
@@ -113,6 +114,7 @@ export interface HeelEngineering {
   shankBendingMomentNm: number
   shankOverloaded: boolean
   thomasTooHigh: boolean
+  rockerTooHigh: boolean
   shankLength: number
   steelThickness: number
   heelOffsetTooFarBack: boolean
@@ -264,8 +266,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     ballBuildUpMm >= 6 ||
     clampedWeight >= 90
 
-  // ИСПРАВЛЕНО: Пяточный клин и Каблук Томаса зависят ТОЛЬКО от реального угла завала пятки (clampedPronation)!
-  // Если Завал пятки = 0° (Нейтраль), то пяточный клин = 0 мм и каблук Томаса НЕ требуется!
   let insoleType: 'neutral' | 'supinator' | 'pronator' = 'neutral'
   let archSupportHeightMm = archType === 'cavus' ? 12 : archType === 'flat' ? 11 : 7
   let medialHeelWedgeMm = 0
@@ -288,7 +288,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     recommendThomasHeel = varusAbs >= 3.5
     recommendedThomasMm = Math.min(24, Math.round((12 + varusAbs * 0.9) * Math.min(1.15, weightScale)))
   } else {
-    // Завал пятки 0°..±1° (Нейтральная ось пятки!)
     insoleType = archType === 'flat' ? 'supinator' : 'neutral'
     medialHeelWedgeMm = 0
     lateralWedgeMm = 0
@@ -364,7 +363,6 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   )
   const peakHeelPressureKpa = Math.round((heelForceN / heelAreaCm2) * 10 * 1.45)
 
-  // Пелот Зейца включается только при реальной перегрузке переднего отдела или Hallux Valgus >= 12°
   const requiresMetatarsalPad =
     forefootLoad >= 68 ||
     peakForefootPressureKpa >= 215 ||
@@ -398,6 +396,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
 
   const shankOverloaded = shankBendingMomentNm > C.MAX_SHANK_MOMENT_NM
   const thomasTooHigh = soleType === 'thomas' && heelHeight > C.MAX_THOMAS_HEEL_MM
+  const rockerTooHigh = soleType === 'rocker' && (heelHeight > C.MAX_ROCKER_HEEL_MM || netRise > 22)
 
   let steelThickness = clampedWeight >= 85 || gender === 'male' ? 1.5 : 1.2
   if (netRise > 35 || shankBendingMomentNm > 20) steelThickness = Math.max(steelThickness, 1.5)
@@ -481,6 +480,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     shankBendingMomentNm,
     shankOverloaded,
     thomasTooHigh,
+    rockerTooHigh,
     shankLength,
     steelThickness,
     heelOffsetTooFarBack,
@@ -545,7 +545,7 @@ export function computeAudit(
   if (eng.heelOffsetTooFarForward) {
     return { status: 'ERROR', titleKey: 'heelFwdTitle', messageKey: 'heelFwdDesc' }
   }
-  if (eng.thomasTooHigh) {
+  if (eng.thomasTooHigh || eng.rockerTooHigh) {
     return { status: 'ERROR', titleKey: 'errTitle', messageKey: 'errDesc' }
   }
   if (eng.internalSlope >= C.CRITICAL_ANGLE || eng.shankOverloaded) {
@@ -592,14 +592,20 @@ export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
     input.weightKg >= 95
   ) {
     if (soleType === 'flat') soleType = 'rocker'
-    heelHeight = 24
+    heelHeight = 26
     toeThickness = 14
     rockerAngle = 15
   }
 
   if (soleType === 'thomas' && heelHeight > HEEL_CONST.MAX_THOMAS_HEEL_MM) {
+    heelHeight = 26
+    toeThickness = 12
+  }
+
+  if (soleType === 'rocker' && (heelHeight > HEEL_CONST.MAX_ROCKER_HEEL_MM || heelHeight - toeThickness > 20)) {
     heelHeight = 28
-    toeThickness = Math.max(toeThickness, 12)
+    toeThickness = 14
+    rockerAngle = Math.max(14, rockerAngle)
   }
 
   const targetRad = (HEEL_CONST.SAFE_ANGLE * Math.PI) / 180
