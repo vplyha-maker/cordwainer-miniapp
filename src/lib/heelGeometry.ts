@@ -3,6 +3,7 @@ import {
   HEEL_CONST,
   computeEngineering,
   type SoleType,
+  type RockerType,
   type Gender,
   type ToeShape,
   type ArchMorphology,
@@ -24,6 +25,7 @@ export interface GeometryInput {
   heelHeight: number
   toeThickness: number
   soleType: SoleType
+  rockerType?: RockerType
   rockerAngle: number
   rockerStartPct: number
   heelTipOffsetMm: number
@@ -39,6 +41,35 @@ export interface GeometryInput {
   shankLength?: number
   thomasExtensionMm?: number
   instepBuildUpMm?: number
+}
+
+/**
+ * Размерно-согласованная проекция вида сверху (плантарный контур колодки),
+ * вычисленная непосредственно из миллиметровых параметров LastGeometryModel (исправление 5.1, 5.2, 5.3).
+ */
+export interface TopPlanProjectionGeometry {
+  viewBoxWidth: number
+  viewBoxHeight: number
+  centerY: number
+  scaleX: number
+  scaleY: number
+  xHeelBack: number
+  xHeelCenter: number
+  xInstep: number
+  xPelotte: number
+  xApexM5: number
+  xApexM1: number
+  xBall: number
+  xFootTip: number
+  xLastToe: number
+  yM1: number
+  yM5: number
+  yFootApex: number
+  yLastApex: number
+  standardContourPath: string
+  customContourPath: string
+  buildUpZonePath: string
+  toeFreeSpaceZonePath: string
 }
 
 export interface HeelGeometry {
@@ -77,6 +108,8 @@ export interface HeelGeometry {
   yFootBall: number
   yFootPelotte: number
   yInstepTop: number
+  /** Параметрическая геометрия вида сверху (единые координаты из LastGeometryModel) */
+  topProjection: TopPlanProjectionGeometry
 }
 
 function evalCubicBezier(t: number, p0: number, p1: number, p2: number, p3: number): number {
@@ -87,6 +120,326 @@ function evalCubicBezier(t: number, p0: number, p1: number, p2: number, p3: numb
     3 * mt * t * t * p2 +
     t * t * t * p3
   )
+}
+
+/**
+ * Строит размерно-пропорциональную проекцию вида сверху из миллиметровых координат LastGeometryModel
+ * с дифференцированным анатомическим контуром мыска для египетской, греческой и римской стопы (5.1, 5.2).
+ */
+export function buildTopPlanProjection(gm: LastGeometryModel): TopPlanProjectionGeometry {
+  const viewBoxWidth = 320
+  const viewBoxHeight = 155
+  const centerY = 78
+  const padLeft = 36
+  const usableWidthPx = 254
+  const scaleX = usableWidthPx / Math.max(200, gm.lastLengthMm)
+  const scaleY = scaleX * 0.92
+
+  const toTopX = (xMm: number) => parseFloat((padLeft + xMm * scaleX).toFixed(1))
+
+  const xHeelBack = toTopX(gm.xHeelMm)
+  const xHeelCenter = toTopX(gm.xHeelCenterMm)
+  const xInstep = toTopX(gm.xInstepMm)
+  const xPelotte = toTopX(gm.xPelotteMm)
+  const xApexM5 = toTopX(gm.xApexM5Mm)
+  const xApexM1 = toTopX(gm.xApexM1Mm)
+  const xBall = toTopX(gm.xBallMm)
+  const xFootTip = toTopX(gm.footLengthMm)
+  const xLastToe = toTopX(gm.lastLengthMm)
+
+  const halfHeelStdPx = (gm.heelWidthMm * 0.5) * scaleY
+  const halfMidStdPx = (gm.midfootWidthMm * 0.5) * scaleY
+  const halfBallStdPx = (gm.standardForefootWidthMm * 0.5) * scaleY
+  const halfBallCustomPx = (gm.forefootWidthMm * 0.5) * scaleY
+  const bunionExtraPx = gm.medialBunionPocketMm * scaleY * 1.15
+
+  // Поперечное смещение вершины мыска (вверх на схеме = медиальная сторона I луча)
+  const apexMedialShiftPx = gm.toeBoxShiftMedialMm * scaleY * 0.85
+  const yLastApex = parseFloat((centerY - apexMedialShiftPx).toFixed(1))
+  const yFootApex = parseFloat(
+    (centerY - gm.anatomicalFootApexOffsetMm * scaleY * 0.75).toFixed(1)
+  )
+
+  // Индивидуальная геометрия носочной дуги по морфологии пальцев (египетская / греческая / римская)
+  const toeMorphOffsetMedPx =
+    gm.toeShape === 'egyptian'
+      ? 6 * scaleY
+      : gm.toeShape === 'greek'
+        ? -2 * scaleY
+        : 3 * scaleY
+  const toeLateralBulgePx =
+    gm.toeShape === 'roman'
+      ? halfBallCustomPx * 0.78
+      : gm.toeShape === 'greek'
+        ? halfBallCustomPx * 0.62
+        : halfBallCustomPx * 0.48
+
+  const yMedHeel = parseFloat((centerY - halfHeelStdPx).toFixed(1))
+  const yLatHeel = parseFloat((centerY + halfHeelStdPx).toFixed(1))
+  const yMedMid = parseFloat((centerY - halfMidStdPx * 0.88).toFixed(1))
+  const yLatMid = parseFloat((centerY + halfMidStdPx * 1.04).toFixed(1))
+
+  const yMedBallStd = parseFloat((centerY - halfBallStdPx * 1.04).toFixed(1))
+  const yLatBallStd = parseFloat((centerY + halfBallStdPx * 0.96).toFixed(1))
+
+  const yM1 = parseFloat((centerY - halfBallCustomPx * 1.04 - bunionExtraPx).toFixed(1))
+  const yM5 = parseFloat((centerY + halfBallCustomPx * 0.96).toFixed(1))
+
+  const xToeShoulder = toTopX(gm.lastLengthMm * 0.89)
+  const yMedShoulderStd = parseFloat((centerY - halfBallStdPx * 0.62).toFixed(1))
+  const yLatShoulderStd = parseFloat((centerY + halfBallStdPx * 0.56).toFixed(1))
+
+  const yMedShoulderCustom = parseFloat(
+    (centerY - halfBallCustomPx * 0.66 - apexMedialShiftPx * 0.55 - toeMorphOffsetMedPx * 0.25).toFixed(1)
+  )
+  const yLatShoulderCustom = parseFloat(
+    (centerY + toeLateralBulgePx - apexMedialShiftPx * 0.2).toFixed(1)
+  )
+
+  const standardContourPath =
+    'M ' +
+    String(xHeelBack) +
+    ' ' +
+    String(centerY) +
+    ' C ' +
+    String(xHeelBack) +
+    ' ' +
+    String(yMedHeel) +
+    ', ' +
+    String(xHeelCenter + 14) +
+    ' ' +
+    String(yMedHeel) +
+    ', ' +
+    String(xInstep - 10) +
+    ' ' +
+    String(yMedMid) +
+    ' C ' +
+    String(xPelotte) +
+    ' ' +
+    String(yMedMid) +
+    ', ' +
+    String(xApexM1 - 16) +
+    ' ' +
+    String(yMedBallStd) +
+    ', ' +
+    String(xBall + 4) +
+    ' ' +
+    String(yMedBallStd) +
+    ' C ' +
+    String(xToeShoulder) +
+    ' ' +
+    String(yMedShoulderStd) +
+    ', ' +
+    String(xLastToe - 6) +
+    ' ' +
+    String(centerY - 9) +
+    ', ' +
+    String(xLastToe - 3) +
+    ' ' +
+    String(centerY) +
+    ' C ' +
+    String(xLastToe - 6) +
+    ' ' +
+    String(centerY + 9) +
+    ', ' +
+    String(xToeShoulder) +
+    ' ' +
+    String(yLatShoulderStd) +
+    ', ' +
+    String(xBall) +
+    ' ' +
+    String(yLatBallStd) +
+    ' C ' +
+    String(xApexM5 - 10) +
+    ' ' +
+    String(yLatBallStd) +
+    ', ' +
+    String(xPelotte) +
+    ' ' +
+    String(yLatMid) +
+    ', ' +
+    String(xInstep - 10) +
+    ' ' +
+    String(yLatMid) +
+    ' C ' +
+    String(xHeelCenter + 14) +
+    ' ' +
+    String(yLatHeel) +
+    ', ' +
+    String(xHeelBack) +
+    ' ' +
+    String(yLatHeel) +
+    ', ' +
+    String(xHeelBack) +
+    ' ' +
+    String(centerY) +
+    ' Z'
+
+  const customContourPath =
+    'M ' +
+    String(xHeelBack) +
+    ' ' +
+    String(centerY) +
+    ' C ' +
+    String(xHeelBack) +
+    ' ' +
+    String(yMedHeel) +
+    ', ' +
+    String(xHeelCenter + 14) +
+    ' ' +
+    String(yMedHeel) +
+    ', ' +
+    String(xInstep - 10) +
+    ' ' +
+    String(yMedMid) +
+    ' C ' +
+    String(xPelotte) +
+    ' ' +
+    String(yMedMid) +
+    ', ' +
+    String(xApexM1 - 14) +
+    ' ' +
+    String(yM1) +
+    ', ' +
+    String(xBall + 5) +
+    ' ' +
+    String(parseFloat((yM1 + 2).toFixed(1))) +
+    ' C ' +
+    String(xToeShoulder) +
+    ' ' +
+    String(yMedShoulderCustom) +
+    ', ' +
+    String(xLastToe - 4) +
+    ' ' +
+    String(parseFloat((yLastApex - 8).toFixed(1))) +
+    ', ' +
+    String(xLastToe) +
+    ' ' +
+    String(yLastApex) +
+    ' C ' +
+    String(xLastToe - 3) +
+    ' ' +
+    String(parseFloat((yLastApex + 10 + gm.toeLateralPlateauFactor * 6).toFixed(1))) +
+    ', ' +
+    String(xToeShoulder) +
+    ' ' +
+    String(yLatShoulderCustom) +
+    ', ' +
+    String(xBall - 2) +
+    ' ' +
+    String(yM5) +
+    ' C ' +
+    String(xApexM5 - 12) +
+    ' ' +
+    String(yM5) +
+    ', ' +
+    String(xPelotte) +
+    ' ' +
+    String(yLatMid) +
+    ', ' +
+    String(xInstep - 10) +
+    ' ' +
+    String(yLatMid) +
+    ' C ' +
+    String(xHeelCenter + 14) +
+    ' ' +
+    String(yLatHeel) +
+    ', ' +
+    String(xHeelBack) +
+    ' ' +
+    String(yLatHeel) +
+    ', ' +
+    String(xHeelBack) +
+    ' ' +
+    String(centerY) +
+    ' Z'
+
+  const buildUpZonePath =
+    'M ' +
+    String(xPelotte - 6) +
+    ' ' +
+    String(yMedMid) +
+    ' Q ' +
+    String(xApexM1) +
+    ' ' +
+    String(parseFloat((yM1 - 3).toFixed(1))) +
+    ', ' +
+    String(xToeShoulder - 6) +
+    ' ' +
+    String(yMedShoulderCustom) +
+    ' L ' +
+    String(xToeShoulder - 8) +
+    ' ' +
+    String(yMedShoulderStd) +
+    ' Q ' +
+    String(xApexM1) +
+    ' ' +
+    String(yMedBallStd) +
+    ', ' +
+    String(xPelotte - 6) +
+    ' ' +
+    String(yMedMid) +
+    ' Z'
+
+  const toeFreeSpaceZonePath =
+    'M ' +
+    String(xFootTip - 6) +
+    ' ' +
+    String(parseFloat((yMedShoulderCustom + 2).toFixed(1))) +
+    ' Q ' +
+    String(xLastToe - 2) +
+    ' ' +
+    String(parseFloat((yLastApex - 10).toFixed(1))) +
+    ', ' +
+    String(xLastToe) +
+    ' ' +
+    String(yLastApex) +
+    ' Q ' +
+    String(xLastToe - 2) +
+    ' ' +
+    String(parseFloat((yLastApex + 12).toFixed(1))) +
+    ', ' +
+    String(xFootTip - 6) +
+    ' ' +
+    String(parseFloat((yLatShoulderCustom - 2).toFixed(1))) +
+    ' L ' +
+    String(xFootTip - 12) +
+    ' ' +
+    String(parseFloat((yLatShoulderCustom - 6).toFixed(1))) +
+    ' Q ' +
+    String(xFootTip + 4) +
+    ' ' +
+    String(yFootApex) +
+    ', ' +
+    String(xFootTip - 12) +
+    ' ' +
+    String(parseFloat((yMedShoulderCustom + 6).toFixed(1))) +
+    ' Z'
+
+  return {
+    viewBoxWidth,
+    viewBoxHeight,
+    centerY,
+    scaleX: parseFloat(scaleX.toFixed(4)),
+    scaleY: parseFloat(scaleY.toFixed(4)),
+    xHeelBack,
+    xHeelCenter,
+    xInstep,
+    xPelotte,
+    xApexM5,
+    xApexM1,
+    xBall,
+    xFootTip,
+    xLastToe,
+    yM1,
+    yM5,
+    yFootApex,
+    yLastApex,
+    standardContourPath,
+    customContourPath,
+    buildUpZonePath,
+    toeFreeSpaceZonePath,
+  }
 }
 
 /**
@@ -107,6 +460,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
       heelHeight: input.heelHeight,
       toeThickness: input.toeThickness,
       soleType: input.soleType,
+      rockerType: input.rockerType ?? 'forefoot',
       rockerAngle: input.rockerAngle,
       rockerStartPct: input.rockerStartPct,
       heelTipOffsetMm: input.heelTipOffsetMm,
@@ -167,13 +521,70 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const c1y = yFootHeel * 0.65 + yFootBall * 0.35
   const c2y = yFootHeel * 0.25 + yFootBall * 0.75
 
-  const topPath = ('M ' + String(xHeel - 4) + ' ' + String(yFootHeel - 3) + ' L ' + String(xHeelCenter - 6) + ' ' + String(yFootHeel) + ' C ' + String(c1x) + ' ' + String(c1y) + ', ' + String(c2x) + ' ' + String(c2y) + ', ' + String(xBall) + ' ' + String(yFootBall) + ' Q ' + String(xBall + rockerZone * 0.45) + ' ' + String(yFootBall) + ', ' + String(xToe) + ' ' + String(yFootToe))
+  const topPath =
+    'M ' +
+    String(xHeel - 4) +
+    ' ' +
+    String(yFootHeel - 3) +
+    ' L ' +
+    String(xHeelCenter - 6) +
+    ' ' +
+    String(yFootHeel) +
+    ' C ' +
+    String(c1x) +
+    ' ' +
+    String(c1y) +
+    ', ' +
+    String(c2x) +
+    ' ' +
+    String(c2y) +
+    ', ' +
+    String(xBall) +
+    ' ' +
+    String(yFootBall) +
+    ' Q ' +
+    String(xBall + rockerZone * 0.45) +
+    ' ' +
+    String(yFootBall) +
+    ', ' +
+    String(xToe) +
+    ' ' +
+    String(yFootToe)
 
   const yHeelSeat = yFootHeel + Math.min(hScaled * 0.14, 7 * scale)
   const yBottomToe =
     gm.soleType === 'rocker' ? yFootToe + Math.max(tScaled, 4) : yGround - 1
 
-  const bottomPath = (' L ' + String(xToe) + ' ' + String(yBottomToe) + ' Q ' + String(xBall + rockerZone * 0.45) + ' ' + String(yGround) + ', ' + String(xBall) + ' ' + String(yGround) + ' C ' + String(c2x) + ' ' + String(yGround) + ', ' + String(c1x) + ' ' + String(yHeelSeat + 2) + ', ' + String(xHeelCenter - 4) + ' ' + String(yHeelSeat + 2) + ' L ' + String(xHeel - 2) + ' ' + String(yHeelSeat) + ' Z')
+  const bottomPath =
+    ' L ' +
+    String(xToe) +
+    ' ' +
+    String(yBottomToe) +
+    ' Q ' +
+    String(xBall + rockerZone * 0.45) +
+    ' ' +
+    String(yGround) +
+    ', ' +
+    String(xBall) +
+    ' ' +
+    String(yGround) +
+    ' C ' +
+    String(c2x) +
+    ' ' +
+    String(yGround) +
+    ', ' +
+    String(c1x) +
+    ' ' +
+    String(yHeelSeat + 2) +
+    ', ' +
+    String(xHeelCenter - 4) +
+    ' ' +
+    String(yHeelSeat + 2) +
+    ' L ' +
+    String(xHeel - 2) +
+    ' ' +
+    String(yHeelSeat) +
+    ' Z'
   const solePath = topPath + bottomPath
 
   const tInstep = Math.max(0, Math.min(1, (xInstep - archStartX) / archSpanX))
@@ -182,38 +593,148 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const yInstepTop = yInstepFoot - instepHeightPx
   const toeBoxHeightPx = gm.toeBoxHeightMm * scale
 
-  const lastUpperPath = ('M ' + String(xHeel - 2) + ' ' + String(yFootHeel - 3) + ' Q ' + String(xHeel - 5) + ' ' + String(yFootHeel - 32 * scale) + ', ' + String(xHeel + 8) + ' ' + String(yFootHeel - 48 * scale) + ' L ' + String(xInstep - 20) + ' ' + String(yInstepTop - 6) + ' Q ' + String(xInstep + 6) + ' ' + String(yInstepTop + 4) + ', ' + String(xBall + 4) + ' ' + String(yFootBall - 22 * scale) + ' Q ' + String(xToe - 8) + ' ' + String(yFootToe - toeBoxHeightPx * 0.65) + ', ' + String(xToe) + ' ' + String(yFootToe - 3))
+  const lastUpperPath =
+    'M ' +
+    String(xHeel - 2) +
+    ' ' +
+    String(yFootHeel - 3) +
+    ' Q ' +
+    String(xHeel - 5) +
+    ' ' +
+    String(yFootHeel - 32 * scale) +
+    ', ' +
+    String(xHeel + 8) +
+    ' ' +
+    String(yFootHeel - 48 * scale) +
+    ' L ' +
+    String(xInstep - 20) +
+    ' ' +
+    String(yInstepTop - 6) +
+    ' Q ' +
+    String(xInstep + 6) +
+    ' ' +
+    String(yInstepTop + 4) +
+    ', ' +
+    String(xBall + 4) +
+    ' ' +
+    String(yFootBall - 22 * scale) +
+    ' Q ' +
+    String(xToe - 8) +
+    ' ' +
+    String(yFootToe - toeBoxHeightPx * 0.65) +
+    ', ' +
+    String(xToe) +
+    ' ' +
+    String(yFootToe - 3)
 
-  // Модификация прямого взъёма:
-  // > 0 -> наращивание (налепка) поверх гребня колодки
-  // < 0 -> снятие материала (уменьшение объёма гребня) внутрь контура колодки
-  // Радиальная толщина налепки на гребень составляет ~0.26 от прироста обхвата ΔO_в и ограничивается 14 мм по высоте схемы
   let instepBuildUpPath = ''
   if (gm.instepBuildUpMm > 0) {
     const radialMm = Math.min(14, Math.max(1.5, gm.instepBuildUpMm * 0.26))
     const buildUpPx = radialMm * scale * 1.15
-    instepBuildUpPath = ('M ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 4 - buildUpPx * 1.5) + ', ' + String(xBall) + ' ' + String(yFootBall - 22 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + 1) + ', ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Z')
+    instepBuildUpPath =
+      'M ' +
+      String(xInstep - 18) +
+      ' ' +
+      String(yInstepTop - 4) +
+      ' Q ' +
+      String(xInstep) +
+      ' ' +
+      String(yInstepTop - 4 - buildUpPx * 1.5) +
+      ', ' +
+      String(xBall) +
+      ' ' +
+      String(yFootBall - 22 * scale) +
+      ' Q ' +
+      String(xInstep) +
+      ' ' +
+      String(yInstepTop + 1) +
+      ', ' +
+      String(xInstep - 18) +
+      ' ' +
+      String(yInstepTop - 4) +
+      ' Z'
   } else if (gm.instepBuildUpMm < 0) {
     const radialMm = Math.min(12, Math.max(1.5, Math.abs(gm.instepBuildUpMm) * 0.26))
     const reducePx = radialMm * scale * 1.15
-    instepBuildUpPath = ('M ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + reducePx * 1.4) + ', ' + String(xBall - 2) + ' ' + String(yFootBall - 20 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 1) + ', ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Z')
+    instepBuildUpPath =
+      'M ' +
+      String(xInstep - 16) +
+      ' ' +
+      String(yInstepTop - 2) +
+      ' Q ' +
+      String(xInstep) +
+      ' ' +
+      String(yInstepTop + reducePx * 1.4) +
+      ', ' +
+      String(xBall - 2) +
+      ' ' +
+      String(yFootBall - 20 * scale) +
+      ' Q ' +
+      String(xInstep) +
+      ' ' +
+      String(yInstepTop - 1) +
+      ', ' +
+      String(xInstep - 16) +
+      ' ' +
+      String(yInstepTop - 2) +
+      ' Z'
   }
 
-  // Модификация пучков (наращивание / снятие) в зоне M1–M5
   let ballBuildUpPath = ''
   if (gm.ballBuildUpMm !== 0) {
     const ballDeltaPx = Math.min(12, Math.abs(gm.ballBuildUpMm) * scale * 1.1)
     const dir = gm.ballBuildUpMm > 0 ? -1 : 1
-    ballBuildUpPath = ('M ' + String(xApexM5 - 6) + ' ' + String(yFootBall - 16 * scale) + ' Q ' + String((xApexM5 + xApexM1) * 0.5) + ' ' + String(yFootBall - 22 * scale + dir * ballDeltaPx * 1.6) + ', ' + String(xApexM1 + 8) + ' ' + String(yFootBall - 14 * scale) + ' Q ' + String((xApexM5 + xApexM1) * 0.5) + ' ' + String(yFootBall - 18 * scale) + ', ' + String(xApexM5 - 6) + ' ' + String(yFootBall - 16 * scale) + ' Z')
+    ballBuildUpPath =
+      'M ' +
+      String(xApexM5 - 6) +
+      ' ' +
+      String(yFootBall - 16 * scale) +
+      ' Q ' +
+      String((xApexM5 + xApexM1) * 0.5) +
+      ' ' +
+      String(yFootBall - 22 * scale + dir * ballDeltaPx * 1.6) +
+      ', ' +
+      String(xApexM1 + 8) +
+      ' ' +
+      String(yFootBall - 14 * scale) +
+      ' Q ' +
+      String((xApexM5 + xApexM1) * 0.5) +
+      ' ' +
+      String(yFootBall - 18 * scale) +
+      ', ' +
+      String(xApexM5 - 6) +
+      ' ' +
+      String(yFootBall - 16 * scale) +
+      ' Z'
   }
 
-  // Карман под Hallux Valgus (центрирован строго по xApexM1 из LastGeometryModel)
   let bunionPocketPath = ''
   if (gm.medialBunionPocketMm > 0) {
     const pocketR = gm.bunionPocketRadiusMm * scale * 0.55
     const pocketH = (3 + gm.medialBunionPocketMm * 1.15) * scale
     const yCenterM1 = yFootBall - 8 * scale
-    bunionPocketPath = ('M ' + String(xApexM1 - pocketR) + ' ' + String(yCenterM1 + 2) + ' Q ' + String(xApexM1) + ' ' + String(yCenterM1 - pocketH * 1.7) + ', ' + String(xApexM1 + pocketR) + ' ' + String(yCenterM1 + 2) + ' Q ' + String(xApexM1) + ' ' + String(yCenterM1 + pocketH * 0.65) + ', ' + String(xApexM1 - pocketR) + ' ' + String(yCenterM1 + 2) + ' Z')
+    bunionPocketPath =
+      'M ' +
+      String(xApexM1 - pocketR) +
+      ' ' +
+      String(yCenterM1 + 2) +
+      ' Q ' +
+      String(xApexM1) +
+      ' ' +
+      String(yCenterM1 - pocketH * 1.7) +
+      ', ' +
+      String(xApexM1 + pocketR) +
+      ' ' +
+      String(yCenterM1 + 2) +
+      ' Q ' +
+      String(xApexM1) +
+      ' ' +
+      String(yCenterM1 + pocketH * 0.65) +
+      ', ' +
+      String(xApexM1 - pocketR) +
+      ' ' +
+      String(yCenterM1 + 2) +
+      ' Z'
   }
 
   const xBackTop = xHeel - 2
@@ -222,19 +743,124 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
 
   let heelPath = ''
   if (gm.soleType === 'rocker') {
-    heelPath = ('M ' + String(xBackTop) + ' ' + String(yHeelSeat) + ' C ' + String(c1x) + ' ' + String(yHeelSeat) + ', ' + String(c2x) + ' ' + String(yGround) + ', ' + String(xBall) + ' ' + String(yGround) + ' L ' + String(xHeel + 16) + ' ' + String(yGround) + ' C ' + String(xHeel + 4) + ' ' + String(yGround) + ', ' + String(xBackTop - 2) + ' ' + String(yGround - hScaled * 0.4) + ', ' + String(xBackTop) + ' ' + String(yHeelSeat) + ' Z')
+    const rearBevelX =
+      gm.rockerType === 'heelToToe' ? 24 : gm.rockerType === 'negative' ? 18 : 13
+    const rearBevelLiftPx = gm.rearHeelRockerLiftMm * scale
+    heelPath =
+      'M ' +
+      String(xBackTop) +
+      ' ' +
+      String(yHeelSeat) +
+      ' C ' +
+      String(c1x) +
+      ' ' +
+      String(yHeelSeat) +
+      ', ' +
+      String(c2x) +
+      ' ' +
+      String(yGround) +
+      ', ' +
+      String(xBall) +
+      ' ' +
+      String(yGround) +
+      ' L ' +
+      String(xHeel + rearBevelX) +
+      ' ' +
+      String(yGround) +
+      ' C ' +
+      String(xHeel + 4) +
+      ' ' +
+      String(yGround - rearBevelLiftPx) +
+      ', ' +
+      String(xBackTop - 2) +
+      ' ' +
+      String(yGround - hScaled * 0.4) +
+      ', ' +
+      String(xBackTop) +
+      ' ' +
+      String(yHeelSeat) +
+      ' Z'
   } else {
-    heelPath = ('M ' + String(xBackTop) + ' ' + String(yHeelSeat) + ' C ' + String(xBackTop - 2) + ' ' + String(yHeelSeat + hScaled * 0.45) + ', ' + String(xBackBot - 1) + ' ' + String(yGround - hScaled * 0.2) + ', ' + String(xBackBot) + ' ' + String(yGround) + ' L ' + String(xFrontHeel) + ' ' + String(yGround) + ' C ' + String(xFrontHeel - 1) + ' ' + String(yGround - hScaled * 0.3) + ', ' + String(xFrontHeel + 1) + ' ' + String(yHeelSeat + hScaled * 0.3) + ', ' + String(xFrontHeel + 2) + ' ' + String(yHeelSeat + 1) + ' Z')
+    heelPath =
+      'M ' +
+      String(xBackTop) +
+      ' ' +
+      String(yHeelSeat) +
+      ' C ' +
+      String(xBackTop - 2) +
+      ' ' +
+      String(yHeelSeat + hScaled * 0.45) +
+      ', ' +
+      String(xBackBot - 1) +
+      ' ' +
+      String(yGround - hScaled * 0.2) +
+      ', ' +
+      String(xBackBot) +
+      ' ' +
+      String(yGround) +
+      ' L ' +
+      String(xFrontHeel) +
+      ' ' +
+      String(yGround) +
+      ' C ' +
+      String(xFrontHeel - 1) +
+      ' ' +
+      String(yGround - hScaled * 0.3) +
+      ', ' +
+      String(xFrontHeel + 1) +
+      ' ' +
+      String(yHeelSeat + hScaled * 0.3) +
+      ', ' +
+      String(xFrontHeel + 2) +
+      ' ' +
+      String(yHeelSeat + 1) +
+      ' Z'
   }
 
-  // Выступ каблука Томаса строится строго по координате xThomasFrontMm из LastGeometryModel
   let thomasExtensionPath = ''
   if (gm.soleType === 'thomas' && gm.thomasExtensionMm > 0) {
     const xThomasFront = toSvgX(gm.xThomasFrontMm)
     const tThomas = Math.max(0, Math.min(1, (xThomasFront - archStartX) / archSpanX))
     const yThomasArch = evalCubicBezier(tThomas, yFootHeel, c1y, c2y, yFootBall) + 2
 
-    thomasExtensionPath = ('M ' + String(xFrontHeel - 1) + ' ' + String(yHeelSeat + 1) + ' L ' + String(xFrontHeel - 1) + ' ' + String(yGround) + ' L ' + String(xThomasFront) + ' ' + String(yGround) + ' C ' + String(xThomasFront + 2) + ' ' + String(yGround - (yGround - yThomasArch) * 0.45) + ', ' + String(xThomasFront - 1) + ' ' + String(yThomasArch + 4) + ', ' + String(xThomasFront - 2) + ' ' + String(yThomasArch) + ' C ' + String((xFrontHeel + xThomasFront) * 0.5) + ' ' + String(yHeelSeat + 2) + ', ' + String(xFrontHeel + 2) + ' ' + String(yHeelSeat + 1) + ', ' + String(xFrontHeel - 1) + ' ' + String(yHeelSeat + 1) + ' Z')
+    thomasExtensionPath =
+      'M ' +
+      String(xFrontHeel - 1) +
+      ' ' +
+      String(yHeelSeat + 1) +
+      ' L ' +
+      String(xFrontHeel - 1) +
+      ' ' +
+      String(yGround) +
+      ' L ' +
+      String(xThomasFront) +
+      ' ' +
+      String(yGround) +
+      ' C ' +
+      String(xThomasFront + 2) +
+      ' ' +
+      String(yGround - (yGround - yThomasArch) * 0.45) +
+      ', ' +
+      String(xThomasFront - 1) +
+      ' ' +
+      String(yThomasArch + 4) +
+      ', ' +
+      String(xThomasFront - 2) +
+      ' ' +
+      String(yThomasArch) +
+      ' C ' +
+      String((xFrontHeel + xThomasFront) * 0.5) +
+      ' ' +
+      String(yHeelSeat + 2) +
+      ', ' +
+      String(xFrontHeel + 2) +
+      ' ' +
+      String(yHeelSeat + 1) +
+      ', ' +
+      String(xFrontHeel - 1) +
+      ' ' +
+      String(yHeelSeat + 1) +
+      ' Z'
   }
 
   const xShankEnd = toSvgX(gm.xShankEndMm)
@@ -247,12 +873,27 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const q3x = evalCubicBezier(tt, archStartX, c1x, c2x, xBall)
   const q3y = evalCubicBezier(tt, yFootHeel, c1y, c2y, yFootBall)
   const sOff = 2.5
-  const shankCurve = ('M ' + String(archStartX) + ' ' + String(yFootHeel + sOff) + ' C ' + String(q1x) + ' ' + String(q1y + sOff) + ', ' + String(q2x) + ' ' + String(q2y + sOff) + ', ' + String(q3x) + ' ' + String(q3y + sOff))
+  const shankCurve =
+    'M ' +
+    String(archStartX) +
+    ' ' +
+    String(yFootHeel + sOff) +
+    ' C ' +
+    String(q1x) +
+    ' ' +
+    String(q1y + sOff) +
+    ', ' +
+    String(q2x) +
+    ' ' +
+    String(q2y + sOff) +
+    ', ' +
+    String(q3x) +
+    ' ' +
+    String(q3y + sOff)
 
   const tPelotte = Math.max(0, Math.min(1, (xPelotte - archStartX) / archSpanX))
   const yFootPelotte = evalCubicBezier(tPelotte, yFootHeel, c1y, c2y, yFootBall)
 
-  // Высота и полуширина пелота берутся напрямую из LastGeometryModel
   const pelotteHeightMm = gm.metatarsalPadHeightMm ?? 4
   const pelotteHeightPx = pelotteHeightMm * scale * 1.15
   const pelotteHalfW = gm.pelotteHalfLengthMm * scale
@@ -261,10 +902,49 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const yStartP = evalCubicBezier(tStartP, yFootHeel, c1y, c2y, yFootBall)
   const yEndP = evalCubicBezier(tEndP, yFootHeel, c1y, c2y, yFootBall)
 
-  const pelottePath = ('M ' + String(xPelotte - pelotteHalfW) + ' ' + String(yStartP) + ' Q ' + String(xPelotte) + ' ' + String(yFootPelotte - pelotteHeightPx * 1.65) + ', ' + String(xPelotte + pelotteHalfW) + ' ' + String(yEndP) + ' Z')
+  const pelottePath =
+    'M ' +
+    String(xPelotte - pelotteHalfW) +
+    ' ' +
+    String(yStartP) +
+    ' Q ' +
+    String(xPelotte) +
+    ' ' +
+    String(yFootPelotte - pelotteHeightPx * 1.65) +
+    ', ' +
+    String(xPelotte + pelotteHalfW) +
+    ' ' +
+    String(yEndP) +
+    ' Z'
 
   const carbonYOff = 3.2
-  const carbonPath = ('M ' + String(xHeelCenter) + ' ' + String(yFootHeel + carbonYOff) + ' C ' + String(c1x) + ' ' + String(c1y + carbonYOff) + ', ' + String(c2x) + ' ' + String(c2y + carbonYOff) + ', ' + String(xBall) + ' ' + String(yFootBall + carbonYOff) + ' Q ' + String(xBall + rockerZone * 0.45) + ' ' + String(yFootBall + carbonYOff) + ', ' + String(xToe - 4) + ' ' + String(yFootToe + carbonYOff))
+  const carbonPath =
+    'M ' +
+    String(xHeelCenter) +
+    ' ' +
+    String(yFootHeel + carbonYOff) +
+    ' C ' +
+    String(c1x) +
+    ' ' +
+    String(c1y + carbonYOff) +
+    ', ' +
+    String(c2x) +
+    ' ' +
+    String(c2y + carbonYOff) +
+    ', ' +
+    String(xBall) +
+    ' ' +
+    String(yFootBall + carbonYOff) +
+    ' Q ' +
+    String(xBall + rockerZone * 0.45) +
+    ' ' +
+    String(yFootBall + carbonYOff) +
+    ', ' +
+    String(xToe - 4) +
+    ' ' +
+    String(yFootToe + carbonYOff)
+
+  const topProjection = buildTopPlanProjection(gm)
 
   return {
     model: gm,
@@ -298,5 +978,6 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     yFootBall,
     yFootPelotte,
     yInstepTop,
+    topProjection,
   }
 }
