@@ -2526,9 +2526,11 @@ const TRANSLATIONS = {
     guideTip:
       'Tipp: Tippen Sie unten auf ein beliebiges Farbfeld oder die 13-Zonen-Leiste, um den exakten HEX-Code direkt in die Zwischenablage zu kopieren.',
   },
-} as const
+}
 
-type TranslationDict = (typeof TRANSLATIONS)['ru']
+export type TranslationDict = {
+  [K in keyof (typeof TRANSLATIONS)['ru']]: string
+}
 
 /**
  * ИСПРАВЛЕНО (AUDIT-05): Динамическое формирование подписей свотчей в точном соответствии
