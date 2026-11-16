@@ -1,3 +1,4 @@
+```react
 // src/components/heel/HeelCanvas.tsx
 import React, { useState, Suspense } from 'react'
 import type { HeelEngineering, HeelAudit, SoleType, Gender } from '../../lib/heelCalc'
@@ -7,7 +8,7 @@ const HeelScene3D = React.lazy(() =>
   import('./HeelScene3D').then((m) => ({ default: m.HeelScene3D }))
 )
 
-type Labels = {
+export interface HeelCanvasLabels {
   heelLbl: string
   toeLbl: string
   dropLbl: string
@@ -19,12 +20,13 @@ type Labels = {
   mm?: string
 }
 
-type Props = {
+export interface HeelCanvasProps {
   geometry: HeelGeometry
   eng: HeelEngineering
   audit: HeelAudit
   auditTitle: string
   auditMessage: string
+  autoFixBanner?: string | null
   gender?: Gender
   soleType: SoleType
   heelHeight: number
@@ -34,7 +36,7 @@ type Props = {
   heelTipOffsetMm?: number
   pronationDeg?: number
   isDark?: boolean
-  labels: Labels
+  labels: HeelCanvasLabels
   onFix?: () => void
 }
 
@@ -65,6 +67,7 @@ export function HeelCanvas({
   audit,
   auditTitle,
   auditMessage,
+  autoFixBanner,
   gender = 'female',
   soleType,
   heelHeight,
@@ -76,11 +79,12 @@ export function HeelCanvas({
   isDark = true,
   labels: t,
   onFix,
-}: Props) {
+}: HeelCanvasProps) {
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d')
   const styleObj = AUDIT_STYLES[audit.status] || AUDIT_STYLES.SUCCESS
   const rearLabel = t.rearfoot ?? t.heelLbl
   const foreLabel = t.forefoot ?? t.toeLbl
+  const gm = eng.geometryModel
 
   return (
     <div
@@ -99,6 +103,11 @@ export function HeelCanvas({
           <div className="text-[10px] font-sans leading-tight opacity-80">
             {auditMessage}
           </div>
+          {autoFixBanner && (
+            <div className="text-[8.5px] font-mono leading-tight mt-1 text-[#F59E0B]">
+              {autoFixBanner}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -180,20 +189,20 @@ export function HeelCanvas({
                 x={Math.max(8, g.xHeel - 4)}
                 y="12"
                 fill="var(--color-muted)"
-                fontSize="7"
+                fontSize="6.8"
                 fontFamily="monospace"
               >
-                {rearLabel.toUpperCase()}: {eng.heelLoad}% ({eng.peakHeelPressureKpa} кПа)
+                {rearLabel.toUpperCase()}: {eng.heelLoad}% (~{eng.peakHeelPressureKpa} кПа, мод.)
               </text>
               <text
-                x={g.xToe - 85}
+                x={Math.max(110, g.xToe - 108)}
                 y="12"
                 fill="#E11D48"
-                fontSize="7"
+                fontSize="6.8"
                 fontFamily="monospace"
                 fontWeight="bold"
               >
-                {foreLabel.toUpperCase()}: {eng.forefootLoad}% ({eng.peakForefootPressureKpa} кПа)
+                {foreLabel.toUpperCase()}: {eng.forefootLoad}% (~{eng.peakForefootPressureKpa} кПа, мод.)
               </text>
             </g>
 
@@ -216,14 +225,49 @@ export function HeelCanvas({
                 strokeDasharray="3 3"
                 opacity="0.35"
               />
+              {/* Модификация прямого взъёма: наращивание (+) или снятие материала (−) */}
               {g.instepBuildUpPath && (
                 <path
                   d={g.instepBuildUpPath}
-                  fill="#10B981"
-                  fillOpacity="0.3"
-                  stroke="#10B981"
+                  fill={g.instepModAction === 'build_up' ? '#10B981' : '#F59E0B'}
+                  fillOpacity={g.instepModAction === 'build_up' ? '0.3' : '0.22'}
+                  stroke={g.instepModAction === 'build_up' ? '#10B981' : '#F59E0B'}
                   strokeWidth="1"
+                  strokeDasharray={g.instepModAction === 'reduce' ? '2 2' : undefined}
                 />
+              )}
+              {/* Модификация пучков: наращивание (+) или снятие материала (−) */}
+              {g.ballBuildUpPath && (
+                <path
+                  d={g.ballBuildUpPath}
+                  fill={g.ballModAction === 'build_up' ? '#F59E0B' : '#3186FF'}
+                  fillOpacity="0.24"
+                  stroke={g.ballModAction === 'build_up' ? '#F59E0B' : '#3186FF'}
+                  strokeWidth="0.9"
+                  strokeDasharray={g.ballModAction === 'reduce' ? '2 2' : undefined}
+                />
+              )}
+              {/* Разгрузочный карман под Hallux Valgus (M1) */}
+              {g.bunionPocketPath && gm.medialBunionPocketMm > 0 && (
+                <g>
+                  <path
+                    d={g.bunionPocketPath}
+                    fill="#F59E0B"
+                    fillOpacity="0.38"
+                    stroke="#F59E0B"
+                    strokeWidth="1.1"
+                  />
+                  <text
+                    x={g.xApexM1 - 14}
+                    y={g.yFootBall - 18}
+                    fill="#F59E0B"
+                    fontSize="6"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    HV +{gm.medialBunionPocketMm}мм
+                  </text>
+                </g>
               )}
               <line
                 x1={g.xHeel + 2}
@@ -261,7 +305,7 @@ export function HeelCanvas({
                   fontFamily="monospace"
                   fontWeight="bold"
                 >
-                  THOMAS +{eng.rx.thomasExtensionMm}mm
+                  THOMAS +{gm.thomasExtensionMm}mm
                 </text>
               </g>
             )}
@@ -275,7 +319,7 @@ export function HeelCanvas({
               transform="translate(0, 6)"
             />
 
-            {eng.requiresMetatarsalPad && (
+            {gm.requiresMetatarsalPad && (
               <g transform="translate(0, 6)">
                 <path
                   d={g.pelottePath}
@@ -313,7 +357,7 @@ export function HeelCanvas({
                 d={g.shankCurve}
                 fill="none"
                 stroke="var(--color-accent)"
-                strokeWidth={Math.max(2, eng.steelThickness * (g.scale * 0.8))}
+                strokeWidth={Math.max(2, gm.steelThicknessMm * (g.scale * 0.8))}
                 strokeLinecap="round"
                 transform="translate(0, 6)"
               />
@@ -322,7 +366,7 @@ export function HeelCanvas({
                 d={g.carbonPath}
                 fill="none"
                 stroke="#10B981"
-                strokeWidth={Math.max(1.8, eng.carbonInsertThicknessMm * (g.scale * 0.85))}
+                strokeWidth={Math.max(1.8, gm.carbonInsertThicknessMm * (g.scale * 0.85))}
                 strokeDasharray="6 2"
                 strokeLinecap="round"
                 transform="translate(0, 6)"
@@ -343,13 +387,21 @@ export function HeelCanvas({
       >
         <span>
           {t.internalSlope}{' '}
-          <strong className="text-[var(--color-ink)] font-serif">{eng.internalSlope.toFixed(1)}°</strong>
+          <strong className="text-[var(--color-ink)] font-serif">
+            {eng.internalSlope.toFixed(1)}°
+          </strong>
         </span>
         <span>
-          СТЕЛЬКА: <strong className="text-[var(--color-ink)]">{eng.rx.shoreA.split(' ')[0]} Шор</strong>
+          СТЕЛЬКА:{' '}
+          <strong className="text-[var(--color-ink)]">
+            {eng.rx.shoreA.split(' ')[0]} Шор
+          </strong>
         </span>
         <span>
-          МОМЕНТ: <strong className="text-[var(--color-ink)] font-serif">{eng.shankBendingMomentNm} Н·м</strong>
+          МОМЕНТ (ОЦЕНКА):{' '}
+          <strong className="text-[var(--color-ink)] font-serif">
+            {eng.shankBendingMomentNm} Н·м
+          </strong>
         </span>
       </div>
     </div>
