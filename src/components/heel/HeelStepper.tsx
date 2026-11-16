@@ -42,17 +42,15 @@ export function HeelStepper({
   const formattedValue =
     (showPlusSign || label.includes('Пронация') || label.includes('Pronation')) &&
     value > 0
-      ? `+${value}`
-      : `${value}`
+      ? ('+' + String(value))
+      : String(value)
 
   return (
     <div
-      className={`flex flex-col border ${cLine} rounded-[14px] p-3.5 bg-[var(--color-surface)] justify-between shadow-[0_4px_20px_rgb(0,0,0,0.02)] transition-colors ${
-        disabled ? 'opacity-40 pointer-events-none' : ''
-      }`}
+      className={('flex flex-col border ' + String(cLine) + ' rounded-[14px] p-3.5 bg-[var(--color-surface)] justify-between shadow-[0_4px_20px_rgb(0,0,0,0.02)] transition-colors ' + String(disabled ? 'opacity-40 pointer-events-none' : ''))}
     >
       <span
-        className={`text-[8px] uppercase tracking-[0.22em] mb-2 ${cTextMuted} truncate pr-1 font-mono`}
+        className={('text-[8px] uppercase tracking-[0.22em] mb-2 ' + String(cTextMuted) + ' truncate pr-1 font-mono')}
       >
         {label}
       </span>
@@ -62,17 +60,15 @@ export function HeelStepper({
           type="button"
           onClick={() => bump(-1)}
           disabled={disabled || value <= min}
-          className={`w-7 h-7 flex items-center justify-center rounded-[8px] bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation transition-transform ${
-            disabled || value <= min
+          className={('w-7 h-7 flex items-center justify-center rounded-[8px] bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation transition-transform ' + String(disabled || value <= min
               ? 'opacity-20 cursor-not-allowed'
-              : `active:scale-95 ${cText}`
-          }`}
+              : ('active:scale-95 ' + String(cText))))}
           aria-label="Decrease"
         >
           −
         </button>
 
-        <div className={`flex items-baseline font-serif text-2xl tabular-nums ${cText}`}>
+        <div className={('flex items-baseline font-serif text-2xl tabular-nums ' + String(cText))}>
           {formattedValue}
           {unit ? (
             <span className="font-sans text-[9px] ml-0.5 opacity-60">{unit}</span>
@@ -83,11 +79,9 @@ export function HeelStepper({
           type="button"
           onClick={() => bump(1)}
           disabled={disabled || value >= max}
-          className={`w-7 h-7 flex items-center justify-center rounded-[8px] bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation transition-transform ${
-            disabled || value >= max
+          className={('w-7 h-7 flex items-center justify-center rounded-[8px] bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation transition-transform ' + String(disabled || value >= max
               ? 'opacity-20 cursor-not-allowed'
-              : `active:scale-95 ${cText}`
-          }`}
+              : ('active:scale-95 ' + String(cText))))}
           aria-label="Increase"
         >
           +
