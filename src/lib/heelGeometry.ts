@@ -187,13 +187,16 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   // Модификация прямого взъёма:
   // > 0 -> наращивание (налепка) поверх гребня колодки
   // < 0 -> снятие материала (уменьшение объёма гребня) внутрь контура колодки
+  // Радиальная толщина налепки на гребень составляет ~0.26 от прироста обхвата ΔO_в и ограничивается 14 мм по высоте схемы
   let instepBuildUpPath = ''
   if (gm.instepBuildUpMm > 0) {
-    const buildUpPx = gm.instepBuildUpMm * scale * 1.4
-    instepBuildUpPath = ('M ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 4 - buildUpPx * 1.8) + ', ' + String(xBall) + ' ' + String(yFootBall - 22 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + 1) + ', ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Z')
+    const radialMm = Math.min(14, Math.max(1.5, gm.instepBuildUpMm * 0.26))
+    const buildUpPx = radialMm * scale * 1.15
+    instepBuildUpPath = ('M ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 4 - buildUpPx * 1.5) + ', ' + String(xBall) + ' ' + String(yFootBall - 22 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + 1) + ', ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Z')
   } else if (gm.instepBuildUpMm < 0) {
-    const reducePx = Math.abs(gm.instepBuildUpMm) * scale * 1.3
-    instepBuildUpPath = ('M ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + reducePx * 1.6) + ', ' + String(xBall - 2) + ' ' + String(yFootBall - 20 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 1) + ', ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Z')
+    const radialMm = Math.min(12, Math.max(1.5, Math.abs(gm.instepBuildUpMm) * 0.26))
+    const reducePx = radialMm * scale * 1.15
+    instepBuildUpPath = ('M ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + reducePx * 1.4) + ', ' + String(xBall - 2) + ' ' + String(yFootBall - 20 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 1) + ', ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Z')
   }
 
   // Модификация пучков (наращивание / снятие) в зоне M1–M5
