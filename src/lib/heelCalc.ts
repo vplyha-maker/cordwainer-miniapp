@@ -799,7 +799,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
       ? clampedPronation * 0.52 * thomasHeightEfficiency
       : soleType === 'rocker'
         ? clampedPronation * 0.42
-        : clampedPronation * 0.15
+        : clampedPronation * 0.35
   const effectiveRoll = clampedPronation - orthoStabilization
   const m1Ratio = Math.max(0.22, Math.min(0.82, 0.55 - effectiveRoll * 0.024))
   const loadM1Pct = Math.round(forefootLoad * m1Ratio)
@@ -1230,14 +1230,15 @@ export function computeAudit(
   if (eng.internalSlope >= C.CRITICAL_ANGLE || eng.shankOverloaded) {
     return { status: 'ERROR', titleKey: 'errTitle', messageKey: 'errDesc' }
   }
-  if (eng.rx.recommendThomasHeel && soleType === 'flat') {
-    return { status: 'ERROR', titleKey: 'thomasNeedTitle', messageKey: 'thomasNeedDesc' }
-  }
+  // При выборе "Стандарт" рекомендация каблука Томаса показывается как WARNING, а не блокирующий ERROR
   if (eng.highInversionRisk || eng.highPronationStress) {
     return { status: 'ERROR', titleKey: 'invertTitle', messageKey: 'invertDesc' }
   }
   if (eng.peakForefootPressureKpa >= C.CRITICAL_KPA || eng.forefootLoad >= C.CRITICAL_LOAD) {
     return { status: 'ERROR', titleKey: 'padTitle', messageKey: 'padDesc' }
+  }
+  if (eng.rx.recommendThomasHeel && soleType === 'flat') {
+    return { status: 'WARNING', titleKey: 'thomasNeedTitle', messageKey: 'thomasNeedDesc' }
   }
   if (eng.internalSlope < 0) {
     return { status: 'WARNING', titleKey: 'negDropTitle', messageKey: 'negDropDesc' }
@@ -1300,8 +1301,8 @@ export function collectAuditViolations(
     )
   }
   if (eng.rx.recommendThomasHeel && soleType === 'flat') {
-    errors.push(
-      ('Завал стопы (' + String(eng.pronationDeg) + '°) продавливает свод на плоской подошве — требуется каблук Томаса')
+    warnings.push(
+      ('При завале стопы (' + String(eng.pronationDeg) + '°) для максимальной стабилизации рекомендуется каблук Томаса')
     )
   }
   if (eng.highInversionRisk || eng.highPronationStress) {
@@ -1471,18 +1472,7 @@ export function suggestAutoFix(
       }
     }
 
-    // Шаг Г: Если на плоской подошве выраженный завал (recommendThomasHeel) — переход на каблук Томаса
-    // ВАЖНО: Никогда не сбрасываем 'thomas' или 'rocker' обратно в 'flat'!
-    if (state.soleType === 'flat' && currentEng.rx.recommendThomasHeel) {
-      state.soleType = 'thomas'
-      if (state.heelHeight > C.MAX_THOMAS_HEEL_MM) {
-        state.heelHeight = 28
-      }
-      appliedChanges.push(
-        ('Итер. ' + String(step) + ': назначен ортопедический каблук Томаса для стабилизации завала (' + String(state.pronationDeg) + '°)')
-      )
-      changedInStep = true
-    }
+    // Шаг Г: Сохраняем выбранный пользователем тип подошвы (soleType не меняется принудительно!)
 
     // Шаг Д: Снижение продольного уклона, перегрузки пучков, момента геленка и риска инверсии
     const needsDropReduction =
@@ -1570,44 +1560,22 @@ export function suggestAutoFix(
         }
       }
 
-      // 3) Только если перепад уже минимален, а критическое давление или перегрузка геленка
-      //    не устраняются на текущей подошве — подключаем стабилизирующую конструкцию подошвы
+      // 3) Если после шага перепад всё ещё даёт перегрузку в рамках текущего типа подошвы — дожимаем перепад высот до минимума (4..8 мм)
       const recheckEng = computeEngineering(state)
       if (
-        recheckEng.peakForefootPressureKpa >= C.CRITICAL_KPA ||
-        recheckEng.shankOverloaded ||
-        recheckEng.highInversionRisk
+        (recheckEng.peakForefootPressureKpa >= C.CRITICAL_KPA ||
+          recheckEng.shankOverloaded ||
+          recheckEng.highInversionRisk) &&
+        state.heelHeight - state.toeThickness > 4
       ) {
-        if (state.soleType === 'flat') {
-          if (Math.abs(state.pronationDeg) >= 3.5 || recheckEng.highInversionRisk) {
-            state.soleType = 'thomas'
-            state.heelHeight = Math.min(state.heelHeight, 24)
-            state.toeThickness = Math.min(state.heelHeight, Math.max(state.toeThickness, 14))
-            appliedChanges.push(
-              ('Итер. ' + String(step) + ': переход со стандартной подошвы на каблук Томаса для стабилизации и разгрузки')
-            )
-            changedInStep = true
-          } else {
-            state.soleType = 'rocker'
-            state.heelHeight = Math.min(state.heelHeight, 24)
-            state.toeThickness = Math.min(state.heelHeight, Math.max(state.toeThickness, 14))
-            state.rockerAngle = Math.max(state.rockerAngle, 18)
-            state.rockerStartPct = 60
-            appliedChanges.push(
-              ('Итер. ' + String(step) + ': переход со стандартной подошвы на рокерную подошву для снятия критического давления пучков')
-            )
-            changedInStep = true
-          }
-        } else if (
-          state.soleType === 'thomas' &&
-          !recheckEng.rx.recommendThomasHeel &&
-          (recheckEng.peakForefootPressureKpa >= C.CRITICAL_KPA || recheckEng.shankOverloaded)
-        ) {
-          state.soleType = 'rocker'
-          state.rockerAngle = Math.max(state.rockerAngle, 18)
-          state.rockerStartPct = 60
+        const minHeel = state.soleType === 'rocker' ? 20 : 16
+        const nextHeel = Math.max(minHeel, state.heelHeight - 4)
+        const nextToe = Math.min(nextHeel - 4, Math.max(state.toeThickness, nextHeel - 8))
+        if (nextHeel !== state.heelHeight || nextToe !== state.toeThickness) {
+          state.heelHeight = nextHeel
+          state.toeThickness = Math.max(0, nextToe)
           appliedChanges.push(
-            ('Итер. ' + String(step) + ': переход на рокерную подошву из-за экстремального давления в пучках при нейтральной пятке')
+            ('Итер. ' + String(step) + ': перепад высот снижен до ' + String(state.heelHeight - state.toeThickness) + ' мм (H=' + String(state.heelHeight) + ', T=' + String(state.toeThickness) + ' мм) без смены типа подошвы')
           )
           changedInStep = true
         }
