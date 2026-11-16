@@ -1,7 +1,7 @@
 // src/components/heel/HeelStepper.tsx
 import React from 'react'
 
-type Props = {
+export interface HeelStepperProps {
   label: string
   value: number
   min: number
@@ -27,7 +27,7 @@ export function HeelStepper({
   disabled = false,
   isDark = true,
   onHaptic,
-}: Props) {
+}: HeelStepperProps) {
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
@@ -40,7 +40,8 @@ export function HeelStepper({
   }
 
   const formattedValue =
-    (showPlusSign || label.includes('Пронация') || label.includes('Pronation')) && value > 0
+    (showPlusSign || label.includes('Пронация') || label.includes('Pronation')) &&
+    value > 0
       ? `+${value}`
       : `${value}`
 
@@ -55,6 +56,7 @@ export function HeelStepper({
       >
         {label}
       </span>
+
       <div className="flex items-center justify-between gap-1">
         <button
           type="button"
