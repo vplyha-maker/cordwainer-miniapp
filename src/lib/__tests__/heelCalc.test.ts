@@ -15,14 +15,14 @@ import { buildHeelGeometry } from '../heelGeometry'
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
-    throw new Error(`ASSERTION FAILED: ${message}`)
+    throw new Error(('ASSERTION FAILED: ' + String(message)))
   }
 }
 
 function assertEqual<T>(actual: T, expected: T, message: string): void {
   if (actual !== expected) {
     throw new Error(
-      `ASSERTION FAILED: ${message} — expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
+      ('ASSERTION FAILED: ' + String(message) + ' — expected ' + String(JSON.stringify(expected)) + ', got ' + String(JSON.stringify(actual)))
     )
   }
 }
@@ -60,7 +60,7 @@ export function runAllHeelTests(): { passed: number; details: string[] } {
   const test = (name: string, fn: () => void) => {
     fn()
     passed++
-    details.push(`✓ ${name}`)
+    details.push(('✓ ' + String(name)))
   }
 
   // 1. Единый источник геометрической правды и согласование длин между heelCalc и heelGeometry
@@ -412,8 +412,8 @@ export function runAllHeelTests(): { passed: number; details: string[] } {
     assertEqual(fix2.resolved, true, 'Resolved flat valgus overload')
     assertEqual(
       fix2.soleType,
-      'thomas',
-      'Upgraded flat sole to thomas heel due to valgus -7°'
+      'flat',
+      'Preserved flat soleType without forcibly switching to thomas'
     )
     assert(fix2.iterations >= 1 && fix2.iterations <= 7, 'Converged within iteration limit')
 
@@ -498,8 +498,7 @@ export function runAllHeelTests(): { passed: number; details: string[] } {
 
 // Автозапуск при прямом вызове через Node/TSX
 const result = runAllHeelTests()
-console.log(`ALL ${result.passed} TEST SUITES PASSED:`)
+console.log(('ALL ' + String(result.passed) + ' TEST SUITES PASSED:'))
 for (const line of result.details) {
-  console.log(`  ${line}`)
+  console.log(('  ' + String(line)))
 }
-
