@@ -985,35 +985,7 @@ export function HeelScene3D({
       )
       dynamicGroup.add(apexToeMarker)
 
-      // Дуга модификации прямого взъёма в 3D (показывает +наращивание зелёным или -снятие жёлтым)
-      if (gm.instepBuildUpMm !== 0) {
-        const uInstep = gm.uInstep
-        const xInstep = -1.24 + uInstep * 2.48
-        const baseCrestY =
-          getSoleProfileY(uInstep) + gm.instepBaseHeightMm * mmToUnit * 0.52
-        const deltaCrestY = gm.instepBuildUpMm * mmToUnit * 1.2
-        const hwInstep = getHalfWidth(uInstep) * 0.85
-        const zMed = getMedialCurve(uInstep)
-        const instepArcPts = [
-          new THREE.Vector3(xInstep, getSoleProfileY(uInstep) + 0.03, -hwInstep + zMed),
-          new THREE.Vector3(xInstep, baseCrestY + deltaCrestY, zMed),
-          new THREE.Vector3(xInstep, getSoleProfileY(uInstep) + 0.03, hwInstep + zMed),
-        ]
-        dynamicGroup.add(
-          new THREE.Mesh(
-            new THREE.TubeGeometry(
-              new THREE.CatmullRomCurve3(instepArcPts),
-              16,
-              0.007,
-              8,
-              false
-            ),
-            new THREE.MeshBasicMaterial({
-              color: gm.instepModAction === 'build_up' ? 0x10b981 : 0xf59e0b,
-            })
-          )
-        )
-      }
+
     }
 
     const achillesPivot = new THREE.Group()
