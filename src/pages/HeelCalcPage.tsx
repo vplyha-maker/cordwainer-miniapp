@@ -16,6 +16,8 @@ import {
   type ToeShape,
   type ArchMorphology,
   type AsymmetrySide,
+  type FootSideProfile,
+  type ShankProfileType,
 } from '../lib/heelCalc'
 import { buildHeelGeometry } from '../lib/heelGeometry'
 import { HeelCanvas } from '../components/heel/HeelCanvas'
@@ -110,18 +112,42 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [soleType, setSoleType] = useState<SoleType>('thomas')
   const [heelTipOffsetMm, setHeelTipOffsetMm] = useState(0)
   const [rockerType, setRockerType] = useState<RockerType>('forefoot')
-  const [pronationDeg, setPronationDeg] = useState(-5)
+  const [shankProfilePreference, setShankProfilePreference] = useState<
+    ShankProfileType | undefined
+  >(undefined)
 
+  // Симметричные / ведущие параметры
+  const [pronationDeg, setPronationDeg] = useState(-5)
   const [ballGirthMm, setBallGirthMm] = useState(226)
   const [instepGirthMm, setInstepGirthMm] = useState(235)
   const [obliqueGirthMm, setObliqueGirthMm] = useState(296)
-
-  // Клинические параметры: морфология пальцев, HV, свод и сторона асимметрии
   const [toeShape, setToeShape] = useState<ToeShape>('egyptian')
   const [halluxValgusDeg, setHalluxValgusDeg] = useState(8)
   const [archType, setArchType] = useState<ArchMorphology>('normal')
   const [lengthAsymmetryMm, setLengthAsymmetryMm] = useState(2)
   const [asymmetrySide, setAsymmetrySide] = useState<AsymmetrySide>('left')
+
+  // Независимые профили Левой и Правой стопы (LeftRightFootProfile)
+  const [independentSides, setIndependentSides] = useState<boolean>(false)
+  const [activeSide, setActiveSide] = useState<'left' | 'right'>('left')
+  const [leftProfile, setLeftProfile] = useState<FootSideProfile>({
+    ballGirthMm: 226,
+    instepGirthMm: 235,
+    obliqueGirthMm: 296,
+    pronationDeg: -5,
+    halluxValgusDeg: 8,
+    archType: 'normal',
+    toeShape: 'egyptian',
+  })
+  const [rightProfile, setRightProfile] = useState<FootSideProfile>({
+    ballGirthMm: 224,
+    instepGirthMm: 233,
+    obliqueGirthMm: 294,
+    pronationDeg: -3,
+    halluxValgusDeg: 6,
+    archType: 'normal',
+    toeShape: 'egyptian',
+  })
 
   useEffect(() => {
     if (toeThickness > heelHeight + 10) {
@@ -130,6 +156,65 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   }, [heelHeight, toeThickness])
 
   const t = useMemo(() => getLabels(lang), [lang])
+
+  // Текущие отображаемые в степперах обхваты и углы (с учётом режима ПАРА / ЛЕВ / ПРАВ)
+  const curBallGirth = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.ballGirthMm
+      : rightProfile.ballGirthMm
+    : ballGirthMm
+  const curInstepGirth = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.instepGirthMm
+      : rightProfile.instepGirthMm
+    : instepGirthMm
+  const curObliqueGirth = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.obliqueGirthMm
+      : rightProfile.obliqueGirthMm
+    : obliqueGirthMm
+  const curPronation = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.pronationDeg
+      : rightProfile.pronationDeg
+    : pronationDeg
+  const curHvDeg = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.halluxValgusDeg
+      : rightProfile.halluxValgusDeg
+    : halluxValgusDeg
+  const curArchType = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.archType
+      : rightProfile.archType
+    : archType
+  const curToeShape = independentSides
+    ? activeSide === 'left'
+      ? leftProfile.toeShape
+      : rightProfile.toeShape
+    : toeShape
+
+  const updateSideField = <K extends keyof FootSideProfile>(
+    key: K,
+    val: FootSideProfile[K]
+  ) => {
+    setAutoFixBanner(null)
+    if (!independentSides) {
+      if (key === 'ballGirthMm') setBallGirthMm(val as number)
+      if (key === 'instepGirthMm') setInstepGirthMm(val as number)
+      if (key === 'obliqueGirthMm') setObliqueGirthMm(val as number)
+      if (key === 'pronationDeg') setPronationDeg(val as number)
+      if (key === 'halluxValgusDeg') setHalluxValgusDeg(val as number)
+      if (key === 'archType') setArchType(val as ArchMorphology)
+      if (key === 'toeShape') setToeShape(val as ToeShape)
+      setLeftProfile((p) => ({ ...p, [key]: val }))
+      setRightProfile((p) => ({ ...p, [key]: val }))
+    } else if (activeSide === 'left') {
+      setLeftProfile((p) => ({ ...p, [key]: val }))
+    } else {
+      setRightProfile((p) => ({ ...p, [key]: val }))
+    }
+  }
 
   const handleGenderChange = (newGender: Gender) => {
     haptic('light')
@@ -142,6 +227,18 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     setBallGirthMm(std.ballGirthMm)
     setInstepGirthMm(std.instepGirthMm)
     setObliqueGirthMm(std.obliqueGirthMm)
+    setLeftProfile((p) => ({
+      ...p,
+      ballGirthMm: std.ballGirthMm,
+      instepGirthMm: std.instepGirthMm,
+      obliqueGirthMm: std.obliqueGirthMm,
+    }))
+    setRightProfile((p) => ({
+      ...p,
+      ballGirthMm: std.ballGirthMm,
+      instepGirthMm: std.instepGirthMm,
+      obliqueGirthMm: std.obliqueGirthMm,
+    }))
     setHeelHeight(newGender === 'male' ? 26 : 28)
     setToeThickness(12)
   }
@@ -150,10 +247,25 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     setAutoFixBanner(null)
     const oldStd = getStandardGirths(gender, shoeSize)
     const newStd = getStandardGirths(gender, newSize)
+    const dBall = newStd.ballGirthMm - oldStd.ballGirthMm
+    const dInstep = newStd.instepGirthMm - oldStd.instepGirthMm
+    const dOblique = newStd.obliqueGirthMm - oldStd.obliqueGirthMm
     setShoeSize(newSize)
-    setBallGirthMm(newStd.ballGirthMm + (ballGirthMm - oldStd.ballGirthMm))
-    setInstepGirthMm(newStd.instepGirthMm + (instepGirthMm - oldStd.instepGirthMm))
-    setObliqueGirthMm(newStd.obliqueGirthMm + (obliqueGirthMm - oldStd.obliqueGirthMm))
+    setBallGirthMm((v) => v + dBall)
+    setInstepGirthMm((v) => v + dInstep)
+    setObliqueGirthMm((v) => v + dOblique)
+    setLeftProfile((p) => ({
+      ...p,
+      ballGirthMm: p.ballGirthMm + dBall,
+      instepGirthMm: p.instepGirthMm + dInstep,
+      obliqueGirthMm: p.obliqueGirthMm + dOblique,
+    }))
+    setRightProfile((p) => ({
+      ...p,
+      ballGirthMm: p.ballGirthMm + dBall,
+      instepGirthMm: p.instepGirthMm + dInstep,
+      obliqueGirthMm: p.obliqueGirthMm + dOblique,
+    }))
   }
 
   const handleAsymmetrySideChange = (side: AsymmetrySide) => {
@@ -187,15 +299,20 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       rockerStartPct,
       heelTipOffsetMm,
       rockerType,
-      pronationDeg,
-      ballGirthMm,
-      instepGirthMm,
-      obliqueGirthMm,
-      toeShape,
-      halluxValgusDeg,
-      archType,
+      pronationDeg: curPronation,
+      ballGirthMm: curBallGirth,
+      instepGirthMm: curInstepGirth,
+      obliqueGirthMm: curObliqueGirth,
+      toeShape: curToeShape,
+      halluxValgusDeg: curHvDeg,
+      archType: curArchType,
       lengthAsymmetryMm,
       asymmetrySide,
+      independentSides,
+      activeSide,
+      leftProfile,
+      rightProfile,
+      shankProfilePreference,
     }),
     [
       gender,
@@ -208,15 +325,20 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       rockerStartPct,
       heelTipOffsetMm,
       rockerType,
-      pronationDeg,
-      ballGirthMm,
-      instepGirthMm,
-      obliqueGirthMm,
-      toeShape,
-      halluxValgusDeg,
-      archType,
+      curPronation,
+      curBallGirth,
+      curInstepGirth,
+      curObliqueGirth,
+      curToeShape,
+      curHvDeg,
+      curArchType,
       lengthAsymmetryMm,
       asymmetrySide,
+      independentSides,
+      activeSide,
+      leftProfile,
+      rightProfile,
+      shankProfilePreference,
     ]
   )
 
@@ -227,7 +349,6 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     [eng, soleType, heelHeight, rockerAngle]
   )
 
-  // 2D-геометрия строится строго из единого объекта eng.geometryModel
   const geometry = useMemo(
     () =>
       buildHeelGeometry({
@@ -277,12 +398,19 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
 
   const gm = eng.geometryModel
+  const se = eng.shankEngineering
   const auditTitle = t[audit.titleKey as keyof typeof t] ?? audit.titleKey
   const auditMessage = t[audit.messageKey as keyof typeof t] ?? audit.messageKey
 
   return (
     <div
-      className={('fixed inset-0 flex flex-col h-[100dvh] w-full max-w-[100vw] transition-colors duration-300 ' + String(cBg) + ' ' + String(cText) + ' overflow-hidden')}
+      className={
+        'fixed inset-0 flex flex-col h-[100dvh] w-full max-w-[100vw] transition-colors duration-300 ' +
+        String(cBg) +
+        ' ' +
+        String(cText) +
+        ' overflow-hidden'
+      }
     >
       <style>{'* { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; } .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }'}</style>
 
@@ -294,7 +422,10 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             haptic('light')
             onBack()
           }}
-          className={('flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider outline-none border-none bg-transparent cursor-pointer py-1 shrink-0 ' + String(cTextMuted))}
+          className={
+            'flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-wider outline-none border-none bg-transparent cursor-pointer py-1 shrink-0 ' +
+            String(cTextMuted)
+          }
         >
           <span>←</span>
           <span>НАЗАД</span>
@@ -307,9 +438,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                 key={type}
                 type="button"
                 onClick={() => handleSoleTypeChange(type)}
-                className={('px-2.5 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' + String(soleType === type
-                    ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
-                    : 'bg-transparent text-[var(--color-ink)] opacity-60'))}
+                className={
+                  'px-2.5 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' +
+                  String(
+                    soleType === type
+                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
+                      : 'bg-transparent text-[var(--color-ink)] opacity-60'
+                  )
+                }
               >
                 {t[type]}
               </button>
@@ -322,9 +458,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                 key={g}
                 type="button"
                 onClick={() => handleGenderChange(g)}
-                className={('px-2 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' + String(gender === g
-                    ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
-                    : 'bg-transparent text-[var(--color-ink)] opacity-60'))}
+                className={
+                  'px-2 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' +
+                  String(
+                    gender === g
+                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
+                      : 'bg-transparent text-[var(--color-ink)] opacity-60'
+                  )
+                }
               >
                 {g === 'female' ? t.female : t.male}
               </button>
@@ -349,7 +490,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
           rockerAngle={rockerAngle}
           rockerStartPct={rockerStartPct}
           heelTipOffsetMm={heelTipOffsetMm}
-          pronationDeg={pronationDeg}
+          pronationDeg={curPronation}
           isDark={isDark}
           labels={t}
           onFix={handleFix}
@@ -359,7 +500,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
       {/* 3. ВКЛАДКИ (ОБМЕРЫ / АНАТОМИЯ & АПЕКС / ПОДОШВА / ТЕХКАРТА) */}
       <div className="px-3 shrink-0">
         <div
-          className={('grid grid-cols-4 gap-1 p-1 rounded-[10px] border ' + String(cLine) + ' bg-[var(--color-surface)]')}
+          className={
+            'grid grid-cols-4 gap-1 p-1 rounded-[10px] border ' +
+            String(cLine) +
+            ' bg-[var(--color-surface)]'
+          }
         >
           {(
             [
@@ -376,9 +521,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                 haptic('light')
                 setActiveTab(tab.id)
               }}
-              className={('py-1.5 rounded-[7px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' + String(activeTab === tab.id
-                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold shadow-sm'
-                  : 'bg-transparent text-[var(--color-ink)] opacity-60'))}
+              className={
+                'py-1.5 rounded-[7px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' +
+                String(
+                  activeTab === tab.id
+                    ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold shadow-sm'
+                    : 'bg-transparent text-[var(--color-ink)] opacity-60'
+                )
+              }
             >
               {tab.label}
             </button>
@@ -388,11 +538,70 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
       {/* 4. НИЖНЯЯ ПАНЕЛЬ */}
       <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 scrollbar-hide">
+        {/* ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМА ПОЛУПАР (ПАРА СИММЕТРИЧНО vs ЛЕВАЯ L vs ПРАВАЯ R) В ТАБАХ 1 И 2 */}
+        {(activeTab === 'foot' || activeTab === 'anatomy') && (
+          <div className="grid grid-cols-3 gap-1.5 mb-2">
+            <button
+              type="button"
+              onClick={() => {
+                haptic('light')
+                setIndependentSides(false)
+              }}
+              className={
+                'py-1.5 px-2 rounded-[8px] text-[7.5px] font-mono uppercase border cursor-pointer transition-all ' +
+                String(
+                  !independentSides
+                    ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
+                    : String(cLine) + ' bg-[var(--color-surface)] ' + String(cText) + ' opacity-75'
+                )
+              }
+            >
+              ПАРА (ОБЩИЕ ОБМЕРЫ)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptic('light')
+                setIndependentSides(true)
+                setActiveSide('left')
+              }}
+              className={
+                'py-1.5 px-2 rounded-[8px] text-[7.5px] font-mono uppercase border cursor-pointer transition-all ' +
+                String(
+                  independentSides && activeSide === 'left'
+                    ? 'bg-[#10B981] text-black border-transparent font-semibold'
+                    : String(cLine) + ' bg-[var(--color-surface)] ' + String(cText) + ' opacity-75'
+                )
+              }
+            >
+              ЛЕВАЯ ПОЛУПАРА (L)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptic('light')
+                setIndependentSides(true)
+                setActiveSide('right')
+              }}
+              className={
+                'py-1.5 px-2 rounded-[8px] text-[7.5px] font-mono uppercase border cursor-pointer transition-all ' +
+                String(
+                  independentSides && activeSide === 'right'
+                    ? 'bg-[#3186FF] text-white border-transparent font-semibold'
+                    : String(cLine) + ' bg-[var(--color-surface)] ' + String(cText) + ' opacity-75'
+                )
+              }
+            >
+              ПРАВАЯ ПОЛУПАРА (R)
+            </button>
+          </div>
+        )}
+
         {activeTab === 'foot' && (
           <div className="grid grid-cols-2 gap-2">
             <CleanStepper
               label="РАЗМЕР СТОПЫ"
-              badge={('Стопа ' + String(gm.footLengthMm) + ' мм · След ' + String(gm.lastLengthMm) + ' мм')}
+              badge={'Стопа ' + String(gm.footLengthMm) + ' мм · След ' + String(gm.lastLengthMm) + ' мм'}
               value={shoeSize}
               min={gender === 'male' ? 38 : 33}
               max={gender === 'male' ? 48 : 43}
@@ -401,7 +610,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             />
             <CleanStepper
               label="ВЕС ЧЕЛОВЕКА"
-              badge={('Стелька ' + String(eng.rx.shoreA.split(' ')[0]) + ' Шор')}
+              badge={'Стелька ' + String(eng.rx.shoreA.split(' ')[0]) + ' Шор'}
               value={weightKg}
               min={40}
               max={150}
@@ -414,57 +623,76 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               isDark={isDark}
             />
             <CleanStepper
-              label="ЗАВАЛ ПЯТКИ"
+              label={
+                independentSides
+                  ? 'ЗАВАЛ ПЯТКИ (' + String(activeSide === 'left' ? 'ЛЕВ' : 'ПРАВ') + ')'
+                  : 'ЗАВАЛ ПЯТКИ'
+              }
               badge={
-                pronationDeg <= -2
-                  ? ('Вальгус · Клин +' + String(eng.rx.medialHeelWedgeMm) + 'мм')
-                  : pronationDeg >= 2
-                    ? ('Варус · Клин +' + String(eng.rx.lateralWedgeMm) + 'мм')
+                curPronation <= -2
+                  ? 'Вальгус · Клин +' + String(eng.rx.medialHeelWedgeMm) + 'мм'
+                  : curPronation >= 2
+                    ? 'Варус · Клин +' + String(eng.rx.lateralWedgeMm) + 'мм'
                     : 'Нейтральная ось'
               }
-              value={pronationDeg}
+              value={curPronation}
               min={-12}
               max={12}
-              onChange={(v) => {
-                setAutoFixBanner(null)
-                setPronationDeg(v)
-              }}
+              onChange={(v) => updateSideField('pronationDeg', v)}
               unit="°"
               showPlus
               isDark={isDark}
             />
             <CleanStepper
-              label="ПУЧКИ (ОБХВАТ Oп)"
-              badge={(String(gm.forefootWidthMm) + 'мм · ' + String(formatBallModification(gm.ballBuildUpMm, true)))}
-              value={ballGirthMm}
+              label={
+                independentSides
+                  ? 'ПУЧКИ Oп (' + String(activeSide === 'left' ? 'ЛЕВ' : 'ПРАВ') + ')'
+                  : 'ПУЧКИ (ОБХВАТ Oп)'
+              }
+              badge={
+                String(gm.forefootWidthMm) + 'мм · ' + String(formatBallModification(gm.ballBuildUpMm, true))
+              }
+              value={curBallGirth}
               min={185}
               max={295}
-              onChange={setBallGirthMm}
+              onChange={(v) => updateSideField('ballGirthMm', v)}
               unit="мм"
               isDark={isDark}
             />
             <CleanStepper
-              label="ПРЯМОЙ ВЗЪЕМ (Oв)"
+              label={
+                independentSides
+                  ? 'ПРЯМОЙ ВЗЪЕМ Oв (' + String(activeSide === 'left' ? 'ЛЕВ' : 'ПРАВ') + ')'
+                  : 'ПРЯМОЙ ВЗЪЕМ (Oв)'
+              }
               badge={formatInstepModification(gm.instepBuildUpMm, true)}
-              value={instepGirthMm}
+              value={curInstepGirth}
               min={190}
               max={310}
-              onChange={setInstepGirthMm}
+              onChange={(v) => updateSideField('instepGirthMm', v)}
               unit="мм"
               isDark={isDark}
             />
             <CleanStepper
-              label="КОСОЙ ОБХВАТ (Oк)"
+              label={
+                independentSides
+                  ? 'КОСОЙ ОБХВАТ Oк (' + String(activeSide === 'left' ? 'ЛЕВ' : 'ПРАВ') + ')'
+                  : 'КОСОЙ ОБХВАТ (Oк)'
+              }
               badge={
                 eng.rx.requiresZipOrLaceWarning
-                  ? (String(eng.rx.obliqueEntryDeltaMm >= 0 ? ('+' + String(eng.rx.obliqueEntryDeltaMm)) : eng.rx.obliqueEntryDeltaMm) + 'мм · Нужен замок/шнур!')
-                  : ('Пятка ' + String(gm.heelWidthMm) + 'мм · Вход свободный')
+                  ? String(
+                      eng.rx.obliqueEntryDeltaMm >= 0
+                        ? '+' + String(eng.rx.obliqueEntryDeltaMm)
+                        : eng.rx.obliqueEntryDeltaMm
+                    ) + 'мм · Нужен замок/шнур!'
+                  : 'Пятка ' + String(gm.heelWidthMm) + 'мм · Вход свободный'
               }
               dangerBadge={eng.rx.requiresZipOrLaceWarning}
-              value={obliqueGirthMm}
+              value={curObliqueGirth}
               min={250}
               max={390}
-              onChange={setObliqueGirthMm}
+              onChange={(v) => updateSideField('obliqueGirthMm', v)}
               unit="мм"
               isDark={isDark}
             />
@@ -487,11 +715,16 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   type="button"
                   onClick={() => {
                     haptic('light')
-                    setToeShape(item.id)
+                    updateSideField('toeShape', item.id)
                   }}
-                  className={('p-2 rounded-[10px] border text-left cursor-pointer transition-all ' + String(toeShape === item.id
-                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent'
-                      : (String(cLine) + ' bg-[var(--color-surface)] ' + String(cText))))}
+                  className={
+                    'p-2 rounded-[10px] border text-left cursor-pointer transition-all ' +
+                    String(
+                      curToeShape === item.id
+                        ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent'
+                        : String(cLine) + ' bg-[var(--color-surface)] ' + String(cText)
+                    )
+                  }
                 >
                   <div className="font-mono text-[8px] font-semibold">{item.title}</div>
                   <div className="text-[8px] opacity-75">{item.sub}</div>
@@ -512,11 +745,16 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   type="button"
                   onClick={() => {
                     haptic('light')
-                    setArchType(item.id)
+                    updateSideField('archType', item.id)
                   }}
-                  className={('p-2 rounded-[10px] border text-left cursor-pointer transition-all ' + String(archType === item.id
-                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent'
-                      : (String(cLine) + ' bg-[var(--color-surface)] ' + String(cText))))}
+                  className={
+                    'p-2 rounded-[10px] border text-left cursor-pointer transition-all ' +
+                    String(
+                      curArchType === item.id
+                        ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent'
+                        : String(cLine) + ' bg-[var(--color-surface)] ' + String(cText)
+                    )
+                  }
                 >
                   <div className="font-mono text-[8px] font-semibold">{item.title}</div>
                   <div className="text-[8px] opacity-75">{item.sub}</div>
@@ -531,17 +769,17 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   {
                     id: 'left' as const,
                     title: 'ЛЕВАЯ ДЛИННЕЕ',
-                    sub: ('Лев ' + String(gm.leftFootLengthMm) + ' > Прав ' + String(gm.rightFootLengthMm)),
+                    sub: 'Лев ' + String(gm.leftFootLengthMm) + ' > Прав ' + String(gm.rightFootLengthMm),
                   },
                   {
                     id: 'equal' as const,
                     title: 'РАВНЫЕ СТОПЫ',
-                    sub: ('Лев = Прав (' + String(gm.footLengthMm) + ' мм)'),
+                    sub: 'Лев = Прав (' + String(gm.footLengthMm) + ' мм)',
                   },
                   {
                     id: 'right' as const,
                     title: 'ПРАВАЯ ДЛИННЕЕ',
-                    sub: ('Прав ' + String(gm.rightFootLengthMm) + ' > Лев ' + String(gm.leftFootLengthMm)),
+                    sub: 'Прав ' + String(gm.rightFootLengthMm) + ' > Лев ' + String(gm.leftFootLengthMm),
                   },
                 ]
               ).map((item) => (
@@ -549,9 +787,14 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   key={item.id}
                   type="button"
                   onClick={() => handleAsymmetrySideChange(item.id)}
-                  className={('p-1.5 rounded-[10px] border text-left cursor-pointer transition-all ' + String(gm.longerFootSide === item.id
-                      ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent'
-                      : (String(cLine) + ' bg-[var(--color-surface)] ' + String(cText))))}
+                  className={
+                    'p-1.5 rounded-[10px] border text-left cursor-pointer transition-all ' +
+                    String(
+                      gm.longerFootSide === item.id
+                        ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent'
+                        : String(cLine) + ' bg-[var(--color-surface)] ' + String(cText)
+                    )
+                  }
                 >
                   <div className="font-mono text-[7.5px] font-semibold">{item.title}</div>
                   <div className="text-[7.5px] opacity-75">{item.sub}</div>
@@ -561,27 +804,38 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
             <div className="grid grid-cols-2 gap-2">
               <CleanStepper
-                label="HALLUX VALGUS (I ПАЛЕЦ)"
+                label={
+                  independentSides
+                    ? 'HALLUX VALGUS (' + String(activeSide === 'left' ? 'ЛЕВ' : 'ПРАВ') + ')'
+                    : 'HALLUX VALGUS (I ПАЛЕЦ)'
+                }
                 badge={
                   gm.medialBunionPocketMm > 0
-                    ? ('Карман на колодке +' + String(gm.medialBunionPocketMm) + ' мм')
+                    ? 'Карман на колодке +' + String(gm.medialBunionPocketMm) + ' мм'
                     : 'Без деформации M1'
                 }
-                dangerBadge={halluxValgusDeg >= 15}
-                value={halluxValgusDeg}
+                dangerBadge={curHvDeg >= 15}
+                value={curHvDeg}
                 min={0}
                 max={35}
-                onChange={setHalluxValgusDeg}
+                onChange={(v) => updateSideField('halluxValgusDeg', v)}
                 unit="°"
                 isDark={isDark}
               />
               <CleanStepper
                 label="РАЗНИЦА ДЛИН СТОП (ΔL)"
                 badge={
-                  gm.compensatoryInsoleHalfPairMm > 0
-                    ? ('Полустелька +' + String(gm.compensatoryInsoleHalfPairMm) + ' мм (' + String(gm.shorterFootSide === 'right' ? 'в прав.' : 'в лев.') + ')')
-                    : 'В пределах нормы (≤ 3 мм)'
+                  gm.requiresMismatchedPairLasts
+                    ? 'Распаровка колодок! Вкладыш +' + String(gm.compensatoryInsoleHalfPairMm) + 'мм'
+                    : gm.compensatoryInsoleHalfPairMm > 0
+                      ? 'Полустелька +' +
+                        String(gm.compensatoryInsoleHalfPairMm) +
+                        ' мм (' +
+                        String(gm.shorterFootSide === 'right' ? 'в прав.' : 'в лев.') +
+                        ')'
+                      : 'В пределах нормы (≤ 3 мм)'
                 }
+                dangerBadge={gm.requiresMismatchedPairLasts}
                 value={gm.lengthAsymmetryMm}
                 min={0}
                 max={14}
@@ -592,7 +846,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             </div>
 
             <div
-              className={('p-2.5 rounded-[11px] border ' + String(cLine) + ' bg-[var(--color-surface)] text-[10px]')}
+              className={
+                'p-2.5 rounded-[11px] border ' +
+                String(cLine) +
+                ' bg-[var(--color-surface)] text-[10px]'
+              }
             >
               <div className="font-mono text-[8px] uppercase text-[#10B981] font-semibold">
                 РЕКОМЕНДУЕМАЯ ГЕОМЕТРИЯ МЫСКА И АПЕКСА КОЛОДКИ:
@@ -612,7 +870,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
 
         {activeTab === 'sole' && (
           <div className="space-y-2.5">
-            {soleType === 'rocker' && (
+            {soleType === 'rocker' ? (
               <div className="grid grid-cols-3 gap-1.5">
                 {(
                   [
@@ -625,11 +883,52 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                     key={r.type}
                     type="button"
                     onClick={() => handleRockerType(r.type)}
-                    className={('py-1.5 px-1 rounded-[8px] text-[8.5px] font-mono border cursor-pointer ' + String(rockerType === r.type
-                        ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
-                        : (String(cLine) + ' bg-[var(--color-surface)] ' + String(cText) + ' opacity-75')))}
+                    className={
+                      'py-1.5 px-1 rounded-[8px] text-[8.5px] font-mono border cursor-pointer ' +
+                      String(
+                        rockerType === r.type
+                          ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
+                          : String(cLine) +
+                            ' bg-[var(--color-surface)] ' +
+                            String(cText) +
+                            ' opacity-75'
+                      )
+                    }
                   >
                     {r.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              /* Выбор профиля стального геленка 65Г (Авто / Плоский / Желобчатый с ребром жёсткости) */
+              <div className="grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    { id: undefined, label: 'ГЕЛЕНОК: АВТО' },
+                    { id: 'flat_plate' as const, label: 'ПЛОСКИЙ 65Г' },
+                    { id: 'fluted_ribbed' as const, label: 'ЖЕЛОБЧАТЫЙ (РЕБРО)' },
+                  ]
+                ).map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      haptic('light')
+                      setShankProfilePreference(item.id)
+                    }}
+                    className={
+                      'py-1.5 px-1 rounded-[8px] text-[7.5px] font-mono border cursor-pointer ' +
+                      String(
+                        shankProfilePreference === item.id
+                          ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
+                          : String(cLine) +
+                            ' bg-[var(--color-surface)] ' +
+                            String(cText) +
+                            ' opacity-75'
+                      )
+                    }
+                  >
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -638,7 +937,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
             <div className="grid grid-cols-2 gap-2">
               <CleanStepper
                 label="ВЫСОТА КАБЛУКА"
-                badge={('Чистый перепад: ' + String(gm.netRiseMm) + ' мм')}
+                badge={'Чистый перепад: ' + String(gm.netRiseMm) + ' мм'}
                 dangerBadge={eng.thomasTooHigh || eng.rockerTooHigh}
                 value={heelHeight}
                 min={10}
@@ -652,7 +951,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               />
               <CleanStepper
                 label="ПЛАТФОРМА НОСКА"
-                badge={('Уклон стопы: ' + String(eng.internalSlope.toFixed(1)) + '°')}
+                badge={'Уклон стопы: ' + String(eng.internalSlope.toFixed(1)) + '°'}
                 value={toeThickness}
                 min={0}
                 max={Math.min(HEEL_CONST.MAX_TOE, heelHeight + 10)}
@@ -665,7 +964,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               />
               <CleanStepper
                 label="ЛИНИЯ ПУЧКОВ"
-                badge={('M1: ' + String(gm.xApexM1Mm) + 'мм · M5: ' + String(gm.xApexM5Mm) + 'мм')}
+                badge={'M1: ' + String(gm.xApexM1Mm) + 'мм · M5: ' + String(gm.xApexM5Mm) + 'мм'}
                 value={rockerStartPct}
                 min={55}
                 max={75}
@@ -679,7 +978,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               {soleType === 'rocker' ? (
                 <CleanStepper
                   label="УГОЛ РОКЕРА"
-                  badge={('Карбон пластина: ' + String(gm.carbonInsertThicknessMm) + ' мм')}
+                  badge={'Карбон пластина: ' + String(gm.carbonInsertThicknessMm) + ' мм'}
                   value={rockerAngle}
                   min={5}
                   max={HEEL_CONST.MAX_ROCKER_ANGLE}
@@ -695,8 +994,16 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   label="ПОСАДКА ПЯТКИ (ДОПУСК −2…+5)"
                   badge={
                     soleType === 'thomas'
-                      ? ('Томас +' + String(gm.thomasExtensionMm) + 'мм (' + String(gm.thomasHeelType === 'medial' ? 'Внутр' : 'Наруж') + ')')
-                      : ('Норма: от ' + String(HEEL_CONST.MIN_SAFE_HEEL_OFFSET_MM) + ' до +' + String(HEEL_CONST.MAX_SAFE_HEEL_OFFSET_MM) + ' мм')
+                      ? 'Томас +' +
+                        String(gm.thomasExtensionMm) +
+                        'мм (' +
+                        String(gm.thomasHeelType === 'medial' ? 'Внутр' : 'Наруж') +
+                        ')'
+                      : 'Норма: от ' +
+                        String(HEEL_CONST.MIN_SAFE_HEEL_OFFSET_MM) +
+                        ' до +' +
+                        String(HEEL_CONST.MAX_SAFE_HEEL_OFFSET_MM) +
+                        ' мм'
                   }
                   dangerBadge={eng.heelOffsetTooFarBack || eng.heelOffsetTooFarForward}
                   value={heelTipOffsetMm}
@@ -726,7 +1033,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               }}
               className="w-full py-2.5 px-3 rounded-[11px] bg-[#10B981] text-black font-mono text-[9.5px] uppercase tracking-wider font-semibold cursor-pointer border-none shadow-sm active:scale-98 transition-transform flex items-center justify-between"
             >
-              <span>📋 ОТКРЫТЬ ПОЛНЫЙ ОТЧЕТ КОНСИЛИУМА (A–H + ФОРМУЛЫ)</span>
+              <span>📋 ОТКРЫТЬ ПОЛНЫЙ ОТЧЕТ КОНСИЛИУМА (L/R + 65Г + ВАЛИДАЦИЯ)</span>
               <span>↗</span>
             </button>
 
@@ -734,14 +1041,24 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               <RxCard
                 step="01 // КОЛОДКА & ОБХВАТЫ"
                 title={eng.rx.widthCode}
-                line1={('След: ' + String(gm.lastLengthMm) + ' мм · Мысок H=' + String(gm.toeBoxHeightMm) + ' мм')}
-                line2={(String(formatBallModification(gm.ballBuildUpMm, true)) + ' · ' + String(formatInstepModification(gm.instepBuildUpMm, true)))}
+                line1={'След: ' + String(gm.lastLengthMm) + ' мм · Мысок H=' + String(gm.toeBoxHeightMm) + ' мм'}
+                line2={
+                  'Слой пучков: ' +
+                  String(gm.ballRadialLayerMm >= 0 ? '+' + String(gm.ballRadialLayerMm) : gm.ballRadialLayerMm) +
+                  'мм · Взъём: ' +
+                  String(
+                    gm.instepRadialLayerMm >= 0
+                      ? '+' + String(gm.instepRadialLayerMm)
+                      : gm.instepRadialLayerMm
+                  ) +
+                  'мм'
+                }
                 accent={gm.ballBuildUpMm !== 0 || gm.instepBuildUpMm !== 0}
                 isDark={isDark}
               />
 
               <RxCard
-                step="02 // МЫСОК, HV & АСИММЕТРИЯ"
+                step="02 // МЫСОК, HV & ПОЛУПАРЫ"
                 title={
                   gm.lastApexType === 'oblique_anatomical'
                     ? 'Косой апекс (II луч)'
@@ -749,20 +1066,41 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                       ? 'Широкий апекс (I–III)'
                       : 'Прямой апекс (I луч)'
                 }
-                line1={('Сдвиг апекса: +' + String(gm.toeBoxShiftMedialMm) + ' мм · Сгиб ' + String(gm.metatarsalObliqueAngleDeg) + '°')}
+                line1={
+                  'Сдвиг апекса: +' +
+                  String(gm.toeBoxShiftMedialMm) +
+                  ' мм · Сгиб ' +
+                  String(gm.metatarsalObliqueAngleDeg) +
+                  '°'
+                }
                 line2={
                   gm.medialBunionPocketMm > 0
-                    ? ('Карман HV: +' + String(gm.medialBunionPocketMm) + ' мм' + String(gm.compensatoryInsoleHalfPairMm > 0 ? (' · Вкладыш +' + String(gm.compensatoryInsoleHalfPairMm) + 'мм') : ''))
+                    ? 'Карман HV: +' +
+                      String(gm.medialBunionPocketMm) +
+                      ' мм' +
+                      String(
+                        gm.compensatoryInsoleHalfPairMm > 0
+                          ? ' · Вкладыш +' + String(gm.compensatoryInsoleHalfPairMm) + 'мм'
+                          : ''
+                      )
                     : gm.compensatoryInsoleHalfPairMm > 0
-                      ? ('Полустелька +' + String(gm.compensatoryInsoleHalfPairMm) + ' мм (' + String(gm.shorterFootSide === 'right' ? 'в прав.' : 'в лев.') + ')')
-                      : ('Стопы: Лев ' + String(gm.leftFootLengthMm) + ' / Прав ' + String(gm.rightFootLengthMm) + ' мм')
+                      ? 'Полустелька +' +
+                        String(gm.compensatoryInsoleHalfPairMm) +
+                        ' мм (' +
+                        String(gm.shorterFootSide === 'right' ? 'в прав.' : 'в лев.') +
+                        ')'
+                      : 'Стопы: Лев ' +
+                        String(gm.leftFootLengthMm) +
+                        ' / Прав ' +
+                        String(gm.rightFootLengthMm) +
+                        ' мм'
                 }
                 accent={gm.medialBunionPocketMm > 0 || gm.compensatoryInsoleHalfPairMm > 0}
                 isDark={isDark}
               />
 
               <RxCard
-                step="03 // ТИП СТЕЛЬКИ"
+                step="03 // СТЕЛЬКА & 2D-ПЕДОБАРОГРАФИЯ"
                 title={
                   !eng.rx.orthoticIndicated
                     ? 'Профилактическая'
@@ -772,38 +1110,62 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                         ? 'Пронатор (Варус)'
                         : 'Разгрузочная'
                 }
-                line1={('Свод: ' + String(eng.rx.archSupportHeightMm) + ' мм · ' + String(eng.rx.shoreA.split(' ')[0]) + ' Шор')}
+                line1={
+                  'Свод: ' +
+                  String(eng.rx.archSupportHeightMm) +
+                  ' мм · ' +
+                  String(eng.rx.shoreA.split(' ')[0]) +
+                  ' Шор'
+                }
                 line2={
-                  eng.rx.medialHeelWedgeMm > 0
-                    ? ('Внутр. клин пятки: +' + String(eng.rx.medialHeelWedgeMm) + ' мм')
-                    : eng.rx.lateralWedgeMm > 0
-                      ? ('Наруж. клин пятки: +' + String(eng.rx.lateralWedgeMm) + ' мм')
-                      : 'Без клина пятки (0 мм)'
+                  'Пик (' +
+                  String(eng.pressureModel.dominantMetatarsalRay) +
+                  '): ' +
+                  String(eng.peakForefootPressureKpa) +
+                  ' кПа · Клин +' +
+                  String(Math.max(eng.rx.medialHeelWedgeMm, eng.rx.lateralWedgeMm)) +
+                  ' мм'
                 }
                 accent={eng.rx.orthoticIndicated}
                 isDark={isDark}
               />
 
               <RxCard
-                step="04 // ПЕЛОТ & КОНСТРУКЦИЯ ОПОРЫ"
+                step="04 // ГЕЛЕНОК (10^6 ЦИКЛОВ) & ОПОРА"
                 title={
                   soleType === 'thomas'
-                    ? ('Каблук Томаса +' + String(gm.thomasExtensionMm) + ' мм')
+                    ? 'Каблук Томаса +' + String(gm.thomasExtensionMm) + ' мм'
                     : soleType === 'rocker'
-                      ? ('Рокер ' + String(gm.rockerAngleDeg) + '° + Карбон')
+                      ? 'Рокер ' + String(gm.rockerAngleDeg) + '° + Карбон'
                       : 'Стандартный каблук'
                 }
                 line1={
                   gm.requiresMetatarsalPad
-                    ? ('Пелот Зейца: ' + String(gm.metatarsalPadHeightMm) + 'мм (на ' + String(gm.metatarsalPadPosMm) + 'мм)')
+                    ? 'Пелот Зейца: ' +
+                      String(gm.metatarsalPadHeightMm) +
+                      'мм (на ' +
+                      String(gm.metatarsalPadPosMm) +
+                      'мм)'
                     : 'Пелот Зейца: Не требуется'
                 }
                 line2={
                   soleType === 'rocker'
-                    ? ('Карбон пластина: ' + String(gm.carbonInsertThicknessMm) + ' мм (старт ' + String(gm.rockerStartPct) + '%)')
-                    : ('Геленок 65Г: ' + String(gm.shankLengthMm) + '×' + String(gm.steelThicknessMm) + 'мм (~' + String(eng.shankBendingMomentNm) + ' Н·м)')
+                    ? 'Карбон пластина: ' +
+                      String(gm.carbonInsertThicknessMm) +
+                      ' мм (старт ' +
+                      String(gm.rockerStartPct) +
+                      '%)'
+                    : String(se.profileType === 'fluted_ribbed' ? 'Желоб 65Г ' : 'Плоск 65Г ') +
+                      String(gm.shankLengthMm) +
+                      '×' +
+                      String(gm.steelThicknessMm) +
+                      'мм (σ=' +
+                      String(se.estimatedBendingStressMpa) +
+                      'МПа, k=' +
+                      String(se.fatigueSafetyFactor) +
+                      ')'
                 }
-                danger={soleType === 'flat' && eng.rx.recommendThomasHeel}
+                danger={se.isOverloaded}
                 accent={soleType !== 'flat'}
                 isDark={isDark}
               />
@@ -841,13 +1203,21 @@ function CleanStepper({
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/60' : 'text-[#1C1816]/60'
 
-  const dispVal = showPlus && value > 0 ? ('+' + String(value)) : String(value)
+  const dispVal = showPlus && value > 0 ? '+' + String(value) : String(value)
 
   return (
     <div
-      className={('flex flex-col border ' + String(cLine) + ' rounded-[12px] px-2.5 py-2 bg-[var(--color-surface)] justify-between')}
+      className={
+        'flex flex-col border ' +
+        String(cLine) +
+        ' rounded-[12px] px-2.5 py-2 bg-[var(--color-surface)] justify-between'
+      }
     >
-      <div className={('text-[8px] uppercase tracking-wider font-mono font-semibold ' + String(cTextMuted))}>
+      <div
+        className={
+          'text-[8px] uppercase tracking-wider font-mono font-semibold ' + String(cTextMuted)
+        }
+      >
         {label}
       </div>
 
@@ -860,12 +1230,19 @@ function CleanStepper({
               onChange(value - step)
             }
           }}
-          className={('w-7 h-7 flex items-center justify-center rounded-[7px] bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation ' + String(value <= min ? 'opacity-20 cursor-not-allowed' : ('active:scale-95 ' + String(cText))))}
+          className={
+            'w-7 h-7 flex items-center justify-center rounded-[7px] bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation ' +
+            String(
+              value <= min
+                ? 'opacity-20 cursor-not-allowed'
+                : 'active:scale-95 ' + String(cText)
+            )
+          }
         >
           −
         </button>
 
-        <span className={('font-serif text-xl font-medium tabular-nums ' + String(cText))}>
+        <span className={'font-serif text-xl font-medium tabular-nums ' + String(cText)}>
           {dispVal}
           <span className="font-sans text-[9px] ml-0.5 opacity-65">{unit}</span>
         </span>
@@ -878,14 +1255,24 @@ function CleanStepper({
               onChange(value + step)
             }
           }}
-          className={('w-7 h-7 flex items-center justify-center rounded-[7px] bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation ' + String(value >= max ? 'opacity-20 cursor-not-allowed' : ('active:scale-95 ' + String(cText))))}
+          className={
+            'w-7 h-7 flex items-center justify-center rounded-[7px] bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] text-base leading-none outline-none cursor-pointer touch-manipulation ' +
+            String(
+              value >= max
+                ? 'opacity-20 cursor-not-allowed'
+                : 'active:scale-95 ' + String(cText)
+            )
+          }
         >
           +
         </button>
       </div>
 
       <div
-        className={('text-[8.5px] font-mono leading-tight ' + String(dangerBadge ? 'text-[#E11D48] font-semibold' : 'text-[#10B981]'))}
+        className={
+          'text-[8.5px] font-mono leading-tight ' +
+          String(dangerBadge ? 'text-[#E11D48] font-semibold' : 'text-[#10B981]')
+        }
       >
         {badge}
       </div>
@@ -907,9 +1294,12 @@ function RxCard({
 
   return (
     <div
-      className={('flex flex-col justify-between rounded-[11px] border p-2.5 bg-[var(--color-surface)] ' + String(cLine))}
+      className={
+        'flex flex-col justify-between rounded-[11px] border p-2.5 bg-[var(--color-surface)] ' +
+        String(cLine)
+      }
     >
-      <div className={('text-[7.5px] font-mono uppercase tracking-wider ' + String(cTextMuted))}>
+      <div className={'text-[7.5px] font-mono uppercase tracking-wider ' + String(cTextMuted)}>
         {step}
       </div>
       <div
@@ -936,25 +1326,30 @@ function getLabels(lang: Lang) {
     loadLbl: 'ПЛЮСНА:',
     successTitle: 'БИОМЕХАНИКА СБАЛАНСИРОВАНА',
     successDesc:
-      'Модельная оценка давления в пучках и ось пятки в пределах ортопедической нормы.',
-    warnTitle: 'ПОВЫШЕННАЯ НАГРУЗКА',
-    warn1Desc: ('Уклон > ' + String(C.COMFORT_ANGLE) + '°. Проверьте жесткость стельки в Техкарте.'),
+      '2D-педобарография M1–M5, ресурс геленка 10^6 циклов и инварианты колодки в норме.',
+    warnTitle: 'ПОВЫШЕННАЯ НАГРУЗКА / КЛИНИЧЕСКИЙ КОНТРОЛЬ',
+    warn1Desc:
+      'Уклон > ' + String(C.COMFORT_ANGLE) + '°. Проверьте жесткость стельки в Техкарте.',
     warn2Desc: 'Сильный угол рокера при низком каблуке.',
-    girthWarnTitle: 'ВЫСОКИЙ ВЗЪЕМ / КОСОЙ ОБХВАТ',
+    girthWarnTitle: 'ОСОБЫЕ ТРЕБОВАНИЯ К КОЛОДКЕ / РАСКРЫВАЕМОСТИ',
     girthWarnDesc:
-      'Требуется доработка гребня колодки и обязательная шнуровка/молния.',
-    thomasNeedTitle: 'ТРЕБУЕТСЯ КАБЛУК ТОМАСА',
-    thomasNeedDesc: 'Завал стопы продавливает свод. Нажмите «Автоподбор».',
-    errTitle: 'ПЕРЕГРУЗКА ГЕЛЕНКА / ВЫСОКИЙ КАБЛУК',
-    errDesc: ('Превышен момент геленка (> ' + String(C.MAX_SHANK_MOMENT_NM) + ' Н·м) или лимит высоты Томаса (' + String(C.MAX_THOMAS_HEEL_MM) + ' мм). Нажмите «Автоподбор».'),
-    padTitle: 'ПЕРЕГРУЗКА ПУЧКОВ (> 245 кПа, мод.)',
+      'Проверьте доработку гребня/пучков, шнуровку и клинические рекомендации в Техкарте.',
+    thomasNeedTitle: 'РЕКОМЕНДУЕТСЯ КАБЛУК ТОМАСА',
+    thomasNeedDesc:
+      'Выраженный завал пятки на стандартной подошве — рассмотрите вкладку «Томаса».',
+    errTitle: 'ПЕРЕГРУЗКА ГЕЛЕНКА (10^6 ЦИКЛОВ) / ВЫСОКИЙ КАБЛУК',
+    errDesc:
+      'Превышен предельный момент/усталость геленка 65Г или лимит высоты подошвы. Нажмите «Автоподбор».',
+    padTitle: 'ПЕРЕГРУЗКА ПУЧКОВ M1–M5 (> 245 кПа, мод.)',
     padDesc:
-      'Высокая модельная оценка давления под M1–M5! Нажмите «Автоподбор» для разгрузки.',
-    negDropTitle: 'ОТРИЦАТЕЛЬНЫЙ ДРОП',
-    negDropDesc: 'Платформа выше каблука.',
-    heelBackTitle: ('СМЕЩЕНИЕ КАБЛУКА НАЗАД (< ' + String(C.MIN_SAFE_HEEL_OFFSET_MM) + ' мм)'),
+      'Высокая модельная оценка давления по 2D-педобарографии! Нажмите «Автоподбор».',
+    negDropTitle: 'ОТРИЦАТЕЛЬНЫЙ ДРОП (ОШИБКА)',
+    negDropDesc: 'Платформа носка выше пятки! Нажмите «Автоподбор» для выравнивания.',
+    heelBackTitle:
+      'СМЕЩЕНИЕ КАБЛУКА НАЗАД (< ' + String(C.MIN_SAFE_HEEL_OFFSET_MM) + ' мм)',
     heelBackDesc: 'Критично: консольный риск излома супинатора 65Г. Нажмите «Автоподбор».',
-    heelFwdTitle: ('СМЕЩЕНИЕ ПЯТКИ ВПЕРЕД (> +' + String(C.MAX_SAFE_HEEL_OFFSET_MM) + ' мм)'),
+    heelFwdTitle:
+      'СМЕЩЕНИЕ ПЯТКИ ВПЕРЕД (> +' + String(C.MAX_SAFE_HEEL_OFFSET_MM) + ' мм)',
     heelFwdDesc: 'Нарушена соосность пяточного упора. Нажмите «Автоподбор».',
     invertTitle: 'РИСК ВЫВИХА / ТЯЖЕЛЫЙ ВАЛЬГУС',
     invertDesc:
@@ -978,7 +1373,7 @@ function getLabels(lang: Lang) {
     male: 'ЧОЛ',
     fixBtn: 'Автопідбір',
     successTitle: 'БІОМЕХАНІКА ЗБАЛАНСОВАНА',
-    thomasNeedTitle: 'ПОТРІБЕН КАБЛУК ТОМАСА',
+    thomasNeedTitle: 'РЕКОМЕНДУЄТЬСЯ КАБЛУК ТОМАСА',
     padTitle: 'ПЕРЕВАНТАЖЕННЯ ПУЧКІВ (> 245 кПа, мод.)',
     flat: 'Стандарт',
     thomas: 'Томаса',
