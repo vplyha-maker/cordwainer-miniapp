@@ -116,7 +116,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     ShankProfileType | undefined
   >(undefined)
 
-  // Симметричные / ведущие параметры
+  // Симметричные начальные параметры по умолчанию (исправление P1.2: L === R при старте)
   const [pronationDeg, setPronationDeg] = useState(-5)
   const [ballGirthMm, setBallGirthMm] = useState(226)
   const [instepGirthMm, setInstepGirthMm] = useState(235)
@@ -124,10 +124,10 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
   const [toeShape, setToeShape] = useState<ToeShape>('egyptian')
   const [halluxValgusDeg, setHalluxValgusDeg] = useState(8)
   const [archType, setArchType] = useState<ArchMorphology>('normal')
-  const [lengthAsymmetryMm, setLengthAsymmetryMm] = useState(2)
-  const [asymmetrySide, setAsymmetrySide] = useState<AsymmetrySide>('left')
+  const [lengthAsymmetryMm, setLengthAsymmetryMm] = useState(0)
+  const [asymmetrySide, setAsymmetrySide] = useState<AsymmetrySide>('equal')
 
-  // Независимые профили Левой и Правой стопы (LeftRightFootProfile)
+  // Независимые профили Левой и Правой стопы инициализируются строго симметрично (P1.2)
   const [independentSides, setIndependentSides] = useState<boolean>(false)
   const [activeSide, setActiveSide] = useState<'left' | 'right'>('left')
   const [leftProfile, setLeftProfile] = useState<FootSideProfile>({
@@ -140,11 +140,11 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
     toeShape: 'egyptian',
   })
   const [rightProfile, setRightProfile] = useState<FootSideProfile>({
-    ballGirthMm: 224,
-    instepGirthMm: 233,
-    obliqueGirthMm: 294,
-    pronationDeg: -3,
-    halluxValgusDeg: 6,
+    ballGirthMm: 226,
+    instepGirthMm: 235,
+    obliqueGirthMm: 296,
+    pronationDeg: -5,
+    halluxValgusDeg: 8,
     archType: 'normal',
     toeShape: 'egyptian',
   })
@@ -680,15 +680,17 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   : 'КОСОЙ ОБХВАТ (Oк)'
               }
               badge={
-                eng.rx.requiresZipOrLaceWarning
-                  ? String(
-                      eng.rx.obliqueEntryDeltaMm >= 0
-                        ? '+' + String(eng.rx.obliqueEntryDeltaMm)
-                        : eng.rx.obliqueEntryDeltaMm
-                    ) + 'мм · Нужен замок/шнур!'
-                  : 'Пятка ' + String(gm.heelWidthMm) + 'мм · Вход свободный'
+                eng.rx.requiresCncLastWarning
+                  ? 'ΔOк ' + String(eng.rx.obliqueEntryDeltaMm) + 'мм · ЧПУ-колодка!'
+                  : eng.rx.requiresZipOrLaceWarning
+                    ? String(
+                        eng.rx.obliqueEntryDeltaMm >= 0
+                          ? '+' + String(eng.rx.obliqueEntryDeltaMm)
+                          : eng.rx.obliqueEntryDeltaMm
+                      ) + 'мм · Нужен замок/шнур!'
+                    : 'Пятка ' + String(gm.heelWidthMm) + 'мм · Вход свободный'
               }
-              dangerBadge={eng.rx.requiresZipOrLaceWarning}
+              dangerBadge={eng.rx.requiresZipOrLaceWarning || eng.rx.requiresCncLastWarning}
               value={curObliqueGirth}
               min={250}
               max={390}
@@ -978,7 +980,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               {soleType === 'rocker' ? (
                 <CleanStepper
                   label="УГОЛ РОКЕРА"
-                  badge={'Карбон пластина: ' + String(gm.carbonInsertThicknessMm) + ' мм'}
+                  badge={'Карбон CFRP: ' + String(gm.carbonInsertThicknessMm) + ' мм (k=' + String(se.fatigueSafetyFactor) + ')'}
                   value={rockerAngle}
                   min={5}
                   max={HEEL_CONST.MAX_ROCKER_ANGLE}
@@ -1033,7 +1035,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               }}
               className="w-full py-2.5 px-3 rounded-[11px] bg-[#10B981] text-black font-mono text-[9.5px] uppercase tracking-wider font-semibold cursor-pointer border-none shadow-sm active:scale-98 transition-transform flex items-center justify-between"
             >
-              <span>📋 ОТКРЫТЬ ПОЛНЫЙ ОТЧЕТ КОНСИЛИУМА (L/R + 65Г + ВАЛИДАЦИЯ)</span>
+              <span>📋 ОТКРЫТЬ ПОЛНЫЙ ОТЧЕТ КОНСИЛИУМА (L/R + 65Г/CFRP + 3 УРОВНЯ ТЗ)</span>
               <span>↗</span>
             </button>
 
@@ -1100,7 +1102,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               />
 
               <RxCard
-                step="03 // СТЕЛЬКА & 2D-ПЕДОБАРОГРАФИЯ"
+                step="03 // СТЕЛЬКА & ЭВРИСТИКА ДАВЛЕНИЯ"
                 title={
                   !eng.rx.orthoticIndicated
                     ? 'Профилактическая'
@@ -1122,7 +1124,7 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                   String(eng.pressureModel.dominantMetatarsalRay) +
                   '): ' +
                   String(eng.peakForefootPressureKpa) +
-                  ' кПа · Клин +' +
+                  ' кПа (эврист.) · Клин +' +
                   String(Math.max(eng.rx.medialHeelWedgeMm, eng.rx.lateralWedgeMm)) +
                   ' мм'
                 }
@@ -1131,12 +1133,12 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
               />
 
               <RxCard
-                step="04 // ГЕЛЕНОК (10^6 ЦИКЛОВ) & ОПОРА"
+                step="04 // УСИЛИТЕЛЬ (10^6 ЦИКЛОВ) & ОПОРА"
                 title={
                   soleType === 'thomas'
                     ? 'Каблук Томаса +' + String(gm.thomasExtensionMm) + ' мм'
                     : soleType === 'rocker'
-                      ? 'Рокер ' + String(gm.rockerAngleDeg) + '° + Карбон'
+                      ? 'Рокер ' + String(gm.rockerAngleDeg) + '° + Карбон CFRP'
                       : 'Стандартный каблук'
                 }
                 line1={
@@ -1150,11 +1152,15 @@ export function HeelCalcPage({ onBack, lang }: HeelCalcPageProps) {
                 }
                 line2={
                   soleType === 'rocker'
-                    ? 'Карбон пластина: ' +
+                    ? 'CFRP ' +
+                      String(se.shankWidthMm) +
+                      '×' +
                       String(gm.carbonInsertThicknessMm) +
-                      ' мм (старт ' +
-                      String(gm.rockerStartPct) +
-                      '%)'
+                      'мм (σ=' +
+                      String(se.estimatedBendingStressMpa) +
+                      'МПа, k=' +
+                      String(se.fatigueSafetyFactor) +
+                      ')'
                     : String(se.profileType === 'fluted_ribbed' ? 'Желоб 65Г ' : 'Плоск 65Г ') +
                       String(gm.shankLengthMm) +
                       '×' +
@@ -1326,7 +1332,7 @@ function getLabels(lang: Lang) {
     loadLbl: 'ПЛЮСНА:',
     successTitle: 'БИОМЕХАНИКА СБАЛАНСИРОВАНА',
     successDesc:
-      '2D-педобарография M1–M5, ресурс геленка 10^6 циклов и инварианты колодки в норме.',
+      'Нормированная эвристика давления M1–M5, ресурс усилителя 10^6 циклов и инварианты колодки в норме.',
     warnTitle: 'ПОВЫШЕННАЯ НАГРУЗКА / КЛИНИЧЕСКИЙ КОНТРОЛЬ',
     warn1Desc:
       'Уклон > ' + String(C.COMFORT_ANGLE) + '°. Проверьте жесткость стельки в Техкарте.',
@@ -1337,12 +1343,12 @@ function getLabels(lang: Lang) {
     thomasNeedTitle: 'РЕКОМЕНДУЕТСЯ КАБЛУК ТОМАСА',
     thomasNeedDesc:
       'Выраженный завал пятки на стандартной подошве — рассмотрите вкладку «Томаса».',
-    errTitle: 'ПЕРЕГРУЗКА ГЕЛЕНКА (10^6 ЦИКЛОВ) / ВЫСОКИЙ КАБЛУК',
+    errTitle: 'ПЕРЕГРУЗКА УСИЛИТЕЛЯ (10^6 ЦИКЛОВ) / ВЫСОКИЙ КАБЛУК',
     errDesc:
-      'Превышен предельный момент/усталость геленка 65Г или лимит высоты подошвы. Нажмите «Автоподбор».',
-    padTitle: 'ПЕРЕГРУЗКА ПУЧКОВ M1–M5 (> 245 кПа, мод.)',
+      'Превышен предельный момент/усталость 65Г (CFRP) или лимит высоты подошвы. Нажмите «Автоподбор».',
+    padTitle: 'ПЕРЕГРУЗКА ПУЧКОВ M1–M5 (> 245 кПа, эврист.)',
     padDesc:
-      'Высокая модельная оценка давления по 2D-педобарографии! Нажмите «Автоподбор».',
+      'Высокая расчётная оценка давления по эвристике M1–M5! Нажмите «Автоподбор».',
     negDropTitle: 'ОТРИЦАТЕЛЬНЫЙ ДРОП (ОШИБКА)',
     negDropDesc: 'Платформа носка выше пятки! Нажмите «Автоподбор» для выравнивания.',
     heelBackTitle:
@@ -1374,7 +1380,7 @@ function getLabels(lang: Lang) {
     fixBtn: 'Автопідбір',
     successTitle: 'БІОМЕХАНІКА ЗБАЛАНСОВАНА',
     thomasNeedTitle: 'РЕКОМЕНДУЄТЬСЯ КАБЛУК ТОМАСА',
-    padTitle: 'ПЕРЕВАНТАЖЕННЯ ПУЧКІВ (> 245 кПа, мод.)',
+    padTitle: 'ПЕРЕВАНТАЖЕННЯ ПУЧКІВ (> 245 кПа, евріст.)',
     flat: 'Стандарт',
     thomas: 'Томаса',
     rocker: 'Рокер',
