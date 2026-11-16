@@ -6,32 +6,149 @@ export type RockerType = 'forefoot' | 'heelToToe' | 'negative'
 export type ToeShape = 'egyptian' | 'greek' | 'roman'
 export type ArchMorphology = 'flat' | 'normal' | 'cavus'
 export type LastApexType = 'medial_straight' | 'oblique_anatomical' | 'wide_square'
+export type AsymmetrySide = 'left' | 'right' | 'equal'
+export type BuildUpAction = 'build_up' | 'reduce' | 'neutral'
 
+/**
+ * Единый реестр антропометрических, биомеханических и конструктивных констант.
+ * Все эмпирические коэффициенты задокументированы с указанием физического смысла
+ * и отраслевого источника (ГОСТ 3927 / ЦНИИКП / ортопедическая биомеханика стопы).
+ */
 export const HEEL_CONST = {
+  /** Шаг штихмассовой системы (1 Paris Point = 2/3 см = 6.67 мм) */
   STEP_TO_MM: 6.67,
+  /** Поправка перехода от штихмассового размера (EU) к базовой длине стопы: L_foot = (Size - 1.5) * 6.67 */
+  SHOE_SIZE_TO_FOOT_OFFSET_PARIS: 1.5,
+  /** Доля учёта межосевой асимметрии при расчёте длины опорной (длинной) стопы относительно базового размера */
+  ASYMMETRY_LONGER_FOOT_FACTOR: 0.5,
+
+  /** Базовый минимальный функциональный припуск перед пальцами (женская египетская стопа, мм) */
   FUNCTIONAL_ALLOWANCE: 8,
+  /** Базовый функциональный свободный припуск в носочной части (мм) */
+  BASE_TOE_FREE_SPACE_MM: 10,
+  /** Дополнительный свободный припуск для мужской колодки из-за большей длины дистальных фаланг (мм) */
+  MALE_TOE_EXTRA_MM: 2,
+  /** Конструктивно-фасонный припуск декоративной части мыска колодки сверх функционального припуска (мм) */
+  LAST_FASHION_ALLOWANCE_MM: 6,
+  /** Эталонные морфологические поправки припуска под форму пальцев (мм): египетская (8), римская (9), греческая (11 — удлинённый II луч) */
+  TOE_ALLOWANCE_EGYPTIAN_MM: 8,
+  TOE_ALLOWANCE_ROMAN_MM: 9,
+  TOE_ALLOWANCE_GREEK_MM: 11,
+
+  /** Эмпирический антропометрический коэффициент отношения ширины следа в пучках W_пуч к обхвату пучков O_п (ЦНИИКП: ~0.415) */
+  FOREFOOT_WIDTH_TO_GIRTH_RATIO: 0.415,
+  /** Эмпирический коэффициент отношения ширины пятки W_пят к обхвату пучков O_п (ЦНИИКП: ~0.274) */
+  HEEL_WIDTH_TO_GIRTH_RATIO: 0.274,
+
+  /** Порог угла Hallux Valgus (°), начиная с которого требуется формирование разгрузочного кармана под головку M1 */
+  HV_POCKET_THRESHOLD_DEG: 10,
+  /** Базовый угол нормы I плюснефалангового сустава (°) для отсчёта глубины кармана HV */
+  HV_BASE_NORMAL_DEG: 8,
+  /** Коэффициент глубины медиального кармана M1 (мм на каждый градус отклонения HV свыше 8°) */
+  HV_POCKET_FACTOR: 0.35,
+  /** Максимально допустимая глубина локального кармана под косточку M1 без искажения затяжной кромки (мм) */
+  MAX_BUNION_POCKET_MM: 8,
+  /** Коэффициент дополнительного медиального смещения апекса мыска при Hallux Valgus (мм/град) */
+  HV_APEX_SHIFT_FACTOR: 0.25,
+
+  /** Порог разницы длин стоп ΔL (мм), начиная с которого назначается компенсационная полустелька/вкладыш в короткую полупару */
+  COMPENSATORY_INSOLE_THRESHOLD_MM: 4,
+  /** Доля продольной асимметрии стоп, компенсируемая объёмным вкладышем/полустелькой в короткую полупару */
+  COMPENSATORY_INSOLE_RATIO: 0.75,
+
+  /** Максимальная толщина платформы под пучками (мм) */
   MAX_TOE: 60,
+  /** Максимальный подъём носочной пружины / рокера (мм) */
   MAX_LIFT: 50,
+  /** Максимальная биомеханически эффективная высота каблука Томаса (мм); выше 35 мм теряется поддержка ладьевидной кости */
   MAX_THOMAS_HEEL_MM: 35,
-  MAX_ROCKER_HEEL_MM: 45, // Максимальная безопасная высота пятки для рокерной подошвы
+  /** Максимальная безопасная высота пятки для рокерной подошвы-танкетки (мм) */
+  MAX_ROCKER_HEEL_MM: 45,
+  /** Максимальный безопасный перепад высот (netRise) для жёсткой рокерной подошвы (мм) */
+  MAX_ROCKER_NET_RISE_MM: 22,
+
+  /** Предельно допустимый оценочный изгибающий момент на стальной геленок 65Г (Н·м) */
   MAX_SHANK_MOMENT_NM: 28,
+  /** Критический угол продольного уклона колодки (°), вызывающий перегрузку плюснефаланговых суставов */
   CRITICAL_ANGLE: 16,
+  /** Граница комфортного физиологического угла продольного уклона (°) */
   COMFORT_ANGLE: 11.5,
+  /** Целевой безопасный угол продольного уклона при автоподборе (°) */
   SAFE_ANGLE: 10.5,
+
+  /** Критическая доля нагрузки на передний отдел стопы (%) */
   CRITICAL_LOAD: 75,
+  /** Порог модельной оценки пикового плантарного давления в пучках (кПа), требующий разгрузки */
   CRITICAL_KPA: 245,
+  /** Порог модельной оценки давления для назначения метатарзального пелота Зейца (кПа) */
+  PELOTTE_PRESSURE_THRESHOLD_KPA: 215,
+  /** Порог нагрузки переднего отдела (%) для назначения пелота Зейца */
+  PELOTTE_LOAD_THRESHOLD_PCT: 68,
+
+  /** Максимальный конструктивный угол переднего рокера (°) */
   MAX_ROCKER_ANGLE: 28,
+  /** Максимальный коэффициент снижения нагрузки на пучки за счёт перекатной рокерной подошвы (32%) */
   ROCKER_MITIGATION_CAP: 0.32,
+  /** Коэффициент разгрузки переднего отдела за счёт удлинения груди каблука Томаса (снижение на 9%) */
+  THOMAS_LOAD_RELIEF_FACTOR: 0.91,
+
+  /** Относительная продольная координата центра пяточного опирания (15% от длины колодки L_last) */
   HEEL_CENTER_RATIO: 0.15,
+  /** Относительная продольная координата переднего среза (груди) стандартного каблука (25% от L_last) */
+  HEEL_FRONT_BASE_RATIO: 0.25,
+  /** Относительная продольная координата гребня прямого взъёма (52% от L_last) */
+  INSTEP_POS_RATIO: 0.52,
+  /** Смещение центра головки I плюсневой кости (M1) проксимальнее расчётной линии пучков (мм) */
+  M1_PROXIMAL_FROM_BALL_MM: 5,
+  /** Антропометрическое проксимальное смещение головки V плюсневой кости (M5) относительно M1 (8.2% от длины стопы L_foot) */
+  M5_PROXIMAL_TO_FOOT_RATIO: 0.082,
+  /** Эффективная поперечная база между центрами головок M1 и M5 в долях ширины пучков (82% от W_пуч) */
+  EFFECTIVE_METATARSAL_SPAN_RATIO: 0.82,
+  /** Позиция вершины метатарзального пелота Зейца проксимальнее головки M1 (за головками II–IV плюсневых костей, мм) */
+  PELOTTE_PROXIMAL_OFFSET_MM: 7,
+
+  /**
+   * Ограничения смещения оси набойки каблука (heelTipOffsetMm):
+   * - Допуск безопасности: от -2 мм (назад) до +5 мм (вперёд).
+   * - При смещении < -2 мм назад резко растёт консольный пролёт геленка 65Г под кубовидной костью (риск излома).
+   * - При смещении > +5 мм вперёд (без специальной груди Томаса) нарушается устойчивость начального контакта пятки.
+   * - Диапазон слайдера в UI (-6...+8 мм) шире безопасного допуска, чтобы позволять моделировать и диагностировать ошибки сборки.
+   */
+  MIN_SAFE_HEEL_OFFSET_MM: -2,
+  MAX_SAFE_HEEL_OFFSET_MM: 5,
   MAX_HEEL_OFFSET_MM: 5,
+  MIN_HEEL_OFFSET_SLIDER_MM: -6,
+  MAX_HEEL_OFFSET_SLIDER_MM: 8,
+
+  /** Пороги фронтального завала пятки (пронация/супинация, °) */
   CRITICAL_PRONATION_DEG: 5.5,
   WARN_PRONATION_DEG: 3,
+
+  /** Базовая доля нагрузки на передний отдел стопы при нулевом перепаде высот (%) */
+  BASE_FOREFOOT_LOAD_PCT: 44,
+  /** Коэффициент прироста доли нагрузки на передний отдел от тангенса продольного наклона (netRise / lEff) */
+  SLOPE_TO_LOAD_GAIN: 102,
+  /** Квазистатический коэффициент вертикальной реакции опоры в фазе переката (1.15 от статического веса m*g) */
+  QUASI_STATIC_GAIT_FACTOR: 1.15,
+  /** Эталонная длина стопы для масштабирования контактной площади (мм) */
+  REF_FOOT_LENGTH_MM: 245,
+  /** Эталонная площадь опоры переднего отдела стопы при длине 245 мм (см²) */
+  REF_FOREFOOT_CONTACT_AREA_CM2: 46,
+  /** Эталонная площадь опоры пятки при длине 245 мм (см²) */
+  REF_HEEL_CONTACT_AREA_CM2: 33,
+  /** Модельный форм-фактор концентрации пикового давления под головками M1–M5 */
+  FOREFOOT_PEAK_CONCENTRATION_FACTOR: 1.55,
+  /** Модельный форм-фактор концентрации пикового давления под пяточным бугром */
+  HEEL_PEAK_CONCENTRATION_FACTOR: 1.45,
+
+  /** Максимальное число шагов итеративного алгоритма автоподбора (suggestAutoFix) */
+  MAX_AUTO_FIX_ITERATIONS: 7,
 } as const
 
 export const ROCKER_PRESETS: Record<RockerType, { angle: number; startPct: number }> = {
-  forefoot:  { angle: 15, startPct: 60 },
+  forefoot: { angle: 15, startPct: 60 },
   heelToToe: { angle: 18, startPct: 56 },
-  negative:  { angle: 10, startPct: 65 },
+  negative: { angle: 10, startPct: 65 },
 }
 
 export interface HeelInput {
@@ -53,6 +170,7 @@ export interface HeelInput {
   halluxValgusDeg?: number
   archType?: ArchMorphology
   lengthAsymmetryMm?: number
+  asymmetrySide?: AsymmetrySide
 }
 
 export interface MathFormulaStep {
@@ -64,13 +182,133 @@ export interface MathFormulaStep {
   meaning: string
 }
 
+/**
+ * ЕДИНЫЙ ИСТОЧНИК ГЕОМЕТРИЧЕСКОЙ ПРАВДЫ (Single Source of Truth).
+ * Вычисляется ровно один раз в computeEngineering и передаётся во все модули:
+ * - 2D SVG (heelGeometry.ts / HeelCanvas.tsx)
+ * - 3D сцену (HeelScene3D.tsx)
+ * - Экспертный отчёт и ТЗ мастеру (OrthoExpertReportModal.tsx / HeelCalcPage.tsx)
+ */
+export interface LastGeometryModel {
+  // 1. Длины и асимметрия стоп (мм)
+  footLengthMm: number
+  leftFootLengthMm: number
+  rightFootLengthMm: number
+  longerFootSide: AsymmetrySide
+  shorterFootSide: 'left' | 'right' | 'none'
+  lengthAsymmetryMm: number
+  compensatoryInsoleHalfPairMm: number
+  toeShapeAllowanceMm: number
+  toeFreeSpaceMm: number
+  fashionAllowanceMm: number
+  lastLengthMm: number
+
+  // 2. Продольные координаты по оси X от задника пятки (0 мм) до вершины мыска (lastLengthMm)
+  xHeelMm: number
+  xHeelCenterMm: number
+  xHeelTipCenterMm: number
+  xHeelBackBottomMm: number
+  xHeelFrontBaseMm: number
+  xThomasFrontMm: number
+  xShankStartMm: number
+  xShankEndMm: number
+  xInstepMm: number
+  xPelotteMm: number
+  xApexM5Mm: number
+  xApexM1Mm: number
+  xBallMm: number
+  xToeMm: number
+
+  // 3. Нормализованные продольные координаты u ∈ [0, 1] (X / lastLengthMm) для 3D и 2D
+  uHeelCenter: number
+  uHeelFrontBase: number
+  uThomasFront: number
+  uShankEnd: number
+  uInstep: number
+  uPelotte: number
+  uApexM5: number
+  uApexM1: number
+  uBall: number
+
+  // 4. Вертикальные параметры профиля (мм)
+  heelHeightMm: number
+  toeThicknessMm: number
+  netRiseMm: number
+  rockerLiftMm: number
+  instepBaseHeightMm: number
+  toeBoxHeightMm: number
+
+  // 5. Поперечная геометрия, апекс, Hallux Valgus и модификации обхватов (build-up / снятие)
+  standardForefootWidthMm: number
+  forefootWidthMm: number
+  effectiveForefootWidthWithBunionMm: number
+  heelWidthMm: number
+  ballBuildUpMm: number
+  ballModAction: BuildUpAction
+  instepBuildUpMm: number
+  instepModAction: BuildUpAction
+  medialBunionPocketMm: number
+  bunionPocketCenterMm: number
+  bunionPocketRadiusMm: number
+  toeShape: ToeShape
+  lastApexType: LastApexType
+  lastApexLabel: string
+  anatomicalFootApexOffsetMm: number
+  toeBoxShiftMedialMm: number
+  metatarsalObliqueAngleDeg: number
+
+  // 6. Параметры пелота Зейца и опорной конструкции подошвы
+  requiresMetatarsalPad: boolean
+  metatarsalPadPosMm: number | null
+  metatarsalPadHeightMm: number | null
+  pelotteHalfLengthMm: number
+  soleType: SoleType
+  thomasHeelType: 'none' | 'medial' | 'lateral'
+  thomasExtensionMm: number
+  effectiveHeelTipOffsetMm: number
+  rockerAngleDeg: number
+  rockerStartPct: number
+  rockerZoneLengthMm: number
+  shankLengthMm: number
+  steelThicknessMm: number
+  carbonInsertThicknessMm: number
+}
+
+/**
+ * Архитектурная модель прочностного расчёта геленка / упругого каркаса подошвы.
+ * Текущий расчёт момента является инженерной аналитической оценкой (консольно-балочное приближение)
+ * и содержит геометрические характеристики сечения для последующей калибровки (МКЭ / стендовые испытания).
+ */
+export interface ShankEngineeringModel {
+  isAnalyticalEstimate: true
+  material: 'steel_65G' | 'carbon_composite'
+  shankLengthMm: number
+  shankWidthMm: number
+  steelThicknessMm: number
+  effectiveMomentArmMm: number
+  bendingMomentNm: number
+  maxAllowedMomentNm: number
+  /** Осевой момент сопротивления изгибу прямоугольного сечения W_x = b * h^2 / 6 (мм³) */
+  sectionModulusMm3: number
+  /** Оценочное нормальное напряжение изгиба в стальной пластине 65Г (МПа) с учётом доли момента, воспринимаемой геленком */
+  estimatedBendingStressMpa: number
+  /** Оценочный коэффициент запаса прочности относительно условного предела текучести стали 65Г (780 МПа) */
+  safetyFactor: number
+  isOverloaded: boolean
+}
+
 export interface MasterPrescription {
   widthCode: string
   ballBuildUpMm: number
+  ballModAction: BuildUpAction
+  ballModSummary: string
   instepBuildUpMm: number
+  instepModAction: BuildUpAction
+  instepModSummary: string
   obliqueEntryDeltaMm: number
   requiresZipOrLaceWarning: boolean
   forefootWidthMm: number
+  effectiveForefootWidthWithBunionMm: number
   standardForefootWidthMm: number
   heelWidthMm: number
   widthIndexPct: number
@@ -81,7 +319,13 @@ export interface MasterPrescription {
   toeBoxHeightMm: number
   toeFreeSpaceMm: number
   medialBunionPocketMm: number
+  asymmetrySide: AsymmetrySide
+  leftFootLengthMm: number
+  rightFootLengthMm: number
+  longerFootSide: AsymmetrySide
+  shorterFootSide: 'left' | 'right' | 'none'
   compensatoryInsoleHalfPairMm: number
+  asymmetrySummary: string
   orthoticIndicated: boolean
   insoleType: 'neutral' | 'supinator' | 'pronator'
   archSupportHeightMm: number
@@ -93,11 +337,18 @@ export interface MasterPrescription {
   thomasHeelType: 'none' | 'medial' | 'lateral'
   thomasExtensionMm: number
   recommendedThomasMm: number
+  soleConstructionSummary: string
   metatarsalObliqueAngleDeg: number
   calculations: MathFormulaStep[]
 }
 
 export interface HeelEngineering {
+  /** Единый источник геометрической правды для 2D, 3D и ТЗ */
+  geometryModel: LastGeometryModel
+  /** Архитектурный модуль оценки прочности геленка 65Г / карбоновой пластины */
+  shankEngineering: ShankEngineeringModel
+  /** Явный признак того, что пиковое давление (кПа) и координаты ЦД (COP) являются расчётной модельной оценкой */
+  isPressureAndCopModelEstimate: true
   lastLengthMm: number
   footLengthMm: number
   lEff: number
@@ -107,9 +358,13 @@ export interface HeelEngineering {
   heelLoad: number
   loadM1Pct: number
   loadM5Pct: number
+  /** Модельная оценка пикового плантарного давления под пучками (кПа) */
   peakForefootPressureKpa: number
+  /** Модельная оценка пикового плантарного давления под пяткой (кПа) */
   peakHeelPressureKpa: number
+  /** Модельная оценка продольной координаты центра давления COP от задника (мм) */
   copLongitudinalMm: number
+  /** Модельная оценка медио-латерального смещения центра давления COP (мм) */
   copLateralMm: number
   shankBendingMomentNm: number
   shankOverloaded: boolean
@@ -138,6 +393,102 @@ export interface HeelAudit {
   status: AuditStatus
   titleKey: string
   messageKey: string
+}
+
+export type AutoFixResolutionStatus = 'RESOLVED' | 'PARTIAL_OR_UNRESOLVABLE' | 'ALREADY_OPTIMAL'
+
+export interface AutoFixResult {
+  soleType: SoleType
+  toeThickness: number
+  heelHeight: number
+  heelTipOffsetMm: number
+  rockerAngle: number
+  rockerStartPct: number
+  status: AutoFixResolutionStatus
+  iterations: number
+  resolved: boolean
+  summaryMessage: string
+  appliedChanges: string[]
+  remainingIssues: string[]
+}
+
+/**
+ * Определяет тип технологической операции на колодке по знаку отклонения обхвата:
+ * > 0 -> наращивание (налепка кожи/пласта на колодку)
+ * < 0 -> снятие материала (уменьшение объёма колодки / компенсационный вкладыш)
+ * === 0 -> базовая геометрия без модификации
+ */
+export function getBuildUpAction(deltaMm: number): BuildUpAction {
+  if (deltaMm > 0) return 'build_up'
+  if (deltaMm < 0) return 'reduce'
+  return 'neutral'
+}
+
+export function formatBallModification(ballBuildUpMm: number, short = false): string {
+  if (ballBuildUpMm > 0) {
+    return short
+      ? `Налепка пучков +${ballBuildUpMm} мм`
+      : `Наращивание (налепка) в пучках +${ballBuildUpMm} мм`
+  }
+  if (ballBuildUpMm < 0) {
+    return short
+      ? `Снятие в пучках ${ballBuildUpMm} мм`
+      : `Снятие материала (уменьшение) в пучках ${ballBuildUpMm} мм`
+  }
+  return short ? 'База пучков 0 мм' : 'Базовая геометрия пучков (0 мм)'
+}
+
+export function formatInstepModification(instepBuildUpMm: number, short = false): string {
+  if (instepBuildUpMm > 0) {
+    return short
+      ? `Налепка на гребень +${instepBuildUpMm} мм`
+      : `Наращивание (налепка) на гребень взъёма +${instepBuildUpMm} мм`
+  }
+  if (instepBuildUpMm < 0) {
+    return short
+      ? `Снятие / вкладыш ${instepBuildUpMm} мм`
+      : `Снятие материала с гребня (уменьшение / вкладыш) ${instepBuildUpMm} мм`
+  }
+  return short ? 'Взъём в норме 0 мм' : 'Базовая геометрия прямого взъёма (0 мм)'
+}
+
+/**
+ * Строго разделяет описание конструкции каблука Томаса, рокерной подошвы с карбоном и стандартного каблука.
+ * Исключает смешивание каблука Томаса и рокерной карбоновой пластины в одном описании.
+ */
+export function describeSoleConstruction(params: {
+  soleType: SoleType
+  netRiseMm: number
+  heelHeightMm: number
+  toeThicknessMm: number
+  thomasHeelType: 'none' | 'medial' | 'lateral'
+  thomasExtensionMm: number
+  rockerAngleDeg: number
+  rockerStartPct: number
+  carbonInsertThicknessMm: number
+  shankLengthMm: number
+  steelThicknessMm: number
+}): string {
+  const {
+    soleType,
+    netRiseMm,
+    thomasHeelType,
+    thomasExtensionMm,
+    rockerAngleDeg,
+    rockerStartPct,
+    carbonInsertThicknessMm,
+    shankLengthMm,
+    steelThicknessMm,
+  } = params
+
+  if (soleType === 'thomas') {
+    const sideLabel = thomasHeelType === 'lateral' ? 'с наружной (латеральной) стороны' : 'с внутренней (медиальной) стороны'
+    return `Ортопедический каблук Томаса с удлинением груди +${thomasExtensionMm} мм ${sideLabel} и стальным геленком 65Г (${shankLengthMm}×${steelThicknessMm} мм)`
+  }
+  if (soleType === 'rocker') {
+    return `Рокерная перекатная подошва (угол переката ${rockerAngleDeg}°, старт на ${rockerStartPct}% длины) с интегрированной карбоновой пластиной толщиной ${carbonInsertThicknessMm} мм`
+  }
+  return `Стандартный каблук (чистый перепад высот ${netRiseMm} мм) со стальным геленком 65Г (${shankLengthMm}×${steelThicknessMm} мм)`
 }
 
 export function getStandardGirths(gender: Gender, shoeSize: number) {
@@ -180,25 +531,80 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     halluxValgusDeg = 0,
     archType = 'normal',
     lengthAsymmetryMm = 0,
+    asymmetrySide,
   } = input
 
   const clampedWeight = Math.max(35, Math.min(160, weightKg))
   const hvDeg = Math.max(0, Math.min(40, halluxValgusDeg))
-  const asymMm = Math.max(0, Math.min(15, lengthAsymmetryMm))
+  const rawAsymMm = Math.max(0, Math.min(15, lengthAsymmetryMm))
 
-  const footLengthMm = Math.round((shoeSize - 1.5) * C.STEP_TO_MM + asymMm * 0.5)
-  const toeShapeAllowance = toeShape === 'greek' ? 11 : toeShape === 'roman' ? 9 : 8
-  const toeFreeSpaceMm = 10 + (gender === 'male' ? 2 : 0) + (toeShapeAllowance - 8)
-  const lastLengthMm = Math.round(footLengthMm + toeFreeSpaceMm + 6)
+  // 1. Разрешение стороны асимметрии стоп (left longer / right longer / equal)
+  const resolvedAsymmetrySide: AsymmetrySide =
+    rawAsymMm === 0 || asymmetrySide === 'equal'
+      ? 'equal'
+      : asymmetrySide === 'right'
+        ? 'right'
+        : 'left'
 
+  const effectiveAsymMm = resolvedAsymmetrySide === 'equal' ? 0 : rawAsymMm
+
+  /**
+   * ЕДИНАЯ ФОРМУЛА ДЛИНЫ СТОПЫ И КОЛОДКИ (зафиксирована для всех модулей):
+   * 1) Длина опорной (длинной) стопы:
+   *    footLengthMm = round((shoeSize - 1.5) * 6.67 + effectiveAsymMm * 0.5)
+   * 2) Свободный функциональный припуск перед пальцами:
+   *    toeFreeSpaceMm = 10 + (male ? 2 : 0) + (toeShapeAllowanceMm - 8)
+   * 3) Полная конструктивная длина следа колодки:
+   *    lastLengthMm = round(footLengthMm + toeFreeSpaceMm + 6)
+   */
+  const footLengthMm = Math.round(
+    (shoeSize - C.SHOE_SIZE_TO_FOOT_OFFSET_PARIS) * C.STEP_TO_MM +
+      effectiveAsymMm * C.ASYMMETRY_LONGER_FOOT_FACTOR
+  )
+  const shorterFootLengthMm = Math.max(150, footLengthMm - effectiveAsymMm)
+
+  const leftFootLengthMm =
+    resolvedAsymmetrySide === 'right' ? shorterFootLengthMm : footLengthMm
+  const rightFootLengthMm =
+    resolvedAsymmetrySide === 'left' ? shorterFootLengthMm : footLengthMm
+  const shorterFootSide: 'left' | 'right' | 'none' =
+    resolvedAsymmetrySide === 'left'
+      ? 'right'
+      : resolvedAsymmetrySide === 'right'
+        ? 'left'
+        : 'none'
+
+  const toeShapeAllowanceMm =
+    toeShape === 'greek'
+      ? C.TOE_ALLOWANCE_GREEK_MM
+      : toeShape === 'roman'
+        ? C.TOE_ALLOWANCE_ROMAN_MM
+        : C.TOE_ALLOWANCE_EGYPTIAN_MM
+  const toeFreeSpaceMm =
+    C.BASE_TOE_FREE_SPACE_MM +
+    (gender === 'male' ? C.MALE_TOE_EXTRA_MM : 0) +
+    (toeShapeAllowanceMm - C.TOE_ALLOWANCE_EGYPTIAN_MM)
+  const fashionAllowanceMm = C.LAST_FASHION_ALLOWANCE_MM
+  const lastLengthMm = Math.round(footLengthMm + toeFreeSpaceMm + fashionAllowanceMm)
+
+  // 2. Поперечные обхваты, полнота и модификации колодки (с учётом знака!)
   const std = getStandardGirths(gender, shoeSize)
   const ballBuildUpMm = ballGirthMm - std.ballGirthMm
   const instepBuildUpMm = instepGirthMm - std.instepGirthMm
   const obliqueEntryDeltaMm = obliqueGirthMm - std.obliqueGirthMm
 
-  const standardForefootWidthMm = parseFloat((std.ballGirthMm * 0.415).toFixed(1))
-  const forefootWidthMm = parseFloat((ballGirthMm * 0.415).toFixed(1))
-  const heelWidthMm = parseFloat((ballGirthMm * 0.274).toFixed(1))
+  const ballModAction = getBuildUpAction(ballBuildUpMm)
+  const instepModAction = getBuildUpAction(instepBuildUpMm)
+  const ballModSummary = formatBallModification(ballBuildUpMm)
+  const instepModSummary = formatInstepModification(instepBuildUpMm)
+
+  const standardForefootWidthMm = parseFloat(
+    (std.ballGirthMm * C.FOREFOOT_WIDTH_TO_GIRTH_RATIO).toFixed(1)
+  )
+  const forefootWidthMm = parseFloat(
+    (ballGirthMm * C.FOREFOOT_WIDTH_TO_GIRTH_RATIO).toFixed(1)
+  )
+  const heelWidthMm = parseFloat((ballGirthMm * C.HEEL_WIDTH_TO_GIRTH_RATIO).toFixed(1))
   const widthIndexPct = parseFloat(((forefootWidthMm / footLengthMm) * 100).toFixed(1))
 
   const widthIndex = Math.round(6 + ballBuildUpMm / std.stepWidthMm)
@@ -218,30 +624,82 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const requiresZipOrLaceWarning =
     obliqueEntryDeltaMm >= 12 || instepBuildUpMm >= 10 || archType === 'cavus'
 
+  // 3. Морфология пальцев (египетская / греческая / римская), апекс и карман под Hallux Valgus
   const anatomicalFootApexOffsetMm =
     toeShape === 'egyptian' ? 9 : toeShape === 'greek' ? -2 : 3
+
+  const medialBunionPocketMm =
+    hvDeg >= C.HV_POCKET_THRESHOLD_DEG
+      ? Math.min(
+          C.MAX_BUNION_POCKET_MM,
+          Math.round((hvDeg - C.HV_BASE_NORMAL_DEG) * C.HV_POCKET_FACTOR)
+        )
+      : 0
+
+  const hvExtraApexShiftMm =
+    hvDeg >= C.HV_POCKET_THRESHOLD_DEG
+      ? Math.round((hvDeg - C.HV_BASE_NORMAL_DEG) * C.HV_APEX_SHIFT_FACTOR)
+      : 0
 
   let lastApexType: LastApexType = 'medial_straight'
   let lastApexLabel = 'Прямой апекс (Straight Medial Apex — по оси I луча)'
   let toeBoxShiftMedialMm = 5
-  if (toeShape === 'greek' && hvDeg < 12) {
-    lastApexType = 'oblique_anatomical'
-    lastApexLabel = 'Косой апекс (Oblique Apex — вершина по II лучу)'
-    toeBoxShiftMedialMm = 0
+
+  if (toeShape === 'greek') {
+    if (hvDeg < 15) {
+      lastApexType = 'oblique_anatomical'
+      lastApexLabel =
+        hvDeg >= C.HV_POCKET_THRESHOLD_DEG
+          ? 'Косой анатомический апекс (II луч + медиальная коррекция HV)'
+          : 'Косой апекс (Oblique Apex — вершина по II лучу)'
+      toeBoxShiftMedialMm = hvExtraApexShiftMm
+    } else {
+      lastApexType = 'medial_straight'
+      lastApexLabel =
+        'Орто-прямой медиальный апекс (коррекция выраженного HV при греческой стопе)'
+      toeBoxShiftMedialMm = 3 + hvExtraApexShiftMm
+    }
   } else if (toeShape === 'roman') {
     lastApexType = 'wide_square'
-    lastApexLabel = 'Широкий трапециевидный апекс (I–III лучи)'
-    toeBoxShiftMedialMm = 3
-  } else if (hvDeg >= 10) {
+    lastApexLabel =
+      hvDeg >= C.HV_POCKET_THRESHOLD_DEG
+        ? 'Широкий трапециевидный апекс (I–III лучи + разгрузка HV)'
+        : 'Широкий трапециевидный апекс (I–III лучи)'
+    toeBoxShiftMedialMm = 3 + hvExtraApexShiftMm
+  } else {
     lastApexType = 'medial_straight'
-    lastApexLabel = 'Орто-прямой медиальный апекс (разгрузка I луча)'
-    toeBoxShiftMedialMm = Math.round(5 + (hvDeg - 8) * 0.25)
+    lastApexLabel =
+      hvDeg >= C.HV_POCKET_THRESHOLD_DEG
+        ? 'Орто-прямой медиальный апекс (разгрузка I луча)'
+        : 'Прямой апекс (Straight Medial Apex — по оси I луча)'
+    toeBoxShiftMedialMm = 5 + hvExtraApexShiftMm
   }
 
-  const medialBunionPocketMm = hvDeg >= 10 ? Math.min(8, Math.round((hvDeg - 8) * 0.35)) : 0
+  const effectiveForefootWidthWithBunionMm = parseFloat(
+    (forefootWidthMm + medialBunionPocketMm).toFixed(1)
+  )
   const toeBoxHeightMm = archType === 'cavus' ? 28 : hvDeg >= 15 ? 25 : 22
-  const compensatoryInsoleHalfPairMm = asymMm >= 4 ? Math.round(asymMm * 0.75) : 0
 
+  // 4. Компенсация асимметрии длины стоп
+  const compensatoryInsoleHalfPairMm =
+    effectiveAsymMm >= C.COMPENSATORY_INSOLE_THRESHOLD_MM
+      ? Math.round(effectiveAsymMm * C.COMPENSATORY_INSOLE_RATIO)
+      : 0
+
+  let asymmetrySummary =
+    'Стопы равной длины (ΔL = 0 мм). Парные колодки без дополнительной компенсации.'
+  if (effectiveAsymMm > 0) {
+    const longerName = resolvedAsymmetrySide === 'left' ? 'Левая' : 'Правая'
+    const shorterAccusative = resolvedAsymmetrySide === 'left' ? 'правую' : 'левую'
+    const shorterGenitive = resolvedAsymmetrySide === 'left' ? 'правой' : 'левой'
+    if (compensatoryInsoleHalfPairMm > 0) {
+      asymmetrySummary = `${longerName} стопа длиннее на ${effectiveAsymMm} мм (Лев: ${leftFootLengthMm} мм, Прав: ${rightFootLengthMm} мм). Подбор базовой колодки по длинной стопе; в ${shorterAccusative} полупару установить компенсационную полустельку/вкладыш +${compensatoryInsoleHalfPairMm} мм и выполнить затяжку носка ${shorterGenitive} полупары.`
+    } else {
+      asymmetrySummary = `${longerName} стопа длиннее на ${effectiveAsymMm} мм (Лев: ${leftFootLengthMm} мм, Прав: ${rightFootLengthMm} мм). Асимметрия ≤ 3 мм в пределах физиологического допуска — полустелька не требуется.`
+    }
+  }
+
+  // 5. Жёсткость стельки, задника и стабилизация пятки
   let shoreA = '40–45 Shore A (Средняя EVA)'
   if (clampedWeight < 60) {
     shoreA = '30–35 Shore A (Мягкая EVA/PPT)'
@@ -262,8 +720,8 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const orthoticIndicated =
     Math.abs(clampedPronation) >= 2 ||
     archType !== 'normal' ||
-    hvDeg >= 10 ||
-    ballBuildUpMm >= 6 ||
+    hvDeg >= C.HV_POCKET_THRESHOLD_DEG ||
+    Math.abs(ballBuildUpMm) >= 6 ||
     clampedWeight >= 90
 
   let insoleType: 'neutral' | 'supinator' | 'pronator' = 'neutral'
@@ -279,14 +737,20 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     archSupportHeightMm = Math.min(15, Math.round(9 + valgusAbs * 0.45))
     medialHeelWedgeMm = Math.min(7, Math.max(2, Math.round(valgusAbs * 0.5 * weightScale)))
     recommendThomasHeel = valgusAbs >= 3.5
-    recommendedThomasMm = Math.min(26, Math.round((13 + valgusAbs * 0.95) * Math.min(1.15, weightScale)))
+    recommendedThomasMm = Math.min(
+      26,
+      Math.round((13 + valgusAbs * 0.95) * Math.min(1.15, weightScale))
+    )
   } else if (clampedPronation >= 2) {
     const varusAbs = Math.abs(clampedPronation)
     insoleType = 'pronator'
     archSupportHeightMm = Math.max(0, Math.round(4 - varusAbs * 0.4))
     lateralWedgeMm = Math.min(7, Math.max(2, Math.round(varusAbs * 0.5 * weightScale)))
     recommendThomasHeel = varusAbs >= 3.5
-    recommendedThomasMm = Math.min(24, Math.round((12 + varusAbs * 0.9) * Math.min(1.15, weightScale)))
+    recommendedThomasMm = Math.min(
+      24,
+      Math.round((12 + varusAbs * 0.9) * Math.min(1.15, weightScale))
+    )
   } else {
     insoleType = archType === 'flat' ? 'supinator' : 'neutral'
     medialHeelWedgeMm = 0
@@ -302,6 +766,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     thomasExtensionMm = recommendedThomasMm
   }
 
+  // 6. Продольный профиль, эффективный рычаг и распределение нагрузки
   const clampedStartPct = Math.max(52, Math.min(78, rockerStartPct))
   const dynamicLeverRatio = Math.max(
     0.58,
@@ -313,7 +778,8 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const asinArg = lEff > 0 ? Math.max(-1, Math.min(1, netRise / lEff)) : 0
   const internalSlope = Math.asin(asinArg) * (180 / Math.PI)
 
-  let loadCalc = 44 + (netRise / Math.max(lEff, 1)) * 102
+  let loadCalc =
+    C.BASE_FOREFOOT_LOAD_PCT + (netRise / Math.max(lEff, 1)) * C.SLOPE_TO_LOAD_GAIN
   if (soleType === 'rocker') {
     const angleFactor = Math.min(1, Math.max(0, rockerAngle / C.MAX_ROCKER_ANGLE))
     const distFromOptimum = Math.abs(clampedStartPct - 60)
@@ -321,7 +787,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     const factor = Math.min(1, angleFactor * placementEfficiency)
     loadCalc *= 1 - C.ROCKER_MITIGATION_CAP * factor
   } else if (soleType === 'thomas') {
-    loadCalc *= 0.91
+    loadCalc *= C.THOMAS_LOAD_RELIEF_FACTOR
   }
   const forefootLoad = Math.min(100, Math.max(0, Math.round(loadCalc)))
   const heelLoad = 100 - forefootLoad
@@ -332,84 +798,153 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     soleType === 'thomas'
       ? clampedPronation * 0.52 * thomasHeightEfficiency
       : soleType === 'rocker'
-      ? clampedPronation * 0.42
-      : clampedPronation * 0.15
+        ? clampedPronation * 0.42
+        : clampedPronation * 0.15
   const effectiveRoll = clampedPronation - orthoStabilization
   const m1Ratio = Math.max(0.22, Math.min(0.82, 0.55 - effectiveRoll * 0.024))
   const loadM1Pct = Math.round(forefootLoad * m1Ratio)
   const loadM5Pct = Math.max(0, forefootLoad - loadM1Pct)
 
+  // 7. Продольные координаты ключевых анатомических точек (Единый источник геометрической правды)
   const heelCenterPos = lastLengthMm * C.HEEL_CENTER_RATIO
   const ballPos = lastLengthMm * (clampedStartPct / 100)
-  const apexM1_Mm = Math.round(ballPos - 5)
-  const apexM5_Mm = Math.round(apexM1_Mm - footLengthMm * 0.082)
+  const apexM1_Mm = Math.round(ballPos - C.M1_PROXIMAL_FROM_BALL_MM)
+  const apexM5_Mm = Math.round(apexM1_Mm - footLengthMm * C.M5_PROXIMAL_TO_FOOT_RATIO)
   const metatarsalObliqueAngleDeg = parseFloat(
-    (Math.atan2(apexM1_Mm - apexM5_Mm, forefootWidthMm * 0.82) * (180 / Math.PI)).toFixed(1)
+    (
+      Math.atan2(
+        apexM1_Mm - apexM5_Mm,
+        forefootWidthMm * C.EFFECTIVE_METATARSAL_SPAN_RATIO
+      ) *
+      (180 / Math.PI)
+    ).toFixed(1)
   )
 
-  const contactAreaScale = (footLengthMm / 245) * (1 + ballBuildUpMm * 0.008)
+  // 8. Модельная оценка плантарного давления и показаний к пелоту Зейца
+  // Учитываем, что карман под HV также расширяет опорную/объёмную зону первого луча
+  const contactAreaScale =
+    (footLengthMm / C.REF_FOOT_LENGTH_MM) *
+    (1 + ballBuildUpMm * 0.008 + medialBunionPocketMm * 0.005)
   const orthoReliefFactor =
     soleType === 'rocker' ? 1.52 : soleType === 'thomas' ? 1.42 : 1.0
-  const foreAreaCm2 = Math.max(30, 46 * contactAreaScale * orthoReliefFactor)
-  const heelAreaCm2 = Math.max(22, 33 * contactAreaScale * (soleType !== 'flat' ? 1.32 : 1.0))
+  const foreAreaCm2 = Math.max(
+    30,
+    C.REF_FOREFOOT_CONTACT_AREA_CM2 * contactAreaScale * orthoReliefFactor
+  )
+  const heelAreaCm2 = Math.max(
+    22,
+    C.REF_HEEL_CONTACT_AREA_CM2 * contactAreaScale * (soleType !== 'flat' ? 1.32 : 1.0)
+  )
 
-  const totalForceN = clampedWeight * 9.81 * 1.15
+  const totalForceN = clampedWeight * 9.81 * C.QUASI_STATIC_GAIT_FACTOR
   const foreForceN = totalForceN * (forefootLoad / 100)
   const heelForceN = totalForceN * (heelLoad / 100)
-  const rollConcentration = 1 + Math.abs(effectiveRoll) * 0.028 + (archType === 'cavus' ? 0.12 : 0)
+  const rollConcentration =
+    1 + Math.abs(effectiveRoll) * 0.028 + (archType === 'cavus' ? 0.12 : 0)
 
   const peakForefootPressureKpa = Math.round(
-    (foreForceN / foreAreaCm2) * 10 * 1.55 * rollConcentration
+    (foreForceN / foreAreaCm2) *
+      10 *
+      C.FOREFOOT_PEAK_CONCENTRATION_FACTOR *
+      rollConcentration
   )
-  const peakHeelPressureKpa = Math.round((heelForceN / heelAreaCm2) * 10 * 1.45)
+  const peakHeelPressureKpa = Math.round(
+    (heelForceN / heelAreaCm2) * 10 * C.HEEL_PEAK_CONCENTRATION_FACTOR
+  )
 
   const requiresMetatarsalPad =
-    forefootLoad >= 68 ||
-    peakForefootPressureKpa >= 215 ||
+    forefootLoad >= C.PELOTTE_LOAD_THRESHOLD_PCT ||
+    peakForefootPressureKpa >= C.PELOTTE_PRESSURE_THRESHOLD_KPA ||
     ballBuildUpMm >= 6 ||
     hvDeg >= 12
 
+  const defaultPelottePosMm = Math.round(apexM1_Mm - C.PELOTTE_PROXIMAL_OFFSET_MM)
   let metatarsalPadPosMm: number | null = null
   let metatarsalPadHeightMm: number | null = null
   if (requiresMetatarsalPad) {
-    metatarsalPadPosMm = Math.round(apexM1_Mm - 7)
+    metatarsalPadPosMm = defaultPelottePosMm
     metatarsalPadHeightMm =
-      clampedWeight >= 100 || ballBuildUpMm >= 10 || hvDeg >= 15 ? 6 : netRise > 25 ? 5 : 4
+      clampedWeight >= 100 || ballBuildUpMm >= 10 || hvDeg >= 15
+        ? 6
+        : netRise > 25
+          ? 5
+          : 4
   }
 
+  // 9. Расчёт параметров геленка 65Г и модуля shankEngineering
   const shankLength = Math.round(Math.max(40, ballPos - heelCenterPos - 5))
+  const effectiveHeelTipOffsetMm = soleType !== 'rocker' ? heelTipOffsetMm : 0
+
   const supportReductionMm =
     soleType === 'rocker'
       ? shankLength * 0.42
       : soleType === 'thomas'
-      ? thomasExtensionMm * 0.85
-      : 0
-  const offsetPenaltyMm = soleType !== 'rocker' ? Math.max(0, -heelTipOffsetMm) * 2.2 : 0
-  const effectiveMomentArmM = Math.max(
-    0.014,
-    (shankLength * 0.48 - supportReductionMm + offsetPenaltyMm) / 1000
+        ? thomasExtensionMm * 0.85
+        : 0
+  const offsetPenaltyMm =
+    soleType !== 'rocker' ? Math.max(0, -effectiveHeelTipOffsetMm) * 2.2 : 0
+  const effectiveMomentArmMm = parseFloat(
+    Math.max(14, shankLength * 0.48 - supportReductionMm + offsetPenaltyMm).toFixed(1)
   )
-  const slopeLoadFactor = 0.25 + Math.max(0, Math.sin((internalSlope * Math.PI) / 180)) * 0.95
+  const effectiveMomentArmM = effectiveMomentArmMm / 1000
+  const slopeLoadFactor =
+    0.25 + Math.max(0, Math.sin((internalSlope * Math.PI) / 180)) * 0.95
   const shankBendingMomentNm = parseFloat(
     (totalForceN * effectiveMomentArmM * slopeLoadFactor).toFixed(1)
   )
 
   const shankOverloaded = shankBendingMomentNm > C.MAX_SHANK_MOMENT_NM
   const thomasTooHigh = soleType === 'thomas' && heelHeight > C.MAX_THOMAS_HEEL_MM
-  const rockerTooHigh = soleType === 'rocker' && (heelHeight > C.MAX_ROCKER_HEEL_MM || netRise > 22)
+  const rockerTooHigh =
+    soleType === 'rocker' &&
+    (heelHeight > C.MAX_ROCKER_HEEL_MM || netRise > C.MAX_ROCKER_NET_RISE_MM)
 
   let steelThickness = clampedWeight >= 85 || gender === 'male' ? 1.5 : 1.2
   if (netRise > 35 || shankBendingMomentNm > 20) steelThickness = Math.max(steelThickness, 1.5)
   if (netRise > 55 || shankBendingMomentNm > 25 || clampedWeight >= 105) steelThickness = 2.0
 
-  const heelOffsetTooFarBack = soleType !== 'rocker' && heelTipOffsetMm < -1
-  const heelOffsetTooFarForward =
-    soleType !== 'rocker' && heelTipOffsetMm > C.MAX_HEEL_OFFSET_MM
+  const shankWidthMm = gender === 'male' ? 16 : 14
+  const sectionModulusMm3 = parseFloat(
+    ((shankWidthMm * steelThickness * steelThickness) / 6).toFixed(2)
+  )
+  // Стальной геленок воспринимает ~35% суммарного изгибающего момента свода (остальное — затяжная стелька и подошва)
+  const shankMomentShareNmm = shankBendingMomentNm * 1000 * 0.35
+  const estimatedBendingStressMpa = Math.round(
+    shankMomentShareNmm / Math.max(0.5, sectionModulusMm3)
+  )
+  const safetyFactor = parseFloat(
+    (780 / Math.max(1, estimatedBendingStressMpa)).toFixed(2)
+  )
 
-  const baseStabilityFactor = soleType === 'thomas' ? 0.5 : soleType === 'rocker' ? 0.55 : 1.0
+  const shankEngineering: ShankEngineeringModel = {
+    isAnalyticalEstimate: true,
+    material: soleType === 'rocker' ? 'carbon_composite' : 'steel_65G',
+    shankLengthMm: shankLength,
+    shankWidthMm,
+    steelThicknessMm: steelThickness,
+    effectiveMomentArmMm,
+    bendingMomentNm: shankBendingMomentNm,
+    maxAllowedMomentNm: C.MAX_SHANK_MOMENT_NM,
+    sectionModulusMm3,
+    estimatedBendingStressMpa,
+    safetyFactor,
+    isOverloaded: shankOverloaded,
+  }
+
+  // 10. Согласованные допуски смещения оси каблука: [-2 мм .. +5 мм]
+  const heelOffsetTooFarBack =
+    soleType !== 'rocker' && effectiveHeelTipOffsetMm < C.MIN_SAFE_HEEL_OFFSET_MM
+  const heelOffsetTooFarForward =
+    soleType !== 'rocker' && effectiveHeelTipOffsetMm > C.MAX_SAFE_HEEL_OFFSET_MM
+
+  const baseStabilityFactor =
+    soleType === 'thomas' ? 0.5 : soleType === 'rocker' ? 0.55 : 1.0
   const heightRisk = Math.max(0, netRise) * 0.55
   const rollRisk = Math.abs(effectiveRoll) * (2.6 + (clampedWeight / 75) * 1.15)
-  const inversionRisk = Math.min(100, Math.round((heightRisk + rollRisk) * baseStabilityFactor))
+  const inversionRisk = Math.min(
+    100,
+    Math.round((heightRisk + rollRisk) * baseStabilityFactor)
+  )
 
   const copLongitudinalMm = Math.round(
     heelCenterPos + (ballPos - heelCenterPos) * (forefootLoad / 100)
@@ -423,47 +958,179 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
         )
       : 0
 
+  // 11. Сборка единой геометрической модели LastGeometryModel
+  const xHeelCenterMm = Math.round(heelCenterPos)
+  const xHeelTipCenterMm = Math.round(heelCenterPos + effectiveHeelTipOffsetMm)
+  const heelHalfBaseLengthMm = (gender === 'male' ? 32 : 28) * 0.5
+  const xHeelBackBottomMm = Math.max(
+    0,
+    Math.round(xHeelTipCenterMm - heelHalfBaseLengthMm * 0.92)
+  )
+  const xHeelFrontBaseMm = Math.round(xHeelTipCenterMm + heelHalfBaseLengthMm)
+  const xThomasFrontMm =
+    soleType === 'thomas' ? xHeelFrontBaseMm + thomasExtensionMm : xHeelFrontBaseMm
+  const xShankStartMm = xHeelCenterMm
+  const xShankEndMm = Math.min(
+    Math.round(ballPos - 4),
+    xHeelCenterMm + shankLength
+  )
+  const xInstepMm = Math.round(lastLengthMm * C.INSTEP_POS_RATIO)
+  const xBallMm = Math.round(ballPos)
+  const rockerZoneLengthMm = Math.max(1, lastLengthMm - xBallMm)
+  const activeRockerDeg = soleType === 'rocker' ? rockerAngle : 0
+  const rockerLiftMm =
+    soleType === 'rocker'
+      ? Math.min(
+          C.MAX_LIFT,
+          Math.round(
+            rockerZoneLengthMm *
+              Math.min(1, Math.max(0, Math.sin((activeRockerDeg * Math.PI) / 180)))
+          )
+        )
+      : 6
+
+  const geometryModel: LastGeometryModel = {
+    footLengthMm,
+    leftFootLengthMm,
+    rightFootLengthMm,
+    longerFootSide: resolvedAsymmetrySide,
+    shorterFootSide,
+    lengthAsymmetryMm: effectiveAsymMm,
+    compensatoryInsoleHalfPairMm,
+    toeShapeAllowanceMm,
+    toeFreeSpaceMm,
+    fashionAllowanceMm,
+    lastLengthMm,
+
+    xHeelMm: 0,
+    xHeelCenterMm,
+    xHeelTipCenterMm,
+    xHeelBackBottomMm,
+    xHeelFrontBaseMm,
+    xThomasFrontMm,
+    xShankStartMm,
+    xShankEndMm,
+    xInstepMm,
+    xPelotteMm: defaultPelottePosMm,
+    xApexM5Mm: apexM5_Mm,
+    xApexM1Mm: apexM1_Mm,
+    xBallMm,
+    xToeMm: lastLengthMm,
+
+    uHeelCenter: parseFloat((xHeelCenterMm / lastLengthMm).toFixed(4)),
+    uHeelFrontBase: parseFloat((xHeelFrontBaseMm / lastLengthMm).toFixed(4)),
+    uThomasFront: parseFloat((xThomasFrontMm / lastLengthMm).toFixed(4)),
+    uShankEnd: parseFloat((xShankEndMm / lastLengthMm).toFixed(4)),
+    uInstep: parseFloat((xInstepMm / lastLengthMm).toFixed(4)),
+    uPelotte: parseFloat((defaultPelottePosMm / lastLengthMm).toFixed(4)),
+    uApexM5: parseFloat((apexM5_Mm / lastLengthMm).toFixed(4)),
+    uApexM1: parseFloat((apexM1_Mm / lastLengthMm).toFixed(4)),
+    uBall: parseFloat((xBallMm / lastLengthMm).toFixed(4)),
+
+    heelHeightMm: heelHeight,
+    toeThicknessMm: toeThickness,
+    netRiseMm: netRise,
+    rockerLiftMm,
+    instepBaseHeightMm: gender === 'male' ? 60 : 54,
+    toeBoxHeightMm,
+
+    standardForefootWidthMm,
+    forefootWidthMm,
+    effectiveForefootWidthWithBunionMm,
+    heelWidthMm,
+    ballBuildUpMm,
+    ballModAction,
+    instepBuildUpMm,
+    instepModAction,
+    medialBunionPocketMm,
+    bunionPocketCenterMm: apexM1_Mm,
+    bunionPocketRadiusMm: 18 + Math.min(6, Math.round(medialBunionPocketMm * 0.8)),
+    toeShape,
+    lastApexType,
+    lastApexLabel,
+    anatomicalFootApexOffsetMm,
+    toeBoxShiftMedialMm,
+    metatarsalObliqueAngleDeg,
+
+    requiresMetatarsalPad,
+    metatarsalPadPosMm,
+    metatarsalPadHeightMm,
+    pelotteHalfLengthMm: 11,
+    soleType,
+    thomasHeelType,
+    thomasExtensionMm,
+    effectiveHeelTipOffsetMm,
+    rockerAngleDeg: activeRockerDeg,
+    rockerStartPct: clampedStartPct,
+    rockerZoneLengthMm,
+    shankLengthMm: shankLength,
+    steelThicknessMm: steelThickness,
+    carbonInsertThicknessMm,
+  }
+
+  const soleConstructionSummary = describeSoleConstruction({
+    soleType,
+    netRiseMm: netRise,
+    heelHeightMm: heelHeight,
+    toeThicknessMm: toeThickness,
+    thomasHeelType,
+    thomasExtensionMm,
+    rockerAngleDeg: rockerAngle,
+    rockerStartPct: clampedStartPct,
+    carbonInsertThicknessMm,
+    shankLengthMm: shankLength,
+    steelThicknessMm: steelThickness,
+  })
+
   const calculations: MathFormulaStep[] = [
     {
       title: '1. Конструктивная длина следа колодки (L_last)',
-      given: `Размер = ${shoeSize}, Стопа L_ст = ${footLengthMm} мм, Припуск Движ+Фасон = ${toeFreeSpaceMm + 6} мм`,
+      given: `Размер = ${shoeSize}, Опорная стопа L_ст = ${footLengthMm} мм (Лев: ${leftFootLengthMm} / Прав: ${rightFootLengthMm} мм), Суммарный припуск = ${toeFreeSpaceMm + fashionAllowanceMm} мм`,
       formula: 'L_last = L_ст + Δ_свободн + Δ_фасон',
-      substitution: `${footLengthMm} + ${toeFreeSpaceMm} + 6`,
-      result: `${lastLengthMm} мм`,
-      meaning: `Зеленая зона свободного пространства перед пальцами равна ${toeFreeSpaceMm} мм.`,
+      substitution: `${footLengthMm} + ${toeFreeSpaceMm} + ${fashionAllowanceMm}`,
+      result: `${lastLengthMm} мм (свободный припуск мыска +${toeFreeSpaceMm} мм)`,
+      meaning:
+        compensatoryInsoleHalfPairMm > 0
+          ? `${asymmetrySummary}`
+          : `Зелёная зона свободного пространства перед пальцами +${toeFreeSpaceMm} мм (${toeShape === 'greek' ? 'Греческая стопа, удлинённый II луч' : toeShape === 'roman' ? 'Римская стопа' : 'Египетская стопа'}).`,
     },
     {
-      title: '2. Расширение пучков и карман под I луч (Желтая зона доработки)',
-      given: `Обхват клиента O_п = ${ballGirthMm} мм, База = ${std.ballGirthMm} мм, HV = ${hvDeg}°`,
-      formula: 'ΔO_п = O_п − O_база;  ΔW_пуч = (O_п − O_база) × 0.415',
-      substitution: `${ballGirthMm} − ${std.ballGirthMm} = ${ballBuildUpMm} мм`,
-      result: `Налепка пучков: ${ballBuildUpMm >= 0 ? `+${ballBuildUpMm}` : ballBuildUpMm} мм (Ширина ${forefootWidthMm} мм vs база ${standardForefootWidthMm} мм)`,
+      title: '2. Модификация пучков и карман под I луч (Жёлтая зона доработки)',
+      given: `Обхват клиента O_п = ${ballGirthMm} мм, Эталон = ${std.ballGirthMm} мм, HV = ${hvDeg}°`,
+      formula: 'ΔO_п = O_п − O_п(эт); W_M1 = W_пуч + Δ_HV',
+      substitution: `${ballGirthMm} − ${std.ballGirthMm} = ${ballBuildUpMm} мм; Карман HV = +${medialBunionPocketMm} мм`,
+      result: `${ballModSummary} (Ширина ${forefootWidthMm} мм vs база ${standardForefootWidthMm} мм; с HV: ${effectiveForefootWidthWithBunionMm} мм)`,
       meaning:
         ballBuildUpMm > 0 || medialBunionPocketMm > 0
-          ? `Желтая зона модификации: расширить пучки на +${Math.max(0, ballBuildUpMm)} мм, карман M1 +${medialBunionPocketMm} мм.`
-          : 'Стандартная ширина пучков колодки.',
+          ? `Жёлтая зона модификации: ${ballBuildUpMm > 0 ? `нарастить пучки на +${ballBuildUpMm} мм` : ballBuildUpMm < 0 ? `снять материал в пучках ${ballBuildUpMm} мм` : 'базовая ширина пучков'}${medialBunionPocketMm > 0 ? `, сформировать локальный карман M1 +${medialBunionPocketMm} мм` : ''}.`
+          : ballBuildUpMm < 0
+            ? `Узкая стопа: требуется снятие материала (уменьшение объёма колодки в пучках на ${ballBuildUpMm} мм).`
+            : 'Стандартная ширина пучков колодки (без налепки и снятия).',
     },
     {
       title: '3. Положение апекса и косой линии сгиба (Синие ориентиры)',
-      given: `M1 = ${apexM1_Mm} мм, M5 = ${apexM5_Mm} мм, Ширина = ${forefootWidthMm} мм`,
+      given: `M1 = ${apexM1_Mm} мм, M5 = ${apexM5_Mm} мм, Ширина пучков = ${forefootWidthMm} мм`,
       formula: 'φ_изгиба = arctan((X_M1 − X_M5) / (0.82 × W_пуч))',
-      substitution: `arctan((${apexM1_Mm} − ${apexM5_Mm}) / ${(forefootWidthMm * 0.82).toFixed(1)})`,
+      substitution: `arctan((${apexM1_Mm} − ${apexM5_Mm}) / ${(forefootWidthMm * C.EFFECTIVE_METATARSAL_SPAN_RATIO).toFixed(1)})`,
       result: `Угол сгиба φ = ${metatarsalObliqueAngleDeg}°; Смещение апекса мыска = +${toeBoxShiftMedialMm} мм`,
       meaning: `${lastApexLabel}.`,
     },
     {
-      title: '4. Пиковое давление (Красная зона) и момент геленка 65Г',
-      given: `Вес = ${clampedWeight} кг, Нагрузка пучков = ${forefootLoad}%, Наклон = ${internalSlope.toFixed(1)}°`,
-      formula: 'P_peak = (F_пуч / S_оп) × k;  M_гел = F_дин × L_рычага × k_укл',
-      substitution: `P = ${peakForefootPressureKpa} кПа;  M = ${shankBendingMomentNm} Н·м`,
-      result: `Давление ${peakForefootPressureKpa} кПа · Момент ${shankBendingMomentNm} Н·м (Сталь ${steelThickness} мм)`,
+      title: '4. Модельная оценка пикового давления (Красная зона) и момент геленка',
+      given: `Вес = ${clampedWeight} кг, Нагрузка пучков = ${forefootLoad}%, Уклон = ${internalSlope.toFixed(1)}°`,
+      formula: 'P_est = (F_пуч / S_оп) × k_конц; M_гел = F_дин × L_рычага × k_укл',
+      substitution: `P_est ≈ ${peakForefootPressureKpa} кПа (модельная оценка); M_гел ≈ ${shankBendingMomentNm} Н·м`,
+      result: `Модельная оценка давления: ${peakForefootPressureKpa} кПа · Оценочный момент: ${shankBendingMomentNm} Н·м (${soleType === 'rocker' ? `Карбон ${carbonInsertThicknessMm} мм` : `Сталь 65Г ${steelThickness} мм`})`,
       meaning: requiresMetatarsalPad
-        ? `Требуется пелот Зейца ${metatarsalPadHeightMm} мм на расстоянии ${metatarsalPadPosMm} мм от пятки.`
-        : 'Перегрузки поперечного свода нет — пелот Зейца не требуется.',
+        ? `Назначен пелот Зейца высотой ${metatarsalPadHeightMm} мм на расстоянии ${metatarsalPadPosMm} мм от пятки. Конструкция опоры: ${soleConstructionSummary}.`
+        : `Перегрузки поперечного свода по модели нет — пелот Зейца не требуется. Конструкция опоры: ${soleConstructionSummary}.`,
     },
   ]
 
   return {
+    geometryModel,
+    shankEngineering,
+    isPressureAndCopModelEstimate: true,
     lastLengthMm,
     footLengthMm,
     lEff,
@@ -498,10 +1165,15 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     rx: {
       widthCode,
       ballBuildUpMm,
+      ballModAction,
+      ballModSummary,
       instepBuildUpMm,
+      instepModAction,
+      instepModSummary,
       obliqueEntryDeltaMm,
       requiresZipOrLaceWarning,
       forefootWidthMm,
+      effectiveForefootWidthWithBunionMm,
       standardForefootWidthMm,
       heelWidthMm,
       widthIndexPct,
@@ -512,7 +1184,13 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
       toeBoxHeightMm,
       toeFreeSpaceMm,
       medialBunionPocketMm,
+      asymmetrySide: resolvedAsymmetrySide,
+      leftFootLengthMm,
+      rightFootLengthMm,
+      longerFootSide: resolvedAsymmetrySide,
+      shorterFootSide,
       compensatoryInsoleHalfPairMm,
+      asymmetrySummary,
       orthoticIndicated,
       insoleType,
       archSupportHeightMm,
@@ -524,6 +1202,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
       thomasHeelType,
       thomasExtensionMm,
       recommendedThomasMm,
+      soleConstructionSummary,
       metatarsalObliqueAngleDeg,
       calculations,
     },
@@ -575,52 +1254,409 @@ export function computeAudit(
   return { status: 'SUCCESS', titleKey: 'successTitle', messageKey: 'successDesc' }
 }
 
-export function suggestAutoFix(input: HeelInput, eng: HeelEngineering) {
-  let soleType: SoleType = input.soleType
-  let heelHeight = input.heelHeight
-  let toeThickness = input.toeThickness
-  const heelTipOffsetMm = 0
-  let rockerAngle = input.rockerAngle
+/**
+ * Собирает полный список всех активных критических ошибок и предупреждений
+ * для итеративного алгоритма suggestAutoFix и детальной диагностики.
+ */
+export function collectAuditViolations(
+  eng: HeelEngineering,
+  soleType: SoleType,
+  heelHeight: number,
+  rockerAngle: number
+): { errors: string[]; warnings: string[] } {
+  const C = HEEL_CONST
+  const errors: string[] = []
+  const warnings: string[] = []
+  const activeRocker = soleType === 'rocker' ? rockerAngle : 0
 
-  if (Math.abs(input.pronationDeg) >= 3.5) {
-    soleType = 'thomas'
-    heelHeight = 24
-    toeThickness = 14
-  } else if (
-    eng.peakForefootPressureKpa >= HEEL_CONST.CRITICAL_KPA ||
-    eng.shankOverloaded ||
-    input.weightKg >= 95
+  if (eng.heelOffsetTooFarBack) {
+    errors.push(
+      `Смещение каблука назад (< ${C.MIN_SAFE_HEEL_OFFSET_MM} мм): риск излома геленка 65Г`
+    )
+  }
+  if (eng.heelOffsetTooFarForward) {
+    errors.push(
+      `Смещение пятки вперёд (> +${C.MAX_SAFE_HEEL_OFFSET_MM} мм): нарушение соосности пяточного упора`
+    )
+  }
+  if (eng.thomasTooHigh) {
+    errors.push(
+      `Высота каблука Томаса (${heelHeight} мм) превышает лимит ${C.MAX_THOMAS_HEEL_MM} мм`
+    )
+  }
+  if (eng.rockerTooHigh) {
+    errors.push(
+      `Параметры рокера превышают лимит (высота пятки > ${C.MAX_ROCKER_HEEL_MM} мм или перепад > ${C.MAX_ROCKER_NET_RISE_MM} мм)`
+    )
+  }
+  if (eng.internalSlope >= C.CRITICAL_ANGLE) {
+    errors.push(
+      `Критический угол продольного уклона (${eng.internalSlope.toFixed(1)}° >= ${C.CRITICAL_ANGLE}°)`
+    )
+  }
+  if (eng.shankOverloaded) {
+    errors.push(
+      `Перегрузка геленка (${eng.shankBendingMomentNm} Н·м > ${C.MAX_SHANK_MOMENT_NM} Н·м)`
+    )
+  }
+  if (eng.rx.recommendThomasHeel && soleType === 'flat') {
+    errors.push(
+      `Завал стопы (${eng.pronationDeg}°) продавливает свод на плоской подошве — требуется каблук Томаса`
+    )
+  }
+  if (eng.highInversionRisk || eng.highPronationStress) {
+    errors.push(
+      `Высокий риск боковой нестабильности / вывиха (индекс нестабильности ${eng.inversionRisk}%, эффективный завал)`
+    )
+  }
+  if (eng.peakForefootPressureKpa >= C.CRITICAL_KPA || eng.forefootLoad >= C.CRITICAL_LOAD) {
+    errors.push(
+      `Перегрузка пучков (модельная оценка ${eng.peakForefootPressureKpa} кПа / нагрузка ${eng.forefootLoad}%)`
+    )
+  }
+
+  if (eng.internalSlope < 0) {
+    warnings.push('Отрицательный перепад высот (платформа носка выше каблука)')
+  }
+  if (eng.internalSlope > C.COMFORT_ANGLE && eng.internalSlope < C.CRITICAL_ANGLE) {
+    warnings.push(`Уклон стопы (${eng.internalSlope.toFixed(1)}°) выше комфортного (${C.COMFORT_ANGLE}°)`)
+  }
+  if (heelHeight < 20 && activeRocker > 16) {
+    warnings.push('Слишком агрессивный угол рокера при низкой пятке (< 20 мм)')
+  }
+  if (eng.rx.requiresZipOrLaceWarning) {
+    warnings.push('Высокий взъём / косой обхват — требуется шнуровка или молния')
+  }
+
+  return { errors, warnings }
+}
+
+/**
+ * ИТЕРАТИВНЫЙ И НАДЁЖНЫЙ АЛГОРИТМ АВТОПОДБОРА (suggestAutoFix).
+ * Пошагово вычисляет состояние (computeEngineering + computeAudit), находит все активные нарушения,
+ * вносит минимально необходимые безопасные корректировки без неоправданной смены типа подошвы
+ * и пересчитывает модель до полного устранения ошибок или достижения лимита итераций (7).
+ */
+export function suggestAutoFix(
+  input: HeelInput,
+  initialEng?: HeelEngineering
+): AutoFixResult {
+  const C = HEEL_CONST
+  const maxHeelForGender = input.gender === 'male' ? 55 : 85
+  const minHeelAllowed = 10
+
+  let state: HeelInput = { ...input }
+  let currentEng = initialEng ?? computeEngineering(state)
+  let currentAudit = computeAudit(
+    currentEng,
+    state.soleType,
+    state.heelHeight,
+    state.rockerAngle
+  )
+  let violations = collectAuditViolations(
+    currentEng,
+    state.soleType,
+    state.heelHeight,
+    state.rockerAngle
+  )
+
+  const appliedChanges: string[] = []
+
+  // Если критических ошибок нет и уклон уже в комфортной зоне (0..COMFORT_ANGLE), ничего не ломаем
+  if (
+    violations.errors.length === 0 &&
+    currentEng.internalSlope >= 0 &&
+    currentEng.internalSlope <= C.COMFORT_ANGLE &&
+    !(state.heelHeight < 20 && state.soleType === 'rocker' && state.rockerAngle > 16)
   ) {
-    if (soleType === 'flat') soleType = 'rocker'
-    heelHeight = 26
-    toeThickness = 14
-    rockerAngle = 15
+    return {
+      soleType: state.soleType,
+      toeThickness: state.toeThickness,
+      heelHeight: state.heelHeight,
+      heelTipOffsetMm: state.heelTipOffsetMm,
+      rockerAngle: state.rockerAngle,
+      rockerStartPct: state.rockerStartPct,
+      status: 'ALREADY_OPTIMAL',
+      iterations: 0,
+      resolved: true,
+      summaryMessage: 'Параметры уже находятся в безопасном ортопедическом диапазоне.',
+      appliedChanges: [],
+      remainingIssues: [],
+    }
   }
 
-  if (soleType === 'thomas' && heelHeight > HEEL_CONST.MAX_THOMAS_HEEL_MM) {
-    heelHeight = 26
-    toeThickness = 12
+  let iterations = 0
+
+  for (let step = 1; step <= C.MAX_AUTO_FIX_ITERATIONS; step++) {
+    currentEng = computeEngineering(state)
+    currentAudit = computeAudit(
+      currentEng,
+      state.soleType,
+      state.heelHeight,
+      state.rockerAngle
+    )
+    violations = collectAuditViolations(
+      currentEng,
+      state.soleType,
+      state.heelHeight,
+      state.rockerAngle
+    )
+
+    const hasSlopeOrRockerWarning =
+      currentEng.internalSlope < 0 ||
+      currentEng.internalSlope > C.COMFORT_ANGLE ||
+      (state.soleType === 'rocker' && state.heelHeight < 20 && state.rockerAngle > 16)
+
+    if (violations.errors.length === 0 && !hasSlopeOrRockerWarning) {
+      break
+    }
+
+    iterations = step
+    let changedInStep = false
+
+    // Шаг А: Устранение недопустимого смещения набойки каблука (допуск -2..+5 мм)
+    if (currentEng.heelOffsetTooFarBack || currentEng.heelOffsetTooFarForward) {
+      const safeOffset = 0
+      if (state.heelTipOffsetMm !== safeOffset) {
+        appliedChanges.push(
+          `Итер. ${step}: смещение каблука скорректировано с ${state.heelTipOffsetMm} мм до ${safeOffset} мм`
+        )
+        state.heelTipOffsetMm = safeOffset
+        changedInStep = true
+      }
+    }
+
+    // Шаг Б: Устранение отрицательного дропа (платформа выше каблука)
+    if (state.heelHeight < state.toeThickness) {
+      const nextToe = Math.max(0, state.heelHeight)
+      appliedChanges.push(
+        `Итер. ${step}: толщина платформы снижена с ${state.toeThickness} до ${nextToe} мм (устранение отрицательного дропа)`
+      )
+      state.toeThickness = nextToe
+      changedInStep = true
+    }
+
+    // Шаг В: Ограничение высоты каблука Томаса и рокера без смены типа подошвы
+    if (state.soleType === 'thomas' && state.heelHeight > C.MAX_THOMAS_HEEL_MM) {
+      const nextHeel = C.MAX_THOMAS_HEEL_MM
+      appliedChanges.push(
+        `Итер. ${step}: высота каблука Томаса снижена с ${state.heelHeight} до ${nextHeel} мм`
+      )
+      state.heelHeight = nextHeel
+      state.toeThickness = Math.min(state.toeThickness, state.heelHeight)
+      changedInStep = true
+    }
+
+    if (state.soleType === 'rocker') {
+      if (state.heelHeight > C.MAX_ROCKER_HEEL_MM) {
+        appliedChanges.push(
+          `Итер. ${step}: высота рокерной пятки снижена с ${state.heelHeight} до ${C.MAX_ROCKER_HEEL_MM} мм`
+        )
+        state.heelHeight = C.MAX_ROCKER_HEEL_MM
+        changedInStep = true
+      }
+      if (state.heelHeight - state.toeThickness > C.MAX_ROCKER_NET_RISE_MM) {
+        const neededToe = Math.min(
+          C.MAX_TOE,
+          state.heelHeight - C.MAX_ROCKER_NET_RISE_MM
+        )
+        if (neededToe > state.toeThickness && neededToe <= 24) {
+          appliedChanges.push(
+            `Итер. ${step}: платформа носка увеличена с ${state.toeThickness} до ${neededToe} мм (перепад рокера ≤ ${C.MAX_ROCKER_NET_RISE_MM} мм)`
+          )
+          state.toeThickness = neededToe
+        } else {
+          const nextHeel = Math.max(20, state.toeThickness + C.MAX_ROCKER_NET_RISE_MM)
+          appliedChanges.push(
+            `Итер. ${step}: высота пятки снижена с ${state.heelHeight} до ${nextHeel} мм (перепад рокера ≤ ${C.MAX_ROCKER_NET_RISE_MM} мм)`
+          )
+          state.heelHeight = nextHeel
+        }
+        changedInStep = true
+      }
+      if (state.heelHeight < 20 && state.rockerAngle > 16) {
+        state.heelHeight = 22
+        appliedChanges.push(
+          `Итер. ${step}: высота пятки увеличена до 22 мм для согласования с углом рокера ${state.rockerAngle}°`
+        )
+        changedInStep = true
+      }
+    }
+
+    // Шаг Г: Если на плоской подошве выраженный завал (recommendThomasHeel) — переход на каблук Томаса
+    // ВАЖНО: Никогда не сбрасываем 'thomas' или 'rocker' обратно в 'flat'!
+    if (state.soleType === 'flat' && currentEng.rx.recommendThomasHeel) {
+      state.soleType = 'thomas'
+      if (state.heelHeight > C.MAX_THOMAS_HEEL_MM) {
+        state.heelHeight = 28
+      }
+      appliedChanges.push(
+        `Итер. ${step}: назначен ортопедический каблук Томаса для стабилизации завала (${state.pronationDeg}°)`
+      )
+      changedInStep = true
+    }
+
+    // Шаг Д: Снижение продольного уклона, перегрузки пучков, момента геленка и риска инверсии
+    const needsDropReduction =
+      currentEng.internalSlope > C.COMFORT_ANGLE ||
+      currentEng.shankOverloaded ||
+      currentEng.peakForefootPressureKpa >= C.CRITICAL_KPA ||
+      currentEng.forefootLoad >= C.CRITICAL_LOAD ||
+      currentEng.highInversionRisk
+
+    if (needsDropReduction) {
+      const targetRad = (C.SAFE_ANGLE * Math.PI) / 180
+      const maxSafeNet = Math.max(
+        0,
+        Math.min(14, Math.floor(currentEng.lEff * Math.sin(targetRad)))
+      )
+      const currentNet = state.heelHeight - state.toeThickness
+
+      // 1) Сначала мягко уменьшаем чистый перепад высот (netRise), сохраняя текущий тип подошвы
+      if (currentNet > 0) {
+        const targetNet =
+          currentNet > maxSafeNet
+            ? maxSafeNet
+            : Math.max(0, currentNet - 4)
+
+        // Пробуем сначала поднять платформу до разумного предела (16 мм), затем плавно снижать каблук
+        const maxComfortPlatform = Math.min(C.MAX_TOE, state.heelHeight, 18)
+        if (state.toeThickness < maxComfortPlatform && state.heelHeight - state.toeThickness > targetNet) {
+          const nextToe = Math.min(
+            maxComfortPlatform,
+            state.heelHeight - targetNet,
+            state.toeThickness + 4
+          )
+          if (nextToe !== state.toeThickness) {
+            appliedChanges.push(
+              `Итер. ${step}: толщина носочной части увеличена с ${state.toeThickness} до ${nextToe} мм`
+            )
+            state.toeThickness = nextToe
+            changedInStep = true
+          }
+        }
+
+        if (state.heelHeight - state.toeThickness > targetNet && state.heelHeight > minHeelAllowed) {
+          const minTargetHeel = state.soleType === 'rocker' ? 20 : 14
+          const nextHeel = Math.max(
+            minTargetHeel,
+            Math.min(maxHeelForGender, state.toeThickness + targetNet, state.heelHeight - 6)
+          )
+          if (nextHeel < state.heelHeight) {
+            appliedChanges.push(
+              `Итер. ${step}: высота каблука снижена с ${state.heelHeight} до ${nextHeel} мм`
+            )
+            state.heelHeight = nextHeel
+            if (state.toeThickness > state.heelHeight) {
+              state.toeThickness = state.heelHeight
+            }
+            changedInStep = true
+          }
+        }
+      }
+
+      // 2) Если уже выбран режим 'rocker', оптимизируем угол переката и точку старта (к оптимуму 60%)
+      if (
+        state.soleType === 'rocker' &&
+        (currentEng.peakForefootPressureKpa >= C.CRITICAL_KPA ||
+          currentEng.forefootLoad >= C.CRITICAL_LOAD)
+      ) {
+        if (state.rockerAngle < C.MAX_ROCKER_ANGLE) {
+          const nextAngle = Math.min(C.MAX_ROCKER_ANGLE, state.rockerAngle + 4)
+          appliedChanges.push(
+            `Итер. ${step}: угол переката рокера увеличен с ${state.rockerAngle}° до ${nextAngle}° для разгрузки пучков`
+          )
+          state.rockerAngle = nextAngle
+          changedInStep = true
+        }
+        if (Math.abs(state.rockerStartPct - 60) > 2) {
+          const nextStart =
+            state.rockerStartPct > 60
+              ? Math.max(60, state.rockerStartPct - 3)
+              : Math.min(60, state.rockerStartPct + 3)
+          appliedChanges.push(
+            `Итер. ${step}: линия старта рокера приближена к оптимуму (${state.rockerStartPct}% → ${nextStart}%)`
+          )
+          state.rockerStartPct = nextStart
+          changedInStep = true
+        }
+      }
+
+      // 3) Только если перепад уже минимален, а критическое давление или перегрузка геленка
+      //    не устраняются на текущей подошве — подключаем стабилизирующую конструкцию подошвы
+      const recheckEng = computeEngineering(state)
+      if (
+        recheckEng.peakForefootPressureKpa >= C.CRITICAL_KPA ||
+        recheckEng.shankOverloaded ||
+        recheckEng.highInversionRisk
+      ) {
+        if (state.soleType === 'flat') {
+          if (Math.abs(state.pronationDeg) >= 3.5 || recheckEng.highInversionRisk) {
+            state.soleType = 'thomas'
+            state.heelHeight = Math.min(state.heelHeight, 24)
+            state.toeThickness = Math.min(state.heelHeight, Math.max(state.toeThickness, 14))
+            appliedChanges.push(
+              `Итер. ${step}: переход со стандартной подошвы на каблук Томаса для стабилизации и разгрузки`
+            )
+            changedInStep = true
+          } else {
+            state.soleType = 'rocker'
+            state.heelHeight = Math.min(state.heelHeight, 24)
+            state.toeThickness = Math.min(state.heelHeight, Math.max(state.toeThickness, 14))
+            state.rockerAngle = Math.max(state.rockerAngle, 18)
+            state.rockerStartPct = 60
+            appliedChanges.push(
+              `Итер. ${step}: переход со стандартной подошвы на рокерную подошву для снятия критического давления пучков`
+            )
+            changedInStep = true
+          }
+        } else if (
+          state.soleType === 'thomas' &&
+          !recheckEng.rx.recommendThomasHeel &&
+          (recheckEng.peakForefootPressureKpa >= C.CRITICAL_KPA || recheckEng.shankOverloaded)
+        ) {
+          state.soleType = 'rocker'
+          state.rockerAngle = Math.max(state.rockerAngle, 18)
+          state.rockerStartPct = 60
+          appliedChanges.push(
+            `Итер. ${step}: переход на рокерную подошву из-за экстремального давления в пучках при нейтральной пятке`
+          )
+          changedInStep = true
+        }
+      }
+    }
+
+    if (!changedInStep) {
+      break
+    }
   }
 
-  if (soleType === 'rocker' && (heelHeight > HEEL_CONST.MAX_ROCKER_HEEL_MM || heelHeight - toeThickness > 20)) {
-    heelHeight = 28
-    toeThickness = 14
-    rockerAngle = Math.max(14, rockerAngle)
-  }
+  // Финальная верификация после завершения цикла
+  const finalEng = computeEngineering(state)
+  const finalViolations = collectAuditViolations(
+    finalEng,
+    state.soleType,
+    state.heelHeight,
+    state.rockerAngle
+  )
+  const resolved = finalViolations.errors.length === 0
 
-  const targetRad = (HEEL_CONST.SAFE_ANGLE * Math.PI) / 180
-  const maxSafeNet = Math.min(14, Math.floor(eng.lEff * Math.sin(targetRad)))
-  if (heelHeight - toeThickness > maxSafeNet) {
-    toeThickness = Math.min(HEEL_CONST.MAX_TOE, Math.max(0, Math.ceil(heelHeight - maxSafeNet)))
-  } else if (heelHeight < toeThickness) {
-    toeThickness = heelHeight
-  }
+  const summaryMessage = resolved
+    ? `Автоподбор успешно завершён за ${Math.max(1, iterations)} итер.: все критические ошибки устранены.`
+    : `Невозможно полностью устранить автоматически в допустимых диапазонах (${finalViolations.errors.length} пробл. требуют индивидуального ортезирования): ${finalViolations.errors.join('; ')}`
 
   return {
-    soleType,
-    toeThickness,
-    heelHeight,
-    heelTipOffsetMm,
-    rockerAngle,
+    soleType: state.soleType,
+    toeThickness: state.toeThickness,
+    heelHeight: state.heelHeight,
+    heelTipOffsetMm: state.heelTipOffsetMm,
+    rockerAngle: state.rockerAngle,
+    rockerStartPct: state.rockerStartPct,
+    status: resolved ? 'RESOLVED' : 'PARTIAL_OR_UNRESOLVABLE',
+    iterations: Math.max(1, iterations),
+    resolved,
+    summaryMessage,
+    appliedChanges,
+    remainingIssues: finalViolations.errors,
   }
 }
