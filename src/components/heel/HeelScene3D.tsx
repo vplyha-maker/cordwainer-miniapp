@@ -1,7 +1,13 @@
 // src/components/heel/HeelScene3D.tsx
 import React, { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import type { HeelEngineering, SoleType, Gender, LastApexType } from '../../lib/heelCalc'
+import type {
+  HeelEngineering,
+  SoleType,
+  Gender,
+  LastApexType,
+  ToeShape,
+} from '../../lib/heelCalc'
 
 type CameraPreset = 'iso' | 'side' | 'bottom' | 'rear'
 
@@ -90,17 +96,65 @@ const LAST_DORSAL_HEIGHT_PTS: Pts = [
   [1.0, 0.08],
 ]
 
-const getAnatomicWidthForApex = (u: number, apexType: LastApexType) => {
+/**
+ * Вычисляет анатомическую полуширину и асимметричное удлинение мыска в зависимости от типа апекса
+ * и индивидуальной морфологии пальцев (египетская / греческая / римская — исправление 5.2).
+ */
+const getAnatomicWidthForApex = (
+  u: number,
+  apexType: LastApexType,
+  toeShape: ToeShape = 'egyptian'
+) => {
   const base = hermiteProfile(LAST_WIDTH_PTS, u)
   if (u <= 0.72) return base
   const t = (u - 0.72) / 0.28
+  const shapeExtra =
+    toeShape === 'roman'
+      ? 0.14 * Math.sin(t * Math.PI)
+      : toeShape === 'greek'
+        ? 0.06 * Math.sin(t * Math.PI)
+        : 0
   if (apexType === 'wide_square') {
-    return base + 0.12 * Math.sin(t * Math.PI)
+    return base + Math.max(shapeExtra, 0.12 * Math.sin(t * Math.PI))
   }
   if (apexType === 'oblique_anatomical') {
-    return base + 0.04 * Math.sin(t * Math.PI)
+    return base + Math.max(shapeExtra, 0.05 * Math.sin(t * Math.PI))
   }
-  return base
+  return base + shapeExtra * 0.5
+}
+
+/**
+ * Анатомический дистальный контур переднего края мыска Δx(zNorm) для 3 типов пальцев (5.2):
+ * - египетская: максимум длины смещён медиально к I лучу (zNorm ≈ +0.52), плавный скос к V пальцу;
+ * - греческая: вершина контура смещена ко II лучу (zNorm ≈ +0.16);
+ * - римская: широкое трапециевидное плато вдоль I–III лучей (zNorm ∈ [-0.2, +0.55]).
+ */
+const getDistalToeContourOffsetX = (
+  u: number,
+  zNorm: number,
+  toeShape: ToeShape,
+  apexZNorm: number,
+  plateauFactor: number
+): number => {
+  if (u <= 0.84) return 0
+  const tipWeight = Math.pow((u - 0.84) / 0.16, 1.5)
+  const distFromApex = zNorm - apexZNorm
+  if (toeShape === 'roman') {
+    const plateauLoss =
+      zNorm >= -0.22 && zNorm <= 0.62
+        ? Math.pow(distFromApex, 2) * 0.025
+        : Math.pow(Math.abs(distFromApex), 1.8) * 0.095
+    return -tipWeight * plateauLoss * (1.1 - plateauFactor * 0.3)
+  }
+  if (toeShape === 'greek') {
+    const greekPeak =
+      0.028 * Math.exp(-Math.pow((zNorm - 0.16) / 0.34, 2)) -
+      0.065 * Math.pow(zNorm - 0.16, 2)
+    return tipWeight * greekPeak
+  }
+  // Египетская стопа: максимум на медиальном I луче, скос к латеральному краю
+  const egyptianSlope = -0.058 * Math.pow(Math.max(0, 0.52 - zNorm), 1.65)
+  return tipWeight * egyptianSlope
 }
 
 const getMedialShift = (u: number) => {
@@ -112,11 +166,14 @@ const getMedialShift = (u: number) => {
 
 /**
  * Строит процедурный замкнутый 3D-меш верха ортопедической колодки (Last Solid Shell)
- * по параметрическим сечениям из LastGeometryModel (с учётом гребня взъёма, пучков, кармана HV и высоты мыска).
+ * по параметрическим сечениям из LastGeometryModel (с учётом гребня взъёма, пучков, кармана HV и анатомического контура пальцев).
  */
 function createProceduralLastSolidGeometry(params: {
   uInstep: number
   uApexM1: number
+  toeShape: ToeShape
+  toeApexLateralZNorm: number
+  toeLateralPlateauFactor: number
   instepBaseHeightScene: number
   instepRadialDeltaScene: number
   toeBoxHeightScene: number
@@ -128,6 +185,9 @@ function createProceduralLastSolidGeometry(params: {
   const {
     uInstep,
     uApexM1,
+    toeShape,
+    toeApexLateralZNorm,
+    toeLateralPlateauFactor,
     instepBaseHeightScene,
     instepRadialDeltaScene,
     toeBoxHeightScene,
@@ -150,12 +210,10 @@ function createProceduralLastSolidGeometry(params: {
     const hw = getHalfWidth(u)
     const zCenter = getMedialCurve(u)
 
-    // Локальная модификация гребня взъёма вокруг uInstep
     const distInstep = Math.abs(u - uInstep)
     const instepWave =
       distInstep < 0.22 ? 0.5 * (1 + Math.cos((distInstep / 0.22) * Math.PI)) : 0
 
-    // Базовая высота колодки в сечении u
     const dorsalProfile = hermiteProfile(LAST_DORSAL_HEIGHT_PTS, u)
     const toeFactor = u > 0.72 ? Math.sin(((u - 0.72) / 0.28) * Math.PI) : 0
     const sectionHeight = Math.max(
@@ -165,7 +223,6 @@ function createProceduralLastSolidGeometry(params: {
         (toeBoxHeightScene - instepBaseHeightScene * 0.3) * toeFactor * 0.45
     )
 
-    // Продольное скругление задника пятки и носка колодки
     let xRoundOffset = 0
     if (u < 0.04) {
       xRoundOffset = (0.04 - u) * 0.35
@@ -174,14 +231,11 @@ function createProceduralLastSolidGeometry(params: {
     }
 
     for (let it = 0; it <= segsTheta; it++) {
-      // theta от 0 до PI формирует свод верха колодки от латерального ранта (-hw) через гребень к медиальному ранту (+hw)
       const theta = (it / segsTheta) * Math.PI
-      const zNorm = -Math.cos(theta) // -1 (латерально) .. +1 (медиально)
-      const domeSin = Math.sin(theta) // 0 на затяжной кромке .. 1 на гребне
+      const zNorm = -Math.cos(theta)
+      const domeSin = Math.sin(theta)
 
-      // Анатомическая асимметрия поперечного сечения колодки (медиальный свод выше латерального ската)
       const medialCrestBias = 1 + 0.12 * zNorm * Math.sin(u * Math.PI)
-      // Сужение конуса колодки кверху в пяточно-геленочной части
       const topTaper = 1 - 0.22 * Math.pow(domeSin, 1.5) * (1 - u * 0.5)
 
       const bunionZ =
@@ -189,7 +243,15 @@ function createProceduralLastSolidGeometry(params: {
           ? getBunionBulge(u, zNorm) * (1 - domeSin * 0.55)
           : 0
 
-      const vx = x + xRoundOffset * (1 - domeSin * 0.3)
+      const anatomicToeDx = getDistalToeContourOffsetX(
+        u,
+        zNorm,
+        toeShape,
+        toeApexLateralZNorm,
+        toeLateralPlateauFactor
+      )
+
+      const vx = x + (xRoundOffset + anatomicToeDx) * (1 - domeSin * 0.25)
       const vy = ySole + Math.pow(domeSin, 0.82) * sectionHeight * medialCrestBias
       const vz = zNorm * hw * topTaper + zCenter + bunionZ
 
@@ -316,6 +378,11 @@ function createFullRockerWedgeGeometry(params: {
   baseSoleW: number
   ballRatio: number
   activeRockerRad: number
+  rearHeelRockerSpanU: number
+  rearHeelRockerLiftScene: number
+  toeShape: ToeShape
+  toeApexLateralZNorm: number
+  toeLateralPlateauFactor: number
   getSoleProfileY: (u: number) => number
   getHalfWidth: (u: number) => number
   getMedialCurve: (u: number) => number
@@ -325,6 +392,11 @@ function createFullRockerWedgeGeometry(params: {
     baseSoleW,
     ballRatio,
     activeRockerRad,
+    rearHeelRockerSpanU,
+    rearHeelRockerLiftScene,
+    toeShape,
+    toeApexLateralZNorm,
+    toeLateralPlateauFactor,
     getSoleProfileY,
     getHalfWidth,
     getMedialCurve,
@@ -342,11 +414,19 @@ function createFullRockerWedgeGeometry(params: {
     const u = Math.max(0, Math.min(1, (x + 1.24) / 2.48))
     const zNorm = z / (baseSoleW * 0.5)
 
-    let endRoundX = x
+    let endRoundX =
+      x +
+      getDistalToeContourOffsetX(
+        u,
+        zNorm,
+        toeShape,
+        toeApexLateralZNorm,
+        toeLateralPlateauFactor
+      )
     if (u < 0.08) {
       endRoundX += zNorm * zNorm * 0.065 * (1 - u / 0.08)
     } else if (u > 0.92) {
-      endRoundX -= zNorm * zNorm * 0.065 * ((u - 0.92) / 0.08)
+      endRoundX -= zNorm * zNorm * 0.045 * ((u - 0.92) / 0.08)
     }
 
     const hw = getHalfWidth(u) * (1.03 - yNorm * 0.03)
@@ -355,9 +435,9 @@ function createFullRockerWedgeGeometry(params: {
     const yTop = Math.max(0.04, getSoleProfileY(u) - 0.004)
 
     let yBottom = 0
-    if (u < 0.14) {
-      const heelRockerRatio = (0.14 - u) / 0.14
-      yBottom = 0.085 * Math.pow(heelRockerRatio, 1.8)
+    if (u < rearHeelRockerSpanU) {
+      const heelRockerRatio = (rearHeelRockerSpanU - u) / Math.max(0.05, rearHeelRockerSpanU)
+      yBottom = rearHeelRockerLiftScene * Math.pow(heelRockerRatio, 1.8)
     } else if (u > ballRatio) {
       const r = (u - ballRatio) / Math.max(0.05, 1 - ballRatio)
       yBottom = Math.sin(activeRockerRad) * 0.62 * Math.pow(r, 1.65)
@@ -740,7 +820,10 @@ export function HeelScene3D({
 
     const getArchYAtX = (x: number) => getSoleProfileY((x + 1.24) / 2.48)
     const getHalfWidth = (u: number) =>
-      Math.max(0.05, baseSoleW * 0.5 * getAnatomicWidthForApex(u, gm.lastApexType))
+      Math.max(
+        0.05,
+        baseSoleW * 0.5 * getAnatomicWidthForApex(u, gm.lastApexType, gm.toeShape)
+      )
     const getHalfWidthAtX = (x: number) =>
       getHalfWidth(Math.max(0, Math.min(1, (x + 1.24) / 2.48)))
     const getMedialCurve = (u: number) => {
@@ -760,7 +843,7 @@ export function HeelScene3D({
       return bunionBulgeMax * longitudinalWave * medialFactor
     }
 
-    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА С 2D ГАУССОВЫМ ПОЛЕМ ПЕДОБАРОГРАФИИ (M1–M5, свод, пятка)
+    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА С НОРМИРОВАННЫМ ГАУССОВЫМ ПОЛЕМ ПЕДОБАРОГРАФИИ (M1–M5, свод, пятка)
     const segsX = 96
     const segsZ = 24
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -780,6 +863,15 @@ export function HeelScene3D({
       const x = pos.getX(i)
       const zNorm = pos.getZ(i) / (baseSoleW * 0.5)
       const u = (x + 1.24) / 2.48
+
+      const anatomicToeDx = getDistalToeContourOffsetX(
+        u,
+        zNorm,
+        gm.toeShape,
+        gm.toeApexLateralZNorm,
+        gm.toeLateralPlateauFactor
+      )
+      pos.setX(i, x + anatomicToeDx)
 
       const bunionExtraZ = getBunionBulge(u, zNorm)
       const finalZ = zNorm * getHalfWidth(u) + getMedialCurve(u) + bunionExtraZ
@@ -827,7 +919,6 @@ export function HeelScene3D({
 
       pos.setY(i, y + orthoLift + 0.01)
 
-      // Расчёт локального давления в точке (u, zNorm) по 2D гауссовой модели педобарографии
       let localKpa = 0
       for (const gc of gCenters) {
         const du = (u - gc.u) / gc.sigmaU
@@ -897,6 +988,9 @@ export function HeelScene3D({
       const lastSolidGeom = createProceduralLastSolidGeometry({
         uInstep: gm.uInstep,
         uApexM1: gm.uApexM1,
+        toeShape: gm.toeShape,
+        toeApexLateralZNorm: gm.toeApexLateralZNorm,
+        toeLateralPlateauFactor: gm.toeLateralPlateauFactor,
         instepBaseHeightScene: gm.instepBaseHeightMm * mmToUnit * 0.62,
         instepRadialDeltaScene: gm.instepRadialLayerMm * mmToUnit * 0.9,
         toeBoxHeightScene: gm.toeBoxHeightMm * mmToUnit * 0.72,
@@ -935,10 +1029,19 @@ export function HeelScene3D({
 
     // 2. ПОДОШВА И КАБЛУК
     if (gm.soleType === 'rocker') {
+      const rearHeelRockerSpanU =
+        gm.rockerType === 'heelToToe' ? 0.22 : gm.rockerType === 'negative' ? 0.16 : 0.12
+      const rearHeelRockerLiftScene = Math.max(0.04, gm.rearHeelRockerLiftMm * mmToUnit)
+
       const rockerWedgeGeom = createFullRockerWedgeGeometry({
         baseSoleW,
         ballRatio,
         activeRockerRad,
+        rearHeelRockerSpanU,
+        rearHeelRockerLiftScene,
+        toeShape: gm.toeShape,
+        toeApexLateralZNorm: gm.toeApexLateralZNorm,
+        toeLateralPlateauFactor: gm.toeLateralPlateauFactor,
         getSoleProfileY,
         getHalfWidth,
         getMedialCurve,
@@ -997,6 +1100,14 @@ export function HeelScene3D({
         const u = (x + 1.24) / 2.48
         const hw = getHalfWidth(u)
         const zNorm = z / (baseSoleW * 0.5)
+        const anatomicToeDx = getDistalToeContourOffsetX(
+          u,
+          zNorm,
+          gm.toeShape,
+          gm.toeApexLateralZNorm,
+          gm.toeLateralPlateauFactor
+        )
+        sPos.setX(i, x + anatomicToeDx)
         sPos.setZ(i, zNorm * hw + getMedialCurve(u) + getBunionBulge(u, zNorm) * 0.5)
         sPos.setY(i, getSoleProfileY(u) - 0.008 + origY)
       }
@@ -1135,7 +1246,7 @@ export function HeelScene3D({
       apexToeMarker.position.set(
         1.22,
         getSoleProfileY(0.99) + 0.025,
-        getMedialCurve(0.99)
+        getMedialCurve(0.99) + gm.toeApexLateralZNorm * getHalfWidth(0.92) * 0.55
       )
       dynamicGroup.add(apexToeMarker)
     }
@@ -1259,7 +1370,7 @@ export function HeelScene3D({
               </strong>
             ) : soleType === 'rocker' ? (
               <strong className="text-[#F59E0B]">
-                РОКЕР {rockerAngle}° (Карбон {gm.carbonInsertThicknessMm}мм)
+                РОКЕР {rockerAngle}° (CFRP {gm.carbonInsertThicknessMm}мм)
               </strong>
             ) : (
               <strong className={eng.rx.recommendThomasHeel ? 'text-[#F59E0B]' : ''}>
@@ -1313,7 +1424,7 @@ export function HeelScene3D({
       <div className="px-3 py-1.5 flex items-center justify-between flex-wrap gap-x-2 gap-y-1 text-[8px] font-mono border-t border-[var(--color-border)] bg-[var(--color-surface)]/40">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#E11D48] inline-block" />
-          2D-Педобарография/Пелот
+          Эвристика давления/Пелот
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#10B981] inline-block" />
@@ -1325,7 +1436,7 @@ export function HeelScene3D({
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block" />
-          HV/Геленок ({eng.shankEngineering.profileType === 'fluted_ribbed' ? 'Желоб' : 'Плоск'})
+          HV/{eng.shankEngineering.material === 'carbon_composite' ? 'Карбон CFRP' : eng.shankEngineering.profileType === 'fluted_ribbed' ? '65Г (Желоб)' : '65Г (Плоск)'}
         </span>
       </div>
     </div>
