@@ -12,8 +12,22 @@ import type { Lang as AppLang } from '../App'
 
 type ThreeLib = typeof THREE_TYPES
 
-// Поддержка расширенной языковой модели с обратной совместимостью с App.tsx
-export type SupportedLang = AppLang | 'ru' | 'uk' | 'de'
+// Рыночная стоимость разовой разблокировки PRO-модуля в Telegram Stars (~$4.99)
+export const PRO_COLORS_PRICE_STARS = 250
+
+// Строгий список поддерживаемых языков компонента с защитой от неизвестных значений из App.tsx (AUDIT-02)
+export type SupportedLang = 'ru' | 'uk' | 'de'
+
+const APP_NATIVE_LANGS: readonly ('ru' | 'uk')[] = ['ru', 'uk']
+
+export function normalizeSupportedLang(input: unknown): SupportedLang {
+  if (input === 'ru' || input === 'uk' || input === 'de') return input
+  return 'ru'
+}
+
+export function isAppNativeLang(input: SupportedLang): input is AppLang & ('ru' | 'uk') {
+  return APP_NATIVE_LANGS.includes(input as 'ru' | 'uk')
+}
 
 type ColorsPageProps = {
   onBack: () => void
@@ -62,7 +76,7 @@ export type SneakerColors = {
   swoosh: string
 }
 
-type SneakerZoneKey = keyof SneakerColors
+export type SneakerZoneKey = keyof SneakerColors
 
 type TelegramWebApp = {
   initData?: string
@@ -86,6 +100,14 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   } catch {}
 }
 
+/**
+ * Кратчайшая угловая дистанция на окружности 0..360° (AUDIT-10).
+ * Исключает ложные срабатывания виброотклика при переходе через 359° <-> 0°.
+ */
+export function getCircularAngleDiff(angleA: number, angleB: number): number {
+  return Math.abs(((((angleA - angleB) % 360) + 540) % 360) - 180)
+}
+
 const LockIcon = ({ size = 10 }: { size?: number }) => (
   <svg
     width={size}
@@ -105,10 +127,9 @@ const LockIcon = ({ size = 10 }: { size?: number }) => (
 )
 
 /* ============================================================================
-   1. COLOR ENGINE (КЛАССИЧЕСКИЙ КРУГ ИТТЕНА RYB <-> RGB/HSL, TINT/SHADE, КОНТРАСТ)
+   1. COLOR ENGINE (КРУГ ИТТЕНА RYB <-> HSL, СМЕШИВАНИЕ ПИГМЕНТА, OKLAB КОНТРАСТ)
    ============================================================================ */
 
-// Узловые точки классического круга Иттена (RYB угол -> перцептивный HSL/RGB угол)
 const RYB_TO_HSL_ANCHORS: readonly [number, number][] = [
   [0, 0],     // Красный (Red)
   [30, 15],   // Красно-оранжевый
@@ -173,9 +194,16 @@ function rgb01ToHex(r: number, g: number, b: number): string {
   return `#${toByte(r)}${toByte(g)}${toByte(b)}`
 }
 
+function srgbChannelToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+
 /**
- * Физически корректное смешивание базового пигмента с белилами (Tint) и сажей (Shade)
- * в линейном пространстве sRGB с возвратом точного HEX-кода (#RRGGBB).
+ * ИСПРАВЛЕНО (AUDIT-03): Перцептивно согласованное смешивание базового пигмента
+ * с белилами (Tint) и чёрным пигментом (Shade) по билинейной модели Пигмент–Белила–Сажа–Тон.
+ * - При shadeBlack = 1.0, tintWhite = 0: даёт глубокий угольно-чёрный цвет кожи (Y < 0.015 < 0.025).
+ * - При tintWhite = 1.0, shadeBlack = 0: даёт чистый снежно-белый цвет (Y > 0.92 > 0.88).
+ * - При tintWhite = 1.0, shadeBlack = 1.0: даёт сбалансированный нейтральный средне-серый тон.
  */
 export function synthesizePigmentHex(
   wheelHue: number,
@@ -184,44 +212,59 @@ export function synthesizePigmentHex(
   chromaScale = 0.85,
   modelMode: ColorModelMode = 'ryb'
 ): string {
-  const effectiveHue = modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
+  const effectiveHue =
+    modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
   const w = Math.max(0, Math.min(1, tintWhite))
   const b = Math.max(0, Math.min(1, shadeBlack))
   const sat = Math.max(8, Math.min(96, chromaScale * 100))
 
-  // Чистый базовый пигмент в линейном представлении
-  const [rBase, gBase, bBase] = hslToRgb01(effectiveHue, sat, 50)
-  const toLin = (c: number) => Math.pow(c, 2.2)
-  const toSrgb = (c: number) => Math.pow(Math.max(0, Math.min(1, c)), 1 / 2.2)
+  // 1. Чистый пигмент (w = 0, b = 0)
+  const [rP, gP, bP] = hslToRgb01(effectiveHue, sat, 50)
 
-  // Нормализованные веса пигмента, белил (Tint) и чёрного пигмента (Shade)
-  // При одновременном росте Tint и Shade образуется благородный нейтральный серый (Tone)
-  const whiteWeight = w * (1 - b * 0.42) * 0.86
-  const blackWeight = b * (1 - w * 0.32) * 0.86
-  const pigmentWeight = Math.max(0.06, 1 - whiteWeight - blackWeight)
-  const total = pigmentWeight + whiteWeight + blackWeight
+  // 2. Белила (w = 1, b = 0) -> Y ≈ 0.935 (> 0.88)
+  const rW = 0.968 + 0.008 * rP
+  const gW = 0.968 + 0.008 * gP
+  const bW = 0.965 + 0.008 * bP
 
-  const wp = pigmentWeight / total
-  const ww = whiteWeight / total
-  const wb = blackWeight / total
+  // 3. Глубокий обувной чёрный/графит (w = 0, b = 1) -> Y ≈ 0.009 (< 0.025)
+  const rK = 0.072 + 0.038 * rP
+  const gK = 0.072 + 0.038 * gP
+  const bK = 0.072 + 0.038 * bP
 
-  // Мягкий глубокий графит вместо абсолютного нуля для реалистичной кожи/замши
-  const blackFloor = 0.008
-  const rLin = wp * toLin(rBase) + ww * 1.0 + wb * blackFloor
-  const gLin = wp * toLin(gBase) + ww * 1.0 + wb * blackFloor
-  const bLin = wp * toLin(bBase) + ww * 1.0 + wb * blackFloor
+  // 4. Нейтральный средне-серый тон при одновременном максимуме белил и сажи (w = 1, b = 1)
+  const rG = 0.455 + 0.035 * rP
+  const gG = 0.455 + 0.035 * gP
+  const bG = 0.455 + 0.035 * bP
 
-  return rgb01ToHex(toSrgb(rLin), toSrgb(gLin), toSrgb(bLin))
+  const wP = (1 - w) * (1 - b)
+  const wW = w * (1 - b)
+  const wK = (1 - w) * b
+  const wG = w * b
+
+  const rOut = wP * rP + wW * rW + wK * rK + wG * rG
+  const gOut = wP * gP + wW * gW + wK * gK + wG * gG
+  const bOut = wP * bP + wW * bW + wK * bK + wG * bG
+
+  return rgb01ToHex(rOut, gOut, bOut)
 }
 
-function getRelativeLuminance(hex: string): number {
+function parseHexToRgb01(hex: string): [number, number, number] {
   const clean = hex.replace('#', '')
-  if (clean.length !== 6) return 0.5
-  const r = parseInt(clean.slice(0, 2), 16) / 255
-  const g = parseInt(clean.slice(2, 4), 16) / 255
-  const b = parseInt(clean.slice(4, 6), 16) / 255
-  const chan = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
-  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b)
+  if (clean.length !== 6) return [0.5, 0.5, 0.5]
+  return [
+    parseInt(clean.slice(0, 2), 16) / 255,
+    parseInt(clean.slice(2, 4), 16) / 255,
+    parseInt(clean.slice(4, 6), 16) / 255,
+  ]
+}
+
+export function getRelativeLuminance(hex: string): number {
+  const [r, g, b] = parseHexToRgb01(hex)
+  return (
+    0.2126 * srgbChannelToLinear(r) +
+    0.7152 * srgbChannelToLinear(g) +
+    0.0722 * srgbChannelToLinear(b)
+  )
 }
 
 export function getContrastRatio(hexA: string, hexB: string): number {
@@ -230,6 +273,40 @@ export function getContrastRatio(hexA: string, hexB: string): number {
   const brightest = Math.max(l1, l2)
   const darkest = Math.min(l1, l2)
   return (brightest + 0.05) / (darkest + 0.05)
+}
+
+/**
+ * Перевод HEX в перцептивное пространство OKLab для оценки хроматического контраста (AUDIT-08).
+ */
+function hexToOklab(hex: string): [number, number, number] {
+  const [sr, sg, sb] = parseHexToRgb01(hex)
+  const r = srgbChannelToLinear(sr)
+  const g = srgbChannelToLinear(sg)
+  const b = srgbChannelToLinear(sb)
+
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ]
+}
+
+/**
+ * ИСПРАВЛЕНО (AUDIT-08): Комплексная оценка контраста пары цветов, объединяющая
+ * яркостный контраст WCAG (ΔL) и хроматическое различие в пространстве OKLab (ΔE).
+ */
+export function getPerceptualPairContrast(hexA: string, hexB: string): number {
+  const lumRatio = getContrastRatio(hexA, hexB)
+  const [L1, a1, b1] = hexToOklab(hexA)
+  const [L2, a2, b2] = hexToOklab(hexB)
+  const deltaChroma = Math.hypot(a1 - a2, b1 - b2)
+  const deltaLight = Math.abs(L1 - L2)
+  const oklabEffectiveRatio = 1 + deltaChroma * 9.5 + deltaLight * 3.2
+  return Math.max(lumRatio, oklabEffectiveRatio)
 }
 
 export function getSchemeWheelAngles(baseHue: number, scheme: Scheme): number[] {
@@ -320,7 +397,7 @@ export function generateHarmonyPalette(
 }
 
 /* ============================================================================
-   2. FOOTWEAR COLOR MAPPING (НЕЗАВИСИМОЕ РАСПРЕДЕЛЕНИЕ ЦВЕТОВ ПО КОНСТРУКЦИИ)
+   2. FOOTWEAR COLOR MAPPING (РАСПРЕДЕЛЕНИЕ ЦВЕТОВ И СИНХРОННЫЕ ПОДПИСИ СВОТЧЕЙ)
    ============================================================================ */
 
 export function mapPaletteToFootwear(
@@ -378,7 +455,7 @@ export function mapPaletteToFootwear(
         heel: mainColor,
         collar: tertiaryColor,
         tongue: secondaryColor,
-        lining: mainColor,
+        lining: colors.length > 3 ? tertiaryColor : mainColor,
         swoosh: mainColor,
         midsole: neutralMidsole,
         encap: secondaryColor,
@@ -422,7 +499,7 @@ export function mapPaletteToFootwear(
 }
 
 /* ============================================================================
-   3. 3D-ГЕОМЕТРИЯ И МАТЕРИАЛЫ NEW BALANCE 574 (БЕЗ ДУБЛИРОВАНИЯ ТРЕУГОЛЬНИКОВ)
+   3. 3D-ГЕОМЕТРИЯ И МАТЕРИАЛЫ NEW BALANCE 574 (AUDIT-04, AUDIT-06, AUDIT-07, AUDIT-09)
    ============================================================================ */
 
 type SneakerMaterials = {
@@ -441,7 +518,6 @@ type SneakerMaterials = {
   swoosh: THREE_TYPES.MeshStandardMaterial
 }
 
-// Явная таблица соответствия имён объектов GLB конструктивным зонам редактора
 const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   upper_vamp: 'vamp',
   vamp: 'vamp',
@@ -455,8 +531,11 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   saddle: 'quarters',
   eyestay: 'eyestays',
   eyestays: 'eyestays',
+  eye_stay: 'eyestays',
   heel_counter: 'heel',
   heel_wrap: 'heel',
+  heel_lining: 'lining',
+  collar_lining: 'lining',
   collar: 'collar',
   ankle_collar: 'collar',
   tongue: 'tongue',
@@ -474,31 +553,63 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   encap_rim: 'encap',
   heel_clip: 'encap',
   midsole: 'midsole',
+  mid_sole: 'midsole',
   eva_midsole: 'midsole',
   outsole: 'outsole',
+  out_sole: 'outsole',
   rubber_outsole: 'outsole',
 }
 
-function resolveGlbZone(rawName: string): SneakerZoneKey | null {
+/**
+ * ИСПРАВЛЕНО (AUDIT-09): Приоритетный порядок проверки специфичных подстрок
+ * (lining и mid_sole проверяются раньше общих heel, collar и sole).
+ */
+export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   const normalized = rawName.trim().toLowerCase().replace(/[\s.-]+/g, '_')
+  if (!normalized) return null
   if (GLB_EXPLICIT_ZONE_MAP[normalized]) {
     return GLB_EXPLICIT_ZONE_MAP[normalized]
   }
-  if (normalized.includes('vamp') || normalized.includes('mudguard')) return 'vamp'
-  if (normalized.includes('toe')) return 'toeBox'
-  if (normalized.includes('quarter') || normalized.includes('saddle')) return 'quarters'
-  if (normalized.includes('eyestay')) return 'eyestays'
-  if (normalized.includes('collar')) return 'collar'
-  if (normalized.includes('encap') || normalized.includes('clip')) return 'encap'
-  if (normalized.includes('heel_tab') || normalized.includes('swoosh') || normalized.includes('logo') || normalized.includes('tab'))
+  if (
+    normalized.includes('lining') ||
+    normalized.includes('insole') ||
+    normalized.includes('sockliner')
+  ) {
+    return 'lining'
+  }
+  if (
+    normalized.includes('heel_tab') ||
+    normalized.includes('backtab') ||
+    normalized.includes('swoosh') ||
+    normalized.includes('logo') ||
+    normalized.includes('tab')
+  ) {
     return 'swoosh'
-  if (normalized.includes('heel')) return 'heel'
-  if (normalized.includes('lining') || normalized.includes('insole')) return 'lining'
+  }
+  if (normalized.includes('encap') || normalized.includes('clip')) return 'encap'
+  if (
+    normalized.includes('midsole') ||
+    normalized.includes('mid_sole') ||
+    normalized.includes('eva')
+  ) {
+    return 'midsole'
+  }
+  if (
+    normalized.includes('outsole') ||
+    normalized.includes('out_sole') ||
+    normalized.includes('tread')
+  ) {
+    return 'outsole'
+  }
+  if (normalized.includes('eyestay') || normalized.includes('eye_stay')) return 'eyestays'
+  if (normalized.includes('toe')) return 'toeBox'
+  if (normalized.includes('vamp') || normalized.includes('mudguard')) return 'vamp'
+  if (normalized.includes('quarter') || normalized.includes('saddle')) return 'quarters'
+  if (normalized.includes('collar')) return 'collar'
   if (normalized.includes('tongue')) return 'tongue'
   if (normalized.includes('lace')) return 'laces'
-  if (normalized.includes('midsole') || normalized.includes('eva')) return 'midsole'
-  if (normalized.includes('outsole') || normalized.includes('tread') || normalized.includes('sole'))
-    return 'outsole'
+  if (normalized.includes('heel')) return 'heel'
+  if (normalized.includes('sole')) return 'outsole'
   return null
 }
 
@@ -507,14 +618,24 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
-function getFootprintPoint(phi: number) {
+function wrapAnglePi(phi: number): number {
+  return Math.atan2(Math.sin(phi), Math.cos(phi))
+}
+
+/**
+ * ИСПРАВЛЕНО (AUDIT-07): C^1-гладкая параметризация контура следа без бесконечной
+ * производной в полюсах мыска (phi = 0) и пятки (phi = ±pi).
+ */
+export function getFootprintPoint(rawPhi: number) {
+  const phi = wrapAnglePi(rawPhi)
   const zNorm = Math.cos(phi)
   const z = 1.34 * zNorm
   const t = 0.5 * (zNorm + 1.0)
 
   const s = Math.sin(phi)
-  const signS = s >= 0 ? 1 : -1
-  const roundEnv = signS * Math.pow(Math.abs(s), 0.68)
+  // C^infty-гладкая регуляризация вместо негладкого sign(s)*|s|^0.68
+  const eps2 = 0.045
+  const roundEnv = (s / Math.pow(s * s + eps2, 0.16)) * Math.pow(1 + eps2, 0.16)
 
   const wBase =
     0.405 -
@@ -522,11 +643,13 @@ function getFootprintPoint(phi: number) {
     0.115 * Math.exp(-Math.pow((t - 0.66) / 0.21, 2)) -
     0.025 * Math.exp(-Math.pow((t - 0.96) / 0.07, 2))
 
-  const asym =
-    s >= 0
-      ? -0.035 * Math.exp(-Math.pow((t - 0.38) / 0.14, 2)) +
-        0.018 * Math.exp(-Math.pow((t - 0.70) / 0.16, 2))
-      : 0.028 * Math.exp(-Math.pow((t - 0.58) / 0.20, 2))
+  // Гладкий переход асимметрии через s вместо разрывного s >= 0
+  const latWeight = 0.5 * (1 + s / Math.sqrt(s * s + 0.02))
+  const asymPos =
+    -0.035 * Math.exp(-Math.pow((t - 0.38) / 0.14, 2)) +
+    0.018 * Math.exp(-Math.pow((t - 0.70) / 0.16, 2))
+  const asymNeg = 0.028 * Math.exp(-Math.pow((t - 0.58) / 0.20, 2))
+  const asym = latWeight * asymPos + (1 - latWeight) * asymNeg
 
   const centerX =
     0.025 * Math.exp(-Math.pow((t - 0.70) / 0.25, 2)) -
@@ -536,9 +659,15 @@ function getFootprintPoint(phi: number) {
   return { x, z, t }
 }
 
-function getToplineRim(phi: number) {
-  const a = Math.abs(phi)
-  const sign = phi >= 0 ? 1 : -1
+/**
+ * ИСПРАВЛЕНО (AUDIT-07): Приведение угла phi к [-pi, pi] и C^1-гладкое замыкание
+ * верхнего канта горловины на центральном шве пятки (phi = ±pi).
+ */
+export function getToplineRim(rawPhi: number) {
+  const phi = wrapAnglePi(rawPhi)
+  const s = Math.sin(phi)
+  // Гладкий модуль угла a и гладкий знак
+  const a = Math.acos(Math.max(-1, Math.min(1, Math.cos(phi))))
 
   const u1 = Math.max(0, Math.min(1, a / 0.35))
   const ue = Math.max(0, Math.min(1, (a - 0.35) / (1.48 - 0.35)))
@@ -546,7 +675,7 @@ function getToplineRim(phi: number) {
 
   const zSeg1 = 0.44 - 0.03 * (u1 * u1)
   const zSeg2 = 0.41 - 0.63 * ue
-  const zSeg3 = -0.22 - 0.98 * Math.pow(Math.sin(uc * (Math.PI * 0.5)), 1.1)
+  const zSeg3 = -0.22 - 0.98 * Math.sin(uc * (Math.PI * 0.5))
 
   const w12 = smoothstep(0.28, 0.42, a)
   const w23 = smoothstep(1.40, 1.56, a)
@@ -554,30 +683,49 @@ function getToplineRim(phi: number) {
 
   const xSeg1 = 0.13 * Math.sin(u1 * (Math.PI * 0.5))
   const xSeg2 = 0.13 + 0.05 * ue
-  const xSeg3 =
-    (0.18 + 0.12 * Math.sin(uc * Math.PI)) * Math.pow(Math.cos(uc * (Math.PI * 0.5)), 0.7)
+  // Гладкое обращение ширины канта в 0 на заднем шве (uc -> 1) с конечной производной
+  const cosUc = Math.cos(uc * (Math.PI * 0.5))
+  const smoothTapering = (cosUc / Math.pow(cosUc * cosUc + 0.04, 0.15)) * Math.pow(1.04, 0.15)
+  const xSeg3 = (0.18 + 0.12 * Math.sin(uc * Math.PI)) * smoothTapering
 
   const xAbs = (1 - w12) * xSeg1 + w12 * ((1 - w23) * xSeg2 + w23 * xSeg3)
-  const xRim = sign * xAbs
+  const signSmooth = s / Math.sqrt(s * s + 1e-5)
+  const xRim = signSmooth * xAbs
 
   const ySeg1 = 0.22
-  const ySeg2 = 0.22 + 0.44 * Math.pow(ue, 0.92)
-  const ySeg3 = 0.66 * (1 - uc) + 0.62 * uc - 0.21 * Math.pow(Math.sin(uc * Math.PI), 1.15)
+  const ySeg2 = 0.22 + 0.44 * Math.pow(ue + 1e-4, 0.92)
+  const ySeg3 = 0.66 * (1 - uc) + 0.62 * uc - 0.21 * Math.pow(Math.sin(uc * Math.PI) + 1e-4, 1.15)
   const yRim = (1 - w12) * ySeg1 + w12 * ((1 - w23) * ySeg2 + w23 * ySeg3)
 
   return { x: xRim, y: yRim, z: zRim }
 }
 
-function evalBaseLastSurface(phi: number, v: number): readonly [number, number, number] {
+/**
+ * Продольный профиль подошвы с идеально горизонтальной опорной плоскостью
+ * на участке пятка–пучки t in [0.12, 0.62] (AUDIT-06).
+ */
+export function getSoleVerticalProfile(t: number) {
+  const toeSpring = Math.pow(Math.max(0, (t - 0.62) / 0.38), 1.75) * 0.11
+  const heelBevel = Math.pow(1 - smoothstep(0.0, 0.12, t), 2) * 0.012
+  const heelLift = (1 - t) * 0.06
+  // Верхняя грань межподошвы (затяжная кромка верха) имеет положительный подъём к пятке
+  const yTopBase = -0.14 + heelLift + toeSpring
+  // Нижняя грань межподошвы и базовая плоскость протектора строго горизонтальны на t in [0.12, 0.62]
+  const yMidBot = -0.268 + heelBevel + toeSpring
+  const yOutBotBase = -0.320 + heelBevel + toeSpring
+  const midThick = yTopBase - yMidBot
+  return { yTopBase, yMidBot, yOutBotBase, midThick, toeSpring }
+}
+
+function evalBaseLastSurface(rawPhi: number, v: number): readonly [number, number, number] {
+  const phi = wrapAnglePi(rawPhi)
   const fp = getFootprintPoint(phi)
   const rim = getToplineRim(phi)
+  const { yTopBase: y0 } = getSoleVerticalProfile(fp.t)
 
-  const toeSpring = Math.pow(Math.max(0, (fp.t - 0.58) / 0.42), 1.75) * 0.11
-  const heelLift = (1 - fp.t) * 0.06
-  const y0 = -0.14 + heelLift + toeSpring
-
-  const toeWeight = 1 - smoothstep(0.35, 0.92, Math.abs(phi))
-  const heelWeight = smoothstep(2.0, Math.PI, Math.abs(phi))
+  const a = Math.acos(Math.max(-1, Math.min(1, Math.cos(phi))))
+  const toeWeight = 1 - smoothstep(0.35, 0.92, a)
+  const heelWeight = smoothstep(2.0, Math.PI, a)
 
   const vClamped = Math.max(0, Math.min(1, v))
   const uSide = 1 - Math.pow(1 - vClamped, 1.35)
@@ -606,13 +754,12 @@ function evalBaseLastSurface(phi: number, v: number): readonly [number, number, 
   return [x, y, z] as const
 }
 
-/**
- * Вычисляет точку на колодке со смещением по истинной геометрической нормали поверхности
- * (через частные производные dP/dPhi x dP/dV), исключая самопересечения панелей.
- */
-function sampleUpperSurface(phi: number, v: number, normalOffset = 0): readonly [number, number, number] {
+export function sampleUpperSurfaceWithNormal(
+  phi: number,
+  v: number,
+  normalOffset = 0
+): { pos: readonly [number, number, number]; normal: readonly [number, number, number] } {
   const [x, y, z] = evalBaseLastSurface(phi, v)
-  if (normalOffset === 0) return [x, y, z] as const
 
   const epsPhi = 0.012
   const epsV = 0.012
@@ -635,7 +782,6 @@ function sampleUpperSurface(phi: number, v: number, normalOffset = 0): readonly 
   let ny = tz * bx - tx * bz
   let nz = tx * by - ty * bx
 
-  // Ориентируем нормаль строго наружу от центральной оси колодки (0, 0.05, -0.25)
   const outX = x
   const outY = Math.max(0.15, y - 0.02)
   const outZ = z - -0.25
@@ -646,11 +792,26 @@ function sampleUpperSurface(phi: number, v: number, normalOffset = 0): readonly 
   }
 
   const len = Math.sqrt(nx * nx + ny * ny + nz * nz) + 1e-7
-  return [
-    x + normalOffset * (nx / len),
-    y + normalOffset * (ny / len),
-    z + normalOffset * (nz / len),
-  ] as const
+  const unx = nx / len
+  const uny = ny / len
+  const unz = nz / len
+
+  return {
+    pos: [
+      x + normalOffset * unx,
+      y + normalOffset * uny,
+      z + normalOffset * unz,
+    ] as const,
+    normal: [unx, uny, unz] as const,
+  }
+}
+
+export function sampleUpperSurface(
+  phi: number,
+  v: number,
+  normalOffset = 0
+): readonly [number, number, number] {
+  return sampleUpperSurfaceWithNormal(phi, v, normalOffset).pos
 }
 
 function buildPanelPatch(
@@ -662,7 +823,7 @@ function buildPanelPatch(
     vStart: number
     vEnd: number
     vSteps: number
-    layerTier: number // 0 = базовая сетка/подложка, 1 = средний слой, 2 = верхний накладной каркас
+    layerTier: number
     thickness?: number
     bevelU?: number
     bevelV?: number
@@ -683,7 +844,6 @@ function buildPanelPatch(
     seamInset = 0.008,
   } = options
 
-  // Контроль зазоров между деталями и разнесение слоёв без пересечений
   const p0 = phiStart + (phiEnd - phiStart) * seamInset
   const p1 = phiEnd - (phiEnd - phiStart) * seamInset
   const v0 = vStart + (vEnd - vStart) * seamInset
@@ -727,10 +887,8 @@ function buildPanelPatch(
       const b = (i + 1) * stride + j
       const c = (i + 1) * stride + (j + 1)
       const d = i * stride + (j + 1)
-      // Внешняя лицевая сторона
       indices.push(a, d, b, b, d, c)
 
-      // Внутренняя обратная сторона
       const ai = innerBase + a
       const bi = innerBase + b
       const ci = innerBase + c
@@ -739,7 +897,6 @@ function buildPanelPatch(
     }
   }
 
-  // Боковые торцы панели (единый замкнутый контур толщины)
   for (let i = 0; i < phiSteps; i++) {
     const a0 = i * stride
     const b0 = (i + 1) * stride
@@ -767,11 +924,7 @@ function buildPanelPatch(
   return geom
 }
 
-/**
- * ИСПРАВЛЕНО (п. 1.1 аудита): Удалено дублирование треугольников с обратным порядком вершин.
- * Каждая поверхность имеет строго одну согласованную ориентацию нормалей без Z-fighting и погашения нормалей.
- */
-function buildParametricGridGeometry(
+export function buildParametricGridGeometry(
   THREE: ThreeLib,
   uSteps: number,
   wSteps: number,
@@ -813,12 +966,65 @@ function buildParametricGridGeometry(
 }
 
 /**
- * ИСПРАВЛЕНО (п. 1.3 аудита): Трёхкомпонентная конструкция подошвы New Balance 574:
- * 1) EVA Midsole (с профилированной боковиной и ступенчатым кантом)
- * 2) ENCAP Support Structure (полиуретановая чаша стабилизации пятки)
- * 3) Rubber Outsole (сегментированный зубчатый протектор)
+ * ИСПРАВЛЕНО (AUDIT-04): Возвращает штрихи логотипа «N» для латеральной (sign = -1)
+ * и медиальной (sign = +1) боковин так, чтобы при взгляде снаружи на каждую боковину
+ * диагональная перекладина всегда шла из верхнего левого угла в нижний правый угол буквы «N»
+ * (а не превращалась в зеркальную «И» на медиальной стороне), с разносом по высоте (tierOffset)
+ * для исключения Z-fighting и согласованием обхода вершин (flipWinding).
  */
-function buildSoleComponentGeometry(
+export function getNLogoStrokesForSide(sign: -1 | 1): {
+  pStart: number
+  vStart: number
+  pEnd: number
+  vEnd: number
+  elevationDelta: number
+  flipWinding: boolean
+}[] {
+  // Стойка ближе к мыску (phi ~ 1.12) и стойка ближе к пятке (phi ~ 1.48)
+  // При взгляде снаружи:
+  // На левой (латеральной, sign = -1) боковине мысок слева, пятка справа -> левая стойка передняя, правая задняя.
+  // На правой (медиальной, sign = +1) боковине пятка слева, мысок справа -> левая стойка задняя, правая передняя.
+  const diagStartPhi = sign < 0 ? 1.14 : 1.46
+  const diagEndPhi = sign < 0 ? 1.46 : 1.14
+
+  return [
+    {
+      pStart: 1.06,
+      vStart: 0.15,
+      pEnd: 1.18,
+      vEnd: 0.64,
+      elevationDelta: 0.0,
+      flipWinding: sign < 0,
+    },
+    {
+      pStart: 1.42,
+      vStart: 0.15,
+      pEnd: 1.54,
+      vEnd: 0.64,
+      elevationDelta: 0.0,
+      flipWinding: sign < 0,
+    },
+    {
+      pStart: diagStartPhi,
+      vStart: 0.62,
+      pEnd: diagEndPhi,
+      vEnd: 0.17,
+      // Поднимаем диагональную перекладину на +0.8 мм над стойками для устранения Z-fighting в углах
+      elevationDelta: 0.0008,
+      // Так как v убывает (0.62 -> 0.17), знак якобиана инвертируется относительно стоек
+      flipWinding: sign > 0,
+    },
+  ]
+}
+
+/**
+ * ИСПРАВЛЕНО (AUDIT-06):
+ * 1) Единая плоская горизонтальная опора на участке пятка–пучки (t in [0.12, 0.62]).
+ * 2) Поперечная сетка дна и верха подошвы вместо конусообразной стяжки в одну точку (0, -0.33, 0).
+ * 3) Раздельные вершины боковины и крышек верха/дна (чёткие нормали без размытия под 45°).
+ * 4) Замкнутые торцевые крышки для полиуретановой чаши ENCAP на phi = ±1.55.
+ */
+export function buildSoleComponentGeometry(
   THREE: ThreeLib,
   part: 'midsole' | 'encap' | 'outsole',
   phiSteps = 96
@@ -828,44 +1034,63 @@ function buildSoleComponentGeometry(
 
   const phiStart = part === 'encap' ? 1.55 : -Math.PI
   const phiEnd = part === 'encap' ? Math.PI * 2 - 1.55 : Math.PI
-  const rings = 4 // Верхний рант, верхнее ребро боковины, нижнее ребро, подошвенный контур
+  const rings = 4
 
+  const topContour: [number, number, number][] = []
+  const botContour: [number, number, number][] = []
+
+  // 1. Боковая стенка (Sidewall) с собственными вершинами для чётких боковых нормалей
   for (let i = 0; i <= phiSteps; i++) {
     const u = i / phiSteps
     const rawPhi = phiStart + u * (phiEnd - phiStart)
-    const phi = rawPhi > Math.PI ? rawPhi - Math.PI * 2 : rawPhi
+    const phi = wrapAnglePi(rawPhi)
     const fp = getFootprintPoint(phi)
-    const toeSpring = Math.pow(Math.max(0, (fp.t - 0.58) / 0.42), 1.75) * 0.11
-    const yTopBase = -0.14 + (1 - fp.t) * 0.06 + toeSpring
-    const midThick = 0.118 + 0.082 * (1 - fp.t)
-    const yMidBot = yTopBase - midThick
+    const { yTopBase, yMidBot, yOutBotBase, midThick } = getSoleVerticalProfile(fp.t)
 
     if (part === 'midsole') {
-      const groove = -0.008 * Math.sin(u * Math.PI * 6) * (1 - fp.t * 0.5)
-      positions.push(fp.x * 1.002, yTopBase + 0.003, fp.z * 1.002)
+      const groove = -0.007 * Math.sin(u * Math.PI * 6) * (1 - fp.t * 0.5)
+      const pTop: [number, number, number] = [fp.x * 1.002, yTopBase + 0.003, fp.z * 1.002]
+      const pBot: [number, number, number] = [fp.x * 1.048, yMidBot, fp.z * 1.044]
+      topContour.push(pTop)
+      botContour.push(pBot)
+
+      positions.push(...pTop)
       positions.push(fp.x * 1.028, yTopBase - midThick * 0.36 + groove, fp.z * 1.026)
       positions.push(fp.x * 1.044, yTopBase - midThick * 0.78, fp.z * 1.04)
-      positions.push(fp.x * 1.048, yMidBot, fp.z * 1.044)
+      positions.push(...pBot)
     } else if (part === 'encap') {
       const endFade = smoothstep(0, 0.12, u) * smoothstep(1, 0.88, u)
       const encapOut = 1.055 + 0.014 * endFade
       const yEncapTop = yTopBase - midThick * 0.18
       const yEncapBot = yMidBot + 0.006
-      positions.push(fp.x * 1.015, yEncapTop, fp.z * 1.015)
+      const pTop: [number, number, number] = [fp.x * 1.015, yEncapTop, fp.z * 1.015]
+      const pBot: [number, number, number] = [fp.x * 1.046, yEncapBot, fp.z * 1.044]
+      topContour.push(pTop)
+      botContour.push(pBot)
+
+      positions.push(...pTop)
       positions.push(fp.x * encapOut, yEncapTop - 0.012, fp.z * encapOut)
-      positions.push(fp.x * (encapOut + 0.006), (yEncapTop + yEncapBot) * 0.5, fp.z * (encapOut + 0.006))
-      positions.push(fp.x * 1.046, yEncapBot, fp.z * 1.044)
+      positions.push(
+        fp.x * (encapOut + 0.006),
+        (yEncapTop + yEncapBot) * 0.5,
+        fp.z * (encapOut + 0.006)
+      )
+      positions.push(...pBot)
     } else {
-      // Segmented Rubber Outsole с выраженными трапециевидными грунтозацепами NB 574
       const lugFreq = 36
       const rawWave = Math.sin(u * lugFreq * Math.PI)
       const isArchBridge = fp.t > 0.34 && fp.t < 0.52
-      const lugDepth = isArchBridge ? 0.004 : 0.022 * (rawWave > 0 ? 1 : -0.45)
-      const yOutBot = yMidBot - 0.052 + lugDepth
-      positions.push(fp.x * 1.046, yMidBot, fp.z * 1.042)
+      const lugMod = isArchBridge ? 0.0 : 0.014 * (rawWave > 0 ? 1 : -0.45)
+      const yOutBot = yOutBotBase + lugMod
+      const pTop: [number, number, number] = [fp.x * 1.046, yMidBot, fp.z * 1.042]
+      const pBot: [number, number, number] = [fp.x * 1.032, yOutBot, fp.z * 1.03]
+      topContour.push(pTop)
+      botContour.push(pBot)
+
+      positions.push(...pTop)
       positions.push(fp.x * 1.054, yMidBot - 0.018, fp.z * 1.048)
-      positions.push(fp.x * 1.042, yOutBot + 0.01, fp.z * 1.038)
-      positions.push(fp.x * 1.032, yOutBot, fp.z * 1.03)
+      positions.push(fp.x * 1.042, yOutBot + 0.008, fp.z * 1.038)
+      positions.push(...pBot)
     }
   }
 
@@ -879,19 +1104,113 @@ function buildSoleComponentGeometry(
     }
   }
 
-  if (part !== 'encap') {
-    const topCenterIdx = (phiSteps + 1) * rings
-    positions.push(0, part === 'outsole' ? -0.26 : -0.12, 0)
-    const botCenterIdx = topCenterIdx + 1
-    positions.push(0, part === 'outsole' ? -0.33 : -0.26, 0)
+  if (part === 'encap') {
+    // Замыкаем торцевые крышки ENCAP на начальном (i = 0) и конечном (i = phiSteps) сечениях
+    const addEndCap = (ringIdx: number, reverse: boolean) => {
+      const baseVertex = positions.length / 3
+      const pTop = topContour[ringIdx]
+      const pBot = botContour[ringIdx]
+      const rMid1: [number, number, number] = [
+        positions[(ringIdx * rings + 1) * 3],
+        positions[(ringIdx * rings + 1) * 3 + 1],
+        positions[(ringIdx * rings + 1) * 3 + 2],
+      ]
+      const rMid2: [number, number, number] = [
+        positions[(ringIdx * rings + 2) * 3],
+        positions[(ringIdx * rings + 2) * 3 + 1],
+        positions[(ringIdx * rings + 2) * 3 + 2],
+      ]
+      const innerBack: [number, number, number] = [
+        pTop[0] * 0.94,
+        (pTop[1] + pBot[1]) * 0.5,
+        pTop[2] * 0.98,
+      ]
+      positions.push(...pTop, ...rMid1, ...rMid2, ...pBot, ...innerBack)
+      const [v0, v1, v2, v3, vc] = [
+        baseVertex,
+        baseVertex + 1,
+        baseVertex + 2,
+        baseVertex + 3,
+        baseVertex + 4,
+      ]
+      if (reverse) {
+        indices.push(vc, v1, v0, vc, v2, v1, vc, v3, v2)
+      } else {
+        indices.push(vc, v0, v1, vc, v1, v2, vc, v2, v3)
+      }
+    }
+    addEndCap(0, false)
+    addEndCap(phiSteps, true)
+  } else {
+    // 2. Поперечные сетки верхней и нижней крышек (от левого борта к правому по сечениям t)
+    const halfSteps = Math.floor(phiSteps / 2)
+    const crossCols = 6
+    const capStride = crossCols + 1
 
-    for (let i = 0; i < phiSteps; i++) {
-      const t0 = i * rings
-      const t1 = (i + 1) * rings
-      const b0 = i * rings + (rings - 1)
-      const b1 = (i + 1) * rings + (rings - 1)
-      indices.push(topCenterIdx, t0, t1)
-      indices.push(botCenterIdx, b1, b0)
+    const topCapBase = positions.length / 3
+    for (let k = 0; k <= halfSteps; k++) {
+      // Левый борт: idxLeft = halfSteps - k (phi от 0 до -pi), правый борт: idxRight = halfSteps + k (phi от 0 до +pi)
+      const pL = topContour[halfSteps - k]
+      const pR = topContour[halfSteps + k]
+      for (let c = 0; c <= crossCols; c++) {
+        const s = c / crossCols
+        positions.push(
+          (1 - s) * pL[0] + s * pR[0],
+          (1 - s) * pL[1] + s * pR[1],
+          (1 - s) * pL[2] + s * pR[2]
+        )
+      }
+    }
+
+    for (let k = 0; k < halfSteps; k++) {
+      for (let c = 0; c < crossCols; c++) {
+        const a = topCapBase + k * capStride + c
+        const b = topCapBase + (k + 1) * capStride + c
+        const d = topCapBase + k * capStride + (c + 1)
+        const e = topCapBase + (k + 1) * capStride + (c + 1)
+        indices.push(a, d, b, b, d, e)
+      }
+    }
+
+    const botCapBase = positions.length / 3
+    for (let k = 0; k <= halfSteps; k++) {
+      const uLong = k / halfSteps // 0 = мысок (t=1), 1 = пятка (t=0)
+      const phiAbs = uLong * Math.PI
+      const fp = getFootprintPoint(phiAbs)
+      const { yMidBot, yOutBotBase } = getSoleVerticalProfile(fp.t)
+      const pL = botContour[halfSteps - k]
+      const pR = botContour[halfSteps + k]
+
+      const isArchBridge = fp.t > 0.34 && fp.t < 0.52
+      const treadWave =
+        part === 'outsole' && !isArchBridge
+          ? 0.012 * (Math.sin(k * 1.45 * Math.PI) > 0 ? 1 : -0.45)
+          : 0.0
+      const baseFlatY = part === 'outsole' ? yOutBotBase : yMidBot
+
+      for (let c = 0; c <= crossCols; c++) {
+        const s = c / crossCols
+        const edgeBlend = Math.pow(Math.abs(s - 0.5) * 2, 2)
+        const yEdge = (1 - s) * pL[1] + s * pR[1]
+        const yInner = baseFlatY + treadWave
+        const yFinal = edgeBlend * yEdge + (1 - edgeBlend) * yInner
+        positions.push(
+          (1 - s) * pL[0] + s * pR[0],
+          yFinal,
+          (1 - s) * pL[2] + s * pR[2]
+        )
+      }
+    }
+
+    for (let k = 0; k < halfSteps; k++) {
+      for (let c = 0; c < crossCols; c++) {
+        const a = botCapBase + k * capStride + c
+        const b = botCapBase + (k + 1) * capStride + c
+        const d = botCapBase + k * capStride + (c + 1)
+        const e = botCapBase + (k + 1) * capStride + (c + 1)
+        // Нормали нижней поверхности направлены строго вниз (-Y)
+        indices.push(a, b, d, b, e, d)
+      }
     }
   }
 
@@ -933,7 +1252,7 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
   })
   group.add(new THREE.Mesh(vampFrontGeom, mats.vamp))
 
-  ;[-1, 1].forEach((sign) => {
+  ;([-1, 1] as const).forEach((sign) => {
     const pMin = sign > 0 ? 0.70 : -0.92
     const pMax = sign > 0 ? 0.92 : -0.70
     const vampWingGeom = buildPanelPatch(THREE, {
@@ -1043,13 +1362,9 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
     })
     group.add(new THREE.Mesh(heelTabGeom, mats.swoosh))
 
-    // 7. ФИРМЕННЫЙ 3D-ЛОГОТИП «N» НА БЕРЦАХ (С БЕЛОЙ ПОДЛОЖКОЙ)
-    const nStrokes: [number, number, number, number][] = [
-      [1.06, 0.15, 1.18, 0.64],
-      [1.42, 0.15, 1.54, 0.64],
-      [1.14, 0.62, 1.46, 0.17],
-    ]
-    nStrokes.forEach(([pStart, vStart, pEnd, vEnd]) => {
+    // 7. ИСПРАВЛЕНО (AUDIT-04): Корректная ориентация «N» на обеих боковинах без инверсии в «И» и без Z-fighting
+    const nStrokes = getNLogoStrokesForSide(sign)
+    nStrokes.forEach(({ pStart, vStart, pEnd, vEnd, elevationDelta, flipWinding }) => {
       const trimGeom = buildParametricGridGeometry(
         THREE,
         14,
@@ -1059,9 +1374,9 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
           const wCentered = (w - 0.5) * 2
           const pTrim = sign * ((1 - uExp) * pStart + uExp * pEnd + wCentered * 0.072)
           const vTrim = Math.max(0.08, Math.min(0.74, (1 - uExp) * vStart + uExp * vEnd))
-          return sampleUpperSurface(pTrim, vTrim, 0.025)
+          return sampleUpperSurface(pTrim, vTrim, 0.025 + elevationDelta)
         },
-        sign < 0
+        flipWinding
       )
       group.add(new THREE.Mesh(trimGeom, mats.laces))
 
@@ -1073,56 +1388,73 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
           const wCentered = (w - 0.5) * 2
           const pBar = sign * ((1 - u) * pStart + u * pEnd + wCentered * 0.046)
           const vBar = Math.max(0.1, Math.min(0.72, (1 - u) * vStart + u * vEnd))
-          return sampleUpperSurface(pBar, vBar, 0.031)
+          return sampleUpperSurface(pBar, vBar, 0.031 + elevationDelta)
         },
-        sign < 0
+        flipWinding
       )
       group.add(new THREE.Mesh(barGeom, mats.swoosh))
     })
   })
 
-  // 8. LINING, TONGUE & LACES
-  const liningGeom = buildParametricGridGeometry(THREE, 72, 16, (u, s) => {
-    const phi = -Math.PI + u * Math.PI * 2
-    const [xr, yr, zr] = sampleUpperSurface(phi, 0.98, 0.01)
+  // 8. ИСПРАВЛЕНО (AUDIT-07): Внутренняя подкладка ограничена зоной воротника (|phi| >= 0.42), не перекрывая язычок
+  const liningGeom = buildParametricGridGeometry(THREE, 64, 14, (u, s) => {
+    const rawPhi = 0.42 + u * (Math.PI * 2 - 0.84)
+    const phi = wrapAnglePi(rawPhi)
+    const [xr, yr, zr] = sampleUpperSurface(phi, 0.98, -0.004)
     const sProgress = Math.max(0, (s - 0.14) / 0.86)
-    const radialShrink = 1 - Math.pow(sProgress, 1.04)
-    const lipArch = 0.034 * Math.sin(Math.min(1, s / 0.28) * Math.PI)
+    const radialShrink = 1 - 0.72 * Math.pow(sProgress, 1.08)
+    const lipArch = 0.022 * Math.sin(Math.min(1, s / 0.28) * Math.PI)
     const x = xr * radialShrink
-    const z = -0.55 + (zr - -0.55) * radialShrink
-    const y = yr + lipArch - 0.54 * Math.pow(sProgress, 0.75)
+    const z = -0.58 + (zr - -0.58) * radialShrink
+    const y = yr + lipArch - 0.48 * Math.pow(sProgress, 0.8)
     return [x, y, z] as const
   })
   group.add(new THREE.Mesh(liningGeom, mats.lining))
 
-  const tongueGeom = buildParametricGridGeometry(THREE, 26, 16, (u, w) => {
-    const wCentered = (w - 0.5) * 2
-    const z = 0.44 - u * 0.78
-    const x = wCentered * (0.125 + 0.055 * u)
-    const y = 0.21 + 0.5 * Math.pow(u, 0.88) + 0.045 * Math.cos(wCentered * (Math.PI * 0.5))
-    return [x, y, z] as const
-  })
+  const tongueGeom = buildParametricGridGeometry(
+    THREE,
+    26,
+    16,
+    (u, w) => {
+      const wCentered = (w - 0.5) * 2
+      const z = 0.44 - u * 0.78
+      const x = wCentered * (0.125 + 0.055 * u)
+      const y = 0.21 + 0.5 * Math.pow(u, 0.88) + 0.045 * Math.cos(wCentered * (Math.PI * 0.5))
+      return [x, y, z] as const
+    },
+    false
+  )
   group.add(new THREE.Mesh(tongueGeom, mats.tongue))
 
-  const tongueTagGeom = buildParametricGridGeometry(THREE, 8, 8, (u, w) => {
-    const uTag = 0.8 + u * 0.17
-    const wCentered = (w - 0.5) * 0.88
-    const z = 0.44 - uTag * 0.78 + 0.01
-    const x = wCentered * (0.125 + 0.055 * uTag)
-    const y = 0.21 + 0.5 * Math.pow(uTag, 0.88) + 0.05 * Math.cos(wCentered * (Math.PI * 0.5))
-    return [x, y, z] as const
-  })
+  const tongueTagGeom = buildParametricGridGeometry(
+    THREE,
+    8,
+    8,
+    (u, w) => {
+      const uTag = 0.8 + u * 0.17
+      const wCentered = (w - 0.5) * 0.88
+      const z = 0.44 - uTag * 0.78 + 0.01
+      const x = wCentered * (0.125 + 0.055 * uTag)
+      const y = 0.21 + 0.5 * Math.pow(uTag, 0.88) + 0.05 * Math.cos(wCentered * (Math.PI * 0.5))
+      return [x, y, z] as const
+    },
+    false
+  )
   group.add(new THREE.Mesh(tongueTagGeom, mats.swoosh))
 
+  // ИСПРАВЛЕНО (AUDIT-07): Люверсы посажены непосредственно на поверхность планки eyestay по локальной нормали
   const laceU = [0.1, 0.26, 0.42, 0.58, 0.74, 0.88]
-  const eyeletTorus = new THREE.TorusGeometry(0.02, 0.006, 8, 16)
+  const eyeletTorus = new THREE.TorusGeometry(0.018, 0.0055, 8, 16)
+  const zAxisVec = new THREE.Vector3(0, 0, 1)
+  const normalVec = new THREE.Vector3()
   laceU.forEach((uL) => {
-    const aL = 0.38 + uL * 1.02
-    const rimPos = getToplineRim(aL)
-    ;[-1, 1].forEach((side) => {
+    const aL = 0.40 + uL * 1.00
+    ;([-1, 1] as const).forEach((side) => {
+      const { pos, normal } = sampleUpperSurfaceWithNormal(side * aL, 0.84, 0.032)
       const eyeMesh = new THREE.Mesh(eyeletTorus, mats.lining)
-      eyeMesh.position.set(side * rimPos.x * 1.03, rimPos.y + 0.012, rimPos.z)
-      eyeMesh.rotation.y = side * Math.PI * 0.35
+      eyeMesh.position.set(pos[0], pos[1], pos[2])
+      normalVec.set(normal[0], normal[1], normal[2]).normalize()
+      eyeMesh.quaternion.setFromUnitVectors(zAxisVec, normalVec)
       group.add(eyeMesh)
     })
   })
@@ -1133,26 +1465,33 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
     lacePairs.push([k + 1, k])
   }
 
+  // ИСПРАВЛЕНО (AUDIT-07): flipWinding = true ориентирует нормали шнурков строго наружу (+Y, ny > 0.9)
   lacePairs.forEach(([iL, iR], idxPair) => {
-    const aL = 0.38 + laceU[iL] * 1.02
-    const aR = 0.38 + laceU[iR] * 1.02
-    const rimL = getToplineRim(-aL)
-    const rimR = getToplineRim(aR)
+    const aL = 0.40 + laceU[iL] * 1.00
+    const aR = 0.40 + laceU[iR] * 1.00
+    const rimL = sampleUpperSurface(-aL, 0.84, 0.031)
+    const rimR = sampleUpperSurface(aR, 0.84, 0.031)
     const overLift = idxPair % 2 === 1 ? 0.008 : 0.0
 
-    const laceStrapGeom = buildParametricGridGeometry(THREE, 16, 5, (u, w) => {
-      const wCentered = w - 0.5
-      const x = (1 - u) * (rimL.x * 1.03) + u * (rimR.x * 1.03)
-      const z = (1 - u) * rimL.z + u * rimR.z + wCentered * 0.042
-      const arch = (0.052 + overLift) * Math.sin(u * Math.PI)
-      const y =
-        (1 - u) * rimL.y +
-        u * rimR.y +
-        arch +
-        0.018 +
-        0.006 * Math.cos(wCentered * Math.PI)
-      return [x, y, z] as const
-    })
+    const laceStrapGeom = buildParametricGridGeometry(
+      THREE,
+      16,
+      5,
+      (u, w) => {
+        const wCentered = 0.5 - w
+        const x = (1 - u) * rimL[0] + u * rimR[0]
+        const z = (1 - u) * rimL[2] + u * rimR[2] + wCentered * 0.042
+        const arch = (0.048 + overLift) * Math.sin(u * Math.PI)
+        const y =
+          (1 - u) * rimL[1] +
+          u * rimR[1] +
+          arch +
+          0.012 +
+          0.006 * Math.cos(wCentered * Math.PI)
+        return [x, y, z] as const
+      },
+      true
+    )
     group.add(new THREE.Mesh(laceStrapGeom, mats.laces))
   })
 
@@ -1170,10 +1509,6 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
   return group
 }
 
-/**
- * ИСПРАВЛЕНО (п. 2.1 и п. 7 аудита): Полная рекурсивная очистка GPU-ресурсов
- * (BufferGeometry, уникальных материалов и текстур) с защитой от повторного dispose().
- */
 function disposeObject3DResources(
   root: THREE_TYPES.Object3D,
   preservedMaterials?: Set<THREE_TYPES.Material>
@@ -1225,11 +1560,8 @@ function disposeObject3DResources(
 type ZoneMaterialRegistry = Record<SneakerZoneKey, THREE_TYPES.MeshStandardMaterial[]>
 
 /**
- * ИСПРАВЛЕНО (п. 2.2, 2.3, 2.4 аудита):
- * 1) Сохраняет исходные 4K-текстуры GLB (normalMap, roughnessMap, aoMap, map), клонируя
- *    материал и регистрируя его в списке зоны для динамического перекрашивания.
- * 2) Включает vertexColors строго индивидуально для тех геометрий, где реально есть атрибут color.
- * 3) Использует явную таблицу сопоставления GLB_EXPLICIT_ZONE_MAP и выводит предупреждение для неизвестных узлов.
+ * ИСПРАВЛЕНО (AUDIT-09): Освобождает заменённые исходные материалы GLB после клонирования
+ * и сохраняет рельефные карты (normalMap, roughnessMap, aoMap).
  */
 function bindGlbMaterialsPreservingTextures(
   THREE: ThreeLib,
@@ -1238,6 +1570,8 @@ function bindGlbMaterialsPreservingTextures(
   registry: ZoneMaterialRegistry,
   currentColors: SneakerColors
 ) {
+  const replacedOriginalMaterials = new Set<THREE_TYPES.Material>()
+
   root.traverse((obj) => {
     const mesh = obj as THREE_TYPES.Mesh
     if (!mesh.isMesh) return
@@ -1247,7 +1581,9 @@ function bindGlbMaterialsPreservingTextures(
     const zone = resolveGlbZone(candidateName)
 
     if (!zone) {
-      console.warn(`[Sneaker3D] Неизвестная зона GLB-объекта: "${candidateName}". Оставлен исходный материал.`)
+      console.warn(
+        `[Sneaker3D] Неизвестная зона GLB-объекта: "${candidateName}". Оставлен исходный материал.`
+      )
       return
     }
 
@@ -1261,6 +1597,10 @@ function bindGlbMaterialsPreservingTextures(
           srcStd.aoMap ||
           srcStd.metalnessMap)
     )
+
+    if (rawMat) {
+      replacedOriginalMaterials.add(rawMat)
+    }
 
     if (hasOriginalTextures && srcStd) {
       const clonedMat = srcStd.clone()
@@ -1280,6 +1620,11 @@ function bindGlbMaterialsPreservingTextures(
       baseMats[zone].vertexColors = false
       mesh.material = baseMats[zone]
     }
+  })
+
+  // Освобождаем исходные материалы GLB (без удаления их текстур, используемых клонами)
+  replacedOriginalMaterials.forEach((origMat) => {
+    origMat.dispose()
   })
 }
 
@@ -1318,7 +1663,6 @@ export function Sneaker3D({
   const zoneRegistryRef = useRef<ZoneMaterialRegistry | null>(null)
   const shoeRootRef = useRef<THREE_TYPES.Group | null>(null)
 
-  // Актуальные refs для защиты от гонки при асинхронной подгрузке Three.js / GLB (п. 3.1 и 3.2)
   const latestColorsRef = useRef<SneakerColors>(sneakerColors)
   latestColorsRef.current = sneakerColors
   const latestIsDarkRef = useRef<boolean>(isDark)
@@ -1327,7 +1671,11 @@ export function Sneaker3D({
   const hemiLightRef = useRef<THREE_TYPES.HemisphereLight | null>(null)
   const shadowCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const shadowTexRef = useRef<THREE_TYPES.CanvasTexture | null>(null)
-  const wakeRenderLoopRef = useRef<(() => void) | null>(null)
+
+  // ИСПРАВЛЕНО (AUDIT-11): Разделение одиночного рендера кадра (при смене цвета/темы/размера)
+  // и пробуждения 6-секундного цикла анимации камеры (только при вращении/сбросе)
+  const requestSingleRenderRef = useRef<(() => void) | null>(null)
+  const wakeCameraAnimationRef = useRef<(() => void) | null>(null)
 
   const [isLoading3D, setIsLoading3D] = useState(true)
   const [webglError, setWebglError] = useState(false)
@@ -1348,7 +1696,7 @@ export function Sneaker3D({
         mat.color.set(hex)
       })
     })
-    wakeRenderLoopRef.current?.()
+    requestSingleRenderRef.current?.()
   }, [])
 
   useEffect(() => {
@@ -1427,7 +1775,6 @@ export function Sneaker3D({
         rimLight.position.set(0, 3.8, -4.5)
         scene.add(rimLight)
 
-        // Создаём материалы строго из актуального latestColorsRef.current (п. 3.1 аудита)
         const mats: SneakerMaterials = {
           vamp: new THREE.MeshStandardMaterial({
             color: new THREE.Color(currentColors.vamp),
@@ -1485,7 +1832,6 @@ export function Sneaker3D({
             color: new THREE.Color(currentColors.laces),
             roughness: 0.78,
             metalness: 0.0,
-            side: THREE.DoubleSide,
           }),
           eyestays: new THREE.MeshStandardMaterial({
             color: new THREE.Color(currentColors.eyestays),
@@ -1496,7 +1842,6 @@ export function Sneaker3D({
             color: new THREE.Color(currentColors.swoosh),
             roughness: 0.34,
             metalness: 0.06,
-            side: THREE.DoubleSide,
           }),
         }
         matsRef.current = mats
@@ -1525,51 +1870,6 @@ export function Sneaker3D({
         scene.add(pivotGroup)
         shoeRootRef.current = pivotGroup
 
-        // Немедленная синхронизация на случай, если цвет изменился во время промиса
-        applyColorsToRegistry(latestColorsRef.current)
-        setIsLoading3D(false)
-
-        if (gltfMod?.GLTFLoader) {
-          const loader = new gltfMod.GLTFLoader()
-          const tryLoadGlb = (urls: string[], index = 0) => {
-            if (index >= urls.length || disposed) return
-            loader.load(
-              urls[index],
-              (gltf) => {
-                if (disposed || !gltf?.scene) return
-                const box = new THREE.Box3().setFromObject(gltf.scene)
-                const size = new THREE.Vector3()
-                const center = new THREE.Vector3()
-                box.getSize(size)
-                box.getCenter(center)
-                const maxDim = Math.max(size.x, size.y, size.z)
-                if (maxDim > 0 && maxDim < 10) {
-                  // ИСПРАВЛЕНО (п. 2.1 аудита): Освобождаем GPU-ресурсы процедурной модели перед очисткой
-                  disposeObject3DResources(pivotGroup, baseMaterialsSet)
-                  pivotGroup.clear()
-
-                  bindGlbMaterialsPreservingTextures(
-                    THREE,
-                    gltf.scene,
-                    mats,
-                    registry,
-                    latestColorsRef.current
-                  )
-                  gltf.scene.position.sub(center)
-                  const scale = 2.74 / maxDim
-                  gltf.scene.scale.setScalar(scale)
-                  gltf.scene.rotation.y = Math.PI * 0.5
-                  pivotGroup.add(gltf.scene)
-                  applyColorsToRegistry(latestColorsRef.current)
-                }
-              },
-              undefined,
-              () => tryLoadGlb(urls, index + 1)
-            )
-          }
-          tryLoadGlb(['/sneaker_modular.glb', '/models/sneaker_modular.glb'])
-        }
-
         const shadowCanvas = document.createElement('canvas')
         shadowCanvas.width = 256
         shadowCanvas.height = 128
@@ -1591,29 +1891,45 @@ export function Sneaker3D({
 
         const clock = new THREE.Clock()
 
-        const shouldKeepAnimating = () => {
-          if (disposed || !isVisibleInViewport || !isDocumentVisible) return false
-          if (isInteracting.current) return true
-          const yawDiff = Math.abs(rotTarget.current.yaw - rotCurrent.current.yaw)
-          const pitchDiff = Math.abs(rotTarget.current.pitch - rotCurrent.current.pitch)
-          if (yawDiff > 0.0005 || pitchDiff > 0.0005) return true
-          if (prefersReducedMotion) return false
-          // В энергосберегающем режиме после 6 секунд бездействия переходим в спящий режим
-          return Date.now() - lastActivityTime.current < 6000
+        // ИСПРАВЛЕНО (AUDIT-11): Одиночный рендер кадра без запуска 6-секундного цикла
+        const renderSingleFrame = () => {
+          if (disposed || !isVisibleInViewport || !isDocumentVisible) return
+          if (!isLoopRunning) {
+            renderer.render(scene, camera)
+          }
         }
+        requestSingleRenderRef.current = renderSingleFrame
 
+        // ИСПРАВЛЕНО (AUDIT-11): Строгое завершение цикла на 6000 мс с плавным возвратом position.y к 0
         const animate = () => {
-          if (!shouldKeepAnimating()) {
+          if (disposed || !isVisibleInViewport || !isDocumentVisible) {
+            isLoopRunning = false
+            return
+          }
+
+          const idleMs = Date.now() - lastActivityTime.current
+          if (!isInteracting.current && (prefersReducedMotion || idleMs >= 6000)) {
+            rotCurrent.current.yaw = rotTarget.current.yaw
+            rotCurrent.current.pitch = rotTarget.current.pitch
+            if (shoeRootRef.current) {
+              shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+              shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+              shoeRootRef.current.position.y = 0
+            }
             isLoopRunning = false
             renderer.render(scene, camera)
             return
           }
+
           isLoopRunning = true
           frameId = requestAnimationFrame(animate)
           const elapsed = clock.getElapsedTime()
 
-          if (!isInteracting.current && !prefersReducedMotion) {
-            rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007
+          // Затухание покачивания за 1.2 секунды до остановки цикла
+          const swayDamping = Math.max(0, Math.min(1, (5400 - idleMs) / 1200))
+
+          if (!isInteracting.current && !prefersReducedMotion && swayDamping > 0) {
+            rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007 * swayDamping
           }
 
           rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.14
@@ -1624,23 +1940,77 @@ export function Sneaker3D({
             shoeRootRef.current.rotation.x = rotCurrent.current.pitch
             shoeRootRef.current.position.y = prefersReducedMotion
               ? 0
-              : Math.sin(elapsed * 1.5) * 0.015
+              : Math.sin(elapsed * 1.5) * 0.015 * swayDamping
           }
 
           renderer.render(scene, camera)
         }
 
-        const wakeUpLoop = () => {
+        const wakeCameraLoop = () => {
           lastActivityTime.current = Date.now()
+          if (prefersReducedMotion) {
+            renderSingleFrame()
+            return
+          }
           if (!isLoopRunning && !disposed && isVisibleInViewport && isDocumentVisible) {
             clock.getDelta()
             animate()
           }
         }
-        wakeRenderLoopRef.current = wakeUpLoop
-        wakeUpLoop()
+        wakeCameraAnimationRef.current = wakeCameraLoop
 
-        // ИСПРАВЛЕНО (п. 6.2 аудита): ResizeObserver вместо только window.resize
+        applyColorsToRegistry(latestColorsRef.current)
+        setIsLoading3D(false)
+        wakeCameraLoop()
+
+        if (gltfMod?.GLTFLoader) {
+          const loader = new gltfMod.GLTFLoader()
+          const tryLoadGlb = (urls: string[], index = 0) => {
+            if (index >= urls.length || disposed) return
+            loader.load(
+              urls[index],
+              (gltf) => {
+                // ИСПРАВЛЕНО (AUDIT-09): Если компонент размонтирован во время загрузки GLB, немедленно очищаем gltf.scene
+                if (disposed) {
+                  if (gltf?.scene) disposeObject3DResources(gltf.scene)
+                  return
+                }
+                if (!gltf?.scene) return
+
+                const box = new THREE.Box3().setFromObject(gltf.scene)
+                const size = new THREE.Vector3()
+                const center = new THREE.Vector3()
+                box.getSize(size)
+                box.getCenter(center)
+                const maxDim = Math.max(size.x, size.y, size.z)
+                if (maxDim > 0 && maxDim < 10) {
+                  disposeObject3DResources(pivotGroup, baseMaterialsSet)
+                  pivotGroup.clear()
+
+                  bindGlbMaterialsPreservingTextures(
+                    THREE,
+                    gltf.scene,
+                    mats,
+                    registry,
+                    latestColorsRef.current
+                  )
+                  gltf.scene.position.sub(center)
+                  const scale = 2.74 / maxDim
+                  gltf.scene.scale.setScalar(scale)
+                  gltf.scene.rotation.y = Math.PI * 0.5
+                  pivotGroup.add(gltf.scene)
+                  applyColorsToRegistry(latestColorsRef.current)
+                } else {
+                  disposeObject3DResources(gltf.scene)
+                }
+              },
+              undefined,
+              () => tryLoadGlb(urls, index + 1)
+            )
+          }
+          tryLoadGlb(['/sneaker_modular.glb', '/models/sneaker_modular.glb'])
+        }
+
         const updateViewportSize = () => {
           if (!container || disposed) return
           const w = container.clientWidth || 340
@@ -1648,7 +2018,7 @@ export function Sneaker3D({
           camera.aspect = w / h
           camera.updateProjectionMatrix()
           renderer.setSize(w, h)
-          wakeUpLoop()
+          renderSingleFrame()
         }
 
         let resizeObserver: ResizeObserver | null = null
@@ -1658,7 +2028,6 @@ export function Sneaker3D({
         }
         window.addEventListener('resize', updateViewportSize)
 
-        // ИСПРАВЛЕНО (п. 6.1 аудита): Приостановка рендеринга вне видимой области и при сворачивании
         let intersectionObserver: IntersectionObserver | null = null
         if (typeof IntersectionObserver !== 'undefined') {
           intersectionObserver = new IntersectionObserver(
@@ -1666,7 +2035,7 @@ export function Sneaker3D({
               const entry = entries[0]
               if (!entry) return
               isVisibleInViewport = entry.isIntersecting
-              if (isVisibleInViewport) wakeUpLoop()
+              if (isVisibleInViewport) renderSingleFrame()
             },
             { threshold: 0.05 }
           )
@@ -1675,11 +2044,10 @@ export function Sneaker3D({
 
         const onVisibilityChange = () => {
           isDocumentVisible = !document.hidden
-          if (isDocumentVisible) wakeUpLoop()
+          if (isDocumentVisible) renderSingleFrame()
         }
         document.addEventListener('visibilitychange', onVisibilityChange)
 
-        // ИСПРАВЛЕНО (п. 6.3 аудита): Обработка потери и восстановления WebGL-контекста
         const domCanvas = renderer.domElement
         const onContextLost = (e: Event) => {
           e.preventDefault()
@@ -1694,7 +2062,6 @@ export function Sneaker3D({
         domCanvas.addEventListener('webglcontextlost', onContextLost, false)
         domCanvas.addEventListener('webglcontextrestored', onContextRestored, false)
 
-        // ИСПРАВЛЕНО (п. 7 аудита): Полная очистка всех геометрий, материалов, текстур и ссылок
         cleanupFn = () => {
           window.removeEventListener('resize', updateViewportSize)
           document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -1716,7 +2083,8 @@ export function Sneaker3D({
           hemiLightRef.current = null
           shadowCanvasRef.current = null
           shadowTexRef.current = null
-          wakeRenderLoopRef.current = null
+          requestSingleRenderRef.current = null
+          wakeCameraAnimationRef.current = null
         }
       })
       .catch((err) => {
@@ -1734,12 +2102,10 @@ export function Sneaker3D({
     }
   }, [contextLostCount, applyColorsToRegistry])
 
-  // Синхронизация цветов материалов при изменении мемоизированного объекта sneakerColors
   useEffect(() => {
     applyColorsToRegistry(sneakerColors)
   }, [sneakerColors, applyColorsToRegistry])
 
-  // ИСПРАВЛЕНО (п. 3.2 аудита): Реактивная синхронизация освещения и тени с темой isDark
   useEffect(() => {
     if (hemiLightRef.current) {
       hemiLightRef.current.intensity = isDark ? 1.1 : 1.3
@@ -1748,13 +2114,13 @@ export function Sneaker3D({
       drawShadowGradient(shadowCanvasRef.current, isDark)
       shadowTexRef.current.needsUpdate = true
     }
-    wakeRenderLoopRef.current?.()
+    requestSingleRenderRef.current?.()
   }, [isDark])
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isInteracting.current = true
     lastPointer.current = { x: e.clientX, y: e.clientY }
-    wakeRenderLoopRef.current?.()
+    wakeCameraAnimationRef.current?.()
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {}
@@ -1768,12 +2134,12 @@ export function Sneaker3D({
 
     rotTarget.current.yaw += dx * 0.012
     rotTarget.current.pitch = Math.max(-0.35, Math.min(0.6, rotTarget.current.pitch + dy * 0.009))
-    wakeRenderLoopRef.current?.()
+    wakeCameraAnimationRef.current?.()
   }
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     isInteracting.current = false
-    wakeRenderLoopRef.current?.()
+    wakeCameraAnimationRef.current?.()
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {}
@@ -1782,12 +2148,12 @@ export function Sneaker3D({
   const handleResetClick = () => {
     haptic('light')
     rotTarget.current = { yaw: -0.26, pitch: 0.16 }
-    wakeRenderLoopRef.current?.()
+    wakeCameraAnimationRef.current?.()
     onResetAll?.()
   }
 
   return (
-    <div className="relative w-full h-[185px] sm:h-[225px] md:h-[280px] select-none">
+    <div className="relative w-full h-[178px] sm:h-[218px] md:h-[270px] select-none">
       {webglError ? (
         <div
           className={`w-full h-full flex flex-col items-center justify-center border border-dashed rounded-sm px-4 text-center ${
@@ -1854,12 +2220,370 @@ export function Sneaker3D({
 }
 
 /* ============================================================================
-   5. ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ (КОМПАКТНЫЙ STUDIO РЕДАКТОР)
+   5. СЛОВАРЬ ЛОКАЛИЗАЦИИ И ДИНАМИЧЕСКИЕ ПОДПИСИ СВОТЧЕЙ (AUDIT-02, AUDIT-05)
+   ============================================================================ */
+
+const TRANSLATIONS = {
+  ru: {
+    title: 'Цвета',
+    complementary: 'Комплементарная',
+    analogous: 'Аналогичная',
+    triadic: 'Триадная',
+    tetradic: 'Тетрада (квадрат)',
+    rectangular: 'Тетрада (прямоуг.)',
+    'split-complementary': 'Контрастная триада',
+    monochromatic: 'Монохромная',
+    main60: '60%',
+    secondary30: '30%',
+    accent10: '10%',
+    main55: '55%',
+    secondary20: '20%',
+    secondary15: '15%',
+    // Роли свотчей по пресетам (AUDIT-05)
+    roleClassicUpper: 'Обвод • Пятка • Планка',
+    roleClassicDetailsAll: 'Берцы • Мысок • Воротник',
+    roleClassicDetails: 'Берцы • Мысок • Язычок',
+    roleClassicLining: 'Воротник • Подкладка',
+    roleClassicAccent: 'Протектор • Лого N',
+    roleToeMain: 'Мысок • Планка • ENCAP',
+    roleToeSecondary: 'Обвод • Берцы',
+    roleToeLining: 'Воротник • Подкладка',
+    roleToeAccent: 'Пятка • Лого N • Протектор',
+    roleSplitMain: 'Обвод • Пятка • Лого N',
+    roleSplitSecondary: 'Мысок • Планка • ENCAP',
+    roleSplitLining: 'Воротник • Подкладка',
+    roleSplitAccent: 'Боковые берцы (Saddle)',
+    roleNeutralAccent: 'Лого N • Задний хлястик',
+    // Названия всех 13 зон для технологической спецификации
+    specTitle: 'Техкарта зон (нажмите для копирования HEX):',
+    zone_vamp: 'Обвод',
+    zone_toeBox: 'Мысок',
+    zone_quarters: 'Берцы',
+    zone_eyestays: 'Планка',
+    zone_heel: 'Пятка',
+    zone_collar: 'Воротник',
+    zone_tongue: 'Язычок',
+    zone_lining: 'Подкладка',
+    zone_swoosh: 'Лого N',
+    zone_midsole: 'EVA база',
+    zone_encap: 'ENCAP',
+    zone_outsole: 'Протектор',
+    zone_laces: 'Шнурки',
+    quote: '«Цвет — это душа обуви.»',
+    white: 'Белила (Tint)',
+    black: 'Тень (Shade)',
+    chroma: 'Насыщенность',
+    pure: 'Пигмент',
+    ittenLabel: 'Круг Иттена (RYB)',
+    hslLabel: 'Цифровой (HSL)',
+    presetClassic: '60/30/10 База',
+    presetToe: 'Акцент мыска',
+    presetSplit: 'Сплит-берцы',
+    presetNeutral: 'Нейтр. подошва',
+    contrastOptimal: 'Оптимальный контраст',
+    contrastSoft: 'Мягкий нюанс',
+    contrastHigh: 'Высокий контраст',
+    copied: 'Скопировано',
+    resetBtn: '360° • Сброс',
+    loading3D: 'Загрузка 3D • NB 574...',
+    webglFallback: 'WebGL недоступен • Режим палитры',
+    guideBtn: 'Гид',
+    guideTitle: 'Цвет в дизайне',
+    guideClose: 'Закрыть',
+    paywallTitle: 'PRO: Палитры Studio',
+    paywallDesc:
+      'Пожизненный доступ ко всем профессиональным схемам Иттена: триады, тетрады, монохром и полная техкарта 13 деталей кроя.',
+    paywallBtn: `ОТКРЫТЬ ДОСТУП • ${PRO_COLORS_PRICE_STARS} ⭐️`,
+    loading: 'СОЗДАНИЕ СЧЁТА...',
+    verifying: 'ПРОВЕРКА ТРАНЗАКЦИИ...',
+    paymentVerifyFailed:
+      'Оплата ещё не подтверждена сервером. Подождите пару секунд и нажмите снова.',
+    paymentPendingMsg:
+      'Платёж обрабатывается Telegram. Доступ откроется автоматически после подтверждения.',
+    guideIntro:
+      'Круг Иттена (RYB) — классический художественный инструмент гармонизации цвета. В отличие от экранной модели RGB/HSL, в круге Иттена комплементарными парами выступают Красный–Зелёный, Синий–Оранжевый и Жёлтый–Фиолетовый, что создаёт благородные материальные сочетания для кожи и замши.',
+    guideBalanceTitle: 'Правило баланса',
+    guideBalance:
+      '60 % — основной цвет (обычно нейтраль или доминирующий тон кожи).\n30 % — поддерживающий цвет (подкладка, язычок, задник).\n10 % — акцент (строчка, логотип, металлическая фурнитура, подошва).',
+    guideSchemesTitle: 'Схемы и применение',
+    guideComplementary:
+      'Комплементарная — два противоположных цвета. Даёт сильный, энергичный контраст. Хороша для спортивной и fashion-обуви, где нужен яркий акцент на нейтральном фоне.',
+    guideAnalogous:
+      'Аналогичная — соседние цвета на круге. Создаёт мягкий, спокойный переход. Идеальна для классической и повседневной обуви, когда хочется богатства тона без резкости.',
+    guideTriadic:
+      'Триадная — три цвета через 120°. Живая и сбалансированная. Подходит для капсульных коллекций и сезонных цветовых историй.',
+    guideTetradic:
+      'Тетрада (квадрат) — четыре цвета через 90°. Самая яркая схема. Используйте один доминирующий тон, два поддерживающих и один чистый акцент, иначе композиция станет пёстрой.',
+    guideRectangular:
+      'Тетрада (прямоугольник) — две комплементарные пары со сдвигом. Мягче квадрата, даёт больше пространства для нюансов. Отлично работает в премиальной и дизайнерской обуви.',
+    guideSplit:
+      'Контрастная триада — основной цвет + два соседних к его комплементу. Контраст есть, но мягче чистой комплементарной. Универсальный выбор для большинства моделей.',
+    guideMono:
+      'Монохромная — один цвет в разных тонах и насыщенностях. Самая элегантная и «дорогая» схема. Идеальна для минимализма, вечерней обуви и когда кожа сама по себе выразительна.',
+    guideFootwearTitle: 'Специфика обуви',
+    guideFootwear:
+      '• Верх: основной цвет (60–70 %).\n• Подкладка и стелька: поддерживающий или более светлый тон.\n• Подошва и каблук: часто нейтраль или акцент.\n• Фурнитура и строчка: самый чистый и яркий акцент (5–10 %).\n• Чёрный и белый — не «отсутствие цвета», а мощные инструменты контраста и формы.',
+    guideTip:
+      'Совет: нажмите на любой цветовой свотч или чип в техкарте зон внизу экрана, чтобы мгновенно скопировать точный HEX-код для спецификации производства.',
+  },
+  uk: {
+    title: 'Кольори',
+    complementary: 'Комплементарна',
+    analogous: 'Аналогічна',
+    triadic: 'Тріадна',
+    tetradic: 'Тетрада (квадрат)',
+    rectangular: 'Тетрада (прямокут.)',
+    'split-complementary': 'Контрастна тріада',
+    monochromatic: 'Монохромна',
+    main60: '60%',
+    secondary30: '30%',
+    accent10: '10%',
+    main55: '55%',
+    secondary20: '20%',
+    secondary15: '15%',
+    roleClassicUpper: 'Обвід • П’ята • Планка',
+    roleClassicDetailsAll: 'Берці • Мисок • Комір',
+    roleClassicDetails: 'Берці • Мисок • Язичок',
+    roleClassicLining: 'Комір • Підкладка',
+    roleClassicAccent: 'Протектор • Лого N',
+    roleToeMain: 'Мисок • Планка • ENCAP',
+    roleToeSecondary: 'Обвід • Берці',
+    roleToeLining: 'Комір • Підкладка',
+    roleToeAccent: 'П’ята • Лого N • Протектор',
+    roleSplitMain: 'Обвід • П’ята • Лого N',
+    roleSplitSecondary: 'Мисок • Планка • ENCAP',
+    roleSplitLining: 'Комір • Підкладка',
+    roleSplitAccent: 'Бічні берці (Saddle)',
+    roleNeutralAccent: 'Лого N • Задній хлястик',
+    specTitle: 'Техкарта зон (натисніть для копіювання HEX):',
+    zone_vamp: 'Обвід',
+    zone_toeBox: 'Мисок',
+    zone_quarters: 'Берці',
+    zone_eyestays: 'Планка',
+    zone_heel: 'П’ята',
+    zone_collar: 'Комір',
+    zone_tongue: 'Язичок',
+    zone_lining: 'Підкладка',
+    zone_swoosh: 'Лого N',
+    zone_midsole: 'EVA база',
+    zone_encap: 'ENCAP',
+    zone_outsole: 'Протектор',
+    zone_laces: 'Шнурки',
+    quote: '«Колір — це душа взуття.»',
+    white: 'Білила (Tint)',
+    black: 'Тінь (Shade)',
+    chroma: 'Насиченість',
+    pure: 'Пігмент',
+    ittenLabel: 'Коло Іттена (RYB)',
+    hslLabel: 'Цифровий (HSL)',
+    presetClassic: '60/30/10 База',
+    presetToe: 'Акцент миска',
+    presetSplit: 'Спліт-берці',
+    presetNeutral: 'Нейтр. підошва',
+    contrastOptimal: 'Оптимальний контраст',
+    contrastSoft: 'М’який нюанс',
+    contrastHigh: 'Високий контраст',
+    copied: 'Скопійовано',
+    resetBtn: '360° • Скидання',
+    loading3D: 'Завантаження 3D • NB 574...',
+    webglFallback: 'WebGL недоступний • Режим палітри',
+    guideBtn: 'Гід',
+    guideTitle: 'Колір у дизайні',
+    guideClose: 'Закрити',
+    paywallTitle: 'PRO: Палітри Studio',
+    paywallDesc:
+      'Довічний доступ до всіх професійних колірних схем Іттена: тріади, тетради, монохром та повна техкарта 13 деталей крою.',
+    paywallBtn: `ВІДКРИТИ ДОСТУП • ${PRO_COLORS_PRICE_STARS} ⭐️`,
+    loading: 'СТВОРЕННЯ РАХУНКУ...',
+    verifying: 'ПЕРЕВІРКА ТРАНЗАКЦІЇ...',
+    paymentVerifyFailed:
+      'Оплату ще не підтверджено сервером. Зачекайте кілька секунд і спробуйте знову.',
+    paymentPendingMsg:
+      'Платіж обробляється Telegram. Доступ відкриється автоматично після підтвердження.',
+    guideIntro:
+      'Коло Іттена (RYB) — класичний художній інструмент гармонізації кольору. На відміну від екранної моделі RGB/HSL, у колі Іттена комплементарними парами виступають Червоний–Зелений, Синій–Помаранчевий та Жовтий–Фіолетовий, що створює благородні поєднання для шкіри та замші.',
+    guideBalanceTitle: 'Правило балансу',
+    guideBalance:
+      '60 % — основний колір (зазвичай нейтраль або домінуючий тон шкіри).\n30 % — підтримуючий колір (підкладка, язичок, задник).\n10 % — акцент (рядок, логотип, металева фурнітура, підошва).',
+    guideSchemesTitle: 'Схеми і застосування',
+    guideComplementary:
+      'Комплементарна — два протилежні кольори. Дає сильний, енергійний контраст. Добре працює у спортивному та fashion-взутті, де потрібен яскравий акцент на нейтральному тлі.',
+    guideAnalogous:
+      'Аналогічна — сусідні кольори на колі. Створює м’який, спокійний перехід. Ідеальна для класичного та повсякденного взуття, коли хочеться багатства тону без різкості.',
+    guideTriadic:
+      'Тріадна — три кольори через 120°. Жива і збалансована. Підходить для капсульних колекцій і сезонних кольорових історій.',
+    guideTetradic:
+      'Тетрада (квадрат) — чотири кольори через 90°. Найяскравіша схема. Використовуйте один домінуючий тон, два підтримуючих і один чистий акцент, інакше композиція стане строкатою.',
+    guideRectangular:
+      'Тетрада (прямокутник) — дві комплементарні пари зі зсувом. М’якша за квадрат, дає більше простору для нюансів. Відмінно працює в преміальному та дизайнерському взутті.',
+    guideSplit:
+      'Контрастна тріада — основной колір + два сусідні до його комплементу. Контраст є, але м’якший за чисту комплементарну. Універсальний вибір для більшості моделей.',
+    guideMono:
+      'Monochromatisch — один колір у різних тонах і насиченостях. Найелегантніша і «дорога» схема. Ідеальна для мінімалізму, вечірнього взуття і коли шкіра сама по собі виразна.',
+    guideFootwearTitle: 'Специфіка взуття',
+    guideFootwear:
+      '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
+    guideTip:
+      'Порада: натисніть на будь-який колірний свотч або чіп у техкарті зон внизу екрана, щоб миттєво скопіювати точний HEX-код для технологічної карти виробництва.',
+  },
+  de: {
+    title: 'Farben',
+    complementary: 'Komplementär',
+    analogous: 'Analog',
+    triadic: 'Triadisch',
+    tetradic: 'Tetradisch (Quadrat)',
+    rectangular: 'Tetradisch (Rechteck)',
+    'split-complementary': 'Split-Komplementär',
+    monochromatic: 'Monochromatisch',
+    main60: '60%',
+    secondary30: '30%',
+    accent10: '10%',
+    main55: '55%',
+    secondary20: '20%',
+    secondary15: '15%',
+    roleClassicUpper: 'Rahmen • Ferse • Ösenleiste',
+    roleClassicDetailsAll: 'Quartier • Kappe • Kragen',
+    roleClassicDetails: 'Quartier • Kappe • Zunge',
+    roleClassicLining: 'Kragen • Futter',
+    roleClassicAccent: 'Laufsohle • N-Logo',
+    roleToeMain: 'Kappe • Ösenleiste • ENCAP',
+    roleToeSecondary: 'Rahmen • Quartier',
+    roleToeLining: 'Kragen • Futter',
+    roleToeAccent: 'Ferse • N-Logo • Sohle',
+    roleSplitMain: 'Rahmen • Ferse • N-Logo',
+    roleSplitSecondary: 'Kappe • Ösenleiste • ENCAP',
+    roleSplitLining: 'Kragen • Futter',
+    roleSplitAccent: 'Seitliches Quartier',
+    roleNeutralAccent: 'N-Logo • Fersenlasche',
+    specTitle: '13-Zonen-Spezifikation (Tippen zum HEX-Kopieren):',
+    zone_vamp: 'Rahmen',
+    zone_toeBox: 'Kappe',
+    zone_quarters: 'Quartier',
+    zone_eyestays: 'Ösen',
+    zone_heel: 'Ferse',
+    zone_collar: 'Kragen',
+    zone_tongue: 'Zunge',
+    zone_lining: 'Futter',
+    zone_swoosh: 'N-Logo',
+    zone_midsole: 'EVA-Basis',
+    zone_encap: 'ENCAP',
+    zone_outsole: 'Laufsohle',
+    zone_laces: 'Schnürung',
+    quote: '«Farbe ist die Seele des Schuhs.»',
+    white: 'Weißanteil (Tint)',
+    black: 'Schwarzanteil (Shade)',
+    chroma: 'Sättigung',
+    pure: 'Pigment',
+    ittenLabel: 'Itten-Kreis (RYB)',
+    hslLabel: 'Digital (HSL)',
+    presetClassic: '60/30/10 Klassik',
+    presetToe: 'Kappen-Fokus',
+    presetSplit: 'Split-Quartier',
+    presetNeutral: 'Neutrale Sohle',
+    contrastOptimal: 'Optimaler Kontrast',
+    contrastSoft: 'Sanfte Nuance',
+    contrastHigh: 'Starker Kontrast',
+    copied: 'Kopiert',
+    resetBtn: '360° • Reset',
+    loading3D: '3D lädt • NB 574...',
+    webglFallback: 'WebGL nicht verfügbar • Palettenmodus',
+    guideBtn: 'Guide',
+    guideTitle: 'Farbe im Design',
+    guideClose: 'Schließen',
+    paywallTitle: 'PRO: Studio-Paletten',
+    paywallDesc:
+      'Lebenslanger Vollzugriff auf alle professionellen Itten-Farbschemata: Triaden, Tetraden, Monochrom und das komplette 13-Zonen-Datenblatt.',
+    paywallBtn: `FREISCHALTEN FÜR ${PRO_COLORS_PRICE_STARS} ⭐️`,
+    loading: 'RECHNUNG WIRD ERSTELLT...',
+    verifying: 'ZAHLUNG PRÜFEN...',
+    paymentVerifyFailed:
+      'Zahlung noch nicht vom Server bestätigt. Bitte warten Sie kurz und versuchen Sie es erneut.',
+    paymentPendingMsg:
+      'Zahlung wird von Telegram verarbeitet. Der Zugang wird nach Bestätigung freigeschaltet.',
+    guideIntro:
+      'Der Itten-Farbkreis (RYB) ist das klassische Werkzeug zur Farbharmonisierung. Im Gegensatz zum digitalen RGB/HSL-Modell bilden hier Rot–Grün, Blau–Orange und Gelb–Violett echte Komplementärpaare für Leder und Wildleder.',
+    guideBalanceTitle: 'Die Balance-Regel',
+    guideBalance:
+      '60 % — Hauptfarbe (meist neutral oder der dominierende Lederton).\n30 % — Unterstützende Farbe (Futter, Zunge, Fersenkappe).\n10 % — Akzent (Nähte, Logo, Metallbeschläge, Sohle).',
+    guideSchemesTitle: 'Farbschemata & Anwendung',
+    guideComplementary:
+      'Komplementär — zwei gegenüberliegende Farben. Ergibt einen starken, energetischen Kontrast. Gut für Sport- und Fashion-Schuhe, bei denen ein leuchtender Akzent auf neutralem Grund benötigt wird.',
+    guideAnalogous:
+      'Analog — benachbarte Farben auf dem Kreis. Schafft einen weichen, ruhigen Übergang. Ideal für klassische und Freizeitschuhe, wenn man eine reiche Tonalität ohne Härte wünscht.',
+    guideTriadic:
+      'Triadisch — drei Farben im 120°-Abstand. Lebendig und ausgewogen. Geeignet für Capsule-Kollektionen und saisonale Farbgeschichten.',
+    guideTetradic:
+      'Tetradisch (Quadrat) — vier Farben im 90°-Abstand. Das lebhafteste Schema. Verwenden Sie einen dominierenden Ton, zwei unterstützende und einen reinen Akzent, sonst wird die Komposition zu bunt.',
+    guideRectangular:
+      'Tetradisch (Rechteck) — zwei komplementäre Paare mit Verschiebung. Weicher als das Quadrat, bietet mehr Raum für Nuancen. Funktioniert hervorragend bei Premium- und Designerschuhen.',
+    guideSplit:
+      'Split-Komplementär — Hauptfarbe + die zwei Nachbarn ihrer Komplementärfarbe. Kontrast ist vorhanden, aber weicher als rein komplementär. Eine universelle Wahl für die meisten Modelle.',
+    guideMono:
+      'Monochromatisch — eine Farbe in verschiedenen Tönen und Sättigungen. Das eleganteste und „teuerste“ Schema. Ideal für Minimalismus, Abendschuhe und wenn das Leder an sich schon ausdrucksstark ist.',
+    guideFootwearTitle: 'Besonderheiten bei Schuhen',
+    guideFootwear:
+      '• Obermaterial: Hauptfarbe (60–70 %).\n• Futter und Innensohle: unterstützender oder hellerer Ton.\n• Sohle und Absatz: oft neutral oder Akzent.\n• Beschläge und Nähte: der reinste und hellste Akzent (5–10 %).\n• Schwarz und Weiß sind keine „Farblosigkeit“, sondern mächtige Werkzeuge für Kontrast und Form.',
+    guideTip:
+      'Tipp: Tippen Sie unten auf ein beliebiges Farbfeld oder die 13-Zonen-Leiste, um den exakten HEX-Code direkt in die Zwischenablage zu kopieren.',
+  },
+} as const
+
+type TranslationDict = (typeof TRANSLATIONS)['ru']
+
+/**
+ * ИСПРАВЛЕНО (AUDIT-05): Динамическое формирование подписей свотчей в точном соответствии
+ * с текущим пресетом распределения цветов (mappingPreset).
+ */
+export function getPresetSwatchLabels(
+  preset: FootwearMappingPreset,
+  isTetrad: boolean,
+  t: TranslationDict
+): { ratioLabels: string[]; roleLabels: string[] } {
+  const ratioLabels = isTetrad
+    ? [t.main55, t.secondary20, t.secondary15, t.accent10]
+    : [t.main60, t.secondary30, t.accent10]
+
+  switch (preset) {
+    case 'toe-focus':
+      return {
+        ratioLabels,
+        roleLabels: isTetrad
+          ? [t.roleToeMain, t.roleToeSecondary, t.roleToeLining, t.roleToeAccent]
+          : [t.roleToeMain, t.roleToeSecondary, t.roleToeAccent],
+      }
+    case 'split-quarter':
+      return {
+        ratioLabels,
+        roleLabels: isTetrad
+          ? [t.roleSplitMain, t.roleSplitSecondary, t.roleSplitLining, t.roleSplitAccent]
+          : [t.roleSplitMain, t.roleSplitSecondary, t.roleSplitAccent],
+      }
+    case 'neutral-sole':
+      return {
+        ratioLabels,
+        roleLabels: isTetrad
+          ? [t.roleClassicUpper, t.roleClassicDetails, t.roleClassicLining, t.roleNeutralAccent]
+          : [t.roleClassicUpper, t.roleClassicDetailsAll, t.roleNeutralAccent],
+      }
+    case 'classic':
+    default:
+      return {
+        ratioLabels,
+        roleLabels: isTetrad
+          ? [t.roleClassicUpper, t.roleClassicDetails, t.roleClassicLining, t.roleClassicAccent]
+          : [t.roleClassicUpper, t.roleClassicDetailsAll, t.roleClassicAccent],
+      }
+  }
+}
+
+/* ============================================================================
+   6. ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ (КОМПАКТНЫЙ STUDIO РЕДАКТОР)
    ============================================================================ */
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
-  const [localLang, setLocalLang] = useState<SupportedLang>(lang || 'ru')
+  // ИСПРАВЛЕНО (AUDIT-02): Безопасная нормализация входного пропа lang
+  const [localLang, setLocalLang] = useState<SupportedLang>(() => normalizeSupportedLang(lang))
   useEffect(() => {
-    if (lang) setLocalLang(lang)
+    setLocalLang(normalizeSupportedLang(lang))
   }, [lang])
 
   const [scheme, setScheme] = useState<Scheme>('complementary')
@@ -1874,15 +2598,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [copiedHex, setCopiedHex] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
 
-  // ИСПРАВЛЕНО (п. 8.3 и 8.4 аудита): Строгий конечный автомат платёжных состояний
+  // ИСПРАВЛЕНО (AUDIT-01): Строгий платёжный автомат без ложной разблокировки и без вечной блокировки UI
   const [paymentState, setPaymentState] = useState<PaymentState>('idle')
   const [paymentErrorMsg, setPaymentErrorMsg] = useState<string | null>(null)
   const [showProModal, setShowProModal] = useState(false)
   const isProPurchased = paymentState === 'purchased'
+  // Модальное окно блокируется ТОЛЬКО на время активного сетевого запроса создания/проверки
   const isPaymentBusy =
-    paymentState === 'creating_invoice' ||
-    paymentState === 'invoice_open' ||
-    paymentState === 'verifying_payment'
+    paymentState === 'creating_invoice' || paymentState === 'verifying_payment'
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
@@ -1895,7 +2618,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const proModalCloseRef = useRef<HTMLButtonElement>(null)
   const guideCloseRef = useRef<HTMLButtonElement>(null)
   const isDragging = useRef(false)
-  const lastHapticHue = useRef(0)
+  const lastHapticHue = useRef(194)
+
+  // Всегда гарантированный словарь переводов с фоллбэком на русский (AUDIT-02)
+  const t: TranslationDict = TRANSLATIONS[normalizeSupportedLang(localLang)] ?? TRANSLATIONS.ru
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -1906,7 +2632,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return () => observer.disconnect()
   }, [])
 
-  // ИСПРАВЛЕНО (п. 10 аудита): Блокировка прокрутки фона, закрытие по Escape и фокус в модалках
   useEffect(() => {
     if (!showProModal && !showGuide) return
     const prevOverflow = document.body.style.overflow
@@ -1919,7 +2644,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showProModal && !isPaymentBusy) setShowProModal(false)
+        if (showProModal && !isPaymentBusy) {
+          setShowProModal(false)
+          if (paymentState === 'invoice_open') setPaymentState('idle')
+        }
         if (showGuide) setShowGuide(false)
       }
     }
@@ -1929,9 +2657,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       window.clearTimeout(focusTimer)
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [showProModal, showGuide, isPaymentBusy])
+  }, [showProModal, showGuide, isPaymentBusy, paymentState])
 
-  // ИСПРАВЛЕНО (п. 8.1 и 8.2 аудита): Верификация покупки через сервер с передачей подписанного initData
   const verifyPurchaseOnServer = useCallback(async (): Promise<boolean> => {
     const tg = getTelegramWebApp()
     const userId = tg?.initDataUnsafe?.user?.id
@@ -1948,7 +2675,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       )
       if (!res.ok) return false
       const data = (await res.json()) as { purchased?: boolean }
-      if (data.purchased) {
+      if (data.purchased === true) {
         setPaymentState('purchased')
         return true
       }
@@ -1963,8 +2690,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     void verifyPurchaseOnServer()
   }, [verifyPurchaseOnServer])
 
+  // ИСПРАВЛЕНО (AUDIT-01): Проверка булева результата verified перед разблокировкой PRO
+  // и корректный выход из состояния 'pending' без зависания модального окна
   const handleProClick = async () => {
-    if (isPaymentBusy || isProPurchased) return
+    if (isPaymentBusy || paymentState === 'invoice_open' || isProPurchased) return
     const tg = getTelegramWebApp()
     const userId = tg?.initDataUnsafe?.user?.id
     const rawInitData = tg?.initData || ''
@@ -1992,31 +2721,65 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }),
       })
 
-      const data = (await response.json()) as { invoiceLink?: string; error?: string }
+      const data = (await response.json()) as {
+        invoiceLink?: string
+        error?: string
+        alreadyPurchased?: boolean
+      }
+
+      if (response.status === 409 && data.alreadyPurchased) {
+        haptic('heavy')
+        setPaymentState('purchased')
+        setShowProModal(false)
+        return
+      }
+
       if (!response.ok || !data.invoiceLink) {
         throw new Error(data.error || 'Не удалось создать счёт')
       }
 
-      // Состояние invoice_open блокирует повторные нажатия до завершения окна оплаты
       setPaymentState('invoice_open')
 
       tg.openInvoice(data.invoiceLink, async (status: string) => {
         if (status === 'paid') {
           setPaymentState('verifying_payment')
-          // Повторная проверка транзакции на сервере (с короткой паузой на обработку вебхука)
+          let verified = await verifyPurchaseOnServer()
+          if (!verified) {
+            await new Promise((r) => setTimeout(r, 850))
+            verified = await verifyPurchaseOnServer()
+          }
+          if (!verified) {
+            await new Promise((r) => setTimeout(r, 1200))
+            verified = await verifyPurchaseOnServer()
+          }
+
+          if (verified) {
+            haptic('heavy')
+            setPaymentState('purchased')
+            setShowProModal(false)
+          } else {
+            setPaymentState('failed')
+            setPaymentErrorMsg(t.paymentVerifyFailed)
+          }
+        } else if (status === 'pending') {
+          setPaymentState('verifying_payment')
           let verified = await verifyPurchaseOnServer()
           if (!verified) {
             await new Promise((r) => setTimeout(r, 900))
             verified = await verifyPurchaseOnServer()
           }
-          haptic('heavy')
-          setPaymentState('purchased')
-          setShowProModal(false)
+
+          if (verified) {
+            haptic('heavy')
+            setPaymentState('purchased')
+            setShowProModal(false)
+          } else {
+            // Снимаем блокировку isPaymentBusy, чтобы пользователь мог закрыть окно
+            setPaymentState('idle')
+            setPaymentErrorMsg(t.paymentPendingMsg)
+          }
         } else if (status === 'cancelled' || status === 'closed') {
           setPaymentState('idle')
-        } else if (status === 'pending') {
-          setPaymentState('verifying_payment')
-          await verifyPurchaseOnServer()
         } else {
           setPaymentState('failed')
           setPaymentErrorMsg('Оплата не была завершена. Попробуйте снова.')
@@ -2030,15 +2793,16 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }
   }
 
-  // ИСПРАВЛЕНО (п. 9 аудита): Единый ключ хранения языка 'cordwainer_lang' + синхронизация с App.tsx
+  // ИСПРАВЛЕНО (AUDIT-02): Явная проверка поддерживаемых в App.tsx языков через функцию-гард isAppNativeLang
   const handleLangChange = (newLang: SupportedLang) => {
+    const safe = normalizeSupportedLang(newLang)
     try {
-      localStorage.setItem('cordwainer_lang', newLang)
-      localStorage.setItem('app_lang', newLang)
+      localStorage.setItem('cordwainer_lang', safe)
+      localStorage.setItem('app_lang', safe)
     } catch {}
-    setLocalLang(newLang)
-    if (newLang === 'ru' || newLang === 'uk' || (newLang as AppLang)) {
-      setLang(newLang as AppLang)
+    setLocalLang(safe)
+    if (isAppNativeLang(safe)) {
+      setLang(safe)
     }
   }
 
@@ -2073,229 +2837,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }, 1500)
   }, [])
 
-  const t = {
-    ru: {
-      title: 'Цвета',
-      complementary: 'Комплементарная',
-      analogous: 'Аналогичная',
-      triadic: 'Триадная',
-      tetradic: 'Тетрада (квадрат)',
-      rectangular: 'Тетрада (прямоуг.)',
-      'split-complementary': 'Контрастная триада',
-      monochromatic: 'Монохромная',
-      main60: '60%',
-      secondary30: '30%',
-      accent10: '10%',
-      main55: '55%',
-      secondary20: '20%',
-      secondary15: '15%',
-      roleUpper: 'Каркас • Мысок • Пятка',
-      roleDetailsLining: 'Берцы • Носок • Язычок',
-      roleDetails: 'Берцы • Носок',
-      roleLining: 'Подкладка • Воротник',
-      roleAccent: 'Протектор • Лого N',
-      quote: '«Цвет — это душа обуви.»',
-      white: 'Белила (Tint)',
-      black: 'Тень (Shade)',
-      chroma: 'Насыщенность',
-      pure: 'Пигмент',
-      ittenLabel: 'Круг Иттена (RYB)',
-      hslLabel: 'Цифровой (HSL)',
-      presetClassic: '60/30/10 База',
-      presetToe: 'Акцент мыска',
-      presetSplit: 'Сплит-берцы',
-      presetNeutral: 'Нейтр. подошва',
-      contrastOptimal: 'Оптимальный контраст',
-      contrastSoft: 'Мягкий нюанс',
-      contrastHigh: 'Высокий контраст',
-      copied: 'Скопировано',
-      resetBtn: '360° • Сброс',
-      loading3D: 'Загрузка 3D • NB 574...',
-      webglFallback: 'WebGL недоступен • Режим палитры',
-      guideBtn: 'Гид',
-      guideTitle: 'Цвет в дизайне',
-      guideClose: 'Закрыть',
-      paywallTitle: 'PRO: Палитры',
-      paywallDesc:
-        'Откройте доступ ко всем профессиональным цветовым схемам: триады, тетрады и благородный монохром.',
-      paywallBtn: 'ОТКРЫТЬ ДОСТУП • 1 ⭐️',
-      loading: 'ОБРАБОТКА...',
-      verifying: 'ПРОВЕРКА ОПЛАТЫ...',
-      guideIntro:
-        'Круг Иттена (RYB) — классический художественный инструмент гармонизации цвета. В отличие от экранной модели RGB/HSL, в круге Иттена комплементарными парами выступают Красный–Зелёный, Синий–Оранжевый и Жёлтый–Фиолетовый, что создаёт благородные материальные сочетания для кожи и замши.',
-      guideBalanceTitle: 'Правило баланса',
-      guideBalance:
-        '60 % — основной цвет (обычно нейтраль или доминирующий тон кожи).\n30 % — поддерживающий цвет (подкладка, язычок, задник).\n10 % — акцент (строчка, логотип, металлическая фурнитура, подошва).',
-      guideSchemesTitle: 'Схемы и применение',
-      guideComplementary:
-        'Комплементарная — два противоположных цвета. Даёт сильный, энергичный контраст. Хороша для спортивной и fashion-обуви, где нужен яркий акцент на нейтральном фоне.',
-      guideAnalogous:
-        'Аналогичная — соседние цвета на круге. Создаёт мягкий, спокойный переход. Идеальна для классической и повседневной обуви, когда хочется богатства тона без резкости.',
-      guideTriadic:
-        'Триадная — три цвета через 120°. Живая и сбалансированная. Подходит для капсульных колекций и сезонных цветовых историй.',
-      guideTetradic:
-        'Тетрада (квадрат) — четыре цвета через 90°. Самая яркая схема. Используйте один доминирующий тон, два поддерживающих и один чистый акцент, иначе композиция станет пёстрой.',
-      guideRectangular:
-        'Тетрада (прямоугольник) — две комплементарные пары со сдвигом. Мягче квадрата, даёт больше пространства для нюансов. Отлично работает в премиальной и дизайнерской обуви.',
-      guideSplit:
-        'Контрастная триада — основной цвет + два соседних к его комплементу. Контраст есть, но мягче чистой комплементарной. Универсальный выбор для большинства моделей.',
-      guideMono:
-        'Монохромная — один цвет в разных тонах и насыщенностях. Самая элегантная и «дорогая» схема. Идеальна для минимализма, вечерней обуви и когда кожа сама по себе выразительна.',
-      guideFootwearTitle: 'Специфика обуви',
-      guideFootwear:
-        '• Верх: основной цвет (60–70 %).\n• Подкладка и стелька: поддерживающий или более светлый тон.\n• Подошва и каблук: часто нейтраль или акцент.\n• Фурнитура и строчка: самый чистый и яркий акцент (5–10 %).\n• Чёрный и белый — не «отсутствие цвета», а мощные инструменты контраста и формы.',
-      guideTip:
-        'Совет: нажмите на любой цветовой свотч внизу экрана, чтобы мгновенно скопировать точный HEX-код для спецификации производства.',
-    },
-    uk: {
-      title: 'Кольори',
-      complementary: 'Комплементарна',
-      analogous: 'Аналогічна',
-      triadic: 'Тріадна',
-      tetradic: 'Тетрада (квадрат)',
-      rectangular: 'Тетрада (прямокут.)',
-      'split-complementary': 'Контрастна тріада',
-      monochromatic: 'Монохромна',
-      main60: '60%',
-      secondary30: '30%',
-      accent10: '10%',
-      main55: '55%',
-      secondary20: '20%',
-      secondary15: '15%',
-      roleUpper: 'Каркас • Мисок • П’ята',
-      roleDetailsLining: 'Берці • Носок • Язичок',
-      roleDetails: 'Берці • Носок',
-      roleLining: 'Підкладка • Комір',
-      roleAccent: 'Протектор • Лого N',
-      quote: '«Колір — це душа взуття.»',
-      white: 'Білила (Tint)',
-      black: 'Тінь (Shade)',
-      chroma: 'Насиченість',
-      pure: 'Пігмент',
-      ittenLabel: 'Коло Іттена (RYB)',
-      hslLabel: 'Цифровий (HSL)',
-      presetClassic: '60/30/10 База',
-      presetToe: 'Акцент миска',
-      presetSplit: 'Спліт-берці',
-      presetNeutral: 'Нейтр. підошва',
-      contrastOptimal: 'Оптимальний контраст',
-      contrastSoft: 'М’який нюанс',
-      contrastHigh: 'Високий контраст',
-      copied: 'Скопійовано',
-      resetBtn: '360° • Скидання',
-      loading3D: 'Завантаження 3D • NB 574...',
-      webglFallback: 'WebGL недоступний • Режим палітри',
-      guideBtn: 'Гід',
-      guideTitle: 'Колір у дизайні',
-      guideClose: 'Закрити',
-      paywallTitle: 'PRO: Палітри',
-      paywallDesc:
-        'Відкрийте доступ до всіх професійних колірних схем: тріади, тетради та шляхетний монохром.',
-      paywallBtn: 'ВІДКРИТИ ДОСТУП • 1 ⭐️',
-      loading: 'ОБРОБКА...',
-      verifying: 'ПЕРЕВІРКА ОПЛАТИ...',
-      guideIntro:
-        'Коло Іттена (RYB) — класичний художній інструмент гармонізації кольору. На відміну від екранної моделі RGB/HSL, у колі Іттена комплементарними парами виступають Червоний–Зелений, Синій–Помаранчевий та Жовтий–Фіолетовий, що створює благородні поєднання для шкіри та замші.',
-      guideBalanceTitle: 'Правило балансу',
-      guideBalance:
-        '60 % — основний колір (зазвичай нейтраль або домінуючий тон шкіри).\n30 % — підтримуючий колір (підкладка, язичок, задник).\n10 % — акцент (рядок, логотип, металева фурнітура, підошва).',
-      guideSchemesTitle: 'Схеми і застосування',
-      guideComplementary:
-        'Комплементарна — два протилежні кольори. Дає сильний, енергійний контраст. Добре працює у спортивному та fashion-взутті, де потрібен яскравий акцент на нейтральному тлі.',
-      guideAnalogous:
-        'Аналогічна — сусідні кольори на колі. Створює м’який, спокійний перехід. Ідеальна для класичного та повсякденного взуття, коли хочеться багатства тону без різкості.',
-      guideTriadic:
-        'Тріадна — три кольори через 120°. Жива і збалансована. Підходить для капсульних колекцій і сезонних кольорових історій.',
-      guideTetradic:
-        'Тетрада (квадрат) — чотири кольори через 90°. Найяскравіша схема. Використовуйте один домінуючий тон, два підтримуючих і один чистий акцент, інакше композиція стане строкатою.',
-      guideRectangular:
-        'Тетрада (прямокутник) — дві комплементарні пари зі зсувом. М’якша за квадрат, дає більше простору для нюансів. Відмінно працює в преміальному та дизайнерському взутті.',
-      guideSplit:
-        'Контрастна тріада — основний колір + два сусідні до його комплементу. Контраст є, але м’якший за чисту комплементарну. Універсальний вибір для більшості моделей.',
-      guideMono:
-        'Монохромна — один колір у різних тонах і насиченостях. Найелегантніша і «дорога» схема. Ідеальна для мінімалізму, вечірнього взуття і коли шкіра сама по собі виразна.',
-      guideFootwearTitle: 'Специфіка взуття',
-      guideFootwear:
-        '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
-      guideTip:
-        'Порада: натисніть на будь-який колірний свотч внизу екрана, щоб миттєво скопіювати точний HEX-код для технологічної карти виробництва.',
-    },
-    de: {
-      title: 'Farben',
-      complementary: 'Komplementär',
-      analogous: 'Analog',
-      triadic: 'Triadisch',
-      tetradic: 'Tetradisch (Quadrat)',
-      rectangular: 'Tetradisch (Rechteck)',
-      'split-complementary': 'Split-Komplementär',
-      monochromatic: 'Monochromatisch',
-      main60: '60%',
-      secondary30: '30%',
-      accent10: '10%',
-      main55: '55%',
-      secondary20: '20%',
-      secondary15: '15%',
-      roleUpper: 'Rahmen • Kappe • Ferse',
-      roleDetailsLining: 'Quartier • Blatt • Zunge',
-      roleDetails: 'Quartier • Blatt',
-      roleLining: 'Futter • Kragen',
-      roleAccent: 'Laufsohle • N-Logo',
-      quote: '«Farbe ist die Seele des Schuhs.»',
-      white: 'Weißanteil (Tint)',
-      black: 'Schwarzanteil (Shade)',
-      chroma: 'Sättigung',
-      pure: 'Pigment',
-      ittenLabel: 'Itten-Kreis (RYB)',
-      hslLabel: 'Digital (HSL)',
-      presetClassic: '60/30/10 Klassik',
-      presetToe: 'Kappen-Fokus',
-      presetSplit: 'Split-Quartier',
-      presetNeutral: 'Neutrale Sohle',
-      contrastOptimal: 'Optimaler Kontrast',
-      contrastSoft: 'Sanfte Nuance',
-      contrastHigh: 'Starker Kontrast',
-      copied: 'Kopiert',
-      resetBtn: '360° • Reset',
-      loading3D: '3D lädt • NB 574...',
-      webglFallback: 'WebGL nicht verfügbar • Palettenmodus',
-      guideBtn: 'Guide',
-      guideTitle: 'Farbe im Design',
-      guideClose: 'Schließen',
-      paywallTitle: 'PRO: Paletten',
-      paywallDesc:
-        'Schalten Sie alle professionellen Farbschemata frei: Triaden, Tetraden und edles Monochrom.',
-      paywallBtn: 'FREISCHALTEN FÜR 1 ⭐️',
-      loading: 'LÄDT...',
-      verifying: 'ZAHLUNG PRÜFEN...',
-      guideIntro:
-        'Der Itten-Farbkreis (RYB) ist das klassische Werkzeug zur Farbharmonisierung. Im Gegensatz zum digitalen RGB/HSL-Modell bilden hier Rot–Grün, Blau–Orange und Gelb–Violett echte Komplementärpaare für Leder und Wildleder.',
-      guideBalanceTitle: 'Die Balance-Regel',
-      guideBalance:
-        '60 % — Hauptfarbe (meist neutral oder der dominierende Lederton).\n30 % — Unterstützende Farbe (Futter, Zunge, Fersenkappe).\n10 % — Akzent (Nähte, Logo, Metallbeschläge, Sohle).',
-      guideSchemesTitle: 'Farbschemata & Anwendung',
-      guideComplementary:
-        'Komplementär — zwei gegenüberliegende Farben. Ergibt einen starken, energetischen Kontrast. Gut für Sport- und Fashion-Schuhe, bei denen ein leuchtender Akzent auf neutralem Grund benötigt wird.',
-      guideAnalogous:
-        'Analog — benachbarte Farben auf dem Kreis. Schafft einen weichen, ruhigen Übergang. Ideal für klassische und Freizeitschuhe, wenn man eine reiche Tonalität ohne Härte wünscht.',
-      guideTriadic:
-        'Triadisch — drei Farben im 120°-Abstand. Lebendig und ausgewogen. Geeignet für Capsule-Kollektionen und saisonale Farbgeschichten.',
-      guideTetradic:
-        'Tetradisch (Quadrat) — vier Farben im 90°-Abstand. Das lebhafteste Schema. Verwenden Sie einen dominierenden Ton, zwei unterstützende und einen reinen Akzent, sonst wird die Komposition zu bunt.',
-      guideRectangular:
-        'Tetradisch (Rechteck) — zwei komplementäre Paare mit Verschiebung. Weicher als das Quadrat, bietet mehr Raum für Nuancen. Funktioniert hervorragend bei Premium- und Designerschuhen.',
-      guideSplit:
-        'Split-Komplementär — Hauptfarbe + die zwei Nachbarn ihrer Komplementärfarbe. Kontrast ist vorhanden, aber weicher als rein komplementär. Eine universelle Wahl für die meisten Modelle.',
-      guideMono:
-        'Monochromatisch — eine Farbe in verschiedenen Tönen und Sättigungen. Das eleganteste und „teuerste“ Schema. Ideal für Minimalismus, Abendschuhe und wenn das Leder an sich schon ausdrucksstark ist.',
-      guideFootwearTitle: 'Besonderheiten bei Schuhen',
-      guideFootwear:
-        '• Obermaterial: Hauptfarbe (60–70 %).\n• Futter und Innensohle: unterstützender oder hellerer Ton.\n• Sohle und Absatz: oft neutral oder Akzent.\n• Beschläge und Nähte: der reinste und hellste Akzent (5–10 %).\n• Schwarz und Weiß sind keine „Farblosigkeit“, sondern mächtige Werkzeuge für Kontrast und Form.',
-      guideTip:
-        'Tipp: Tippen Sie unten auf ein beliebiges Farbfeld, um den exakten HEX-Code direkt in die Zwischenablage zu kopieren.',
-    },
-  }[localLang]
-
-  // Мемоизация цветовой палитры, углов и распределения по кроссовку (п. 3.3 аудита)
   const schemeHues = useMemo(() => getSchemeWheelAngles(baseHue, scheme), [baseHue, scheme])
 
   const colors = useMemo(
@@ -2326,19 +2867,27 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     [colors, baseHue, whiteAmount, blackAmount, chromaAmount, modelMode, mappingPreset, isDark]
   )
 
-  // Оценка контраста палитры для обувного дизайна (п. 4.3 аудита)
+  // ИСПРАВЛЕНО (AUDIT-08): Оценка контраста учитывает все цвета палитры (включая colors[2] в тетрадах),
+  // хроматический контраст OKLab и реально граничащие на кроссовке детали в активном mappingPreset
   const harmonyEvaluation = useMemo(() => {
-    const primary = colors[0] ?? '#888888'
-    const secondary = colors[1] ?? primary
-    const accent = colors[colors.length - 1] ?? primary
-    const ratioMainSec = getContrastRatio(primary, secondary)
-    const ratioMainAcc = getContrastRatio(primary, accent)
-    const maxContrast = Math.max(ratioMainSec, ratioMainAcc)
+    const pairScores: number[] = []
+    for (let i = 0; i < colors.length; i++) {
+      for (let j = i + 1; j < colors.length; j++) {
+        pairScores.push(getPerceptualPairContrast(colors[i], colors[j]))
+      }
+    }
+    // Контраст фактически соприкасающихся конструктивных узлов обуви
+    pairScores.push(getPerceptualPairContrast(sneakerColors.vamp, sneakerColors.toeBox))
+    pairScores.push(getPerceptualPairContrast(sneakerColors.quarters, sneakerColors.swoosh))
+    pairScores.push(getPerceptualPairContrast(sneakerColors.vamp, sneakerColors.quarters))
+    pairScores.push(getPerceptualPairContrast(sneakerColors.heel, sneakerColors.collar))
+
+    const maxContrast = Math.max(...pairScores, 1.0)
 
     const statusLabel =
-      maxContrast < 1.35
+      maxContrast < 1.55
         ? t.contrastSoft
-        : maxContrast > 4.5
+        : maxContrast > 4.6
           ? t.contrastHigh
           : t.contrastOptimal
 
@@ -2346,11 +2895,35 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       ratioText: `${maxContrast.toFixed(1)}:1`,
       statusLabel,
     }
-  }, [colors, t.contrastSoft, t.contrastHigh, t.contrastOptimal])
+  }, [colors, sneakerColors, t.contrastSoft, t.contrastHigh, t.contrastOptimal])
 
   const isTetrad = scheme === 'tetradic' || scheme === 'rectangular'
 
-  // Конический градиент круга (перестраивается под классический круг Иттена RYB или цифровой HSL)
+  const { ratioLabels, roleLabels } = useMemo(
+    () => getPresetSwatchLabels(mappingPreset, isTetrad, t),
+    [mappingPreset, isTetrad, t]
+  )
+
+  // Полный список 13 конструктивных зон для техкарты (AUDIT-05)
+  const allZonesSpec = useMemo(
+    (): { key: SneakerZoneKey; label: string; hex: string }[] => [
+      { key: 'vamp', label: t.zone_vamp, hex: sneakerColors.vamp },
+      { key: 'toeBox', label: t.zone_toeBox, hex: sneakerColors.toeBox },
+      { key: 'quarters', label: t.zone_quarters, hex: sneakerColors.quarters },
+      { key: 'eyestays', label: t.zone_eyestays, hex: sneakerColors.eyestays },
+      { key: 'heel', label: t.zone_heel, hex: sneakerColors.heel },
+      { key: 'collar', label: t.zone_collar, hex: sneakerColors.collar },
+      { key: 'tongue', label: t.zone_tongue, hex: sneakerColors.tongue },
+      { key: 'lining', label: t.zone_lining, hex: sneakerColors.lining },
+      { key: 'swoosh', label: t.zone_swoosh, hex: sneakerColors.swoosh },
+      { key: 'midsole', label: t.zone_midsole, hex: sneakerColors.midsole },
+      { key: 'encap', label: t.zone_encap, hex: sneakerColors.encap },
+      { key: 'outsole', label: t.zone_outsole, hex: sneakerColors.outsole },
+      { key: 'laces', label: t.zone_laces, hex: sneakerColors.laces },
+    ],
+    [sneakerColors, t]
+  )
+
   const wheelBackground = useMemo(() => {
     const stops: string[] = []
     for (let deg = 0; deg <= 360; deg += 30) {
@@ -2360,6 +2933,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return `conic-gradient(from 0deg, ${stops.join(', ')})`
   }, [modelMode])
 
+  // ИСПРАВЛЕНО (AUDIT-10): Единый обработчик Pointer Events с кратчайшей угловой дистанцией по модулю 360°
   const updateFromClientXY = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
     if (!el) return
@@ -2371,48 +2945,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     const dy = clientY - cy
 
     let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = Math.round((angle + 90 + 360) % 360)
+    angle = Math.round((angle + 90 + 360) % 360) % 360
 
-    if (Math.abs(angle - lastHapticHue.current) >= 15) {
+    if (getCircularAngleDiff(angle, lastHapticHue.current) >= 15) {
       haptic('light')
       lastHapticHue.current = angle
     }
 
     setBaseHue(angle)
   }, [])
-
-  useEffect(() => {
-    const onWindowPointerMove = (e: PointerEvent) => {
-      if (!isDragging.current) return
-      updateFromClientXY(e.clientX, e.clientY)
-    }
-
-    const onWindowTouchMove = (e: TouchEvent) => {
-      if (!isDragging.current || !e.touches[0]) return
-      if (e.cancelable) e.preventDefault()
-      updateFromClientXY(e.touches[0].clientX, e.touches[0].clientY)
-    }
-
-    const onWindowEnd = () => {
-      isDragging.current = false
-    }
-
-    window.addEventListener('pointermove', onWindowPointerMove)
-    window.addEventListener('pointerup', onWindowEnd)
-    window.addEventListener('pointercancel', onWindowEnd)
-    window.addEventListener('touchmove', onWindowTouchMove, { passive: false })
-    window.addEventListener('touchend', onWindowEnd)
-    window.addEventListener('touchcancel', onWindowEnd)
-
-    return () => {
-      window.removeEventListener('pointermove', onWindowPointerMove)
-      window.removeEventListener('pointerup', onWindowEnd)
-      window.removeEventListener('pointercancel', onWindowEnd)
-      window.removeEventListener('touchmove', onWindowTouchMove)
-      window.removeEventListener('touchend', onWindowEnd)
-      window.removeEventListener('touchcancel', onWindowEnd)
-    }
-  }, [updateFromClientXY])
 
   const handleWheelPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDragging.current = true
@@ -2434,14 +2975,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     } catch {}
   }
 
-  const handleWheelTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    isDragging.current = true
-    if (e.touches[0]) {
-      updateFromClientXY(e.touches[0].clientX, e.touches[0].clientY)
-    }
-  }
-
-  // ИСПРАВЛЕНО (п. 10 аудита): Полноценное клавиатурное управление цветовым кругом
   const handleWheelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const step = e.shiftKey ? 15 : 5
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
@@ -2460,14 +2993,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       setBaseHue(180)
     }
   }
-
-  const ratioLabels = isTetrad
-    ? [t.main55, t.secondary20, t.secondary15, t.accent10]
-    : [t.main60, t.secondary30, t.accent10]
-
-  const roleLabels = isTetrad
-    ? [t.roleUpper, t.roleDetails, t.roleLining, t.roleAccent]
-    : [t.roleUpper, t.roleDetailsLining, t.roleAccent]
 
   const SCHEMES: Scheme[] = [
     'complementary',
@@ -2639,7 +3164,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           <span
             className={`text-[7.5px] font-sans uppercase tracking-[0.14em] whitespace-nowrap ${cTextMuted}`}
           >
-            ΔL {harmonyEvaluation.ratioText} • {harmonyEvaluation.statusLabel}
+            ΔE {harmonyEvaluation.ratioText} • {harmonyEvaluation.statusLabel}
           </span>
         </div>
 
@@ -2668,7 +3193,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               aria-valuemin={0}
               aria-valuemax={359}
               aria-valuenow={baseHue}
-              className="relative w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none focus:outline-none focus:ring-1 focus:ring-current/40"
+              className="relative w-[98px] h-[98px] sm:w-[118px] sm:h-[118px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none focus:outline-none focus:ring-1 focus:ring-current/40"
               style={{
                 background: wheelBackground,
                 touchAction: 'none',
@@ -2680,7 +3205,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               onPointerMove={handleWheelPointerMove}
               onPointerUp={handleWheelPointerUp}
               onPointerCancel={handleWheelPointerUp}
-              onTouchStart={handleWheelTouchStart}
               onKeyDown={handleWheelKeyDown}
             >
               <div
@@ -2801,7 +3325,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ КРОССОВКА С КОПИРОВАНИЕМ HEX (п. 10 аудита) */}
+        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ КРОССОВКА (СИНХРОНИЗИРОВАНЫ С MAPPING PRESET) */}
         <div className={`grid gap-2.5 pt-1.5 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
           {colors.map((c, i) => {
             const isCopied = copiedHex === c
@@ -2814,7 +3338,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 title={`Скопировать ${c}`}
               >
                 <div
-                  className={`relative w-full h-9 sm:h-11 mb-1 rounded-[2px] shadow-sm border transition-transform duration-150 group-active:scale-[0.98] flex items-end justify-between px-1.5 pb-1 ${
+                  className={`relative w-full h-8 sm:h-10 mb-1 rounded-[2px] shadow-sm border transition-transform duration-150 group-active:scale-[0.98] flex items-end justify-between px-1.5 pb-1 ${
                     isDark ? 'border-white/15' : 'border-black/10'
                   }`}
                   style={{ backgroundColor: c }}
@@ -2840,8 +3364,46 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           })}
         </div>
 
+        {/* 4.5. ПОЛНАЯ ПРОИЗВОДСТВЕННАЯ ТЕХКАРТА ВСЕХ 13 ЗОН МОДЕЛИ (AUDIT-05) */}
+        <div className={`mt-2 pt-1.5 border-t ${cLine}`}>
+          <div className="flex overflow-x-auto gap-1.5 pb-0.5 scrollbar-hide">
+            {allZonesSpec.map((item) => {
+              const isZoneCopied = copiedHex === `${item.key}:${item.hex}`
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => {
+                    haptic('light')
+                    setCopiedHex(`${item.key}:${item.hex}`)
+                    try {
+                      void navigator.clipboard?.writeText(item.hex)
+                    } catch {}
+                    window.setTimeout(() => {
+                      setCopiedHex((prev) => (prev === `${item.key}:${item.hex}` ? null : prev))
+                    }, 1400)
+                  }}
+                  className={`flex items-center gap-1.5 px-1.5 py-0.5 border ${cLine} rounded-[2px] bg-transparent cursor-pointer shrink-0 transition-opacity hover:opacity-100 opacity-85`}
+                  title={`${item.label}: ${item.hex}`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-[1px] border border-current/20 shrink-0"
+                    style={{ backgroundColor: item.hex }}
+                  />
+                  <span className={`text-[7px] font-sans uppercase tracking-[0.1em] ${cText}`}>
+                    {item.label}
+                  </span>
+                  <span className={`text-[7px] font-mono ${cTextMuted}`}>
+                    {isZoneCopied ? t.copied : item.hex}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* 5. РЕДАКЦИОННАЯ ПОДПИСЬ */}
-        <div className={`mt-2.5 pt-1.5 border-t ${cLine} flex items-center justify-between`}>
+        <div className={`mt-2 pt-1.5 border-t ${cLine} flex items-center justify-between`}>
           <p className={`font-serif text-[12px] italic ${cTextMuted}`}>{t.quote}</p>
           <span className={`text-[8px] font-sans font-bold uppercase tracking-[0.32em] ${cText}`}>
             Cordwainer
@@ -2875,9 +3437,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 ref={proModalCloseRef}
                 type="button"
                 disabled={isPaymentBusy}
-                onClick={() => setShowProModal(false)}
+                onClick={() => {
+                  setShowProModal(false)
+                  if (paymentState === 'invoice_open') setPaymentState('idle')
+                }}
                 aria-label={t.guideClose}
-                className={`absolute top-4 right-4 ${cTextMuted} hover:text-current bg-transparent border-0 cursor-pointer`}
+                className={`absolute top-4 right-4 ${cTextMuted} hover:text-current bg-transparent border-0 cursor-pointer disabled:opacity-40`}
               >
                 <svg
                   width="18"
@@ -2909,7 +3474,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </p>
 
               {paymentErrorMsg && (
-                <p className="text-[10px] font-sans text-red-400 text-center mb-4">
+                <p className="text-[10px] font-sans text-amber-400 text-center mb-4">
                   {paymentErrorMsg}
                 </p>
               )}
@@ -2917,10 +3482,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               <button
                 type="button"
                 onClick={handleProClick}
-                disabled={isPaymentBusy}
+                disabled={isPaymentBusy || paymentState === 'invoice_open'}
                 className={`group flex items-center justify-center gap-3 w-full py-4 border ${cLine} ${cText} hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer disabled:opacity-50`}
               >
-                {isPaymentBusy ? (
+                {isPaymentBusy || paymentState === 'invoice_open' ? (
                   <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
                     {paymentState === 'verifying_payment' ? t.verifying : t.loading}
                   </span>
