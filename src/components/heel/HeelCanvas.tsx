@@ -302,7 +302,7 @@ export function HeelCanvas({
                 />
                 <text
                   x={g.xHeelCenter + 18}
-                  y={g.yGround - 5}
+                  y={g.yGround + 11}
                   fill="#10B981"
                   fontSize="6.5"
                   fontFamily="monospace"
