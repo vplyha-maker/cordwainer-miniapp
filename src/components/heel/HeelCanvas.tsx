@@ -1,4 +1,3 @@
-```react
 // src/components/heel/HeelCanvas.tsx
 import React, { useState, Suspense } from 'react'
 import type { HeelEngineering, HeelAudit, SoleType, Gender } from '../../lib/heelCalc'
