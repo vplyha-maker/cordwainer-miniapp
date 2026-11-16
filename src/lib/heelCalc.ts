@@ -427,13 +427,13 @@ export function getBuildUpAction(deltaMm: number): BuildUpAction {
 export function formatBallModification(ballBuildUpMm: number, short = false): string {
   if (ballBuildUpMm > 0) {
     return short
-      ? `Налепка пучков +${ballBuildUpMm} мм`
-      : `Наращивание (налепка) в пучках +${ballBuildUpMm} мм`
+      ? ('Налепка пучков +' + String(ballBuildUpMm) + ' мм')
+      : ('Наращивание (налепка) в пучках +' + String(ballBuildUpMm) + ' мм')
   }
   if (ballBuildUpMm < 0) {
     return short
-      ? `Снятие в пучках ${ballBuildUpMm} мм`
-      : `Снятие материала (уменьшение) в пучках ${ballBuildUpMm} мм`
+      ? ('Снятие в пучках ' + String(ballBuildUpMm) + ' мм')
+      : ('Снятие материала (уменьшение) в пучках ' + String(ballBuildUpMm) + ' мм')
   }
   return short ? 'База пучков 0 мм' : 'Базовая геометрия пучков (0 мм)'
 }
@@ -441,13 +441,13 @@ export function formatBallModification(ballBuildUpMm: number, short = false): st
 export function formatInstepModification(instepBuildUpMm: number, short = false): string {
   if (instepBuildUpMm > 0) {
     return short
-      ? `Налепка на гребень +${instepBuildUpMm} мм`
-      : `Наращивание (налепка) на гребень взъёма +${instepBuildUpMm} мм`
+      ? ('Налепка на гребень +' + String(instepBuildUpMm) + ' мм')
+      : ('Наращивание (налепка) на гребень взъёма +' + String(instepBuildUpMm) + ' мм')
   }
   if (instepBuildUpMm < 0) {
     return short
-      ? `Снятие / вкладыш ${instepBuildUpMm} мм`
-      : `Снятие материала с гребня (уменьшение / вкладыш) ${instepBuildUpMm} мм`
+      ? ('Снятие / вкладыш ' + String(instepBuildUpMm) + ' мм')
+      : ('Снятие материала с гребня (уменьшение / вкладыш) ' + String(instepBuildUpMm) + ' мм')
   }
   return short ? 'Взъём в норме 0 мм' : 'Базовая геометрия прямого взъёма (0 мм)'
 }
@@ -483,12 +483,12 @@ export function describeSoleConstruction(params: {
 
   if (soleType === 'thomas') {
     const sideLabel = thomasHeelType === 'lateral' ? 'с наружной (латеральной) стороны' : 'с внутренней (медиальной) стороны'
-    return `Ортопедический каблук Томаса с удлинением груди +${thomasExtensionMm} мм ${sideLabel} и стальным геленком 65Г (${shankLengthMm}×${steelThicknessMm} мм)`
+    return ('Ортопедический каблук Томаса с удлинением груди +' + String(thomasExtensionMm) + ' мм ' + String(sideLabel) + ' и стальным геленком 65Г (' + String(shankLengthMm) + '×' + String(steelThicknessMm) + ' мм)')
   }
   if (soleType === 'rocker') {
-    return `Рокерная перекатная подошва (угол переката ${rockerAngleDeg}°, старт на ${rockerStartPct}% длины) с интегрированной карбоновой пластиной толщиной ${carbonInsertThicknessMm} мм`
+    return ('Рокерная перекатная подошва (угол переката ' + String(rockerAngleDeg) + '°, старт на ' + String(rockerStartPct) + '% длины) с интегрированной карбоновой пластиной толщиной ' + String(carbonInsertThicknessMm) + ' мм')
   }
-  return `Стандартный каблук (чистый перепад высот ${netRiseMm} мм) со стальным геленком 65Г (${shankLengthMm}×${steelThicknessMm} мм)`
+  return ('Стандартный каблук (чистый перепад высот ' + String(netRiseMm) + ' мм) со стальным геленком 65Г (' + String(shankLengthMm) + '×' + String(steelThicknessMm) + ' мм)')
 }
 
 export function getStandardGirths(gender: Gender, shoeSize: number) {
@@ -620,7 +620,7 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     11: 'W (11) Экстра-орто',
   }
   const clampedW = Math.max(3, Math.min(11, widthIndex))
-  const widthCode = widthMap[clampedW] || `F (${clampedW})`
+  const widthCode = widthMap[clampedW] || ('F (' + String(clampedW) + ')')
   const requiresZipOrLaceWarning =
     obliqueEntryDeltaMm >= 12 || instepBuildUpMm >= 10 || archType === 'cavus'
 
@@ -693,9 +693,9 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
     const shorterAccusative = resolvedAsymmetrySide === 'left' ? 'правую' : 'левую'
     const shorterGenitive = resolvedAsymmetrySide === 'left' ? 'правой' : 'левой'
     if (compensatoryInsoleHalfPairMm > 0) {
-      asymmetrySummary = `${longerName} стопа длиннее на ${effectiveAsymMm} мм (Лев: ${leftFootLengthMm} мм, Прав: ${rightFootLengthMm} мм). Подбор базовой колодки по длинной стопе; в ${shorterAccusative} полупару установить компенсационную полустельку/вкладыш +${compensatoryInsoleHalfPairMm} мм и выполнить затяжку носка ${shorterGenitive} полупары.`
+      asymmetrySummary = (String(longerName) + ' стопа длиннее на ' + String(effectiveAsymMm) + ' мм (Лев: ' + String(leftFootLengthMm) + ' мм, Прав: ' + String(rightFootLengthMm) + ' мм). Подбор базовой колодки по длинной стопе; в ' + String(shorterAccusative) + ' полупару установить компенсационную полустельку/вкладыш +' + String(compensatoryInsoleHalfPairMm) + ' мм и выполнить затяжку носка ' + String(shorterGenitive) + ' полупары.')
     } else {
-      asymmetrySummary = `${longerName} стопа длиннее на ${effectiveAsymMm} мм (Лев: ${leftFootLengthMm} мм, Прав: ${rightFootLengthMm} мм). Асимметрия ≤ 3 мм в пределах физиологического допуска — полустелька не требуется.`
+      asymmetrySummary = (String(longerName) + ' стопа длиннее на ' + String(effectiveAsymMm) + ' мм (Лев: ' + String(leftFootLengthMm) + ' мм, Прав: ' + String(rightFootLengthMm) + ' мм). Асимметрия ≤ 3 мм в пределах физиологического допуска — полустелька не требуется.')
     }
   }
 
@@ -1085,45 +1085,45 @@ export function computeEngineering(input: HeelInput): HeelEngineering {
   const calculations: MathFormulaStep[] = [
     {
       title: '1. Конструктивная длина следа колодки (L_last)',
-      given: `Размер = ${shoeSize}, Опорная стопа L_ст = ${footLengthMm} мм (Лев: ${leftFootLengthMm} / Прав: ${rightFootLengthMm} мм), Суммарный припуск = ${toeFreeSpaceMm + fashionAllowanceMm} мм`,
+      given: ('Размер = ' + String(shoeSize) + ', Опорная стопа L_ст = ' + String(footLengthMm) + ' мм (Лев: ' + String(leftFootLengthMm) + ' / Прав: ' + String(rightFootLengthMm) + ' мм), Суммарный припуск = ' + String(toeFreeSpaceMm + fashionAllowanceMm) + ' мм'),
       formula: 'L_last = L_ст + Δ_свободн + Δ_фасон',
-      substitution: `${footLengthMm} + ${toeFreeSpaceMm} + ${fashionAllowanceMm}`,
-      result: `${lastLengthMm} мм (свободный припуск мыска +${toeFreeSpaceMm} мм)`,
+      substitution: (String(footLengthMm) + ' + ' + String(toeFreeSpaceMm) + ' + ' + String(fashionAllowanceMm)),
+      result: (String(lastLengthMm) + ' мм (свободный припуск мыска +' + String(toeFreeSpaceMm) + ' мм)'),
       meaning:
         compensatoryInsoleHalfPairMm > 0
-          ? `${asymmetrySummary}`
-          : `Зелёная зона свободного пространства перед пальцами +${toeFreeSpaceMm} мм (${toeShape === 'greek' ? 'Греческая стопа, удлинённый II луч' : toeShape === 'roman' ? 'Римская стопа' : 'Египетская стопа'}).`,
+          ? String(asymmetrySummary)
+          : ('Зелёная зона свободного пространства перед пальцами +' + String(toeFreeSpaceMm) + ' мм (' + String(toeShape === 'greek' ? 'Греческая стопа, удлинённый II луч' : toeShape === 'roman' ? 'Римская стопа' : 'Египетская стопа') + ').'),
     },
     {
       title: '2. Модификация пучков и карман под I луч (Жёлтая зона доработки)',
-      given: `Обхват клиента O_п = ${ballGirthMm} мм, Эталон = ${std.ballGirthMm} мм, HV = ${hvDeg}°`,
+      given: ('Обхват клиента O_п = ' + String(ballGirthMm) + ' мм, Эталон = ' + String(std.ballGirthMm) + ' мм, HV = ' + String(hvDeg) + '°'),
       formula: 'ΔO_п = O_п − O_п(эт); W_M1 = W_пуч + Δ_HV',
-      substitution: `${ballGirthMm} − ${std.ballGirthMm} = ${ballBuildUpMm} мм; Карман HV = +${medialBunionPocketMm} мм`,
-      result: `${ballModSummary} (Ширина ${forefootWidthMm} мм vs база ${standardForefootWidthMm} мм; с HV: ${effectiveForefootWidthWithBunionMm} мм)`,
+      substitution: (String(ballGirthMm) + ' − ' + String(std.ballGirthMm) + ' = ' + String(ballBuildUpMm) + ' мм; Карман HV = +' + String(medialBunionPocketMm) + ' мм'),
+      result: (String(ballModSummary) + ' (Ширина ' + String(forefootWidthMm) + ' мм vs база ' + String(standardForefootWidthMm) + ' мм; с HV: ' + String(effectiveForefootWidthWithBunionMm) + ' мм)'),
       meaning:
         ballBuildUpMm > 0 || medialBunionPocketMm > 0
-          ? `Жёлтая зона модификации: ${ballBuildUpMm > 0 ? `нарастить пучки на +${ballBuildUpMm} мм` : ballBuildUpMm < 0 ? `снять материал в пучках ${ballBuildUpMm} мм` : 'базовая ширина пучков'}${medialBunionPocketMm > 0 ? `, сформировать локальный карман M1 +${medialBunionPocketMm} мм` : ''}.`
+          ? ('Жёлтая зона модификации: ' + String(ballBuildUpMm > 0 ? ('нарастить пучки на +' + String(ballBuildUpMm) + ' мм') : ballBuildUpMm < 0 ? ('снять материал в пучках ' + String(ballBuildUpMm) + ' мм') : 'базовая ширина пучков') + String(medialBunionPocketMm > 0 ? (', сформировать локальный карман M1 +' + String(medialBunionPocketMm) + ' мм') : '') + '.')
           : ballBuildUpMm < 0
-            ? `Узкая стопа: требуется снятие материала (уменьшение объёма колодки в пучках на ${ballBuildUpMm} мм).`
+            ? ('Узкая стопа: требуется снятие материала (уменьшение объёма колодки в пучках на ' + String(ballBuildUpMm) + ' мм).')
             : 'Стандартная ширина пучков колодки (без налепки и снятия).',
     },
     {
       title: '3. Положение апекса и косой линии сгиба (Синие ориентиры)',
-      given: `M1 = ${apexM1_Mm} мм, M5 = ${apexM5_Mm} мм, Ширина пучков = ${forefootWidthMm} мм`,
+      given: ('M1 = ' + String(apexM1_Mm) + ' мм, M5 = ' + String(apexM5_Mm) + ' мм, Ширина пучков = ' + String(forefootWidthMm) + ' мм'),
       formula: 'φ_изгиба = arctan((X_M1 − X_M5) / (0.82 × W_пуч))',
-      substitution: `arctan((${apexM1_Mm} − ${apexM5_Mm}) / ${(forefootWidthMm * C.EFFECTIVE_METATARSAL_SPAN_RATIO).toFixed(1)})`,
-      result: `Угол сгиба φ = ${metatarsalObliqueAngleDeg}°; Смещение апекса мыска = +${toeBoxShiftMedialMm} мм`,
-      meaning: `${lastApexLabel}.`,
+      substitution: ('arctan((' + String(apexM1_Mm) + ' − ' + String(apexM5_Mm) + ') / ' + String((forefootWidthMm * C.EFFECTIVE_METATARSAL_SPAN_RATIO).toFixed(1)) + ')'),
+      result: ('Угол сгиба φ = ' + String(metatarsalObliqueAngleDeg) + '°; Смещение апекса мыска = +' + String(toeBoxShiftMedialMm) + ' мм'),
+      meaning: (String(lastApexLabel) + '.'),
     },
     {
       title: '4. Модельная оценка пикового давления (Красная зона) и момент геленка',
-      given: `Вес = ${clampedWeight} кг, Нагрузка пучков = ${forefootLoad}%, Уклон = ${internalSlope.toFixed(1)}°`,
+      given: ('Вес = ' + String(clampedWeight) + ' кг, Нагрузка пучков = ' + String(forefootLoad) + '%, Уклон = ' + String(internalSlope.toFixed(1)) + '°'),
       formula: 'P_est = (F_пуч / S_оп) × k_конц; M_гел = F_дин × L_рычага × k_укл',
-      substitution: `P_est ≈ ${peakForefootPressureKpa} кПа (модельная оценка); M_гел ≈ ${shankBendingMomentNm} Н·м`,
-      result: `Модельная оценка давления: ${peakForefootPressureKpa} кПа · Оценочный момент: ${shankBendingMomentNm} Н·м (${soleType === 'rocker' ? `Карбон ${carbonInsertThicknessMm} мм` : `Сталь 65Г ${steelThickness} мм`})`,
+      substitution: ('P_est ≈ ' + String(peakForefootPressureKpa) + ' кПа (модельная оценка); M_гел ≈ ' + String(shankBendingMomentNm) + ' Н·м'),
+      result: ('Модельная оценка давления: ' + String(peakForefootPressureKpa) + ' кПа · Оценочный момент: ' + String(shankBendingMomentNm) + ' Н·м (' + String(soleType === 'rocker' ? ('Карбон ' + String(carbonInsertThicknessMm) + ' мм') : ('Сталь 65Г ' + String(steelThickness) + ' мм')) + ')'),
       meaning: requiresMetatarsalPad
-        ? `Назначен пелот Зейца высотой ${metatarsalPadHeightMm} мм на расстоянии ${metatarsalPadPosMm} мм от пятки. Конструкция опоры: ${soleConstructionSummary}.`
-        : `Перегрузки поперечного свода по модели нет — пелот Зейца не требуется. Конструкция опоры: ${soleConstructionSummary}.`,
+        ? ('Назначен пелот Зейца высотой ' + String(metatarsalPadHeightMm) + ' мм на расстоянии ' + String(metatarsalPadPosMm) + ' мм от пятки. Конструкция опоры: ' + String(soleConstructionSummary) + '.')
+        : ('Перегрузки поперечного свода по модели нет — пелот Зейца не требуется. Конструкция опоры: ' + String(soleConstructionSummary) + '.'),
     },
   ]
 
@@ -1271,47 +1271,47 @@ export function collectAuditViolations(
 
   if (eng.heelOffsetTooFarBack) {
     errors.push(
-      `Смещение каблука назад (< ${C.MIN_SAFE_HEEL_OFFSET_MM} мм): риск излома геленка 65Г`
+      ('Смещение каблука назад (< ' + String(C.MIN_SAFE_HEEL_OFFSET_MM) + ' мм): риск излома геленка 65Г')
     )
   }
   if (eng.heelOffsetTooFarForward) {
     errors.push(
-      `Смещение пятки вперёд (> +${C.MAX_SAFE_HEEL_OFFSET_MM} мм): нарушение соосности пяточного упора`
+      ('Смещение пятки вперёд (> +' + String(C.MAX_SAFE_HEEL_OFFSET_MM) + ' мм): нарушение соосности пяточного упора')
     )
   }
   if (eng.thomasTooHigh) {
     errors.push(
-      `Высота каблука Томаса (${heelHeight} мм) превышает лимит ${C.MAX_THOMAS_HEEL_MM} мм`
+      ('Высота каблука Томаса (' + String(heelHeight) + ' мм) превышает лимит ' + String(C.MAX_THOMAS_HEEL_MM) + ' мм')
     )
   }
   if (eng.rockerTooHigh) {
     errors.push(
-      `Параметры рокера превышают лимит (высота пятки > ${C.MAX_ROCKER_HEEL_MM} мм или перепад > ${C.MAX_ROCKER_NET_RISE_MM} мм)`
+      ('Параметры рокера превышают лимит (высота пятки > ' + String(C.MAX_ROCKER_HEEL_MM) + ' мм или перепад > ' + String(C.MAX_ROCKER_NET_RISE_MM) + ' мм)')
     )
   }
   if (eng.internalSlope >= C.CRITICAL_ANGLE) {
     errors.push(
-      `Критический угол продольного уклона (${eng.internalSlope.toFixed(1)}° >= ${C.CRITICAL_ANGLE}°)`
+      ('Критический угол продольного уклона (' + String(eng.internalSlope.toFixed(1)) + '° >= ' + String(C.CRITICAL_ANGLE) + '°)')
     )
   }
   if (eng.shankOverloaded) {
     errors.push(
-      `Перегрузка геленка (${eng.shankBendingMomentNm} Н·м > ${C.MAX_SHANK_MOMENT_NM} Н·м)`
+      ('Перегрузка геленка (' + String(eng.shankBendingMomentNm) + ' Н·м > ' + String(C.MAX_SHANK_MOMENT_NM) + ' Н·м)')
     )
   }
   if (eng.rx.recommendThomasHeel && soleType === 'flat') {
     errors.push(
-      `Завал стопы (${eng.pronationDeg}°) продавливает свод на плоской подошве — требуется каблук Томаса`
+      ('Завал стопы (' + String(eng.pronationDeg) + '°) продавливает свод на плоской подошве — требуется каблук Томаса')
     )
   }
   if (eng.highInversionRisk || eng.highPronationStress) {
     errors.push(
-      `Высокий риск боковой нестабильности / вывиха (индекс нестабильности ${eng.inversionRisk}%, эффективный завал)`
+      ('Высокий риск боковой нестабильности / вывиха (индекс нестабильности ' + String(eng.inversionRisk) + '%, эффективный завал)')
     )
   }
   if (eng.peakForefootPressureKpa >= C.CRITICAL_KPA || eng.forefootLoad >= C.CRITICAL_LOAD) {
     errors.push(
-      `Перегрузка пучков (модельная оценка ${eng.peakForefootPressureKpa} кПа / нагрузка ${eng.forefootLoad}%)`
+      ('Перегрузка пучков (модельная оценка ' + String(eng.peakForefootPressureKpa) + ' кПа / нагрузка ' + String(eng.forefootLoad) + '%)')
     )
   }
 
@@ -1319,7 +1319,7 @@ export function collectAuditViolations(
     warnings.push('Отрицательный перепад высот (платформа носка выше каблука)')
   }
   if (eng.internalSlope > C.COMFORT_ANGLE && eng.internalSlope < C.CRITICAL_ANGLE) {
-    warnings.push(`Уклон стопы (${eng.internalSlope.toFixed(1)}°) выше комфортного (${C.COMFORT_ANGLE}°)`)
+    warnings.push(('Уклон стопы (' + String(eng.internalSlope.toFixed(1)) + '°) выше комфортного (' + String(C.COMFORT_ANGLE) + '°)'))
   }
   if (heelHeight < 20 && activeRocker > 16) {
     warnings.push('Слишком агрессивный угол рокера при низкой пятке (< 20 мм)')
@@ -1347,12 +1347,6 @@ export function suggestAutoFix(
 
   let state: HeelInput = { ...input }
   let currentEng = initialEng ?? computeEngineering(state)
-  let currentAudit = computeAudit(
-    currentEng,
-    state.soleType,
-    state.heelHeight,
-    state.rockerAngle
-  )
   let violations = collectAuditViolations(
     currentEng,
     state.soleType,
@@ -1389,12 +1383,6 @@ export function suggestAutoFix(
 
   for (let step = 1; step <= C.MAX_AUTO_FIX_ITERATIONS; step++) {
     currentEng = computeEngineering(state)
-    currentAudit = computeAudit(
-      currentEng,
-      state.soleType,
-      state.heelHeight,
-      state.rockerAngle
-    )
     violations = collectAuditViolations(
       currentEng,
       state.soleType,
@@ -1419,7 +1407,7 @@ export function suggestAutoFix(
       const safeOffset = 0
       if (state.heelTipOffsetMm !== safeOffset) {
         appliedChanges.push(
-          `Итер. ${step}: смещение каблука скорректировано с ${state.heelTipOffsetMm} мм до ${safeOffset} мм`
+          ('Итер. ' + String(step) + ': смещение каблука скорректировано с ' + String(state.heelTipOffsetMm) + ' мм до ' + String(safeOffset) + ' мм')
         )
         state.heelTipOffsetMm = safeOffset
         changedInStep = true
@@ -1430,7 +1418,7 @@ export function suggestAutoFix(
     if (state.heelHeight < state.toeThickness) {
       const nextToe = Math.max(0, state.heelHeight)
       appliedChanges.push(
-        `Итер. ${step}: толщина платформы снижена с ${state.toeThickness} до ${nextToe} мм (устранение отрицательного дропа)`
+        ('Итер. ' + String(step) + ': толщина платформы снижена с ' + String(state.toeThickness) + ' до ' + String(nextToe) + ' мм (устранение отрицательного дропа)')
       )
       state.toeThickness = nextToe
       changedInStep = true
@@ -1440,7 +1428,7 @@ export function suggestAutoFix(
     if (state.soleType === 'thomas' && state.heelHeight > C.MAX_THOMAS_HEEL_MM) {
       const nextHeel = C.MAX_THOMAS_HEEL_MM
       appliedChanges.push(
-        `Итер. ${step}: высота каблука Томаса снижена с ${state.heelHeight} до ${nextHeel} мм`
+        ('Итер. ' + String(step) + ': высота каблука Томаса снижена с ' + String(state.heelHeight) + ' до ' + String(nextHeel) + ' мм')
       )
       state.heelHeight = nextHeel
       state.toeThickness = Math.min(state.toeThickness, state.heelHeight)
@@ -1450,7 +1438,7 @@ export function suggestAutoFix(
     if (state.soleType === 'rocker') {
       if (state.heelHeight > C.MAX_ROCKER_HEEL_MM) {
         appliedChanges.push(
-          `Итер. ${step}: высота рокерной пятки снижена с ${state.heelHeight} до ${C.MAX_ROCKER_HEEL_MM} мм`
+          ('Итер. ' + String(step) + ': высота рокерной пятки снижена с ' + String(state.heelHeight) + ' до ' + String(C.MAX_ROCKER_HEEL_MM) + ' мм')
         )
         state.heelHeight = C.MAX_ROCKER_HEEL_MM
         changedInStep = true
@@ -1462,13 +1450,13 @@ export function suggestAutoFix(
         )
         if (neededToe > state.toeThickness && neededToe <= 24) {
           appliedChanges.push(
-            `Итер. ${step}: платформа носка увеличена с ${state.toeThickness} до ${neededToe} мм (перепад рокера ≤ ${C.MAX_ROCKER_NET_RISE_MM} мм)`
+            ('Итер. ' + String(step) + ': платформа носка увеличена с ' + String(state.toeThickness) + ' до ' + String(neededToe) + ' мм (перепад рокера ≤ ' + String(C.MAX_ROCKER_NET_RISE_MM) + ' мм)')
           )
           state.toeThickness = neededToe
         } else {
           const nextHeel = Math.max(20, state.toeThickness + C.MAX_ROCKER_NET_RISE_MM)
           appliedChanges.push(
-            `Итер. ${step}: высота пятки снижена с ${state.heelHeight} до ${nextHeel} мм (перепад рокера ≤ ${C.MAX_ROCKER_NET_RISE_MM} мм)`
+            ('Итер. ' + String(step) + ': высота пятки снижена с ' + String(state.heelHeight) + ' до ' + String(nextHeel) + ' мм (перепад рокера ≤ ' + String(C.MAX_ROCKER_NET_RISE_MM) + ' мм)')
           )
           state.heelHeight = nextHeel
         }
@@ -1477,7 +1465,7 @@ export function suggestAutoFix(
       if (state.heelHeight < 20 && state.rockerAngle > 16) {
         state.heelHeight = 22
         appliedChanges.push(
-          `Итер. ${step}: высота пятки увеличена до 22 мм для согласования с углом рокера ${state.rockerAngle}°`
+          ('Итер. ' + String(step) + ': высота пятки увеличена до 22 мм для согласования с углом рокера ' + String(state.rockerAngle) + '°')
         )
         changedInStep = true
       }
@@ -1491,7 +1479,7 @@ export function suggestAutoFix(
         state.heelHeight = 28
       }
       appliedChanges.push(
-        `Итер. ${step}: назначен ортопедический каблук Томаса для стабилизации завала (${state.pronationDeg}°)`
+        ('Итер. ' + String(step) + ': назначен ортопедический каблук Томаса для стабилизации завала (' + String(state.pronationDeg) + '°)')
       )
       changedInStep = true
     }
@@ -1529,7 +1517,7 @@ export function suggestAutoFix(
           )
           if (nextToe !== state.toeThickness) {
             appliedChanges.push(
-              `Итер. ${step}: толщина носочной части увеличена с ${state.toeThickness} до ${nextToe} мм`
+              ('Итер. ' + String(step) + ': толщина носочной части увеличена с ' + String(state.toeThickness) + ' до ' + String(nextToe) + ' мм')
             )
             state.toeThickness = nextToe
             changedInStep = true
@@ -1544,7 +1532,7 @@ export function suggestAutoFix(
           )
           if (nextHeel < state.heelHeight) {
             appliedChanges.push(
-              `Итер. ${step}: высота каблука снижена с ${state.heelHeight} до ${nextHeel} мм`
+              ('Итер. ' + String(step) + ': высота каблука снижена с ' + String(state.heelHeight) + ' до ' + String(nextHeel) + ' мм')
             )
             state.heelHeight = nextHeel
             if (state.toeThickness > state.heelHeight) {
@@ -1564,7 +1552,7 @@ export function suggestAutoFix(
         if (state.rockerAngle < C.MAX_ROCKER_ANGLE) {
           const nextAngle = Math.min(C.MAX_ROCKER_ANGLE, state.rockerAngle + 4)
           appliedChanges.push(
-            `Итер. ${step}: угол переката рокера увеличен с ${state.rockerAngle}° до ${nextAngle}° для разгрузки пучков`
+            ('Итер. ' + String(step) + ': угол переката рокера увеличен с ' + String(state.rockerAngle) + '° до ' + String(nextAngle) + '° для разгрузки пучков')
           )
           state.rockerAngle = nextAngle
           changedInStep = true
@@ -1575,7 +1563,7 @@ export function suggestAutoFix(
               ? Math.max(60, state.rockerStartPct - 3)
               : Math.min(60, state.rockerStartPct + 3)
           appliedChanges.push(
-            `Итер. ${step}: линия старта рокера приближена к оптимуму (${state.rockerStartPct}% → ${nextStart}%)`
+            ('Итер. ' + String(step) + ': линия старта рокера приближена к оптимуму (' + String(state.rockerStartPct) + '% → ' + String(nextStart) + '%)')
           )
           state.rockerStartPct = nextStart
           changedInStep = true
@@ -1596,7 +1584,7 @@ export function suggestAutoFix(
             state.heelHeight = Math.min(state.heelHeight, 24)
             state.toeThickness = Math.min(state.heelHeight, Math.max(state.toeThickness, 14))
             appliedChanges.push(
-              `Итер. ${step}: переход со стандартной подошвы на каблук Томаса для стабилизации и разгрузки`
+              ('Итер. ' + String(step) + ': переход со стандартной подошвы на каблук Томаса для стабилизации и разгрузки')
             )
             changedInStep = true
           } else {
@@ -1606,7 +1594,7 @@ export function suggestAutoFix(
             state.rockerAngle = Math.max(state.rockerAngle, 18)
             state.rockerStartPct = 60
             appliedChanges.push(
-              `Итер. ${step}: переход со стандартной подошвы на рокерную подошву для снятия критического давления пучков`
+              ('Итер. ' + String(step) + ': переход со стандартной подошвы на рокерную подошву для снятия критического давления пучков')
             )
             changedInStep = true
           }
@@ -1619,7 +1607,7 @@ export function suggestAutoFix(
           state.rockerAngle = Math.max(state.rockerAngle, 18)
           state.rockerStartPct = 60
           appliedChanges.push(
-            `Итер. ${step}: переход на рокерную подошву из-за экстремального давления в пучках при нейтральной пятке`
+            ('Итер. ' + String(step) + ': переход на рокерную подошву из-за экстремального давления в пучках при нейтральной пятке')
           )
           changedInStep = true
         }
@@ -1642,8 +1630,8 @@ export function suggestAutoFix(
   const resolved = finalViolations.errors.length === 0
 
   const summaryMessage = resolved
-    ? `Автоподбор успешно завершён за ${Math.max(1, iterations)} итер.: все критические ошибки устранены.`
-    : `Невозможно полностью устранить автоматически в допустимых диапазонах (${finalViolations.errors.length} пробл. требуют индивидуального ортезирования): ${finalViolations.errors.join('; ')}`
+    ? ('Автоподбор успешно завершён за ' + String(Math.max(1, iterations)) + ' итер.: все критические ошибки устранены.')
+    : ('Невозможно полностью устранить автоматически в допустимых диапазонах (' + String(finalViolations.errors.length) + ' пробл. требуют индивидуального ортезирования): ' + String(finalViolations.errors.join('; ')))
 
   return {
     soleType: state.soleType,
