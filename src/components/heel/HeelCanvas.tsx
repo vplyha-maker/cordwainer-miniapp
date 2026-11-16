@@ -84,6 +84,7 @@ export function HeelCanvas({
   const rearLabel = t.rearfoot ?? t.heelLbl
   const foreLabel = t.forefoot ?? t.toeLbl
   const gm = eng.geometryModel
+  const svgViewBox = '0 0 ' + String(g.svgWidth) + ' ' + String(g.svgHeight + 10)
 
   return (
     <div
@@ -121,20 +122,23 @@ export function HeelCanvas({
           )}
 
           <div className="flex items-center rounded-[8px] p-0.5 border border-[var(--color-border)] bg-[var(--color-surface)]">
-            {(['3d', '2d'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setViewMode(mode)}
-                className={`px-2 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ${
-                  viewMode === mode
-                    ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
-                    : 'bg-transparent text-[var(--color-ink)] opacity-55'
-                }`}
-              >
-                {mode === '3d' ? '3D' : '2D'}
-              </button>
-            ))}
+            {(['3d', '2d'] as const).map((mode) => {
+              const btnCls =
+                'px-2 py-1 rounded-[6px] text-[8px] font-mono uppercase tracking-wider transition-all cursor-pointer border-none ' +
+                (viewMode === mode
+                  ? 'bg-[var(--color-ink)] text-[var(--color-bg)] font-semibold'
+                  : 'bg-transparent text-[var(--color-ink)] opacity-55')
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  className={btnCls}
+                >
+                  {mode === '3d' ? '3D' : '2D'}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -166,7 +170,7 @@ export function HeelCanvas({
           <svg
             width="100%"
             height="100%"
-            viewBox={`0 0 ${g.svgWidth} ${g.svgHeight + 10}`}
+            viewBox={svgViewBox}
             preserveAspectRatio="xMidYMid meet"
             className="overflow-visible"
           >
