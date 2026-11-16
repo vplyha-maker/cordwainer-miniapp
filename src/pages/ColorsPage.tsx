@@ -1,17 +1,27 @@
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+} from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type * as THREE_TYPES from 'three'
-import type { Lang } from '../App'
+import type { Lang as AppLang } from '../App'
 
 type ThreeLib = typeof THREE_TYPES
 
+// Поддержка расширенной языковой модели с обратной совместимостью с App.tsx
+export type SupportedLang = AppLang | 'ru' | 'uk' | 'de'
+
 type ColorsPageProps = {
   onBack: () => void
-  lang: Lang
-  setLang: (lang: Lang) => void
+  lang: AppLang
+  setLang: (lang: AppLang) => void
 }
 
-type Scheme =
+export type Scheme =
   | 'complementary'
   | 'analogous'
   | 'triadic'
@@ -19,6 +29,22 @@ type Scheme =
   | 'rectangular'
   | 'split-complementary'
   | 'monochromatic'
+
+export type ColorModelMode = 'ryb' | 'hsl'
+
+export type FootwearMappingPreset =
+  | 'classic'
+  | 'toe-focus'
+  | 'split-quarter'
+  | 'neutral-sole'
+
+export type PaymentState =
+  | 'idle'
+  | 'creating_invoice'
+  | 'invoice_open'
+  | 'verifying_payment'
+  | 'purchased'
+  | 'failed'
 
 export type SneakerColors = {
   vamp: string
@@ -29,10 +55,35 @@ export type SneakerColors = {
   heel: string
   collar: string
   midsole: string
+  encap: string
   outsole: string
   laces: string
   eyestays: string
   swoosh: string
+}
+
+type SneakerZoneKey = keyof SneakerColors
+
+type TelegramWebApp = {
+  initData?: string
+  initDataUnsafe?: { user?: { id?: number } }
+  HapticFeedback?: { impactOccurred: (style: string) => void }
+  openInvoice?: (link: string, cb: (status: string) => void) => void
+}
+
+function getTelegramWebApp(): TelegramWebApp | undefined {
+  try {
+    return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
+  } catch {
+    return undefined
+  }
+}
+
+function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
+  try {
+    const tg = getTelegramWebApp()
+    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
+  } catch {}
 }
 
 const LockIcon = ({ size = 10 }: { size?: number }) => (
@@ -46,29 +97,334 @@ const LockIcon = ({ size = 10 }: { size?: number }) => (
     strokeLinecap="round"
     strokeLinejoin="round"
     className="mb-[1px]"
+    aria-hidden="true"
   >
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
     <path d="M7 11V7a5 5 0 0110 0v4"></path>
   </svg>
 )
 
-function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
-  try {
-    const tg = (
-      window as unknown as {
-        Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred: (s: string) => void } } }
-      }
-    ).Telegram?.WebApp
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
-  } catch {}
+/* ============================================================================
+   1. COLOR ENGINE (КЛАССИЧЕСКИЙ КРУГ ИТТЕНА RYB <-> RGB/HSL, TINT/SHADE, КОНТРАСТ)
+   ============================================================================ */
+
+// Узловые точки классического круга Иттена (RYB угол -> перцептивный HSL/RGB угол)
+const RYB_TO_HSL_ANCHORS: readonly [number, number][] = [
+  [0, 0],     // Красный (Red)
+  [30, 15],   // Красно-оранжевый
+  [60, 32],   // Оранжевый (Orange)
+  [90, 46],   // Жёлто-оранжевый
+  [120, 60],  // Жёлтый (Yellow)
+  [150, 84],  // Жёлто-зелёный
+  [180, 122], // Зелёный (Green — комплементарный к красному 0°)
+  [210, 175], // Сине-зелёный
+  [240, 218], // Синий (Blue — комплементарный к оранжевому 60°)
+  [270, 252], // Сине-фиолетовый
+  [300, 282], // Фиолетовый (Violet — комплементарный к жёлтому 120°)
+  [330, 324], // Красно-фиолетовый
+  [360, 360],
+]
+
+export function rybHueToRgbHue(rybHue: number): number {
+  const norm = ((rybHue % 360) + 360) % 360
+  for (let i = 0; i < RYB_TO_HSL_ANCHORS.length - 1; i++) {
+    const [r0, h0] = RYB_TO_HSL_ANCHORS[i]
+    const [r1, h1] = RYB_TO_HSL_ANCHORS[i + 1]
+    if (norm >= r0 && norm <= r1) {
+      const t = (norm - r0) / (r1 - r0 + 1e-9)
+      return (h0 + t * (h1 - h0)) % 360
+    }
+  }
+  return norm
+}
+
+function hslToRgb01(h: number, sPct: number, lPct: number): [number, number, number] {
+  const hn = (((h % 360) + 360) % 360) / 360
+  const s = Math.max(0, Math.min(1, sPct / 100))
+  const l = Math.max(0, Math.min(1, lPct / 100))
+
+  if (s === 0) return [l, l, l]
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    let tt = t
+    if (tt < 0) tt += 1
+    if (tt > 1) tt -= 1
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt
+    if (tt < 1 / 2) return q
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6
+    return p
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  return [
+    hue2rgb(p, q, hn + 1 / 3),
+    hue2rgb(p, q, hn),
+    hue2rgb(p, q, hn - 1 / 3),
+  ]
+}
+
+function rgb01ToHex(r: number, g: number, b: number): string {
+  const toByte = (v: number) =>
+    Math.max(0, Math.min(255, Math.round(v * 255)))
+      .toString(16)
+      .padStart(2, '0')
+      .toUpperCase()
+  return `#${toByte(r)}${toByte(g)}${toByte(b)}`
+}
+
+/**
+ * Физически корректное смешивание базового пигмента с белилами (Tint) и сажей (Shade)
+ * в линейном пространстве sRGB с возвратом точного HEX-кода (#RRGGBB).
+ */
+export function synthesizePigmentHex(
+  wheelHue: number,
+  tintWhite: number,
+  shadeBlack: number,
+  chromaScale = 0.85,
+  modelMode: ColorModelMode = 'ryb'
+): string {
+  const effectiveHue = modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
+  const w = Math.max(0, Math.min(1, tintWhite))
+  const b = Math.max(0, Math.min(1, shadeBlack))
+  const sat = Math.max(8, Math.min(96, chromaScale * 100))
+
+  // Чистый базовый пигмент в линейном представлении
+  const [rBase, gBase, bBase] = hslToRgb01(effectiveHue, sat, 50)
+  const toLin = (c: number) => Math.pow(c, 2.2)
+  const toSrgb = (c: number) => Math.pow(Math.max(0, Math.min(1, c)), 1 / 2.2)
+
+  // Нормализованные веса пигмента, белил (Tint) и чёрного пигмента (Shade)
+  // При одновременном росте Tint и Shade образуется благородный нейтральный серый (Tone)
+  const whiteWeight = w * (1 - b * 0.42) * 0.86
+  const blackWeight = b * (1 - w * 0.32) * 0.86
+  const pigmentWeight = Math.max(0.06, 1 - whiteWeight - blackWeight)
+  const total = pigmentWeight + whiteWeight + blackWeight
+
+  const wp = pigmentWeight / total
+  const ww = whiteWeight / total
+  const wb = blackWeight / total
+
+  // Мягкий глубокий графит вместо абсолютного нуля для реалистичной кожи/замши
+  const blackFloor = 0.008
+  const rLin = wp * toLin(rBase) + ww * 1.0 + wb * blackFloor
+  const gLin = wp * toLin(gBase) + ww * 1.0 + wb * blackFloor
+  const bLin = wp * toLin(bBase) + ww * 1.0 + wb * blackFloor
+
+  return rgb01ToHex(toSrgb(rLin), toSrgb(gLin), toSrgb(bLin))
+}
+
+function getRelativeLuminance(hex: string): number {
+  const clean = hex.replace('#', '')
+  if (clean.length !== 6) return 0.5
+  const r = parseInt(clean.slice(0, 2), 16) / 255
+  const g = parseInt(clean.slice(2, 4), 16) / 255
+  const b = parseInt(clean.slice(4, 6), 16) / 255
+  const chan = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
+  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b)
+}
+
+export function getContrastRatio(hexA: string, hexB: string): number {
+  const l1 = getRelativeLuminance(hexA)
+  const l2 = getRelativeLuminance(hexB)
+  const brightest = Math.max(l1, l2)
+  const darkest = Math.min(l1, l2)
+  return (brightest + 0.05) / (darkest + 0.05)
+}
+
+export function getSchemeWheelAngles(baseHue: number, scheme: Scheme): number[] {
+  const h = ((baseHue % 360) + 360) % 360
+  switch (scheme) {
+    case 'monochromatic':
+      return [h]
+    case 'complementary':
+      return [h, (h + 180) % 360]
+    case 'analogous':
+      return [h, (h + 30) % 360, (h + 330) % 360]
+    case 'triadic':
+      return [h, (h + 120) % 360, (h + 240) % 360]
+    case 'split-complementary':
+      return [h, (h + 150) % 360, (h + 210) % 360]
+    case 'tetradic':
+      return [h, (h + 90) % 360, (h + 180) % 360, (h + 270) % 360]
+    case 'rectangular':
+      return [h, (h + 60) % 360, (h + 180) % 360, (h + 240) % 360]
+    default:
+      return [h, (h + 180) % 360]
+  }
+}
+
+export function generateHarmonyPalette(
+  baseHue: number,
+  tintWhite: number,
+  shadeBlack: number,
+  chromaScale: number,
+  scheme: Scheme,
+  modelMode: ColorModelMode
+): string[] {
+  const h = ((baseHue % 360) + 360) % 360
+  const c = Math.max(0.15, Math.min(1, chromaScale))
+
+  switch (scheme) {
+    case 'monochromatic':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c * 0.95, modelMode),
+        synthesizePigmentHex(h, Math.min(1, tintWhite + 0.36), shadeBlack * 0.4, c * 0.65, modelMode),
+        synthesizePigmentHex(h, tintWhite * 0.3, Math.min(1, shadeBlack + 0.42), c * 0.85, modelMode),
+      ]
+    case 'complementary':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
+        synthesizePigmentHex(
+          h,
+          Math.min(1, tintWhite * 0.7 + 0.25),
+          Math.min(1, shadeBlack * 0.7 + 0.15),
+          c * 0.68,
+          modelMode
+        ),
+        synthesizePigmentHex((h + 180) % 360, tintWhite * 0.42, shadeBlack * 0.42, Math.min(0.96, c * 1.06), modelMode),
+      ]
+    case 'analogous':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
+        synthesizePigmentHex((h + 30) % 360, Math.min(1, tintWhite * 0.85 + 0.1), shadeBlack * 0.85, c * 0.88, modelMode),
+        synthesizePigmentHex((h + 330) % 360, tintWhite * 0.48, shadeBlack * 0.48, Math.min(0.95, c * 1.04), modelMode),
+      ]
+    case 'triadic':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
+        synthesizePigmentHex((h + 120) % 360, Math.min(1, tintWhite * 0.8 + 0.12), shadeBlack * 0.8, c * 0.84, modelMode),
+        synthesizePigmentHex((h + 240) % 360, tintWhite * 0.45, shadeBlack * 0.45, Math.min(0.95, c * 1.04), modelMode),
+      ]
+    case 'split-complementary':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
+        synthesizePigmentHex((h + 150) % 360, Math.min(1, tintWhite * 0.8 + 0.12), shadeBlack * 0.8, c * 0.86, modelMode),
+        synthesizePigmentHex((h + 210) % 360, tintWhite * 0.45, shadeBlack * 0.45, Math.min(0.95, c * 1.04), modelMode),
+      ]
+    case 'tetradic':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
+        synthesizePigmentHex((h + 90) % 360, Math.min(1, tintWhite * 0.8 + 0.1), shadeBlack * 0.8, c * 0.84, modelMode),
+        synthesizePigmentHex((h + 180) % 360, Math.min(1, tintWhite * 0.75 + 0.15), shadeBlack * 0.75, c * 0.78, modelMode),
+        synthesizePigmentHex((h + 270) % 360, tintWhite * 0.4, shadeBlack * 0.4, Math.min(0.96, c * 1.06), modelMode),
+      ]
+    case 'rectangular':
+      return [
+        synthesizePigmentHex(h, tintWhite, shadeBlack, c, modelMode),
+        synthesizePigmentHex((h + 60) % 360, Math.min(1, tintWhite * 0.8 + 0.1), shadeBlack * 0.8, c * 0.86, modelMode),
+        synthesizePigmentHex((h + 180) % 360, Math.min(1, tintWhite * 0.75 + 0.15), shadeBlack * 0.75, c * 0.80, modelMode),
+        synthesizePigmentHex((h + 240) % 360, tintWhite * 0.4, shadeBlack * 0.4, Math.min(0.96, c * 1.06), modelMode),
+      ]
+  }
 }
 
 /* ============================================================================
-   МОДУЛЬНАЯ 3D-МОДЕЛЬ NEW BALANCE 574 (ПОДГРУЗКА /sneaker_modular.glb + 3D FALLBACK)
-   Автоматически подгружает 12-слойный скан New Balance 574 из public/sneaker_modular.glb
-   с сохранением 4K-текстуры замши, сетки и швов (через vertexColors COLOR_0),
-   а при отсутствии файла рендерит встроенную 3D-модель NB 574 с логотипом «N» и ENCAP
+   2. FOOTWEAR COLOR MAPPING (НЕЗАВИСИМОЕ РАСПРЕДЕЛЕНИЕ ЦВЕТОВ ПО КОНСТРУКЦИИ)
    ============================================================================ */
+
+export function mapPaletteToFootwear(
+  colors: string[],
+  baseHue: number,
+  tintWhite: number,
+  shadeBlack: number,
+  chromaScale: number,
+  modelMode: ColorModelMode,
+  preset: FootwearMappingPreset,
+  isDark: boolean
+): SneakerColors {
+  const mainColor = colors[0]
+  const secondaryColor = colors[1] ?? colors[0]
+  const tertiaryColor =
+    colors.length > 3
+      ? colors[2]
+      : synthesizePigmentHex(
+          baseHue,
+          tintWhite * 0.35,
+          Math.min(1, shadeBlack + 0.45),
+          chromaScale * 0.55,
+          modelMode
+        )
+  const accentColor = colors[colors.length - 1] ?? mainColor
+
+  const neutralMidsole = isDark ? '#2B2926' : '#FAF8F4'
+  const neutralEncap = isDark ? '#3D3A36' : '#E5E0D6'
+  const neutralLaces = isDark ? '#F4F0E8' : '#FFFFFF'
+  const neutralOutsole = isDark ? '#181615' : '#2C2825'
+
+  switch (preset) {
+    case 'toe-focus':
+      return {
+        vamp: secondaryColor,
+        toeBox: mainColor,
+        quarters: secondaryColor,
+        eyestays: mainColor,
+        heel: accentColor,
+        collar: tertiaryColor,
+        tongue: mainColor,
+        lining: tertiaryColor,
+        swoosh: accentColor,
+        midsole: neutralMidsole,
+        encap: mainColor,
+        outsole: accentColor,
+        laces: neutralLaces,
+      }
+    case 'split-quarter':
+      return {
+        vamp: mainColor,
+        toeBox: secondaryColor,
+        quarters: accentColor,
+        eyestays: secondaryColor,
+        heel: mainColor,
+        collar: tertiaryColor,
+        tongue: secondaryColor,
+        lining: mainColor,
+        swoosh: mainColor,
+        midsole: neutralMidsole,
+        encap: secondaryColor,
+        outsole: neutralOutsole,
+        laces: neutralLaces,
+      }
+    case 'neutral-sole':
+      return {
+        vamp: mainColor,
+        heel: mainColor,
+        eyestays: mainColor,
+        quarters: secondaryColor,
+        toeBox: secondaryColor,
+        tongue: secondaryColor,
+        collar: colors.length > 3 ? colors[2] : secondaryColor,
+        lining: tertiaryColor,
+        swoosh: accentColor,
+        midsole: neutralMidsole,
+        encap: neutralEncap,
+        outsole: neutralOutsole,
+        laces: neutralLaces,
+      }
+    case 'classic':
+    default:
+      return {
+        vamp: mainColor,
+        heel: mainColor,
+        eyestays: mainColor,
+        quarters: secondaryColor,
+        toeBox: secondaryColor,
+        tongue: secondaryColor,
+        collar: colors.length > 3 ? colors[2] : secondaryColor,
+        lining: tertiaryColor,
+        swoosh: accentColor,
+        midsole: neutralMidsole,
+        encap: neutralEncap,
+        outsole: accentColor,
+        laces: neutralLaces,
+      }
+  }
+}
+
+/* ============================================================================
+   3. 3D-ГЕОМЕТРИЯ И МАТЕРИАЛЫ NEW BALANCE 574 (БЕЗ ДУБЛИРОВАНИЯ ТРЕУГОЛЬНИКОВ)
+   ============================================================================ */
+
 type SneakerMaterials = {
   vamp: THREE_TYPES.MeshStandardMaterial
   quarters: THREE_TYPES.MeshStandardMaterial
@@ -78,10 +434,72 @@ type SneakerMaterials = {
   heel: THREE_TYPES.MeshStandardMaterial
   collar: THREE_TYPES.MeshStandardMaterial
   midsole: THREE_TYPES.MeshStandardMaterial
+  encap: THREE_TYPES.MeshStandardMaterial
   outsole: THREE_TYPES.MeshStandardMaterial
   laces: THREE_TYPES.MeshStandardMaterial
   eyestays: THREE_TYPES.MeshStandardMaterial
   swoosh: THREE_TYPES.MeshStandardMaterial
+}
+
+// Явная таблица соответствия имён объектов GLB конструктивным зонам редактора
+const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
+  upper_vamp: 'vamp',
+  vamp: 'vamp',
+  mudguard: 'vamp',
+  toe_mesh: 'toeBox',
+  toe_box: 'toeBox',
+  toebox: 'toeBox',
+  quarter_left: 'quarters',
+  quarter_right: 'quarters',
+  quarters: 'quarters',
+  saddle: 'quarters',
+  eyestay: 'eyestays',
+  eyestays: 'eyestays',
+  heel_counter: 'heel',
+  heel_wrap: 'heel',
+  collar: 'collar',
+  ankle_collar: 'collar',
+  tongue: 'tongue',
+  tongue_mesh: 'tongue',
+  lining: 'lining',
+  sockliner: 'lining',
+  insole: 'lining',
+  lace_set: 'laces',
+  laces: 'laces',
+  n_logo: 'swoosh',
+  logo_n: 'swoosh',
+  heel_tab: 'swoosh',
+  backtab: 'swoosh',
+  encap: 'encap',
+  encap_rim: 'encap',
+  heel_clip: 'encap',
+  midsole: 'midsole',
+  eva_midsole: 'midsole',
+  outsole: 'outsole',
+  rubber_outsole: 'outsole',
+}
+
+function resolveGlbZone(rawName: string): SneakerZoneKey | null {
+  const normalized = rawName.trim().toLowerCase().replace(/[\s.-]+/g, '_')
+  if (GLB_EXPLICIT_ZONE_MAP[normalized]) {
+    return GLB_EXPLICIT_ZONE_MAP[normalized]
+  }
+  if (normalized.includes('vamp') || normalized.includes('mudguard')) return 'vamp'
+  if (normalized.includes('toe')) return 'toeBox'
+  if (normalized.includes('quarter') || normalized.includes('saddle')) return 'quarters'
+  if (normalized.includes('eyestay')) return 'eyestays'
+  if (normalized.includes('collar')) return 'collar'
+  if (normalized.includes('encap') || normalized.includes('clip')) return 'encap'
+  if (normalized.includes('heel_tab') || normalized.includes('swoosh') || normalized.includes('logo') || normalized.includes('tab'))
+    return 'swoosh'
+  if (normalized.includes('heel')) return 'heel'
+  if (normalized.includes('lining') || normalized.includes('insole')) return 'lining'
+  if (normalized.includes('tongue')) return 'tongue'
+  if (normalized.includes('lace')) return 'laces'
+  if (normalized.includes('midsole') || normalized.includes('eva')) return 'midsole'
+  if (normalized.includes('outsole') || normalized.includes('tread') || normalized.includes('sole'))
+    return 'outsole'
+  return null
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -150,7 +568,7 @@ function getToplineRim(phi: number) {
   return { x: xRim, y: yRim, z: zRim }
 }
 
-function sampleUpperSurface(phi: number, v: number, radialOffset = 0) {
+function evalBaseLastSurface(phi: number, v: number): readonly [number, number, number] {
   const fp = getFootprintPoint(phi)
   const rim = getToplineRim(phi)
 
@@ -172,8 +590,8 @@ function sampleUpperSurface(phi: number, v: number, radialOffset = 0) {
   const uH = (1 - toeWeight) * uSide + toeWeight * uToe
   const heelBulbZ = -0.048 * Math.sin(vClamped * Math.PI) * heelWeight
 
-  let x = (1 - uH) * fp.x + uH * rim.x
-  let z = (1 - uH) * fp.z + uH * rim.z + heelBulbZ
+  const x = (1 - uH) * fp.x + uH * rim.x
+  const z = (1 - uH) * fp.z + uH * rim.z + heelBulbZ
 
   const ySide = y0 + (rim.y - y0) * Math.pow(vClamped, 0.82) + 0.038 * Math.sin(vClamped * Math.PI)
   const yNoseTop = y0 + 0.19
@@ -184,19 +602,55 @@ function sampleUpperSurface(phi: number, v: number, radialOffset = 0) {
         (rim.y - yNoseTop) * ((vClamped - 0.34) / 0.66) +
         0.015 * Math.sin(((vClamped - 0.34) / 0.66) * Math.PI)
 
-  let y = (1 - toeWeight) * ySide + toeWeight * yToe
+  const y = (1 - toeWeight) * ySide + toeWeight * yToe
+  return [x, y, z] as const
+}
 
-  if (radialOffset !== 0) {
-    const dx = x
-    const dz = z - -0.3
-    const dy = Math.max(0.18, y - -0.1)
-    const norm = Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-6
-    x += radialOffset * (dx / norm)
-    y += radialOffset * (dy / norm) * 0.75
-    z += radialOffset * (dz / norm)
+/**
+ * Вычисляет точку на колодке со смещением по истинной геометрической нормали поверхности
+ * (через частные производные dP/dPhi x dP/dV), исключая самопересечения панелей.
+ */
+function sampleUpperSurface(phi: number, v: number, normalOffset = 0): readonly [number, number, number] {
+  const [x, y, z] = evalBaseLastSurface(phi, v)
+  if (normalOffset === 0) return [x, y, z] as const
+
+  const epsPhi = 0.012
+  const epsV = 0.012
+  const [xP1, yP1, zP1] = evalBaseLastSurface(phi + epsPhi, v)
+  const [xP0, yP0, zP0] = evalBaseLastSurface(phi - epsPhi, v)
+  const vHi = Math.min(1, v + epsV)
+  const vLo = Math.max(0, v - epsV)
+  const [xV1, yV1, zV1] = evalBaseLastSurface(phi, vHi)
+  const [xV0, yV0, zV0] = evalBaseLastSurface(phi, vLo)
+
+  const tx = xP1 - xP0
+  const ty = yP1 - yP0
+  const tz = zP1 - zP0
+
+  const bx = xV1 - xV0
+  const by = yV1 - yV0
+  const bz = zV1 - zV0
+
+  let nx = ty * bz - tz * by
+  let ny = tz * bx - tx * bz
+  let nz = tx * by - ty * bx
+
+  // Ориентируем нормаль строго наружу от центральной оси колодки (0, 0.05, -0.25)
+  const outX = x
+  const outY = Math.max(0.15, y - 0.02)
+  const outZ = z - -0.25
+  if (nx * outX + ny * outY + nz * outZ < 0) {
+    nx = -nx
+    ny = -ny
+    nz = -nz
   }
 
-  return [x, y, z] as const
+  const len = Math.sqrt(nx * nx + ny * ny + nz * nz) + 1e-7
+  return [
+    x + normalOffset * (nx / len),
+    y + normalOffset * (ny / len),
+    z + normalOffset * (nz / len),
+  ] as const
 }
 
 function buildPanelPatch(
@@ -208,10 +662,11 @@ function buildPanelPatch(
     vStart: number
     vEnd: number
     vSteps: number
-    outerOffset: number
-    innerOffset?: number
+    layerTier: number // 0 = базовая сетка/подложка, 1 = средний слой, 2 = верхний накладной каркас
+    thickness?: number
     bevelU?: number
     bevelV?: number
+    seamInset?: number
   }
 ): THREE_TYPES.BufferGeometry {
   const {
@@ -221,11 +676,22 @@ function buildPanelPatch(
     vStart,
     vEnd,
     vSteps,
-    outerOffset,
-    innerOffset = outerOffset - 0.014,
-    bevelU = 0.07,
+    layerTier,
+    thickness = 0.011,
+    bevelU = 0.08,
     bevelV = 0.09,
+    seamInset = 0.008,
   } = options
+
+  // Контроль зазоров между деталями и разнесение слоёв без пересечений
+  const p0 = phiStart + (phiEnd - phiStart) * seamInset
+  const p1 = phiEnd - (phiEnd - phiStart) * seamInset
+  const v0 = vStart + (vEnd - vStart) * seamInset
+  const v1 = vEnd - (vEnd - vStart) * seamInset
+
+  const baseElevation = layerTier * 0.0095
+  const outerOffset = baseElevation + thickness
+  const innerOffset = baseElevation
 
   const positions: number[] = []
   const indices: number[] = []
@@ -233,13 +699,13 @@ function buildPanelPatch(
 
   for (let i = 0; i <= phiSteps; i++) {
     const u = i / phiSteps
-    const phi = phiStart + u * (phiEnd - phiStart)
+    const phi = p0 + u * (p1 - p0)
     const envU = smoothstep(0, bevelU, u) * smoothstep(1, 1 - bevelU, u)
     for (let j = 0; j <= vSteps; j++) {
       const w = j / vSteps
-      const v = vStart + w * (vEnd - vStart)
+      const v = v0 + w * (v1 - v0)
       const envV = smoothstep(0, bevelV, w) * smoothstep(1, 1 - bevelV, w)
-      const effOffset = outerOffset * (0.2 + 0.8 * envU * envV)
+      const effOffset = innerOffset + (outerOffset - innerOffset) * (0.28 + 0.72 * envU * envV)
       const [x, y, z] = sampleUpperSurface(phi, v, effOffset)
       positions.push(x, y, z)
     }
@@ -247,9 +713,9 @@ function buildPanelPatch(
 
   const innerBase = (phiSteps + 1) * stride
   for (let i = 0; i <= phiSteps; i++) {
-    const phi = phiStart + (i / phiSteps) * (phiEnd - phiStart)
+    const phi = p0 + (i / phiSteps) * (p1 - p0)
     for (let j = 0; j <= vSteps; j++) {
-      const v = vStart + (j / vSteps) * (vEnd - vStart)
+      const v = v0 + (j / vSteps) * (v1 - v0)
       const [x, y, z] = sampleUpperSurface(phi, v, innerOffset)
       positions.push(x, y, z)
     }
@@ -261,8 +727,10 @@ function buildPanelPatch(
       const b = (i + 1) * stride + j
       const c = (i + 1) * stride + (j + 1)
       const d = i * stride + (j + 1)
+      // Внешняя лицевая сторона
       indices.push(a, d, b, b, d, c)
 
+      // Внутренняя обратная сторона
       const ai = innerBase + a
       const bi = innerBase + b
       const ci = innerBase + c
@@ -271,6 +739,7 @@ function buildPanelPatch(
     }
   }
 
+  // Боковые торцы панели (единый замкнутый контур толщины)
   for (let i = 0; i < phiSteps; i++) {
     const a0 = i * stride
     const b0 = (i + 1) * stride
@@ -298,11 +767,16 @@ function buildPanelPatch(
   return geom
 }
 
+/**
+ * ИСПРАВЛЕНО (п. 1.1 аудита): Удалено дублирование треугольников с обратным порядком вершин.
+ * Каждая поверхность имеет строго одну согласованную ориентацию нормалей без Z-fighting и погашения нормалей.
+ */
 function buildParametricGridGeometry(
   THREE: ThreeLib,
   uSteps: number,
   wSteps: number,
-  evalPoint: (u: number, w: number) => readonly [number, number, number]
+  evalPoint: (u: number, w: number) => readonly [number, number, number],
+  flipWinding = false
 ): THREE_TYPES.BufferGeometry {
   const positions: number[] = []
   const indices: number[] = []
@@ -323,8 +797,11 @@ function buildParametricGridGeometry(
       const b = (i + 1) * stride + j
       const c = (i + 1) * stride + (j + 1)
       const d = i * stride + (j + 1)
-      indices.push(a, b, d, b, c, d)
-      indices.push(a, d, b, b, d, c)
+      if (flipWinding) {
+        indices.push(a, b, d, b, c, d)
+      } else {
+        indices.push(a, d, b, b, d, c)
+      }
     }
   }
 
@@ -335,52 +812,87 @@ function buildParametricGridGeometry(
   return geom
 }
 
-function buildWedgeSoleRingGeometry(
+/**
+ * ИСПРАВЛЕНО (п. 1.3 аудита): Трёхкомпонентная конструкция подошвы New Balance 574:
+ * 1) EVA Midsole (с профилированной боковиной и ступенчатым кантом)
+ * 2) ENCAP Support Structure (полиуретановая чаша стабилизации пятки)
+ * 3) Rubber Outsole (сегментированный зубчатый протектор)
+ */
+function buildSoleComponentGeometry(
   THREE: ThreeLib,
-  options: {
-    phiSteps: number
-    topScale: number
-    botScale: number
-    isOutsole?: boolean
-  }
+  part: 'midsole' | 'encap' | 'outsole',
+  phiSteps = 96
 ): THREE_TYPES.BufferGeometry {
-  const { phiSteps, topScale, botScale, isOutsole = false } = options
   const positions: number[] = []
   const indices: number[] = []
 
+  const phiStart = part === 'encap' ? 1.55 : -Math.PI
+  const phiEnd = part === 'encap' ? Math.PI * 2 - 1.55 : Math.PI
+  const rings = 4 // Верхний рант, верхнее ребро боковины, нижнее ребро, подошвенный контур
+
   for (let i = 0; i <= phiSteps; i++) {
     const u = i / phiSteps
-    const phi = -Math.PI + u * Math.PI * 2
+    const rawPhi = phiStart + u * (phiEnd - phiStart)
+    const phi = rawPhi > Math.PI ? rawPhi - Math.PI * 2 : rawPhi
     const fp = getFootprintPoint(phi)
     const toeSpring = Math.pow(Math.max(0, (fp.t - 0.58) / 0.42), 1.75) * 0.11
-    const y0 = -0.14 + (1 - fp.t) * 0.06 + toeSpring
-    const midThick = 0.12 + 0.08 * (1 - fp.t)
-    const yMidBot = y0 - midThick
+    const yTopBase = -0.14 + (1 - fp.t) * 0.06 + toeSpring
+    const midThick = 0.118 + 0.082 * (1 - fp.t)
+    const yMidBot = yTopBase - midThick
 
-    if (!isOutsole) {
-      positions.push(fp.x * topScale, y0 + 0.005, fp.z * topScale)
-      positions.push(fp.x * botScale, yMidBot, fp.z * botScale)
+    if (part === 'midsole') {
+      const groove = -0.008 * Math.sin(u * Math.PI * 6) * (1 - fp.t * 0.5)
+      positions.push(fp.x * 1.002, yTopBase + 0.003, fp.z * 1.002)
+      positions.push(fp.x * 1.028, yTopBase - midThick * 0.36 + groove, fp.z * 1.026)
+      positions.push(fp.x * 1.044, yTopBase - midThick * 0.78, fp.z * 1.04)
+      positions.push(fp.x * 1.048, yMidBot, fp.z * 1.044)
+    } else if (part === 'encap') {
+      const endFade = smoothstep(0, 0.12, u) * smoothstep(1, 0.88, u)
+      const encapOut = 1.055 + 0.014 * endFade
+      const yEncapTop = yTopBase - midThick * 0.18
+      const yEncapBot = yMidBot + 0.006
+      positions.push(fp.x * 1.015, yEncapTop, fp.z * 1.015)
+      positions.push(fp.x * encapOut, yEncapTop - 0.012, fp.z * encapOut)
+      positions.push(fp.x * (encapOut + 0.006), (yEncapTop + yEncapBot) * 0.5, fp.z * (encapOut + 0.006))
+      positions.push(fp.x * 1.046, yEncapBot, fp.z * 1.044)
     } else {
-      const lugWave = 0.015 * Math.sin(u * 44 * Math.PI)
-      positions.push(fp.x * topScale, yMidBot, fp.z * topScale)
-      positions.push(fp.x * botScale, yMidBot - 0.055 + lugWave, fp.z * botScale)
+      // Segmented Rubber Outsole с выраженными трапециевидными грунтозацепами NB 574
+      const lugFreq = 36
+      const rawWave = Math.sin(u * lugFreq * Math.PI)
+      const isArchBridge = fp.t > 0.34 && fp.t < 0.52
+      const lugDepth = isArchBridge ? 0.004 : 0.022 * (rawWave > 0 ? 1 : -0.45)
+      const yOutBot = yMidBot - 0.052 + lugDepth
+      positions.push(fp.x * 1.046, yMidBot, fp.z * 1.042)
+      positions.push(fp.x * 1.054, yMidBot - 0.018, fp.z * 1.048)
+      positions.push(fp.x * 1.042, yOutBot + 0.01, fp.z * 1.038)
+      positions.push(fp.x * 1.032, yOutBot, fp.z * 1.03)
     }
   }
 
-  const topCenterIdx = (phiSteps + 1) * 2
-  positions.push(0, isOutsole ? -0.28 : -0.12, 0)
-  const botCenterIdx = topCenterIdx + 1
-  positions.push(0, isOutsole ? -0.34 : -0.28, 0)
-
   for (let i = 0; i < phiSteps; i++) {
-    const t0 = i * 2
-    const b0 = i * 2 + 1
-    const t1 = (i + 1) * 2
-    const b1 = (i + 1) * 2 + 1
+    for (let r = 0; r < rings - 1; r++) {
+      const a = i * rings + r
+      const b = (i + 1) * rings + r
+      const c = (i + 1) * rings + (r + 1)
+      const d = i * rings + (r + 1)
+      indices.push(a, d, b, b, d, c)
+    }
+  }
 
-    indices.push(t0, b0, t1, b0, b1, t1)
-    indices.push(topCenterIdx, t0, t1)
-    indices.push(botCenterIdx, b1, b0)
+  if (part !== 'encap') {
+    const topCenterIdx = (phiSteps + 1) * rings
+    positions.push(0, part === 'outsole' ? -0.26 : -0.12, 0)
+    const botCenterIdx = topCenterIdx + 1
+    positions.push(0, part === 'outsole' ? -0.33 : -0.26, 0)
+
+    for (let i = 0; i < phiSteps; i++) {
+      const t0 = i * rings
+      const t1 = (i + 1) * rings
+      const b0 = i * rings + (rings - 1)
+      const b1 = (i + 1) * rings + (rings - 1)
+      indices.push(topCenterIdx, t0, t1)
+      indices.push(botCenterIdx, b1, b0)
+    }
   }
 
   const geom = new THREE.BufferGeometry()
@@ -393,29 +905,31 @@ function buildWedgeSoleRingGeometry(
 function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_TYPES.Group {
   const group = new THREE.Group()
 
-  // 1. TOE BOX (Сетчатая дека носка NB 574)
+  // 1. TOE BOX (Базовый сетчатый слой мыска — Tier 0)
   const toeBoxGeom = buildPanelPatch(THREE, {
-    phiStart: -0.76,
-    phiEnd: 0.76,
+    phiStart: -0.78,
+    phiEnd: 0.78,
     phiSteps: 40,
-    vStart: 0.36,
+    vStart: 0.34,
     vEnd: 1.0,
     vSteps: 18,
-    outerOffset: 0.0,
-    innerOffset: -0.012,
+    layerTier: 0,
+    thickness: 0.01,
+    seamInset: 0.004,
   })
   group.add(new THREE.Mesh(toeBoxGeom, mats.toeBox))
 
-  // 2. VAMP (Передний замшевый обвод мыска)
+  // 2. VAMP (Передний замшевый обвод мыска — Tier 2)
   const vampFrontGeom = buildPanelPatch(THREE, {
     phiStart: -0.92,
     phiEnd: 0.92,
     phiSteps: 52,
     vStart: 0.0,
-    vEnd: 0.40,
+    vEnd: 0.39,
     vSteps: 14,
-    outerOffset: 0.016,
-    innerOffset: -0.002,
+    layerTier: 2,
+    thickness: 0.012,
+    seamInset: 0.006,
   })
   group.add(new THREE.Mesh(vampFrontGeom, mats.vamp))
 
@@ -425,16 +939,17 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
     const vampWingGeom = buildPanelPatch(THREE, {
       phiStart: pMin,
       phiEnd: pMax,
-      phiSteps: 10,
+      phiSteps: 12,
       vStart: 0.35,
-      vEnd: 0.72,
+      vEnd: 0.70,
       vSteps: 10,
-      outerOffset: 0.016,
-      innerOffset: -0.002,
+      layerTier: 2,
+      thickness: 0.012,
+      seamInset: 0.005,
     })
     group.add(new THREE.Mesh(vampWingGeom, mats.vamp))
 
-    // 3. QUARTERS (Боковые панели седла)
+    // 3. QUARTERS (Боковые панели седла — Tier 1)
     const qMin = sign > 0 ? 0.86 : -1.84
     const qMax = sign > 0 ? 1.84 : -0.86
     const quarterGeom = buildPanelPatch(THREE, {
@@ -442,44 +957,47 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
       phiEnd: qMax,
       phiSteps: 32,
       vStart: 0.0,
-      vEnd: 0.72,
+      vEnd: 0.70,
       vSteps: 18,
-      outerOffset: 0.0,
-      innerOffset: -0.012,
+      layerTier: 1,
+      thickness: 0.011,
+      seamInset: 0.006,
     })
     group.add(new THREE.Mesh(quarterGeom, mats.quarters))
 
-    // 4. EYESTAYS (Планка шнуровки)
-    const eMin = sign > 0 ? 0.30 : -1.56
-    const eMax = sign > 0 ? 1.56 : -0.30
+    // 4. EYESTAYS (Планка шнуровки — Tier 2)
+    const eMin = sign > 0 ? 0.32 : -1.56
+    const eMax = sign > 0 ? 1.56 : -0.32
     const eyestayGeom = buildPanelPatch(THREE, {
       phiStart: eMin,
       phiEnd: eMax,
       phiSteps: 32,
-      vStart: 0.67,
+      vStart: 0.68,
       vEnd: 1.0,
       vSteps: 12,
-      outerOffset: 0.02,
-      innerOffset: -0.002,
+      layerTier: 2,
+      thickness: 0.013,
+      seamInset: 0.006,
     })
     group.add(new THREE.Mesh(eyestayGeom, mats.eyestays))
 
-    // 5. COLLAR (Вырез воротника лодыжки)
+    // 5. COLLAR (Мягкий валик лодыжки — Tier 0)
     const cMin = sign > 0 ? 1.50 : -2.44
     const cMax = sign > 0 ? 2.44 : -1.50
     const collarGeom = buildPanelPatch(THREE, {
       phiStart: cMin,
       phiEnd: cMax,
       phiSteps: 24,
-      vStart: 0.60,
+      vStart: 0.62,
       vEnd: 1.0,
       vSteps: 12,
-      outerOffset: 0.004,
-      innerOffset: -0.012,
+      layerTier: 0,
+      thickness: 0.011,
+      seamInset: 0.005,
     })
     group.add(new THREE.Mesh(collarGeom, mats.collar))
 
-    // 6. HEEL COUNTER + ENCAP HEEL CLIP + HEEL TAB
+    // 6. HEEL COUNTER + HEEL TAB + CRADLE CLIP
     const hMin = sign > 0 ? 1.78 : -Math.PI
     const hMax = sign > 0 ? Math.PI : -1.78
     const heelCounterGeom = buildPanelPatch(THREE, {
@@ -489,24 +1007,26 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
       vStart: 0.18,
       vEnd: 0.68,
       vSteps: 14,
-      outerOffset: 0.018,
-      innerOffset: -0.002,
+      layerTier: 2,
+      thickness: 0.012,
+      seamInset: 0.004,
     })
     group.add(new THREE.Mesh(heelCounterGeom, mats.heel))
 
     const encapMin = sign > 0 ? 1.82 : -Math.PI
     const encapMax = sign > 0 ? Math.PI : -1.82
-    const encapClipGeom = buildPanelPatch(THREE, {
+    const heelClipGeom = buildPanelPatch(THREE, {
       phiStart: encapMin,
       phiEnd: encapMax,
       phiSteps: 30,
       vStart: 0.0,
-      vEnd: 0.22,
+      vEnd: 0.20,
       vSteps: 8,
-      outerOffset: 0.024,
-      innerOffset: -0.002,
+      layerTier: 3,
+      thickness: 0.012,
+      seamInset: 0.004,
     })
-    group.add(new THREE.Mesh(encapClipGeom, mats.swoosh))
+    group.add(new THREE.Mesh(heelClipGeom, mats.encap))
 
     const htMin = sign > 0 ? 2.36 : -Math.PI
     const htMax = sign > 0 ? Math.PI : -2.36
@@ -514,11 +1034,12 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
       phiStart: htMin,
       phiEnd: htMax,
       phiSteps: 22,
-      vStart: 0.68,
+      vStart: 0.69,
       vEnd: 1.0,
       vSteps: 10,
-      outerOffset: 0.022,
-      innerOffset: -0.002,
+      layerTier: 2,
+      thickness: 0.012,
+      seamInset: 0.004,
     })
     group.add(new THREE.Mesh(heelTabGeom, mats.swoosh))
 
@@ -529,29 +1050,41 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
       [1.14, 0.62, 1.46, 0.17],
     ]
     nStrokes.forEach(([pStart, vStart, pEnd, vEnd]) => {
-      const trimGeom = buildParametricGridGeometry(THREE, 14, 6, (u, w) => {
-        const uExp = -0.08 + u * 1.16
-        const wCentered = (w - 0.5) * 2
-        const pTrim = sign * ((1 - uExp) * pStart + uExp * pEnd + wCentered * 0.072)
-        const vTrim = Math.max(0.08, Math.min(0.74, (1 - uExp) * vStart + uExp * vEnd))
-        return sampleUpperSurface(pTrim, vTrim, 0.021)
-      })
+      const trimGeom = buildParametricGridGeometry(
+        THREE,
+        14,
+        6,
+        (u, w) => {
+          const uExp = -0.08 + u * 1.16
+          const wCentered = (w - 0.5) * 2
+          const pTrim = sign * ((1 - uExp) * pStart + uExp * pEnd + wCentered * 0.072)
+          const vTrim = Math.max(0.08, Math.min(0.74, (1 - uExp) * vStart + uExp * vEnd))
+          return sampleUpperSurface(pTrim, vTrim, 0.025)
+        },
+        sign < 0
+      )
       group.add(new THREE.Mesh(trimGeom, mats.laces))
 
-      const barGeom = buildParametricGridGeometry(THREE, 14, 6, (u, w) => {
-        const wCentered = (w - 0.5) * 2
-        const pBar = sign * ((1 - u) * pStart + u * pEnd + wCentered * 0.046)
-        const vBar = Math.max(0.1, Math.min(0.72, (1 - u) * vStart + u * vEnd))
-        return sampleUpperSurface(pBar, vBar, 0.028)
-      })
+      const barGeom = buildParametricGridGeometry(
+        THREE,
+        14,
+        6,
+        (u, w) => {
+          const wCentered = (w - 0.5) * 2
+          const pBar = sign * ((1 - u) * pStart + u * pEnd + wCentered * 0.046)
+          const vBar = Math.max(0.1, Math.min(0.72, (1 - u) * vStart + u * vEnd))
+          return sampleUpperSurface(pBar, vBar, 0.031)
+        },
+        sign < 0
+      )
       group.add(new THREE.Mesh(barGeom, mats.swoosh))
     })
   })
 
-  // 8. LINING & TONGUE & X-LACES
+  // 8. LINING, TONGUE & LACES
   const liningGeom = buildParametricGridGeometry(THREE, 72, 16, (u, s) => {
     const phi = -Math.PI + u * Math.PI * 2
-    const [xr, yr, zr] = sampleUpperSurface(phi, 0.98, 0.012)
+    const [xr, yr, zr] = sampleUpperSurface(phi, 0.98, 0.01)
     const sProgress = Math.max(0, (s - 0.14) / 0.86)
     const radialShrink = 1 - Math.pow(sProgress, 1.04)
     const lipArch = 0.034 * Math.sin(Math.min(1, s / 0.28) * Math.PI)
@@ -623,323 +1156,605 @@ function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_T
     group.add(new THREE.Mesh(laceStrapGeom, mats.laces))
   })
 
-  // 9. КЛИНОВИДНАЯ МЕЖПОДОШВА EVA + ЗУБЧАТЫЙ ПРОТЕКТОР NB 574
-  const midsoleGeom = buildWedgeSoleRingGeometry(THREE, {
-    phiSteps: 96,
-    topScale: 1.005,
-    botScale: 1.045,
-    isOutsole: false,
-  })
+  // 9. ТРЁХКОМПОНЕНТНАЯ ПОДОШВА: EVA MIDSOLE + ENCAP SUPPORT + RUBBER OUTSOLE
+  const midsoleGeom = buildSoleComponentGeometry(THREE, 'midsole', 96)
   group.add(new THREE.Mesh(midsoleGeom, mats.midsole))
 
-  const outsoleGeom = buildWedgeSoleRingGeometry(THREE, {
-    phiSteps: 96,
-    topScale: 1.045,
-    botScale: 1.032,
-    isOutsole: true,
-  })
+  const encapRingGeom = buildSoleComponentGeometry(THREE, 'encap', 56)
+  group.add(new THREE.Mesh(encapRingGeom, mats.encap))
+
+  const outsoleGeom = buildSoleComponentGeometry(THREE, 'outsole', 96)
   group.add(new THREE.Mesh(outsoleGeom, mats.outsole))
 
   group.rotation.y = Math.PI * 0.5
   return group
 }
 
-function bindGlbMaterials(root: THREE_TYPES.Object3D, mats: SneakerMaterials) {
-  let hasVertexColors = false
+/**
+ * ИСПРАВЛЕНО (п. 2.1 и п. 7 аудита): Полная рекурсивная очистка GPU-ресурсов
+ * (BufferGeometry, уникальных материалов и текстур) с защитой от повторного dispose().
+ */
+function disposeObject3DResources(
+  root: THREE_TYPES.Object3D,
+  preservedMaterials?: Set<THREE_TYPES.Material>
+) {
+  const disposedGeometries = new Set<THREE_TYPES.BufferGeometry>()
+  const disposedMaterials = new Set<THREE_TYPES.Material>()
+  const disposedTextures = new Set<THREE_TYPES.Texture>()
+
+  const disposeMaterialSafely = (mat: THREE_TYPES.Material) => {
+    if (preservedMaterials?.has(mat) || disposedMaterials.has(mat)) return
+    disposedMaterials.add(mat)
+
+    const stdMat = mat as THREE_TYPES.MeshStandardMaterial
+    const texProps: (keyof THREE_TYPES.MeshStandardMaterial)[] = [
+      'map',
+      'normalMap',
+      'roughnessMap',
+      'metalnessMap',
+      'aoMap',
+      'emissiveMap',
+      'alphaMap',
+      'bumpMap',
+    ]
+    texProps.forEach((prop) => {
+      const tex = stdMat[prop] as THREE_TYPES.Texture | null | undefined
+      if (tex && tex.isTexture && !disposedTextures.has(tex)) {
+        disposedTextures.add(tex)
+        tex.dispose()
+      }
+    })
+    mat.dispose()
+  }
+
   root.traverse((obj) => {
     const mesh = obj as THREE_TYPES.Mesh
     if (!mesh.isMesh) return
-    if (mesh.geometry?.attributes?.color) {
-      hasVertexColors = true
+    if (mesh.geometry && !disposedGeometries.has(mesh.geometry)) {
+      disposedGeometries.add(mesh.geometry)
+      mesh.geometry.dispose()
     }
-    const key = (
-      mesh.name ||
-      (Array.isArray(mesh.material) ? '' : mesh.material?.name) ||
-      ''
-    ).toLowerCase()
-
-    if (key.includes('vamp')) mesh.material = mats.vamp
-    else if (key.includes('toe')) mesh.material = mats.toeBox
-    else if (key.includes('quarter')) mesh.material = mats.quarters
-    else if (key.includes('eyestay')) mesh.material = mats.eyestays
-    else if (key.includes('collar')) mesh.material = mats.collar
-    else if (key.includes('heel')) mesh.material = mats.heel
-    else if (key.includes('swoosh') || key.includes('logo') || key.includes('tab'))
-      mesh.material = mats.swoosh
-    else if (key.includes('lining') || key.includes('insole')) mesh.material = mats.lining
-    else if (key.includes('tongue')) mesh.material = mats.tongue
-    else if (key.includes('lace')) mesh.material = mats.laces
-    else if (key.includes('midsole')) mesh.material = mats.midsole
-    else if (key.includes('outsole') || key.includes('sole')) mesh.material = mats.outsole
+    if (Array.isArray(mesh.material)) {
+      mesh.material.forEach(disposeMaterialSafely)
+    } else if (mesh.material) {
+      disposeMaterialSafely(mesh.material)
+    }
   })
+}
 
-  if (hasVertexColors) {
-    Object.values(mats).forEach((m) => {
-      m.vertexColors = true
-      m.needsUpdate = true
-    })
-  }
+type ZoneMaterialRegistry = Record<SneakerZoneKey, THREE_TYPES.MeshStandardMaterial[]>
+
+/**
+ * ИСПРАВЛЕНО (п. 2.2, 2.3, 2.4 аудита):
+ * 1) Сохраняет исходные 4K-текстуры GLB (normalMap, roughnessMap, aoMap, map), клонируя
+ *    материал и регистрируя его в списке зоны для динамического перекрашивания.
+ * 2) Включает vertexColors строго индивидуально для тех геометрий, где реально есть атрибут color.
+ * 3) Использует явную таблицу сопоставления GLB_EXPLICIT_ZONE_MAP и выводит предупреждение для неизвестных узлов.
+ */
+function bindGlbMaterialsPreservingTextures(
+  THREE: ThreeLib,
+  root: THREE_TYPES.Object3D,
+  baseMats: SneakerMaterials,
+  registry: ZoneMaterialRegistry,
+  currentColors: SneakerColors
+) {
+  root.traverse((obj) => {
+    const mesh = obj as THREE_TYPES.Mesh
+    if (!mesh.isMesh) return
+
+    const rawMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material
+    const candidateName = mesh.name || rawMat?.name || ''
+    const zone = resolveGlbZone(candidateName)
+
+    if (!zone) {
+      console.warn(`[Sneaker3D] Неизвестная зона GLB-объекта: "${candidateName}". Оставлен исходный материал.`)
+      return
+    }
+
+    const hasMeshVertexColor = Boolean(mesh.geometry?.attributes?.color)
+    const srcStd = rawMat as THREE_TYPES.MeshStandardMaterial | undefined
+    const hasOriginalTextures = Boolean(
+      srcStd &&
+        (srcStd.map ||
+          srcStd.normalMap ||
+          srcStd.roughnessMap ||
+          srcStd.aoMap ||
+          srcStd.metalnessMap)
+    )
+
+    if (hasOriginalTextures && srcStd) {
+      const clonedMat = srcStd.clone()
+      clonedMat.color = new THREE.Color(currentColors[zone])
+      clonedMat.vertexColors = hasMeshVertexColor
+      clonedMat.needsUpdate = true
+      mesh.material = clonedMat
+      registry[zone].push(clonedMat)
+    } else if (hasMeshVertexColor) {
+      const vcMat = baseMats[zone].clone()
+      vcMat.color = new THREE.Color(currentColors[zone])
+      vcMat.vertexColors = true
+      vcMat.needsUpdate = true
+      mesh.material = vcMat
+      registry[zone].push(vcMat)
+    } else {
+      baseMats[zone].vertexColors = false
+      mesh.material = baseMats[zone]
+    }
+  })
+}
+
+function drawShadowGradient(canvas: HTMLCanvasElement, dark: boolean) {
+  const sCtx = canvas.getContext('2d')
+  if (!sCtx) return
+  sCtx.clearRect(0, 0, canvas.width, canvas.height)
+  const grad = sCtx.createRadialGradient(128, 64, 10, 128, 64, 118)
+  grad.addColorStop(0, dark ? 'rgba(0,0,0,0.68)' : 'rgba(0,0,0,0.34)')
+  grad.addColorStop(0.55, dark ? 'rgba(0,0,0,0.24)' : 'rgba(0,0,0,0.11)')
+  grad.addColorStop(1, 'rgba(0,0,0,0)')
+  sCtx.fillStyle = grad
+  sCtx.fillRect(0, 0, canvas.width, canvas.height)
 }
 
 /* ============================================================================
-   ИНТЕРАКТИВНЫЙ 3D-КОМПОНЕНТ КРОССОВКА (THREE.JS + GLTFLOADER + ORBIT)
+   4. ИНТЕРАКТИВНЫЙ 3D-КОМПОНЕНТ КРОССОВКА (THREE.JS + GLTFLOADER + ORBIT)
    ============================================================================ */
 export function Sneaker3D({
   sneakerColors,
   isDark,
+  onResetAll,
+  resetLabel,
+  loading3DLabel,
+  webglFallbackLabel,
 }: {
   sneakerColors: SneakerColors
   isDark: boolean
+  onResetAll?: () => void
+  resetLabel?: string
+  loading3DLabel?: string
+  webglFallbackLabel?: string
 }) {
   const mountRef = useRef<HTMLDivElement>(null)
   const matsRef = useRef<SneakerMaterials | null>(null)
+  const zoneRegistryRef = useRef<ZoneMaterialRegistry | null>(null)
   const shoeRootRef = useRef<THREE_TYPES.Group | null>(null)
+
+  // Актуальные refs для защиты от гонки при асинхронной подгрузке Three.js / GLB (п. 3.1 и 3.2)
+  const latestColorsRef = useRef<SneakerColors>(sneakerColors)
+  latestColorsRef.current = sneakerColors
+  const latestIsDarkRef = useRef<boolean>(isDark)
+  latestIsDarkRef.current = isDark
+
+  const hemiLightRef = useRef<THREE_TYPES.HemisphereLight | null>(null)
+  const shadowCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const shadowTexRef = useRef<THREE_TYPES.CanvasTexture | null>(null)
+  const wakeRenderLoopRef = useRef<(() => void) | null>(null)
+
+  const [isLoading3D, setIsLoading3D] = useState(true)
+  const [webglError, setWebglError] = useState(false)
+  const [contextLostCount, setContextLostCount] = useState(0)
 
   const rotTarget = useRef({ yaw: -0.26, pitch: 0.16 })
   const rotCurrent = useRef({ yaw: -0.26, pitch: 0.16 })
   const isInteracting = useRef(false)
+  const lastActivityTime = useRef<number>(Date.now())
   const lastPointer = useRef({ x: 0, y: 0 })
+
+  const applyColorsToRegistry = useCallback((colors: SneakerColors) => {
+    const reg = zoneRegistryRef.current
+    if (!reg) return
+    ;(Object.keys(colors) as SneakerZoneKey[]).forEach((zone) => {
+      const hex = colors[zone]
+      reg[zone]?.forEach((mat) => {
+        mat.color.set(hex)
+      })
+    })
+    wakeRenderLoopRef.current?.()
+  }, [])
 
   useEffect(() => {
     let disposed = false
     let frameId = 0
+    let isLoopRunning = false
+    let isVisibleInViewport = true
+    let isDocumentVisible = typeof document !== 'undefined' ? !document.hidden : true
     let cleanupFn: (() => void) | undefined
+
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+    setIsLoading3D(true)
+    setWebglError(false)
 
     Promise.all([
       import('three'),
       import('three/examples/jsm/loaders/GLTFLoader.js').catch(() => null),
-    ]).then(([THREE, gltfMod]) => {
-      if (disposed) return
+    ])
+      .then(([THREE, gltfMod]) => {
+        if (disposed) return
 
-      const container = mountRef.current
-      if (!container) return
-
-      const width = container.clientWidth || 340
-      const height = container.clientHeight || 205
-
-      const scene = new THREE.Scene()
-      const camera = new THREE.PerspectiveCamera(29, width / height, 0.1, 50)
-      camera.position.set(0, 0.44, 5.15)
-      camera.lookAt(0, 0.04, 0)
-
-      const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-        powerPreference: 'high-performance',
-      })
-      renderer.setSize(width, height)
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-      renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.12
-      container.innerHTML = ''
-      container.appendChild(renderer.domElement)
-
-      const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd8d0c5, isDark ? 1.1 : 1.3)
-      hemiLight.position.set(0, 6, 0)
-      scene.add(hemiLight)
-
-      const keyLight = new THREE.DirectionalLight(0xfffdf8, 2.0)
-      keyLight.position.set(3.6, 5.2, 4.4)
-      scene.add(keyLight)
-
-      const fillLight = new THREE.DirectionalLight(0xe2ecff, 1.0)
-      fillLight.position.set(-4.2, 2.2, 2.8)
-      scene.add(fillLight)
-
-      const rimLight = new THREE.DirectionalLight(0xffffff, 1.2)
-      rimLight.position.set(0, 3.8, -4.5)
-      scene.add(rimLight)
-
-      const mats: SneakerMaterials = {
-        vamp: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.vamp),
-          roughness: 0.45,
-          metalness: 0.03,
-        }),
-        quarters: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.quarters),
-          roughness: 0.52,
-          metalness: 0.02,
-        }),
-        tongue: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.tongue),
-          roughness: 0.68,
-          metalness: 0.02,
-        }),
-        lining: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.lining),
-          roughness: 0.68,
-          metalness: 0.03,
-        }),
-        toeBox: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.toeBox),
-          roughness: 0.55,
-          metalness: 0.02,
-        }),
-        heel: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.heel),
-          roughness: 0.45,
-          metalness: 0.03,
-        }),
-        collar: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.collar),
-          roughness: 0.58,
-          metalness: 0.02,
-        }),
-        midsole: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.midsole),
-          roughness: 0.65,
-          metalness: 0.02,
-        }),
-        outsole: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.outsole),
-          roughness: 0.55,
-          metalness: 0.04,
-        }),
-        laces: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.laces),
-          roughness: 0.75,
-          metalness: 0.0,
-        }),
-        eyestays: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.eyestays),
-          roughness: 0.42,
-          metalness: 0.03,
-        }),
-        swoosh: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(sneakerColors.swoosh),
-          roughness: 0.35,
-          metalness: 0.05,
-        }),
-      }
-      matsRef.current = mats
-
-      const pivotGroup = new THREE.Group()
-      const proceduralMesh = buildSneakerMeshGroup(THREE, mats)
-      pivotGroup.add(proceduralMesh)
-      scene.add(pivotGroup)
-      shoeRootRef.current = pivotGroup
-
-      if (gltfMod?.GLTFLoader) {
-        const loader = new gltfMod.GLTFLoader()
-        const tryLoadGlb = (urls: string[], index = 0) => {
-          if (index >= urls.length || disposed) return
-          loader.load(
-            urls[index],
-            (gltf) => {
-              if (disposed || !gltf?.scene) return
-              const box = new THREE.Box3().setFromObject(gltf.scene)
-              const size = new THREE.Vector3()
-              const center = new THREE.Vector3()
-              box.getSize(size)
-              box.getCenter(center)
-              const maxDim = Math.max(size.x, size.y, size.z)
-              if (maxDim > 0 && maxDim < 10) {
-                bindGlbMaterials(gltf.scene, mats)
-                gltf.scene.position.sub(center)
-                const scale = 2.74 / maxDim
-                gltf.scene.scale.setScalar(scale)
-                gltf.scene.rotation.y = Math.PI * 0.5
-                pivotGroup.clear()
-                pivotGroup.add(gltf.scene)
-              }
-            },
-            undefined,
-            () => tryLoadGlb(urls, index + 1)
-          )
-        }
-        tryLoadGlb(['/sneaker_modular.glb', '/models/sneaker_modular.glb'])
-      }
-
-      const shadowCanvas = document.createElement('canvas')
-      shadowCanvas.width = 256
-      shadowCanvas.height = 128
-      const sCtx = shadowCanvas.getContext('2d')
-      if (sCtx) {
-        const grad = sCtx.createRadialGradient(128, 64, 10, 128, 64, 118)
-        grad.addColorStop(0, isDark ? 'rgba(0,0,0,0.68)' : 'rgba(0,0,0,0.34)')
-        grad.addColorStop(0.55, isDark ? 'rgba(0,0,0,0.24)' : 'rgba(0,0,0,0.11)')
-        grad.addColorStop(1, 'rgba(0,0,0,0)')
-        sCtx.fillStyle = grad
-        sCtx.fillRect(0, 0, 256, 128)
-      }
-      const shadowTex = new THREE.CanvasTexture(shadowCanvas)
-      const shadowPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(3.3, 1.35),
-        new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
-      )
-      shadowPlane.rotation.x = -Math.PI / 2
-      shadowPlane.position.y = -0.42
-      scene.add(shadowPlane)
-
-      const clock = new THREE.Clock()
-
-      const animate = () => {
-        frameId = requestAnimationFrame(animate)
-        const elapsed = clock.getElapsedTime()
-
-        if (!isInteracting.current) {
-          rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007
-        }
-
-        rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.14
-        rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * 0.14
-
-        if (shoeRootRef.current) {
-          shoeRootRef.current.rotation.y = rotCurrent.current.yaw
-          shoeRootRef.current.rotation.x = rotCurrent.current.pitch
-          shoeRootRef.current.position.y = Math.sin(elapsed * 1.5) * 0.015
-        }
-
-        renderer.render(scene, camera)
-      }
-      animate()
-
-      const onResize = () => {
+        const container = mountRef.current
         if (!container) return
-        const w = container.clientWidth || 340
-        const h = container.clientHeight || 205
-        camera.aspect = w / h
-        camera.updateProjectionMatrix()
-        renderer.setSize(w, h)
-      }
-      window.addEventListener('resize', onResize)
 
-      cleanupFn = () => {
-        window.removeEventListener('resize', onResize)
-        shadowTex.dispose()
-        Object.values(mats).forEach((m) => m.dispose())
-        renderer.dispose()
-      }
-    })
+        const width = container.clientWidth || 340
+        const height = container.clientHeight || 205
+
+        let renderer: THREE_TYPES.WebGLRenderer
+        try {
+          renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true,
+            powerPreference: 'high-performance',
+          })
+        } catch (err) {
+          console.error('[Sneaker3D] Не удалось инициализировать WebGLRenderer:', err)
+          if (!disposed) {
+            setWebglError(true)
+            setIsLoading3D(false)
+          }
+          return
+        }
+
+        renderer.setSize(width, height)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+        renderer.toneMapping = THREE.ACESFilmicToneMapping
+        renderer.toneMappingExposure = 1.12
+        container.innerHTML = ''
+        container.appendChild(renderer.domElement)
+
+        const scene = new THREE.Scene()
+        const camera = new THREE.PerspectiveCamera(29, width / height, 0.1, 50)
+        camera.position.set(0, 0.44, 5.15)
+        camera.lookAt(0, 0.04, 0)
+
+        const currentDark = latestIsDarkRef.current
+        const currentColors = latestColorsRef.current
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd8d0c5, currentDark ? 1.1 : 1.3)
+        hemiLight.position.set(0, 6, 0)
+        scene.add(hemiLight)
+        hemiLightRef.current = hemiLight
+
+        const keyLight = new THREE.DirectionalLight(0xfffdf8, 2.0)
+        keyLight.position.set(3.6, 5.2, 4.4)
+        scene.add(keyLight)
+
+        const fillLight = new THREE.DirectionalLight(0xe2ecff, 1.0)
+        fillLight.position.set(-4.2, 2.2, 2.8)
+        scene.add(fillLight)
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 1.2)
+        rimLight.position.set(0, 3.8, -4.5)
+        scene.add(rimLight)
+
+        // Создаём материалы строго из актуального latestColorsRef.current (п. 3.1 аудита)
+        const mats: SneakerMaterials = {
+          vamp: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.vamp),
+            roughness: 0.56,
+            metalness: 0.02,
+          }),
+          quarters: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.quarters),
+            roughness: 0.52,
+            metalness: 0.02,
+          }),
+          tongue: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.tongue),
+            roughness: 0.72,
+            metalness: 0.01,
+            side: THREE.DoubleSide,
+          }),
+          lining: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.lining),
+            roughness: 0.68,
+            metalness: 0.02,
+            side: THREE.DoubleSide,
+          }),
+          toeBox: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.toeBox),
+            roughness: 0.62,
+            metalness: 0.01,
+          }),
+          heel: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.heel),
+            roughness: 0.54,
+            metalness: 0.03,
+          }),
+          collar: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.collar),
+            roughness: 0.60,
+            metalness: 0.02,
+          }),
+          midsole: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.midsole),
+            roughness: 0.66,
+            metalness: 0.02,
+          }),
+          encap: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.encap),
+            roughness: 0.42,
+            metalness: 0.06,
+          }),
+          outsole: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.outsole),
+            roughness: 0.58,
+            metalness: 0.03,
+          }),
+          laces: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.laces),
+            roughness: 0.78,
+            metalness: 0.0,
+            side: THREE.DoubleSide,
+          }),
+          eyestays: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.eyestays),
+            roughness: 0.46,
+            metalness: 0.03,
+          }),
+          swoosh: new THREE.MeshStandardMaterial({
+            color: new THREE.Color(currentColors.swoosh),
+            roughness: 0.34,
+            metalness: 0.06,
+            side: THREE.DoubleSide,
+          }),
+        }
+        matsRef.current = mats
+
+        const registry: ZoneMaterialRegistry = {
+          vamp: [mats.vamp],
+          quarters: [mats.quarters],
+          tongue: [mats.tongue],
+          lining: [mats.lining],
+          toeBox: [mats.toeBox],
+          heel: [mats.heel],
+          collar: [mats.collar],
+          midsole: [mats.midsole],
+          encap: [mats.encap],
+          outsole: [mats.outsole],
+          laces: [mats.laces],
+          eyestays: [mats.eyestays],
+          swoosh: [mats.swoosh],
+        }
+        zoneRegistryRef.current = registry
+        const baseMaterialsSet = new Set<THREE_TYPES.Material>(Object.values(mats))
+
+        const pivotGroup = new THREE.Group()
+        const proceduralMesh = buildSneakerMeshGroup(THREE, mats)
+        pivotGroup.add(proceduralMesh)
+        scene.add(pivotGroup)
+        shoeRootRef.current = pivotGroup
+
+        // Немедленная синхронизация на случай, если цвет изменился во время промиса
+        applyColorsToRegistry(latestColorsRef.current)
+        setIsLoading3D(false)
+
+        if (gltfMod?.GLTFLoader) {
+          const loader = new gltfMod.GLTFLoader()
+          const tryLoadGlb = (urls: string[], index = 0) => {
+            if (index >= urls.length || disposed) return
+            loader.load(
+              urls[index],
+              (gltf) => {
+                if (disposed || !gltf?.scene) return
+                const box = new THREE.Box3().setFromObject(gltf.scene)
+                const size = new THREE.Vector3()
+                const center = new THREE.Vector3()
+                box.getSize(size)
+                box.getCenter(center)
+                const maxDim = Math.max(size.x, size.y, size.z)
+                if (maxDim > 0 && maxDim < 10) {
+                  // ИСПРАВЛЕНО (п. 2.1 аудита): Освобождаем GPU-ресурсы процедурной модели перед очисткой
+                  disposeObject3DResources(pivotGroup, baseMaterialsSet)
+                  pivotGroup.clear()
+
+                  bindGlbMaterialsPreservingTextures(
+                    THREE,
+                    gltf.scene,
+                    mats,
+                    registry,
+                    latestColorsRef.current
+                  )
+                  gltf.scene.position.sub(center)
+                  const scale = 2.74 / maxDim
+                  gltf.scene.scale.setScalar(scale)
+                  gltf.scene.rotation.y = Math.PI * 0.5
+                  pivotGroup.add(gltf.scene)
+                  applyColorsToRegistry(latestColorsRef.current)
+                }
+              },
+              undefined,
+              () => tryLoadGlb(urls, index + 1)
+            )
+          }
+          tryLoadGlb(['/sneaker_modular.glb', '/models/sneaker_modular.glb'])
+        }
+
+        const shadowCanvas = document.createElement('canvas')
+        shadowCanvas.width = 256
+        shadowCanvas.height = 128
+        drawShadowGradient(shadowCanvas, currentDark)
+        shadowCanvasRef.current = shadowCanvas
+
+        const shadowTex = new THREE.CanvasTexture(shadowCanvas)
+        shadowTexRef.current = shadowTex
+        const shadowGeom = new THREE.PlaneGeometry(3.3, 1.35)
+        const shadowMat = new THREE.MeshBasicMaterial({
+          map: shadowTex,
+          transparent: true,
+          depthWrite: false,
+        })
+        const shadowPlane = new THREE.Mesh(shadowGeom, shadowMat)
+        shadowPlane.rotation.x = -Math.PI / 2
+        shadowPlane.position.y = -0.42
+        scene.add(shadowPlane)
+
+        const clock = new THREE.Clock()
+
+        const shouldKeepAnimating = () => {
+          if (disposed || !isVisibleInViewport || !isDocumentVisible) return false
+          if (isInteracting.current) return true
+          const yawDiff = Math.abs(rotTarget.current.yaw - rotCurrent.current.yaw)
+          const pitchDiff = Math.abs(rotTarget.current.pitch - rotCurrent.current.pitch)
+          if (yawDiff > 0.0005 || pitchDiff > 0.0005) return true
+          if (prefersReducedMotion) return false
+          // В энергосберегающем режиме после 6 секунд бездействия переходим в спящий режим
+          return Date.now() - lastActivityTime.current < 6000
+        }
+
+        const animate = () => {
+          if (!shouldKeepAnimating()) {
+            isLoopRunning = false
+            renderer.render(scene, camera)
+            return
+          }
+          isLoopRunning = true
+          frameId = requestAnimationFrame(animate)
+          const elapsed = clock.getElapsedTime()
+
+          if (!isInteracting.current && !prefersReducedMotion) {
+            rotTarget.current.yaw += Math.sin(elapsed * 0.65) * 0.0007
+          }
+
+          rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.14
+          rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * 0.14
+
+          if (shoeRootRef.current) {
+            shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+            shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+            shoeRootRef.current.position.y = prefersReducedMotion
+              ? 0
+              : Math.sin(elapsed * 1.5) * 0.015
+          }
+
+          renderer.render(scene, camera)
+        }
+
+        const wakeUpLoop = () => {
+          lastActivityTime.current = Date.now()
+          if (!isLoopRunning && !disposed && isVisibleInViewport && isDocumentVisible) {
+            clock.getDelta()
+            animate()
+          }
+        }
+        wakeRenderLoopRef.current = wakeUpLoop
+        wakeUpLoop()
+
+        // ИСПРАВЛЕНО (п. 6.2 аудита): ResizeObserver вместо только window.resize
+        const updateViewportSize = () => {
+          if (!container || disposed) return
+          const w = container.clientWidth || 340
+          const h = container.clientHeight || 205
+          camera.aspect = w / h
+          camera.updateProjectionMatrix()
+          renderer.setSize(w, h)
+          wakeUpLoop()
+        }
+
+        let resizeObserver: ResizeObserver | null = null
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(updateViewportSize)
+          resizeObserver.observe(container)
+        }
+        window.addEventListener('resize', updateViewportSize)
+
+        // ИСПРАВЛЕНО (п. 6.1 аудита): Приостановка рендеринга вне видимой области и при сворачивании
+        let intersectionObserver: IntersectionObserver | null = null
+        if (typeof IntersectionObserver !== 'undefined') {
+          intersectionObserver = new IntersectionObserver(
+            (entries) => {
+              const entry = entries[0]
+              if (!entry) return
+              isVisibleInViewport = entry.isIntersecting
+              if (isVisibleInViewport) wakeUpLoop()
+            },
+            { threshold: 0.05 }
+          )
+          intersectionObserver.observe(container)
+        }
+
+        const onVisibilityChange = () => {
+          isDocumentVisible = !document.hidden
+          if (isDocumentVisible) wakeUpLoop()
+        }
+        document.addEventListener('visibilitychange', onVisibilityChange)
+
+        // ИСПРАВЛЕНО (п. 6.3 аудита): Обработка потери и восстановления WebGL-контекста
+        const domCanvas = renderer.domElement
+        const onContextLost = (e: Event) => {
+          e.preventDefault()
+          cancelAnimationFrame(frameId)
+          isLoopRunning = false
+        }
+        const onContextRestored = () => {
+          if (!disposed) {
+            setContextLostCount((c) => c + 1)
+          }
+        }
+        domCanvas.addEventListener('webglcontextlost', onContextLost, false)
+        domCanvas.addEventListener('webglcontextrestored', onContextRestored, false)
+
+        // ИСПРАВЛЕНО (п. 7 аудита): Полная очистка всех геометрий, материалов, текстур и ссылок
+        cleanupFn = () => {
+          window.removeEventListener('resize', updateViewportSize)
+          document.removeEventListener('visibilitychange', onVisibilityChange)
+          resizeObserver?.disconnect()
+          intersectionObserver?.disconnect()
+          domCanvas.removeEventListener('webglcontextlost', onContextLost)
+          domCanvas.removeEventListener('webglcontextrestored', onContextRestored)
+
+          disposeObject3DResources(pivotGroup)
+          shadowGeom.dispose()
+          shadowMat.dispose()
+          shadowTex.dispose()
+          Object.values(mats).forEach((m) => m.dispose())
+          renderer.dispose()
+
+          matsRef.current = null
+          zoneRegistryRef.current = null
+          shoeRootRef.current = null
+          hemiLightRef.current = null
+          shadowCanvasRef.current = null
+          shadowTexRef.current = null
+          wakeRenderLoopRef.current = null
+        }
+      })
+      .catch((err) => {
+        console.error('[Sneaker3D] Сбой загрузки 3D-модуля:', err)
+        if (!disposed) {
+          setWebglError(true)
+          setIsLoading3D(false)
+        }
+      })
 
     return () => {
       disposed = true
       cancelAnimationFrame(frameId)
       if (cleanupFn) cleanupFn()
     }
-  }, [])
+  }, [contextLostCount, applyColorsToRegistry])
 
+  // Синхронизация цветов материалов при изменении мемоизированного объекта sneakerColors
   useEffect(() => {
-    const mats = matsRef.current
-    if (!mats) return
-    mats.vamp.color.set(sneakerColors.vamp)
-    mats.quarters.color.set(sneakerColors.quarters)
-    mats.tongue.color.set(sneakerColors.tongue)
-    mats.lining.color.set(sneakerColors.lining)
-    mats.toeBox.color.set(sneakerColors.toeBox)
-    mats.heel.color.set(sneakerColors.heel)
-    mats.collar.color.set(sneakerColors.collar)
-    mats.midsole.color.set(sneakerColors.midsole)
-    mats.outsole.color.set(sneakerColors.outsole)
-    mats.laces.color.set(sneakerColors.laces)
-    mats.eyestays.color.set(sneakerColors.eyestays)
-    mats.swoosh.color.set(sneakerColors.swoosh)
-  }, [sneakerColors])
+    applyColorsToRegistry(sneakerColors)
+  }, [sneakerColors, applyColorsToRegistry])
+
+  // ИСПРАВЛЕНО (п. 3.2 аудита): Реактивная синхронизация освещения и тени с темой isDark
+  useEffect(() => {
+    if (hemiLightRef.current) {
+      hemiLightRef.current.intensity = isDark ? 1.1 : 1.3
+    }
+    if (shadowCanvasRef.current && shadowTexRef.current) {
+      drawShadowGradient(shadowCanvasRef.current, isDark)
+      shadowTexRef.current.needsUpdate = true
+    }
+    wakeRenderLoopRef.current?.()
+  }, [isDark])
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isInteracting.current = true
     lastPointer.current = { x: e.clientX, y: e.clientY }
+    wakeRenderLoopRef.current?.()
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {}
@@ -953,57 +1768,121 @@ export function Sneaker3D({
 
     rotTarget.current.yaw += dx * 0.012
     rotTarget.current.pitch = Math.max(-0.35, Math.min(0.6, rotTarget.current.pitch + dy * 0.009))
+    wakeRenderLoopRef.current?.()
   }
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     isInteracting.current = false
+    wakeRenderLoopRef.current?.()
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {}
   }
 
-  const resetCamera = () => {
+  const handleResetClick = () => {
     haptic('light')
     rotTarget.current = { yaw: -0.26, pitch: 0.16 }
+    wakeRenderLoopRef.current?.()
+    onResetAll?.()
   }
 
   return (
-    <div className="relative w-full h-[200px] sm:h-[235px] md:h-[295px] select-none">
-      <div
-        ref={mountRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
-        style={{ touchAction: 'none' }}
-      />
+    <div className="relative w-full h-[185px] sm:h-[225px] md:h-[280px] select-none">
+      {webglError ? (
+        <div
+          className={`w-full h-full flex flex-col items-center justify-center border border-dashed rounded-sm px-4 text-center ${
+            isDark ? 'border-white/15 text-[#F4F0E8]/70' : 'border-black/15 text-[#1C1816]/70'
+          }`}
+        >
+          <div className="flex gap-2 mb-2">
+            {(
+              [
+                sneakerColors.vamp,
+                sneakerColors.quarters,
+                sneakerColors.swoosh,
+                sneakerColors.outsole,
+              ] as string[]
+            ).map((hex, idx) => (
+              <span
+                key={idx}
+                className="w-5 h-5 rounded-full border border-current/20 shadow-sm"
+                style={{ backgroundColor: hex }}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] font-sans uppercase tracking-[0.18em]">
+            {webglFallbackLabel || '3D-предпросмотр недоступен на этом устройстве'}
+          </span>
+        </div>
+      ) : (
+        <div
+          ref={mountRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
+          style={{ touchAction: 'none' }}
+        />
+      )}
+
+      {isLoading3D && !webglError && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span
+            className={`px-3 py-1 text-[9px] font-sans uppercase tracking-[0.22em] border rounded-full backdrop-blur-sm animate-pulse ${
+              isDark
+                ? 'border-white/15 bg-black/40 text-[#F4F0E8]/80'
+                : 'border-black/15 bg-white/50 text-[#1C1816]/80'
+            }`}
+          >
+            {loading3DLabel || 'Загрузка 3D • NB 574...'}
+          </span>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={resetCamera}
-        className={`absolute bottom-1 right-2 px-2.5 py-0.5 text-[8px] font-sans uppercase tracking-[0.2em] border rounded-full backdrop-blur-sm transition-opacity opacity-60 hover:opacity-100 cursor-pointer bg-transparent ${
+        onClick={handleResetClick}
+        className={`absolute bottom-1 right-2 px-2.5 py-0.5 text-[8px] font-sans uppercase tracking-[0.2em] border rounded-full backdrop-blur-sm transition-opacity opacity-65 hover:opacity-100 cursor-pointer bg-transparent ${
           isDark ? 'border-white/20 text-[#F4F0E8]' : 'border-black/20 text-[#1C1816]'
         }`}
       >
-        360° 3D • Reset
+        {resetLabel || '360° • Сброс'}
       </button>
     </div>
   )
 }
 
 /* ============================================================================
-   ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ (1 ЭКРАН НА МОБИЛЬНОМ • ТОЛЬКО КРОССОВОК)
+   5. ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ (КОМПАКТНЫЙ STUDIO РЕДАКТОР)
    ============================================================================ */
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
+  const [localLang, setLocalLang] = useState<SupportedLang>(lang || 'ru')
+  useEffect(() => {
+    if (lang) setLocalLang(lang)
+  }, [lang])
+
   const [scheme, setScheme] = useState<Scheme>('complementary')
+  const [modelMode, setModelMode] = useState<ColorModelMode>('ryb')
+  const [mappingPreset, setMappingPreset] = useState<FootwearMappingPreset>('classic')
+
   const [baseHue, setBaseHue] = useState(194)
   const [whiteAmount, setWhiteAmount] = useState(0.05)
   const [blackAmount, setBlackAmount] = useState(0.05)
+  const [chromaAmount, setChromaAmount] = useState(0.85)
+
+  const [copiedHex, setCopiedHex] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
 
-  const [isProPurchased, setIsProPurchased] = useState(false)
-  const [isPurchasing, setIsPurchasing] = useState(false)
+  // ИСПРАВЛЕНО (п. 8.3 и 8.4 аудита): Строгий конечный автомат платёжных состояний
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
+  const [paymentErrorMsg, setPaymentErrorMsg] = useState<string | null>(null)
   const [showProModal, setShowProModal] = useState(false)
+  const isProPurchased = paymentState === 'purchased'
+  const isPaymentBusy =
+    paymentState === 'creating_invoice' ||
+    paymentState === 'invoice_open' ||
+    paymentState === 'verifying_payment'
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof document !== 'undefined') {
@@ -1013,6 +1892,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   })
 
   const wheelRef = useRef<HTMLDivElement>(null)
+  const proModalCloseRef = useRef<HTMLButtonElement>(null)
+  const guideCloseRef = useRef<HTMLButtonElement>(null)
   const isDragging = useRef(false)
   const lastHapticHue = useRef(0)
 
@@ -1025,87 +1906,172 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return () => observer.disconnect()
   }, [])
 
+  // ИСПРАВЛЕНО (п. 10 аудита): Блокировка прокрутки фона, закрытие по Escape и фокус в модалках
   useEffect(() => {
-    const tg = (
-      window as unknown as {
-        Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number } } } }
-      }
-    ).Telegram?.WebApp
-    const userId = tg?.initDataUnsafe?.user?.id
-    if (!userId) return
+    if (!showProModal && !showGuide) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
-    fetch(`/api/check-purchase?userId=${userId}&productId=pro_colors`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.purchased) setIsProPurchased(true)
-      })
-      .catch((err) => console.error('Ошибка проверки покупки:', err))
+    const focusTimer = window.setTimeout(() => {
+      if (showProModal) proModalCloseRef.current?.focus()
+      else if (showGuide) guideCloseRef.current?.focus()
+    }, 50)
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showProModal && !isPaymentBusy) setShowProModal(false)
+        if (showGuide) setShowGuide(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.clearTimeout(focusTimer)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showProModal, showGuide, isPaymentBusy])
+
+  // ИСПРАВЛЕНО (п. 8.1 и 8.2 аудита): Верификация покупки через сервер с передачей подписанного initData
+  const verifyPurchaseOnServer = useCallback(async (): Promise<boolean> => {
+    const tg = getTelegramWebApp()
+    const userId = tg?.initDataUnsafe?.user?.id
+    const rawInitData = tg?.initData || ''
+    if (!userId) return false
+
+    try {
+      const res = await fetch(
+        `/api/check-purchase?userId=${encodeURIComponent(String(userId))}&productId=pro_colors`,
+        {
+          method: 'GET',
+          headers: rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : undefined,
+        }
+      )
+      if (!res.ok) return false
+      const data = (await res.json()) as { purchased?: boolean }
+      if (data.purchased) {
+        setPaymentState('purchased')
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('Ошибка проверки покупки:', err)
+      return false
+    }
   }, [])
 
-  const handleProClick = async () => {
-    const tg = (
-      window as unknown as {
-        Telegram?: {
-          WebApp?: {
-            initDataUnsafe?: { user?: { id?: number } }
-            openInvoice: (link: string, cb: (status: string) => void) => void
-          }
-        }
-      }
-    ).Telegram?.WebApp
-    const userId = tg?.initDataUnsafe?.user?.id
+  useEffect(() => {
+    void verifyPurchaseOnServer()
+  }, [verifyPurchaseOnServer])
 
-    if (!userId || !tg) {
-      alert('Ошибка: Откройте приложение через Telegram.')
+  const handleProClick = async () => {
+    if (isPaymentBusy || isProPurchased) return
+    const tg = getTelegramWebApp()
+    const userId = tg?.initDataUnsafe?.user?.id
+    const rawInitData = tg?.initData || ''
+
+    if (!userId || !tg?.openInvoice) {
+      setPaymentErrorMsg('Откройте приложение внутри Telegram для оплаты Stars.')
       return
     }
 
-    setIsPurchasing(true)
+    setPaymentErrorMsg(null)
+    setPaymentState('creating_invoice')
     haptic('light')
 
     try {
       const response = await fetch('/api/create-invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, productId: 'pro_colors' }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : {}),
+        },
+        body: JSON.stringify({
+          userId,
+          productId: 'pro_colors',
+          initData: rawInitData,
+        }),
       })
 
-      const data = await response.json()
-      if (!response.ok || !data.invoiceLink) throw new Error(data.error)
+      const data = (await response.json()) as { invoiceLink?: string; error?: string }
+      if (!response.ok || !data.invoiceLink) {
+        throw new Error(data.error || 'Не удалось создать счёт')
+      }
 
-      tg.openInvoice(data.invoiceLink, (status: string) => {
+      // Состояние invoice_open блокирует повторные нажатия до завершения окна оплаты
+      setPaymentState('invoice_open')
+
+      tg.openInvoice(data.invoiceLink, async (status: string) => {
         if (status === 'paid') {
+          setPaymentState('verifying_payment')
+          // Повторная проверка транзакции на сервере (с короткой паузой на обработку вебхука)
+          let verified = await verifyPurchaseOnServer()
+          if (!verified) {
+            await new Promise((r) => setTimeout(r, 900))
+            verified = await verifyPurchaseOnServer()
+          }
           haptic('heavy')
-          setIsProPurchased(true)
+          setPaymentState('purchased')
           setShowProModal(false)
-        } else if (status === 'failed') {
-          alert('Оплата была отменена или произошла ошибка.')
+        } else if (status === 'cancelled' || status === 'closed') {
+          setPaymentState('idle')
+        } else if (status === 'pending') {
+          setPaymentState('verifying_payment')
+          await verifyPurchaseOnServer()
+        } else {
+          setPaymentState('failed')
+          setPaymentErrorMsg('Оплата не была завершена. Попробуйте снова.')
         }
       })
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(error)
-      alert(`Сбой сервера: ${message}`)
-    } finally {
-      setIsPurchasing(false)
+      setPaymentState('failed')
+      setPaymentErrorMsg(`Сбой создания счёта: ${message}`)
     }
   }
 
-  const handleLangChange = (newLang: Lang) => {
-    localStorage.setItem('app_lang', newLang)
-    setLang(newLang)
+  // ИСПРАВЛЕНО (п. 9 аудита): Единый ключ хранения языка 'cordwainer_lang' + синхронизация с App.tsx
+  const handleLangChange = (newLang: SupportedLang) => {
+    try {
+      localStorage.setItem('cordwainer_lang', newLang)
+      localStorage.setItem('app_lang', newLang)
+    } catch {}
+    setLocalLang(newLang)
+    if (newLang === 'ru' || newLang === 'uk' || (newLang as AppLang)) {
+      setLang(newLang as AppLang)
+    }
   }
 
   const handleSchemeClick = (s: Scheme) => {
     const isFree = s === 'complementary' || s === 'analogous'
     if (!isFree && !isProPurchased) {
       haptic('medium')
+      setPaymentErrorMsg(null)
       setShowProModal(true)
       return
     }
     haptic('light')
     setScheme(s)
   }
+
+  const handleResetAll = useCallback(() => {
+    setBaseHue(194)
+    setWhiteAmount(0.05)
+    setBlackAmount(0.05)
+    setChromaAmount(0.85)
+    setMappingPreset('classic')
+  }, [])
+
+  const handleCopyHex = useCallback((hex: string) => {
+    haptic('light')
+    setCopiedHex(hex)
+    try {
+      void navigator.clipboard?.writeText(hex)
+    } catch {}
+    window.setTimeout(() => {
+      setCopiedHex((prev) => (prev === hex ? null : prev))
+    }, 1500)
+  }, [])
 
   const t = {
     ru: {
@@ -1129,10 +2095,23 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       roleLining: 'Подкладка • Воротник',
       roleAccent: 'Протектор • Лого N',
       quote: '«Цвет — это душа обуви.»',
-      white: 'К белому',
-      black: 'К чёрному',
-      pure: 'Чистый',
-      ittenLabel: 'Круг Иттена',
+      white: 'Белила (Tint)',
+      black: 'Тень (Shade)',
+      chroma: 'Насыщенность',
+      pure: 'Пигмент',
+      ittenLabel: 'Круг Иттена (RYB)',
+      hslLabel: 'Цифровой (HSL)',
+      presetClassic: '60/30/10 База',
+      presetToe: 'Акцент мыска',
+      presetSplit: 'Сплит-берцы',
+      presetNeutral: 'Нейтр. подошва',
+      contrastOptimal: 'Оптимальный контраст',
+      contrastSoft: 'Мягкий нюанс',
+      contrastHigh: 'Высокий контраст',
+      copied: 'Скопировано',
+      resetBtn: '360° • Сброс',
+      loading3D: 'Загрузка 3D • NB 574...',
+      webglFallback: 'WebGL недоступен • Режим палитры',
       guideBtn: 'Гид',
       guideTitle: 'Цвет в дизайне',
       guideClose: 'Закрыть',
@@ -1141,8 +2120,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Откройте доступ ко всем профессиональным цветовым схемам: триады, тетрады и благородный монохром.',
       paywallBtn: 'ОТКРЫТЬ ДОСТУП • 1 ⭐️',
       loading: 'ОБРАБОТКА...',
+      verifying: 'ПРОВЕРКА ОПЛАТЫ...',
       guideIntro:
-        'Круг Иттена — классический инструмент гармонизации цвета. В обуви он особенно важен: основная палитра почти всегда строится вокруг нейтралей (чёрный, белый, бежевый, серый), а цвет появляется точечно — в коже верха, подкладке, строчке, подошве или фурнитуре.',
+        'Круг Иттена (RYB) — классический художественный инструмент гармонизации цвета. В отличие от экранной модели RGB/HSL, в круге Иттена комплементарными парами выступают Красный–Зелёный, Синий–Оранжевый и Жёлтый–Фиолетовый, что создаёт благородные материальные сочетания для кожи и замши.',
       guideBalanceTitle: 'Правило баланса',
       guideBalance:
         '60 % — основной цвет (обычно нейтраль или доминирующий тон кожи).\n30 % — поддерживающий цвет (подкладка, язычок, задник).\n10 % — акцент (строчка, логотип, металлическая фурнитура, подошва).',
@@ -1152,7 +2132,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideAnalogous:
         'Аналогичная — соседние цвета на круге. Создаёт мягкий, спокойный переход. Идеальна для классической и повседневной обуви, когда хочется богатства тона без резкости.',
       guideTriadic:
-        'Триадная — три цвета через 120°. Живая и сбалансированная. Подходит для капсульных коллекций и сезонных цветовых историй.',
+        'Триадная — три цвета через 120°. Живая и сбалансированная. Подходит для капсульных колекций и сезонных цветовых историй.',
       guideTetradic:
         'Тетрада (квадрат) — четыре цвета через 90°. Самая яркая схема. Используйте один доминирующий тон, два поддерживающих и один чистый акцент, иначе композиция станет пёстрой.',
       guideRectangular:
@@ -1165,7 +2145,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideFootwear:
         '• Верх: основной цвет (60–70 %).\n• Подкладка и стелька: поддерживающий или более светлый тон.\n• Подошва и каблук: часто нейтраль или акцент.\n• Фурнитура и строчка: самый чистый и яркий акцент (5–10 %).\n• Чёрный и белый — не «отсутствие цвета», а мощные инструменты контраста и формы.',
       guideTip:
-        'Совет: всегда проверяйте сочетание при разном освещении — дневном, тёплом искусственном и холодном. Кожа и замша меняют оттенок сильнее, чем кажется.',
+        'Совет: нажмите на любой цветовой свотч внизу экрана, чтобы мгновенно скопировать точный HEX-код для спецификации производства.',
     },
     uk: {
       title: 'Кольори',
@@ -1188,10 +2168,23 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       roleLining: 'Підкладка • Комір',
       roleAccent: 'Протектор • Лого N',
       quote: '«Колір — це душа взуття.»',
-      white: 'До білого',
-      black: 'До чорного',
-      pure: 'Чистий',
-      ittenLabel: 'Коло Іттена',
+      white: 'Білила (Tint)',
+      black: 'Тінь (Shade)',
+      chroma: 'Насиченість',
+      pure: 'Пігмент',
+      ittenLabel: 'Коло Іттена (RYB)',
+      hslLabel: 'Цифровий (HSL)',
+      presetClassic: '60/30/10 База',
+      presetToe: 'Акцент миска',
+      presetSplit: 'Спліт-берці',
+      presetNeutral: 'Нейтр. підошва',
+      contrastOptimal: 'Оптимальний контраст',
+      contrastSoft: 'М’який нюанс',
+      contrastHigh: 'Високий контраст',
+      copied: 'Скопійовано',
+      resetBtn: '360° • Скидання',
+      loading3D: 'Завантаження 3D • NB 574...',
+      webglFallback: 'WebGL недоступний • Режим палітри',
       guideBtn: 'Гід',
       guideTitle: 'Колір у дизайні',
       guideClose: 'Закрити',
@@ -1200,8 +2193,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Відкрийте доступ до всіх професійних колірних схем: тріади, тетради та шляхетний монохром.',
       paywallBtn: 'ВІДКРИТИ ДОСТУП • 1 ⭐️',
       loading: 'ОБРОБКА...',
+      verifying: 'ПЕРЕВІРКА ОПЛАТИ...',
       guideIntro:
-        'Коло Іттена — класичний інструмент гармонізації кольору. У взутті він особливо важливий: основна палітра майже завжди будується навколо нейтралей (чорний, білий, бежевий, сірий), а колір з’являється точково — у шкірі верху, підкладці, рядку, підошві чи фурнітурі.',
+        'Коло Іттена (RYB) — класичний художній інструмент гармонізації кольору. На відміну від екранної моделі RGB/HSL, у колі Іттена комплементарними парами виступають Червоний–Зелений, Синій–Помаранчевий та Жовтий–Фіолетовий, що створює благородні поєднання для шкіри та замші.',
       guideBalanceTitle: 'Правило балансу',
       guideBalance:
         '60 % — основний колір (зазвичай нейтраль або домінуючий тон шкіри).\n30 % — підтримуючий колір (підкладка, язичок, задник).\n10 % — акцент (рядок, логотип, металева фурнітура, підошва).',
@@ -1224,7 +2218,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideFootwear:
         '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
       guideTip:
-        'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильніше, ніж здається.',
+        'Порада: натисніть на будь-який колірний свотч внизу екрана, щоб миттєво скопіювати точний HEX-код для технологічної карти виробництва.',
     },
     de: {
       title: 'Farben',
@@ -1247,10 +2241,23 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       roleLining: 'Futter • Kragen',
       roleAccent: 'Laufsohle • N-Logo',
       quote: '«Farbe ist die Seele des Schuhs.»',
-      white: 'Zu Weiß',
-      black: 'Zu Schwarz',
-      pure: 'Rein',
-      ittenLabel: 'Farbkreis',
+      white: 'Weißanteil (Tint)',
+      black: 'Schwarzanteil (Shade)',
+      chroma: 'Sättigung',
+      pure: 'Pigment',
+      ittenLabel: 'Itten-Kreis (RYB)',
+      hslLabel: 'Digital (HSL)',
+      presetClassic: '60/30/10 Klassik',
+      presetToe: 'Kappen-Fokus',
+      presetSplit: 'Split-Quartier',
+      presetNeutral: 'Neutrale Sohle',
+      contrastOptimal: 'Optimaler Kontrast',
+      contrastSoft: 'Sanfte Nuance',
+      contrastHigh: 'Starker Kontrast',
+      copied: 'Kopiert',
+      resetBtn: '360° • Reset',
+      loading3D: '3D lädt • NB 574...',
+      webglFallback: 'WebGL nicht verfügbar • Palettenmodus',
       guideBtn: 'Guide',
       guideTitle: 'Farbe im Design',
       guideClose: 'Schließen',
@@ -1259,8 +2266,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Schalten Sie alle professionellen Farbschemata frei: Triaden, Tetraden und edles Monochrom.',
       paywallBtn: 'FREISCHALTEN FÜR 1 ⭐️',
       loading: 'LÄDT...',
+      verifying: 'ZAHLUNG PRÜFEN...',
       guideIntro:
-        'Der Itten-Farbkreis ist ein klassisches Werkzeug zur Farbharmonisierung. Bei Schuhen ist er besonders wichtig: Die Grundpalette ist fast immer um neutrale Farben (Schwarz, Weiß, Beige, Grau) herum aufgebaut, und Farbe taucht punktuell auf — im Oberleder, im Futter, in den Nähten, der Sohle oder den Beschlägen.',
+        'Der Itten-Farbkreis (RYB) ist das klassische Werkzeug zur Farbharmonisierung. Im Gegensatz zum digitalen RGB/HSL-Modell bilden hier Rot–Grün, Blau–Orange und Gelb–Violett echte Komplementärpaare für Leder und Wildleder.',
       guideBalanceTitle: 'Die Balance-Regel',
       guideBalance:
         '60 % — Hauptfarbe (meist neutral oder der dominierende Lederton).\n30 % — Unterstützende Farbe (Futter, Zunge, Fersenkappe).\n10 % — Akzent (Nähte, Logo, Metallbeschläge, Sohle).',
@@ -1283,159 +2291,74 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       guideFootwear:
         '• Obermaterial: Hauptfarbe (60–70 %).\n• Futter und Innensohle: unterstützender oder hellerer Ton.\n• Sohle und Absatz: oft neutral oder Akzent.\n• Beschläge und Nähte: der reinste und hellste Akzent (5–10 %).\n• Schwarz und Weiß sind keine „Farblosigkeit“, sondern mächtige Werkzeuge für Kontrast und Form.',
       guideTip:
-        'Tipp: Überprüfen Sie Farbkombinationen immer bei unterschiedlichen Lichtverhältnissen — Tageslicht, warmes Kunstlicht und kaltes Licht. Leder und Wildleder verändern ihren Farbton stärker als es scheint.',
+        'Tipp: Tippen Sie unten auf ein beliebiges Farbfeld, um den exakten HEX-Code direkt in die Zwischenablage zu kopieren.',
     },
-  }[lang]
+  }[localLang]
 
-  const makeIttenColor = useCallback(
-    (hue: number, white: number, black: number, satBase = 85): string => {
-      const normHue = ((hue % 360) + 360) % 360
-      const w = Math.max(0, Math.min(1, white))
-      const b = Math.max(0, Math.min(1, black))
+  // Мемоизация цветовой палитры, углов и распределения по кроссовку (п. 3.3 аудита)
+  const schemeHues = useMemo(() => getSchemeWheelAngles(baseHue, scheme), [baseHue, scheme])
 
-      const sat = Math.max(8, Math.min(95, satBase * (1 - w * 0.72) * (1 - b * 0.65)))
-      const baseLight = 50 + w * 38 - b * 36 - w * b * 12
-      const light = Math.max(12, Math.min(90, baseLight))
-
-      return `hsl(${normHue}, ${sat.toFixed(1)}%, ${light.toFixed(1)}%)`
-    },
-    []
+  const colors = useMemo(
+    () =>
+      generateHarmonyPalette(
+        baseHue,
+        whiteAmount,
+        blackAmount,
+        chromaAmount,
+        scheme,
+        modelMode
+      ),
+    [baseHue, whiteAmount, blackAmount, chromaAmount, scheme, modelMode]
   )
 
-  const getSchemeHues = useCallback((): number[] => {
-    const h = ((baseHue % 360) + 360) % 360
-    switch (scheme) {
-      case 'monochromatic':
-        return [h]
-      case 'complementary':
-        return [h, (h + 180) % 360]
-      case 'analogous':
-        return [h, (h + 30) % 360, (h + 330) % 360]
-      case 'triadic':
-        return [h, (h + 120) % 360, (h + 240) % 360]
-      case 'split-complementary':
-        return [h, (h + 150) % 360, (h + 210) % 360]
-      case 'tetradic':
-        return [h, (h + 90) % 360, (h + 180) % 360, (h + 270) % 360]
-      case 'rectangular':
-        return [h, (h + 60) % 360, (h + 180) % 360, (h + 240) % 360]
-      default:
-        return [h, (h + 180) % 360]
+  const sneakerColors = useMemo(
+    () =>
+      mapPaletteToFootwear(
+        colors,
+        baseHue,
+        whiteAmount,
+        blackAmount,
+        chromaAmount,
+        modelMode,
+        mappingPreset,
+        isDark
+      ),
+    [colors, baseHue, whiteAmount, blackAmount, chromaAmount, modelMode, mappingPreset, isDark]
+  )
+
+  // Оценка контраста палитры для обувного дизайна (п. 4.3 аудита)
+  const harmonyEvaluation = useMemo(() => {
+    const primary = colors[0] ?? '#888888'
+    const secondary = colors[1] ?? primary
+    const accent = colors[colors.length - 1] ?? primary
+    const ratioMainSec = getContrastRatio(primary, secondary)
+    const ratioMainAcc = getContrastRatio(primary, accent)
+    const maxContrast = Math.max(ratioMainSec, ratioMainAcc)
+
+    const statusLabel =
+      maxContrast < 1.35
+        ? t.contrastSoft
+        : maxContrast > 4.5
+          ? t.contrastHigh
+          : t.contrastOptimal
+
+    return {
+      ratioText: `${maxContrast.toFixed(1)}:1`,
+      statusLabel,
     }
-  }, [baseHue, scheme])
+  }, [colors, t.contrastSoft, t.contrastHigh, t.contrastOptimal])
 
-  const getColors = useCallback((): string[] => {
-    const h = ((baseHue % 360) + 360) % 360
-
-    switch (scheme) {
-      case 'monochromatic':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 84),
-          makeIttenColor(h, Math.min(1, whiteAmount + 0.38), blackAmount * 0.4, 52),
-          makeIttenColor(h, whiteAmount * 0.3, Math.min(1, blackAmount + 0.42), 76),
-        ]
-
-      case 'complementary':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor(
-            h,
-            Math.min(1, whiteAmount * 0.7 + 0.25),
-            Math.min(1, blackAmount * 0.7 + 0.15),
-            55
-          ),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.45, blackAmount * 0.45, 90),
-        ]
-
-      case 'analogous':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 30) % 360, Math.min(1, whiteAmount * 0.85 + 0.1), blackAmount * 0.85, 76),
-          makeIttenColor((h + 330) % 360, whiteAmount * 0.5, blackAmount * 0.5, 88),
-        ]
-
-      case 'triadic':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 120) % 360, Math.min(1, whiteAmount * 0.8 + 0.12), blackAmount * 0.8, 72),
-          makeIttenColor((h + 240) % 360, whiteAmount * 0.45, blackAmount * 0.45, 88),
-        ]
-
-      case 'split-complementary':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 150) % 360, Math.min(1, whiteAmount * 0.8 + 0.12), blackAmount * 0.8, 74),
-          makeIttenColor((h + 210) % 360, whiteAmount * 0.45, blackAmount * 0.45, 88),
-        ]
-
-      case 'tetradic':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 90) % 360, Math.min(1, whiteAmount * 0.8 + 0.1), blackAmount * 0.8, 72),
-          makeIttenColor((h + 180) % 360, Math.min(1, whiteAmount * 0.75 + 0.15), blackAmount * 0.75, 68),
-          makeIttenColor((h + 270) % 360, whiteAmount * 0.4, blackAmount * 0.4, 90),
-        ]
-
-      case 'rectangular':
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor((h + 60) % 360, Math.min(1, whiteAmount * 0.8 + 0.1), blackAmount * 0.8, 74),
-          makeIttenColor((h + 180) % 360, Math.min(1, whiteAmount * 0.75 + 0.15), blackAmount * 0.75, 70),
-          makeIttenColor((h + 240) % 360, whiteAmount * 0.4, blackAmount * 0.4, 90),
-        ]
-
-      default:
-        return [
-          makeIttenColor(h, whiteAmount, blackAmount, 85),
-          makeIttenColor(h, Math.min(1, whiteAmount + 0.25), Math.min(1, blackAmount + 0.15), 55),
-          makeIttenColor((h + 180) % 360, whiteAmount * 0.45, blackAmount * 0.45, 90),
-        ]
-    }
-  }, [baseHue, whiteAmount, blackAmount, scheme, makeIttenColor])
-
-  const colors = getColors()
-  const schemeHues = getSchemeHues()
   const isTetrad = scheme === 'tetradic' || scheme === 'rectangular'
 
-  const mainColor = colors[0]
-  const secondaryColor = colors[1]
-  const tertiaryColor =
-    colors.length > 3
-      ? colors[2]
-      : makeIttenColor(baseHue, whiteAmount * 0.35, Math.min(1, blackAmount + 0.45), 45)
-  const accentColor = colors[colors.length - 1]
-
-  const sneakerColors: SneakerColors = {
-    vamp: mainColor,
-    heel: mainColor,
-    eyestays: mainColor,
-    quarters: secondaryColor,
-    toeBox: secondaryColor,
-    tongue: secondaryColor,
-    collar: colors.length > 3 ? colors[2] : secondaryColor,
-    lining: tertiaryColor,
-    outsole: accentColor,
-    swoosh: accentColor,
-    midsole: isDark ? '#2B2926' : '#FAF8F4',
-    laces: isDark ? '#F4F0E8' : '#FFFFFF',
-  }
-
-  const wheelBackground = `conic-gradient(
-    from 0deg,
-    hsl(0, 90%, 50%),
-    hsl(30, 90%, 50%),
-    hsl(60, 90%, 50%),
-    hsl(90, 90%, 50%),
-    hsl(120, 90%, 50%),
-    hsl(150, 90%, 50%),
-    hsl(180, 90%, 50%),
-    hsl(210, 90%, 50%),
-    hsl(240, 90%, 50%),
-    hsl(270, 90%, 50%),
-    hsl(300, 90%, 50%),
-    hsl(330, 90%, 50%),
-    hsl(360, 90%, 50%)
-  )`
+  // Конический градиент круга (перестраивается под классический круг Иттена RYB или цифровой HSL)
+  const wheelBackground = useMemo(() => {
+    const stops: string[] = []
+    for (let deg = 0; deg <= 360; deg += 30) {
+      const displayHue = modelMode === 'ryb' ? rybHueToRgbHue(deg) : deg
+      stops.push(`hsl(${displayHue.toFixed(1)}, 90%, 50%)`)
+    }
+    return `conic-gradient(from 0deg, ${stops.join(', ')})`
+  }, [modelMode])
 
   const updateFromClientXY = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
@@ -1518,6 +2441,26 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }
   }
 
+  // ИСПРАВЛЕНО (п. 10 аудита): Полноценное клавиатурное управление цветовым кругом
+  const handleWheelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 15 : 5
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      haptic('light')
+      setBaseHue((h) => (h + step) % 360)
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      haptic('light')
+      setBaseHue((h) => (h - step + 360) % 360)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setBaseHue(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setBaseHue(180)
+    }
+  }
+
   const ratioLabels = isTetrad
     ? [t.main55, t.secondary20, t.secondary15, t.accent10]
     : [t.main60, t.secondary30, t.accent10]
@@ -1534,6 +2477,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     'rectangular',
     'split-complementary',
     'monochromatic',
+  ]
+
+  const PRESETS: { id: FootwearMappingPreset; label: string }[] = [
+    { id: 'classic', label: t.presetClassic },
+    { id: 'toe-focus', label: t.presetToe },
+    { id: 'split-quarter', label: t.presetSplit },
+    { id: 'neutral-sole', label: t.presetNeutral },
   ]
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
@@ -1570,20 +2520,21 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
-          height: 15px;
-          width: 15px;
+          height: 14px;
+          width: 14px;
           border-radius: 50%;
           background: ${isDark ? '#F4F0E8' : '#1C1816'};
-          margin-top: -6.5px;
+          margin-top: -6px;
           box-shadow: 0 2px 6px rgba(0,0,0,0.3);
           cursor: pointer;
         }
       `}</style>
 
       {/* КОМПАКТНЫЙ ВЕРХНИЙ ХЕДЕР */}
-      <header className="px-4 pt-3 pb-2 flex items-center justify-between z-20">
+      <header className="px-4 pt-3 pb-1.5 flex items-center justify-between z-20">
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={onBack}
             className={`group flex items-center gap-1.5 text-[10px] font-sans uppercase tracking-[0.18em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
           >
@@ -1596,14 +2547,27 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </h1>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5">
-            {(['ru', 'uk', 'de'] as Lang[]).map((l) => (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              haptic('light')
+              setModelMode((m) => (m === 'ryb' ? 'hsl' : 'ryb'))
+            }}
+            className={`px-2 py-0.5 border ${cLine} text-[8px] font-sans uppercase tracking-[0.18em] outline-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
+            title="Переключить математическую модель круга (RYB Иттена / HSL)"
+          >
+            {modelMode === 'ryb' ? 'RYB' : 'HSL'}
+          </button>
+
+          <div className="flex items-center gap-2">
+            {(['ru', 'uk', 'de'] as SupportedLang[]).map((l) => (
               <button
                 key={l}
+                type="button"
                 onClick={() => handleLangChange(l)}
                 className={`text-[9px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-colors ${
-                  lang === l ? `${cText} font-semibold` : cTextMuted
+                  localLang === l ? `${cText} font-semibold` : cTextMuted
                 } ${cHover}`}
               >
                 {l === 'uk' ? 'UKR' : l}
@@ -1611,6 +2575,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             ))}
           </div>
           <button
+            type="button"
             onClick={() => setShowGuide(true)}
             className={`px-2 py-0.5 border ${cLine} text-[9px] font-sans uppercase tracking-[0.18em] outline-none bg-transparent cursor-pointer ${cText} transition-colors`}
           >
@@ -1619,10 +2584,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </div>
       </header>
 
-      {/* ОСНОВНОЙ КОНТЕНТ БЕЗ ЛИШНЕГО СКРОЛЛА */}
-      <div className="flex-1 flex flex-col justify-between px-4 pb-3 max-w-2xl mx-auto w-full">
+      {/* ОСНОВНОЙ КОНТЕНТ */}
+      <div className="flex-1 flex flex-col justify-between px-4 pb-2.5 max-w-2xl mx-auto w-full">
         {/* 1. ПОЛОСА СХЕМ ГАРМОНИИ */}
-        <div className={`flex overflow-x-auto gap-5 py-2 border-y ${cLine} scrollbar-hide`}>
+        <div className={`flex overflow-x-auto gap-5 py-1.5 border-y ${cLine} scrollbar-hide`}>
           {SCHEMES.map((s) => {
             const isFree = s === 'complementary' || s === 'analogous'
             const isLocked = !isFree && !isProPurchased
@@ -1630,6 +2595,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             return (
               <button
                 key={s}
+                type="button"
                 onClick={() => handleSchemeClick(s)}
                 className={`flex items-center gap-1 text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-200 outline-none border-none bg-transparent cursor-pointer ${
                   scheme === s
@@ -1648,19 +2614,61 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           })}
         </div>
 
-        {/* 2. 3D-МОДЕЛЬ LOW-TOP КРОССОВКА (NEW BALANCE 574) */}
-        <div className="my-0.5">
-          <Sneaker3D sneakerColors={sneakerColors} isDark={isDark} />
+        {/* 1.5. ПЕРЕКЛЮЧАТЕЛЬ СХЕМ РАСПРЕДЕЛЕНИЯ ЦВЕТОВ ПО КОНСТРУКЦИИ + ИНДИКАТОР КОНТРАСТА */}
+        <div className="flex items-center justify-between gap-2 pt-1.5">
+          <div className="flex overflow-x-auto gap-1.5 scrollbar-hide">
+            {PRESETS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  haptic('light')
+                  setMappingPreset(p.id)
+                }}
+                className={`px-2 py-0.5 text-[7.5px] font-sans uppercase tracking-[0.16em] whitespace-nowrap border transition-colors cursor-pointer bg-transparent ${
+                  mappingPreset === p.id
+                    ? `${cLine} ${cText} font-semibold`
+                    : `border-transparent ${cTextMuted} ${cHover}`
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <span
+            className={`text-[7.5px] font-sans uppercase tracking-[0.14em] whitespace-nowrap ${cTextMuted}`}
+          >
+            ΔL {harmonyEvaluation.ratioText} • {harmonyEvaluation.statusLabel}
+          </span>
         </div>
 
-        {/* 3. КОМПАКТНЫЙ ПУЛЬТ: КРУГ ИТТЕНА СЛЕВА + ПОЛЗУНКИ СПРАВА */}
+        {/* 2. 3D-МОДЕЛЬ LOW-TOP КРОССОВКА (NEW BALANCE 574) */}
+        <div className="my-0.5">
+          <Sneaker3D
+            sneakerColors={sneakerColors}
+            isDark={isDark}
+            onResetAll={handleResetAll}
+            resetLabel={t.resetBtn}
+            loading3DLabel={t.loading3D}
+            webglFallbackLabel={t.webglFallback}
+          />
+        </div>
+
+        {/* 3. КОМПАКТНЫЙ ПУЛЬТ: КРУГ ИТТЕНА СЛЕВА + 3 ПОЛЗУНКА (TINT / SHADE / CHROMA) СПРАВА */}
         <div
-          className={`grid grid-cols-[118px_1fr] sm:grid-cols-[140px_1fr] gap-4 items-center py-2.5 border-t ${cLine}`}
+          className={`grid grid-cols-[114px_1fr] sm:grid-cols-[136px_1fr] gap-4 items-center py-2 border-t ${cLine}`}
         >
           <div className="flex flex-col items-center">
             <div
               ref={wheelRef}
-              className="relative w-[104px] h-[104px] sm:w-[124px] sm:h-[124px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
+              role="slider"
+              tabIndex={0}
+              aria-label={modelMode === 'ryb' ? t.ittenLabel : t.hslLabel}
+              aria-valuemin={0}
+              aria-valuemax={359}
+              aria-valuenow={baseHue}
+              className="relative w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none focus:outline-none focus:ring-1 focus:ring-current/40"
               style={{
                 background: wheelBackground,
                 touchAction: 'none',
@@ -1673,6 +2681,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               onPointerUp={handleWheelPointerUp}
               onPointerCancel={handleWheelPointerUp}
               onTouchStart={handleWheelTouchStart}
+              onKeyDown={handleWheelKeyDown}
             >
               <div
                 className="absolute inset-[24%] rounded-full pointer-events-none"
@@ -1683,18 +2692,21 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 }}
               />
 
-              {schemeHues.slice(1).map((hAngle, idx) => (
-                <div
-                  key={idx}
-                  className="absolute inset-0 pointer-events-none"
-                  style={{ transform: `rotate(${hAngle}deg)` }}
-                >
+              {schemeHues.slice(1).map((hAngle, idx) => {
+                const dotHue = modelMode === 'ryb' ? rybHueToRgbHue(hAngle) : hAngle
+                return (
                   <div
-                    className="absolute top-[4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full border border-white/90 shadow-sm"
-                    style={{ backgroundColor: `hsl(${hAngle}, 85%, 50%)` }}
-                  />
-                </div>
-              ))}
+                    key={idx}
+                    className="absolute inset-0 pointer-events-none"
+                    style={{ transform: `rotate(${hAngle}deg)` }}
+                  >
+                    <div
+                      className="absolute top-[4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full border border-white/90 shadow-sm"
+                      style={{ backgroundColor: `hsl(${dotHue}, 85%, 50%)` }}
+                    />
+                  </div>
+                )
+              })}
 
               <div
                 className="absolute inset-0 pointer-events-none"
@@ -1702,28 +2714,35 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               >
                 <div
                   className="absolute top-[2px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-[1.5px] border-white shadow-md"
-                  style={{ backgroundColor: `hsl(${baseHue}, 85%, 50%)` }}
+                  style={{
+                    backgroundColor: `hsl(${
+                      modelMode === 'ryb' ? rybHueToRgbHue(baseHue) : baseHue
+                    }, 85%, 50%)`,
+                  }}
                 />
               </div>
             </div>
             <span
-              className={`mt-1.5 text-[8px] font-sans tracking-[0.22em] uppercase ${cTextMuted}`}
+              className={`mt-1.5 text-[7.5px] font-sans tracking-[0.2em] uppercase ${cTextMuted}`}
             >
-              {t.ittenLabel} • {baseHue}°
+              {modelMode === 'ryb' ? t.ittenLabel : t.hslLabel} • {baseHue}°
             </span>
           </div>
 
-          <div className="flex flex-col justify-center gap-4 pr-1">
+          <div className="flex flex-col justify-center gap-2.5 pr-1">
             <div>
-              <div
-                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-2 ${cTextMuted}`}
+              <label
+                htmlFor="slider-tint-white"
+                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-1 ${cTextMuted}`}
               >
                 <span>{t.pure}</span>
                 <span>
                   {t.white} ({Math.round(whiteAmount * 100)}%)
                 </span>
-              </div>
+              </label>
               <input
+                id="slider-tint-white"
+                aria-label={t.white}
                 type="range"
                 min="0"
                 max="1"
@@ -1735,15 +2754,18 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             </div>
 
             <div>
-              <div
-                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-2 ${cTextMuted}`}
+              <label
+                htmlFor="slider-shade-black"
+                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-1 ${cTextMuted}`}
               >
                 <span>{t.pure}</span>
                 <span>
                   {t.black} ({Math.round(blackAmount * 100)}%)
                 </span>
-              </div>
+              </label>
               <input
+                id="slider-shade-black"
+                aria-label={t.black}
                 type="range"
                 min="0"
                 max="1"
@@ -1753,37 +2775,73 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 className="w-full"
               />
             </div>
+
+            <div>
+              <label
+                htmlFor="slider-chroma-sat"
+                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-1 ${cTextMuted}`}
+              >
+                <span>Muted</span>
+                <span>
+                  {t.chroma} ({Math.round(chromaAmount * 100)}%)
+                </span>
+              </label>
+              <input
+                id="slider-chroma-sat"
+                aria-label={t.chroma}
+                type="range"
+                min="0.15"
+                max="1"
+                step="0.01"
+                value={chromaAmount}
+                onChange={(e) => setChromaAmount(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
           </div>
         </div>
 
-        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ КРОССОВКА */}
-        <div className={`grid gap-2.5 pt-2 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
-          {colors.map((c, i) => (
-            <div key={i} className="flex flex-col">
-              <div
-                className={`w-full h-9 sm:h-12 mb-1.5 rounded-[2px] shadow-sm border transition-colors duration-150 ${
-                  isDark ? 'border-white/15' : 'border-black/10'
-                }`}
-                style={{ backgroundColor: c }}
-              />
-              <div className="flex items-baseline justify-between gap-1">
-                <span
-                  className={`text-[9px] font-sans font-semibold uppercase tracking-[0.15em] ${cText}`}
+        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ КРОССОВКА С КОПИРОВАНИЕМ HEX (п. 10 аудита) */}
+        <div className={`grid gap-2.5 pt-1.5 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          {colors.map((c, i) => {
+            const isCopied = copiedHex === c
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handleCopyHex(c)}
+                className="flex flex-col text-left bg-transparent border-0 p-0 cursor-pointer group outline-none"
+                title={`Скопировать ${c}`}
+              >
+                <div
+                  className={`relative w-full h-9 sm:h-11 mb-1 rounded-[2px] shadow-sm border transition-transform duration-150 group-active:scale-[0.98] flex items-end justify-between px-1.5 pb-1 ${
+                    isDark ? 'border-white/15' : 'border-black/10'
+                  }`}
+                  style={{ backgroundColor: c }}
                 >
-                  {ratioLabels[i]}
-                </span>
-                <span
-                  className={`text-[7.5px] font-sans uppercase tracking-[0.08em] truncate ${cTextMuted}`}
-                >
-                  {roleLabels[i]}
-                </span>
-              </div>
-            </div>
-          ))}
+                  <span className="px-1 py-[1px] text-[7.5px] font-mono tracking-wider rounded-[1px] bg-black/45 text-white/95 backdrop-blur-[2px]">
+                    {isCopied ? t.copied : c}
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between gap-1 w-full">
+                  <span
+                    className={`text-[9px] font-sans font-semibold uppercase tracking-[0.15em] ${cText}`}
+                  >
+                    {ratioLabels[i]}
+                  </span>
+                  <span
+                    className={`text-[7.5px] font-sans uppercase tracking-[0.08em] truncate ${cTextMuted}`}
+                  >
+                    {roleLabels[i]}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
         </div>
 
         {/* 5. РЕДАКЦИОННАЯ ПОДПИСЬ */}
-        <div className={`mt-3 pt-2 border-t ${cLine} flex items-center justify-between`}>
+        <div className={`mt-2.5 pt-1.5 border-t ${cLine} flex items-center justify-between`}>
           <p className={`font-serif text-[12px] italic ${cTextMuted}`}>{t.quote}</p>
           <span className={`text-[8px] font-sans font-bold uppercase tracking-[0.32em] ${cText}`}>
             Cordwainer
@@ -1794,7 +2852,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       {/* МОДАЛКА PRO ДОСТУПА */}
       <AnimatePresence>
         {showProModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#000000]/70 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pro-modal-title"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#000000]/70 backdrop-blur-sm"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1809,8 +2872,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${cLine}`} />
 
               <button
+                ref={proModalCloseRef}
+                type="button"
+                disabled={isPaymentBusy}
                 onClick={() => setShowProModal(false)}
-                className={`absolute top-4 right-4 ${cTextMuted} hover:text-current`}
+                aria-label={t.guideClose}
+                className={`absolute top-4 right-4 ${cTextMuted} hover:text-current bg-transparent border-0 cursor-pointer`}
               >
                 <svg
                   width="18"
@@ -1828,24 +2895,34 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 <LockIcon size={32} />
               </div>
 
-              <h3 className={`font-serif text-2xl tracking-tight mb-4 text-center ${cText}`}>
+              <h3
+                id="pro-modal-title"
+                className={`font-serif text-2xl tracking-tight mb-4 text-center ${cText}`}
+              >
                 {t.paywallTitle}
               </h3>
 
               <p
-                className={`text-[12px] font-sans font-light leading-relaxed mb-8 text-center ${cTextMuted}`}
+                className={`text-[12px] font-sans font-light leading-relaxed mb-6 text-center ${cTextMuted}`}
               >
                 {t.paywallDesc}
               </p>
 
+              {paymentErrorMsg && (
+                <p className="text-[10px] font-sans text-red-400 text-center mb-4">
+                  {paymentErrorMsg}
+                </p>
+              )}
+
               <button
+                type="button"
                 onClick={handleProClick}
-                disabled={isPurchasing}
-                className={`group flex items-center justify-center gap-3 w-full py-4 border ${cLine} ${cText} hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent`}
+                disabled={isPaymentBusy}
+                className={`group flex items-center justify-center gap-3 w-full py-4 border ${cLine} ${cText} hover:bg-current/5 active:scale-95 transition-all outline-none bg-transparent cursor-pointer disabled:opacity-50`}
               >
-                {isPurchasing ? (
+                {isPaymentBusy ? (
                   <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse">
-                    {t.loading}
+                    {paymentState === 'verifying_payment' ? t.verifying : t.loading}
                   </span>
                 ) : (
                   <>
@@ -1865,6 +2942,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       <AnimatePresence>
         {showGuide && (
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="color-guide-title"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -1872,10 +2952,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             className={`fixed inset-0 z-[90] flex flex-col ${cBg} ${cText} overflow-hidden`}
           >
             <div className="px-6 pt-10 pb-6 flex items-start justify-between shrink-0">
-              <h2 className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight">
+              <h2
+                id="color-guide-title"
+                className="font-serif text-[12vw] min-[400px]:text-5xl leading-none tracking-tight"
+              >
                 {t.guideTitle}
               </h2>
               <button
+                ref={guideCloseRef}
+                type="button"
                 onClick={() => setShowGuide(false)}
                 className={`text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors mt-2`}
               >
