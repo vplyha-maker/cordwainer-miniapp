@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import * as THREE from 'three'
+import type * as THREE_TYPES from 'three'
 import type { Lang } from '../App'
+
+type ThreeLib = typeof THREE_TYPES
 
 type ColorsPageProps = {
   onBack: () => void
@@ -39,46 +41,44 @@ const LockIcon = ({ size = 10 }: { size?: number }) => (
 
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred: (s: string) => void } } } })
-      .Telegram?.WebApp
+    const tg = (
+      window as unknown as {
+        Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred: (s: string) => void } } }
+      }
+    ).Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
   } catch {}
 }
 
 /* ============================================================================
-   ПАРАМЕТРИЧЕСКИЙ ГЕНЕРАТОР 3D-МОДЕЛИ ОБУВИ (THREE.JS)
-   Создает детализированную многослойную 3D-колодку и детали верха/подошвы
+   ПАРАМЕТРИЧЕСКИЙ ГЕНЕРАТОР 3D-МОДЕЛИ ОБУВИ (ДИНАМИЧЕСКИЙ THREE.JS)
+   Динамический import('three') выносит движок в отдельный чанк и не раздувает
+   главный бандл index.js свыше лимита 2 МБ в vite-plugin-pwa (Workbox)
    ============================================================================ */
 type ShoeMaterials = {
-  main: THREE.MeshPhysicalMaterial
-  secondary: THREE.MeshStandardMaterial
-  tertiary: THREE.MeshStandardMaterial
-  accent: THREE.MeshPhysicalMaterial
-  midsole: THREE.MeshStandardMaterial
-  lace: THREE.MeshStandardMaterial
-  insole: THREE.MeshStandardMaterial
+  main: THREE_TYPES.MeshPhysicalMaterial
+  secondary: THREE_TYPES.MeshStandardMaterial
+  tertiary: THREE_TYPES.MeshStandardMaterial
+  accent: THREE_TYPES.MeshPhysicalMaterial
+  midsole: THREE_TYPES.MeshStandardMaterial
+  lace: THREE_TYPES.MeshStandardMaterial
+  insole: THREE_TYPES.MeshStandardMaterial
 }
 
 function sampleSilhouetteProfile(t: number, silhouette: Silhouette) {
-  // t = 0 (пятка) ... t = 1 (мысок)
   const z = (t - 0.5) * 2.85
 
-  // Асимметричный контур стопы (медиальная и латеральная стороны)
   let halfWidth = 0.36
   if (t < 0.22) {
-    // Пятка
     const u = t / 0.22
     halfWidth = 0.14 + 0.22 * Math.sin(u * Math.PI * 0.5)
   } else if (t < 0.52) {
-    // Геленочная часть (перешеек свода)
     const u = (t - 0.22) / 0.3
     halfWidth = 0.36 - 0.055 * Math.sin(u * Math.PI)
   } else if (t < 0.78) {
-    // Пучки (самая широкая часть)
     const u = (t - 0.52) / 0.26
     halfWidth = 0.36 + 0.095 * Math.sin(u * Math.PI * 0.75)
   } else {
-    // Сужение к мыску
     const u = (t - 0.78) / 0.22
     const tipPower = silhouette === 'pump' ? 1.65 : silhouette === 'derby' ? 1.35 : 1.15
     halfWidth = 0.425 * Math.cos(Math.pow(u, tipPower) * Math.PI * 0.485)
@@ -87,7 +87,6 @@ function sampleSilhouetteProfile(t: number, silhouette: Silhouette) {
   if (silhouette === 'pump') halfWidth *= 0.86
   if (silhouette === 'derby') halfWidth *= 0.93
 
-  // Изгиб центральной оси стопы (банановидность колодки к большому пальцу)
   const centerShiftX =
     t < 0.3
       ? 0
@@ -95,10 +94,8 @@ function sampleSilhouetteProfile(t: number, silhouette: Silhouette) {
       ? Math.sin(((t - 0.3) / 0.45) * Math.PI) * 0.045
       : 0.035 * (1 - (t - 0.75) / 0.25)
 
-  // Профиль подошвы (нижняя линия колодки + toe spring)
   let yBottom = 0
   if (silhouette === 'pump') {
-    // Подъем каблука 105 мм
     const heelLift = t < 0.58 ? 0.72 * Math.pow(1 - t / 0.58, 1.45) : 0
     const toeSpring = t > 0.78 ? Math.pow((t - 0.78) / 0.22, 1.9) * 0.08 : 0
     yBottom = -0.34 + heelLift + toeSpring
@@ -107,29 +104,23 @@ function sampleSilhouetteProfile(t: number, silhouette: Silhouette) {
     const toeSpring = t > 0.72 ? Math.pow((t - 0.72) / 0.28, 1.85) * 0.11 : 0
     yBottom = -0.22 + heelLift + toeSpring
   } else {
-    // Runner: спортивный перекат (rocker + toe spring)
     const heelBevel = t < 0.1 ? Math.pow((0.1 - t) / 0.1, 1.8) * 0.065 : 0
     const drop = (1 - t) * 0.09
     const toeSpring = t > 0.68 ? Math.pow((t - 0.68) / 0.32, 1.85) * 0.17 : 0
     yBottom = -0.22 + drop + heelBevel + toeSpring
   }
 
-  // Верхний профиль колодки (гребень подъема, союзка, мысок)
   let upperHeight = 0.48
   if (t < 0.14) {
-    // Задник
     const u = t / 0.14
     upperHeight = 0.24 + 0.56 * Math.sin(u * Math.PI * 0.5)
   } else if (t < 0.44) {
-    // Вырез горловины / язычок
     const u = (t - 0.14) / 0.3
     upperHeight = 0.78 + 0.08 * Math.sin(u * Math.PI)
   } else if (t < 0.76) {
-    // Спуск по подъему (взъем)
     const u = (t - 0.44) / 0.32
     upperHeight = 0.82 - 0.44 * Math.pow(u, 0.92)
   } else {
-    // Коробочка мыска
     const u = (t - 0.76) / 0.24
     const toeBoxH = silhouette === 'pump' ? 0.26 : silhouette === 'derby' ? 0.33 : 0.38
     upperHeight = toeBoxH * Math.cos(u * Math.PI * 0.46) + 0.04
@@ -141,23 +132,22 @@ function sampleSilhouetteProfile(t: number, silhouette: Silhouette) {
   return { z, halfWidth, centerShiftX, yBottom, upperHeight }
 }
 
-/**
- * Создает замкнутую или частичную 3D-оболочку детали обуви по диапазону длины [tStart, tEnd]
- * и угловому диапазону поперечного сечения [thetaStart, thetaEnd]
- */
-function buildShellPatchGeometry(options: {
-  silhouette: Silhouette
-  tStart: number
-  tEnd: number
-  tSteps: number
-  thetaStart: number
-  thetaEnd: number
-  thetaSteps: number
-  radialOffset: number
-  thickness: number
-  collarCutout?: boolean
-  topCurveMod?: (t: number, theta: number) => number
-}): THREE.BufferGeometry {
+function buildShellPatchGeometry(
+  THREE: ThreeLib,
+  options: {
+    silhouette: Silhouette
+    tStart: number
+    tEnd: number
+    tSteps: number
+    thetaStart: number
+    thetaEnd: number
+    thetaSteps: number
+    radialOffset: number
+    thickness: number
+    collarCutout?: boolean
+    topCurveMod?: (t: number, theta: number) => number
+  }
+): THREE_TYPES.BufferGeometry {
   const {
     silhouette,
     tStart,
@@ -180,17 +170,14 @@ function buildShellPatchGeometry(options: {
     const theta = thetaStart + (j / thetaSteps) * (thetaEnd - thetaStart)
     const prof = sampleSilhouetteProfile(t, silhouette)
 
-    // theta = 0 (подошва латерально) -> PI/2 (верх гребня) -> PI (подошва медиально)
     const cosT = Math.cos(theta)
     const sinT = Math.sin(theta)
 
-    // Асимметрия свода
     const sideScale = cosT < 0 ? 1.0 : 1.04
     const rOffset = isInner ? radialOffset - thickness : radialOffset
 
     const x = prof.centerShiftX - cosT * (prof.halfWidth * sideScale + rOffset)
 
-    // Профиль высоты сечения с учетом выреза горловины (ankle opening)
     let localH = prof.upperHeight
     if (collarCutout && t > 0.07 && t < 0.43) {
       const uCollar = (t - 0.07) / 0.36
@@ -205,7 +192,6 @@ function buildShellPatchGeometry(options: {
       localH += topCurveMod(t, theta)
     }
 
-    // Приплюснутая у подошвы и объемная сверху форма колодки
     const verticalCurve = Math.pow(Math.max(0, sinT), 0.78)
     const y = prof.yBottom + verticalCurve * (localH + rOffset)
     const z = prof.z
@@ -215,7 +201,6 @@ function buildShellPatchGeometry(options: {
 
   const stride = thetaSteps + 1
 
-  // Наружная поверхность
   for (let i = 0; i <= tSteps; i++) {
     for (let j = 0; j <= thetaSteps; j++) {
       const [x, y, z] = getPoint(i, j, false)
@@ -223,7 +208,6 @@ function buildShellPatchGeometry(options: {
     }
   }
 
-  // Внутренняя поверхность (для реальной толщины кожи)
   const innerBaseIdx = (tSteps + 1) * stride
   for (let i = 0; i <= tSteps; i++) {
     for (let j = 0; j <= thetaSteps; j++) {
@@ -232,7 +216,6 @@ function buildShellPatchGeometry(options: {
     }
   }
 
-  // Индексы наружной и внутренней поверхностей
   for (let i = 0; i < tSteps; i++) {
     for (let j = 0; j < thetaSteps; j++) {
       const a = i * stride + j
@@ -249,16 +232,13 @@ function buildShellPatchGeometry(options: {
     }
   }
 
-  // Зашиваем торцы (бортики толщины кожи)
   for (let i = 0; i < tSteps; i++) {
-    // Край j = 0
     const a0 = i * stride
     const b0 = (i + 1) * stride
     const ai0 = innerBaseIdx + a0
     const bi0 = innerBaseIdx + b0
     indices.push(a0, ai0, b0, b0, ai0, bi0)
 
-    // Край j = thetaSteps
     const a1 = i * stride + thetaSteps
     const b1 = (i + 1) * stride + thetaSteps
     const ai1 = innerBaseIdx + a1
@@ -267,14 +247,12 @@ function buildShellPatchGeometry(options: {
   }
 
   for (let j = 0; j < thetaSteps; j++) {
-    // Край i = 0
     const a0 = j
     const d0 = j + 1
     const ai0 = innerBaseIdx + a0
     const di0 = innerBaseIdx + d0
     indices.push(a0, d0, ai0, d0, di0, ai0)
 
-    // Край i = tSteps
     const a1 = tSteps * stride + j
     const d1 = tSteps * stride + j + 1
     const ai1 = innerBaseIdx + a1
@@ -289,18 +267,18 @@ function buildShellPatchGeometry(options: {
   return geom
 }
 
-/**
- * Создает сплошное 3D-тело подошвы/межподошвы по диапазону длины [tStart, tEnd]
- */
-function buildSoleSlabGeometry(options: {
-  silhouette: Silhouette
-  tStart: number
-  tEnd: number
-  tSteps: number
-  flareWidth: number
-  topOffset: number
-  bottomThickness: number
-}): THREE.BufferGeometry {
+function buildSoleSlabGeometry(
+  THREE: ThreeLib,
+  options: {
+    silhouette: Silhouette
+    tStart: number
+    tEnd: number
+    tSteps: number
+    flareWidth: number
+    topOffset: number
+    bottomThickness: number
+  }
+): THREE_TYPES.BufferGeometry {
   const { silhouette, tStart, tEnd, tSteps, flareWidth, topOffset, bottomThickness } = options
   const radialSegs = 36
   const positions: number[] = []
@@ -310,7 +288,6 @@ function buildSoleSlabGeometry(options: {
     const t = tStart + (i / tSteps) * (tEnd - tStart)
     const prof = sampleSilhouetteProfile(t, silhouette)
 
-    // Плавное скругление носка и пятки в плане
     const endTapering =
       t < tStart + 0.04
         ? Math.sin(((t - tStart) / 0.04) * Math.PI * 0.5)
@@ -351,12 +328,15 @@ function buildSoleSlabGeometry(options: {
   return geom
 }
 
-function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): THREE.Group {
+function buildFootwearMeshGroup(
+  THREE: ThreeLib,
+  silhouette: Silhouette,
+  mats: ShoeMaterials
+): THREE_TYPES.Group {
   const group = new THREE.Group()
 
   if (silhouette === 'runner') {
-    // 1. Внутренняя подкладка и анатомическая стелька (Tertiary / 15-30%)
-    const liningGeom = buildShellPatchGeometry({
+    const liningGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.04,
       tEnd: 0.85,
@@ -370,8 +350,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(liningGeom, mats.tertiary))
 
-    // Мягкий валик воротника голенища (Tertiary)
-    const collarRollGeom = buildShellPatchGeometry({
+    const collarRollGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.05,
       tEnd: 0.41,
@@ -385,8 +364,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(collarRollGeom, mats.tertiary))
 
-    // 2. Замшевая база союзки и берцев (Secondary / 30%)
-    const suedeBaseGeom = buildShellPatchGeometry({
+    const suedeBaseGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.12,
       tEnd: 0.94,
@@ -400,8 +378,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(suedeBaseGeom, mats.secondary))
 
-    // Пухлый язычок кроссовка (Secondary / 30%)
-    const tongueGeom = buildShellPatchGeometry({
+    const tongueGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.31,
       tEnd: 0.66,
@@ -416,8 +393,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(tongueGeom, mats.secondary))
 
-    // Жаккардовый ярлык на язычке (Accent / 10%)
-    const tongueTagGeom = buildShellPatchGeometry({
+    const tongueTagGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.33,
       tEnd: 0.41,
@@ -432,8 +408,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(tongueTagGeom, mats.accent))
 
-    // 3. Кожаный мысок / Mudguard (Main / 60%)
-    const mudguardGeom = buildShellPatchGeometry({
+    const mudguardGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.66,
       tEnd: 0.995,
@@ -445,7 +420,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.018,
       collarCutout: false,
       topCurveMod: (t, theta) => {
-        // Вырез на союзке, чтобы сверху читалась замшевая вставка
         const centerDist = Math.abs(theta - Math.PI * 0.5)
         if (t < 0.86 && centerDist < 0.52) {
           return -0.09 * Math.cos((centerDist / 0.52) * Math.PI * 0.5)
@@ -455,8 +429,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(mudguardGeom, mats.main))
 
-    // Кожаный пяточный стакан / Heel Counter (Main / 60%)
-    const heelCounterGeom = buildShellPatchGeometry({
+    const heelCounterGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.005,
       tEnd: 0.29,
@@ -470,8 +443,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(heelCounterGeom, mats.main))
 
-    // Пяточный хлястик / Heel Tab (Accent / 10%)
-    const heelTabGeom = buildShellPatchGeometry({
+    const heelTabGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.01,
       tEnd: 0.09,
@@ -486,8 +458,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(heelTabGeom, mats.accent))
 
-    // Кожаная планка шнуровки / Eyestay (Main / 60%) — латеральная и медиальная
-    const eyestayLatGeom = buildShellPatchGeometry({
+    const eyestayLatGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.37,
       tEnd: 0.69,
@@ -499,7 +470,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.018,
       collarCutout: false,
     })
-    const eyestayMedGeom = buildShellPatchGeometry({
+    const eyestayMedGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.37,
       tEnd: 0.69,
@@ -514,8 +485,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     group.add(new THREE.Mesh(eyestayLatGeom, mats.main))
     group.add(new THREE.Mesh(eyestayMedGeom, mats.main))
 
-    // 4. Фирменные боковые шевроны / полосы (Accent / 10%)
-    const stripe1Lat = buildShellPatchGeometry({
+    const stripe1Lat = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.41,
       tEnd: 0.52,
@@ -527,7 +497,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.012,
       collarCutout: true,
     })
-    const stripe2Lat = buildShellPatchGeometry({
+    const stripe2Lat = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.54,
       tEnd: 0.6,
@@ -539,7 +509,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.012,
       collarCutout: true,
     })
-    const stripe1Med = buildShellPatchGeometry({
+    const stripe1Med = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.41,
       tEnd: 0.52,
@@ -551,7 +521,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.012,
       collarCutout: true,
     })
-    const stripe2Med = buildShellPatchGeometry({
+    const stripe2Med = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.54,
       tEnd: 0.6,
@@ -568,7 +538,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     group.add(new THREE.Mesh(stripe1Med, mats.accent))
     group.add(new THREE.Mesh(stripe2Med, mats.accent))
 
-    // 5. Объемные 3D-шнурки и люверсы (5 рядов перекрестной шнуровки)
     const laceTValues = [0.41, 0.47, 0.53, 0.59, 0.65]
     laceTValues.forEach((lt, idx) => {
       const prof = sampleSilhouetteProfile(lt, 'runner')
@@ -576,7 +545,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       const xLat = prof.centerShiftX - prof.halfWidth * 0.46
       const xMed = prof.centerShiftX + prof.halfWidth * 0.48
 
-      // Люверсы
       const eyeletGeom = new THREE.TorusGeometry(0.024, 0.008, 10, 18)
       const isAccentEyelet = idx === 0 || idx === laceTValues.length - 1
       const eyeMat = isAccentEyelet ? mats.accent : mats.tertiary
@@ -591,7 +559,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       eyeMed.rotation.y = -Math.PI * 0.35
       group.add(eyeMed)
 
-      // Дуга шнурка
       const curve = new THREE.QuadraticBezierCurve3(
         new THREE.Vector3(xLat, yLace, prof.z),
         new THREE.Vector3(prof.centerShiftX, yLace + 0.075, prof.z + 0.015),
@@ -601,8 +568,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       group.add(new THREE.Mesh(tubeGeom, mats.lace))
     })
 
-    // 6. Массивная скульптурная межподошва EVA (Midsole)
-    const midsoleGeom = buildSoleSlabGeometry({
+    const midsoleGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.0,
       tEnd: 0.99,
@@ -613,8 +579,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(midsoleGeom, mats.midsole))
 
-    // Пяточный стабилизатор / спойлер в межподошве (Tertiary)
-    const stabilizerGeom = buildSoleSlabGeometry({
+    const stabilizerGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.0,
       tEnd: 0.34,
@@ -625,8 +590,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(stabilizerGeom, mats.tertiary))
 
-    // 7. Протектор / Подметка с захлестом на мысок (Accent / 10%)
-    const outsoleGeom = buildSoleSlabGeometry({
+    const outsoleGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.0,
       tEnd: 1.0,
@@ -637,8 +601,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(outsoleGeom, mats.accent))
 
-    // Передний защитный бампер мыска (характерная деталь Loro Piana / Loewe)
-    const toeBumperGeom = buildShellPatchGeometry({
+    const toeBumperGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'runner',
       tStart: 0.93,
       tEnd: 1.0,
@@ -653,8 +616,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(toeBumperGeom, mats.accent))
   } else if (silhouette === 'derby') {
-    // 3D DERBY — Классический брог с рантом Goodyear и наборным каблуком
-    const liningGeom = buildShellPatchGeometry({
+    const liningGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.04,
       tEnd: 0.85,
@@ -668,8 +630,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(liningGeom, mats.tertiary))
 
-    // Союзка и язычок (Secondary / 30%)
-    const vampGeom = buildShellPatchGeometry({
+    const vampGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.14,
       tEnd: 0.92,
@@ -683,8 +644,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(vampGeom, mats.secondary))
 
-    // Отрезной мысок Wingtip и берцы Дерби (Main / 60%)
-    const wingtipGeom = buildShellPatchGeometry({
+    const wingtipGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.64,
       tEnd: 0.998,
@@ -696,7 +656,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.016,
       collarCutout: false,
     })
-    const quartersGeom = buildShellPatchGeometry({
+    const quartersGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.01,
       tEnd: 0.58,
@@ -711,8 +671,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     group.add(new THREE.Mesh(wingtipGeom, mats.main))
     group.add(new THREE.Mesh(quartersGeom, mats.main))
 
-    // Рант (Tertiary) + Подошва (Midsole) + Набойки (Accent)
-    const weltGeom = buildSoleSlabGeometry({
+    const weltGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.0,
       tEnd: 1.0,
@@ -723,7 +682,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(weltGeom, mats.tertiary))
 
-    const leatherSoleGeom = buildSoleSlabGeometry({
+    const leatherSoleGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.0,
       tEnd: 0.995,
@@ -734,7 +693,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(leatherSoleGeom, mats.midsole))
 
-    const heelBlockGeom = buildSoleSlabGeometry({
+    const heelBlockGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.0,
       tEnd: 0.28,
@@ -745,7 +704,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(heelBlockGeom, mats.midsole))
 
-    const heelTopPieceGeom = buildSoleSlabGeometry({
+    const heelTopPieceGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.0,
       tEnd: 0.28,
@@ -754,7 +713,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       topOffset: -0.17,
       bottomThickness: 0.032,
     })
-    const soleProtectorGeom = buildSoleSlabGeometry({
+    const soleProtectorGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'derby',
       tStart: 0.48,
       tEnd: 0.98,
@@ -766,7 +725,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     group.add(new THREE.Mesh(heelTopPieceGeom, mats.accent))
     group.add(new THREE.Mesh(soleProtectorGeom, mats.accent))
 
-    // Вощеные тонкие шнурки (Accent)
     ;[0.43, 0.48, 0.53, 0.58].forEach((lt) => {
       const prof = sampleSilhouetteProfile(lt, 'derby')
       const yLace = prof.yBottom + prof.upperHeight * 0.92
@@ -780,8 +738,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.011, 8, false), mats.accent))
     })
   } else {
-    // 3D PUMP — Лодочки на шпильке 105 мм
-    const liningGeom = buildShellPatchGeometry({
+    const liningGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'pump',
       tStart: 0.03,
       tEnd: 0.88,
@@ -795,8 +752,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(liningGeom, mats.tertiary))
 
-    // Основной корпус лодочки (Main / 60%)
-    const pumpBodyGeom = buildShellPatchGeometry({
+    const pumpBodyGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'pump',
       tStart: 0.02,
       tEnd: 0.998,
@@ -810,8 +766,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(pumpBodyGeom, mats.main))
 
-    // Пяточный контрфорс и декоративный мысок (Secondary / 30%)
-    const pumpHeelCapGeom = buildShellPatchGeometry({
+    const pumpHeelCapGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'pump',
       tStart: 0.01,
       tEnd: 0.22,
@@ -823,7 +778,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
       thickness: 0.015,
       collarCutout: true,
     })
-    const pumpToeCapGeom = buildShellPatchGeometry({
+    const pumpToeCapGeom = buildShellPatchGeometry(THREE, {
       silhouette: 'pump',
       tStart: 0.78,
       tEnd: 1.0,
@@ -838,7 +793,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     group.add(new THREE.Mesh(pumpHeelCapGeom, mats.secondary))
     group.add(new THREE.Mesh(pumpToeCapGeom, mats.secondary))
 
-    // Изящная пряжка на декольте мыска (Accent / 10%)
     const buckleProf = sampleSilhouetteProfile(0.73, 'pump')
     const buckleGeom = new THREE.BoxGeometry(0.32, 0.045, 0.14)
     const buckleMesh = new THREE.Mesh(buckleGeom, mats.accent)
@@ -850,8 +804,7 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     buckleMesh.rotation.x = 0.35
     group.add(buckleMesh)
 
-    // Лакированная тонкая подошва (Accent / 10%)
-    const pumpSoleGeom = buildSoleSlabGeometry({
+    const pumpSoleGeom = buildSoleSlabGeometry(THREE, {
       silhouette: 'pump',
       tStart: 0.02,
       tEnd: 0.998,
@@ -862,7 +815,6 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     })
     group.add(new THREE.Mesh(pumpSoleGeom, mats.accent))
 
-    // Шпилька 105 мм (Secondary + набойка Accent)
     const heelProf = sampleSilhouetteProfile(0.08, 'pump')
     const stilettoHeight = 0.68
     const stilettoGeom = new THREE.CylinderGeometry(0.068, 0.024, stilettoHeight, 20)
@@ -884,13 +836,12 @@ function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): TH
     group.add(tipMesh)
   }
 
-  // Разворачиваем обувь в классический профильный 3/4 ракурс (мыском вправо)
   group.rotation.y = Math.PI * 0.5
   return group
 }
 
 /* ============================================================================
-   ИНТЕРАКТИВНАЯ 3D-СЦЕНА THREE.JS (ВРАЩЕНИЕ ПАЛЬЦЕМ 360° + PBR МАТЕРИАЛЫ)
+   ИНТЕРАКТИВНАЯ 3D-СЦЕНА THREE.JS (АСИНХРОННАЯ ЗАГРУЗКА ЧАНКА + ВРАЩЕНИЕ 360°)
    ============================================================================ */
 function Footwear3DStage({
   colors,
@@ -902,8 +853,11 @@ function Footwear3DStage({
   isDark: boolean
 }) {
   const mountRef = useRef<HTMLDivElement>(null)
+  const threeRef = useRef<ThreeLib | null>(null)
   const matsRef = useRef<ShoeMaterials | null>(null)
-  const shoeRootRef = useRef<THREE.Group | null>(null)
+  const shoeRootRef = useRef<THREE_TYPES.Group | null>(null)
+  const [isReady, setIsReady] = useState(false)
+
   const rotTarget = useRef({ yaw: -0.22, pitch: 0.14 })
   const rotCurrent = useRef({ yaw: -0.22, pitch: 0.14 })
   const isInteracting = useRef(false)
@@ -914,185 +868,196 @@ function Footwear3DStage({
   const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] || '#4E9A86'
   const accentColor = colors[colors.length - 1] || '#D91E49'
 
-  // Инициализация WebGL-сцены
   useEffect(() => {
-    const container = mountRef.current
-    if (!container) return
-
-    const width = container.clientWidth || 340
-    const height = container.clientHeight || 210
-
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 50)
-    camera.position.set(0, 0.42, 5.25)
-    camera.lookAt(0, -0.02, 0)
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    })
-    renderer.setSize(width, height)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-    renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.12
-    container.innerHTML = ''
-    container.appendChild(renderer.domElement)
-
-    // Студийный трехточечный свет (Key + Fill + Rim)
-    const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 0.85 : 1.05)
-    scene.add(ambientLight)
-
-    const keyLight = new THREE.DirectionalLight(0xfffcf5, 2.2)
-    keyLight.position.set(3.5, 5.5, 4.2)
-    scene.add(keyLight)
-
-    const fillLight = new THREE.DirectionalLight(0xdbe6ff, 1.05)
-    fillLight.position.set(-4.0, 2.0, 2.5)
-    scene.add(fillLight)
-
-    const rimLight = new THREE.DirectionalLight(0xffffff, 1.35)
-    rimLight.position.set(0, 3.8, -4.5)
-    scene.add(rimLight)
-
-    const bottomBounce = new THREE.DirectionalLight(0xffffff, 0.45)
-    bottomBounce.position.set(0, -3.5, 1.5)
-    scene.add(bottomBounce)
-
-    // Инициализация материалов PBR (кожа, замша, резина, EVA)
-    const mats: ShoeMaterials = {
-      main: new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(mainColor),
-        roughness: 0.34,
-        metalness: 0.04,
-        clearcoat: 0.28,
-        clearcoatRoughness: 0.25,
-      }),
-      secondary: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(secondaryColor),
-        roughness: 0.82,
-        metalness: 0.02,
-      }),
-      tertiary: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(tertiaryColor),
-        roughness: 0.52,
-        metalness: 0.05,
-      }),
-      accent: new THREE.MeshPhysicalMaterial({
-        color: new THREE.Color(accentColor),
-        roughness: 0.38,
-        metalness: 0.08,
-        clearcoat: 0.2,
-      }),
-      midsole: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(isDark ? '#262421' : '#FAF7F0'),
-        roughness: 0.65,
-        metalness: 0.02,
-      }),
-      lace: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(isDark ? '#F4F0E8' : '#FFFFFF'),
-        roughness: 0.75,
-        metalness: 0.0,
-      }),
-      insole: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(tertiaryColor),
-        roughness: 0.65,
-      }),
-    }
-    matsRef.current = mats
-
-    const pivotGroup = new THREE.Group()
-    scene.add(pivotGroup)
-    shoeRootRef.current = pivotGroup
-
-    // Мягкая контактная тень под подошвой
-    const shadowCanvas = document.createElement('canvas')
-    shadowCanvas.width = 256
-    shadowCanvas.height = 128
-    const sCtx = shadowCanvas.getContext('2d')
-    if (sCtx) {
-      const grad = sCtx.createRadialGradient(128, 64, 8, 128, 64, 118)
-      grad.addColorStop(0, 'rgba(0,0,0,0.42)')
-      grad.addColorStop(0.55, 'rgba(0,0,0,0.14)')
-      grad.addColorStop(1, 'rgba(0,0,0,0)')
-      sCtx.fillStyle = grad
-      sCtx.fillRect(0, 0, 256, 128)
-    }
-    const shadowTex = new THREE.CanvasTexture(shadowCanvas)
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.4, 1.35),
-      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
-    )
-    shadowPlane.rotation.x = -Math.PI / 2
-    shadowPlane.position.y = -0.39
-    scene.add(shadowPlane)
-
+    let disposed = false
     let frameId = 0
-    const clock = new THREE.Clock()
+    let cleanupFn: (() => void) | undefined
 
-    const animate = () => {
-      frameId = requestAnimationFrame(animate)
-      const elapsed = clock.getElapsedTime()
+    import('three').then((THREE) => {
+      if (disposed) return
+      threeRef.current = THREE
 
-      if (!isInteracting.current) {
-        // Плавное живое покачивание модели, когда пользователь не крутит ее пальцем
-        rotTarget.current.yaw += Math.sin(elapsed * 0.7) * 0.0008
-      }
-
-      rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.12
-      rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * 0.12
-
-      if (shoeRootRef.current) {
-        shoeRootRef.current.rotation.y = rotCurrent.current.yaw
-        shoeRootRef.current.rotation.x = rotCurrent.current.pitch
-        shoeRootRef.current.position.y = Math.sin(elapsed * 1.6) * 0.018
-      }
-
-      renderer.render(scene, camera)
-    }
-    animate()
-
-    const onResize = () => {
+      const container = mountRef.current
       if (!container) return
-      const w = container.clientWidth || 340
-      const h = container.clientHeight || 210
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
-      renderer.setSize(w, h)
-    }
-    window.addEventListener('resize', onResize)
+
+      const width = container.clientWidth || 340
+      const height = container.clientHeight || 210
+
+      const scene = new THREE.Scene()
+      const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 50)
+      camera.position.set(0, 0.42, 5.25)
+      camera.lookAt(0, -0.02, 0)
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      })
+      renderer.setSize(width, height)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.12
+      container.innerHTML = ''
+      container.appendChild(renderer.domElement)
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 0.85 : 1.05)
+      scene.add(ambientLight)
+
+      const keyLight = new THREE.DirectionalLight(0xfffcf5, 2.2)
+      keyLight.position.set(3.5, 5.5, 4.2)
+      scene.add(keyLight)
+
+      const fillLight = new THREE.DirectionalLight(0xdbe6ff, 1.05)
+      fillLight.position.set(-4.0, 2.0, 2.5)
+      scene.add(fillLight)
+
+      const rimLight = new THREE.DirectionalLight(0xffffff, 1.35)
+      rimLight.position.set(0, 3.8, -4.5)
+      scene.add(rimLight)
+
+      const bottomBounce = new THREE.DirectionalLight(0xffffff, 0.45)
+      bottomBounce.position.set(0, -3.5, 1.5)
+      scene.add(bottomBounce)
+
+      const mats: ShoeMaterials = {
+        main: new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(mainColor),
+          roughness: 0.34,
+          metalness: 0.04,
+          clearcoat: 0.28,
+          clearcoatRoughness: 0.25,
+        }),
+        secondary: new THREE.MeshStandardMaterial({
+          color: new THREE.Color(secondaryColor),
+          roughness: 0.82,
+          metalness: 0.02,
+        }),
+        tertiary: new THREE.MeshStandardMaterial({
+          color: new THREE.Color(tertiaryColor),
+          roughness: 0.52,
+          metalness: 0.05,
+        }),
+        accent: new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(accentColor),
+          roughness: 0.38,
+          metalness: 0.08,
+          clearcoat: 0.2,
+        }),
+        midsole: new THREE.MeshStandardMaterial({
+          color: new THREE.Color(isDark ? '#262421' : '#FAF7F0'),
+          roughness: 0.65,
+          metalness: 0.02,
+        }),
+        lace: new THREE.MeshStandardMaterial({
+          color: new THREE.Color(isDark ? '#F4F0E8' : '#FFFFFF'),
+          roughness: 0.75,
+          metalness: 0.0,
+        }),
+        insole: new THREE.MeshStandardMaterial({
+          color: new THREE.Color(tertiaryColor),
+          roughness: 0.65,
+        }),
+      }
+      matsRef.current = mats
+
+      const pivotGroup = new THREE.Group()
+      scene.add(pivotGroup)
+      shoeRootRef.current = pivotGroup
+
+      const shadowCanvas = document.createElement('canvas')
+      shadowCanvas.width = 256
+      shadowCanvas.height = 128
+      const sCtx = shadowCanvas.getContext('2d')
+      if (sCtx) {
+        const grad = sCtx.createRadialGradient(128, 64, 8, 128, 64, 118)
+        grad.addColorStop(0, 'rgba(0,0,0,0.42)')
+        grad.addColorStop(0.55, 'rgba(0,0,0,0.14)')
+        grad.addColorStop(1, 'rgba(0,0,0,0)')
+        sCtx.fillStyle = grad
+        sCtx.fillRect(0, 0, 256, 128)
+      }
+      const shadowTex = new THREE.CanvasTexture(shadowCanvas)
+      const shadowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.4, 1.35),
+        new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+      )
+      shadowPlane.rotation.x = -Math.PI / 2
+      shadowPlane.position.y = -0.39
+      scene.add(shadowPlane)
+
+      const clock = new THREE.Clock()
+
+      const animate = () => {
+        frameId = requestAnimationFrame(animate)
+        const elapsed = clock.getElapsedTime()
+
+        if (!isInteracting.current) {
+          rotTarget.current.yaw += Math.sin(elapsed * 0.7) * 0.0008
+        }
+
+        rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.12
+        rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * 0.12
+
+        if (shoeRootRef.current) {
+          shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+          shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+          shoeRootRef.current.position.y = Math.sin(elapsed * 1.6) * 0.018
+        }
+
+        renderer.render(scene, camera)
+      }
+      animate()
+      setIsReady(true)
+
+      const onResize = () => {
+        if (!container) return
+        const w = container.clientWidth || 340
+        const h = container.clientHeight || 210
+        camera.aspect = w / h
+        camera.updateProjectionMatrix()
+        renderer.setSize(w, h)
+      }
+      window.addEventListener('resize', onResize)
+
+      cleanupFn = () => {
+        window.removeEventListener('resize', onResize)
+        shadowTex.dispose()
+        Object.values(mats).forEach((m) => m.dispose())
+        renderer.dispose()
+      }
+    })
 
     return () => {
+      disposed = true
       cancelAnimationFrame(frameId)
-      window.removeEventListener('resize', onResize)
-      shadowTex.dispose()
-      Object.values(mats).forEach((m) => m.dispose())
-      renderer.dispose()
+      if (cleanupFn) cleanupFn()
     }
   }, [])
 
-  // Перестроение 3D-геометрии при смене силуэта (Runner / Derby / Pump)
   useEffect(() => {
+    if (!isReady) return
+    const THREE = threeRef.current
     const root = shoeRootRef.current
     const mats = matsRef.current
-    if (!root || !mats) return
+    if (!THREE || !root || !mats) return
 
     while (root.children.length > 0) {
       const child = root.children[0]
       root.remove(child)
       child.traverse((obj) => {
-        if ((obj as THREE.Mesh).geometry) {
-          ;(obj as THREE.Mesh).geometry.dispose()
+        const mesh = obj as THREE_TYPES.Mesh
+        if (mesh.geometry) {
+          mesh.geometry.dispose()
         }
       })
     }
 
-    const meshGroup = buildFootwearMeshGroup(silhouette, mats)
+    const meshGroup = buildFootwearMeshGroup(THREE, silhouette, mats)
     root.add(meshGroup)
-  }, [silhouette])
+  }, [silhouette, isReady])
 
-  // Мгновенное обновление цветов материалов по выбранной схеме Иттена (без пересборки геометрии!)
   useEffect(() => {
+    if (!isReady) return
     const mats = matsRef.current
     if (!mats) return
     mats.main.color.set(mainColor)
@@ -1109,7 +1074,7 @@ function Footwear3DStage({
         : '#FAF7F0'
     )
     mats.lace.color.set(isDark ? '#F4F0E8' : '#FFFFFF')
-  }, [mainColor, secondaryColor, tertiaryColor, accentColor, isDark, silhouette])
+  }, [mainColor, secondaryColor, tertiaryColor, accentColor, isDark, silhouette, isReady])
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isInteracting.current = true
@@ -1201,8 +1166,11 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }, [])
 
   useEffect(() => {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number } } } } })
-      .Telegram?.WebApp
+    const tg = (
+      window as unknown as {
+        Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number } } } }
+      }
+    ).Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
     if (!userId) return
 
@@ -1386,7 +1354,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       loading: 'ОБРОБКА...',
       guideIntro:
         'Коло Іттена — класичний інструмент гармонізації кольору. У взутті він особливо важливий: основна палітра майже завжди будується навколо нейтралей (чорний, білий, бежевий, сірий), а колір з’являється точково — у шкірі верху, підкладці, рядку, підошві чи фурнітурі.',
-      guideBalanceTitle: 'Правило балансу',
+      guideBalanceTitle: 'Правило баланса',
       guideBalance:
         '60 % — основний колір (зазвичай нейтраль або домінуючий тон шкіри).\n30 % — підтримуючий колір (підкладка, язичок, задник).\n10 % — акцент (рядок, логотип, металева фурнітура, підошва).',
       guideSchemesTitle: 'Схеми і застосування',
@@ -1406,7 +1374,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Монохромна — один колір у різних тонах і насиченостях. Найелегантніша і «дорога» схема. Ідеальна для мінімалізму, вечірнього взуття і коли шкіра сама по собі виразна.',
       guideFootwearTitle: 'Специфіка взуття',
       guideFootwear:
-        '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнитура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
+        '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
       guideTip:
         'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильніше, ніж здається.',
     },
@@ -1474,7 +1442,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     },
   }[lang]
 
-  // Точная колористическая формула Иттена с корректным откликом на ползунки Белого и Черного
   const makeIttenColor = useCallback(
     (hue: number, white: number, black: number, satBase = 85): string => {
       const normHue = ((hue % 360) + 360) % 360
@@ -1751,7 +1718,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
       `}</style>
 
-      {/* КОМПАКТНЫЙ ВЕРХНИЙ ХЕДЕР (ЗАГОЛОВОК + ЯЗЫКИ + ГИД В ОДНУ СТРОКУ) */}
+      {/* КОМПАКТНЫЙ ВЕРХНИЙ ХЕДЕР */}
       <header className="px-4 pt-3 pb-2 flex items-center justify-between z-20">
         <div className="flex items-center gap-3">
           <button
@@ -1790,7 +1757,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </div>
       </header>
 
-      {/* ОСНОВНОЙ КОНТЕНТ (ОПТИМИЗИРОВАН ПОД ОДИН МОБИЛЬНЫЙ ЭКРАН) */}
+      {/* ОСНОВНОЙ КОНТЕНТ */}
       <div className="flex-1 flex flex-col justify-between px-4 pb-3 max-w-2xl mx-auto w-full">
         {/* 1. ПОЛОСА СХЕМ ГАРМОНИИ */}
         <div className={`flex overflow-x-auto gap-5 py-2 border-y ${cLine} scrollbar-hide`}>
@@ -1851,8 +1818,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </div>
 
         {/* 3. КОМПАКТНЫЙ ПУЛЬТ УПРАВЛЕНИЯ: КРУГ ИТТЕНА СЛЕВА + ПОЛЗУНКИ ТОНА СПРАВА */}
-        <div className={`grid grid-cols-[118px_1fr] sm:grid-cols-[140px_1fr] gap-4 items-center py-2.5 border-t ${cLine}`}>
-          {/* Круг Иттена */}
+        <div
+          className={`grid grid-cols-[118px_1fr] sm:grid-cols-[140px_1fr] gap-4 items-center py-2.5 border-t ${cLine}`}
+        >
           <div className="flex flex-col items-center">
             <div
               ref={wheelRef}
@@ -1902,12 +1870,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 />
               </div>
             </div>
-            <span className={`mt-1.5 text-[8px] font-sans tracking-[0.22em] uppercase ${cTextMuted}`}>
+            <span
+              className={`mt-1.5 text-[8px] font-sans tracking-[0.22em] uppercase ${cTextMuted}`}
+            >
               {t.ittenLabel} • {baseHue}°
             </span>
           </div>
 
-          {/* Ползунки К белому / К чёрному */}
           <div className="flex flex-col justify-center gap-4 pr-1">
             <div>
               <div
@@ -1962,7 +1931,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 style={{ backgroundColor: c }}
               />
               <div className="flex items-baseline justify-between gap-1">
-                <span className={`text-[9px] font-sans font-semibold uppercase tracking-[0.15em] ${cText}`}>
+                <span
+                  className={`text-[9px] font-sans font-semibold uppercase tracking-[0.15em] ${cText}`}
+                >
                   {ratioLabels[i]}
                 </span>
                 <span
@@ -1975,7 +1946,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           ))}
         </div>
 
-        {/* 5. ТОНКАЯ РЕДАКЦИОННАЯ ПОДПИСЬ В ОДНУ СТРОКУ */}
+        {/* 5. ТОНКАЯ РЕДАКЦИОННАЯ ПОДПИСЬ */}
         <div className={`mt-3 pt-2 border-t ${cLine} flex items-center justify-between`}>
           <p className={`font-serif text-[12px] italic ${cTextMuted}`}>{t.quote}</p>
           <span className={`text-[8px] font-sans font-bold uppercase tracking-[0.32em] ${cText}`}>
