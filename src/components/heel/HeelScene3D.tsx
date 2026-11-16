@@ -1146,7 +1146,7 @@ export function HeelScene3D({
         <div className="absolute bottom-1.5 left-2.5 right-2.5 flex items-center justify-between">
           <span className="text-[8px] font-mono uppercase tracking-wider opacity-65 pointer-events-none">
             {eng.rx.widthCode} // Сгиб {gm.metatarsalObliqueAngleDeg}°
-            {gm.medialBunionPocketMm > 0 ? ` // HV +${gm.medialBunionPocketMm}мм` : ''}
+            {gm.medialBunionPocketMm > 0 ? (' // HV +' + String(gm.medialBunionPocketMm) + 'мм') : ''}
           </span>
           <div className="flex items-center gap-1">
             {(
@@ -1161,11 +1161,9 @@ export function HeelScene3D({
                 key={preset.id}
                 type="button"
                 onClick={() => applyCameraPreset(preset.id)}
-                className={`px-2 py-0.5 rounded-[5px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border ${
-                  camPreset === preset.id
+                className={('px-2 py-0.5 rounded-[5px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border ' + String(camPreset === preset.id
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
-                    : 'bg-[var(--color-surface)]/85 text-[var(--color-ink)] border-[var(--color-border)] opacity-75'
-                }`}
+                    : 'bg-[var(--color-surface)]/85 text-[var(--color-ink)] border-[var(--color-border)] opacity-75'))}
               >
                 {preset.label}
               </button>
