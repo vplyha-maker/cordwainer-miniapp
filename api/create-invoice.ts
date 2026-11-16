@@ -4,6 +4,9 @@ import { neon } from '@neondatabase/serverless';
 const PRODUCT_ID_REGEX = /^[a-z0-9_-]{2,32}$/i;
 const MAX_AUTH_AGE_SECONDS = 86400; // 24 часа
 
+// Рыночная стоимость разовой разблокировки PRO-модулей в Telegram Stars (~$4.99 USD)
+export const PRO_MODULE_PRICE_STARS = 250;
+
 interface VerifiedTelegramUser {
   id: number;
   first_name?: string;
@@ -19,25 +22,26 @@ interface ProductConfig {
 const PRODUCT_CATALOG: Record<string, ProductConfig> = {
   pro_colors: {
     title: 'PRO: Палитры и схемы Иттена',
-    description: 'Разовый доступ ко всем профессиональным цветовым схемам (триады, тетрады, монохром)',
-    amount: 1,
+    description:
+      'Пожизненный доступ ко всем профессиональным цветовым схемам (триады, тетрады, монохром и техкарта 13 зон)',
+    amount: PRO_MODULE_PRICE_STARS,
   },
   pro_heel: {
     title: 'PRO: Конструктивные данные каблука',
-    description: 'Разовый доступ к инженерным расчётам, биомеханике и спецификациям каблука',
-    amount: 1,
+    description: 'Пожизненный доступ к инженерным расчётам, биомеханике и спецификациям каблука',
+    amount: PRO_MODULE_PRICE_STARS,
   },
   pro_last: {
     title: 'PRO: Параметры колодки',
-    description: 'Разовый доступ к расширенным конструктивным данным обувной колодки',
-    amount: 1,
+    description: 'Пожизненный доступ к расширенным конструктивным данным обувной колодки',
+    amount: PRO_MODULE_PRICE_STARS,
   },
 };
 
 const DEFAULT_PRODUCT_CONFIG: ProductConfig = {
   title: 'PRO: Конструктивные данные',
-  description: 'Разовый доступ к расширенным профессиональным функциям Cordwainer',
-  amount: 1,
+  description: 'Пожизненный доступ к расширенным профессиональным функциям Cordwainer',
+  amount: PRO_MODULE_PRICE_STARS,
 };
 
 /**
@@ -124,7 +128,13 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'Токен бота не настроен на Vercel' });
   }
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+  let body: Record<string, any> = {};
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+  } catch {
+    return res.status(400).json({ error: 'Некорректный JSON тела запроса' });
+  }
+
   const { userId: rawUserId, productId: rawProductId, initData: bodyInitData } = body;
 
   if (!rawProductId || typeof rawProductId !== 'string' || !PRODUCT_ID_REGEX.test(rawProductId)) {
@@ -202,7 +212,11 @@ export default async function handler(req: any, res: any) {
     };
 
     if (data.ok && data.result) {
-      return res.status(200).json({ invoiceLink: data.result });
+      return res.status(200).json({
+        invoiceLink: data.result,
+        amount: productMeta.amount,
+        currency: 'XTR',
+      });
     } else {
       console.error('[api/create-invoice] Ошибка Telegram Bot API:', data);
       return res.status(502).json({
