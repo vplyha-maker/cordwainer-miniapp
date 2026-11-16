@@ -167,13 +167,13 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const c1y = yFootHeel * 0.65 + yFootBall * 0.35
   const c2y = yFootHeel * 0.25 + yFootBall * 0.75
 
-  const topPath = `M ${xHeel - 4} ${yFootHeel - 3} L ${xHeelCenter - 6} ${yFootHeel} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${xBall} ${yFootBall} Q ${xBall + rockerZone * 0.45} ${yFootBall}, ${xToe} ${yFootToe}`
+  const topPath = ('M ' + String(xHeel - 4) + ' ' + String(yFootHeel - 3) + ' L ' + String(xHeelCenter - 6) + ' ' + String(yFootHeel) + ' C ' + String(c1x) + ' ' + String(c1y) + ', ' + String(c2x) + ' ' + String(c2y) + ', ' + String(xBall) + ' ' + String(yFootBall) + ' Q ' + String(xBall + rockerZone * 0.45) + ' ' + String(yFootBall) + ', ' + String(xToe) + ' ' + String(yFootToe))
 
   const yHeelSeat = yFootHeel + Math.min(hScaled * 0.14, 7 * scale)
   const yBottomToe =
     gm.soleType === 'rocker' ? yFootToe + Math.max(tScaled, 4) : yGround - 1
 
-  const bottomPath = ` L ${xToe} ${yBottomToe} Q ${xBall + rockerZone * 0.45} ${yGround}, ${xBall} ${yGround} C ${c2x} ${yGround}, ${c1x} ${yHeelSeat + 2}, ${xHeelCenter - 4} ${yHeelSeat + 2} L ${xHeel - 2} ${yHeelSeat} Z`
+  const bottomPath = (' L ' + String(xToe) + ' ' + String(yBottomToe) + ' Q ' + String(xBall + rockerZone * 0.45) + ' ' + String(yGround) + ', ' + String(xBall) + ' ' + String(yGround) + ' C ' + String(c2x) + ' ' + String(yGround) + ', ' + String(c1x) + ' ' + String(yHeelSeat + 2) + ', ' + String(xHeelCenter - 4) + ' ' + String(yHeelSeat + 2) + ' L ' + String(xHeel - 2) + ' ' + String(yHeelSeat) + ' Z')
   const solePath = topPath + bottomPath
 
   const tInstep = Math.max(0, Math.min(1, (xInstep - archStartX) / archSpanX))
@@ -182,7 +182,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const yInstepTop = yInstepFoot - instepHeightPx
   const toeBoxHeightPx = gm.toeBoxHeightMm * scale
 
-  const lastUpperPath = `M ${xHeel - 2} ${yFootHeel - 3} Q ${xHeel - 5} ${yFootHeel - 32 * scale}, ${xHeel + 8} ${yFootHeel - 48 * scale} L ${xInstep - 20} ${yInstepTop - 6} Q ${xInstep + 6} ${yInstepTop + 4}, ${xBall + 4} ${yFootBall - 22 * scale} Q ${xToe - 8} ${yFootToe - toeBoxHeightPx * 0.65}, ${xToe} ${yFootToe - 3}`
+  const lastUpperPath = ('M ' + String(xHeel - 2) + ' ' + String(yFootHeel - 3) + ' Q ' + String(xHeel - 5) + ' ' + String(yFootHeel - 32 * scale) + ', ' + String(xHeel + 8) + ' ' + String(yFootHeel - 48 * scale) + ' L ' + String(xInstep - 20) + ' ' + String(yInstepTop - 6) + ' Q ' + String(xInstep + 6) + ' ' + String(yInstepTop + 4) + ', ' + String(xBall + 4) + ' ' + String(yFootBall - 22 * scale) + ' Q ' + String(xToe - 8) + ' ' + String(yFootToe - toeBoxHeightPx * 0.65) + ', ' + String(xToe) + ' ' + String(yFootToe - 3))
 
   // Модификация прямого взъёма:
   // > 0 -> наращивание (налепка) поверх гребня колодки
@@ -190,10 +190,10 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   let instepBuildUpPath = ''
   if (gm.instepBuildUpMm > 0) {
     const buildUpPx = gm.instepBuildUpMm * scale * 1.4
-    instepBuildUpPath = `M ${xInstep - 18} ${yInstepTop - 4} Q ${xInstep} ${yInstepTop - 4 - buildUpPx * 1.8}, ${xBall} ${yFootBall - 22 * scale} Q ${xInstep} ${yInstepTop + 1}, ${xInstep - 18} ${yInstepTop - 4} Z`
+    instepBuildUpPath = ('M ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 4 - buildUpPx * 1.8) + ', ' + String(xBall) + ' ' + String(yFootBall - 22 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + 1) + ', ' + String(xInstep - 18) + ' ' + String(yInstepTop - 4) + ' Z')
   } else if (gm.instepBuildUpMm < 0) {
     const reducePx = Math.abs(gm.instepBuildUpMm) * scale * 1.3
-    instepBuildUpPath = `M ${xInstep - 16} ${yInstepTop - 2} Q ${xInstep} ${yInstepTop + reducePx * 1.6}, ${xBall - 2} ${yFootBall - 20 * scale} Q ${xInstep} ${yInstepTop - 1}, ${xInstep - 16} ${yInstepTop - 2} Z`
+    instepBuildUpPath = ('M ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop + reducePx * 1.6) + ', ' + String(xBall - 2) + ' ' + String(yFootBall - 20 * scale) + ' Q ' + String(xInstep) + ' ' + String(yInstepTop - 1) + ', ' + String(xInstep - 16) + ' ' + String(yInstepTop - 2) + ' Z')
   }
 
   // Модификация пучков (наращивание / снятие) в зоне M1–M5
@@ -201,7 +201,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   if (gm.ballBuildUpMm !== 0) {
     const ballDeltaPx = Math.min(12, Math.abs(gm.ballBuildUpMm) * scale * 1.1)
     const dir = gm.ballBuildUpMm > 0 ? -1 : 1
-    ballBuildUpPath = `M ${xApexM5 - 6} ${yFootBall - 16 * scale} Q ${(xApexM5 + xApexM1) * 0.5} ${yFootBall - 22 * scale + dir * ballDeltaPx * 1.6}, ${xApexM1 + 8} ${yFootBall - 14 * scale} Q ${(xApexM5 + xApexM1) * 0.5} ${yFootBall - 18 * scale}, ${xApexM5 - 6} ${yFootBall - 16 * scale} Z`
+    ballBuildUpPath = ('M ' + String(xApexM5 - 6) + ' ' + String(yFootBall - 16 * scale) + ' Q ' + String((xApexM5 + xApexM1) * 0.5) + ' ' + String(yFootBall - 22 * scale + dir * ballDeltaPx * 1.6) + ', ' + String(xApexM1 + 8) + ' ' + String(yFootBall - 14 * scale) + ' Q ' + String((xApexM5 + xApexM1) * 0.5) + ' ' + String(yFootBall - 18 * scale) + ', ' + String(xApexM5 - 6) + ' ' + String(yFootBall - 16 * scale) + ' Z')
   }
 
   // Карман под Hallux Valgus (центрирован строго по xApexM1 из LastGeometryModel)
@@ -210,7 +210,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     const pocketR = gm.bunionPocketRadiusMm * scale * 0.55
     const pocketH = (3 + gm.medialBunionPocketMm * 1.15) * scale
     const yCenterM1 = yFootBall - 8 * scale
-    bunionPocketPath = `M ${xApexM1 - pocketR} ${yCenterM1 + 2} Q ${xApexM1} ${yCenterM1 - pocketH * 1.7}, ${xApexM1 + pocketR} ${yCenterM1 + 2} Q ${xApexM1} ${yCenterM1 + pocketH * 0.65}, ${xApexM1 - pocketR} ${yCenterM1 + 2} Z`
+    bunionPocketPath = ('M ' + String(xApexM1 - pocketR) + ' ' + String(yCenterM1 + 2) + ' Q ' + String(xApexM1) + ' ' + String(yCenterM1 - pocketH * 1.7) + ', ' + String(xApexM1 + pocketR) + ' ' + String(yCenterM1 + 2) + ' Q ' + String(xApexM1) + ' ' + String(yCenterM1 + pocketH * 0.65) + ', ' + String(xApexM1 - pocketR) + ' ' + String(yCenterM1 + 2) + ' Z')
   }
 
   const xBackTop = xHeel - 2
@@ -219,9 +219,9 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
 
   let heelPath = ''
   if (gm.soleType === 'rocker') {
-    heelPath = `M ${xBackTop} ${yHeelSeat} C ${c1x} ${yHeelSeat}, ${c2x} ${yGround}, ${xBall} ${yGround} L ${xHeel + 16} ${yGround} C ${xHeel + 4} ${yGround}, ${xBackTop - 2} ${yGround - hScaled * 0.4}, ${xBackTop} ${yHeelSeat} Z`
+    heelPath = ('M ' + String(xBackTop) + ' ' + String(yHeelSeat) + ' C ' + String(c1x) + ' ' + String(yHeelSeat) + ', ' + String(c2x) + ' ' + String(yGround) + ', ' + String(xBall) + ' ' + String(yGround) + ' L ' + String(xHeel + 16) + ' ' + String(yGround) + ' C ' + String(xHeel + 4) + ' ' + String(yGround) + ', ' + String(xBackTop - 2) + ' ' + String(yGround - hScaled * 0.4) + ', ' + String(xBackTop) + ' ' + String(yHeelSeat) + ' Z')
   } else {
-    heelPath = `M ${xBackTop} ${yHeelSeat} C ${xBackTop - 2} ${yHeelSeat + hScaled * 0.45}, ${xBackBot - 1} ${yGround - hScaled * 0.2}, ${xBackBot} ${yGround} L ${xFrontHeel} ${yGround} C ${xFrontHeel - 1} ${yGround - hScaled * 0.3}, ${xFrontHeel + 1} ${yHeelSeat + hScaled * 0.3}, ${xFrontHeel + 2} ${yHeelSeat + 1} Z`
+    heelPath = ('M ' + String(xBackTop) + ' ' + String(yHeelSeat) + ' C ' + String(xBackTop - 2) + ' ' + String(yHeelSeat + hScaled * 0.45) + ', ' + String(xBackBot - 1) + ' ' + String(yGround - hScaled * 0.2) + ', ' + String(xBackBot) + ' ' + String(yGround) + ' L ' + String(xFrontHeel) + ' ' + String(yGround) + ' C ' + String(xFrontHeel - 1) + ' ' + String(yGround - hScaled * 0.3) + ', ' + String(xFrontHeel + 1) + ' ' + String(yHeelSeat + hScaled * 0.3) + ', ' + String(xFrontHeel + 2) + ' ' + String(yHeelSeat + 1) + ' Z')
   }
 
   // Выступ каблука Томаса строится строго по координате xThomasFrontMm из LastGeometryModel
@@ -231,7 +231,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
     const tThomas = Math.max(0, Math.min(1, (xThomasFront - archStartX) / archSpanX))
     const yThomasArch = evalCubicBezier(tThomas, yFootHeel, c1y, c2y, yFootBall) + 2
 
-    thomasExtensionPath = `M ${xFrontHeel - 1} ${yHeelSeat + 1} L ${xFrontHeel - 1} ${yGround} L ${xThomasFront} ${yGround} C ${xThomasFront + 2} ${yGround - (yGround - yThomasArch) * 0.45}, ${xThomasFront - 1} ${yThomasArch + 4}, ${xThomasFront - 2} ${yThomasArch} C ${(xFrontHeel + xThomasFront) * 0.5} ${yHeelSeat + 2}, ${xFrontHeel + 2} ${yHeelSeat + 1}, ${xFrontHeel - 1} ${yHeelSeat + 1} Z`
+    thomasExtensionPath = ('M ' + String(xFrontHeel - 1) + ' ' + String(yHeelSeat + 1) + ' L ' + String(xFrontHeel - 1) + ' ' + String(yGround) + ' L ' + String(xThomasFront) + ' ' + String(yGround) + ' C ' + String(xThomasFront + 2) + ' ' + String(yGround - (yGround - yThomasArch) * 0.45) + ', ' + String(xThomasFront - 1) + ' ' + String(yThomasArch + 4) + ', ' + String(xThomasFront - 2) + ' ' + String(yThomasArch) + ' C ' + String((xFrontHeel + xThomasFront) * 0.5) + ' ' + String(yHeelSeat + 2) + ', ' + String(xFrontHeel + 2) + ' ' + String(yHeelSeat + 1) + ', ' + String(xFrontHeel - 1) + ' ' + String(yHeelSeat + 1) + ' Z')
   }
 
   const xShankEnd = toSvgX(gm.xShankEndMm)
@@ -244,7 +244,7 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const q3x = evalCubicBezier(tt, archStartX, c1x, c2x, xBall)
   const q3y = evalCubicBezier(tt, yFootHeel, c1y, c2y, yFootBall)
   const sOff = 2.5
-  const shankCurve = `M ${archStartX} ${yFootHeel + sOff} C ${q1x} ${q1y + sOff}, ${q2x} ${q2y + sOff}, ${q3x} ${q3y + sOff}`
+  const shankCurve = ('M ' + String(archStartX) + ' ' + String(yFootHeel + sOff) + ' C ' + String(q1x) + ' ' + String(q1y + sOff) + ', ' + String(q2x) + ' ' + String(q2y + sOff) + ', ' + String(q3x) + ' ' + String(q3y + sOff))
 
   const tPelotte = Math.max(0, Math.min(1, (xPelotte - archStartX) / archSpanX))
   const yFootPelotte = evalCubicBezier(tPelotte, yFootHeel, c1y, c2y, yFootBall)
@@ -258,10 +258,10 @@ export function buildHeelGeometry(input: GeometryInput): HeelGeometry {
   const yStartP = evalCubicBezier(tStartP, yFootHeel, c1y, c2y, yFootBall)
   const yEndP = evalCubicBezier(tEndP, yFootHeel, c1y, c2y, yFootBall)
 
-  const pelottePath = `M ${xPelotte - pelotteHalfW} ${yStartP} Q ${xPelotte} ${yFootPelotte - pelotteHeightPx * 1.65}, ${xPelotte + pelotteHalfW} ${yEndP} Z`
+  const pelottePath = ('M ' + String(xPelotte - pelotteHalfW) + ' ' + String(yStartP) + ' Q ' + String(xPelotte) + ' ' + String(yFootPelotte - pelotteHeightPx * 1.65) + ', ' + String(xPelotte + pelotteHalfW) + ' ' + String(yEndP) + ' Z')
 
   const carbonYOff = 3.2
-  const carbonPath = `M ${xHeelCenter} ${yFootHeel + carbonYOff} C ${c1x} ${c1y + carbonYOff}, ${c2x} ${c2y + carbonYOff}, ${xBall} ${yFootBall + carbonYOff} Q ${xBall + rockerZone * 0.45} ${yFootBall + carbonYOff}, ${xToe - 4} ${yFootToe + carbonYOff}`
+  const carbonPath = ('M ' + String(xHeelCenter) + ' ' + String(yFootHeel + carbonYOff) + ' C ' + String(c1x) + ' ' + String(c1y + carbonYOff) + ', ' + String(c2x) + ' ' + String(c2y + carbonYOff) + ', ' + String(xBall) + ' ' + String(yFootBall + carbonYOff) + ' Q ' + String(xBall + rockerZone * 0.45) + ' ' + String(yFootBall + carbonYOff) + ', ' + String(xToe - 4) + ' ' + String(yFootToe + carbonYOff))
 
   return {
     model: gm,
