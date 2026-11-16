@@ -20,10 +20,6 @@ export interface HeelScene3DProps {
 
 type Pts = ReadonlyArray<readonly [number, number]>
 
-/**
- * Рекурсивно освобождает GPU-ресурсы (BufferGeometry и Material) всех вложенных объектов Three.js,
- * включая дочерние группы (например, achillesPivot), предотвращая утечки видеопамяти WebGL.
- */
 function disposeObject3D(root: THREE.Object3D): void {
   root.traverse((obj) => {
     const meshOrLine = obj as THREE.Mesh | THREE.LineSegments | THREE.Line
@@ -74,24 +70,34 @@ const LAST_WIDTH_PTS: Pts = [
   [0.58, 0.94],
   [0.68, 1.0],
   [0.78, 0.88],
-  [0.88, 0.60],
+  [0.88, 0.6],
   [0.96, 0.35],
   [1.0, 0.12],
 ]
 
 /**
- * Модифицирует поперечный профиль мыска колодки с учётом морфологии пальцев (египетская / греческая / римская)
+ * Продольный профиль высоты верха колодки (от пяточного закругления через конус/гребень взъёма к союзке и мыску)
  */
+const LAST_DORSAL_HEIGHT_PTS: Pts = [
+  [0.0, 0.72],
+  [0.06, 0.98],
+  [0.18, 1.0],
+  [0.32, 0.94],
+  [0.52, 0.78],
+  [0.68, 0.46],
+  [0.82, 0.34],
+  [0.94, 0.28],
+  [1.0, 0.08],
+]
+
 const getAnatomicWidthForApex = (u: number, apexType: LastApexType) => {
   const base = hermiteProfile(LAST_WIDTH_PTS, u)
   if (u <= 0.72) return base
   const t = (u - 0.72) / 0.28
   if (apexType === 'wide_square') {
-    // Римская стопа — более широкий трапециевидный контур носочной части для I–III лучей
     return base + 0.12 * Math.sin(t * Math.PI)
   }
   if (apexType === 'oblique_anatomical') {
-    // Греческая стопа — центрированный косой контур под удлинённый II луч
     return base + 0.04 * Math.sin(t * Math.PI)
   }
   return base
@@ -102,6 +108,111 @@ const getMedialShift = (u: number) => {
     return 0.055 * Math.sin(((u - 0.15) / 0.7) * Math.PI)
   }
   return 0
+}
+
+/**
+ * Строит процедурный замкнутый 3D-меш верха ортопедической колодки (Last Solid Shell)
+ * по параметрическим сечениям из LastGeometryModel (с учётом гребня взъёма, пучков, кармана HV и высоты мыска).
+ */
+function createProceduralLastSolidGeometry(params: {
+  uInstep: number
+  uApexM1: number
+  instepBaseHeightScene: number
+  instepRadialDeltaScene: number
+  toeBoxHeightScene: number
+  getSoleProfileY: (u: number) => number
+  getHalfWidth: (u: number) => number
+  getMedialCurve: (u: number) => number
+  getBunionBulge: (u: number, zNorm: number) => number
+}): THREE.BufferGeometry {
+  const {
+    uInstep,
+    uApexM1,
+    instepBaseHeightScene,
+    instepRadialDeltaScene,
+    toeBoxHeightScene,
+    getSoleProfileY,
+    getHalfWidth,
+    getMedialCurve,
+    getBunionBulge,
+  } = params
+
+  const segsU = 56
+  const segsTheta = 28
+  const geom = new THREE.BufferGeometry()
+  const positions: number[] = []
+  const indices: number[] = []
+
+  for (let iu = 0; iu <= segsU; iu++) {
+    const u = iu / segsU
+    const x = -1.24 + u * 2.48
+    const ySole = getSoleProfileY(u) + 0.014
+    const hw = getHalfWidth(u)
+    const zCenter = getMedialCurve(u)
+
+    // Локальная модификация гребня взъёма вокруг uInstep
+    const distInstep = Math.abs(u - uInstep)
+    const instepWave =
+      distInstep < 0.22 ? 0.5 * (1 + Math.cos((distInstep / 0.22) * Math.PI)) : 0
+
+    // Базовая высота колодки в сечении u
+    const dorsalProfile = hermiteProfile(LAST_DORSAL_HEIGHT_PTS, u)
+    const toeFactor = u > 0.72 ? Math.sin(((u - 0.72) / 0.28) * Math.PI) : 0
+    const sectionHeight = Math.max(
+      0.04,
+      instepBaseHeightScene * dorsalProfile +
+        instepRadialDeltaScene * instepWave +
+        (toeBoxHeightScene - instepBaseHeightScene * 0.3) * toeFactor * 0.45
+    )
+
+    // Продольное скругление задника пятки и носка колодки
+    let xRoundOffset = 0
+    if (u < 0.04) {
+      xRoundOffset = (0.04 - u) * 0.35
+    } else if (u > 0.96) {
+      xRoundOffset = -(u - 0.96) * 0.35
+    }
+
+    for (let it = 0; it <= segsTheta; it++) {
+      // theta от 0 до PI формирует свод верха колодки от латерального ранта (-hw) через гребень к медиальному ранту (+hw)
+      const theta = (it / segsTheta) * Math.PI
+      const zNorm = -Math.cos(theta) // -1 (латерально) .. +1 (медиально)
+      const domeSin = Math.sin(theta) // 0 на затяжной кромке .. 1 на гребне
+
+      // Анатомическая асимметрия поперечного сечения колодки (медиальный свод выше латерального ската)
+      const medialCrestBias = 1 + 0.12 * zNorm * Math.sin(u * Math.PI)
+      // Сужение конуса колодки кверху в пяточно-геленочной части
+      const topTaper = 1 - 0.22 * Math.pow(domeSin, 1.5) * (1 - u * 0.5)
+
+      const bunionZ =
+        Math.abs(u - uApexM1) < 0.14 && zNorm > 0.1
+          ? getBunionBulge(u, zNorm) * (1 - domeSin * 0.55)
+          : 0
+
+      const vx = x + xRoundOffset * (1 - domeSin * 0.3)
+      const vy = ySole + Math.pow(domeSin, 0.82) * sectionHeight * medialCrestBias
+      const vz = zNorm * hw * topTaper + zCenter + bunionZ
+
+      positions.push(vx, vy, vz)
+    }
+  }
+
+  const ringStride = segsTheta + 1
+  for (let iu = 0; iu < segsU; iu++) {
+    for (let it = 0; it < segsTheta; it++) {
+      const a = iu * ringStride + it
+      const b = (iu + 1) * ringStride + it
+      const c = (iu + 1) * ringStride + (it + 1)
+      const d = iu * ringStride + (it + 1)
+      indices.push(a, b, d)
+      indices.push(b, c, d)
+    }
+  }
+
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+  return geom
 }
 
 function createBezierHeelGeometry(params: {
@@ -201,9 +312,6 @@ function createBezierHeelGeometry(params: {
   return geom
 }
 
-/**
- * Строит 3D рокерную подошву-танкетку со скруглённой пяточной чашкой и мыском
- */
 function createFullRockerWedgeGeometry(params: {
   baseSoleW: number
   ballRatio: number
@@ -279,6 +387,7 @@ export function HeelScene3D({
 }: HeelScene3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const [camPreset, setCamPreset] = useState<CameraPreset>('iso')
+  const [showLastShell, setShowLastShell] = useState<boolean>(true)
 
   const sceneRef = useRef<{
     scene: THREE.Scene
@@ -377,7 +486,6 @@ export function HeelScene3D({
     pelotteMesh.scale.set(1.2, 0.3, 0.88)
     scene.add(pelotteMesh)
 
-    // 3D-индикатор разгрузочного кармана под головку M1 (Hallux Valgus)
     const bunionPocketMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.09, 20, 16),
       new THREE.MeshStandardMaterial({
@@ -544,7 +652,6 @@ export function HeelScene3D({
       dom.removeEventListener('pointercancel', onPointerUp)
       dom.removeEventListener('wheel', onWheel)
 
-      // Полная рекурсивная очистка всех геометрий и материалов при размонтировании
       disposeObject3D(dynamicGroup)
       disposeObject3D(padHeel)
       disposeObject3D(padM1)
@@ -593,13 +700,11 @@ export function HeelScene3D({
     const gridHex = isDark ? 0x48423c : 0xb8b0a4
     ;(grid.material as THREE.LineBasicMaterial).color.setHex(gridHex)
 
-    // Полная рекурсивная очистка старых мешей dynamicGroup перед перестроением
     disposeObject3D(dynamicGroup)
     dynamicGroup.clear()
 
     const isRearView = camPreset === 'rear'
 
-    // ВСЕ КООРДИНАТЫ БЕРУТСЯ ИЗ ЕДИНОГО ИСТОЧНИКА ПРАВДЫ: eng.geometryModel
     const gm = eng.geometryModel
     const mmToUnit = 2.48 / Math.max(220, gm.lastLengthMm)
     const h = gm.heelHeightMm * mmToUnit
@@ -608,7 +713,7 @@ export function HeelScene3D({
     const activeRockerRad =
       gm.soleType === 'rocker' ? (gm.rockerAngleDeg * Math.PI) / 180 : 0
     const baseSoleW =
-      (gender === 'male' ? 0.94 : 0.82) + gm.ballBuildUpMm * 0.01
+      (gender === 'male' ? 0.94 : 0.82) + gm.ballBuildUpMm * 0.008
 
     const apexToeZShift = gm.toeBoxShiftMedialMm * 0.012
     const bunionBulgeMax = gm.medialBunionPocketMm * mmToUnit * 1.35
@@ -646,7 +751,6 @@ export function HeelScene3D({
     const getMedialAtX = (x: number) =>
       getMedialCurve(Math.max(0, Math.min(1, (x + 1.24) / 2.48)))
 
-    // Локальное медиальное расширение следа/колодки под карман Hallux Valgus (на уровне M1)
     const getBunionBulge = (u: number, zNorm: number) => {
       if (bunionBulgeMax <= 0 || zNorm <= 0.15) return 0
       const du = Math.abs(u - gm.uApexM1)
@@ -656,7 +760,7 @@ export function HeelScene3D({
       return bunionBulgeMax * longitudinalWave * medialFactor
     }
 
-    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА
+    // 1. ОРТОПЕДИЧЕСКАЯ СТЕЛЬКА С 2D ГАУССОВЫМ ПОЛЕМ ПЕДОБАРОГРАФИИ (M1–M5, свод, пятка)
     const segsX = 96
     const segsZ = 24
     const insoleGeom = new THREE.PlaneGeometry(2.48, baseSoleW, segsX, segsZ)
@@ -669,6 +773,8 @@ export function HeelScene3D({
     const blueAnatomy = new THREE.Color(0x3186ff)
     const yellowModify = new THREE.Color(0xf59e0b)
     const redPressure = new THREE.Color(0xe11d48)
+
+    const gCenters = eng.pressureModel.gaussianCenters
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
@@ -721,25 +827,32 @@ export function HeelScene3D({
 
       pos.setY(i, y + orthoLift + 0.01)
 
-      const distForefoot = Math.hypot(
-        u - ballRatio,
-        (finalZ - (pronationDeg < 0 ? 0.12 : -0.12)) * 0.8
-      )
-      const foreIntensity =
-        Math.max(0, 1 - distForefoot * 3.4) * (eng.forefootLoad / 100)
+      // Расчёт локального давления в точке (u, zNorm) по 2D гауссовой модели педобарографии
+      let localKpa = 0
+      for (const gc of gCenters) {
+        const du = (u - gc.u) / gc.sigmaU
+        const dz = (zNorm - gc.zRatio) / gc.sigmaZ
+        const w = Math.exp(-0.5 * (du * du + dz * dz))
+        localKpa = Math.max(localKpa, gc.peakKpa * w)
+      }
+
       const vColor = baseColor.clone()
 
       if (wedgeIntensity > 0.15) {
         vColor.lerp(yellowModify, Math.min(0.85, wedgeIntensity * 1.1))
       }
       if (bunionExtraZ > 0.002) {
-        vColor.lerp(yellowModify, Math.min(0.85, (bunionExtraZ / Math.max(0.01, bunionBulgeMax)) * 0.9))
+        vColor.lerp(
+          yellowModify,
+          Math.min(0.85, (bunionExtraZ / Math.max(0.01, bunionBulgeMax)) * 0.9)
+        )
       }
       if (archIntensity > 0.2) {
         vColor.lerp(blueAnatomy, Math.min(0.75, archIntensity * 0.9))
       }
-      if (foreIntensity > 0.45 && eng.peakForefootPressureKpa >= 215) {
-        vColor.lerp(redPressure, Math.min(0.85, (foreIntensity - 0.4) * 1.6))
+      if (localKpa >= 165) {
+        const pNorm = Math.min(1, (localKpa - 165) / 110)
+        vColor.lerp(redPressure, pNorm * 0.88)
       }
       if (u > 0.88) {
         vColor.lerp(greenFreeZone, Math.min(0.8, ((u - 0.88) / 0.12) * 0.85))
@@ -779,7 +892,48 @@ export function HeelScene3D({
       )
     )
 
-    // 2. ПОДОШВА И КАБЛУК (из координат LastGeometryModel)
+    // 1Б. ПРОЦЕДУРНАЯ 3D-СЕТКА ВЕРХА КОЛОДКИ (Last Solid Shell)
+    if (showLastShell && !isRearView) {
+      const lastSolidGeom = createProceduralLastSolidGeometry({
+        uInstep: gm.uInstep,
+        uApexM1: gm.uApexM1,
+        instepBaseHeightScene: gm.instepBaseHeightMm * mmToUnit * 0.62,
+        instepRadialDeltaScene: gm.instepRadialLayerMm * mmToUnit * 0.9,
+        toeBoxHeightScene: gm.toeBoxHeightMm * mmToUnit * 0.72,
+        getSoleProfileY,
+        getHalfWidth,
+        getMedialCurve,
+        getBunionBulge,
+      })
+
+      dynamicGroup.add(
+        new THREE.Mesh(
+          lastSolidGeom,
+          new THREE.MeshStandardMaterial({
+            color: isDark ? 0xd6cab8 : 0x8c7b65,
+            roughness: 0.35,
+            metalness: 0.08,
+            transparent: true,
+            opacity: 0.22,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          })
+        )
+      )
+
+      dynamicGroup.add(
+        new THREE.LineSegments(
+          new THREE.WireframeGeometry(lastSolidGeom),
+          new THREE.LineBasicMaterial({
+            color: isDark ? 0x10b981 : 0x0f766e,
+            transparent: true,
+            opacity: 0.09,
+          })
+        )
+      )
+    }
+
+    // 2. ПОДОШВА И КАБЛУК
     if (gm.soleType === 'rocker') {
       const rockerWedgeGeom = createFullRockerWedgeGeometry({
         baseSoleW,
@@ -860,8 +1014,7 @@ export function HeelScene3D({
       )
 
       const xHeelBack = -1.24
-      // Базовый срез каблука и удлинение Томаса из LastGeometryModel
-      const xFrontBase = -1.24 + (0.25 * 2.48)
+      const xFrontBase = -1.24 + 0.25 * 2.48
       const heelHScene = Math.max(0.04, h)
       const tipOffsetScene = gm.effectiveHeelTipOffsetMm * mmToUnit
 
@@ -924,13 +1077,14 @@ export function HeelScene3D({
           )
         }
         const shankRadius = 0.013 + (gm.steelThicknessMm - 1.2) * 0.01
+        const isFluted = eng.shankEngineering.profileType === 'fluted_ribbed'
         dynamicGroup.add(
           new THREE.Mesh(
             new THREE.TubeGeometry(
               new THREE.CatmullRomCurve3(shankPts),
               24,
               shankRadius,
-              10,
+              isFluted ? 6 : 10,
               false
             ),
             new THREE.MeshStandardMaterial({
@@ -946,7 +1100,7 @@ export function HeelScene3D({
       }
     }
 
-    // 3. СИНИЕ АНАТОМИЧЕСКИЕ ОСИ, АПЕКС И ПРОФИЛЬ ВЗЪЁМА ИЗ LastGeometryModel
+    // 3. СИНИЕ АНАТОМИЧЕСКИЕ ОСИ И АПЕКС ИЗ LastGeometryModel
     const xHeelCenter = -1.24 + gm.uHeelCenter * 2.48
     const uM1 = gm.uApexM1
     const uM5 = gm.uApexM5
@@ -984,8 +1138,6 @@ export function HeelScene3D({
         getMedialCurve(0.99)
       )
       dynamicGroup.add(apexToeMarker)
-
-
     }
 
     const achillesPivot = new THREE.Group()
@@ -995,7 +1147,7 @@ export function HeelScene3D({
         ? pronationDeg * 0.45
         : gm.soleType === 'rocker'
           ? pronationDeg * 0.55
-          : pronationDeg
+          : pronationDeg * 0.65
     achillesPivot.rotation.x = (residualRollDeg * Math.PI) / 180
 
     const achillesAxis = new THREE.Mesh(
@@ -1008,7 +1160,7 @@ export function HeelScene3D({
     achillesPivot.add(achillesAxis)
     dynamicGroup.add(achillesPivot)
 
-    // 4. ЗОНЫ ДАВЛЕНИЯ, КАРМАН HV И ПЕЛОТ ЗЕЙЦА (строго по координатам LastGeometryModel)
+    // 4. ЗОНЫ ДАВЛЕНИЯ, КАРМАН HV И ПЕЛОТ ЗЕЙЦА
     padHeel.visible = !isRearView
     padM1.visible = !isRearView
     padM5.visible = !isRearView
@@ -1031,7 +1183,6 @@ export function HeelScene3D({
       eng.loadM5Pct >= 38 ? 0xe11d48 : 0x3186ff
     )
 
-    // Визуализация кармана под Hallux Valgus на медиальной грани M1
     bunionPocketMesh.visible = gm.medialBunionPocketMm > 0 && !isRearView
     if (bunionPocketMesh.visible) {
       const zMedEdgeM1 =
@@ -1071,6 +1222,7 @@ export function HeelScene3D({
     heelTipOffsetMm,
     pronationDeg,
     camPreset,
+    showLastShell,
     isDark,
   ])
 
@@ -1092,7 +1244,9 @@ export function HeelScene3D({
               {eng.loadM5Pct}%
             </strong>
             <span className="mx-1.5 opacity-30">|</span>
-            <span className="opacity-65">ПИК (МОД.): </span>
+            <span className="opacity-65">
+              ПИК ({eng.pressureModel.dominantMetatarsalRay}):{' '}
+            </span>
             <strong style={{ color: eng.peakForefootPressureKpa >= 245 ? '#E11D48' : 'inherit' }}>
               {eng.peakForefootPressureKpa} кПа
             </strong>
@@ -1108,18 +1262,27 @@ export function HeelScene3D({
                 РОКЕР {rockerAngle}° (Карбон {gm.carbonInsertThicknessMm}мм)
               </strong>
             ) : (
-              <strong className={eng.rx.recommendThomasHeel ? 'text-[#E11D48]' : ''}>
+              <strong className={eng.rx.recommendThomasHeel ? 'text-[#F59E0B]' : ''}>
                 КАБЛУК: СТАНДАРТ
               </strong>
             )}
           </div>
         </div>
 
-        <div className="absolute bottom-1.5 left-2.5 right-2.5 flex items-center justify-between">
-          <span className="text-[8px] font-mono uppercase tracking-wider opacity-65 pointer-events-none">
-            {eng.rx.widthCode} // Сгиб {gm.metatarsalObliqueAngleDeg}°
-            {gm.medialBunionPocketMm > 0 ? (' // HV +' + String(gm.medialBunionPocketMm) + 'мм') : ''}
-          </span>
+        <div className="absolute bottom-1.5 left-2.5 right-2.5 flex items-center justify-between gap-1">
+          <button
+            type="button"
+            onClick={() => setShowLastShell((v) => !v)}
+            className={
+              'px-2 py-0.5 rounded-[5px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border ' +
+              (showLastShell
+                ? 'bg-[#10B981] text-black border-transparent font-semibold'
+                : 'bg-[var(--color-surface)]/85 text-[var(--color-ink)] border-[var(--color-border)] opacity-75')
+            }
+          >
+            {showLastShell ? 'КОЛОДКА: ВКЛ' : 'КОЛОДКА: СКРЫТА'}
+          </button>
+
           <div className="flex items-center gap-1">
             {(
               [
@@ -1133,9 +1296,12 @@ export function HeelScene3D({
                 key={preset.id}
                 type="button"
                 onClick={() => applyCameraPreset(preset.id)}
-                className={('px-2 py-0.5 rounded-[5px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border ' + String(camPreset === preset.id
+                className={
+                  'px-2 py-0.5 rounded-[5px] text-[7.5px] font-mono uppercase tracking-wider transition-all cursor-pointer border ' +
+                  (camPreset === preset.id
                     ? 'bg-[var(--color-ink)] text-[var(--color-bg)] border-transparent font-semibold'
-                    : 'bg-[var(--color-surface)]/85 text-[var(--color-ink)] border-[var(--color-border)] opacity-75'))}
+                    : 'bg-[var(--color-surface)]/85 text-[var(--color-ink)] border-[var(--color-border)] opacity-75')
+                }
               >
                 {preset.label}
               </button>
@@ -1147,11 +1313,11 @@ export function HeelScene3D({
       <div className="px-3 py-1.5 flex items-center justify-between flex-wrap gap-x-2 gap-y-1 text-[8px] font-mono border-t border-[var(--color-border)] bg-[var(--color-surface)]/40">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#E11D48] inline-block" />
-          Давление/Пелот
+          2D-Педобарография/Пелот
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#10B981] inline-block" />
-          Припуск/Томас
+          3D-Колодка/Томас
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#3186FF] inline-block" />
@@ -1159,7 +1325,7 @@ export function HeelScene3D({
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block" />
-          Доработка/HV/Апекс
+          HV/Геленок ({eng.shankEngineering.profileType === 'fluted_ribbed' ? 'Желоб' : 'Плоск'})
         </span>
       </div>
     </div>
