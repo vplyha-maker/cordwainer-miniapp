@@ -6,6 +6,7 @@ import {
   type HeelInput,
   type HeelEngineering,
 } from '../../lib/heelCalc'
+import { buildTopPlanProjection } from '../../lib/heelGeometry'
 
 export interface OrthoExpertReportModalProps {
   isOpen: boolean
@@ -40,8 +41,17 @@ export function OrthoExpertReportModal({
   const se = eng.shankEngineering
   const val = eng.validation
   const prx = eng.rx.pairedRx
+  const levels = eng.rx.structuredLevels
 
-  const hvDeg = input.halluxValgusDeg ?? 0
+  // Размерно-согласованная проекция вида сверху непосредственно из LastGeometryModel (исправление 5.1, 5.2, 5.3)
+  const topProj = buildTopPlanProjection(gm)
+
+  const hvDeg =
+    input.independentSides && input.activeSide === 'right' && input.rightProfile
+      ? input.rightProfile.halluxValgusDeg
+      : input.independentSides && input.activeSide === 'left' && input.leftProfile
+        ? input.leftProfile.halluxValgusDeg
+        : (input.halluxValgusDeg ?? 0)
   const asymMm = gm.lengthAsymmetryMm
   const leftLen = gm.leftFootLengthMm
   const rightLen = gm.rightFootLengthMm
@@ -59,13 +69,6 @@ export function OrthoExpertReportModal({
       : gm.shorterFootSide === 'left'
         ? 'в ЛЕВУЮ полупару'
         : ''
-
-  const xM1Svg = Math.round(40 + gm.uApexM1 * 230)
-  const xM5Svg = Math.round(40 + gm.uApexM5 * 230)
-  const xPelotteSvg = Math.round(40 + gm.uPelotte * 230)
-  const apexZShiftPx = gm.toeBoxShiftMedialMm * 2.2
-  const ballExpandPx = gm.ballRadialLayerMm * 2.4
-  const bunionPocketPx = gm.medialBunionPocketMm * 2.0
 
   const soleSpecLine =
     gm.soleType === 'thomas'
@@ -89,15 +92,21 @@ export function OrthoExpertReportModal({
         String(se.fatigueSafetyFactor) +
         ')'
       : gm.soleType === 'rocker'
-        ? 'Рокерная перекатная подошва: угол переката ' +
+        ? 'Рокерная перекатная подошва [' +
+          String(gm.rockerClinicalLabel) +
+          ']: угол переката ' +
           String(gm.rockerAngleDeg) +
           '°, линия старта переката ' +
           String(gm.rockerStartPct) +
           '% (' +
           String(gm.xBallMm) +
-          ' мм), интегрированная карбоновая пластина ' +
-          String(gm.carbonInsertThicknessMm) +
-          ' мм'
+          ' мм), ' +
+          String(se.profileLabel) +
+          ' (σ ≈ ' +
+          String(se.estimatedBendingStressMpa) +
+          ' МПа, k_fat = ' +
+          String(se.fatigueSafetyFactor) +
+          ')'
         : 'Стандартный каблук: смещение оси набойки ' +
           String(
             gm.effectiveHeelTipOffsetMm >= 0
@@ -137,13 +146,18 @@ export function OrthoExpertReportModal({
     const text = [
       'ИНДИВИДУАЛЬНОЕ ТЕХНИЧЕСКОЕ ЗАДАНИЕ МАСТЕРУ ОБУВНОГО ПРОИЗВОДСТВА',
       '================================================================',
+      '• АКТИВНЫЙ ПРОФИЛЬ ОСНОВНОЙ СЦЕНЫ: ' + String(gm.activeSceneProfileLabel),
+      '',
+      'I. АНТРОПОМЕТРИЯ (ИСХОДНЫЕ ДАННЫЕ СТОПЫ):',
       '• Профиль клиента: ' +
         String(input.gender === 'male' ? 'Мужской' : 'Женский') +
         ', Размер ' +
         String(input.shoeSize) +
         ' EU, Вес ' +
         String(input.weightKg) +
-        ' кг',
+        ' кг (' +
+        String(gm.isAnthropometryMeasured ? 'прямой обмер' : 'расчёт по размеру EU') +
+        ')',
       '• Длины стоп и асимметрия: Левая = ' +
         String(leftLen) +
         ' мм, Правая = ' +
@@ -152,6 +166,8 @@ export function OrthoExpertReportModal({
         String(longerSideText) +
         '). ' +
         String(compInsoleText),
+      '',
+      'II. ИНЖЕНЕРНАЯ СПЕЦИФИКАЦИЯ (ГЕОМЕТРИЯ КОЛОДКИ И КОНСТРУКЦИЯ ПОДОШВЫ):',
       '• Длина и полнота колодки: След L_last = ' +
         String(gm.lastLengthMm) +
         ' мм (опорная стопа ' +
@@ -170,7 +186,7 @@ export function OrthoExpertReportModal({
         String(gm.toeBoxHeightMm) +
         ' мм',
       '• Модификация колодки по обхватам (Жёлтая зона):',
-      '  - Пучки (Oп = ' +
+      ' - Пучки (Oп = ' +
         String(input.ballGirthMm) +
         ' мм): ' +
         String(ballText) +
@@ -178,22 +194,24 @@ export function OrthoExpertReportModal({
         String(gm.forefootWidthMm) +
         ' мм vs база ' +
         String(gm.standardForefootWidthMm) +
+        ' мм, пятка ' +
+        String(gm.heelWidthMm) +
         ' мм)',
-      '  - Карман под Hallux Valgus (HV = ' +
+      ' - Карман под Hallux Valgus (HV = ' +
         String(hvDeg) +
         '°): ' +
         String(
           gm.medialBunionPocketMm > 0
             ? 'сформировать локальный медиальный карман на головке M1 +' +
-                String(gm.medialBunionPocketMm) +
-                ' мм (ширина с учётом HV = ' +
-                String(gm.effectiveForefootWidthWithBunionMm) +
-                ' мм)'
+              String(gm.medialBunionPocketMm) +
+              ' мм (ширина с учётом HV = ' +
+              String(gm.effectiveForefootWidthWithBunionMm) +
+              ' мм)'
             : 'не требуется (0 мм)'
         ),
-      '  - Прямой взъём (Oв = ' + String(input.instepGirthMm) + ' мм): ' + String(instepText),
+      ' - Прямой взъём (Oв = ' + String(input.instepGirthMm) + ' мм): ' + String(instepText),
       '• ПОЛУПАРНАЯ СПЕЦИФИКАЦИЯ (ЛЕВАЯ L / ПРАВАЯ R):',
-      '  [ЛЕВАЯ L]: Стопа ' +
+      ' [ЛЕВАЯ L]: Стопа ' +
         String(prx.left.footLengthMm) +
         ' мм, След ' +
         String(prx.left.lastLengthMm) +
@@ -213,8 +231,12 @@ export function OrthoExpertReportModal({
         String(Math.max(prx.left.medialHeelWedgeMm, prx.left.lateralWedgeMm)) +
         ' мм, вкладыш +' +
         String(prx.left.compensatoryInsoleMm) +
-        ' мм',
-      '  [ПРАВАЯ R]: Стопа ' +
+        ' мм, Пик (' +
+        String(prx.left.dominantRay) +
+        ')=' +
+        String(prx.left.peakForefootPressureKpa) +
+        ' кПа',
+      ' [ПРАВАЯ R]: Стопа ' +
         String(prx.right.footLengthMm) +
         ' мм, След ' +
         String(prx.right.lastLengthMm) +
@@ -234,8 +256,12 @@ export function OrthoExpertReportModal({
         String(Math.max(prx.right.medialHeelWedgeMm, prx.right.lateralWedgeMm)) +
         ' мм, вкладыш +' +
         String(prx.right.compensatoryInsoleMm) +
-        ' мм',
-      '• Конструкция подошвы и геленка (10^6 циклов): Drop = ' +
+        ' мм, Пик (' +
+        String(prx.right.dominantRay) +
+        ')=' +
+        String(prx.right.peakForefootPressureKpa) +
+        ' кПа',
+      '• Конструкция подошвы и силового элемента (10^6 циклов): Drop = ' +
         String(gm.netRiseMm) +
         ' мм (H = ' +
         String(gm.heelHeightMm) +
@@ -247,6 +273,8 @@ export function OrthoExpertReportModal({
         String(soleSpecLine) +
         '. ' +
         String(se.fatigueLifeStatus),
+      '',
+      'III. КЛИНИЧЕСКИЕ И ЭРГОНОМИЧЕСКИЕ РЕКОМЕНДАЦИИ (ТРЕБУЮТ ПОДТВЕРЖДЕНИЯ СПЕЦИАЛИСТОМ):',
       '• Ортопедическая стелька и фурнитура: ' +
         String(eng.rx.shoreA) +
         ', выкладка свода ' +
@@ -257,27 +285,37 @@ export function OrthoExpertReportModal({
         String(
           gm.requiresMetatarsalPad
             ? 'высота ' +
-                String(gm.metatarsalPadHeightMm) +
-                ' мм на расстоянии ' +
-                String(gm.metatarsalPadPosMm) +
-                ' мм от пятки (разгрузка M2–M3 на −' +
-                String(pm.pelotteReliefKpa) +
-                ' кПа)'
+              String(gm.metatarsalPadHeightMm) +
+              ' мм на расстоянии ' +
+              String(gm.metatarsalPadPosMm) +
+              ' мм от пятки (разгрузка M2–M3 на −' +
+              String(pm.pelotteReliefKpa) +
+              ' кПа)'
             : 'не требуется'
         ) +
         ', задник: ' +
         String(eng.rx.counterStiffness),
-      '• 2D-педобарография M1–M5 (модельная оценка): M1=' +
+      '• Нормированная биомеханическая эвристика давления M1–M5 (расчётная оценка без датчиков): M1=' +
         String(pm.kpaM1) +
-        ', M2=' +
+        ' (' +
+        String(pm.rayForcesN.M1) +
+        'Н), M2=' +
         String(pm.kpaM2) +
-        ', M3=' +
+        ' (' +
+        String(pm.rayForcesN.M2) +
+        'Н), M3=' +
         String(pm.kpaM3) +
-        ', M4=' +
+        ' (' +
+        String(pm.rayForcesN.M3) +
+        'Н), M4=' +
         String(pm.kpaM4) +
-        ', M5=' +
+        ' (' +
+        String(pm.rayForcesN.M4) +
+        'Н), M5=' +
         String(pm.kpaM5) +
-        ' кПа (доминирующий луч ' +
+        ' (' +
+        String(pm.rayForcesN.M5) +
+        'Н) кПа (доминирующий луч ' +
         String(pm.dominantMetatarsalRay) +
         '), Пятка Мед/Лат=' +
         String(pm.kpaHeelMedial) +
@@ -325,7 +363,7 @@ export function OrthoExpertReportModal({
           ' shadow-2xl overflow-hidden'
         }
       >
-        {/* 1. ШАПКА МОДАЛЬНОГО ОКНА */}
+        {/* 1. ШАПКА МОДАЛЬНОГО ОКНА С ЯВНОЙ МАРКИРОВКОЙ АКТИВНОГО ПРОФИЛЯ ОСНОВНОЙ СЦЕНЫ */}
         <div
           className={
             'px-4 py-3 border-b ' +
@@ -335,7 +373,7 @@ export function OrthoExpertReportModal({
         >
           <div>
             <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-[#F59E0B] font-semibold">
-              AI FOOTWEAR MASTER VISUAL ASSISTANT // ТЕХЛИСТ КОЛОДОЧНИКА
+              ТЕХЛИСТ КОЛОДОЧНИКА // СЦЕНА: {gm.activeSceneProfileLabel}
             </div>
             <h2 className="font-serif text-[16px] font-semibold leading-tight">
               ИНДИВИДУАЛЬНОЕ ТЕХНИЧЕСКОЕ ЗАДАНИЕ МАСТЕРУ
@@ -360,7 +398,7 @@ export function OrthoExpertReportModal({
         >
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-[#E11D48] inline-block shrink-0" />
-            КРАСНЫЙ: Давление (мод.)
+            КРАСНЫЙ: Давление (эврист.)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-[#10B981] inline-block shrink-0" />
@@ -390,8 +428,8 @@ export function OrthoExpertReportModal({
               [
                 { id: 'top_compare', label: '1. СВЕРХУ' },
                 { id: 'side_bottom_rear', label: '2. ПРОЕКЦИИ' },
-                { id: 'paired_and_shank', label: '3. L/R & 65Г' },
-                { id: 'steps_math', label: '4. ВАЛИДАЦИЯ' },
+                { id: 'paired_and_shank', label: '3. L/R & ПРОЧНОСТЬ' },
+                { id: 'steps_math', label: '4. 3 УРОВНЯ & ВАЛИД.' },
               ] as const
             ).map((tab) => (
               <button
@@ -425,6 +463,9 @@ export function OrthoExpertReportModal({
               ' grid grid-cols-2 gap-x-3 gap-y-1 text-[10.5px]'
             }
           >
+            <div className="col-span-2 font-mono text-[8.5px] text-[#3186FF] pb-0.5 border-b border-[var(--color-border)]/40">
+              ▸ АКТИВНЫЙ ПРОФИЛЬ ОСНОВНОЙ СЦЕНЫ: <strong>{gm.activeSceneProfileLabel}</strong>
+            </div>
             <div>
               • <strong>Стопы (Лев/Прав):</strong> {leftLen} / {rightLen} мм (
               {gm.longerFootSide === 'equal'
@@ -438,7 +479,7 @@ export function OrthoExpertReportModal({
               • <strong>След колодки:</strong> {gm.lastLengthMm} мм ({eng.rx.widthCode})
             </div>
             <div>
-              • <strong>Ширина пучков:</strong> {gm.forefootWidthMm} мм (база{' '}
+              • <strong>Ширина пучков/пятки:</strong> {gm.forefootWidthMm} / {gm.heelWidthMm} мм (база{' '}
               {gm.standardForefootWidthMm} мм
               {gm.medialBunionPocketMm > 0
                 ? ', с HV: ' + String(gm.effectiveForefootWidthWithBunionMm) + ' мм'
@@ -475,34 +516,37 @@ export function OrthoExpertReportModal({
             </div>
           </div>
 
-          {/* ЛИСТ 1: ПРОЕКЦИЯ СВЕРХУ (ДО / ПОСЛЕ) + СХЕМА АПЕКСОВ */}
+          {/* ЛИСТ 1: ПРОЕКЦИЯ СВЕРХУ (ДО / ПОСЛЕ) + НОРМИРОВАННАЯ ЭВРИСТИКА ДАВЛЕНИЯ */}
           {projTab === 'top_compare' && (
             <div className="space-y-3">
               <div className={'p-3 rounded-[12px] border ' + String(cLine) + ' ' + String(cCard)}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-mono text-[8.5px] uppercase tracking-wider font-semibold">
-                    ПРОЕКЦИЯ 1 & 5: ВИД СВЕРХУ — «СТАНДАРТНАЯ vs ИНДИВИДУАЛЬНАЯ КОЛОДКА»
+                    ПРОЕКЦИЯ 1: ВИД СВЕРХУ — «БАЗОВАЯ vs ИНДИВИДУАЛЬНАЯ КОЛОДКА»
                   </span>
-                  <span className="font-mono text-[8px] opacity-60">МАСШТАБ CAD // ММ</span>
+                  <span className="font-mono text-[7.5px] opacity-65">
+                    ИНЖЕНЕРНАЯ СХЕМА (ММ · НЕ CAD-ЛЕКАЛО)
+                  </span>
                 </div>
 
                 <svg viewBox="0 0 320 155" className="w-full h-auto overflow-visible">
                   <line
                     x1="25"
-                    y1="78"
+                    y1={topProj.centerY}
                     x2="295"
-                    y2="78"
+                    y2={topProj.centerY}
                     stroke="#3186FF"
                     strokeWidth="0.8"
                     strokeDasharray="4 3"
                     opacity="0.55"
                   />
-                  <text x="298" y="80" fill="#3186FF" fontSize="6.5" fontFamily="monospace">
+                  <text x="296" y={topProj.centerY + 2} fill="#3186FF" fontSize="6.5" fontFamily="monospace">
                     ОСЬ 0°
                   </text>
 
+                  {/* Стандартный контур базовой колодки из LastGeometryModel */}
                   <path
-                    d="M 40 78 C 40 52, 85 52, 130 55 C 165 56, 195 44, 225 48 C 258 53, 278 65, 282 78 C 278 91, 258 103, 225 108 C 195 112, 165 100, 130 101 C 85 104, 40 104, 40 78 Z"
+                    d={topProj.standardContourPath}
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1"
@@ -510,127 +554,79 @@ export function OrthoExpertReportModal({
                     opacity="0.45"
                   />
 
-                  {(gm.ballBuildUpMm !== 0 || bunionPocketPx > 0) && (
+                  {/* Зона модификации пучков и кармана HV */}
+                  {(gm.ballBuildUpMm !== 0 || gm.medialBunionPocketMm > 0) && (
                     <path
-                      d={
-                        'M 165 52 Q ' +
-                        String(xM1Svg) +
-                        ' ' +
-                        String(36 - Math.max(-8, ballExpandPx) - bunionPocketPx) +
-                        ', 248 ' +
-                        String(54 - apexZShiftPx) +
-                        ' L 245 58 Q ' +
-                        String(xM1Svg) +
-                        ' 45, 165 54 Z'
-                      }
-                      fill={gm.ballBuildUpMm >= 0 || bunionPocketPx > 0 ? '#F59E0B' : '#3186FF'}
-                      fillOpacity="0.36"
-                      stroke={gm.ballBuildUpMm >= 0 || bunionPocketPx > 0 ? '#F59E0B' : '#3186FF'}
+                      d={topProj.buildUpZonePath}
+                      fill={gm.ballBuildUpMm >= 0 || gm.medialBunionPocketMm > 0 ? '#F59E0B' : '#3186FF'}
+                      fillOpacity="0.34"
+                      stroke={gm.ballBuildUpMm >= 0 || gm.medialBunionPocketMm > 0 ? '#F59E0B' : '#3186FF'}
                       strokeWidth="1.2"
                       strokeDasharray={
-                        gm.ballBuildUpMm < 0 && bunionPocketPx === 0 ? '2 2' : undefined
+                        gm.ballBuildUpMm < 0 && gm.medialBunionPocketMm === 0 ? '2 2' : undefined
                       }
                     />
                   )}
 
+                  {/* Зелёная зона свободного носочного припуска перед пальцами */}
                   <path
-                    d={
-                      'M 258 ' +
-                      String(57 - apexZShiftPx * 0.6) +
-                      ' Q 290 ' +
-                      String(60 - apexZShiftPx) +
-                      ', 292 ' +
-                      String(76 - apexZShiftPx) +
-                      ' Q 290 ' +
-                      String(92 - apexZShiftPx * 0.4) +
-                      ', 258 97 L 250 92 Q 275 ' +
-                      String(76 - apexZShiftPx * 0.7) +
-                      ', 250 62 Z'
-                    }
+                    d={topProj.toeFreeSpaceZonePath}
                     fill="#10B981"
-                    fillOpacity="0.32"
+                    fillOpacity="0.3"
                     stroke="#10B981"
                     strokeWidth="1.1"
                   />
 
+                  {/* Индивидуальный контур колодки (с учётом формы пальцев, полноты и кармана HV) */}
                   <path
-                    d={
-                      'M 40 78 C 40 52, 85 52, 130 54 C 165 54, ' +
-                      String(xM1Svg - 10) +
-                      ' ' +
-                      String(42 - ballExpandPx - bunionPocketPx) +
-                      ', 228 ' +
-                      String(46 - ballExpandPx * 0.6 - apexZShiftPx * 0.5) +
-                      ' C 262 ' +
-                      String(50 - apexZShiftPx) +
-                      ', 288 ' +
-                      String(62 - apexZShiftPx) +
-                      ', 292 ' +
-                      String(76 - apexZShiftPx) +
-                      ' C 288 ' +
-                      String(92 - apexZShiftPx * 0.4) +
-                      ', 260 ' +
-                      String(104 + ballExpandPx * 0.5) +
-                      ', 222 ' +
-                      String(110 + ballExpandPx * 0.8) +
-                      ' C 190 ' +
-                      String(114 + ballExpandPx) +
-                      ', 162 101, 130 101 C 85 104, 40 104, 40 78 Z'
-                    }
+                    d={topProj.customContourPath}
                     fill="none"
                     stroke="#F59E0B"
                     strokeWidth="1.6"
                   />
 
+                  {/* Пятна контакта M1 и M5 */}
                   <ellipse
-                    cx={xM1Svg}
-                    cy={46 - ballExpandPx * 0.5 - bunionPocketPx * 0.35}
-                    rx={11 + gm.medialBunionPocketMm * 0.4}
-                    ry={6 + gm.medialBunionPocketMm * 0.25}
+                    cx={topProj.xApexM1}
+                    cy={topProj.yM1 + 7}
+                    rx={10 + gm.medialBunionPocketMm * 0.4}
+                    ry={5.5 + gm.medialBunionPocketMm * 0.22}
                     fill="#E11D48"
                     fillOpacity="0.38"
                     stroke="#E11D48"
                     strokeWidth="1"
                   />
                   <ellipse
-                    cx={xM5Svg}
-                    cy={107 + ballExpandPx * 0.4}
-                    rx="9"
-                    ry="5"
+                    cx={topProj.xApexM5}
+                    cy={topProj.yM5 - 6}
+                    rx="8.5"
+                    ry="4.8"
                     fill="#E11D48"
                     fillOpacity="0.28"
                     stroke="#E11D48"
                     strokeWidth="0.9"
                   />
 
+                  {/* Косая метатарзальная линия сгиба M1–M5 */}
                   <line
-                    x1={xM5Svg}
-                    y1={106 + ballExpandPx * 0.4}
-                    x2={xM1Svg}
-                    y2={46 - ballExpandPx * 0.5 - bunionPocketPx * 0.35}
+                    x1={topProj.xApexM5}
+                    y1={topProj.yM5 - 6}
+                    x2={topProj.xApexM1}
+                    y2={topProj.yM1 + 7}
                     stroke="#3186FF"
                     strokeWidth="1.4"
                   />
-                  <circle
-                    cx={xM1Svg}
-                    cy={46 - ballExpandPx * 0.5 - bunionPocketPx * 0.35}
-                    r="3"
-                    fill="#3186FF"
-                  />
-                  <circle cx={xM5Svg} cy={106 + ballExpandPx * 0.4} r="3" fill="#3186FF" />
+                  <circle cx={topProj.xApexM1} cy={topProj.yM1 + 7} r="3" fill="#3186FF" />
+                  <circle cx={topProj.xApexM5} cy={topProj.yM5 - 6} r="3" fill="#3186FF" />
 
-                  <circle
-                    cx="268"
-                    cy={78 - gm.anatomicalFootApexOffsetMm * 1.6}
-                    r="3"
-                    fill="#3186FF"
-                  />
-                  <circle cx="292" cy={76 - apexZShiftPx} r="3.5" fill="#F59E0B" />
+                  {/* Вершина стопы vs апекс колодки */}
+                  <circle cx={topProj.xFootTip} cy={topProj.yFootApex} r="3" fill="#3186FF" />
+                  <circle cx={topProj.xLastToe} cy={topProj.yLastApex} r="3.5" fill="#F59E0B" />
 
                   {gm.requiresMetatarsalPad && (
                     <ellipse
-                      cx={xPelotteSvg}
-                      cy="76"
+                      cx={topProj.xPelotte}
+                      cy={topProj.centerY - 2}
                       rx="11"
                       ry="14"
                       fill="#E11D48"
@@ -641,10 +637,10 @@ export function OrthoExpertReportModal({
                   )}
 
                   <text
-                    x={Math.max(105, xM1Svg - 32)}
-                    y="24"
+                    x={Math.max(92, topProj.xApexM1 - 36)}
+                    y="18"
                     fill="#F59E0B"
-                    fontSize="6.5"
+                    fontSize="6.4"
                     fontFamily="monospace"
                     fontWeight="bold"
                   >
@@ -654,19 +650,19 @@ export function OrthoExpertReportModal({
                       : ''}
                   </text>
                   <line
-                    x1={xM1Svg}
-                    y1="27"
-                    x2={xM1Svg}
-                    y2={40 - ballExpandPx * 0.5 - bunionPocketPx * 0.35}
+                    x1={topProj.xApexM1}
+                    y1="21"
+                    x2={topProj.xApexM1}
+                    y2={topProj.yM1 + 2}
                     stroke="#F59E0B"
                     strokeWidth="0.8"
                   />
 
                   <text
-                    x={Math.max(70, xM5Svg - 30)}
-                    y="136"
+                    x={Math.max(60, topProj.xApexM5 - 32)}
+                    y="142"
                     fill="#3186FF"
-                    fontSize="6.8"
+                    fontSize="6.6"
                     fontFamily="monospace"
                     fontWeight="bold"
                   >
@@ -674,29 +670,21 @@ export function OrthoExpertReportModal({
                   </text>
 
                   <text
-                    x="212"
+                    x="208"
                     y="16"
                     fill="#10B981"
-                    fontSize="6.8"
+                    fontSize="6.6"
                     fontFamily="monospace"
                     fontWeight="bold"
                   >
-                    ПРИПУСК +{gm.toeFreeSpaceMm}мм
+                    ПРИПУСК +{gm.toeFreeSpaceMm}мм ({gm.toeShape.toUpperCase()})
                   </text>
-                  <line
-                    x1="265"
-                    y1="19"
-                    x2="278"
-                    y2={62 - apexZShiftPx}
-                    stroke="#10B981"
-                    strokeWidth="0.8"
-                  />
 
                   <text
-                    x="208"
-                    y="147"
+                    x="202"
+                    y="149"
                     fill="#F59E0B"
-                    fontSize="6.8"
+                    fontSize="6.6"
                     fontFamily="monospace"
                     fontWeight="bold"
                   >
@@ -705,19 +693,49 @@ export function OrthoExpertReportModal({
                 </svg>
               </div>
 
-              {/* 2D ПЕДОБАРОГРАФИЯ ПО ГОЛОВКАМ M1–M5 */}
+              {/* НОРМИРОВАННАЯ ЭВРИСТИКА ПЛАНТАРНОГО ДАВЛЕНИЯ ПО ГОЛОВКАМ M1–M5 */}
               <div className={'p-3 rounded-[12px] border ' + String(cLine) + ' ' + String(cCard)}>
                 <div className="font-mono text-[8px] uppercase tracking-wider text-[#E11D48] font-semibold mb-1.5">
-                  2D ГАУССОВО ПОЛЕ ПЕДОБАРОГРАФИИ (РАСПРЕДЕЛЕНИЕ ПО ГОЛОВКАМ M1–M5, МОД.)
+                  РАСЧЁТНАЯ БИОМЕХАНИЧЕСКАЯ ЭВРИСТИКА ДАВЛЕНИЯ M1–M5 (БАЛАНС ΣF_Mi = F_fore)
                 </div>
                 <div className="grid grid-cols-5 gap-1.5 text-center text-[9.5px]">
                   {(
                     [
-                      { ray: 'M1', kpa: pm.kpaM1 },
-                      { ray: 'M2', kpa: pm.kpaM2 },
-                      { ray: 'M3', kpa: pm.kpaM3 },
-                      { ray: 'M4', kpa: pm.kpaM4 },
-                      { ray: 'M5', kpa: pm.kpaM5 },
+                      {
+                        ray: 'M1',
+                        kpa: pm.kpaM1,
+                        force: pm.rayForcesN.M1,
+                        area: pm.rayContactAreasCm2.M1,
+                        share: pm.rayLoadSharesPct.M1,
+                      },
+                      {
+                        ray: 'M2',
+                        kpa: pm.kpaM2,
+                        force: pm.rayForcesN.M2,
+                        area: pm.rayContactAreasCm2.M2,
+                        share: pm.rayLoadSharesPct.M2,
+                      },
+                      {
+                        ray: 'M3',
+                        kpa: pm.kpaM3,
+                        force: pm.rayForcesN.M3,
+                        area: pm.rayContactAreasCm2.M3,
+                        share: pm.rayLoadSharesPct.M3,
+                      },
+                      {
+                        ray: 'M4',
+                        kpa: pm.kpaM4,
+                        force: pm.rayForcesN.M4,
+                        area: pm.rayContactAreasCm2.M4,
+                        share: pm.rayLoadSharesPct.M4,
+                      },
+                      {
+                        ray: 'M5',
+                        kpa: pm.kpaM5,
+                        force: pm.rayForcesN.M5,
+                        area: pm.rayContactAreasCm2.M5,
+                        share: pm.rayLoadSharesPct.M5,
+                      },
                     ] as const
                   ).map((item) => {
                     const isDom = pm.dominantMetatarsalRay === item.ray
@@ -736,15 +754,20 @@ export function OrthoExpertReportModal({
                           )
                         }
                       >
-                        <div className="font-mono text-[8px] font-bold">{item.ray}</div>
+                        <div className="font-mono text-[8px] font-bold">
+                          {item.ray} ({item.share}%)
+                        </div>
                         <div className="font-serif text-[13px] font-semibold">{item.kpa}</div>
-                        <div className="text-[7.5px] opacity-70">кПа</div>
+                        <div className="text-[7px] opacity-75">
+                          кПа · {item.force}Н / {item.area}см²
+                        </div>
                       </div>
                     )
                   })}
                 </div>
                 <div className="text-[9.5px] opacity-80 mt-1.5">
-                  Доминирующий луч: <strong>{pm.dominantMetatarsalRay}</strong> · Средний отдел:{' '}
+                  Доминирующий луч: <strong>{pm.dominantMetatarsalRay}</strong> · Фазовый коэфф.
+                  переката: <strong>×{pm.gaitPhaseFactor}</strong> · Средний отдел:{' '}
                   <strong>{pm.kpaMidfoot} кПа</strong> · Пятка (Мед/Лат):{' '}
                   <strong>
                     {pm.kpaHeelMedial} / {pm.kpaHeelLateral} кПа
@@ -762,7 +785,7 @@ export function OrthoExpertReportModal({
             <div className="space-y-3">
               <div className={'p-3 rounded-[12px] border ' + String(cLine) + ' ' + String(cCard)}>
                 <div className="font-mono text-[8.5px] uppercase tracking-wider font-semibold mb-1">
-                  ПРОЕКЦИЯ 2: ВИД СБОКУ (ПРЯМОЙ ВЗЪЁМ, СВОД, ПЕРЕПАД ВЫСОТ И МЫСОК)
+                  ПРОЕКЦИЯ 2: ВИД СБОКУ (ИНЖЕНЕРНАЯ СХЕМА ВЗЪЁМА, СВОДА И ПЕРЕПАДА ВЫСОТ)
                 </div>
                 <svg viewBox="0 0 320 115" className="w-full h-auto overflow-visible">
                   <line
@@ -777,7 +800,15 @@ export function OrthoExpertReportModal({
                   />
                   {gm.soleType === 'rocker' ? (
                     <path
-                      d="M 42 68 L 195 88 L 195 96 L 56 96 Q 44 94, 42 68 Z"
+                      d={
+                        'M 42 68 L ' +
+                        String(Math.round(42 + gm.uBall * 243)) +
+                        ' 88 L ' +
+                        String(Math.round(42 + gm.uBall * 243)) +
+                        ' 96 L ' +
+                        String(48 + gm.rearHeelRockerLiftMm) +
+                        ' 96 Q 44 94, 42 68 Z'
+                      }
                       fill="#475569"
                       fillOpacity="0.55"
                       stroke="currentColor"
@@ -787,9 +818,17 @@ export function OrthoExpertReportModal({
                     <path
                       d={
                         'M 42 68 L ' +
-                        String(gm.soleType === 'thomas' ? 112 : 95) +
+                        String(
+                          gm.soleType === 'thomas'
+                            ? Math.round(42 + gm.uThomasFront * 243)
+                            : Math.round(42 + gm.uHeelFrontBase * 243)
+                        ) +
                         ' 68 L ' +
-                        String(gm.soleType === 'thomas' ? 112 : 95) +
+                        String(
+                          gm.soleType === 'thomas'
+                            ? Math.round(42 + gm.uThomasFront * 243)
+                            : Math.round(42 + gm.uHeelFrontBase * 243)
+                        ) +
                         ' 96 L 44 96 Z'
                       }
                       fill={gm.soleType === 'thomas' ? '#10B981' : 'currentColor'}
@@ -869,7 +908,7 @@ export function OrthoExpertReportModal({
               <div className="grid grid-cols-2 gap-2.5">
                 <div className={'p-2.5 rounded-[12px] border ' + String(cLine) + ' ' + String(cCard)}>
                   <div className="font-mono text-[8px] uppercase tracking-wider font-semibold mb-1">
-                    3. ВИД СЗАДИ (ПЯТКА)
+                    3. ВИД СЗАДИ (ПЯТКА {gm.heelWidthMm} ММ)
                   </div>
                   <svg viewBox="0 0 140 115" className="w-full h-auto">
                     <line
@@ -891,9 +930,9 @@ export function OrthoExpertReportModal({
                       strokeDasharray="2 2"
                     />
                     <rect
-                      x="46"
+                      x={Math.round(70 - gm.heelWidthMm * 0.38)}
                       y="72"
-                      width="48"
+                      width={Math.round(gm.heelWidthMm * 0.76)}
                       height="26"
                       rx="3"
                       fill="currentColor"
@@ -1008,7 +1047,7 @@ export function OrthoExpertReportModal({
                           fontFamily="monospace"
                           fontWeight="bold"
                         >
-                          РОКЕР {gm.rockerAngleDeg}° · КАРБОН {gm.carbonInsertThicknessMm}мм
+                          РОКЕР ({gm.rockerType}) {gm.rockerAngleDeg}° · CFRP {gm.carbonInsertThicknessMm}мм
                         </text>
                       </>
                     ) : (
@@ -1046,7 +1085,7 @@ export function OrthoExpertReportModal({
             </div>
           )}
 
-          {/* ЛИСТ 3: ДВУХКОЛОНОЧНОЕ ТЗ (ЛЕВАЯ / ПРАВАЯ ПОЛУПАРА) + РАСЧЁТ ГЕЛЕНКА 65Г (10^6 ЦИКЛОВ) */}
+          {/* ЛИСТ 3: ДВУХКОЛОНОЧНОЕ ТЗ (L / R) + РАЗДЕЛЁННЫЙ ПРОЧНОСТНОЙ РАСЧЁТ (65Г vs КАРБОН CFRP) */}
           {projTab === 'paired_and_shank' && (
             <div className="space-y-3">
               <div className={'p-3 rounded-[12px] border ' + String(cLine) + ' ' + String(cCard)}>
@@ -1066,7 +1105,7 @@ export function OrthoExpertReportModal({
                         • <strong>Стопа / След:</strong> {sp.footLengthMm} / {sp.lastLengthMm} мм
                       </div>
                       <div>
-                        • <strong>Полнота / Ширина:</strong> {sp.widthCode} ({sp.forefootWidthMm} мм)
+                        • <strong>Полнота / Ширина:</strong> {sp.widthCode} ({sp.forefootWidthMm} мм, пятка {sp.heelWidthMm} мм)
                       </div>
                       <div>
                         • <strong>Пучки (Oп={sp.ballGirthMm}):</strong> ΔOп{' '}
@@ -1103,7 +1142,8 @@ export function OrthoExpertReportModal({
                           : 'Не требуется (0 мм)'}
                       </div>
                       <div>
-                        • <strong>Пик ({sp.dominantRay}):</strong> {sp.peakForefootPressureKpa} кПа
+                        • <strong>Пик ({sp.dominantRay}):</strong> {sp.peakForefootPressureKpa} кПа (
+                        {sp.forefootLoadPct}%)
                         {sp.requiresMetatarsalPad
                           ? ' · Пелот ' + String(sp.metatarsalPadHeightMm) + 'мм'
                           : ''}
@@ -1113,7 +1153,7 @@ export function OrthoExpertReportModal({
                 </div>
               </div>
 
-              {/* ПРОЧНОСТНОЙ РАСЧЁТ СОСТАВНОГО СЕЧЕНИЯ ГЕЛЕНКА (БАЛКА НА УПРУГОМ ОСНОВАНИИ ВИНКЛЕРА) */}
+              {/* ПРОЧНОСТНОЙ РАСЧЁТ СИЛОВОГО ЭЛЕМЕНТА (СТАЛЬ 65Г vs КАРБОН CFRP) */}
               <div
                 className={
                   'p-3 rounded-[12px] border space-y-1.5 text-[10px] ' +
@@ -1123,26 +1163,29 @@ export function OrthoExpertReportModal({
                 }
               >
                 <div className="font-mono text-[8.5px] uppercase tracking-wider text-[#F59E0B] font-semibold">
-                  РАСЧЁТ ГЕЛЕНКА: СОСТАВНОЕ СЕЧЕНИЕ НА УПРУГОМ ОСНОВАНИИ (10^6 ЦИКЛОВ ШАГА)
+                  РАСЧЁТ ПРОЧНОСТИ СИЛОВОГО ЭЛЕМЕНТА ({se.material === 'carbon_composite' ? 'КАРБОН CFRP' : 'СТАЛЬ 65Г'} · 10^6 ЦИКЛОВ)
                 </div>
                 <div>
-                  • <strong>Профиль и сечение:</strong> {se.profileLabel} ({se.shankLengthMm}×
-                  {se.shankWidthMm}×{se.steelThicknessMm} мм
-                  {se.ribDepthMm > 0 ? ', гофр ' + String(se.ribDepthMm) + ' мм' : ''}), W_x ={' '}
-                  <strong>{se.sectionModulusMm3} мм³</strong>
+                  • <strong>Профиль и геометрия сечения:</strong> {se.profileLabel} ({se.shankLengthMm}×
+                  {se.shankWidthMm}×{se.elementThicknessMm} мм
+                  {se.ribDepthMm > 0 ? ', гофр ' + String(se.ribDepthMm) + ' мм' : ''}), нейтр. ось z_NA ={' '}
+                  <strong>{se.neutralAxisMm} мм</strong>, I_x = <strong>{se.momentOfInertiaMm4} мм⁴</strong>,
+                  W_x = <strong>{se.sectionModulusMm3} мм³</strong>, жёсткость EI ={' '}
+                  <strong>{se.flexuralRigidityNm2} Н·м²</strong>
                 </div>
                 <div>
                   • <strong>Распределение момента свода ({se.bendingMomentNm} Н·м):</strong> разгрузка
-                  упругим основанием Винклера (свод + Томас) ={' '}
-                  <strong>−{se.winklerFoundationReliefPct}%</strong>; доля жесткости геленка в
-                  пакете со стелькой = <strong>{se.compositeShankLoadSharePct}%</strong> (чистый
-                  момент на геленок = <strong>{se.netShankMomentNm} Н·м</strong>)
+                  упругим основанием Винклера ={' '}
+                  <strong>−{se.winklerFoundationReliefPct}%</strong>; доля жёсткости EI в слоистом пакете ={' '}
+                  <strong>{se.compositeShankLoadSharePct}%</strong> (чистый момент ={' '}
+                  <strong>{se.netShankMomentNm} Н·м</strong>, концентратор K_σ ={' '}
+                  <strong>{se.stressConcentrationFactor}</strong>)
                 </div>
                 <div>
                   • <strong>Напряжение и циклическая стойкость:</strong> σ_max ≈{' '}
-                  <strong>{se.estimatedBendingStressMpa} МПа</strong> (предел выносливости 10^6
-                  циклов = {se.fatigueLimit1e6Mpa} МПа, статический запас k_ст ={' '}
-                  <strong>{se.safetyFactor}</strong>, усталостный запас k_fat ={' '}
+                  <strong>{se.estimatedBendingStressMpa} МПа</strong> (предел прочности ={' '}
+                  {se.yieldStrengthMpa} МПа, предел выносливости 10^6 циклов = {se.fatigueLimit1e6Mpa}{' '}
+                  МПа, статический запас k_ст = <strong>{se.safetyFactor}</strong>, усталостный запас k_fat ={' '}
                   <strong>{se.fatigueSafetyFactor}</strong>)
                 </div>
                 <div
@@ -1157,9 +1200,53 @@ export function OrthoExpertReportModal({
             </div>
           )}
 
-          {/* ЛИСТ 4: ВАЛИДАЦИЯ ГЕОМЕТРИИ КОЛОДКИ, ЧЕК-ЛИСТ 1–6 И ФОРМУЛЫ */}
+          {/* ЛИСТ 4: ТРЁХУРОВНЕВАЯ СТРУКТУРА ТЗ МАСТЕРУ, ВАЛИДАЦИЯ И ФОРМУЛЫ */}
           {projTab === 'steps_math' && (
             <div className="space-y-3">
+              {/* 3 УРОВНЯ ТЕХНИЧЕСКОГО ЗАДАНИЯ МАСТЕРУ (Аудит раздел 6) */}
+              <div
+                className={
+                  'p-3 rounded-[12px] border space-y-2 text-[9.5px] ' +
+                  String(cLine) +
+                  ' ' +
+                  String(cCard)
+                }
+              >
+                <div className="font-mono text-[8.5px] uppercase tracking-wider text-[#F59E0B] font-semibold">
+                  ТРЁХУРОВНЕВАЯ ДЕКОМПОЗИЦИЯ ТЕХНИЧЕСКОГО ЗАДАНИЯ МАСТЕРУ
+                </div>
+                <div className={'p-2 rounded-[8px] border ' + String(cLine)}>
+                  <div className="font-mono text-[8px] text-[#3186FF] font-bold uppercase mb-1">
+                    УРОВЕНЬ I. АНТРОПОМЕТРИЯ (ИСХОДНЫЕ ДАННЫЕ СТОПЫ)
+                  </div>
+                  {levels.level1Anthropometry.map((line, idx) => (
+                    <div key={idx} className="opacity-85">
+                      • {line}
+                    </div>
+                  ))}
+                </div>
+                <div className={'p-2 rounded-[8px] border ' + String(cLine)}>
+                  <div className="font-mono text-[8px] text-[#10B981] font-bold uppercase mb-1">
+                    УРОВЕНЬ II. ИНЖЕНЕРНАЯ СПЕЦИФИКАЦИЯ (КОЛОДКА И ПОДОШВА)
+                  </div>
+                  {levels.level2EngineeringSpec.map((line, idx) => (
+                    <div key={idx} className="opacity-85">
+                      • {line}
+                    </div>
+                  ))}
+                </div>
+                <div className={'p-2 rounded-[8px] border ' + String(cLine)}>
+                  <div className="font-mono text-[8px] text-[#F59E0B] font-bold uppercase mb-1">
+                    УРОВЕНЬ III. КЛИНИЧЕСКИЕ И ЭРГОНОМИЧЕСКИЕ РЕКОМЕНДАЦИИ (ТРЕБУЮТ ПОДТВЕРЖДЕНИЯ)
+                  </div>
+                  {levels.level3ClinicalRecommendations.map((line, idx) => (
+                    <div key={idx} className="opacity-85">
+                      • {line}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* СПЕЦИАЛИЗИРОВАННАЯ ВАЛИДАЦИЯ ГЕОМЕТРИИ И КЛИНИЧЕСКИХ ЭВРИСТИК */}
               <div
                 className={
