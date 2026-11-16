@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import * as THREE from 'three'
 import type { Lang } from '../App'
 
 type ColorsPageProps = {
@@ -38,745 +39,1139 @@ const LockIcon = ({ size = 10 }: { size?: number }) => (
 
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   try {
-    const tg = (window as any).Telegram?.WebApp
+    const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred: (s: string) => void } } } })
+      .Telegram?.WebApp
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
   } catch {}
 }
 
 /* ============================================================================
-   1. RUNNER — ATELIER LUXURY RUNNER (Пропорции: Loro Piana / Loewe)
+   ПАРАМЕТРИЧЕСКИЙ ГЕНЕРАТОР 3D-МОДЕЛИ ОБУВИ (THREE.JS)
+   Создает детализированную многослойную 3D-колодку и детали верха/подошвы
    ============================================================================ */
-function RunnerSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0] // 60% — Кожаный каркас, мысок, пяточный стакан
-  const secondaryColor = colors[1] // 30% — Замшевая база союзки, берец и язычок
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] // 15% — Внутренняя подкладка, стелька, спойлер
-  const accentColor = colors[colors.length - 1] // 10% — Протектор, шеврон, ярлык язычка, люверсы
+type ShoeMaterials = {
+  main: THREE.MeshPhysicalMaterial
+  secondary: THREE.MeshStandardMaterial
+  tertiary: THREE.MeshStandardMaterial
+  accent: THREE.MeshPhysicalMaterial
+  midsole: THREE.MeshStandardMaterial
+  lace: THREE.MeshStandardMaterial
+  insole: THREE.MeshStandardMaterial
+}
 
-  const outline = isDark ? 'rgba(244, 240, 232, 0.48)' : 'rgba(28, 24, 22, 0.42)'
-  const seam = isDark ? 'rgba(244, 240, 232, 0.28)' : 'rgba(28, 24, 22, 0.24)'
-  const stitch = isDark ? 'rgba(244, 240, 232, 0.55)' : 'rgba(28, 24, 22, 0.45)'
-  const midsoleTop = isDark ? '#262421' : '#FDFBF7'
-  const midsoleBottom = isDark ? '#161513' : '#E6E0D6'
-  const laceColor = isDark ? '#F4F0E8' : '#FFFFFF'
+function sampleSilhouetteProfile(t: number, silhouette: Silhouette) {
+  // t = 0 (пятка) ... t = 1 (мысок)
+  const z = (t - 0.5) * 2.85
+
+  // Асимметричный контур стопы (медиальная и латеральная стороны)
+  let halfWidth = 0.36
+  if (t < 0.22) {
+    // Пятка
+    const u = t / 0.22
+    halfWidth = 0.14 + 0.22 * Math.sin(u * Math.PI * 0.5)
+  } else if (t < 0.52) {
+    // Геленочная часть (перешеек свода)
+    const u = (t - 0.22) / 0.3
+    halfWidth = 0.36 - 0.055 * Math.sin(u * Math.PI)
+  } else if (t < 0.78) {
+    // Пучки (самая широкая часть)
+    const u = (t - 0.52) / 0.26
+    halfWidth = 0.36 + 0.095 * Math.sin(u * Math.PI * 0.75)
+  } else {
+    // Сужение к мыску
+    const u = (t - 0.78) / 0.22
+    const tipPower = silhouette === 'pump' ? 1.65 : silhouette === 'derby' ? 1.35 : 1.15
+    halfWidth = 0.425 * Math.cos(Math.pow(u, tipPower) * Math.PI * 0.485)
+  }
+
+  if (silhouette === 'pump') halfWidth *= 0.86
+  if (silhouette === 'derby') halfWidth *= 0.93
+
+  // Изгиб центральной оси стопы (банановидность колодки к большому пальцу)
+  const centerShiftX =
+    t < 0.3
+      ? 0
+      : t < 0.75
+      ? Math.sin(((t - 0.3) / 0.45) * Math.PI) * 0.045
+      : 0.035 * (1 - (t - 0.75) / 0.25)
+
+  // Профиль подошвы (нижняя линия колодки + toe spring)
+  let yBottom = 0
+  if (silhouette === 'pump') {
+    // Подъем каблука 105 мм
+    const heelLift = t < 0.58 ? 0.72 * Math.pow(1 - t / 0.58, 1.45) : 0
+    const toeSpring = t > 0.78 ? Math.pow((t - 0.78) / 0.22, 1.9) * 0.08 : 0
+    yBottom = -0.34 + heelLift + toeSpring
+  } else if (silhouette === 'derby') {
+    const heelLift = t < 0.32 ? 0.11 : t < 0.5 ? 0.11 * (1 - (t - 0.32) / 0.18) : 0
+    const toeSpring = t > 0.72 ? Math.pow((t - 0.72) / 0.28, 1.85) * 0.11 : 0
+    yBottom = -0.22 + heelLift + toeSpring
+  } else {
+    // Runner: спортивный перекат (rocker + toe spring)
+    const heelBevel = t < 0.1 ? Math.pow((0.1 - t) / 0.1, 1.8) * 0.065 : 0
+    const drop = (1 - t) * 0.09
+    const toeSpring = t > 0.68 ? Math.pow((t - 0.68) / 0.32, 1.85) * 0.17 : 0
+    yBottom = -0.22 + drop + heelBevel + toeSpring
+  }
+
+  // Верхний профиль колодки (гребень подъема, союзка, мысок)
+  let upperHeight = 0.48
+  if (t < 0.14) {
+    // Задник
+    const u = t / 0.14
+    upperHeight = 0.24 + 0.56 * Math.sin(u * Math.PI * 0.5)
+  } else if (t < 0.44) {
+    // Вырез горловины / язычок
+    const u = (t - 0.14) / 0.3
+    upperHeight = 0.78 + 0.08 * Math.sin(u * Math.PI)
+  } else if (t < 0.76) {
+    // Спуск по подъему (взъем)
+    const u = (t - 0.44) / 0.32
+    upperHeight = 0.82 - 0.44 * Math.pow(u, 0.92)
+  } else {
+    // Коробочка мыска
+    const u = (t - 0.76) / 0.24
+    const toeBoxH = silhouette === 'pump' ? 0.26 : silhouette === 'derby' ? 0.33 : 0.38
+    upperHeight = toeBoxH * Math.cos(u * Math.PI * 0.46) + 0.04
+  }
+
+  if (silhouette === 'pump') upperHeight *= 0.84
+  if (silhouette === 'derby') upperHeight *= 0.91
+
+  return { z, halfWidth, centerShiftX, yBottom, upperHeight }
+}
+
+/**
+ * Создает замкнутую или частичную 3D-оболочку детали обуви по диапазону длины [tStart, tEnd]
+ * и угловому диапазону поперечного сечения [thetaStart, thetaEnd]
+ */
+function buildShellPatchGeometry(options: {
+  silhouette: Silhouette
+  tStart: number
+  tEnd: number
+  tSteps: number
+  thetaStart: number
+  thetaEnd: number
+  thetaSteps: number
+  radialOffset: number
+  thickness: number
+  collarCutout?: boolean
+  topCurveMod?: (t: number, theta: number) => number
+}): THREE.BufferGeometry {
+  const {
+    silhouette,
+    tStart,
+    tEnd,
+    tSteps,
+    thetaStart,
+    thetaEnd,
+    thetaSteps,
+    radialOffset,
+    thickness,
+    collarCutout = false,
+    topCurveMod,
+  } = options
+
+  const positions: number[] = []
+  const indices: number[] = []
+
+  const getPoint = (i: number, j: number, isInner: boolean) => {
+    const t = tStart + (i / tSteps) * (tEnd - tStart)
+    const theta = thetaStart + (j / thetaSteps) * (thetaEnd - thetaStart)
+    const prof = sampleSilhouetteProfile(t, silhouette)
+
+    // theta = 0 (подошва латерально) -> PI/2 (верх гребня) -> PI (подошва медиально)
+    const cosT = Math.cos(theta)
+    const sinT = Math.sin(theta)
+
+    // Асимметрия свода
+    const sideScale = cosT < 0 ? 1.0 : 1.04
+    const rOffset = isInner ? radialOffset - thickness : radialOffset
+
+    const x = prof.centerShiftX - cosT * (prof.halfWidth * sideScale + rOffset)
+
+    // Профиль высоты сечения с учетом выреза горловины (ankle opening)
+    let localH = prof.upperHeight
+    if (collarCutout && t > 0.07 && t < 0.43) {
+      const uCollar = (t - 0.07) / 0.36
+      const dip =
+        silhouette === 'pump'
+          ? 0.56 * Math.sin(uCollar * Math.PI)
+          : 0.24 * Math.sin(Math.min(1, uCollar * 1.15) * Math.PI)
+      localH = Math.max(0.24, localH - dip)
+    }
+
+    if (topCurveMod) {
+      localH += topCurveMod(t, theta)
+    }
+
+    // Приплюснутая у подошвы и объемная сверху форма колодки
+    const verticalCurve = Math.pow(Math.max(0, sinT), 0.78)
+    const y = prof.yBottom + verticalCurve * (localH + rOffset)
+    const z = prof.z
+
+    return [x, y, z] as const
+  }
+
+  const stride = thetaSteps + 1
+
+  // Наружная поверхность
+  for (let i = 0; i <= tSteps; i++) {
+    for (let j = 0; j <= thetaSteps; j++) {
+      const [x, y, z] = getPoint(i, j, false)
+      positions.push(x, y, z)
+    }
+  }
+
+  // Внутренняя поверхность (для реальной толщины кожи)
+  const innerBaseIdx = (tSteps + 1) * stride
+  for (let i = 0; i <= tSteps; i++) {
+    for (let j = 0; j <= thetaSteps; j++) {
+      const [x, y, z] = getPoint(i, j, true)
+      positions.push(x, y, z)
+    }
+  }
+
+  // Индексы наружной и внутренней поверхностей
+  for (let i = 0; i < tSteps; i++) {
+    for (let j = 0; j < thetaSteps; j++) {
+      const a = i * stride + j
+      const b = (i + 1) * stride + j
+      const c = (i + 1) * stride + (j + 1)
+      const d = i * stride + (j + 1)
+      indices.push(a, b, d, b, c, d)
+
+      const ai = innerBaseIdx + a
+      const bi = innerBaseIdx + b
+      const ci = innerBaseIdx + c
+      const di = innerBaseIdx + d
+      indices.push(ai, di, bi, bi, di, ci)
+    }
+  }
+
+  // Зашиваем торцы (бортики толщины кожи)
+  for (let i = 0; i < tSteps; i++) {
+    // Край j = 0
+    const a0 = i * stride
+    const b0 = (i + 1) * stride
+    const ai0 = innerBaseIdx + a0
+    const bi0 = innerBaseIdx + b0
+    indices.push(a0, ai0, b0, b0, ai0, bi0)
+
+    // Край j = thetaSteps
+    const a1 = i * stride + thetaSteps
+    const b1 = (i + 1) * stride + thetaSteps
+    const ai1 = innerBaseIdx + a1
+    const bi1 = innerBaseIdx + b1
+    indices.push(a1, b1, ai1, b1, bi1, ai1)
+  }
+
+  for (let j = 0; j < thetaSteps; j++) {
+    // Край i = 0
+    const a0 = j
+    const d0 = j + 1
+    const ai0 = innerBaseIdx + a0
+    const di0 = innerBaseIdx + d0
+    indices.push(a0, d0, ai0, d0, di0, ai0)
+
+    // Край i = tSteps
+    const a1 = tSteps * stride + j
+    const d1 = tSteps * stride + j + 1
+    const ai1 = innerBaseIdx + a1
+    const di1 = innerBaseIdx + d1
+    indices.push(a1, ai1, d1, d1, ai1, di1)
+  }
+
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+  return geom
+}
+
+/**
+ * Создает сплошное 3D-тело подошвы/межподошвы по диапазону длины [tStart, tEnd]
+ */
+function buildSoleSlabGeometry(options: {
+  silhouette: Silhouette
+  tStart: number
+  tEnd: number
+  tSteps: number
+  flareWidth: number
+  topOffset: number
+  bottomThickness: number
+}): THREE.BufferGeometry {
+  const { silhouette, tStart, tEnd, tSteps, flareWidth, topOffset, bottomThickness } = options
+  const radialSegs = 36
+  const positions: number[] = []
+  const indices: number[] = []
+
+  for (let i = 0; i <= tSteps; i++) {
+    const t = tStart + (i / tSteps) * (tEnd - tStart)
+    const prof = sampleSilhouetteProfile(t, silhouette)
+
+    // Плавное скругление носка и пятки в плане
+    const endTapering =
+      t < tStart + 0.04
+        ? Math.sin(((t - tStart) / 0.04) * Math.PI * 0.5)
+        : t > tEnd - 0.04
+        ? Math.sin(((tEnd - t) / 0.04) * Math.PI * 0.5)
+        : 1
+
+    const w = (prof.halfWidth + flareWidth) * (0.25 + 0.75 * endTapering)
+    const yTop = prof.yBottom + topOffset
+    const yBot = yTop - bottomThickness
+
+    for (let j = 0; j <= radialSegs; j++) {
+      const angle = (j / radialSegs) * Math.PI * 2
+      const cosA = Math.cos(angle)
+      const sinA = Math.sin(angle)
+
+      const x = prof.centerShiftX + cosA * w
+      const y = sinA >= 0 ? yTop + sinA * 0.025 : yBot + (1 + sinA) * bottomThickness * 0.15
+      positions.push(x, y, prof.z)
+    }
+  }
+
+  const stride = radialSegs + 1
+  for (let i = 0; i < tSteps; i++) {
+    for (let j = 0; j < radialSegs; j++) {
+      const a = i * stride + j
+      const b = (i + 1) * stride + j
+      const c = (i + 1) * stride + (j + 1)
+      const d = i * stride + (j + 1)
+      indices.push(a, b, d, b, c, d)
+    }
+  }
+
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+  return geom
+}
+
+function buildFootwearMeshGroup(silhouette: Silhouette, mats: ShoeMaterials): THREE.Group {
+  const group = new THREE.Group()
+
+  if (silhouette === 'runner') {
+    // 1. Внутренняя подкладка и анатомическая стелька (Tertiary / 15-30%)
+    const liningGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.04,
+      tEnd: 0.85,
+      tSteps: 36,
+      thetaStart: 0.08,
+      thetaEnd: Math.PI - 0.08,
+      thetaSteps: 28,
+      radialOffset: -0.008,
+      thickness: 0.022,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(liningGeom, mats.tertiary))
+
+    // Мягкий валик воротника голенища (Tertiary)
+    const collarRollGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.05,
+      tEnd: 0.41,
+      tSteps: 28,
+      thetaStart: 0.52,
+      thetaEnd: Math.PI - 0.52,
+      thetaSteps: 20,
+      radialOffset: 0.016,
+      thickness: 0.032,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(collarRollGeom, mats.tertiary))
+
+    // 2. Замшевая база союзки и берцев (Secondary / 30%)
+    const suedeBaseGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.12,
+      tEnd: 0.94,
+      tSteps: 44,
+      thetaStart: 0.04,
+      thetaEnd: Math.PI - 0.04,
+      thetaSteps: 32,
+      radialOffset: 0.006,
+      thickness: 0.016,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(suedeBaseGeom, mats.secondary))
+
+    // Пухлый язычок кроссовка (Secondary / 30%)
+    const tongueGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.31,
+      tEnd: 0.66,
+      tSteps: 22,
+      thetaStart: Math.PI * 0.33,
+      thetaEnd: Math.PI * 0.67,
+      thetaSteps: 16,
+      radialOffset: 0.022,
+      thickness: 0.026,
+      collarCutout: false,
+      topCurveMod: (t) => (t < 0.45 ? (0.45 - t) * 0.35 : 0),
+    })
+    group.add(new THREE.Mesh(tongueGeom, mats.secondary))
+
+    // Жаккардовый ярлык на язычке (Accent / 10%)
+    const tongueTagGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.33,
+      tEnd: 0.41,
+      tSteps: 8,
+      thetaStart: Math.PI * 0.42,
+      thetaEnd: Math.PI * 0.58,
+      thetaSteps: 8,
+      radialOffset: 0.032,
+      thickness: 0.012,
+      collarCutout: false,
+      topCurveMod: (t) => (t < 0.45 ? (0.45 - t) * 0.35 : 0),
+    })
+    group.add(new THREE.Mesh(tongueTagGeom, mats.accent))
+
+    // 3. Кожаный мысок / Mudguard (Main / 60%)
+    const mudguardGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.66,
+      tEnd: 0.995,
+      tSteps: 28,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 30,
+      radialOffset: 0.022,
+      thickness: 0.018,
+      collarCutout: false,
+      topCurveMod: (t, theta) => {
+        // Вырез на союзке, чтобы сверху читалась замшевая вставка
+        const centerDist = Math.abs(theta - Math.PI * 0.5)
+        if (t < 0.86 && centerDist < 0.52) {
+          return -0.09 * Math.cos((centerDist / 0.52) * Math.PI * 0.5)
+        }
+        return 0
+      },
+    })
+    group.add(new THREE.Mesh(mudguardGeom, mats.main))
+
+    // Кожаный пяточный стакан / Heel Counter (Main / 60%)
+    const heelCounterGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.005,
+      tEnd: 0.29,
+      tSteps: 24,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 28,
+      radialOffset: 0.024,
+      thickness: 0.02,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(heelCounterGeom, mats.main))
+
+    // Пяточный хлястик / Heel Tab (Accent / 10%)
+    const heelTabGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.01,
+      tEnd: 0.09,
+      tSteps: 8,
+      thetaStart: 0.38,
+      thetaEnd: Math.PI - 0.38,
+      thetaSteps: 14,
+      radialOffset: 0.034,
+      thickness: 0.016,
+      collarCutout: false,
+      topCurveMod: () => 0.03,
+    })
+    group.add(new THREE.Mesh(heelTabGeom, mats.accent))
+
+    // Кожаная планка шнуровки / Eyestay (Main / 60%) — латеральная и медиальная
+    const eyestayLatGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.37,
+      tEnd: 0.69,
+      tSteps: 20,
+      thetaStart: Math.PI * 0.22,
+      thetaEnd: Math.PI * 0.41,
+      thetaSteps: 10,
+      radialOffset: 0.026,
+      thickness: 0.018,
+      collarCutout: false,
+    })
+    const eyestayMedGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.37,
+      tEnd: 0.69,
+      tSteps: 20,
+      thetaStart: Math.PI * 0.59,
+      thetaEnd: Math.PI * 0.78,
+      thetaSteps: 10,
+      radialOffset: 0.026,
+      thickness: 0.018,
+      collarCutout: false,
+    })
+    group.add(new THREE.Mesh(eyestayLatGeom, mats.main))
+    group.add(new THREE.Mesh(eyestayMedGeom, mats.main))
+
+    // 4. Фирменные боковые шевроны / полосы (Accent / 10%)
+    const stripe1Lat = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.41,
+      tEnd: 0.52,
+      tSteps: 12,
+      thetaStart: 0.05,
+      thetaEnd: Math.PI * 0.32,
+      thetaSteps: 12,
+      radialOffset: 0.021,
+      thickness: 0.012,
+      collarCutout: true,
+    })
+    const stripe2Lat = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.54,
+      tEnd: 0.6,
+      tSteps: 8,
+      thetaStart: 0.05,
+      thetaEnd: Math.PI * 0.31,
+      thetaSteps: 10,
+      radialOffset: 0.021,
+      thickness: 0.012,
+      collarCutout: true,
+    })
+    const stripe1Med = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.41,
+      tEnd: 0.52,
+      tSteps: 12,
+      thetaStart: Math.PI * 0.68,
+      thetaEnd: Math.PI - 0.05,
+      thetaSteps: 12,
+      radialOffset: 0.021,
+      thickness: 0.012,
+      collarCutout: true,
+    })
+    const stripe2Med = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.54,
+      tEnd: 0.6,
+      tSteps: 8,
+      thetaStart: Math.PI * 0.69,
+      thetaEnd: Math.PI - 0.05,
+      thetaSteps: 10,
+      radialOffset: 0.021,
+      thickness: 0.012,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(stripe1Lat, mats.accent))
+    group.add(new THREE.Mesh(stripe2Lat, mats.accent))
+    group.add(new THREE.Mesh(stripe1Med, mats.accent))
+    group.add(new THREE.Mesh(stripe2Med, mats.accent))
+
+    // 5. Объемные 3D-шнурки и люверсы (5 рядов перекрестной шнуровки)
+    const laceTValues = [0.41, 0.47, 0.53, 0.59, 0.65]
+    laceTValues.forEach((lt, idx) => {
+      const prof = sampleSilhouetteProfile(lt, 'runner')
+      const yLace = prof.yBottom + prof.upperHeight * 0.91
+      const xLat = prof.centerShiftX - prof.halfWidth * 0.46
+      const xMed = prof.centerShiftX + prof.halfWidth * 0.48
+
+      // Люверсы
+      const eyeletGeom = new THREE.TorusGeometry(0.024, 0.008, 10, 18)
+      const isAccentEyelet = idx === 0 || idx === laceTValues.length - 1
+      const eyeMat = isAccentEyelet ? mats.accent : mats.tertiary
+
+      const eyeLat = new THREE.Mesh(eyeletGeom, eyeMat)
+      eyeLat.position.set(xLat, yLace, prof.z)
+      eyeLat.rotation.y = Math.PI * 0.35
+      group.add(eyeLat)
+
+      const eyeMed = new THREE.Mesh(eyeletGeom, eyeMat)
+      eyeMed.position.set(xMed, yLace, prof.z)
+      eyeMed.rotation.y = -Math.PI * 0.35
+      group.add(eyeMed)
+
+      // Дуга шнурка
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(xLat, yLace, prof.z),
+        new THREE.Vector3(prof.centerShiftX, yLace + 0.075, prof.z + 0.015),
+        new THREE.Vector3(xMed, yLace, prof.z)
+      )
+      const tubeGeom = new THREE.TubeGeometry(curve, 16, 0.016, 8, false)
+      group.add(new THREE.Mesh(tubeGeom, mats.lace))
+    })
+
+    // 6. Массивная скульптурная межподошва EVA (Midsole)
+    const midsoleGeom = buildSoleSlabGeometry({
+      silhouette: 'runner',
+      tStart: 0.0,
+      tEnd: 0.99,
+      tSteps: 48,
+      flareWidth: 0.048,
+      topOffset: 0.015,
+      bottomThickness: 0.145,
+    })
+    group.add(new THREE.Mesh(midsoleGeom, mats.midsole))
+
+    // Пяточный стабилизатор / спойлер в межподошве (Tertiary)
+    const stabilizerGeom = buildSoleSlabGeometry({
+      silhouette: 'runner',
+      tStart: 0.0,
+      tEnd: 0.34,
+      tSteps: 20,
+      flareWidth: 0.056,
+      topOffset: -0.025,
+      bottomThickness: 0.068,
+    })
+    group.add(new THREE.Mesh(stabilizerGeom, mats.tertiary))
+
+    // 7. Протектор / Подметка с захлестом на мысок (Accent / 10%)
+    const outsoleGeom = buildSoleSlabGeometry({
+      silhouette: 'runner',
+      tStart: 0.0,
+      tEnd: 1.0,
+      tSteps: 48,
+      flareWidth: 0.052,
+      topOffset: -0.115,
+      bottomThickness: 0.048,
+    })
+    group.add(new THREE.Mesh(outsoleGeom, mats.accent))
+
+    // Передний защитный бампер мыска (характерная деталь Loro Piana / Loewe)
+    const toeBumperGeom = buildShellPatchGeometry({
+      silhouette: 'runner',
+      tStart: 0.93,
+      tEnd: 1.0,
+      tSteps: 10,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 20,
+      radialOffset: 0.036,
+      thickness: 0.022,
+      collarCutout: false,
+      topCurveMod: () => -0.16,
+    })
+    group.add(new THREE.Mesh(toeBumperGeom, mats.accent))
+  } else if (silhouette === 'derby') {
+    // 3D DERBY — Классический брог с рантом Goodyear и наборным каблуком
+    const liningGeom = buildShellPatchGeometry({
+      silhouette: 'derby',
+      tStart: 0.04,
+      tEnd: 0.85,
+      tSteps: 34,
+      thetaStart: 0.08,
+      thetaEnd: Math.PI - 0.08,
+      thetaSteps: 26,
+      radialOffset: -0.006,
+      thickness: 0.018,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(liningGeom, mats.tertiary))
+
+    // Союзка и язычок (Secondary / 30%)
+    const vampGeom = buildShellPatchGeometry({
+      silhouette: 'derby',
+      tStart: 0.14,
+      tEnd: 0.92,
+      tSteps: 40,
+      thetaStart: 0.04,
+      thetaEnd: Math.PI - 0.04,
+      thetaSteps: 30,
+      radialOffset: 0.006,
+      thickness: 0.015,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(vampGeom, mats.secondary))
+
+    // Отрезной мысок Wingtip и берцы Дерби (Main / 60%)
+    const wingtipGeom = buildShellPatchGeometry({
+      silhouette: 'derby',
+      tStart: 0.64,
+      tEnd: 0.998,
+      tSteps: 26,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 28,
+      radialOffset: 0.02,
+      thickness: 0.016,
+      collarCutout: false,
+    })
+    const quartersGeom = buildShellPatchGeometry({
+      silhouette: 'derby',
+      tStart: 0.01,
+      tEnd: 0.58,
+      tSteps: 30,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 28,
+      radialOffset: 0.02,
+      thickness: 0.017,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(wingtipGeom, mats.main))
+    group.add(new THREE.Mesh(quartersGeom, mats.main))
+
+    // Рант (Tertiary) + Подошва (Midsole) + Набойки (Accent)
+    const weltGeom = buildSoleSlabGeometry({
+      silhouette: 'derby',
+      tStart: 0.0,
+      tEnd: 1.0,
+      tSteps: 44,
+      flareWidth: 0.036,
+      topOffset: 0.01,
+      bottomThickness: 0.032,
+    })
+    group.add(new THREE.Mesh(weltGeom, mats.tertiary))
+
+    const leatherSoleGeom = buildSoleSlabGeometry({
+      silhouette: 'derby',
+      tStart: 0.0,
+      tEnd: 0.995,
+      tSteps: 44,
+      flareWidth: 0.028,
+      topOffset: -0.02,
+      bottomThickness: 0.048,
+    })
+    group.add(new THREE.Mesh(leatherSoleGeom, mats.midsole))
+
+    const heelBlockGeom = buildSoleSlabGeometry({
+      silhouette: 'derby',
+      tStart: 0.0,
+      tEnd: 0.28,
+      tSteps: 18,
+      flareWidth: 0.025,
+      topOffset: -0.065,
+      bottomThickness: 0.11,
+    })
+    group.add(new THREE.Mesh(heelBlockGeom, mats.midsole))
+
+    const heelTopPieceGeom = buildSoleSlabGeometry({
+      silhouette: 'derby',
+      tStart: 0.0,
+      tEnd: 0.28,
+      tSteps: 18,
+      flareWidth: 0.025,
+      topOffset: -0.17,
+      bottomThickness: 0.032,
+    })
+    const soleProtectorGeom = buildSoleSlabGeometry({
+      silhouette: 'derby',
+      tStart: 0.48,
+      tEnd: 0.98,
+      tSteps: 24,
+      flareWidth: 0.024,
+      topOffset: -0.064,
+      bottomThickness: 0.024,
+    })
+    group.add(new THREE.Mesh(heelTopPieceGeom, mats.accent))
+    group.add(new THREE.Mesh(soleProtectorGeom, mats.accent))
+
+    // Вощеные тонкие шнурки (Accent)
+    ;[0.43, 0.48, 0.53, 0.58].forEach((lt) => {
+      const prof = sampleSilhouetteProfile(lt, 'derby')
+      const yLace = prof.yBottom + prof.upperHeight * 0.92
+      const xLat = prof.centerShiftX - prof.halfWidth * 0.38
+      const xMed = prof.centerShiftX + prof.halfWidth * 0.4
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(xLat, yLace, prof.z),
+        new THREE.Vector3(prof.centerShiftX, yLace + 0.05, prof.z),
+        new THREE.Vector3(xMed, yLace, prof.z)
+      )
+      group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.011, 8, false), mats.accent))
+    })
+  } else {
+    // 3D PUMP — Лодочки на шпильке 105 мм
+    const liningGeom = buildShellPatchGeometry({
+      silhouette: 'pump',
+      tStart: 0.03,
+      tEnd: 0.88,
+      tSteps: 36,
+      thetaStart: 0.06,
+      thetaEnd: Math.PI - 0.06,
+      thetaSteps: 28,
+      radialOffset: -0.005,
+      thickness: 0.016,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(liningGeom, mats.tertiary))
+
+    // Основной корпус лодочки (Main / 60%)
+    const pumpBodyGeom = buildShellPatchGeometry({
+      silhouette: 'pump',
+      tStart: 0.02,
+      tEnd: 0.998,
+      tSteps: 46,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 32,
+      radialOffset: 0.01,
+      thickness: 0.016,
+      collarCutout: true,
+    })
+    group.add(new THREE.Mesh(pumpBodyGeom, mats.main))
+
+    // Пяточный контрфорс и декоративный мысок (Secondary / 30%)
+    const pumpHeelCapGeom = buildShellPatchGeometry({
+      silhouette: 'pump',
+      tStart: 0.01,
+      tEnd: 0.22,
+      tSteps: 18,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 26,
+      radialOffset: 0.02,
+      thickness: 0.015,
+      collarCutout: true,
+    })
+    const pumpToeCapGeom = buildShellPatchGeometry({
+      silhouette: 'pump',
+      tStart: 0.78,
+      tEnd: 1.0,
+      tSteps: 20,
+      thetaStart: 0.02,
+      thetaEnd: Math.PI - 0.02,
+      thetaSteps: 26,
+      radialOffset: 0.02,
+      thickness: 0.015,
+      collarCutout: false,
+    })
+    group.add(new THREE.Mesh(pumpHeelCapGeom, mats.secondary))
+    group.add(new THREE.Mesh(pumpToeCapGeom, mats.secondary))
+
+    // Изящная пряжка на декольте мыска (Accent / 10%)
+    const buckleProf = sampleSilhouetteProfile(0.73, 'pump')
+    const buckleGeom = new THREE.BoxGeometry(0.32, 0.045, 0.14)
+    const buckleMesh = new THREE.Mesh(buckleGeom, mats.accent)
+    buckleMesh.position.set(
+      buckleProf.centerShiftX,
+      buckleProf.yBottom + buckleProf.upperHeight * 0.95,
+      buckleProf.z
+    )
+    buckleMesh.rotation.x = 0.35
+    group.add(buckleMesh)
+
+    // Лакированная тонкая подошва (Accent / 10%)
+    const pumpSoleGeom = buildSoleSlabGeometry({
+      silhouette: 'pump',
+      tStart: 0.02,
+      tEnd: 0.998,
+      tSteps: 46,
+      flareWidth: 0.01,
+      topOffset: 0.005,
+      bottomThickness: 0.028,
+    })
+    group.add(new THREE.Mesh(pumpSoleGeom, mats.accent))
+
+    // Шпилька 105 мм (Secondary + набойка Accent)
+    const heelProf = sampleSilhouetteProfile(0.08, 'pump')
+    const stilettoHeight = 0.68
+    const stilettoGeom = new THREE.CylinderGeometry(0.068, 0.024, stilettoHeight, 20)
+    const stilettoMesh = new THREE.Mesh(stilettoGeom, mats.secondary)
+    stilettoMesh.position.set(
+      heelProf.centerShiftX,
+      heelProf.yBottom - stilettoHeight * 0.5,
+      heelProf.z
+    )
+    group.add(stilettoMesh)
+
+    const tipGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.045, 16)
+    const tipMesh = new THREE.Mesh(tipGeom, mats.accent)
+    tipMesh.position.set(
+      heelProf.centerShiftX,
+      heelProf.yBottom - stilettoHeight - 0.02,
+      heelProf.z
+    )
+    group.add(tipMesh)
+  }
+
+  // Разворачиваем обувь в классический профильный 3/4 ракурс (мыском вправо)
+  group.rotation.y = Math.PI * 0.5
+  return group
+}
+
+/* ============================================================================
+   ИНТЕРАКТИВНАЯ 3D-СЦЕНА THREE.JS (ВРАЩЕНИЕ ПАЛЬЦЕМ 360° + PBR МАТЕРИАЛЫ)
+   ============================================================================ */
+function Footwear3DStage({
+  colors,
+  silhouette,
+  isDark,
+}: {
+  colors: string[]
+  silhouette: Silhouette
+  isDark: boolean
+}) {
+  const mountRef = useRef<HTMLDivElement>(null)
+  const matsRef = useRef<ShoeMaterials | null>(null)
+  const shoeRootRef = useRef<THREE.Group | null>(null)
+  const rotTarget = useRef({ yaw: -0.22, pitch: 0.14 })
+  const rotCurrent = useRef({ yaw: -0.22, pitch: 0.14 })
+  const isInteracting = useRef(false)
+  const lastPointer = useRef({ x: 0, y: 0 })
+
+  const mainColor = colors[0] || '#20B286'
+  const secondaryColor = colors[1] || '#4E9A86'
+  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1] || '#4E9A86'
+  const accentColor = colors[colors.length - 1] || '#D91E49'
+
+  // Инициализация WebGL-сцены
+  useEffect(() => {
+    const container = mountRef.current
+    if (!container) return
+
+    const width = container.clientWidth || 340
+    const height = container.clientHeight || 210
+
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 50)
+    camera.position.set(0, 0.42, 5.25)
+    camera.lookAt(0, -0.02, 0)
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    })
+    renderer.setSize(width, height)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.12
+    container.innerHTML = ''
+    container.appendChild(renderer.domElement)
+
+    // Студийный трехточечный свет (Key + Fill + Rim)
+    const ambientLight = new THREE.AmbientLight(0xffffff, isDark ? 0.85 : 1.05)
+    scene.add(ambientLight)
+
+    const keyLight = new THREE.DirectionalLight(0xfffcf5, 2.2)
+    keyLight.position.set(3.5, 5.5, 4.2)
+    scene.add(keyLight)
+
+    const fillLight = new THREE.DirectionalLight(0xdbe6ff, 1.05)
+    fillLight.position.set(-4.0, 2.0, 2.5)
+    scene.add(fillLight)
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.35)
+    rimLight.position.set(0, 3.8, -4.5)
+    scene.add(rimLight)
+
+    const bottomBounce = new THREE.DirectionalLight(0xffffff, 0.45)
+    bottomBounce.position.set(0, -3.5, 1.5)
+    scene.add(bottomBounce)
+
+    // Инициализация материалов PBR (кожа, замша, резина, EVA)
+    const mats: ShoeMaterials = {
+      main: new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(mainColor),
+        roughness: 0.34,
+        metalness: 0.04,
+        clearcoat: 0.28,
+        clearcoatRoughness: 0.25,
+      }),
+      secondary: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(secondaryColor),
+        roughness: 0.82,
+        metalness: 0.02,
+      }),
+      tertiary: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(tertiaryColor),
+        roughness: 0.52,
+        metalness: 0.05,
+      }),
+      accent: new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color(accentColor),
+        roughness: 0.38,
+        metalness: 0.08,
+        clearcoat: 0.2,
+      }),
+      midsole: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(isDark ? '#262421' : '#FAF7F0'),
+        roughness: 0.65,
+        metalness: 0.02,
+      }),
+      lace: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(isDark ? '#F4F0E8' : '#FFFFFF'),
+        roughness: 0.75,
+        metalness: 0.0,
+      }),
+      insole: new THREE.MeshStandardMaterial({
+        color: new THREE.Color(tertiaryColor),
+        roughness: 0.65,
+      }),
+    }
+    matsRef.current = mats
+
+    const pivotGroup = new THREE.Group()
+    scene.add(pivotGroup)
+    shoeRootRef.current = pivotGroup
+
+    // Мягкая контактная тень под подошвой
+    const shadowCanvas = document.createElement('canvas')
+    shadowCanvas.width = 256
+    shadowCanvas.height = 128
+    const sCtx = shadowCanvas.getContext('2d')
+    if (sCtx) {
+      const grad = sCtx.createRadialGradient(128, 64, 8, 128, 64, 118)
+      grad.addColorStop(0, 'rgba(0,0,0,0.42)')
+      grad.addColorStop(0.55, 'rgba(0,0,0,0.14)')
+      grad.addColorStop(1, 'rgba(0,0,0,0)')
+      sCtx.fillStyle = grad
+      sCtx.fillRect(0, 0, 256, 128)
+    }
+    const shadowTex = new THREE.CanvasTexture(shadowCanvas)
+    const shadowPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.4, 1.35),
+      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
+    )
+    shadowPlane.rotation.x = -Math.PI / 2
+    shadowPlane.position.y = -0.39
+    scene.add(shadowPlane)
+
+    let frameId = 0
+    const clock = new THREE.Clock()
+
+    const animate = () => {
+      frameId = requestAnimationFrame(animate)
+      const elapsed = clock.getElapsedTime()
+
+      if (!isInteracting.current) {
+        // Плавное живое покачивание модели, когда пользователь не крутит ее пальцем
+        rotTarget.current.yaw += Math.sin(elapsed * 0.7) * 0.0008
+      }
+
+      rotCurrent.current.yaw += (rotTarget.current.yaw - rotCurrent.current.yaw) * 0.12
+      rotCurrent.current.pitch += (rotTarget.current.pitch - rotCurrent.current.pitch) * 0.12
+
+      if (shoeRootRef.current) {
+        shoeRootRef.current.rotation.y = rotCurrent.current.yaw
+        shoeRootRef.current.rotation.x = rotCurrent.current.pitch
+        shoeRootRef.current.position.y = Math.sin(elapsed * 1.6) * 0.018
+      }
+
+      renderer.render(scene, camera)
+    }
+    animate()
+
+    const onResize = () => {
+      if (!container) return
+      const w = container.clientWidth || 340
+      const h = container.clientHeight || 210
+      camera.aspect = w / h
+      camera.updateProjectionMatrix()
+      renderer.setSize(w, h)
+    }
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', onResize)
+      shadowTex.dispose()
+      Object.values(mats).forEach((m) => m.dispose())
+      renderer.dispose()
+    }
+  }, [])
+
+  // Перестроение 3D-геометрии при смене силуэта (Runner / Derby / Pump)
+  useEffect(() => {
+    const root = shoeRootRef.current
+    const mats = matsRef.current
+    if (!root || !mats) return
+
+    while (root.children.length > 0) {
+      const child = root.children[0]
+      root.remove(child)
+      child.traverse((obj) => {
+        if ((obj as THREE.Mesh).geometry) {
+          ;(obj as THREE.Mesh).geometry.dispose()
+        }
+      })
+    }
+
+    const meshGroup = buildFootwearMeshGroup(silhouette, mats)
+    root.add(meshGroup)
+  }, [silhouette])
+
+  // Мгновенное обновление цветов материалов по выбранной схеме Иттена (без пересборки геометрии!)
+  useEffect(() => {
+    const mats = matsRef.current
+    if (!mats) return
+    mats.main.color.set(mainColor)
+    mats.secondary.color.set(secondaryColor)
+    mats.tertiary.color.set(tertiaryColor)
+    mats.accent.color.set(accentColor)
+    mats.midsole.color.set(
+      silhouette === 'derby'
+        ? isDark
+          ? '#32251E'
+          : '#CBB396'
+        : isDark
+        ? '#262421'
+        : '#FAF7F0'
+    )
+    mats.lace.color.set(isDark ? '#F4F0E8' : '#FFFFFF')
+  }, [mainColor, secondaryColor, tertiaryColor, accentColor, isDark, silhouette])
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    isInteracting.current = true
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isInteracting.current) return
+    const dx = e.clientX - lastPointer.current.x
+    const dy = e.clientY - lastPointer.current.y
+    lastPointer.current = { x: e.clientX, y: e.clientY }
+
+    rotTarget.current.yaw += dx * 0.012
+    rotTarget.current.pitch = Math.max(-0.35, Math.min(0.55, rotTarget.current.pitch + dy * 0.009))
+  }
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isInteracting.current = false
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const resetCamera = () => {
+    haptic('light')
+    rotTarget.current = { yaw: -0.22, pitch: 0.14 }
+  }
 
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 680 320"
-      className="w-full h-auto max-h-[225px] md:max-h-[285px] select-none overflow-visible"
-    >
-      <defs>
-        <radialGradient id="lp-floor" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.75' : '0.22'} />
-          <stop offset="55%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.07'} />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-        </radialGradient>
-
-        <linearGradient id="lp-last-volume" x1="15%" y1="0%" x2="25%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.2' : '0.36'} />
-          <stop offset="42%" stopColor="#ffffff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.48' : '0.26'} />
-        </linearGradient>
-
-        <linearGradient id="lp-suede" x1="0%" y1="0%" x2="80%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.12' : '0.24'} />
-          <stop offset="50%" stopColor="#000000" stopOpacity="0.04" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.4' : '0.22'} />
-        </linearGradient>
-
-        <linearGradient id="lp-interior" x1="0%" y1="0%" x2="20%" y2="100%">
-          <stop offset="0%" stopColor="#000000" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.68" />
-        </linearGradient>
-
-        <linearGradient id="lp-midsole" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={midsoleTop} />
-          <stop offset="100%" stopColor={midsoleBottom} />
-        </linearGradient>
-
-        <clipPath id="lp-upper-clip">
-          <path d="M 104 234 C 98 198, 108 156, 126 122 C 132 112, 142 110, 156 114 C 188 120, 224 118, 252 108 C 266 90, 280 76, 296 74 C 312 72, 326 82, 338 98 C 368 134, 408 166, 452 184 C 494 194, 542 200, 574 214 C 588 220, 592 232, 582 242 C 525 250, 420 252, 310 250 C 212 248, 146 242, 104 234 Z" />
-        </clipPath>
-      </defs>
-
-      <ellipse cx="342" cy="280" rx="268" ry="14" fill="url(#lp-floor)" />
-      <ellipse cx="335" cy="277" rx="210" ry="6" fill="url(#lp-floor)" />
-
-      <g clipPath="url(#lp-upper-clip)">
-        <rect x="90" y="65" width="270" height="140" fill={tertiaryColor} />
-        <rect x="90" y="65" width="270" height="140" fill="url(#lp-interior)" />
-        <path
-          d="M 155 110 C 150 130, 150 150, 154 168 M 185 112 C 180 132, 180 152, 184 170 M 215 112 C 210 132, 210 152, 214 170"
-          fill="none"
-          stroke="#000000"
-          strokeWidth="1.2"
-          opacity="0.25"
-        />
-
-        <path
-          d="M 235 165 C 242 122, 265 82, 296 74 C 314 72, 328 82, 340 100 C 368 136, 405 168, 445 186 L 315 205 Z"
-          fill={secondaryColor}
-        />
-        <path
-          d="M 235 165 C 242 122, 265 82, 296 74 C 314 72, 328 82, 340 100 C 368 136, 405 168, 445 186 L 315 205 Z"
-          fill="url(#lp-suede)"
-        />
-        <path
-          d="M 284 74 L 324 80 L 314 102 L 276 94 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1"
-        />
-
-        <path
-          d="M 100 135 C 155 152, 202 158, 240 138 L 318 102 L 455 180 L 595 210 L 595 258 L 100 258 Z"
-          fill={secondaryColor}
-        />
-        <path
-          d="M 100 135 C 155 152, 202 158, 240 138 L 318 102 L 455 180 L 595 210 L 595 258 L 100 258 Z"
-          fill="url(#lp-suede)"
-        />
-
-        <path
-          d="M 122 120 C 156 150, 198 158, 234 140 C 254 130, 268 112, 284 96 L 302 112 C 282 136, 260 158, 228 166 C 188 176, 142 162, 112 138 Z"
-          fill={tertiaryColor}
-          stroke={seam}
-          strokeWidth="1.1"
-        />
-        <path
-          d="M 122 120 C 156 150, 198 158, 234 140 C 254 130, 268 112, 284 96 L 302 112 C 282 136, 260 158, 228 166 C 188 176, 142 162, 112 138 Z"
-          fill="url(#lp-last-volume)"
-        />
-
-        <path
-          d="M 248 162 L 298 152 L 352 248 L 302 248 Z"
-          fill={accentColor}
-          stroke={seam}
-          strokeWidth="1"
-        />
-        <path
-          d="M 308 154 L 326 151 L 380 248 L 362 248 Z"
-          fill={accentColor}
-          fillOpacity="0.85"
-          stroke={seam}
-          strokeWidth="0.9"
-        />
-
-        <path
-          d="M 236 172 C 258 152, 276 122, 292 98 C 300 88, 312 88, 322 98 C 354 132, 394 164, 442 184 L 424 208 C 388 194, 348 168, 312 132 C 296 154, 278 174, 254 186 Z"
-          fill={mainColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 236 172 C 258 152, 276 122, 292 98 C 300 88, 312 88, 322 98 C 354 132, 394 164, 442 184 L 424 208 C 388 194, 348 168, 312 132 C 296 154, 278 174, 254 186 Z"
-          fill="url(#lp-last-volume)"
-        />
-        <path
-          d="M 246 175 C 266 155, 283 127, 298 105 C 303 98, 310 98, 317 105 C 348 138, 388 168, 433 187"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.9"
-          strokeDasharray="2.5 2.5"
-        />
-
-        <path
-          d="M 382 252 C 392 216, 424 196, 468 198 C 512 200, 554 204, 588 216 L 592 254 Z"
-          fill={mainColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 382 252 C 392 216, 424 196, 468 198 C 512 200, 554 204, 588 216 L 592 254 Z"
-          fill="url(#lp-last-volume)"
-        />
-        <path
-          d="M 390 248 C 400 220, 428 203, 468 205 C 510 207, 550 210, 582 221"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.9"
-          strokeDasharray="2.5 2.5"
-        />
-
-        <path
-          d="M 98 240 L 122 120 C 148 152, 186 174, 224 192 C 238 210, 244 230, 242 252 L 98 252 Z"
-          fill={mainColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 98 240 L 122 120 C 148 152, 186 174, 224 192 C 238 210, 244 230, 242 252 L 98 252 Z"
-          fill="url(#lp-last-volume)"
-        />
-        <path
-          d="M 120 132 C 146 160, 182 180, 218 197 C 230 214, 236 232, 234 248"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.9"
-          strokeDasharray="2.5 2.5"
-        />
-        <path
-          d="M 118 118 L 142 118 L 136 146 L 112 142 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1"
-        />
-
-        <path
-          d="M 104 234 C 146 242, 212 248, 310 250 C 420 252, 525 250, 582 242"
-          fill="none"
-          stroke="#000000"
-          strokeWidth="3.5"
-          opacity="0.28"
-        />
-      </g>
-
-      <path
-        d="M 104 234 C 98 198, 108 156, 126 122 C 132 112, 142 110, 156 114 C 188 120, 224 118, 252 108 C 266 90, 280 76, 296 74 C 312 72, 326 82, 338 98 C 368 134, 408 166, 452 184 C 494 194, 542 200, 574 214 C 588 220, 592 232, 582 242 C 525 250, 420 252, 310 250 C 212 248, 146 242, 104 234 Z"
-        fill="none"
-        stroke={outline}
-        strokeWidth="1.4"
-        strokeLinejoin="round"
+    <div className="relative w-full h-[185px] sm:h-[220px] md:h-[290px] select-none">
+      <div
+        ref={mountRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
+        style={{ touchAction: 'none' }}
       />
-      <path
-        d="M 126 122 C 158 150, 198 158, 234 140 C 254 130, 268 112, 284 96"
-        fill="none"
-        stroke={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)'}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-
-      <g>
-        {[
-          { x1: 312, y1: 112, x2: 338, y2: 98, accent: true },
-          { x1: 336, y1: 132, x2: 362, y2: 118, accent: false },
-          { x1: 360, y1: 150, x2: 388, y2: 136, accent: false },
-          { x1: 386, y1: 166, x2: 414, y2: 152, accent: false },
-          { x1: 412, y1: 180, x2: 438, y2: 168, accent: true },
-        ].map((l, idx) => (
-          <g key={idx}>
-            <circle
-              cx={l.x1}
-              cy={l.y1}
-              r="3.2"
-              fill={l.accent ? accentColor : tertiaryColor}
-              stroke={outline}
-              strokeWidth="1"
-            />
-            <path
-              d={`M ${l.x1} ${l.y1 + 1.5} Q ${(l.x1 + l.x2) / 2} ${(l.y1 + l.y2) / 2 - 3} ${l.x2} ${l.y2 + 1.5}`}
-              fill="none"
-              stroke="#000000"
-              strokeWidth="4.2"
-              strokeLinecap="round"
-              opacity="0.22"
-            />
-            <path
-              d={`M ${l.x1} ${l.y1} Q ${(l.x1 + l.x2) / 2} ${(l.y1 + l.y2) / 2 - 4} ${l.x2} ${l.y2}`}
-              fill="none"
-              stroke={laceColor}
-              strokeWidth="3.8"
-              strokeLinecap="round"
-            />
-          </g>
-        ))}
-      </g>
-
-      <g>
-        <path
-          d="M 94 264 C 96 273, 110 276, 138 276 L 478 276 C 528 276, 568 266, 592 246 C 596 238, 594 228, 586 224 L 580 232 C 562 254, 522 266, 472 268 L 100 264 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-
-        <path
-          d="M 102 232 C 146 242, 212 248, 310 250 C 420 252, 525 250, 582 240 C 588 246, 588 254, 580 260 C 546 268, 495 270, 440 270 L 102 268 C 92 266, 88 258, 92 246 Z"
-          fill="url(#lp-midsole)"
-          stroke={outline}
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-
-        <path
-          d="M 91 248 L 232 253 C 238 253, 242 257, 240 261 C 238 265, 232 268, 224 268 L 98 267 C 91 264, 89 256, 91 248 Z"
-          fill={tertiaryColor}
-          stroke={outline}
-          strokeWidth="1.1"
-        />
-
-        <path
-          d="M 96 242 C 165 252, 265 256, 390 258 C 475 259, 542 254, 584 244"
-          fill="none"
-          stroke={seam}
-          strokeWidth="1"
-        />
-      </g>
-    </svg>
+      <button
+        type="button"
+        onClick={resetCamera}
+        className={`absolute bottom-1 right-2 px-2 py-0.5 text-[8px] font-sans uppercase tracking-[0.2em] border rounded-full backdrop-blur-sm transition-opacity opacity-60 hover:opacity-100 cursor-pointer bg-transparent ${
+          isDark ? 'border-white/20 text-[#F4F0E8]' : 'border-black/20 text-[#1C1816]'
+        }`}
+      >
+        360° 3D • Reset
+      </button>
+    </div>
   )
 }
 
 /* ============================================================================
-   2. DERBY — BESPOKE PATINA BROGUE (Пропорции: Berluti / John Lobb)
-   ============================================================================ */
-function DerbySvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0]
-  const secondaryColor = colors[1]
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1]
-  const accentColor = colors[colors.length - 1]
-
-  const outline = isDark ? 'rgba(244, 240, 232, 0.48)' : 'rgba(28, 24, 22, 0.42)'
-  const seam = isDark ? 'rgba(244, 240, 232, 0.3)' : 'rgba(28, 24, 22, 0.25)'
-  const stitch = isDark ? 'rgba(244, 240, 232, 0.58)' : 'rgba(28, 24, 22, 0.48)'
-  const soleLeather = isDark ? '#2B211B' : '#CFB99F'
-  const soleWaist = isDark ? '#1A130F' : '#9E8468'
-
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 680 320"
-      className="w-full h-auto max-h-[225px] md:max-h-[285px] select-none overflow-visible"
-    >
-      <defs>
-        <radialGradient id="jl-floor" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.75' : '0.22'} />
-          <stop offset="55%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.07'} />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-        </radialGradient>
-
-        <linearGradient id="jl-glacage" x1="10%" y1="0%" x2="25%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.25' : '0.42'} />
-          <stop offset="36%" stopColor="#ffffff" stopOpacity="0.02" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.52' : '0.3'} />
-        </linearGradient>
-
-        <radialGradient id="jl-toe-burnish" cx="92%" cy="65%" r="35%">
-          <stop offset="0%" stopColor="#000000" stopOpacity="0.32" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-        </radialGradient>
-
-        <linearGradient id="jl-interior" x1="0%" y1="0%" x2="15%" y2="100%">
-          <stop offset="0%" stopColor="#000000" stopOpacity="0.12" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
-        </linearGradient>
-
-        <linearGradient id="jl-sole-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor={soleWaist} />
-          <stop offset="35%" stopColor={soleLeather} />
-          <stop offset="100%" stopColor={soleWaist} />
-        </linearGradient>
-
-        <clipPath id="jl-upper-clip">
-          <path d="M 108 242 C 102 206, 110 164, 128 130 C 133 122, 142 120, 155 122 C 192 125, 232 124, 266 116 C 278 98, 294 86, 310 88 C 324 90, 336 102, 348 116 C 380 148, 418 176, 458 190 C 504 202, 554 208, 584 222 C 596 228, 596 240, 586 246 C 535 256, 442 258, 338 256 C 282 255, 244 248, 204 246 L 108 242 Z" />
-        </clipPath>
-      </defs>
-
-      <ellipse cx="344" cy="280" rx="262" ry="13" fill="url(#jl-floor)" />
-      <ellipse cx="156" cy="279" rx="58" ry="6" fill="url(#jl-floor)" />
-      <ellipse cx="455" cy="279" rx="135" ry="7" fill="url(#jl-floor)" />
-
-      <g clipPath="url(#jl-upper-clip)">
-        <rect x="95" y="75" width="275" height="125" fill={tertiaryColor} />
-        <rect x="95" y="75" width="275" height="125" fill="url(#jl-interior)" />
-        <path
-          d="M 152 132 L 194 136 L 188 148 L 146 144 Z"
-          fill={accentColor}
-          fillOpacity="0.85"
-        />
-
-        <path
-          d="M 230 175 C 242 128, 272 90, 310 88 C 326 90, 338 102, 352 118 C 385 152, 422 178, 462 192 L 598 218 L 598 262 L 220 262 Z"
-          fill={secondaryColor}
-        />
-        <path
-          d="M 230 175 C 242 128, 272 90, 310 88 C 326 90, 338 102, 352 118 C 385 152, 422 178, 462 192 L 598 218 L 598 262 L 220 262 Z"
-          fill="url(#jl-glacage)"
-        />
-
-        <path
-          d="M 124 128 C 160 148, 204 156, 240 142 C 266 132, 282 112, 298 98 C 306 92, 316 92, 326 102 C 356 132, 392 162, 430 180 C 402 198, 386 222, 398 244 L 340 260 L 104 252 L 104 128 Z"
-          fill={mainColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 124 128 C 160 148, 204 156, 240 142 C 266 132, 282 112, 298 98 C 306 92, 316 92, 326 102 C 356 132, 392 162, 430 180 C 402 198, 386 222, 398 244 L 340 260 L 104 252 L 104 128 Z"
-          fill="url(#jl-glacage)"
-        />
-        <path
-          d="M 304 106 C 334 136, 370 164, 418 182 C 392 200, 378 224, 388 244"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.95"
-          strokeDasharray="2.5 2.5"
-        />
-        <g fill={outline} opacity="0.8">
-          <circle cx="410" cy="190" r="1.7" />
-          <circle cx="399" cy="200" r="1.7" />
-          <circle cx="392" cy="212" r="1.7" />
-          <circle cx="390" cy="225" r="1.7" />
-          <circle cx="393" cy="238" r="1.7" />
-        </g>
-
-        <path
-          d="M 358 258 C 382 228, 420 204, 464 188 C 472 204, 496 208, 516 196 C 550 204, 580 214, 596 226 L 596 258 Z"
-          fill={mainColor}
-          stroke={outline}
-          strokeWidth="1.25"
-        />
-        <path
-          d="M 358 258 C 382 228, 420 204, 464 188 C 472 204, 496 208, 516 196 C 550 204, 580 214, 596 226 L 596 258 Z"
-          fill="url(#jl-glacage)"
-        />
-        <path
-          d="M 358 258 C 382 228, 420 204, 464 188 C 472 204, 496 208, 516 196 C 550 204, 580 214, 596 226 L 596 258 Z"
-          fill="url(#jl-toe-burnish)"
-        />
-        <path
-          d="M 368 254 C 390 228, 424 208, 462 195 C 472 209, 496 213, 516 202 C 546 209, 574 218, 588 228"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.95"
-          strokeDasharray="2.5 2.5"
-        />
-        <g fill={outline} opacity="0.82">
-          <circle cx="380" cy="245" r="1.8" />
-          <circle cx="395" cy="233" r="1.8" />
-          <circle cx="412" cy="222" r="1.8" />
-          <circle cx="430" cy="212" r="1.8" />
-          <circle cx="448" cy="203" r="1.8" />
-          <circle cx="468" cy="207" r="1.8" />
-          <circle cx="486" cy="212" r="1.8" />
-          <circle cx="504" cy="209" r="1.8" />
-          <circle cx="524" cy="208" r="1.8" />
-          <circle cx="544" cy="213" r="1.8" />
-          <circle cx="564" cy="220" r="1.8" />
-          <circle cx="536" cy="232" r="2.3" />
-          <circle cx="548" cy="234" r="1.5" />
-          <circle cx="524" cy="230" r="1.5" />
-          <circle cx="538" cy="224" r="1.5" />
-          <circle cx="534" cy="240" r="1.5" />
-          <circle cx="560" cy="236" r="1.7" />
-        </g>
-
-        <path
-          d="M 104 244 L 124 132 C 164 154, 202 184, 228 220 C 236 232, 238 242, 236 250 L 104 246 Z"
-          fill={mainColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 104 244 L 124 132 C 164 154, 202 184, 228 220 C 236 232, 238 242, 236 250 L 104 246 Z"
-          fill="url(#jl-glacage)"
-        />
-        <path
-          d="M 124 140 C 160 160, 196 188, 221 222 C 228 232, 230 240, 229 246"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.95"
-          strokeDasharray="2.5 2.5"
-        />
-        <g fill={outline} opacity="0.78">
-          <circle cx="142" cy="154" r="1.7" />
-          <circle cx="160" cy="168" r="1.7" />
-          <circle cx="178" cy="183" r="1.7" />
-          <circle cx="195" cy="199" r="1.7" />
-          <circle cx="210" cy="216" r="1.7" />
-          <circle cx="220" cy="234" r="1.7" />
-        </g>
-
-        <path
-          d="M 108 242 L 204 246 C 244 248, 282 255, 338 256 C 442 258, 535 256, 586 246"
-          fill="none"
-          stroke="#000000"
-          strokeWidth="3.2"
-          opacity="0.3"
-        />
-      </g>
-
-      <path
-        d="M 108 242 C 102 206, 110 164, 128 130 C 133 122, 142 120, 155 122 C 192 125, 232 124, 266 116 C 278 98, 294 86, 310 88 C 324 90, 336 102, 348 116 C 380 148, 418 176, 458 190 C 504 202, 554 208, 584 222 C 596 228, 596 240, 586 246 C 535 256, 442 258, 338 256 C 282 255, 244 248, 204 246 L 108 242 Z"
-        fill="none"
-        stroke={outline}
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M 128 130 C 162 148, 204 156, 240 142 C 266 132, 282 112, 298 98"
-        fill="none"
-        stroke={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.85)'}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-
-      <g>
-        {[
-          { x1: 318, y1: 112, x2: 342, y2: 100 },
-          { x1: 340, y1: 130, x2: 364, y2: 118 },
-          { x1: 362, y1: 148, x2: 386, y2: 136 },
-          { x1: 384, y1: 164, x2: 408, y2: 152 },
-        ].map((l, idx) => (
-          <g key={idx}>
-            <circle cx={l.x1} cy={l.y1} r="2.2" fill="#181512" stroke={outline} strokeWidth="0.8" />
-            <path
-              d={`M ${l.x1} ${l.y1} Q ${(l.x1 + l.x2) / 2} ${(l.y1 + l.y2) / 2 - 3} ${l.x2} ${l.y2}`}
-              fill="none"
-              stroke={accentColor}
-              strokeWidth="2.6"
-              strokeLinecap="round"
-            />
-          </g>
-        ))}
-      </g>
-
-      <g>
-        <path
-          d="M 108 246 L 204 249 L 200 271 L 114 271 Z"
-          fill="url(#jl-sole-grad)"
-          stroke={outline}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-        <line x1="110" y1="254" x2="203" y2="256" stroke={seam} strokeWidth="0.9" />
-        <line x1="112" y1="262" x2="201" y2="263" stroke={seam} strokeWidth="0.9" />
-        <path
-          d="M 114 271 L 200 271 L 198 278 L 116 278 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-
-        <path
-          d="M 204 249 C 244 250, 282 257, 338 260 C 442 262, 535 260, 588 250 L 584 260 C 538 270, 445 272, 332 270 C 276 268, 242 257, 202 256 Z"
-          fill="url(#jl-sole-grad)"
-          stroke={outline}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-
-        <path
-          d="M 312 269 C 425 271, 528 269, 584 260 L 574 269 C 532 276, 448 278, 326 276 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1.15"
-          strokeLinejoin="round"
-        />
-
-        <path
-          d="M 105 240 L 204 244 C 244 246, 282 253, 338 255 C 442 257, 535 255, 589 244 L 590 250 C 535 261, 442 263, 338 261 C 282 259, 244 252, 204 250 L 106 246 Z"
-          fill={tertiaryColor}
-          stroke={outline}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 110 243 L 204 247 C 244 249, 282 256, 338 258 C 442 260, 534 258, 586 247"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="1.1"
-          strokeDasharray="2 2.5"
-        />
-      </g>
-    </svg>
-  )
-}
-
-/* ============================================================================
-   3. PUMP — HAUTE COUTURE STILETTO 105mm (Пропорции: Gianvito Rossi / YSL)
-   ============================================================================ */
-function PumpSvg({ colors, isDark }: { colors: string[]; isDark: boolean }) {
-  const mainColor = colors[0]
-  const secondaryColor = colors[1]
-  const tertiaryColor = colors.length > 3 ? colors[2] : colors[1]
-  const accentColor = colors[colors.length - 1]
-
-  const outline = isDark ? 'rgba(244, 240, 232, 0.48)' : 'rgba(28, 24, 22, 0.42)'
-  const stitch = isDark ? 'rgba(244, 240, 232, 0.5)' : 'rgba(28, 24, 22, 0.4)'
-
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 680 320"
-      className="w-full h-auto max-h-[225px] md:max-h-[285px] select-none overflow-visible"
-    >
-      <defs>
-        <radialGradient id="gr-floor" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000000" stopOpacity={isDark ? '0.78' : '0.24'} />
-          <stop offset="55%" stopColor="#000000" stopOpacity={isDark ? '0.25' : '0.06'} />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-        </radialGradient>
-
-        <linearGradient id="gr-satin" x1="15%" y1="0%" x2="35%" y2="100%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={isDark ? '0.26' : '0.45'} />
-          <stop offset="40%" stopColor="#ffffff" stopOpacity="0.02" />
-          <stop offset="100%" stopColor="#000000" stopOpacity={isDark ? '0.5' : '0.28'} />
-        </linearGradient>
-
-        <linearGradient id="gr-footbed-depth" x1="0%" y1="0%" x2="85%" y2="100%">
-          <stop offset="0%" stopColor="#000000" stopOpacity="0.1" />
-          <stop offset="55%" stopColor="#000000" stopOpacity="0.32" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
-        </linearGradient>
-
-        <linearGradient id="gr-stiletto" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
-          <stop offset="45%" stopColor="#000000" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0.45" />
-        </linearGradient>
-
-        <clipPath id="gr-body-clip">
-          <path d="M 152 64 C 130 92, 126 128, 138 156 C 194 168, 250 214, 322 264 C 352 280, 382 282, 422 282 L 502 282 C 538 282, 568 272, 592 254 C 556 238, 496 226, 438 220 C 392 246, 336 236, 278 190 C 222 146, 178 92, 152 64 Z" />
-        </clipPath>
-      </defs>
-
-      <ellipse cx="365" cy="283" rx="238" ry="10" fill="url(#gr-floor)" />
-      <ellipse cx="148" cy="281" rx="22" ry="5" fill="url(#gr-floor)" />
-      <ellipse cx="475" cy="281" rx="115" ry="7" fill="url(#gr-floor)" />
-
-      <g>
-        <path
-          d="M 138 154 L 180 168 C 162 192, 154 230, 152 273 L 144 273 C 144 230, 142 188, 138 154 Z"
-          fill={secondaryColor}
-          stroke={outline}
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 138 154 L 180 168 C 162 192, 154 230, 152 273 L 144 273 C 144 230, 142 188, 138 154 Z"
-          fill="url(#gr-stiletto)"
-        />
-        <path
-          d="M 144 273 L 152 273 L 152 280 L 144 280 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1.1"
-        />
-      </g>
-
-      <g>
-        <path
-          d="M 152 64 C 186 78, 232 122, 290 168 C 344 210, 396 226, 438 220 L 408 248 C 320 232, 218 156, 148 112 Z"
-          fill={tertiaryColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 152 64 C 186 78, 232 122, 290 168 C 344 210, 396 226, 438 220 L 408 248 C 320 232, 218 156, 148 112 Z"
-          fill="url(#gr-footbed-depth)"
-        />
-        <path
-          d="M 176 92 C 198 106, 222 126, 244 146 L 230 158 C 208 138, 184 118, 164 102 Z"
-          fill={accentColor}
-          fillOpacity="0.88"
-          stroke={outline}
-          strokeWidth="0.8"
-        />
-      </g>
-
-      <g>
-        <path
-          d="M 138 154 C 194 166, 250 212, 322 262 C 352 278, 382 280, 422 280 L 502 280 C 538 280, 568 270, 592 254 L 594 259 C 568 276, 538 285, 502 285 L 420 285 C 380 285, 350 282, 318 266 C 248 218, 192 172, 138 160 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1.25"
-          strokeLinejoin="round"
-        />
-      </g>
-
-      <g clipPath="url(#gr-body-clip)">
-        <rect x="120" y="55" width="480" height="235" fill={mainColor} />
-        <rect x="120" y="55" width="480" height="235" fill="url(#gr-satin)" />
-
-        <path
-          d="M 120 60 L 166 60 C 188 106, 212 152, 232 204 L 120 190 Z"
-          fill={secondaryColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 120 60 L 166 60 C 188 106, 212 152, 232 204 L 120 190 Z"
-          fill="url(#gr-satin)"
-        />
-        <path
-          d="M 160 66 C 182 110, 205 154, 224 200"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.9"
-          strokeDasharray="2.5 2.5"
-        />
-
-        <path
-          d="M 468 215 C 482 242, 480 266, 462 288 L 598 288 L 598 215 Z"
-          fill={secondaryColor}
-          stroke={outline}
-          strokeWidth="1.2"
-        />
-        <path
-          d="M 468 215 C 482 242, 480 266, 462 288 L 598 288 L 598 215 Z"
-          fill="url(#gr-satin)"
-        />
-        <path
-          d="M 462 218 C 475 242, 473 265, 456 284"
-          fill="none"
-          stroke={stitch}
-          strokeWidth="0.9"
-          strokeDasharray="2.5 2.5"
-        />
-      </g>
-
-      <path
-        d="M 152 64 C 130 92, 126 128, 138 156 C 194 168, 250 214, 322 264 C 352 280, 382 282, 422 282 L 502 282 C 538 282, 568 272, 592 254 C 556 238, 496 226, 438 220 C 392 246, 336 236, 278 190 C 222 146, 178 92, 152 64 Z"
-        fill="none"
-        stroke={outline}
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M 152 64 C 178 92, 222 146, 278 190 C 336 236, 392 246, 438 220"
-        fill="none"
-        stroke={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.88)'}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-
-      <g>
-        <path
-          d="M 432 214 L 478 222 L 470 240 L 424 231 Z"
-          fill={accentColor}
-          stroke={outline}
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M 439 219 L 470 225 L 465 235 L 434 228 Z"
-          fill={secondaryColor}
-          stroke={outline}
-          strokeWidth="0.9"
-          strokeLinejoin="round"
-        />
-        <line
-          x1="434"
-          y1="216"
-          x2="476"
-          y2="223"
-          stroke="#ffffff"
-          strokeWidth="1"
-          opacity="0.65"
-        />
-      </g>
-    </svg>
-  )
-}
-
-/* ============================================================================
-   ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ
+   ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ЦВЕТОВ (КОМПАКТНЫЙ MOBILE-FIRST LAYOUT БЕЗ СКРОЛЛА)
    ============================================================================ */
 export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [scheme, setScheme] = useState<Scheme>('complementary')
   const [silhouette, setSilhouette] = useState<Silhouette>('runner')
-  const [baseHue, setBaseHue] = useState(0)
+  const [baseHue, setBaseHue] = useState(165)
   const [whiteAmount, setWhiteAmount] = useState(0.05)
   const [blackAmount, setBlackAmount] = useState(0.05)
   const [showGuide, setShowGuide] = useState(false)
@@ -806,7 +1201,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }, [])
 
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp
+    const tg = (window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number } } } } })
+      .Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
     if (!userId) return
 
@@ -819,10 +1215,19 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   }, [])
 
   const handleProClick = async () => {
-    const tg = (window as any).Telegram?.WebApp
+    const tg = (
+      window as unknown as {
+        Telegram?: {
+          WebApp?: {
+            initDataUnsafe?: { user?: { id?: number } }
+            openInvoice: (link: string, cb: (status: string) => void) => void
+          }
+        }
+      }
+    ).Telegram?.WebApp
     const userId = tg?.initDataUnsafe?.user?.id
 
-    if (!userId) {
+    if (!userId || !tg) {
       alert('Ошибка: Откройте приложение через Telegram.')
       return
     }
@@ -849,9 +1254,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           alert('Оплата была отменена или произошла ошибка.')
         }
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
       console.error(error)
-      alert(`Сбой сервера: ${error.message}`)
+      alert(`Сбой сервера: ${message}`)
     } finally {
       setIsPurchasing(false)
     }
@@ -886,28 +1292,28 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       analogous: 'Аналогичная',
       triadic: 'Триадная',
       tetradic: 'Тетрада (квадрат)',
-      rectangular: 'Тетрада (прямоугольник)',
+      rectangular: 'Тетрада (прямоуг.)',
       'split-complementary': 'Контрастная триада',
       monochromatic: 'Монохромная',
-      silhouetteRunner: 'Сникер',
-      silhouetteDerby: 'Дерби',
-      silhouettePump: 'Лодочки',
+      silhouetteRunner: 'Сникер 3D',
+      silhouetteDerby: 'Дерби 3D',
+      silhouettePump: 'Лодочки 3D',
       main60: '60%',
       secondary30: '30%',
       accent10: '10%',
       main55: '55%',
       secondary20: '20%',
       secondary15: '15%',
-      roleUpper: 'Верх',
-      roleDetailsLining: 'Детали • Подкладка',
+      roleUpper: 'Верх • Каркас',
+      roleDetailsLining: 'Замша • Язычок',
       roleDetails: 'Детали верха',
-      roleLining: 'Подкладка • Стелька',
-      roleAccent: 'Подошва • Акцент',
+      roleLining: 'Подкладка • Спойлер',
+      roleAccent: 'Протектор • Акцент',
       quote: '«Цвет — это душа обуви.»',
       white: 'К белому',
       black: 'К чёрному',
       pure: 'Чистый',
-      ittenLabel: 'Круговая палитра',
+      ittenLabel: 'Круг Иттена',
       guideBtn: 'Гид',
       guideTitle: 'Цвет в дизайне',
       guideClose: 'Закрыть',
@@ -948,28 +1354,28 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       analogous: 'Аналогічна',
       triadic: 'Тріадна',
       tetradic: 'Тетрада (квадрат)',
-      rectangular: 'Тетрада (прямокутник)',
+      rectangular: 'Тетрада (прямокут.)',
       'split-complementary': 'Контрастна тріада',
       monochromatic: 'Монохромна',
-      silhouetteRunner: 'Снікер',
-      silhouetteDerby: 'Дербі',
-      silhouettePump: 'Човники',
+      silhouetteRunner: 'Снікер 3D',
+      silhouetteDerby: 'Дербі 3D',
+      silhouettePump: 'Човники 3D',
       main60: '60%',
       secondary30: '30%',
       accent10: '10%',
       main55: '55%',
       secondary20: '20%',
       secondary15: '15%',
-      roleUpper: 'Верх',
-      roleDetailsLining: 'Деталі • Підкладка',
+      roleUpper: 'Верх • Каркас',
+      roleDetailsLining: 'Замша • Язичок',
       roleDetails: 'Деталі верху',
-      roleLining: 'Підкладка • Устілка',
-      roleAccent: 'Підошва • Акцент',
+      roleLining: 'Підкладка • Спойлер',
+      roleAccent: 'Протектор • Акцент',
       quote: '«Колір — це душа взуття.»',
       white: 'До білого',
       black: 'До чорного',
       pure: 'Чистий',
-      ittenLabel: 'Кругова палітра',
+      ittenLabel: 'Коло Іттена',
       guideBtn: 'Гід',
       guideTitle: 'Колір у дизайні',
       guideClose: 'Закрити',
@@ -1000,9 +1406,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         'Монохромна — один колір у різних тонах і насиченостях. Найелегантніша і «дорога» схема. Ідеальна для мінімалізму, вечірнього взуття і коли шкіра сама по собі виразна.',
       guideFootwearTitle: 'Специфіка взуття',
       guideFootwear:
-        '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнітура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
+        '• Верх: основний колір (60–70 %).\n• Підкладка і устілка: підтримуючий або світліший тон.\n• Підошва і підбор: часто нейтраль або акцент.\n• Фурнитура і рядок: найчистіший і найяскравіший акцент (5–10 %).\n• Чорний і білий — не «відсутність кольору», а потужні інструменти контрасту і форми.',
       guideTip:
-        'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильнее, ніж здається.',
+        'Порада: завжди перевіряйте поєднання при різному освітленні — денному, теплому штучному і холодному. Шкіра і замша змінюють відтінок сильніше, ніж здається.',
     },
     de: {
       title: 'Farben',
@@ -1013,9 +1419,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       rectangular: 'Tetradisch (Rechteck)',
       'split-complementary': 'Split-Komplementär',
       monochromatic: 'Monochromatisch',
-      silhouetteRunner: 'Sneaker',
-      silhouetteDerby: 'Derby',
-      silhouettePump: 'Pumps',
+      silhouetteRunner: 'Sneaker 3D',
+      silhouetteDerby: 'Derby 3D',
+      silhouettePump: 'Pumps 3D',
       main60: '60%',
       secondary30: '30%',
       accent10: '10%',
@@ -1023,7 +1429,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       secondary20: '20%',
       secondary15: '15%',
       roleUpper: 'Oberleder',
-      roleDetailsLining: 'Details • Futter',
+      roleDetailsLining: 'Wildleder • Zunge',
       roleDetails: 'Details',
       roleLining: 'Futter • Sohle',
       roleAccent: 'Laufsohle • Akzent',
@@ -1084,7 +1490,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     []
   )
 
-  // Активные углы на круге Иттена для визуализации выбранной схемы
   const getSchemeHues = useCallback((): number[] => {
     const h = ((baseHue % 360) + 360) % 360
     switch (scheme) {
@@ -1107,13 +1512,11 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     }
   }, [baseHue, scheme])
 
-  // Генерация гармоничной палитры обуви по законам теории цвета
   const getColors = useCallback((): string[] => {
     const h = ((baseHue % 360) + 360) % 360
 
     switch (scheme) {
       case 'monochromatic':
-        // 1 цвет в 3 градациях светлоты и насыщенности (кожа + светлая замша + глубокий акцент)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 84),
           makeIttenColor(h, Math.min(1, whiteAmount + 0.38), blackAmount * 0.4, 52),
@@ -1121,7 +1524,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         ]
 
       case 'complementary':
-        // 60% основной тон, 30% мягкий родственный тон кожи/замши, 10% противоположный комплементарный удар (180°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
           makeIttenColor(
@@ -1134,7 +1536,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         ]
 
       case 'analogous':
-        // 3 соседних тона на круге (0°, +30°, -30°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
           makeIttenColor((h + 30) % 360, Math.min(1, whiteAmount * 0.85 + 0.1), blackAmount * 0.85, 76),
@@ -1142,7 +1543,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         ]
 
       case 'triadic':
-        // 3 равноудаленных тона через 120° (0°, +120°, +240°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
           makeIttenColor((h + 120) % 360, Math.min(1, whiteAmount * 0.8 + 0.12), blackAmount * 0.8, 72),
@@ -1150,7 +1550,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         ]
 
       case 'split-complementary':
-        // Основной тон (0°) + два соседних к комплементу (+150° и +210°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
           makeIttenColor((h + 150) % 360, Math.min(1, whiteAmount * 0.8 + 0.12), blackAmount * 0.8, 74),
@@ -1158,7 +1557,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         ]
 
       case 'tetradic':
-        // Квадрат: 4 цвета через 90° (0°, +90°, +180°, +270°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
           makeIttenColor((h + 90) % 360, Math.min(1, whiteAmount * 0.8 + 0.1), blackAmount * 0.8, 72),
@@ -1167,7 +1565,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         ]
 
       case 'rectangular':
-        // Прямоугольник: две комплементарные пары (0°, +60°, +180°, +240°)
         return [
           makeIttenColor(h, whiteAmount, blackAmount, 85),
           makeIttenColor((h + 60) % 360, Math.min(1, whiteAmount * 0.8 + 0.1), blackAmount * 0.8, 74),
@@ -1205,7 +1602,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     hsl(360, 90%, 50%)
   )`
 
-  // Безотказное вычисление угла касания/мыши
   const updateFromClientXY = useCallback((clientX: number, clientY: number) => {
     const el = wheelRef.current
     if (!el) return
@@ -1227,7 +1623,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     setBaseHue(angle)
   }, [])
 
-  // Глобальная подписка во время перетаскивания (работает даже если палец вышел за пределы круга)
   useEffect(() => {
     const onWindowPointerMove = (e: PointerEvent) => {
       if (!isDragging.current) return
@@ -1314,17 +1709,17 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/50' : 'text-[#1C1816]/50'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/55' : 'text-[#1C1816]/55'
   const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const cHover = isDark ? 'hover:text-white' : 'hover:text-black'
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className={`relative min-h-[100dvh] w-full transition-colors duration-[1.5s] ${cBg} ${cText}`}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      className={`relative min-h-[100dvh] w-full flex flex-col justify-between transition-colors duration-700 ${cBg} ${cText}`}
     >
       <style>{`
         * {
@@ -1341,39 +1736,45 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
         input[type=range]::-webkit-slider-runnable-track {
           width: 100%;
-          height: 1px;
-          background: ${isDark ? 'rgba(244,240,232,0.2)' : 'rgba(28,24,22,0.2)'};
+          height: 2px;
+          background: ${isDark ? 'rgba(244,240,232,0.22)' : 'rgba(28,24,22,0.22)'};
         }
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
-          height: 14px;
-          width: 14px;
+          height: 15px;
+          width: 15px;
           border-radius: 50%;
           background: ${isDark ? '#F4F0E8' : '#1C1816'};
-          margin-top: -6px;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+          margin-top: -6.5px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
           cursor: pointer;
         }
       `}</style>
 
-      {/* HEADER */}
-      <header className="px-6 pt-8 pb-4 flex items-start justify-between z-20">
-        <button
-          onClick={onBack}
-          className={`group flex items-center gap-3 text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
-        >
-          <span className="transform transition-transform group-hover:-translate-x-1">←</span>
-          <span>Back</span>
-        </button>
+      {/* КОМПАКТНЫЙ ВЕРХНИЙ ХЕДЕР (ЗАГОЛОВОК + ЯЗЫКИ + ГИД В ОДНУ СТРОКУ) */}
+      <header className="px-4 pt-3 pb-2 flex items-center justify-between z-20">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className={`group flex items-center gap-1.5 text-[10px] font-sans uppercase tracking-[0.18em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
+          >
+            <span className="transform transition-transform group-hover:-translate-x-0.5">←</span>
+            <span>Back</span>
+          </button>
+          <span className={`h-3 w-px ${isDark ? 'bg-white/15' : 'bg-black/15'}`} />
+          <h1 className="font-serif text-xl sm:text-2xl tracking-[-0.02em] leading-none">
+            {t.title}
+          </h1>
+        </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            {['ru', 'uk', 'de'].map((l) => (
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            {(['ru', 'uk', 'de'] as Lang[]).map((l) => (
               <button
                 key={l}
-                onClick={() => handleLangChange(l as Lang)}
-                className={`text-[10px] font-sans uppercase tracking-[0.25em] outline-none border-0 bg-transparent cursor-pointer transition-colors duration-300 ${
-                  lang === l ? cText : cTextMuted
+                onClick={() => handleLangChange(l)}
+                className={`text-[9px] font-sans uppercase tracking-[0.2em] outline-none border-0 bg-transparent cursor-pointer transition-colors ${
+                  lang === l ? `${cText} font-semibold` : cTextMuted
                 } ${cHover}`}
               >
                 {l === 'uk' ? 'UKR' : l}
@@ -1382,22 +1783,17 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
           <button
             onClick={() => setShowGuide(true)}
-            className={`text-[10px] font-sans uppercase tracking-[0.2em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} ${cHover} transition-colors`}
+            className={`px-2 py-0.5 border ${cLine} text-[9px] font-sans uppercase tracking-[0.18em] outline-none bg-transparent cursor-pointer ${cText} transition-colors`}
           >
             {t.guideBtn}
           </button>
         </div>
       </header>
 
-      <div className="px-6 pb-24">
-        <div className="mb-10">
-          <h1 className="font-serif text-[18vw] min-[400px]:text-6xl leading-[0.85] tracking-[-0.04em]">
-            {t.title}
-          </h1>
-        </div>
-
-        {/* СХЕМЫ ЦВЕТОВ */}
-        <div className={`flex overflow-x-auto gap-8 pb-5 mb-10 border-b ${cLine} scrollbar-hide`}>
+      {/* ОСНОВНОЙ КОНТЕНТ (ОПТИМИЗИРОВАН ПОД ОДИН МОБИЛЬНЫЙ ЭКРАН) */}
+      <div className="flex-1 flex flex-col justify-between px-4 pb-3 max-w-2xl mx-auto w-full">
+        {/* 1. ПОЛОСА СХЕМ ГАРМОНИИ */}
+        <div className={`flex overflow-x-auto gap-5 py-2 border-y ${cLine} scrollbar-hide`}>
           {SCHEMES.map((s) => {
             const isFree = s === 'complementary' || s === 'analogous'
             const isLocked = !isFree && !isProPurchased
@@ -1406,8 +1802,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               <button
                 key={s}
                 onClick={() => handleSchemeClick(s)}
-                className={`flex items-center gap-1.5 text-[9px] font-sans uppercase tracking-[0.25em] whitespace-nowrap transition-all duration-300 outline-none border-none bg-transparent cursor-pointer ${
-                  scheme === s ? `italic ${cText} opacity-100` : `${cTextMuted} opacity-60 hover:opacity-100`
+                className={`flex items-center gap-1 text-[9px] font-sans uppercase tracking-[0.2em] whitespace-nowrap transition-all duration-200 outline-none border-none bg-transparent cursor-pointer ${
+                  scheme === s
+                    ? `italic font-semibold ${cText} opacity-100`
+                    : `${cTextMuted} opacity-65 hover:opacity-100`
                 }`}
               >
                 {isLocked && (
@@ -1421,18 +1819,50 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           })}
         </div>
 
-        <div className="flex flex-col md:flex-row gap-12 md:gap-16 items-center md:items-start mb-16">
-          {/* ЦВЕТОВОЙ КРУГ ИТТЕНА */}
-          <div className="flex flex-col items-center shrink-0">
+        {/* 2. ПЕРЕКЛЮЧАТЕЛЬ СИЛУЭТОВ + ИНТЕРАКТИВНАЯ 3D-МОДЕЛЬ */}
+        <div className="my-1">
+          <div className="flex justify-center items-center gap-6 pt-1.5 pb-0.5">
+            {SILHOUETTES.map((item) => {
+              const active = silhouette === item.id
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleSilhouetteChange(item.id)}
+                  className={`relative pb-1 text-[9px] font-sans uppercase tracking-[0.24em] outline-none border-none bg-transparent cursor-pointer transition-all duration-200 ${
+                    active ? `${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-85`
+                  }`}
+                >
+                  {item.label}
+                  {active && (
+                    <motion.div
+                      layoutId="silhouetteIndicator"
+                      className={`absolute bottom-0 left-0 right-0 h-[1.5px] ${
+                        isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
+                      }`}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          <Footwear3DStage colors={colors} silhouette={silhouette} isDark={isDark} />
+        </div>
+
+        {/* 3. КОМПАКТНЫЙ ПУЛЬТ УПРАВЛЕНИЯ: КРУГ ИТТЕНА СЛЕВА + ПОЛЗУНКИ ТОНА СПРАВА */}
+        <div className={`grid grid-cols-[118px_1fr] sm:grid-cols-[140px_1fr] gap-4 items-center py-2.5 border-t ${cLine}`}>
+          {/* Круг Иттена */}
+          <div className="flex flex-col items-center">
             <div
               ref={wheelRef}
-              className="relative w-[180px] h-[180px] md:w-[220px] md:h-[220px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
+              className="relative w-[104px] h-[104px] sm:w-[124px] sm:h-[124px] rounded-full cursor-grab active:cursor-grabbing select-none touch-none"
               style={{
                 background: wheelBackground,
                 touchAction: 'none',
                 boxShadow: `0 0 0 1px ${
-                  isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
-                }, 0 10px 30px rgba(0,0,0,0.15)`,
+                  isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'
+                }, 0 6px 18px rgba(0,0,0,0.16)`,
               }}
               onPointerDown={handleWheelPointerDown}
               onPointerMove={handleWheelPointerMove}
@@ -1440,17 +1870,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               onPointerCancel={handleWheelPointerUp}
               onTouchStart={handleWheelTouchStart}
             >
-              {/* Центральная 3D-сфера (pointer-events-none, чтобы не блокировать касания) */}
               <div
                 className="absolute inset-[24%] rounded-full pointer-events-none"
                 style={{
                   background: `radial-gradient(circle at 35% 32%, white 0%, ${colors[0]} 42%, #111 95%)`,
                   boxShadow:
-                    'inset -4px -4px 12px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.25)',
+                    'inset -3px -3px 8px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)',
                 }}
               />
 
-              {/* Вспомогательные маркеры гармонических углов выбранной схемы */}
               {schemeHues.slice(1).map((hAngle, idx) => (
                 <div
                   key={idx}
@@ -1458,147 +1886,101 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   style={{ transform: `rotate(${hAngle}deg)` }}
                 >
                   <div
-                    className="absolute top-[7px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border border-white/90 shadow-sm"
+                    className="absolute top-[4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full border border-white/90 shadow-sm"
                     style={{ backgroundColor: `hsl(${hAngle}, 85%, 50%)` }}
                   />
                 </div>
               ))}
 
-              {/* Главный маркер базового цвета (0°) */}
               <div
                 className="absolute inset-0 pointer-events-none"
                 style={{ transform: `rotate(${baseHue}deg)` }}
               >
                 <div
-                  className="absolute top-1 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-[1.5px] border-white shadow-md"
+                  className="absolute top-[2px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-[1.5px] border-white shadow-md"
                   style={{ backgroundColor: `hsl(${baseHue}, 85%, 50%)` }}
                 />
               </div>
             </div>
-            <p className={`mt-6 text-[9px] font-sans tracking-[0.3em] uppercase ${cTextMuted}`}>
-              {t.ittenLabel}
-            </p>
+            <span className={`mt-1.5 text-[8px] font-sans tracking-[0.22em] uppercase ${cTextMuted}`}>
+              {t.ittenLabel} • {baseHue}°
+            </span>
           </div>
 
-          {/* СИЛУЭТЫ ОБУВИ, ПЕРЕКЛЮЧАТЕЛЬ И СВОТЧИ */}
-          <div className="flex-1 w-full max-w-md">
-            <div className="flex justify-center items-center gap-6 mb-4">
-              {SILHOUETTES.map((item) => {
-                const active = silhouette === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSilhouetteChange(item.id)}
-                    className={`relative pb-2 text-[9px] font-sans uppercase tracking-[0.28em] outline-none border-none bg-transparent cursor-pointer transition-all duration-300 ${
-                      active ? `${cText} opacity-100` : `${cTextMuted} opacity-50 hover:opacity-85`
-                    }`}
-                  >
-                    {item.label}
-                    {active && (
-                      <motion.div
-                        layoutId="silhouetteIndicator"
-                        className={`absolute bottom-0 left-0 right-0 h-[1px] ${
-                          isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
-                        }`}
-                        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                      />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Визуализация выбранной модели */}
-            <div className="mb-10 flex justify-center items-center px-2 min-h-[215px] md:min-h-[265px]">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={silhouette}
-                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-full flex justify-center items-center"
-                >
-                  {silhouette === 'runner' && <RunnerSvg colors={colors} isDark={isDark} />}
-                  {silhouette === 'derby' && <DerbySvg colors={colors} isDark={isDark} />}
-                  {silhouette === 'pump' && <PumpSvg colors={colors} isDark={isDark} />}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Слайдеры Тон/Тень */}
-            <div className="grid grid-cols-2 gap-8 mb-12">
-              <div>
-                <div
-                  className={`flex justify-between text-[9px] font-sans uppercase tracking-widest mb-4 ${cTextMuted}`}
-                >
-                  <span>{t.pure}</span>
-                  <span>{t.white}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={whiteAmount}
-                  onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
-                  className="w-full"
-                />
+          {/* Ползунки К белому / К чёрному */}
+          <div className="flex flex-col justify-center gap-4 pr-1">
+            <div>
+              <div
+                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-2 ${cTextMuted}`}
+              >
+                <span>{t.pure}</span>
+                <span>
+                  {t.white} ({Math.round(whiteAmount * 100)}%)
+                </span>
               </div>
-              <div>
-                <div
-                  className={`flex justify-between text-[9px] font-sans uppercase tracking-widest mb-4 ${cTextMuted}`}
-                >
-                  <span>{t.pure}</span>
-                  <span>{t.black}</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={blackAmount}
-                  onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
-                  className="w-full"
-                />
-              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={whiteAmount}
+                onChange={(e) => setWhiteAmount(parseFloat(e.target.value))}
+                className="w-full"
+              />
             </div>
 
-            {/* Свотчи палитры с подписями зон обуви */}
-            <div className={`grid gap-4 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
-              {colors.map((c, i) => (
-                <div key={i} className="flex flex-col">
-                  <div
-                    className={`w-full h-24 mb-3 shadow-sm border transition-colors duration-200 ${
-                      isDark ? 'border-white/10' : 'border-black/5'
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                  <div className={`text-[9px] font-sans uppercase tracking-[0.2em] ${cText}`}>
-                    {ratioLabels[i]}
-                  </div>
-                  <div
-                    className={`mt-1 text-[8px] font-sans uppercase tracking-[0.12em] leading-tight ${cTextMuted}`}
-                  >
-                    {roleLabels[i]}
-                  </div>
-                </div>
-              ))}
+            <div>
+              <div
+                className={`flex justify-between text-[8px] font-sans uppercase tracking-[0.18em] mb-2 ${cTextMuted}`}
+              >
+                <span>{t.pure}</span>
+                <span>
+                  {t.black} ({Math.round(blackAmount * 100)}%)
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={blackAmount}
+                onChange={(e) => setBlackAmount(parseFloat(e.target.value))}
+                className="w-full"
+              />
             </div>
           </div>
         </div>
 
-        {/* ЦИТАТА */}
-        <div className="pb-10 pt-4">
-          <div className="flex flex-col items-center text-center px-4">
-            <div className={`w-px h-12 mb-8 ${cLine} border-l`} />
-            <p className={`font-serif text-[18px] sm:text-[20px] italic leading-[1.5] ${cTextMuted}`}>
-              {t.quote}
-            </p>
-            <p className={`mt-6 text-[9px] font-sans font-bold uppercase tracking-[0.4em] ${cText}`}>
-              Cordwainer
-            </p>
-          </div>
+        {/* 4. КОМПАКТНЫЕ СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ ОБУВИ */}
+        <div className={`grid gap-2.5 pt-2 ${isTetrad ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          {colors.map((c, i) => (
+            <div key={i} className="flex flex-col">
+              <div
+                className={`w-full h-9 sm:h-12 mb-1.5 rounded-[2px] shadow-sm border transition-colors duration-150 ${
+                  isDark ? 'border-white/15' : 'border-black/10'
+                }`}
+                style={{ backgroundColor: c }}
+              />
+              <div className="flex items-baseline justify-between gap-1">
+                <span className={`text-[9px] font-sans font-semibold uppercase tracking-[0.15em] ${cText}`}>
+                  {ratioLabels[i]}
+                </span>
+                <span
+                  className={`text-[7.5px] font-sans uppercase tracking-[0.08em] truncate ${cTextMuted}`}
+                >
+                  {roleLabels[i]}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 5. ТОНКАЯ РЕДАКЦИОННАЯ ПОДПИСЬ В ОДНУ СТРОКУ */}
+        <div className={`mt-3 pt-2 border-t ${cLine} flex items-center justify-between`}>
+          <p className={`font-serif text-[12px] italic ${cTextMuted}`}>{t.quote}</p>
+          <span className={`text-[8px] font-sans font-bold uppercase tracking-[0.32em] ${cText}`}>
+            Cordwainer
+          </span>
         </div>
       </div>
 
