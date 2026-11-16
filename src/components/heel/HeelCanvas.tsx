@@ -111,11 +111,14 @@ export function HeelCanvas({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {audit.status === 'ERROR' && onFix && (
+          {(audit.status === 'ERROR' || audit.status === 'WARNING') && onFix && (
             <button
               type="button"
               onClick={onFix}
-              className="text-[8.5px] font-mono uppercase tracking-wider py-1.5 px-2.5 rounded-[7px] active:scale-95 transition-transform cursor-pointer border-none bg-[#E11D48] text-white font-semibold shadow-sm"
+              className={
+                'text-[8.5px] font-mono uppercase tracking-wider py-1.5 px-2.5 rounded-[7px] active:scale-95 transition-transform cursor-pointer border-none text-white font-semibold shadow-sm ' +
+                (audit.status === 'ERROR' ? 'bg-[#E11D48]' : 'bg-[#D97706]')
+              }
             >
               {t.fixBtn} 🪄
             </button>
@@ -195,17 +198,17 @@ export function HeelCanvas({
                 fontSize="6.8"
                 fontFamily="monospace"
               >
-                {rearLabel.toUpperCase()}: {eng.heelLoad}% (~{eng.peakHeelPressureKpa} кПа, мод.)
+                {rearLabel.toUpperCase()}: {eng.heelLoad}% (~{eng.peakHeelPressureKpa} кПа, эврист.)
               </text>
               <text
-                x={Math.max(110, g.xToe - 108)}
+                x={Math.max(110, g.xToe - 114)}
                 y="12"
                 fill="#E11D48"
                 fontSize="6.8"
                 fontFamily="monospace"
                 fontWeight="bold"
               >
-                {foreLabel.toUpperCase()}: {eng.forefootLoad}% (~{eng.peakForefootPressureKpa} кПа, мод.)
+                {foreLabel.toUpperCase()}: {eng.forefootLoad}% (~{eng.peakForefootPressureKpa} кПа, эврист.)
               </text>
             </g>
 
@@ -401,7 +404,7 @@ export function HeelCanvas({
           </strong>
         </span>
         <span>
-          МОМЕНТ (ОЦЕНКА):{' '}
+          МОМЕНТ ({eng.shankEngineering.material === 'carbon_composite' ? 'CFRP' : '65Г'}):{' '}
           <strong className="text-[var(--color-ink)] font-serif">
             {eng.shankBendingMomentNm} Н·м
           </strong>
