@@ -3,12 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 import {
   convertShoeSize,
-  calculateProFit,
   formatSize,
   RANGES,
   type Gender,
-  type ShoeStyle,
-  type WidthFit,
 } from '../lib/shoeSizes'
 
 type SizeCalcPageProps = {
@@ -16,9 +13,272 @@ type SizeCalcPageProps = {
   lang: Lang
 }
 
+export type ShoeStyle = 'sneakers' | 'classic' | 'winter' | 'running' | 'sandals'
+export type WidthFit = 'narrow' | 'standard' | 'wide' | 'extraWide'
 type ActiveTab = 'world' | 'fit' | 'brands' | 'guide'
 
+export type ExtendedSizeResult = {
+  mondopoint: number
+  eu: number
+  uk: number
+  us: number
+  ukr: number
+  jp: number
+  cn: number
+  kr: number
+  br: number
+  cm: number
+  mm: number
+}
+
+export type WidthMarks = {
+  eu: 'E' | 'F' | 'G' | 'H'
+  us: string
+  uk: string
+  jp: string
+  gost: number
+  cn: string
+}
+
+export type BrandFitEntry = {
+  brand: string
+  category: string
+  eu: string
+  us: string
+  uk: string
+  jp: string
+  offsetNote: {
+    ru: string
+    uk: string
+    de: string
+    en: string
+  }
+}
+
+export type ProFitResult = {
+  insoleMm: number
+  insoleCm: number
+  lastTraceMm: number
+  allowanceMm: number
+  ballWidthMm: number
+  ballGirthMm: number
+  instepGirthMm: number
+  widthMarks: WidthMarks
+  brandMatrix: BrandFitEntry[]
+}
+
 const PRO_PRICE_STARS = 150
+
+const STYLE_ALLOWANCES: Record<
+  ShoeStyle,
+  { insoleAddMm: number; lastTraceAddMm: number }
+> = {
+  sneakers: { insoleAddMm: 10, lastTraceAddMm: 12 },
+  classic: { insoleAddMm: 12, lastTraceAddMm: 16 },
+  winter: { insoleAddMm: 15, lastTraceAddMm: 18 },
+  running: { insoleAddMm: 13, lastTraceAddMm: 15 },
+  sandals: { insoleAddMm: 6, lastTraceAddMm: 7 },
+}
+
+/**
+ * Расширяет базовый результат convertShoeSize мировыми стандартами JP, CN, KR, BR.
+ * Полностью совместимо как со старой, так и с новой версией ../lib/shoeSizes.
+ */
+function computeExtendedSize(footMm: number, gender: Gender): ExtendedSizeResult {
+  const base = convertShoeSize(footMm, gender)
+  // Японский стандарт JIS S 5037: длина стопы в см с шагом 0.5
+  const jp = Math.round((base.mondopoint / 10) * 2) / 2
+  // Китайский стандарт GB/T 3293.1: (см * 2) - 10
+  const cn = Math.round((jp * 2 - 10) * 2) / 2
+  // Корейский стандарт KS K 3405: Mondopoint в мм
+  const kr = base.mondopoint
+  // Бразильский стандарт ABNT NBR 13310: EU - 2
+  const br = gender === 'kids'
+    ? Math.max(17, Math.round((base.eu - 2) * 2) / 2)
+    : Math.round((base.eu - 2) * 2) / 2
+
+  return {
+    mondopoint: base.mondopoint,
+    eu: base.eu,
+    uk: base.uk,
+    us: base.us,
+    ukr: base.ukr,
+    jp,
+    cn,
+    kr,
+    br,
+    cm: base.cm,
+    mm: base.mm,
+  }
+}
+
+function calculateProFit(
+  footMm: number,
+  gender: Gender,
+  style: ShoeStyle,
+  widthFit: WidthFit
+): ProFitResult {
+  const baseSize = computeExtendedSize(footMm, gender)
+  const allowance = STYLE_ALLOWANCES[style]
+
+  const widthDeltaMm =
+    widthFit === 'narrow'
+      ? -4
+      : widthFit === 'standard'
+        ? 0
+        : widthFit === 'wide'
+          ? 5
+          : 9
+
+  const girthDeltaMm =
+    widthFit === 'narrow'
+      ? -8
+      : widthFit === 'standard'
+        ? 0
+        : widthFit === 'wide'
+          ? 10
+          : 18
+
+  const widthLengthCompMm =
+    (widthFit === 'wide' || widthFit === 'extraWide') &&
+    (style === 'classic' || style === 'running')
+      ? 3
+      : 0
+
+  const totalAllowanceMm = allowance.insoleAddMm + widthLengthCompMm
+  const insoleMm = Math.round(footMm + totalAllowanceMm)
+  const insoleCm = Math.round((insoleMm / 10) * 10) / 10
+  const lastTraceMm = Math.round(footMm + allowance.lastTraceAddMm + widthLengthCompMm)
+
+  const genderWidthFactor = gender === 'men' ? 0.375 : gender === 'women' ? 0.365 : 0.38
+  const genderGirthFactor = gender === 'men' ? 0.945 : gender === 'women' ? 0.925 : 0.95
+
+  const ballWidthMm = Math.round(footMm * genderWidthFactor + widthDeltaMm)
+  const ballGirthMm = Math.round(footMm * genderGirthFactor + girthDeltaMm)
+  const instepGirthMm = Math.round(ballGirthMm * 1.03)
+
+  const widthMap: Record<WidthFit, WidthMarks> = {
+    narrow: {
+      eu: 'E',
+      us: gender === 'women' ? 'AA (2A)' : 'B (Narrow)',
+      uk: 'C / D',
+      jp: 'D / E',
+      gost: 4,
+      cn: '1.5',
+    },
+    standard: {
+      eu: 'F',
+      us: gender === 'women' ? 'B (Medium)' : 'D (Medium)',
+      uk: 'E / F',
+      jp: 'E / 2E',
+      gost: 6,
+      cn: '2.0',
+    },
+    wide: {
+      eu: 'G',
+      us: gender === 'women' ? 'D (Wide)' : '2E (Wide)',
+      uk: 'G',
+      jp: '3E',
+      gost: 8,
+      cn: '2.5',
+    },
+    extraWide: {
+      eu: 'H',
+      us: gender === 'women' ? '2E (X-Wide)' : '4E (X-Wide)',
+      uk: 'H',
+      jp: '4E / F',
+      gost: 10,
+      cn: '3.0',
+    },
+  }
+
+  const wShift = widthFit === 'wide' || widthFit === 'extraWide' ? 0.5 : 0
+
+  const brandMatrix: BrandFitEntry[] = [
+    {
+      brand: 'Nike / Jordan',
+      category: 'Athletic',
+      eu: formatSize(baseSize.eu + 0.5 + wShift),
+      us: formatSize(baseSize.us + 0.5 + wShift),
+      uk: formatSize(baseSize.uk + 0.5),
+      jp: formatSize(baseSize.jp + 0.5),
+      offsetNote: {
+        ru: 'Плотнее в пучках — рекомендуется +0.5 размера',
+        uk: 'Щільніше в пучках — рекомендовано +0.5 розміру',
+        de: 'Schmaler im Vorfuß — +0.5 Größe empfohlen',
+        en: 'Snug forefoot — +0.5 size up recommended',
+      },
+    },
+    {
+      brand: 'New Balance',
+      category: 'Lifestyle / Run',
+      eu: formatSize(baseSize.eu + wShift),
+      us: `${formatSize(baseSize.us)} (${widthFit === 'wide' || widthFit === 'extraWide' ? '2E' : 'D'})`,
+      uk: formatSize(baseSize.uk),
+      jp: formatSize(baseSize.jp),
+      offsetNote: {
+        ru: 'Эталонная колодка US Brannock, доступны полноты D/2E',
+        uk: 'Еталонна колодка US Brannock, доступні повноти D/2E',
+        de: 'Referenz-Passform nach US Brannock (Weiten D/2E)',
+        en: 'True to US Brannock standard with D/2E widths',
+      },
+    },
+    {
+      brand: 'Adidas Originals',
+      category: 'Sneakers',
+      eu: `${formatSize(baseSize.eu)}⅔`,
+      us: formatSize(baseSize.us + wShift),
+      uk: formatSize(baseSize.uk + wShift),
+      jp: formatSize(baseSize.jp),
+      offsetNote: {
+        ru: 'Дробная сетка 1/3 · стандартная посадка по стопе',
+        uk: 'Дробова сітка 1/3 · стандартна посадка по стопі',
+        de: '1/3-Größenraster · reguläre Passform',
+        en: '1/3-step French sizing · true to foot length',
+      },
+    },
+    {
+      brand: 'ASICS / Mizuno',
+      category: 'Japan CM',
+      eu: formatSize(baseSize.eu + 0.5),
+      us: formatSize(baseSize.us + 0.5),
+      uk: formatSize(baseSize.uk + 0.5),
+      jp: `${baseSize.jp.toFixed(1)} cm`,
+      offsetNote: {
+        ru: 'Маркировка строго по длине стопы в см (JIS S 5037)',
+        uk: 'Маркування суворо за довжиною стопи в см (JIS S 5037)',
+        de: 'Exakte Zentimeter-Markierung nach JIS S 5037',
+        en: 'Exact centimeter foot-length marking (JIS S 5037)',
+      },
+    },
+    {
+      brand: 'Cardio / Dress Last',
+      category: 'Classic / Leather',
+      eu: formatSize(Math.round(baseSize.eu)),
+      us: formatSize(baseSize.us),
+      uk: formatSize(baseSize.uk),
+      jp: formatSize(baseSize.jp),
+      offsetNote: {
+        ru: 'Полноразмерная кожаная колодка с припуском +12 мм',
+        uk: 'Повнорозмірна шкіряна колодка з припуском +12 мм',
+        de: 'Vollwertiger Lederleisten mit +12 mm Zugabe',
+        en: 'Full-grain leather last with +12 mm allowance',
+      },
+    },
+  ]
+
+  return {
+    insoleMm,
+    insoleCm,
+    lastTraceMm,
+    allowanceMm: totalAllowanceMm,
+    ballWidthMm,
+    ballGirthMm,
+    instepGirthMm,
+    widthMarks: widthMap[widthFit],
+    brandMatrix,
+  }
+}
 
 const FlagEU = () => (
   <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
@@ -366,7 +626,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     setFootMm((prev) => Math.min(r.max, Math.max(r.min, prev)))
   }, [])
 
-  const result = useMemo(() => convertShoeSize(footMm, gender), [footMm, gender])
+  const result = useMemo(() => computeExtendedSize(footMm, gender), [footMm, gender])
   const proFit = useMemo(
     () => calculateProFit(footMm, gender, shoeStyle, widthFit),
     [footMm, gender, shoeStyle, widthFit]
@@ -376,7 +636,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     unit === 'cm' ? (footMm / 10).toFixed(1).replace('.', ',') : String(Math.round(footMm))
   const pct = Math.min(100, Math.max(0, ((footMm - range.min) / (range.max - range.min)) * 100))
 
-  // Автоматическая проверка покупки в Neon DB при загрузке + кэш гидратации
   const verifyPurchaseOnServer = useCallback(async (uid: number | string) => {
     try {
       const res = await fetch(`/api/check-purchase?userId=${encodeURIComponent(String(uid))}&productId=pro_sizes`, {
@@ -441,7 +700,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
       const data = await response.json()
 
-      // Если сервер сообщает, что модуль уже куплен (409 Conflict) — мгновенно активируем
       if (response.status === 409 && data?.alreadyPurchased) {
         haptic('heavy')
         setIsProPurchased(true)
@@ -508,7 +766,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const usLabel = gender === 'kids' ? 'US K' : gender === 'men' ? 'US M' : 'US W'
 
-  // Динамическое масштабирование живого чертежа стопы (0.86 .. 1.06)
   const blueprintScaleX = 0.86 + (pct / 100) * 0.2
   const blueprintScaleY =
     widthFit === 'narrow'
@@ -519,7 +776,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           ? 1.08
           : 1.15
 
-  // Цветовые токены Quiet Luxury
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cCard = isDark ? 'bg-[#121212]/90' : 'bg-[#EAE5DC]/85'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
@@ -578,7 +834,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         }
       `}</style>
 
-      {/* 1. КОМПАКТНАЯ ВЕРХНЯЯ ПАНЕЛЬ (HEADER + ПЕРЕКЛЮЧАТЕЛИ ПОЛА И ЕДИНИЦ) */}
+      {/* 1. КОМПАКТНАЯ ВЕРХНЯЯ ПАНЕЛЬ */}
       <header className={`px-4 pt-3 pb-2.5 border-b ${cLine} flex items-center justify-between gap-2 shrink-0 z-20`}>
         <button
           onClick={() => {
@@ -591,7 +847,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           <span>{t.back}</span>
         </button>
 
-        {/* Пол (Мужской / Женский / Детский) */}
         <div className={`flex items-center rounded-full p-0.5 border ${cLine} ${cCard}`}>
           {(['men', 'women', 'kids'] as Gender[]).map((g) => (
             <button
@@ -613,7 +868,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           ))}
         </div>
 
-        {/* Переключатель см / мм */}
         <div className={`flex items-center rounded-full p-0.5 border ${cLine} ${cCard}`}>
           {(['cm', 'mm'] as const).map((u) => (
             <button
@@ -636,10 +890,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
       </header>
 
-      {/* 2. ЖИВОЙ БИОМЕТРИЧЕСКИЙ ЧЕРТЁЖ СТОПЫ И КАЛИПЕР (LIVE ANATOMICAL HUD) */}
+      {/* 2. ЖИВОЙ БИОМЕТРИЧЕСКИЙ ЧЕРТЁЖ СТОПЫ И КАЛИПЕР */}
       <section className="px-4 pt-2.5 shrink-0">
         <div className={`relative rounded-xl border ${cLine} ${cCard} px-3.5 py-2.5 overflow-hidden`}>
-          {/* Сетка миллиметровки на фоне */}
           <div
             className="absolute inset-0 pointer-events-none opacity-20"
             style={{
@@ -648,7 +901,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             }}
           />
 
-          {/* Сканирующий лазерный луч */}
           <div className="absolute inset-y-0 left-0 w-1/3 pointer-events-none scan-beam">
             <div
               className="w-[1.5px] h-full"
@@ -660,7 +912,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </div>
 
           <div className="relative z-10 flex items-center justify-between gap-3">
-            {/* Левый блок: Главный размер EU + живой ввод длины */}
             <div className="flex flex-col justify-between shrink-0">
               <div className="flex items-center gap-1.5 mb-1">
                 <FlagEU />
@@ -670,7 +921,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 </span>
               </div>
 
-              {/* Управление стопой (- / число / +) */}
               <div className="flex items-center gap-2 my-0.5">
                 <button
                   onClick={(e) => stepValue(-1, e)}
@@ -726,15 +976,12 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </div>
             </div>
 
-            {/* Правый блок: Интерактивный SVG-чертёж стопы и колодки в реальном времени */}
             <div className="flex-1 flex flex-col items-end justify-center min-w-[140px]">
               <svg viewBox="0 0 220 82" className="w-full max-w-[195px] h-[66px] overflow-visible">
-                {/* Направляющие калипера пятки и мыска */}
                 <line x1="18" y1="8" x2="18" y2="74" stroke={trackColor} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="2 2" />
                 <line x1="184" y1="8" x2="184" y2="74" stroke={trackColor} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="2 2" />
                 <line x1="202" y1="8" x2="202" y2="74" stroke={accentStroke} strokeOpacity="0.8" strokeWidth="1" />
 
-                {/* Внешний контур следа колодки (с припуском) */}
                 <g
                   style={{
                     transform: `translate(110px, 41px) scale(${blueprintScaleX}, ${blueprintScaleY}) translate(-110px, -41px)`,
@@ -750,7 +997,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     opacity="0.7"
                   />
 
-                  {/* Анатомический контур самой стопы */}
                   <path
                     d="M22,41 C22,27 36,22 56,24 C80,26 105,19 132,17 C157,15 181,22 183,38 C185,52 167,63 142,63 C115,63 94,55 70,56 C44,57 22,53 22,41 Z"
                     fill={isDark ? 'rgba(244,240,232,0.08)' : 'rgba(28,24,22,0.08)'}
@@ -758,13 +1004,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     strokeWidth="1.4"
                   />
 
-                  {/* Линия пучков (Ball Girth axis M1-M5) */}
                   <line x1="134" y1="16" x2="138" y2="63" stroke={accentStroke} strokeWidth="1.1" strokeDasharray="2 2" />
-
-                  {/* Продольная ось стопы */}
                   <line x1="22" y1="41" x2="183" y2="38" stroke={trackColor} strokeOpacity="0.3" strokeWidth="0.9" />
 
-                  {/* Пульсирующие биомеханические точки (Пятка, Пучки M1, Мысок) */}
                   <g transform="translate(38, 41)">
                     <circle r="4.5" fill={accentStroke} className="bio-node-ring" />
                     <circle r="2.2" fill={accentStroke} />
@@ -779,7 +1021,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   </g>
                 </g>
 
-                {/* Размерная стрелка внизу чертежа */}
                 <line x1="18" y1="72" x2="184" y2="72" stroke={trackColor} strokeOpacity="0.5" strokeWidth="0.9" />
                 <line x1="184" y1="72" x2="202" y2="72" stroke={accentStroke} strokeWidth="1.4" />
                 <text x="100" y="80" textAnchor="middle" fill={trackColor} opacity="0.65" fontSize="7.5" fontFamily="sans-serif">
@@ -789,7 +1030,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          {/* 3. ПРЕЦИЗИОННЫЙ СЛАЙДЕР-ШТАНГЕНЦИРКУЛЬ С ДЕЛЕНИЯМИ */}
+          {/* 3. ПРЕЦИЗИОННЫЙ СЛАЙДЕР-ШТАНГЕНЦИРКУЛЬ */}
           <div className="relative w-full pt-2 pb-0.5">
             <input
               type="range"
@@ -816,7 +1057,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               />
             </div>
 
-            {/* Шкала линейки */}
             <div className="flex justify-between items-center mt-1.5 px-0.5">
               {Array.from({ length: 21 }).map((_, idx) => (
                 <span
@@ -839,7 +1079,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
       </section>
 
-      {/* 4. НАВИГАЦИЯ ПО ВКЛАДКАМ (ЧТОБЫ ИЗБЕЖАТЬ ВЕРТИКАЛЬНОГО СКРОЛЛА) */}
+      {/* 4. НАВИГАЦИЯ ПО ВКЛАДКАМ */}
       <nav className="px-4 pt-2.5 shrink-0">
         <div className={`grid grid-cols-4 gap-1 p-1 rounded-xl border ${cLine} ${cCard}`}>
           {(
@@ -873,10 +1113,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
       </nav>
 
-      {/* 5. РАБОЧАЯ ОБЛАСТЬ ВКЛАДОК (ВПИСАНА В ОСТАТОК ЭКРАНА) */}
+      {/* 5. РАБОЧАЯ ОБЛАСТЬ ВКЛАДОК */}
       <main className="flex-1 px-4 pt-2.5 pb-3 overflow-y-auto scrollbar-hide flex flex-col justify-between gap-2.5">
         <AnimatePresence mode="wait">
-          {/* ВКЛАДКА 1: 8 МИРОВЫХ СТАНДАРТОВ (EU, UA, US, UK, JP, CN, KR, BR) */}
           {activeTab === 'world' && (
             <motion.div
               key="world"
@@ -931,7 +1170,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
-          {/* ВКЛАДКА 2: PRO ПАРАМЕТРЫ КОЛОДКИ, СТЕЛЬКИ И ПОЛНОТЫ (E-H / 2E-4E) */}
           {activeTab === 'fit' && (
             <motion.div
               key="fit"
@@ -941,7 +1179,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               transition={{ duration: 0.18 }}
               className="flex flex-col gap-2"
             >
-              {/* Выбор типа обуви (влияет на припуск стельки) */}
               <div className={`rounded-xl border ${cLine} ${cCard} p-2.5`}>
                 <div className="flex flex-wrap gap-1 mb-2">
                   {(
@@ -972,7 +1209,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   ))}
                 </div>
 
-                {/* Выбор полноты стопы */}
                 <div className="grid grid-cols-4 gap-1">
                   {(
                     [
@@ -1002,7 +1238,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 </div>
               </div>
 
-              {/* Инженерная сводка колодки и полноты */}
               <div
                 onClick={() => {
                   if (!isProPurchased) handleProClick()
@@ -1045,7 +1280,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
-          {/* ВКЛАДКА 3: PRO МАТРИЦА ПОСАДКИ МИРОВЫХ БРЕНДОВ */}
           {activeTab === 'brands' && (
             <motion.div
               key="brands"
@@ -1055,7 +1289,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               transition={{ duration: 0.18 }}
               className="flex flex-col gap-1.5"
             >
-              {proFit.brandMatrix.map((row) => (
+              {proFit.brandMatrix.map((row: BrandFitEntry) => (
                 <div
                   key={row.brand}
                   onClick={() => {
@@ -1099,7 +1333,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
-          {/* ВКЛАДКА 4: ГИД ПО ЗАМЕРУ И СТАНДАРТЫ ISO */}
           {activeTab === 'guide' && (
             <motion.div
               key="guide"
@@ -1123,7 +1356,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           )}
         </AnimatePresence>
 
-        {/* 6. КОММЕРЧЕСКИЙ БЛОК РАЗБЛОКИРОВКИ PRO (ИЛИ СТАТУС АКТИВАЦИИ) */}
+        {/* 6. КОММЕРЧЕСКИЙ БЛОК РАЗБЛОКИРОВКИ PRO */}
         <div className="shrink-0">
           {statusError && (
             <div className="mb-1.5 px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-[10px] text-center">
