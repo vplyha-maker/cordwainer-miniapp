@@ -1,7 +1,7 @@
 /**
  * src/lib/sizeCalcI18n.tsx
- * Локализация (RU / UK / DE / EN), SVG-флаги и кроссплатформенный тактильный движок
- * с поддержкой Android WebView (navigator.vibrate + Telegram HapticFeedback) и iOS.
+ * Локализация (RU / UK / DE / EN), SVG-флаги и усиленный тактильный движок
+ * для Android (Samsung One UI / Xiaomi / Pixel) и iPhone (Taptic Engine).
  */
 import React from 'react'
 
@@ -12,16 +12,16 @@ export const PRO_PRICE_STARS = 150
 let sharedAudioCtx: AudioContext | null = null
 let lastHapticTimestamp = 0
 
-function isAndroidDevice(): boolean {
-  if (typeof navigator === 'undefined') return false
-  return /android/i.test(navigator.userAgent || '')
-}
-
+/**
+ * Двухчастотный тактильно-акустический импульс штангенциркуля (работает и на iPhone, и на Android!)
+ * Сочетает низкочастотный толчок (125 Гц) и сухой механический щелчок микрометра (880 Гц),
+ * который хорошо воспроизводится динамиками Android-смартфонов.
+ */
 function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') {
   try {
-    // На Android звуковой микро-импульс при быстром скролле не нужен, там работает мотор вибрации
-    if (isAndroidDevice()) return
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioCtx) return
     if (!sharedAudioCtx) {
       sharedAudioCtx = new AudioCtx()
@@ -30,75 +30,124 @@ function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') 
       sharedAudioCtx.resume().catch(() => {})
     }
     const now = sharedAudioCtx.currentTime
-    const osc = sharedAudioCtx.createOscillator()
-    const gain = sharedAudioCtx.createGain()
 
-    const freq = intensity === 'tick' ? 155 : intensity === 'light' ? 135 : intensity === 'medium' ? 115 : 95
-    const duration = intensity === 'tick' ? 0.004 : intensity === 'light' ? 0.006 : 0.009
-    const peakGain = intensity === 'tick' ? 0.035 : intensity === 'light' ? 0.05 : 0.08
+    // 1. Низкочастотный тактильный резонанс
+    const oscLow = sharedAudioCtx.createOscillator()
+    const gainLow = sharedAudioCtx.createGain()
+    const duration = intensity === 'tick' ? 0.008 : intensity === 'light' ? 0.011 : 0.015
+    const peakLow = intensity === 'tick' ? 0.09 : intensity === 'light' ? 0.13 : 0.18
 
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(freq, now)
-    osc.frequency.exponentialRampToValueAtTime(40, now + duration)
+    oscLow.type = 'triangle'
+    oscLow.frequency.setValueAtTime(intensity === 'tick' ? 170 : 140, now)
+    oscLow.frequency.exponentialRampToValueAtTime(48, now + duration)
 
-    gain.gain.setValueAtTime(peakGain, now)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+    gainLow.gain.setValueAtTime(peakLow, now)
+    gainLow.gain.exponentialRampToValueAtTime(0.0001, now + duration)
 
-    osc.connect(gain)
-    gain.connect(sharedAudioCtx.destination)
-    osc.start(now)
-    osc.stop(now + duration)
+    oscLow.connect(gainLow)
+    gainLow.connect(sharedAudioCtx.destination)
+    oscLow.start(now)
+    oscLow.stop(now + duration)
+
+    // 2. Короткий механический щелчок храповика микрометра (слышен и ощутим на Android)
+    const oscClick = sharedAudioCtx.createOscillator()
+    const gainClick = sharedAudioCtx.createGain()
+    const clickDur = 0.0035
+    oscClick.type = 'sine'
+    oscClick.frequency.setValueAtTime(intensity === 'tick' ? 920 : 760, now)
+    oscClick.frequency.exponentialRampToValueAtTime(240, now + clickDur)
+
+    gainClick.gain.setValueAtTime(intensity === 'tick' ? 0.05 : 0.08, now)
+    gainClick.gain.exponentialRampToValueAtTime(0.0001, now + clickDur)
+
+    oscClick.connect(gainClick)
+    gainClick.connect(sharedAudioCtx.destination)
+    oscClick.start(now)
+    oscClick.stop(now + clickDur)
   } catch {}
 }
 
 /**
- * Тактильный отклик при переборе делений шкалы (с защитой от забивания вибромотора Android)
+ * Прямой вызов нативного моста Telegram для Android (TelegramWebviewProxy) + WebApp SDK + Vibrator API
  */
-export function hapticSelection() {
-  const now = performance.now()
-  if (now - lastHapticTimestamp < 38) return
-  lastHapticTimestamp = now
+function triggerNativeTelegramHaptic(style: 'light' | 'medium' | 'heavy' | 'rigid') {
+  const win = window as unknown as {
+    Telegram?: {
+      WebApp?: {
+        HapticFeedback?: {
+          impactOccurred?: (s: string) => void
+          selectionChanged?: () => void
+        }
+      }
+      WebView?: {
+        postEvent?: (eventType: string, callback?: boolean, eventData?: unknown) => void
+      }
+    }
+    TelegramWebviewProxy?: {
+      postEvent?: (eventType: string, eventData: string) => void
+    }
+  }
 
+  // 1. Стандартный SDK Telegram (на Android используем 'medium'/'rigid', т.к. 'light'/selectionChanged глушится на Samsung)
   try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { selectionChanged?: () => void } } } }).Telegram?.WebApp
-    tg?.HapticFeedback?.selectionChanged?.()
-  } catch {}
-
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      // 16 мс — минимальный импульс для чёткого старта вибромотора Android
-      navigator.vibrate(16)
+    const hf = win.Telegram?.WebApp?.HapticFeedback
+    if (hf?.impactOccurred) {
+      hf.impactOccurred(style)
+    } else if (hf?.selectionChanged) {
+      hf.selectionChanged()
     }
   } catch {}
 
+  // 2. Прямой вызов Android Java-моста TelegramWebviewProxy
+  try {
+    if (typeof win.TelegramWebviewProxy?.postEvent === 'function') {
+      win.TelegramWebviewProxy.postEvent(
+        'web_app_trigger_haptic_feedback',
+        JSON.stringify({ type: 'impact', impact_style: style })
+      )
+    } else if (typeof win.Telegram?.WebView?.postEvent === 'function') {
+      win.Telegram.WebView.postEvent('web_app_trigger_haptic_feedback', false, {
+        type: 'impact',
+        impact_style: style,
+      })
+    }
+  } catch {}
+
+  // 3. Браузерный вибратор Android Chrome
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(style === 'heavy' ? 35 : 22)
+    }
+  } catch {}
+}
+
+export function hapticSelection() {
+  const now = performance.now()
+  if (now - lastHapticTimestamp < 36) return
+  lastHapticTimestamp = now
+
+  // На Android 'medium' реально включает мотор вибрации в Telegram (в отличие от беззвучного selectionChanged)
+  triggerNativeTelegramHaptic('medium')
   playTapticMicroPulse('tick')
 }
 
-/**
- * Тактильный отклик при нажатии кнопок и переключении вкладок
- */
 export function hapticImpact(style: 'light' | 'medium' | 'heavy' = 'light') {
   lastHapticTimestamp = performance.now()
-
-  try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { HapticFeedback?: { impactOccurred?: (s: string) => void } } } }).Telegram?.WebApp
-    tg?.HapticFeedback?.impactOccurred?.(style)
-  } catch {}
-
-  try {
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      const duration = style === 'light' ? 20 : style === 'heavy' ? 40 : 28
-      navigator.vibrate(duration)
-    }
-  } catch {}
-
+  const effectiveStyle = style === 'light' ? 'medium' : style
+  triggerNativeTelegramHaptic(effectiveStyle)
   playTapticMicroPulse(style)
 }
 
 export type TranslationBundle = {
   back: string
   subtitle: string
-  step1: string
+  modeFoot: string
+  modeInsole: string
+  footLengthLabel: string
+  insoleInputLabel: string
+  yourSizeLabel: string
+  builtInAllowanceHint: string
+  winterShiftBadge: string
   men: string
   women: string
   kids: string
@@ -108,9 +157,9 @@ export type TranslationBundle = {
   allowanceLabel: string
   widthLabel: string
   girthLabel: string
-  zoneGirth: string
-  zoneArch: string
-  zoneInsole: string
+  xrayFootTag: string
+  xrayInsoleTag: string
+  xrayBallTag: string
   subParisPoint: string
   subDstuMetric: string
   subBrannock: string
@@ -152,19 +201,25 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
   ru: {
     back: 'Назад',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Шкала стопы',
+    modeFoot: 'Замер стопы',
+    modeInsole: 'По стельке',
+    footLengthLabel: 'Длина стопы',
+    insoleInputLabel: 'Длина стельки',
+    yourSizeLabel: 'Ваш размер',
+    builtInAllowanceHint: 'Не прибавляйте стельку на ползунке: внутри размера',
+    winterShiftBadge: 'с учётом запаса',
     men: 'Мужской',
     women: 'Женский',
     kids: 'Детский',
     cmLabel: 'см',
     mmLabel: 'мм',
-    insoleLabel: 'Стелька',
-    allowanceLabel: 'Припуск',
+    insoleLabel: 'Стелька внутри',
+    allowanceLabel: 'Запас мыска',
     widthLabel: 'Ширина пучков',
     girthLabel: 'Обхват пучков',
-    zoneGirth: 'Обхват M1–M5',
-    zoneArch: 'Ширина M1–M5',
-    zoneInsole: 'Стелька',
+    xrayFootTag: 'Стопа',
+    xrayInsoleTag: 'Стелька',
+    xrayBallTag: 'Обхват M1–M5',
     subParisPoint: 'Paris Point (2/3 см)',
     subDstuMetric: 'ДСТУ / ГОСТ · см',
     subBrannock: 'Brannock США',
@@ -191,10 +246,10 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     proBtn: `ОТКРЫТЬ PRO ДОСТУП · ${PRO_PRICE_STARS} ⭐️`,
     proActiveBadge: 'PRO АКТИВЕН',
     loading: 'ПРОВЕРКА ТРАНЗАКЦИИ...',
-    measureGuide1: '1. Встаньте на лист бумаги в носках, распределив вес тела равномерно на обе ноги.',
-    measureGuide2: '2. Отметьте крайнюю точку пятки и самого длинного пальца вертикальным карандашом (90°).',
-    measureGuide3: '3. Для полноты измерьте обхват стопы лентой по выступающим косточкам пучков (M1–M5).',
-    measureTip: 'Проводите замер вечером — к концу дня стопа удлиняется на 2–3 мм и увеличивается в обхвате.',
+    measureGuide1: '1. Встаньте на лист бумаги в носках, распределив вес равномерно на обе ноги.',
+    measureGuide2: '2. Отметьте пятку и самый длинный палец вертикальным карандашом (90°) — это ваша длина стопы (например, 270 мм).',
+    measureGuide3: '3. ВАЖНО: В размер EU 42.5 (для стопы 270 мм) заводской запас стельки (+12…15 мм, т.е. стелька 282–285 мм) УЖЕ ЗАЛОЖЕН. Не выставляйте длину стельки в режиме «Замер стопы»!',
+    measureTip: 'Если вы измерили линейкой вынутую стельку (например, 285 мм), переключите кнопку сверху на «По стельке».',
     disclaimer: 'Расчёты строго по таблицам ГОСТ Р 57425-2017 (ISO 19407) и ISO 9407 (Mondopoint).',
     standardsNote: 'Полнота и обхват пучков: JIS S 5037 · ГОСТ 3927-88 · US Brannock.',
     openInTelegramErr: 'Откройте мини-приложение внутри Telegram для оплаты Stars.',
@@ -204,19 +259,25 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
   uk: {
     back: 'Назад',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Шкала стопи',
+    modeFoot: 'Замір стопи',
+    modeInsole: 'По устілці',
+    footLengthLabel: 'Довжина стопи',
+    insoleInputLabel: 'Довжина устілки',
+    yourSizeLabel: 'Ваш розмір',
+    builtInAllowanceHint: 'Не додавайте устілку на повзунку: всередині розміру',
+    winterShiftBadge: 'з урахуванням запасу',
     men: 'Чоловічий',
     women: 'Жіночий',
     kids: 'Дитячий',
     cmLabel: 'см',
     mmLabel: 'мм',
-    insoleLabel: 'Устілка',
-    allowanceLabel: 'Припуск',
+    insoleLabel: 'Устілка всередині',
+    allowanceLabel: 'Запас миска',
     widthLabel: 'Ширина пучків',
     girthLabel: 'Обхват пучків',
-    zoneGirth: 'Обхват M1–M5',
-    zoneArch: 'Ширина M1–M5',
-    zoneInsole: 'Устілка',
+    xrayFootTag: 'Стопа',
+    xrayInsoleTag: 'Устілка',
+    xrayBallTag: 'Обхват M1–M5',
     subParisPoint: 'Paris Point (2/3 см)',
     subDstuMetric: 'ДСТУ · Метричний см',
     subBrannock: 'Brannock США',
@@ -244,9 +305,9 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     proActiveBadge: 'PRO АКТИВНИЙ',
     loading: 'ПЕРЕВІРКА ТРАНЗАКЦІЇ...',
     measureGuide1: '1. Станьте на аркуш паперу в шкарпетках, рівномірно розподіливши вагу на обидві ноги.',
-    measureGuide2: '2. Позначте крайню точку п’яти та найдовшого пальця вертикальним олівцем (90°).',
-    measureGuide3: '3. Для повноти виміряйте обхват стопи стрічкою по виступаючих кісточках пучків (M1–M5).',
-    measureTip: 'Виконуйте замір увечері — до кінця дня стопа видовжується на 2–3 мм.',
+    measureGuide2: '2. Позначте п’яту та найдовший палець вертикальним олівцем (90°) — це ваша довжина стопи (наприклад, 270 мм).',
+    measureGuide3: '3. ВАЖЛИВО: У розмір EU 42.5 (для стопи 270 мм) заводський запас устілки (+12…15 мм, тобто устілка 282–285 мм) ВЖЕ ЗАКЛАДЕНО. Не виставляйте довжину устілки в режимі «Замір стопи»!',
+    measureTip: 'Якщо ви виміряли лінійкою вийняту устілку (наприклад, 285 мм), перемкніть кнопку зверху на «По устілці».',
     disclaimer: 'Розрахунки за таблицями ISO 19407:2023 та ISO 9407 (Mondopoint).',
     standardsNote: 'Повнота та обхват пучків: JIS S 5037 · ДСТУ ГОСТ 3927 · US Brannock.',
     openInTelegramErr: 'Відкрийте міні-додаток усередині Telegram для оплати Stars.',
@@ -256,19 +317,25 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
   de: {
     back: 'Zurück',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Fußlängen-Skala',
+    modeFoot: 'Fußlänge',
+    modeInsole: 'Innensohle',
+    footLengthLabel: 'Fußlänge',
+    insoleInputLabel: 'Sohlenlänge',
+    yourSizeLabel: 'Ihre Größe',
+    builtInAllowanceHint: 'Zugabe nicht am Regler addieren: In Größe',
+    winterShiftBadge: 'inkl. Zugabe',
     men: 'Herren',
     women: 'Damen',
     kids: 'Kinder',
     cmLabel: 'cm',
     mmLabel: 'mm',
     insoleLabel: 'Innensohle',
-    allowanceLabel: 'Zugabe',
+    allowanceLabel: 'Zehenzugabe',
     widthLabel: 'Ballenbreite',
     girthLabel: 'Ballenumfang',
-    zoneGirth: 'Umfang M1–M5',
-    zoneArch: 'Breite M1–M5',
-    zoneInsole: 'Innensohle',
+    xrayFootTag: 'Fuß',
+    xrayInsoleTag: 'Sohle',
+    xrayBallTag: 'Umfang M1–M5',
     subParisPoint: 'Pariser Stich (2/3 cm)',
     subDstuMetric: 'DSTU · Metrisch (cm)',
     subBrannock: 'US Brannock',
@@ -296,9 +363,9 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     proActiveBadge: 'PRO AKTIV',
     loading: 'TRANSAKTION LÄUFT...',
     measureGuide1: '1. Stellen Sie sich in Socken mit gleichmäßig verteiltem Gewicht auf ein Blatt Papier.',
-    measureGuide2: '2. Markieren Sie Ferse und längsten Zeh mit exakt senkrecht gehaltenem Stift (90°).',
-    measureGuide3: '3. Messen Sie für die Schuhweite den Ballenumfang (M1–M5) mit einem Maßband.',
-    measureTip: 'Messen Sie am späten Nachmittag — Füße dehnen sich tagsüber um 2–3 mm aus.',
+    measureGuide2: '2. Markieren Sie Ferse und längsten Zeh mit senkrechtem Stift (90°) — das ist Ihre Fußlänge (z. B. 270 mm).',
+    measureGuide3: '3. WICHTIG: In Größe EU 42.5 (für 270 mm Fuß) ist die Innensohlen-Zugabe (+12…15 mm, also 282–285 mm Sohle) BEREITS ENTHALTEN!',
+    measureTip: 'Wenn Sie eine herausgenommene Innensohle gemessen haben, schalten Sie oben auf „Innensohle“ um.',
     disclaimer: 'Berechnung exakt nach ISO 19407:2023 und ISO 9407 (Mondopoint in mm).',
     standardsNote: 'Ballenweite nach JIS S 5037 · EU-Schuhweite E–K · US Brannock · DSTU / GOST.',
     openInTelegramErr: 'Bitte öffnen Sie die Mini-App in Telegram für Stars-Zahlungen.',
@@ -308,19 +375,25 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
   en: {
     back: 'Back',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Foot Length Scale',
+    modeFoot: 'By Foot',
+    modeInsole: 'By Insole',
+    footLengthLabel: 'Foot Length',
+    insoleInputLabel: 'Insole Length',
+    yourSizeLabel: 'Your Size',
+    builtInAllowanceHint: 'Do not add insole on slider: inside size',
+    winterShiftBadge: 'with allowance',
     men: 'Men',
     women: 'Women',
     kids: 'Kids',
     cmLabel: 'cm',
     mmLabel: 'mm',
-    insoleLabel: 'Insole',
-    allowanceLabel: 'Allowance',
+    insoleLabel: 'Internal Insole',
+    allowanceLabel: 'Toe Box Space',
     widthLabel: 'Ball Width',
     girthLabel: 'Ball Girth',
-    zoneGirth: 'Girth M1–M5',
-    zoneArch: 'Width M1–M5',
-    zoneInsole: 'Insole',
+    xrayFootTag: 'Foot',
+    xrayInsoleTag: 'Insole',
+    xrayBallTag: 'Girth M1–M5',
     subParisPoint: 'Paris Point (2/3 cm)',
     subDstuMetric: 'DSTU · Metric (cm)',
     subBrannock: 'US Brannock',
@@ -348,9 +421,9 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     proActiveBadge: 'PRO ACTIVE',
     loading: 'VERIFYING...',
     measureGuide1: '1. Stand on a sheet of paper in socks with weight evenly distributed on both feet.',
-    measureGuide2: '2. Mark the back of the heel and tip of the longest toe keeping the pen vertical (90°).',
-    measureGuide3: '3. Measure forefoot ball girth (M1–M5) with a tape measure around the widest joints.',
-    measureTip: 'Measure in the evening — feet naturally expand by 2–3 mm during the day.',
+    measureGuide2: '2. Mark the heel and longest toe with a vertical pen (90°) — this is your foot length (e.g. 270 mm).',
+    measureGuide3: '3. IMPORTANT: Size EU 42.5 (for a 270 mm foot) ALREADY has +12…15 mm insole space built-in (282–285 mm insole). Never enter insole length in "By Foot" mode!',
+    measureTip: 'If you measured a removable shoe insole with a ruler, switch the top mode to "By Insole".',
     disclaimer: 'Calculated per ISO 19407:2023 and ISO 9407 (Mondopoint in mm).',
     standardsNote: 'Forefoot width & girth per JIS S 5037 · EU E–K · US Brannock · DSTU.',
     openInTelegramErr: 'Please open the Mini App inside Telegram to pay with Stars.',
@@ -360,7 +433,7 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
 }
 
 export const FlagEU: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#003399" />
     <g fill="#FFCC00">
       {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
@@ -372,14 +445,14 @@ export const FlagEU: React.FC = () => (
 )
 
 export const FlagUA: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="6" fill="#0057B7" />
     <rect y="6" width="18" height="6" fill="#FFD700" />
   </svg>
 )
 
 export const FlagUK: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#012169" />
     <path d="M0 0 L18 12 M18 0 L0 12" stroke="#fff" strokeWidth="2" />
     <path d="M0 0 L18 12 M18 0 L0 12" stroke="#C8102E" strokeWidth="1" />
@@ -389,7 +462,7 @@ export const FlagUK: React.FC = () => (
 )
 
 export const FlagUS: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#B22234" />
     <rect y="1.33" width="18" height="1.33" fill="#fff" />
     <rect y="4" width="18" height="1.33" fill="#fff" />
@@ -400,14 +473,14 @@ export const FlagUS: React.FC = () => (
 )
 
 export const FlagJP: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
     <rect width="18" height="12" fill="#FFFFFF" />
     <circle cx="9" cy="6" r="3.4" fill="#BC002D" />
   </svg>
 )
 
 export const FlagCN: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#DE2910" />
     <circle cx="3.8" cy="3.6" r="1.4" fill="#FFDE00" />
     <circle cx="6.5" cy="1.8" r="0.45" fill="#FFDE00" />
@@ -418,7 +491,7 @@ export const FlagCN: React.FC = () => (
 )
 
 export const FlagKR: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
     <rect width="18" height="12" fill="#FFFFFF" />
     <circle cx="9" cy="6" r="2.8" fill="#CD2E3A" />
     <path d="M6.2 6 A2.8 2.8 0 0 0 11.8 6 A1.4 1.4 0 0 1 9 6 A1.4 1.4 0 0 0 6.2 6 Z" fill="#0047A0" />
@@ -426,7 +499,7 @@ export const FlagKR: React.FC = () => (
 )
 
 export const FlagBR: React.FC = () => (
-  <svg width="16" height="11" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#009739" />
     <polygon points="9,1.4 16.2,6 9,10.6 1.8,6" fill="#FEDD00" />
     <circle cx="9" cy="6" r="2.2" fill="#012169" />
@@ -434,9 +507,8 @@ export const FlagBR: React.FC = () => (
 )
 
 export const LockIcon: React.FC = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0110 0v4" />
   </svg>
 )
-
