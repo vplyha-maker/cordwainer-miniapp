@@ -533,7 +533,9 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   eyestays: 'eyestays',
   eye_stay: 'eyestays',
   heel_counter: 'heel',
+  heelcounter: 'heel',
   heel_wrap: 'heel',
+  swoosh: 'swoosh',
   heel_lining: 'lining',
   collar_lining: 'lining',
   collar: 'collar',
@@ -1610,9 +1612,33 @@ function bindGlbMaterialsPreservingTextures(
       mesh.material = clonedMat
       registry[zone].push(clonedMat)
     } else if (hasMeshVertexColor) {
+      // В sneaker_modular.glb 4K-фактура замши, сетки и швов запечена в атрибут COLOR_0 (средняя яркость ~173..217/255).
+      // Мягко нормализуем кривую COLOR_0, чтобы сохранить микрорельеф швов без потери яркости чистых цветов Иттена.
+      const colorAttr = mesh.geometry.attributes.color
+      if (colorAttr && !mesh.geometry.userData?.colorNormalized) {
+        const count = colorAttr.count
+        for (let idx = 0; idx < count; idx++) {
+          const r = colorAttr.getX(idx)
+          const g = colorAttr.getY(idx)
+          const b = colorAttr.getZ(idx)
+          // Подтягиваем светлые участки замши к 1.0, сохраняя глубокие тени в швах и перфорации
+          const lift = (v: number) => Math.min(1, Math.pow(Math.max(0, v), 0.55) * 1.06)
+          colorAttr.setXYZ(idx, lift(r), lift(g), lift(b))
+        }
+        colorAttr.needsUpdate = true
+        mesh.geometry.userData = { ...mesh.geometry.userData, colorNormalized: true }
+      }
+
       const vcMat = baseMats[zone].clone()
       vcMat.color = new THREE.Color(currentColors[zone])
       vcMat.vertexColors = true
+      if (srcStd) {
+        vcMat.side = srcStd.side ?? THREE.DoubleSide
+        if (typeof srcStd.roughness === 'number') vcMat.roughness = srcStd.roughness
+        if (typeof srcStd.metalness === 'number') vcMat.metalness = srcStd.metalness
+      } else {
+        vcMat.side = THREE.DoubleSide
+      }
       vcMat.needsUpdate = true
       mesh.material = vcMat
       registry[zone].push(vcMat)
