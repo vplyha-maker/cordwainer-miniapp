@@ -1,3 +1,4 @@
+```react
 import React, {
   useState,
   useEffect,
@@ -451,7 +452,7 @@ export function mapPaletteToFootwear(
         vamp: mainColor,
         toeBox: secondaryColor,
         quarters: accentColor,
-        eyestays: secondaryColor,
+        eyestays: accentColor,
         heel: mainColor,
         collar: tertiaryColor,
         tongue: secondaryColor,
@@ -466,11 +467,11 @@ export function mapPaletteToFootwear(
       return {
         vamp: mainColor,
         heel: mainColor,
-        eyestays: mainColor,
+        eyestays: secondaryColor,
         quarters: secondaryColor,
         toeBox: secondaryColor,
         tongue: secondaryColor,
-        collar: colors.length > 3 ? colors[2] : secondaryColor,
+        collar: colors.length > 3 ? colors[2] : tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
@@ -483,15 +484,15 @@ export function mapPaletteToFootwear(
       return {
         vamp: mainColor,
         heel: mainColor,
-        eyestays: mainColor,
+        eyestays: secondaryColor,
         quarters: secondaryColor,
         toeBox: secondaryColor,
         tongue: secondaryColor,
-        collar: colors.length > 3 ? colors[2] : secondaryColor,
+        collar: colors.length > 3 ? colors[2] : tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
-        encap: neutralEncap,
+        encap: accentColor,
         outsole: accentColor,
         laces: neutralLaces,
       }
@@ -519,6 +520,55 @@ type SneakerMaterials = {
 }
 
 const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
+  // Новая 16-материальная / 21-мешевая студийная модель кроссовка с ремнём и капсулой Air
+  sock_upper_0: 'vamp',
+  sock_sock_upper_0: 'vamp',
+  upper: 'vamp',
+  sock_001_material_018_0: 'toeBox',
+  sock_001: 'toeBox',
+  sock_006_material_018_0: 'quarters',
+  sock_006: 'quarters',
+  sock_007_material_015_0: 'heel',
+  material_015: 'heel',
+  sole_004_material_006_0: 'heel',
+  sole_004: 'heel',
+  sock_007_material_003_0: 'collar',
+  material_003: 'collar',
+  sock_008_material_021_0: 'collar',
+  sock_008: 'collar',
+  material_021: 'collar',
+  sock_005_material_016_0: 'collar',
+  sock_005: 'collar',
+  material_016: 'collar',
+  sole_005_material_020_0: 'eyestays',
+  material_020: 'eyestays',
+  sole_005_material_005_0: 'laces',
+  material_005: 'laces',
+  cube_002_material_024_0: 'laces',
+  cube_002: 'laces',
+  material_024: 'laces',
+  sock_002_material_025_0: 'swoosh',
+  sock_002: 'swoosh',
+  material_025: 'swoosh',
+  sole_006_material_008_0: 'swoosh',
+  sole_006: 'swoosh',
+  cube_material_008_0: 'tongue',
+  plane_001_material_008_0: 'tongue',
+  plane_001: 'tongue',
+  plane_002__0: 'tongue',
+  plane_002: 'tongue',
+  sock_003_material_017_0: 'lining',
+  sock_003: 'lining',
+  material_017: 'lining',
+  bubble_material_006_0: 'encap',
+  bubble: 'encap',
+  sole_cushy_0: 'midsole',
+  cushy: 'midsole',
+  sole_001_material_007_0: 'outsole',
+  sole_001: 'outsole',
+  material_007: 'outsole',
+
+  // Классические ключи NB 574 и универсальных моделей
   upper_vamp: 'vamp',
   vamp: 'vamp',
   mudguard: 'vamp',
@@ -535,7 +585,6 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   heel_counter: 'heel',
   heelcounter: 'heel',
   heel_wrap: 'heel',
-  swoosh: 'swoosh',
   heel_lining: 'lining',
   collar_lining: 'lining',
   collar: 'collar',
@@ -549,6 +598,7 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   laces: 'laces',
   n_logo: 'swoosh',
   logo_n: 'swoosh',
+  swoosh: 'swoosh',
   heel_tab: 'swoosh',
   backtab: 'swoosh',
   encap: 'encap',
@@ -563,8 +613,9 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
 }
 
 /**
- * ИСПРАВЛЕНО (AUDIT-09): Приоритетный порядок проверки специфичных подстрок
- * (lining и mid_sole проверяются раньше общих heel, collar и sole).
+ * Распознаёт конструктивную зону меша GLB по имени узла, родительского узла и материала.
+ * Полностью поддерживает как новую 16-материальную модель (sock.*, sole.*, BUBBLE, Cube, Plane),
+ * так и классическую именованную схему.
  */
 export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   const normalized = rawName.trim().toLowerCase().replace(/[\s.-]+/g, '_')
@@ -572,6 +623,50 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   if (GLB_EXPLICIT_ZONE_MAP[normalized]) {
     return GLB_EXPLICIT_ZONE_MAP[normalized]
   }
+
+  // Точные правила для узлов новой 16-материальной модели (чтобы sole.005 / sole.006 / sole_cushy не попадали в общую 'sole')
+  if (normalized.includes('sock_upper')) return 'vamp'
+  if (normalized.includes('sock_001')) return 'toeBox'
+  if (normalized.includes('sock_006')) return 'quarters'
+  if (normalized.includes('sock_007_material_015') || normalized.includes('material_015')) return 'heel'
+  if (
+    normalized.includes('sock_007_material_003') ||
+    normalized.includes('sock_008') ||
+    normalized.includes('sock_005')
+  ) {
+    return 'collar'
+  }
+  if (normalized.includes('sole_005_material_020') || normalized.includes('material_020')) {
+    return 'eyestays'
+  }
+  if (
+    normalized.includes('sole_005_material_005') ||
+    normalized.includes('cube_002') ||
+    normalized.includes('material_024')
+  ) {
+    return 'laces'
+  }
+  if (
+    normalized.includes('sock_002') ||
+    normalized.includes('sole_006') ||
+    normalized.includes('material_025')
+  ) {
+    return 'swoosh'
+  }
+  if (normalized.includes('sole_004')) return 'heel'
+  if (
+    normalized.includes('plane_001') ||
+    normalized.includes('plane_002') ||
+    normalized.includes('cube_material_008')
+  ) {
+    return 'tongue'
+  }
+  if (normalized.includes('sock_003') || normalized.includes('material_017')) return 'lining'
+  if (normalized.includes('bubble')) return 'encap'
+  if (normalized.includes('sole_cushy') || normalized.includes('cushy')) return 'midsole'
+  if (normalized.includes('sole_001') || normalized.includes('material_007')) return 'outsole'
+
+  // Приоритетный порядок для остальных моделей (AUDIT-09)
   if (
     normalized.includes('lining') ||
     normalized.includes('insole') ||
@@ -603,7 +698,9 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   ) {
     return 'outsole'
   }
-  if (normalized.includes('eyestay') || normalized.includes('eye_stay')) return 'eyestays'
+  if (normalized.includes('eyestay') || normalized.includes('eye_stay') || normalized.includes('strap')) {
+    return 'eyestays'
+  }
   if (normalized.includes('toe')) return 'toeBox'
   if (normalized.includes('vamp') || normalized.includes('mudguard')) return 'vamp'
   if (normalized.includes('quarter') || normalized.includes('saddle')) return 'quarters'
@@ -1704,8 +1801,12 @@ function bindGlbMaterialsPreservingTextures(
     if (!mesh.isMesh) return
 
     const rawMat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material
-    const candidateName = mesh.name || rawMat?.name || ''
-    const zone = resolveGlbZone(candidateName)
+    const parentName = mesh.parent && mesh.parent.name !== 'RootNode' ? mesh.parent.name : ''
+    const candidateName = mesh.name || parentName || rawMat?.name || ''
+    const zone =
+      resolveGlbZone(mesh.name || '') ??
+      resolveGlbZone(`${parentName}_${mesh.name}_${rawMat?.name || ''}`) ??
+      resolveGlbZone(rawMat?.name || '')
 
     if (!zone) {
       console.warn(
@@ -1971,8 +2072,10 @@ export function Sneaker3D({
           }),
           encap: new THREE.MeshStandardMaterial({
             color: new THREE.Color(currentColors.encap),
-            roughness: 0.42,
-            metalness: 0.06,
+            roughness: 0.22,
+            metalness: 0.08,
+            transparent: true,
+            opacity: 0.9,
           }),
           outsole: new THREE.MeshStandardMaterial({
             color: new THREE.Color(currentColors.outsole),
@@ -2146,12 +2249,20 @@ export function Sneaker3D({
                     registry,
                     latestColorsRef.current
                   )
-                  gltf.scene.position.sub(center)
-                  const scale = 2.74 / maxDim
+                  const scale = 2.68 / maxDim
                   gltf.scene.scale.setScalar(scale)
                   gltf.scene.rotation.y = Math.PI * 0.5
+                  gltf.scene.updateMatrixWorld(true)
+                  const scaledBox = new THREE.Box3().setFromObject(gltf.scene)
+                  const scaledCenter = new THREE.Vector3()
+                  scaledBox.getCenter(scaledCenter)
+                  gltf.scene.position.sub(scaledCenter)
+                  gltf.scene.position.y += 0.04
+                  const minY = scaledBox.min.y - scaledCenter.y + 0.04
+                  shadowPlane.position.y = Math.min(-0.42, minY - 0.015)
                   pivotGroup.add(gltf.scene)
                   applyColorsToRegistry(latestColorsRef.current)
+                  renderSingleFrame()
                 } else {
                   disposeObject3DResources(gltf.scene)
                 }
@@ -2392,35 +2503,35 @@ const TRANSLATIONS = {
     secondary20: '20%',
     secondary15: '15%',
     // Роли свотчей по пресетам (AUDIT-05)
-    roleClassicUpper: 'Обвод • Пятка • Планка',
-    roleClassicDetailsAll: 'Берцы • Мысок • Воротник',
-    roleClassicDetails: 'Берцы • Мысок • Язычок',
-    roleClassicLining: 'Воротник • Подкладка',
-    roleClassicAccent: 'Протектор • Лого N',
-    roleToeMain: 'Мысок • Планка • ENCAP',
-    roleToeSecondary: 'Обвод • Берцы',
-    roleToeLining: 'Воротник • Подкладка',
-    roleToeAccent: 'Пятка • Лого N • Протектор',
-    roleSplitMain: 'Обвод • Пятка • Лого N',
-    roleSplitSecondary: 'Мысок • Планка • ENCAP',
-    roleSplitLining: 'Воротник • Подкладка',
-    roleSplitAccent: 'Боковые берцы (Saddle)',
-    roleNeutralAccent: 'Лого N • Задний хлястик',
+    roleClassicUpper: 'Верх • Щиток пятки',
+    roleClassicDetailsAll: 'Обвод • Волна • Ремень',
+    roleClassicDetails: 'Обвод • Волна • Ремень',
+    roleClassicLining: 'Канты • Подкладка',
+    roleClassicAccent: 'Протектор • Штрихи • Air',
+    roleToeMain: 'Обвод • Ремень • Air',
+    roleToeSecondary: 'Верх • Боковая волна',
+    roleToeLining: 'Канты • Подкладка',
+    roleToeAccent: 'Пятка • Штрихи • Протектор',
+    roleSplitMain: 'Верх • Пятка • Штрихи',
+    roleSplitSecondary: 'Обвод • Язычок • Air',
+    roleSplitLining: 'Канты • Подкладка',
+    roleSplitAccent: 'Ремень • Боковая волна',
+    roleNeutralAccent: 'Штрихи • Задняя петля',
     // Названия всех 13 зон для технологической спецификации
     specTitle: 'Техкарта зон (нажмите для копирования HEX):',
-    zone_vamp: 'Обвод',
-    zone_toeBox: 'Мысок',
-    zone_quarters: 'Берцы',
-    zone_eyestays: 'Планка',
+    zone_vamp: 'Верх',
+    zone_toeBox: 'Обвод',
+    zone_quarters: 'Волна',
+    zone_eyestays: 'Ремень',
     zone_heel: 'Пятка',
-    zone_collar: 'Воротник',
+    zone_collar: 'Канты',
     zone_tongue: 'Язычок',
     zone_lining: 'Подкладка',
-    zone_swoosh: 'Лого N',
+    zone_swoosh: 'Штрихи',
     zone_midsole: 'EVA база',
-    zone_encap: 'ENCAP',
+    zone_encap: 'Air блок',
     zone_outsole: 'Протектор',
-    zone_laces: 'Шнурки',
+    zone_laces: 'Пряжка',
     quote: '«Цвет — это душа обуви.»',
     white: 'Белила (Tint)',
     black: 'Тень (Shade)',
