@@ -1,17 +1,17 @@
 /**
  * src/lib/shoeSizes.ts
- * Единственный источник истины: конвертация размеров и расчёт колодки/полноты
- * на основе официальных таблиц:
+ * Официальное ядро конвертации размеров и биометрии обувной колодки:
  * - ГОСТ Р 57425-2017 (ISO/TS 19407:2015) / ISO 19407:2023 (Таблицы 1, 2, 3)
  * - ISO 9407:2019 (Mondopoint, шаг 5 мм)
- * - JIS S 5037:1998 (Япония: таблицы 足長 / 足囲 / 足幅)
- * - ГОСТ 3927-88 / ГОСТ 11373-88 (Интервал полноты 8 мм обхвата в пучках)
+ * - JIS S 5037:1998 (Япония: таблицы обхвата 足囲 и ширины пучков 足幅)
+ * - ГОСТ 3927-88 / ГОСТ 11373-88 (интервал полноты 8 мм обхвата)
  * - US Brannock Device & Континентальная шкала полноты E–F–G–H–K
  */
 
 export type Gender = 'men' | 'women' | 'kids'
 export type ShoeStyle = 'sneakers' | 'classic' | 'winter' | 'running' | 'sandals'
 export type WidthFit = 'narrow' | 'standard' | 'wide' | 'extraWide'
+export type MeasureMode = 'foot' | 'insole'
 
 export interface AdultIsoRow {
   mm: number
@@ -75,11 +75,15 @@ export interface BrandFitEntry {
 }
 
 export interface ProFitResult {
+  footMm: number
+  footCm: number
   insoleMm: number
   insoleCm: number
   lastTraceMm: number
   isoLastRangeMm: [number, number]
   allowanceMm: number
+  styleSizeShiftEu: number
+  recommendedSize: SizeResult
   ballWidthMm: number
   ballGirthMm: number
   widthMarks: WidthMarks
@@ -145,17 +149,10 @@ export const KIDS_TABLE: ReadonlyArray<KidsIsoRow> = [
   { mm: 235, eu: 38.0, uk: 5.0, us: 5.5, jp: 23.5, lastMinMm: 253, lastMaxMm: 259 },
 ]
 
-/**
- * Округление до шага Mondopoint 5 мм (ISO 9407 Группа 1)
- */
 export function toMondopoint(mm: number): number {
   return Math.round(mm / 5) * 5
 }
 
-/**
- * Поиск ближайшей строки таблицы ISO.
- * При равной разнице выбирается больший размер (согласно Примечанию к Таблице 2 ГОСТ Р 57425-2017).
- */
 function findClosest<T extends { mm: number }>(table: ReadonlyArray<T>, mm: number): T {
   let best = table[0]
   let bestDiff = Math.abs(mm - best.mm)
@@ -169,9 +166,6 @@ function findClosest<T extends { mm: number }>(table: ReadonlyArray<T>, mm: numb
   return best
 }
 
-/**
- * Конвертация длины стопы в 8 мировых систем (ISO 19407:2023 / ГОСТ Р 57425-2017)
- */
 export function convertShoeSize(footMm: number, gender: Gender): SizeResult {
   const mm = Math.max(115, Math.min(330, footMm))
   const mondopoint = toMondopoint(mm)
@@ -221,8 +215,11 @@ export function convertShoeSize(footMm: number, gender: Gender): SizeResult {
 }
 
 /**
- * Функциональные припуски стельки и следа колодки по типу обуви (мм)
- * В рамках диапазона ГОСТ Р 57425-2017 Таблица 1 (от +7 до +19 мм)
+ * Припуски стельки и следа колодки по типу обуви (мм).
+ * ВАЖНО: В стандартный размер обуви (например EU 42.5 для стопы 270 мм)
+ * УЖЕ заложен базовый припуск стельки +12 мм (стелька ~282 мм).
+ * Только когда требуемый запас превышает базовый (Зима/Мех +15 мм, Бег +13 мм + широкая стопа),
+ * рекомендуемый размер к покупке сдвигается на +0.5 размера (например с 42.5 до 43), а НЕ на 2 размера!
  */
 export const STYLE_ALLOWANCES: Record<
   ShoeStyle,
@@ -235,15 +232,6 @@ export const STYLE_ALLOWANCES: Record<
   sandals: { insoleAddMm: 6, lastTraceAddMm: 8 },
 }
 
-/**
- * Реальные соответствия полнот между системами:
- * - EU (Континентальная WMS / Schuhweite): E/F (узкая), G (стандарт), H (широкая), K (экстра-широкая)
- * - US (Brannock): Men B -> D -> E/2E -> 3E/4E | Women 2A -> B -> D -> 2E
- * - UK: D/E -> F (стандарт) -> G -> H
- * - JP (JIS S 5037): Men D -> E/2E -> 3E -> 4E/F | Women C/D -> E -> 2E/3E -> 4E
- * - ГОСТ 3927-88 / 11373-88: 5 (узкая) -> 6 (средняя) -> 8 (широкая) -> 9 (очень широкая)
- * - CN (GB/T 3293.1): 1.5 -> 2.0 -> 2.5 -> 3.0
- */
 export function getWidthMarks(widthFit: WidthFit, gender: Gender): WidthMarks {
   const map: Record<WidthFit, WidthMarks> = {
     narrow: {
@@ -282,15 +270,6 @@ export function getWidthMarks(widthFit: WidthFit, gender: Gender): WidthMarks {
   return map[widthFit]
 }
 
-/**
- * Расчёт обхвата пучков (ballGirthMm) и ширины пучков (ballWidthMm)
- * строго по таблицам JIS S 5037:1998 и ГОСТ 3927-88:
- * - Прирост обхвата составляет ровно +3 мм на каждые +5 мм длины стопы (0.6 мм/мм).
- * - Шаг между смежными градациями полноты в JIS S 5037 составляет ровно 6 мм обхвата (в ГОСТ — 8 мм).
- * - Опорная точка для мужской стопы 265 мм (JIS 2E / ГОСТ 6-7): обхват 255 мм, ширина 104 мм.
- * - Опорная точка для женской стопы 240 мм (JIS E / ГОСТ 6): обхват 234 мм, ширина 96 мм.
- * - Опорная точка для детской стопы 170 мм (JIS E): обхват 168 мм, ширина 68 мм.
- */
 export function computeStandardBallMetrics(
   footMm: number,
   gender: Gender,
@@ -306,7 +285,7 @@ export function computeStandardBallMetrics(
           : 2
 
   if (gender === 'men') {
-    const baseGirthAt265 = 254 // ГОСТ 3927-88 полнота 6 (251 мм) / JIS E-2E (252–258 мм)
+    const baseGirthAt265 = 254
     const baseWidthAt265 = 103
     const deltaLength = footMm - 265
     const ballGirthMm = Math.round(baseGirthAt265 + deltaLength * 0.6 + gradeStep * 6)
@@ -315,7 +294,7 @@ export function computeStandardBallMetrics(
   }
 
   if (gender === 'women') {
-    const baseGirthAt240 = 234 // JIS S 5037 Women 24.0 cm E: 足囲 234 mm, 足幅 96 mm
+    const baseGirthAt240 = 234
     const baseWidthAt240 = 96
     const deltaLength = footMm - 240
     const ballGirthMm = Math.round(baseGirthAt240 + deltaLength * 0.6 + gradeStep * 6)
@@ -323,7 +302,6 @@ export function computeStandardBallMetrics(
     return { ballGirthMm, ballWidthMm }
   }
 
-  // Дети (JIS S 5037 Kids 17.0 cm E: 足囲 168 mm, 足幅 68 mm; прирост 4 мм обхвата на 5 мм длины)
   const baseGirthAt170 = 168
   const baseWidthAt170 = 68
   const deltaLength = footMm - 170
@@ -333,7 +311,7 @@ export function computeStandardBallMetrics(
 }
 
 /**
- * PRO-калькулятор параметров колодки, полноты и посадки брендов
+ * Полный расчёт посадки, стельки и рекомендуемого размера с учётом сезона (Зима/Мех, Бег) и полноты
  */
 export function calculateProFit(
   footMm: number,
@@ -346,19 +324,34 @@ export function calculateProFit(
 
   const widthLengthCompMm =
     widthFit === 'wide'
-      ? style === 'classic' || style === 'running'
-        ? 2
-        : 1
+      ? 1
       : widthFit === 'extraWide'
-        ? style === 'classic' || style === 'running'
-          ? 4
-          : 2
+        ? 3
         : 0
 
   const totalAllowanceMm = allowance.insoleAddMm + widthLengthCompMm
   const insoleMm = Math.round(footMm + totalAllowanceMm)
   const insoleCm = Math.round(insoleMm) / 10
   const lastTraceMm = Math.round(footMm + allowance.lastTraceAddMm + widthLengthCompMm)
+
+  // Базовый стандарт ISO 19407 уже включает ~11–12 мм припуска внутри обычного размера.
+  // Если выбран зимний мех (+15 мм) или широкая/экстра-широкая стопа, сдвигаем рекомендуемый размер максимум на +0.5 (или +1.0 для зимы + экстра-полноты).
+  let styleSizeShiftEu = 0
+  if (style === 'winter') {
+    styleSizeShiftEu += 0.5
+  } else if (style === 'running' && (widthFit === 'wide' || widthFit === 'extraWide')) {
+    styleSizeShiftEu += 0.5
+  }
+  if (widthFit === 'extraWide') {
+    styleSizeShiftEu += 0.5
+  } else if (widthFit === 'wide' && style === 'classic') {
+    styleSizeShiftEu += 0.5
+  }
+
+  // Эффективная длина стопы для подбора маркировки с учётом меха/полноты (шаг +3.5 мм = +0.5 размера)
+  const effectiveFootMm = footMm + (styleSizeShiftEu > 0 ? styleSizeShiftEu * 6.67 : 0)
+  const recommendedSize =
+    styleSizeShiftEu > 0 ? convertShoeSize(effectiveFootMm, gender) : baseSize
 
   const { ballGirthMm, ballWidthMm } = computeStandardBallMetrics(footMm, gender, widthFit)
   const widthMarks = getWidthMarks(widthFit, gender)
@@ -430,20 +423,24 @@ export function calculateProFit(
       uk: formatSize(baseSize.uk),
       jp: formatSize(baseSize.jp),
       offsetNote: {
-        ru: 'Классическая кожаная колодка по ISO 19407 (припуск +12 мм)',
-        uk: 'Класична шкіряна колодка за ISO 19407 (припуск +12 мм)',
-        de: 'Klassischer Rahmenleisten nach ISO 19407 (+12 mm Zugabe)',
-        en: 'Classic dress last per ISO 19407 (+12 mm allowance)',
+        ru: 'Классическая кожаная колодка по ISO 19407 (припуск +12 мм уже внутри)',
+        uk: 'Класична шкіряна колодка за ISO 19407 (припуск +12 мм уже всередині)',
+        de: 'Klassischer Rahmenleisten nach ISO 19407 (+12 mm Zugabe integriert)',
+        en: 'Classic dress last per ISO 19407 (+12 mm allowance built-in)',
       },
     },
   ]
 
   return {
+    footMm: Math.round(footMm),
+    footCm: Math.round(footMm) / 10,
     insoleMm,
     insoleCm,
     lastTraceMm,
     isoLastRangeMm: [baseSize.isoLastMinMm, baseSize.isoLastMaxMm],
     allowanceMm: totalAllowanceMm,
+    styleSizeShiftEu,
+    recommendedSize,
     ballWidthMm,
     ballGirthMm,
     widthMarks,
