@@ -1,13 +1,20 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { Lang } from '../App'
+import type { Lang as AppLang } from '../App'
+
+export type SupportedLang = 'ru' | 'uk' | 'de'
+
+export function normalizeSupportedLang(input: unknown): SupportedLang {
+  if (input === 'ru' || input === 'uk' || input === 'de') return input
+  return 'ru'
+}
 
 type StylesPageProps = {
   onBack: () => void
-  lang: Lang
+  lang: AppLang
 }
 
-type StyleSlide = {
+export type StyleSlide = {
   id: string
   video?: string
   poster?: string
@@ -18,114 +25,203 @@ type StyleSlide = {
   hideWatermark?: boolean
 }
 
+export type PaymentState =
+  | 'idle'
+  | 'creating_invoice'
+  | 'invoice_open'
+  | 'verifying_payment'
+  | 'purchased'
+  | 'failed'
+
+// Рыночная цена разового пожизненного доступа к AI-видео лукбуку (включая все будущие пополнения коллекции)
+// 350 Telegram Stars (~$6.99 USD) окупает генерацию ИИ-видео и CDN-трафик при марже сторов
+export const PRO_VIDEOS_PRICE_STARS = 350
+export const FREE_STYLES_COUNT = 3
+export const PREVIEW_TAG_COUNT = 4
+
 const PRO_STORAGE_KEY = 'cordwainer_pro_videos_unlocked'
 
-const getDeviceId = () => {
+type TelegramWebApp = {
+  initData?: string
+  initDataUnsafe?: { user?: { id?: number } }
+  HapticFeedback?: {
+    impactOccurred: (style: 'light' | 'medium' | 'heavy') => void
+    notificationOccurred: (type: 'error' | 'success' | 'warning') => void
+    selectionChanged: () => void
+  }
+  BackButton?: {
+    show: () => void
+    hide: () => void
+    onClick: (cb: () => void) => void
+    offClick: (cb: () => void) => void
+  }
+  ready: () => void
+  expand?: () => void
+  disableVerticalSwipes?: () => void
+  showAlert?: (message: string) => void
+  openTelegramLink?: (url: string) => void
+  openInvoice?: (link: string, cb: (status: string) => void) => void
+}
+
+function getTelegramWebApp(): TelegramWebApp | undefined {
+  try {
+    return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
+  } catch {
+    return undefined
+  }
+}
+
+const getDeviceId = (): string => {
   if (typeof window === 'undefined') return 'unknown'
-  const tg = (window as any).Telegram?.WebApp
+  const tg = getTelegramWebApp()
   const tgUserId = tg?.initDataUnsafe?.user?.id?.toString()
   if (tgUserId) return tgUserId
-  let deviceId = localStorage.getItem('cordwainer_device_id')
-  if (!deviceId) {
-    deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
-    localStorage.setItem('cordwainer_device_id', deviceId)
+  try {
+    let deviceId = localStorage.getItem('cordwainer_device_id')
+    if (!deviceId) {
+      deviceId = 'web_' + Math.random().toString(36).substring(2, 15)
+      localStorage.setItem('cordwainer_device_id', deviceId)
+    }
+    return deviceId
+  } catch {
+    return 'web_guest'
   }
-  return deviceId
 }
 
 /**
  * Точная проверка: запущено ли приложение реально внутри Telegram WebView,
- * а не просто открыто в Safari с подключенным скриптом telegram-web-app.js
+ * а не просто открыто в браузере с подключенным скриптом telegram-web-app.js
  */
 const isRunningInTelegram = (): boolean => {
   if (typeof window === 'undefined') return false
-  const tg = (window as any).Telegram?.WebApp
-  return Boolean(tg?.initData && tg.initData.length > 0)
+  const tg = getTelegramWebApp()
+  return Boolean(tg?.initData && tg.initData.length > 0 && tg?.initDataUnsafe?.user?.id)
 }
 
 const showTelegramAlert = (message: string) => {
-  const tg = (window as any).Telegram?.WebApp
+  const tg = getTelegramWebApp()
   if (isRunningInTelegram() && tg?.showAlert) {
-    tg.showAlert(message)
-  } else {
-    alert(message)
+    try {
+      tg.showAlert(message)
+      return
+    } catch {}
   }
+  alert(message)
 }
 
 const LockIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
     <path d="M7 11V7a5 5 0 0110 0v4"></path>
   </svg>
 )
 
-const UI_TEXT = {
-  ru: {
-    back: 'Назад',
-    aboutStyle: 'О фасоне',
-    hideDesc: 'Скрыть',
-    copied: 'Ссылка скопирована',
-    up: 'Наверх',
-    down: 'Вернуться',
-    moreStyles: '+ ещё 8 фасонов',
-    loadingVideo: 'Загрузка кадра...',
-    errTgOnly: 'Оплата через Telegram Stars доступна внутри приложения Telegram.',
-    errPayment: 'Оплата была отменена или не завершена.',
-    errServer: 'Ошибка соединения',
-    paywall: {
-      tag: 'ЗАКРЫТАЯ КОЛЛЕКЦИЯ • 12 ФАСОНОВ',
-      title: 'Полный\nЛукбук',
-      desc: 'Вы посмотрели 3 из 15 фасонов. Разблокируйте полный доступ ко всей видео-энциклопедии обуви навсегда.',
-      priceNote: 'Разовый платеж (10 ⭐️ за фасон) • Доступ навсегда',
-      btn: 'ОТКРЫТЬ ВСЕ 15 ФАСОНОВ • 150 ⭐️',
-      loading: 'ПОДГОТОВКА СЧЕТА...',
+/**
+ * Динамический генератор локализованных текстов (STYLE-010):
+ * автоматически подставляет актуальное число фасонов из STYLES_DATA и цену PRO_VIDEOS_PRICE_STARS,
+ * поэтому при добавлении новых ИИ-видео в массив тексты и счётчики обновляются сами.
+ */
+function getUiText(lang: SupportedLang, totalCount: number) {
+  const lockedCount = Math.max(0, totalCount - FREE_STYLES_COUNT)
+  const extraCount = Math.max(0, lockedCount - PREVIEW_TAG_COUNT)
+
+  const dict = {
+    ru: {
+      back: 'Назад',
+      aboutStyle: 'О фасоне',
+      hideDesc: 'Скрыть',
+      copied: 'Ссылка скопирована',
+      up: 'Наверх',
+      down: 'Вернуться',
+      moreStyles: `+ ещё ${extraCount} фасонов и новые AI-релизы`,
+      loadingVideo: 'Загрузка кадра...',
+      videoErrorRetry: 'Повтор загрузки...',
+      errTgOnly: 'Оплата через Telegram Stars доступна внутри приложения Telegram.',
+      errPayment: 'Оплата была отменена или не завершена.',
+      errVerifyFailed:
+        'Платёж ещё не подтверждён сервером. Подождите пару секунд и попробуйте снова.',
+      errPending: 'Платёж обрабатывается Telegram. Доступ откроется автоматически после подтверждения.',
+      errServer: 'Ошибка соединения',
+      paywall: {
+        tag: `ЗАКРЫТАЯ AI-КОЛЛЕКЦИЯ • +${lockedCount} ФАСОНОВ`,
+        title: 'Полный\nЛукбук',
+        desc: `Вы посмотрели ${FREE_STYLES_COUNT} из ${totalCount} фасонов. Разблокируйте полный доступ ко всей видео-энциклопедии обуви и всем будущим AI-пополнениям навсегда.`,
+        priceNote: `Разовый платёж • Все ${totalCount}+ фасонов и будущие обновления навсегда`,
+        btn: `ОТКРЫТЬ ВЕСЬ ЛУКБУК • ${PRO_VIDEOS_PRICE_STARS} ⭐️`,
+        loading: 'ПОДГОТОВКА СЧЕТА...',
+        verifying: 'ПРОВЕРКА ОПЛАТЫ...',
+      },
     },
-  },
-  uk: {
-    back: 'Назад',
-    aboutStyle: 'Про фасон',
-    hideDesc: 'Сховати',
-    copied: 'Посилання скопійовано',
-    up: 'Вгору',
-    down: 'Повернутися',
-    moreStyles: '+ ще 8 фасонів',
-    loadingVideo: 'Завантаження кадру...',
-    errTgOnly: 'Оплата через Telegram Stars доступна всередині додатку Telegram.',
-    errPayment: 'Оплату було скасовано або не завершено.',
-    errServer: 'Помилка з’єднання',
-    paywall: {
-      tag: 'ЗАКРИТА КОЛЕКЦІЯ • 12 ФАСОНІВ',
-      title: 'Повний\nЛукбук',
-      desc: 'Ви переглянули 3 з 15 фасонів. Розблокуйте повний доступ до всієї відео-енциклопедії взуття назавжди.',
-      priceNote: 'Разовий платіж (10 ⭐️ за фасон) • Доступ назавжди',
-      btn: 'ВІДКРИТИ ВСІ 15 ФАСОНІВ • 150 ⭐️',
-      loading: 'ПІДГОТОВКА РАХУНКУ...',
+    uk: {
+      back: 'Назад',
+      aboutStyle: 'Про фасон',
+      hideDesc: 'Сховати',
+      copied: 'Посилання скопійовано',
+      up: 'Вгору',
+      down: 'Повернутися',
+      moreStyles: `+ ще ${extraCount} фасонів та нові AI-релізи`,
+      loadingVideo: 'Завантаження кадру...',
+      videoErrorRetry: 'Повторне завантаження...',
+      errTgOnly: 'Оплата через Telegram Stars доступна всередині додатку Telegram.',
+      errPayment: 'Оплату було скасовано або не завершено.',
+      errVerifyFailed:
+        'Платіж ще не підтверджено сервером. Зачекайте кілька секунд і спробуйте знову.',
+      errPending:
+        'Платіж обробляється Telegram. Доступ відкриється автоматично після підтвердження.',
+      errServer: 'Помилка з’єднання',
+      paywall: {
+        tag: `ЗАКРИТА AI-КОЛЕКЦІЯ • +${lockedCount} ФАСОНІВ`,
+        title: 'Повний\nЛукбук',
+        desc: `Ви переглянули ${FREE_STYLES_COUNT} з ${totalCount} фасонів. Розблокуйте повний доступ до всієї відео-енциклопедії взуття та всіх майбутніх AI-поповнень назавжди.`,
+        priceNote: `Разовий платіж • Усі ${totalCount}+ фасонів та майбутні оновлення назавжди`,
+        btn: `ВІДКРИТИ ВЕСЬ ЛУКБУК • ${PRO_VIDEOS_PRICE_STARS} ⭐️`,
+        loading: 'ПІДГОТОВКА РАХУНКУ...',
+        verifying: 'ПЕРЕВІРКА ОПЛАТИ...',
+      },
     },
-  },
-  de: {
-    back: 'Zurück',
-    aboutStyle: 'Details',
-    hideDesc: 'Schließen',
-    copied: 'Link kopiert',
-    up: 'Nach oben',
-    down: 'Zurück',
-    moreStyles: '+ 8 weitere Stile',
-    loadingVideo: 'Video wird geladen...',
-    errTgOnly: 'Zahlung mit Telegram Stars ist nur in der Telegram-App verfügbar.',
-    errPayment: 'Zahlung wurde abgebrochen.',
-    errServer: 'Verbindungsfehler',
-    paywall: {
-      tag: 'EXKLUSIVE KOLLEKTION • 12 STILE',
-      title: 'Volles\nLookbook',
-      desc: 'Sie haben 3 von 15 Stilen gesehen. Schalten Sie den dauerhaften Zugang zur gesamten Video-Enzyklopädie frei.',
-      priceNote: 'Einmalige Zahlung (10 ⭐️ pro Stil) • Dauerhafter Zugang',
-      btn: 'ALLE 15 STILE FREISCHALTEN • 150 ⭐️',
-      loading: 'WIRD GELADEN...',
+    de: {
+      back: 'Zurück',
+      aboutStyle: 'Details',
+      hideDesc: 'Schließen',
+      copied: 'Link kopiert',
+      up: 'Nach oben',
+      down: 'Zurück',
+      moreStyles: `+ ${extraCount} weitere Stile & neue KI-Releases`,
+      loadingVideo: 'Video wird geladen...',
+      videoErrorRetry: 'Erneut versuchen...',
+      errTgOnly: 'Zahlung mit Telegram Stars ist nur in der Telegram-App verfügbar.',
+      errPayment: 'Zahlung wurde abgebrochen.',
+      errVerifyFailed:
+        'Zahlung noch nicht vom Server bestätigt. Bitte warten Sie kurz und versuchen Sie es erneut.',
+      errPending:
+        'Zahlung wird von Telegram verarbeitet. Der Zugang wird nach Bestätigung freigeschaltet.',
+      errServer: 'Verbindungsfehler',
+      paywall: {
+        tag: `EXKLUSIVE KI-KOLLEKTION • +${lockedCount} STILE`,
+        title: 'Volles\nLookbook',
+        desc: `Sie haben ${FREE_STYLES_COUNT} von ${totalCount} Stilen gesehen. Schalten Sie den dauerhaften Zugang zur gesamten Video-Enzyklopädie inklusive aller künftigen KI-Updates frei.`,
+        priceNote: `Einmalige Zahlung • Alle ${totalCount}+ Stile & künftige Updates dauerhaft`,
+        btn: `VOLLES LOOKBOOK FREISCHALTEN • ${PRO_VIDEOS_PRICE_STARS} ⭐️`,
+        loading: 'WIRD GELADEN...',
+        verifying: 'ZAHLUNG PRÜFEN...',
+      },
     },
-  },
+  }
+
+  return dict[lang] ?? dict.ru
 }
 
-const STYLES_DATA: StyleSlide[] = [
+export const STYLES_DATA: StyleSlide[] = [
   {
     id: 'botford',
     video: '/Fason/Botford.mp4',
@@ -189,7 +285,7 @@ const STYLES_DATA: StyleSlide[] = [
     subtitle: { ru: 'Свобода формы', uk: 'Свобода форми', de: 'Freiheit der Form' },
     desc: {
       ru: 'Знаковый скошенный каблук и характерный мыс. Идеальный баланс между эстетикой дикого запада и ритмом современного мегаполиса.',
-      uk: 'Знаковий скошений каблук та характерний мис. Ідеальний баланс між естетикою дикого заходу та ритмом сучасного мегаполіса.',
+      uk: 'Знаковий скошений каблук та характерний мис. Ідеальний баланс між естетикою дикого заходу та ритмом сучасного мегаполиса.',
       de: 'Ikonischer abgeschrägter Absatz und charakteristische Spitze. Die perfekte Balance zwischen der Ästhetik des Wilden Westens und dem Rhythmus der modernen Metropole.',
     },
   },
@@ -244,7 +340,7 @@ const STYLES_DATA: StyleSlide[] = [
     id: 'espadrilles',
     video: '/Fason/Espadrilles.mp4',
     title: { ru: 'Эспадрильи', uk: 'Еспадрильї', de: 'Espadrilles' },
-    subtitle: { ru: 'Средиземноморский шик', uk: 'Середземноморський шик', de: 'Mediterraner Chic' },
+    subtitle: { ru: 'Средиземноморский шик', uk: 'Средиземноморський шик', de: 'Mediterraner Chic' },
     desc: {
       ru: 'Культовая летняя база, сплетенная из натурального джута. Воплощение расслабленного шика и абсолютной свободы, идеально дополняющее легкие льняные образы.',
       uk: 'Культова літня база, сплетена з натурального джуту. Втілення розслабленого шику та абсолютної свободи, що ідеально доповнює легкі лляні образи.',
@@ -301,7 +397,7 @@ const STYLES_DATA: StyleSlide[] = [
 
 type SlideItemProps = {
   slide: StyleSlide
-  lang: 'ru' | 'uk' | 'de'
+  lang: SupportedLang
   index: number
   totalCount: number
   isActive: boolean
@@ -309,6 +405,7 @@ type SlideItemProps = {
   shouldKeepInMemory: boolean
   isMuted: boolean
   onToggleMute: () => void
+  onForceMuteSync: () => void
   onShowToast: (msg: string) => void
   onActiveVideoReady: (index: number) => void
 }
@@ -325,89 +422,159 @@ function SlideItem({
   shouldKeepInMemory,
   isMuted,
   onToggleMute,
+  onForceMuteSync,
   onShowToast,
   onActiveVideoReady,
 }: SlideItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hasFetchedLikesRef = useRef(false)
   const tapTimeoutRef = useRef<number | null>(null)
+  const heartBurstTimeoutRef = useRef<number | null>(null)
+  const likeAbortRef = useRef<AbortController | null>(null)
+  const isLikeInFlightRef = useRef(false)
 
   const [isLiked, setIsLiked] = useState(false)
+  const isLikedRef = useRef(false)
+  isLikedRef.current = isLiked
+
   const [likesCount, setLikesCount] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [isDescOpen, setIsDescOpen] = useState(false)
   const [isVideoLoaded, setIsVideoLoaded] = useState(false)
+  const [hasVideoError, setHasVideoError] = useState(false)
   const [heartBurst, setHeartBurst] = useState<{ id: number; x: number; y: number } | null>(null)
 
   const userId = getDeviceId()
-  const tg = (window as any).Telegram?.WebApp
-  const t = UI_TEXT[lang]
+  const tg = getTelegramWebApp()
+  const t = useMemo(() => getUiText(lang, totalCount), [lang, totalCount])
 
-  // Отложенная загрузка лайков: не конкурируем с первым кадром видео на старте
+  // ИСПРАВЛЕНО (STYLE-007): Гарантированная очистка всех таймеров и AbortController при размонтировании
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current !== null) {
+        window.clearTimeout(tapTimeoutRef.current)
+        tapTimeoutRef.current = null
+      }
+      if (heartBurstTimeoutRef.current !== null) {
+        window.clearTimeout(heartBurstTimeoutRef.current)
+        heartBurstTimeoutRef.current = null
+      }
+      likeAbortRef.current?.abort()
+    }
+  }, [])
+
+  // ИСПРАВЛЕНО (STYLE-009): Прямая синхронизация DOM-свойства muted на элементе <video> для iOS WebKit
+  useEffect(() => {
+    const video = videoRef.current
+    if (video) {
+      video.muted = isMuted
+    }
+  }, [isMuted])
+
+  // Отложенная загрузка лайков с AbortController
   useEffect(() => {
     if (!shouldLoadVideo || hasFetchedLikesRef.current) return
-    let mounted = true
+    const controller = new AbortController()
 
     const timer = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`)
-        if (res.ok && mounted) {
-          const data = await res.json()
-          setLikesCount(data.total || 0)
-          setIsLiked(!!data.isLiked)
+        const rawInitData = tg?.initData || ''
+        const res = await fetch(
+          `/api/like?style_id=${encodeURIComponent(slide.id)}&user_id=${encodeURIComponent(userId)}`,
+          {
+            signal: controller.signal,
+            headers: rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : undefined,
+          }
+        )
+        if (res.ok && !controller.signal.aborted) {
+          const data = (await res.json()) as { total?: number; isLiked?: boolean }
+          setLikesCount(Math.max(0, Number(data.total) || 0))
+          setIsLiked(Boolean(data.isLiked))
           hasFetchedLikesRef.current = true
         }
       } catch {}
     }, isActive ? 350 : 800)
 
     return () => {
-      mounted = false
       window.clearTimeout(timer)
+      controller.abort()
     }
-  }, [slide.id, userId, shouldLoadVideo, isActive])
+  }, [slide.id, userId, shouldLoadVideo, isActive, tg?.initData])
 
-  // Управление буфером по паттерну TikTok / YouTube Shorts:
-  // Загружаем строго по очереди, но НЕ удаляем уже скачанный буфер у соседних 3 слайдов
+  // ИСПРАВЛЕНО (STYLE-003, STYLE-004, STYLE-005):
+  // Последовательная загрузка видео, выгрузка буферов за пределами соседних слайдов
+  // и автовосстановление после сбоя сети (online event)
+  const syncAndPlayActiveVideo = useCallback(() => {
+    const video = videoRef.current
+    if (!video || !isActive) return
+    if (video.readyState >= 2) {
+      setIsVideoLoaded(true)
+      onActiveVideoReady(index)
+    }
+    setIsPaused(false)
+    const playPromise = video.play()
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Если Safari / iOS заблокировал автоплей со звуком — включаем muted и синхронизируем родительский стейт (STYLE-009)
+        video.muted = true
+        onForceMuteSync()
+        video.play().catch(() => {})
+      })
+    }
+  }, [isActive, index, onActiveVideoReady, onForceMuteSync])
+
   useEffect(() => {
     const video = videoRef.current
     if (!video || !slide.video) return
 
-    // Якорь #t=0.001 заставляет Safari на iOS моментально декодировать 1-й кадр как постер
     const targetSrc = slide.poster ? slide.video : `${slide.video}#t=0.001`
 
     if (shouldLoadVideo) {
       if (video.getAttribute('src') !== targetSrc) {
         setIsVideoLoaded(false)
+        setHasVideoError(false)
         video.setAttribute('src', targetSrc)
         video.preload = isActive ? 'auto' : 'metadata'
         video.load()
-      } else if (isActive && video.preload !== 'auto') {
-        video.preload = 'auto'
+        if (isActive) {
+          syncAndPlayActiveVideo()
+        }
+      } else {
+        if (isActive && video.preload !== 'auto') {
+          video.preload = 'auto'
+        }
+        if (isActive && video.readyState >= 2) {
+          setIsVideoLoaded(true)
+          onActiveVideoReady(index)
+        }
       }
     } else if (!shouldKeepInMemory) {
-      // Освобождаем память только если слайд ушел далеко (дальше 3 экранов)
       if (video.getAttribute('src')) {
         video.pause()
         video.removeAttribute('src')
         video.load()
         setIsVideoLoaded(false)
+        setHasVideoError(false)
       }
     }
-  }, [shouldLoadVideo, shouldKeepInMemory, isActive, slide.video, slide.poster])
+  }, [
+    shouldLoadVideo,
+    shouldKeepInMemory,
+    isActive,
+    slide.video,
+    slide.poster,
+    index,
+    onActiveVideoReady,
+    syncAndPlayActiveVideo,
+  ])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
     if (isActive) {
-      setIsPaused(false)
-      const p = video.play()
-      if (p) {
-        p.catch(() => {
-          // Если Safari заблокировал автоплей со звуком, форсируем muted-старт
-          video.muted = true
-          video.play().catch(() => {})
-        })
+      if (video.getAttribute('src')) {
+        syncAndPlayActiveVideo()
       }
     } else {
       video.pause()
@@ -419,20 +586,59 @@ function SlideItem({
       setIsPaused(false)
       setIsDescOpen(false)
     }
-  }, [isActive])
+  }, [isActive, syncAndPlayActiveVideo])
+
+  // ИСПРАВЛЕНО (STYLE-003): Если видео уже было предзагружено до того, как слайд стал активным,
+  // немедленно уведомляем родителя о готовности, чтобы не блокировать предзагрузку activeIndex + 1
+  useEffect(() => {
+    if (isActive && isVideoLoaded) {
+      onActiveVideoReady(index)
+    }
+  }, [isActive, isVideoLoaded, index, onActiveVideoReady])
+
+  // Автоматическое восстановление загрузки видео при возвращении интернета (STYLE-004)
+  useEffect(() => {
+    if (!shouldLoadVideo) return
+    const handleOnline = () => {
+      const video = videoRef.current
+      if (!video || !slide.video) return
+      if (hasVideoError || (!isVideoLoaded && video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE)) {
+        setHasVideoError(false)
+        const targetSrc = slide.poster ? slide.video : `${slide.video}#t=0.001`
+        video.setAttribute('src', targetSrc)
+        video.load()
+        if (isActive) syncAndPlayActiveVideo()
+      }
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [shouldLoadVideo, hasVideoError, isVideoLoaded, isActive, slide.video, slide.poster, syncAndPlayActiveVideo])
 
   const handleVideoReady = () => {
+    setHasVideoError(false)
     setIsVideoLoaded(true)
     if (isActive) {
       onActiveVideoReady(index)
     }
   }
 
+  const handleVideoError = () => {
+    setHasVideoError(true)
+    // Разблокируем очередь предзагрузки следующего слайда даже если текущий ролик недоступен
+    if (isActive) {
+      onActiveVideoReady(index)
+    }
+  }
+
+  // ИСПРАВЛЕНО (STYLE-006): Защита от гонки параллельных запросов лайков и синхронизация с ответом сервера
   const triggerLikeRequest = useCallback(
     async (forceLike = false) => {
-      if (forceLike && isLiked) return
+      const currentLiked = isLikedRef.current
+      if (forceLike && currentLiked) return
+      if (isLikeInFlightRef.current) return
 
-      const next = forceLike ? true : !isLiked
+      const next = forceLike ? true : !currentLiked
+      isLikedRef.current = next
       setIsLiked(next)
       setLikesCount((c) => (next ? c + 1 : Math.max(0, c - 1)))
 
@@ -440,18 +646,46 @@ function SlideItem({
         tg.HapticFeedback.impactOccurred(next ? 'medium' : 'light')
       }
 
+      isLikeInFlightRef.current = true
+      likeAbortRef.current?.abort()
+      const controller = new AbortController()
+      likeAbortRef.current = controller
+
       try {
-        await fetch(`/api/like?style_id=${slide.id}&user_id=${userId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: next ? 'like' : 'unlike' }),
-        })
-      } catch {
+        const rawInitData = tg?.initData || ''
+        const res = await fetch(
+          `/api/like?style_id=${encodeURIComponent(slide.id)}&user_id=${encodeURIComponent(userId)}`,
+          {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              ...(rawInitData ? { 'X-Telegram-Init-Data': rawInitData } : {}),
+            },
+            body: JSON.stringify({
+              action: next ? 'like' : 'unlike',
+              initData: rawInitData,
+            }),
+          }
+        )
+        if (!res.ok) throw new Error('Like failed')
+        const data = (await res.json().catch(() => null)) as {
+          total?: number
+          isLiked?: boolean
+        } | null
+        if (data && typeof data.total === 'number') {
+          setLikesCount(Math.max(0, data.total))
+        }
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        isLikedRef.current = !next
         setIsLiked(!next)
         setLikesCount((c) => (next ? Math.max(0, c - 1) : c + 1))
+      } finally {
+        isLikeInFlightRef.current = false
       }
     },
-    [isLiked, slide.id, tg, userId]
+    [slide.id, tg, userId]
   )
 
   const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -470,8 +704,14 @@ function SlideItem({
       tapTimeoutRef.current = null
 
       setHeartBurst({ id: Date.now(), x, y })
-      triggerLikeRequest(true)
-      setTimeout(() => setHeartBurst(null), 850)
+      void triggerLikeRequest(true)
+      if (heartBurstTimeoutRef.current !== null) {
+        window.clearTimeout(heartBurstTimeoutRef.current)
+      }
+      heartBurstTimeoutRef.current = window.setTimeout(() => {
+        setHeartBurst(null)
+        heartBurstTimeoutRef.current = null
+      }, 850)
     } else {
       tapTimeoutRef.current = window.setTimeout(() => {
         tapTimeoutRef.current = null
@@ -504,7 +744,7 @@ function SlideItem({
     const url = 'https://www.cordwaine.app'
 
     try {
-      if (isRunningInTelegram()) {
+      if (isRunningInTelegram() && tg?.openTelegramLink) {
         tg.openTelegramLink(
           `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
         )
@@ -526,13 +766,13 @@ function SlideItem({
 
   return (
     <div className="relative h-full w-full flex-shrink-0 snap-start snap-always overflow-hidden bg-[#050505]">
-      {/* Элегантный High-Fashion Skeleton при холодном старте после очистки кэша */}
-      {!isVideoLoaded && !slide.poster && (
+      {/* ИСПРАВЛЕНО (STYLE-004): Скелетон отображается до реальной готовности видеокадра (независимо от наличия poster) */}
+      {!isVideoLoaded && (
         <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-b from-[#0d0d0d] via-[#151412] to-[#080808] animate-pulse">
           <div className="flex flex-col items-center gap-2 opacity-40">
             <div className="w-5 h-5 rounded-full border border-white/40 border-t-white animate-spin" />
             <span className="text-[8px] font-sans uppercase tracking-[0.3em] text-white/70">
-              {t.loadingVideo}
+              {hasVideoError ? t.videoErrorRetry : t.loadingVideo}
             </span>
           </div>
         </div>
@@ -546,17 +786,18 @@ function SlideItem({
             preload="none"
             loop
             playsInline
-            // @ts-ignore — поддержка старых версий WebKit на iOS
+            // @ts-expect-error — поддержка старых версий WebKit на iOS
             webkit-playsinline="true"
             muted={isMuted}
             poster={slide.poster}
             onLoadedData={handleVideoReady}
             onCanPlay={handleVideoReady}
             onPlaying={handleVideoReady}
+            onError={handleVideoError}
             className={`
               w-full h-full object-cover
               transition-opacity duration-300 ease-out
-              ${isVideoLoaded || slide.poster ? 'opacity-100' : 'opacity-0'}
+              ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}
               ${slide.hideWatermark ? 'scale-[1.08]' : ''}
             `}
           />
@@ -688,8 +929,9 @@ function SlideItem({
 
         <div className="flex items-center justify-between gap-3 pointer-events-auto">
           <button
+            type="button"
             onClick={toggleDesc}
-            className="flex-1 min-w-0 text-left group py-0.5 pr-2 active:opacity-70 transition-opacity"
+            className="flex-1 min-w-0 text-left group py-0.5 pr-2 active:opacity-70 transition-opacity bg-transparent border-0 cursor-pointer"
           >
             <div className="flex items-center gap-1.5 mb-0.5">
               <span className="text-[8px] font-sans uppercase tracking-[0.28em] text-white/65">
@@ -706,8 +948,10 @@ function SlideItem({
 
           <div className="flex items-center gap-2.5 shrink-0">
             <button
+              type="button"
               onClick={onToggleMute}
-              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90"
+              aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
+              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90 cursor-pointer"
             >
               {isMuted ? (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -724,10 +968,12 @@ function SlideItem({
             </button>
 
             <button
-              onClick={() => triggerLikeRequest(false)}
+              type="button"
+              onClick={() => void triggerLikeRequest(false)}
+              aria-label="Нравится"
               className={`
                 h-9 px-2.5 min-w-[36px] rounded-full border flex items-center justify-center gap-1.5
-                transition-all duration-200 active:scale-90
+                transition-all duration-200 active:scale-90 cursor-pointer
                 ${
                   isLiked
                     ? 'border-white bg-white text-black shadow-[0_0_14px_rgba(255,255,255,0.35)]'
@@ -753,8 +999,10 @@ function SlideItem({
             </button>
 
             <button
-              onClick={handleShare}
-              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90"
+              type="button"
+              onClick={() => void handleShare()}
+              aria-label="Поделиться"
+              className="w-9 h-9 rounded-full border border-white/30 bg-black/35 backdrop-blur-md flex items-center justify-center text-white transition-transform duration-200 active:scale-90 cursor-pointer"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -775,60 +1023,115 @@ const pageVariants = {
   exit: { opacity: 0, transition: { duration: 0.3 } },
 }
 
-export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
-  const currentLang: 'ru' | 'uk' | 'de' =
-    lang === 'uk' || lang === 'ru' || lang === 'de' ? lang : 'ru'
-  const t = UI_TEXT[currentLang]
+export function StylesPage({ onBack, lang = 'ru' as AppLang }: StylesPageProps) {
+  const currentLang = normalizeSupportedLang(lang)
+  const totalStylesCount = STYLES_DATA.length
+  const t = useMemo(() => getUiText(currentLang, totalStylesCount), [currentLang, totalStylesCount])
 
   const [isMuted, setIsMuted] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
-  // Флаг готовности активного видео: разрешает предзагрузку следующего ролика только когда текущий уже готов
   const [readySlideIndex, setReadySlideIndex] = useState<number>(-1)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
+  const toastTimerRef = useRef<number | null>(null)
+  const jumpTimerRef = useRef<number | null>(null)
 
-  // Мгновенное чтение статуса покупки из localStorage + синхронизация с сервером
-  const [isProPurchased, setIsProPurchased] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(PRO_STORAGE_KEY) === 'true'
-  })
-  const [isPurchasing, setIsPurchasing] = useState(false)
+  // ИСПРАВЛЕНО (STYLE-001, STYLE-002): Строгий платёжный автомат, где источником истины выступает сервер
+  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
+  const isProPurchased = paymentState === 'purchased'
+  const isPaymentBusy =
+    paymentState === 'creating_invoice' ||
+    paymentState === 'invoice_open' ||
+    paymentState === 'verifying_payment'
 
   const [buttonMode, setButtonMode] = useState<'hidden' | 'up' | 'down'>('hidden')
-  const returnYRef = useRef<number | null>(null)
+  const returnSlideIndexRef = useRef<number | null>(null)
   const isJumpingRef = useRef(false)
+
+  // Очистка глобальных таймеров страницы при размонтировании (STYLE-007)
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+      if (jumpTimerRef.current !== null) window.clearTimeout(jumpTimerRef.current)
+    }
+  }, [])
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg)
-    setTimeout(() => setToastMessage(null), 2400)
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage(null)
+      toastTimerRef.current = null
+    }, 2400)
   }, [])
 
   const handleActiveVideoReady = useCallback((idx: number) => {
     setReadySlideIndex((prev) => (prev === idx ? prev : idx))
   }, [])
 
-  useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp
-    const userId = tg?.initDataUnsafe?.user?.id || getDeviceId()
-    if (!userId) return
-
-    fetch(`/api/check-purchase?userId=${userId}&productId=pro_videos`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.purchased) {
-          setIsProPurchased(true)
-          localStorage.setItem(PRO_STORAGE_KEY, 'true')
-        }
-      })
-      .catch((err) => console.error('Ошибка проверки:', err))
+  const handleForceMuteSync = useCallback(() => {
+    setIsMuted(true)
   }, [])
 
-  const visibleStyles = isProPurchased ? STYLES_DATA : STYLES_DATA.slice(0, 3)
+  // ИСПРАВЛЕНО (STYLE-001): Верификация покупки через сервер с передачей подписанного X-Telegram-Init-Data
+  // и сбросом неподтверждённого кэша localStorage
+  const verifyPurchaseOnServer = useCallback(async (): Promise<boolean> => {
+    const tg = getTelegramWebApp()
+    const userId = tg?.initDataUnsafe?.user?.id
+    const rawInitData = tg?.initData || ''
+    if (!userId || !rawInitData) {
+      try {
+        localStorage.removeItem(PRO_STORAGE_KEY)
+      } catch {}
+      return false
+    }
+
+    try {
+      const res = await fetch(
+        `/api/check-purchase?userId=${encodeURIComponent(String(userId))}&productId=pro_videos`,
+        {
+          method: 'GET',
+          headers: { 'X-Telegram-Init-Data': rawInitData },
+        }
+      )
+      if (!res.ok) return false
+      const data = (await res.json()) as { purchased?: boolean }
+      if (data.purchased === true) {
+        setPaymentState('purchased')
+        try {
+          localStorage.setItem(PRO_STORAGE_KEY, 'true')
+        } catch {}
+        return true
+      } else {
+        try {
+          localStorage.removeItem(PRO_STORAGE_KEY)
+        } catch {}
+        return false
+      }
+    } catch (err) {
+      console.error('Ошибка проверки покупки pro_videos:', err)
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    void verifyPurchaseOnServer()
+  }, [verifyPurchaseOnServer])
+
+  const visibleStyles = isProPurchased
+    ? STYLES_DATA
+    : STYLES_DATA.slice(0, FREE_STYLES_COUNT)
   const showPaywallSlide = !isProPurchased
-  const lockedPreviewTitles = STYLES_DATA.slice(3, 7).map((s) =>
-    s.title[currentLang].replace('\n', ' ')
+  const lockedPreviewTitles = useMemo(
+    () =>
+      STYLES_DATA.slice(FREE_STYLES_COUNT, FREE_STYLES_COUNT + PREVIEW_TAG_COUNT).map((s) =>
+        s.title[currentLang].replace('\n', ' ')
+      ),
+    [currentLang]
   )
 
   useEffect(() => {
@@ -837,10 +1140,11 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
     const handlePassiveScroll = () => {
       const currentY = container.scrollTop
+      const slideH = Math.max(300, container.clientHeight)
 
-      if (currentY > 800) {
+      if (currentY > slideH * 1.2) {
         setButtonMode((prev) => (prev !== 'up' ? 'up' : prev))
-      } else if (currentY < 100 && returnYRef.current !== null) {
+      } else if (currentY < slideH * 0.25 && returnSlideIndexRef.current !== null) {
         setButtonMode((prev) => (prev !== 'down' ? 'down' : prev))
       } else {
         setButtonMode((prev) => (prev !== 'hidden' ? 'hidden' : prev))
@@ -851,32 +1155,52 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
     return () => container.removeEventListener('scroll', handlePassiveScroll)
   }, [])
 
+  // ИСПРАВЛЕНО (STYLE-008): Навигация «Наверх / Вернуться» по индексу слайда с защитой от наложения таймеров
   const handleSmartScroll = () => {
-    const tg = (window as any).Telegram?.WebApp
+    const tg = getTelegramWebApp()
     if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
 
     const container = scrollRef.current
     if (!container) return
 
+    if (jumpTimerRef.current !== null) {
+      window.clearTimeout(jumpTimerRef.current)
+      jumpTimerRef.current = null
+    }
+
     if (buttonMode === 'up') {
-      returnYRef.current = container.scrollTop
+      returnSlideIndexRef.current = activeIndex
       isJumpingRef.current = true
       setActiveIndex(0)
 
       container.scrollTo({ top: 0, behavior: 'smooth' })
-      setTimeout(() => {
+      jumpTimerRef.current = window.setTimeout(() => {
         isJumpingRef.current = false
-      }, 1000)
-    } else if (buttonMode === 'down' && returnYRef.current !== null) {
+        jumpTimerRef.current = null
+      }, 750)
+    } else if (buttonMode === 'down' && returnSlideIndexRef.current !== null) {
+      const targetIdx = Math.min(
+        returnSlideIndexRef.current,
+        slideRefs.current.length - 1
+      )
       isJumpingRef.current = true
-      const targetIndex = Math.round(returnYRef.current / Math.max(1, container.clientHeight))
-      setActiveIndex(targetIndex)
+      setActiveIndex(targetIdx)
 
-      container.scrollTo({ top: returnYRef.current, behavior: 'smooth' })
-      setTimeout(() => {
+      const targetEl = slideRefs.current[targetIdx]
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth' })
+      } else {
+        container.scrollTo({
+          top: targetIdx * container.clientHeight,
+          behavior: 'smooth',
+        })
+      }
+
+      jumpTimerRef.current = window.setTimeout(() => {
         isJumpingRef.current = false
-        returnYRef.current = null
-      }, 1000)
+        returnSlideIndexRef.current = null
+        jumpTimerRef.current = null
+      }, 750)
     }
   }
 
@@ -888,32 +1212,43 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       (entries) => {
         if (isJumpingRef.current) return
 
+        let bestIdx: number | null = null
+        let bestRatio = 0
+
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
             const idx = Number(entry.target.getAttribute('data-index'))
-            if (!Number.isNaN(idx)) {
-              setActiveIndex(idx)
+            if (!Number.isNaN(idx) && entry.intersectionRatio > bestRatio) {
+              bestRatio = entry.intersectionRatio
+              bestIdx = idx
             }
           }
         }
+
+        if (bestIdx !== null) {
+          setActiveIndex(bestIdx)
+        }
       },
-      { root, threshold: [0.6] }
+      { root, threshold: [0.55, 0.75] }
     )
 
-    const currentRefs = slideRefs.current.filter(Boolean)
-    currentRefs.forEach((el) => observer.observe(el!))
+    const maxSlides = visibleStyles.length + (showPaywallSlide ? 1 : 0)
+    for (let i = 0; i < maxSlides; i++) {
+      const el = slideRefs.current[i]
+      if (el) observer.observe(el)
+    }
 
     return () => observer.disconnect()
-  }, [isProPurchased])
+  }, [visibleStyles.length, showPaywallSlide])
 
-  // Навигация Назад + поддержка клавиши Escape на десктопе
+  // Навигация Назад + поддержка клавиши Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onBack()
     }
     window.addEventListener('keydown', handleKeyDown)
 
-    const tg = (window as any).Telegram?.WebApp
+    const tg = getTelegramWebApp()
     if (isRunningInTelegram() && tg) {
       tg.ready()
       tg.expand?.()
@@ -924,8 +1259,8 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
         tg.BackButton.onClick(onBack)
         return () => {
           window.removeEventListener('keydown', handleKeyDown)
-          tg.BackButton.offClick(onBack)
-          tg.BackButton.hide()
+          tg.BackButton?.offClick(onBack)
+          tg.BackButton?.hide()
         }
       }
     }
@@ -936,63 +1271,124 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
   const handleBackPress = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       e.stopPropagation()
-      const tg = (window as any).Telegram?.WebApp
+      const tg = getTelegramWebApp()
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
       onBack()
     },
     [onBack]
   )
 
+  // ИСПРАВЛЕНО (STYLE-001, STYLE-002): Строгий платёжный сценарий Telegram Stars
+  // с передачей initData, блокировкой повторного открытия счёта и проверкой на сервере после оплаты
   const handleProClick = async () => {
-    const tg = (window as any).Telegram?.WebApp
+    if (isPaymentBusy || isProPurchased) return
+    const tg = getTelegramWebApp()
     const userId = tg?.initDataUnsafe?.user?.id
+    const rawInitData = tg?.initData || ''
 
-    if (!isRunningInTelegram() || !userId) {
+    if (!isRunningInTelegram() || !userId || !rawInitData || !tg?.openInvoice) {
       showTelegramAlert(t.errTgOnly)
       return
     }
 
-    setIsPurchasing(true)
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
+    setPaymentState('creating_invoice')
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light')
 
     try {
       const response = await fetch('/api/create-invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': rawInitData,
+        },
         body: JSON.stringify({
           userId,
           productId: 'pro_videos',
-          amountStars: 150, // Рекомендуемая цена: 150 Telegram Stars (10 ⭐️ за каждый из 15 фасонов)
+          initData: rawInitData,
+          amountStars: PRO_VIDEOS_PRICE_STARS,
         }),
       })
 
-      const data = await response.json()
-      if (!response.ok || !data.invoiceLink) throw new Error(data.error)
+      const data = (await response.json()) as {
+        invoiceLink?: string
+        error?: string
+        alreadyPurchased?: boolean
+      }
 
-      tg.openInvoice(data.invoiceLink, (status: string) => {
-        if (status === 'paid') {
-          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success')
+      if (response.status === 409 && data.alreadyPurchased) {
+        setPaymentState('purchased')
+        try {
           localStorage.setItem(PRO_STORAGE_KEY, 'true')
-          setIsProPurchased(true)
-          setActiveIndex(3)
-        } else if (status === 'failed') {
+        } catch {}
+        setActiveIndex(FREE_STYLES_COUNT)
+        return
+      }
+
+      if (!response.ok || !data.invoiceLink) {
+        throw new Error(data.error || t.errServer)
+      }
+
+      setPaymentState('invoice_open')
+
+      tg.openInvoice(data.invoiceLink, async (status: string) => {
+        if (status === 'paid') {
+          setPaymentState('verifying_payment')
+          let verified = await verifyPurchaseOnServer()
+          if (!verified) {
+            await new Promise((r) => setTimeout(r, 850))
+            verified = await verifyPurchaseOnServer()
+          }
+          if (!verified) {
+            await new Promise((r) => setTimeout(r, 1200))
+            verified = await verifyPurchaseOnServer()
+          }
+
+          if (verified) {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success')
+            setPaymentState('purchased')
+            setActiveIndex(FREE_STYLES_COUNT)
+            window.setTimeout(() => {
+              slideRefs.current[FREE_STYLES_COUNT]?.scrollIntoView({ behavior: 'smooth' })
+            }, 60)
+          } else {
+            setPaymentState('failed')
+            showTelegramAlert(t.errVerifyFailed)
+          }
+        } else if (status === 'pending') {
+          setPaymentState('verifying_payment')
+          const verified = await verifyPurchaseOnServer()
+          if (verified) {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success')
+            setPaymentState('purchased')
+            setActiveIndex(FREE_STYLES_COUNT)
+          } else {
+            setPaymentState('idle')
+            showTelegramAlert(t.errPending)
+          }
+        } else if (status === 'cancelled' || status === 'closed') {
+          setPaymentState('idle')
+        } else {
+          setPaymentState('failed')
           showTelegramAlert(t.errPayment)
         }
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
       console.error(error)
-      showTelegramAlert(`${t.errServer}: ${error.message}`)
-    } finally {
-      setIsPurchasing(false)
+      setPaymentState('failed')
+      showTelegramAlert(`${t.errServer}: ${msg}`)
     }
   }
 
-  const handleToggleMute = () => {
-    if ((window as any).Telegram?.WebApp?.HapticFeedback) {
-      ;(window as any).Telegram.WebApp.HapticFeedback.impactOccurred('light')
+  const handleToggleMute = useCallback(() => {
+    const tg = getTelegramWebApp()
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred('light')
     }
     setIsMuted((v) => !v)
-  }
+  }, [])
+
+  const isPaywallSlideActive = showPaywallSlide && activeIndex === visibleStyles.length
 
   return (
     <motion.div
@@ -1093,16 +1489,14 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
       >
         {visibleStyles.map((slide, index) => {
           const isActive = activeIndex === index
-          // Строгая очередь по принципу TikTok / Shorts:
-          // 1) Активный слайд грузится всегда немедленно.
-          // 2) Следующий слайд (activeIndex + 1) начинает грузиться ТОЛЬКО когда активный уже готов (readySlideIndex === activeIndex).
           const isNextSlideReadyToPreload =
             index === activeIndex + 1 && readySlideIndex === activeIndex
           const isPrevSlide = index === activeIndex - 1
 
           const shouldLoadVideo = isActive || isNextSlideReadyToPreload || isPrevSlide
-          // Держим в памяти 3 соседних слайда, чтобы при возврате назад не качать заново
-          const shouldKeepInMemory = Math.abs(activeIndex - index) <= 3
+          // ИСПРАВЛЕНО (STYLE-005): Храним в памяти строго не более 3 видео (предыдущее, активное, следующее)
+          // во избежание переполнения лимита аппаратных декодеров MediaCodec на бюджетных Android (3–4 ГБ ОЗУ)
+          const shouldKeepInMemory = Math.abs(activeIndex - index) <= 1
 
           return (
             <div
@@ -1117,12 +1511,13 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
                 slide={slide}
                 lang={currentLang}
                 index={index}
-                totalCount={STYLES_DATA.length}
+                totalCount={totalStylesCount}
                 isActive={isActive}
                 shouldLoadVideo={shouldLoadVideo}
                 shouldKeepInMemory={shouldKeepInMemory}
                 isMuted={isMuted}
                 onToggleMute={handleToggleMute}
+                onForceMuteSync={handleForceMuteSync}
                 onShowToast={showToast}
                 onActiveVideoReady={handleActiveVideoReady}
               />
@@ -1142,16 +1537,16 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
             }}
             className="h-full w-full snap-start snap-always relative bg-[#050505] overflow-hidden flex flex-col justify-end px-6"
           >
-            {/* Фоновое видео пейволла грузится ТОЛЬКО когда пользователь долистал до 3-го слайда (activeIndex >= 2) */}
-            {STYLES_DATA[3]?.video && activeIndex >= 2 && (
+            {/* ИСПРАВЛЕНО (STYLE-005): Фоновое превью-видео монтируется ТОЛЬКО когда открыт сам Paywall-слайд */}
+            {STYLES_DATA[FREE_STYLES_COUNT]?.video && isPaywallSlideActive && (
               <video
-                src={`${STYLES_DATA[3].video}#t=0.001`}
+                src={`${STYLES_DATA[FREE_STYLES_COUNT].video}#t=0.001`}
                 autoPlay
                 loop
                 muted
                 playsInline
                 preload="metadata"
-                className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-35 pointer-events-none"
+                className="absolute inset-0 w-full h-full object-cover scale-105 blur-md opacity-30 pointer-events-none"
               />
             )}
 
@@ -1202,14 +1597,14 @@ export function StylesPage({ onBack, lang = 'ru' }: StylesPageProps) {
 
               <button
                 type="button"
-                onClick={handleProClick}
-                disabled={isPurchasing}
+                onClick={() => void handleProClick()}
+                disabled={isPaymentBusy}
                 style={{ touchAction: 'manipulation' }}
-                className="paywall-btn group relative flex items-center justify-between w-full h-[56px] px-6 border text-[#F4F0E8] hover:bg-white/10 active:scale-[0.98] transition-all outline-none bg-black/50 backdrop-blur-md cursor-pointer"
+                className="paywall-btn group relative flex items-center justify-between w-full h-[56px] px-6 border text-[#F4F0E8] hover:bg-white/10 active:scale-[0.98] transition-all outline-none bg-black/50 backdrop-blur-md cursor-pointer disabled:opacity-55"
               >
-                {isPurchasing ? (
+                {isPaymentBusy ? (
                   <span className="text-[10px] font-sans uppercase tracking-[0.2em] animate-pulse mx-auto">
-                    {t.paywall.loading}
+                    {paymentState === 'verifying_payment' ? t.paywall.verifying : t.paywall.loading}
                   </span>
                 ) : (
                   <>
