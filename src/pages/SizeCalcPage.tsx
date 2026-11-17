@@ -2,13 +2,14 @@ import React, { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffe
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Lang } from '../App'
 import {
-  convertShoeSize,
   calculateProFit,
   formatSize,
   RANGES,
+  STYLE_ALLOWANCES,
   type Gender,
   type ShoeStyle,
   type WidthFit,
+  type MeasureMode,
   type BrandFitEntry,
 } from '../lib/shoeSizes'
 import {
@@ -34,37 +35,34 @@ type SizeCalcPageProps = {
 
 type ActiveTab = 'world' | 'fit' | 'brands' | 'guide'
 
-const RULER_TICKS = 29
+const RULER_TICKS = 31
 
 export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const safeLang: SupportedLang =
     lang && (lang === 'ru' || lang === 'uk' || lang === 'de' || lang === 'en') ? lang : 'uk'
   const t = I18N[safeLang]
 
-  // Реф для надёжного вызова onBack независимо от ре-рендеров при смене gender
+  // Надёжная ссылка на onBack без блокировки размонтирования Framer Motion
   const onBackRef = useRef(onBack)
   useEffect(() => {
     onBackRef.current = onBack
   }, [onBack])
 
-  const handleBackClick = useCallback(
-    (e?: React.MouseEvent | React.PointerEvent) => {
-      if (e) {
-        e.stopPropagation()
-      }
-      hapticImpact('light')
+  const triggerBackNavigation = useCallback(() => {
+    hapticImpact('medium')
+    if (typeof onBackRef.current === 'function') {
       onBackRef.current()
-    },
-    []
-  )
+    }
+  }, [])
 
-  // Поддержка системной кнопки «Назад» в Telegram Mini App (Android / iOS)
+  // Подключение системной кнопки Telegram BackButton с обязательным скрытием при выходе
   useEffect(() => {
     const tg = (window as unknown as {
       Telegram?: {
         WebApp?: {
           BackButton?: {
             show?: () => void
+            hide?: () => void
             onClick?: (cb: () => void) => void
             offClick?: (cb: () => void) => void
           }
@@ -76,8 +74,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     if (!tgBack?.onClick) return
 
     const listener = () => {
-      hapticImpact('light')
-      onBackRef.current()
+      hapticImpact('medium')
+      onBackRef.current?.()
     }
     try {
       tgBack.show?.()
@@ -87,6 +85,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     return () => {
       try {
         tgBack.offClick?.(listener)
+        tgBack.hide?.()
       } catch {}
     }
   }, [])
@@ -108,8 +107,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   }, [])
 
   const [gender, setGender] = useState<Gender>('men')
-  const [unit, setUnit] = useState<'cm' | 'mm'>('cm')
-  const [footMm, setFootMm] = useState<number>(RANGES.men.default)
+  const [measureMode, setMeasureMode] = useState<MeasureMode>('foot')
+  const [unit, setUnit] = useState<'cm' | 'mm'>('mm')
+  const [footMm, setFootMm] = useState<number>(270)
   const [shoeStyle, setShoeStyle] = useState<ShoeStyle>('sneakers')
   const [widthFit, setWidthFit] = useState<WidthFit>('standard')
   const [activeTab, setActiveTab] = useState<ActiveTab>('world')
@@ -129,7 +129,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const range = RANGES[gender]
 
   const handleGenderChange = useCallback((g: Gender) => {
-    hapticImpact('light')
+    hapticImpact('medium')
     setGender(g)
     const r = RANGES[g]
     setFootMm((prev) => {
@@ -139,33 +139,28 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     })
   }, [])
 
-  // Все расчёты выполняются через единую библиотеку src/lib/shoeSizes.ts
-  const result = useMemo(() => convertShoeSize(footMm, gender), [footMm, gender])
+  // Главный расчёт по стандартам ISO 19407 / JIS S 5037 / ГОСТ 3927-88
   const proFit = useMemo(
     () => calculateProFit(footMm, gender, shoeStyle, widthFit),
     [footMm, gender, shoeStyle, widthFit]
   )
 
+  // Рекомендуемый размер (с учётом выбранного сезона Зима/Мех и полноты)
+  const activeResult = proFit.recommendedSize
+
+  // Значение, которое видит пользователь на барабане (либо длина стопы, либо длина вынутой стельки)
+  const currentActiveMm = measureMode === 'foot' ? footMm : proFit.insoleMm
+  const sliderMin =
+    measureMode === 'foot' ? range.min : range.min + STYLE_ALLOWANCES[shoeStyle].insoleAddMm
+  const sliderMax =
+    measureMode === 'foot' ? range.max : range.max + STYLE_ALLOWANCES[shoeStyle].insoleAddMm
+
   const displayValue =
-    unit === 'cm' ? (footMm / 10).toFixed(1).replace('.', ',') : String(Math.round(footMm))
+    unit === 'cm'
+      ? (currentActiveMm / 10).toFixed(1).replace('.', ',')
+      : String(Math.round(currentActiveMm))
+
   const pct = Math.min(100, Math.max(0, ((footMm - range.min) / (range.max - range.min)) * 100))
-
-  // Нормализация прогресс-баров по реальным физическим величинам (устранение ID-10)
-  const girthBarPct = useMemo(() => {
-    const minG = gender === 'kids' ? 120 : 195
-    const maxG = gender === 'kids' ? 235 : 300
-    return Math.min(100, Math.max(20, ((proFit.ballGirthMm - minG) / (maxG - minG)) * 100))
-  }, [proFit.ballGirthMm, gender])
-
-  const widthBarPct = useMemo(() => {
-    const minW = gender === 'kids' ? 48 : 78
-    const maxW = gender === 'kids' ? 98 : 122
-    return Math.min(100, Math.max(20, ((proFit.ballWidthMm - minW) / (maxW - minW)) * 100))
-  }, [proFit.ballWidthMm, gender])
-
-  const insoleBarPct = useMemo(() => {
-    return Math.min(100, Math.max(25, (proFit.allowanceMm / 19) * 100))
-  }, [proFit.allowanceMm])
 
   const verifyPurchaseOnServer = useCallback(async (uid: number | string, rawInitData: string) => {
     try {
@@ -231,7 +226,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     const rawInitData = typeof tg?.initData === 'string' ? tg.initData : ''
 
     if (!userId || !rawInitData) {
-      hapticImpact('medium')
+      hapticImpact('heavy')
       setStatusError(t.openInTelegramErr)
       return
     }
@@ -293,15 +288,19 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const startEdit = () => {
     hapticImpact('light')
-    setEditValue(unit === 'cm' ? (footMm / 10).toFixed(1) : String(Math.round(footMm)))
+    setEditValue(
+      unit === 'cm' ? (currentActiveMm / 10).toFixed(1) : String(Math.round(currentActiveMm))
+    )
     setIsEditing(true)
   }
 
   const commitEdit = () => {
     const raw = parseFloat(editValue.replace(',', '.'))
     if (!isNaN(raw)) {
-      const mm = Math.round(unit === 'cm' ? raw * 10 : raw)
-      const clamped = Math.min(range.max, Math.max(range.min, mm))
+      const inputMm = Math.round(unit === 'cm' ? raw * 10 : raw)
+      const targetFootMm =
+        measureMode === 'foot' ? inputMm : inputMm - proFit.allowanceMm
+      const clamped = Math.min(range.max, Math.max(range.min, targetFootMm))
       setFootMm(clamped)
       lastHapticMmRef.current = clamped
       hapticImpact('medium')
@@ -348,8 +347,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       holdTimerRef.current = window.setTimeout(() => {
         holdIntervalRef.current = window.setInterval(() => {
           applyStep(delta)
-        }, 70)
-      }, 320)
+        }, 75)
+      }, 300)
     },
     [applyStep, range.max, range.min, stopHold]
   )
@@ -359,10 +358,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   }, [stopHold])
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextMm = Number(e.target.value)
-    setFootMm(nextMm)
-    if (nextMm !== lastHapticMmRef.current) {
-      lastHapticMmRef.current = nextMm
+    const rawVal = Number(e.target.value)
+    const nextFootMm =
+      measureMode === 'foot'
+        ? rawVal
+        : Math.min(range.max, Math.max(range.min, rawVal - proFit.allowanceMm))
+    setFootMm(nextFootMm)
+    if (nextFootMm !== lastHapticMmRef.current) {
+      lastHapticMmRef.current = nextFootMm
       hapticSelection()
     }
   }
@@ -373,30 +376,42 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const usLabel = gender === 'kids' ? 'US K' : gender === 'men' ? 'US M' : 'US W'
 
+  // Геометрическое масштабирование живого рентген-сканера стопы и колодки
+  const footScaleX = 0.88 + (pct / 100) * 0.14
+  const footScaleY =
+    widthFit === 'narrow'
+      ? 0.9
+      : widthFit === 'standard'
+        ? 1.0
+        : widthFit === 'wide'
+          ? 1.09
+          : 1.17
+  const lastAllowanceExtraPx = Math.round((proFit.allowanceMm - 6) * 0.85)
+
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
   const cCard = isDark ? 'bg-[#141414]' : 'bg-[#EAE4DA]'
-  const cCardElevated = isDark ? 'bg-[#1C1C1E]' : 'bg-[#E2DBD0]'
+  const cCardElevated = isDark ? 'bg-[#1E1E20]' : 'bg-[#DFD7CA]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
   const cTextMuted = isDark ? 'text-[#F4F0E8]/65' : 'text-[#1C1816]/65'
-  const cLine = isDark ? 'border-[#F4F0E8]/14' : 'border-[#1C1816]/14'
+  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
   const accentHex = isDark ? '#D4AF37' : '#8C5A2B'
   const trackColor = isDark ? '#F4F0E8' : '#1C1816'
   const trackBgColor = isDark ? 'rgba(244,240,232,0.16)' : 'rgba(28,24,22,0.16)'
 
   const worldSystems = [
-    { code: 'EU', sub: t.subParisPoint, val: formatSize(result.eu), flag: <FlagEU />, free: true },
-    { code: `UA (${t.cmLabel.toUpperCase()})`, sub: t.subDstuMetric, val: formatSize(result.ukr), flag: <FlagUA />, free: true },
-    { code: usLabel, sub: t.subBrannock, val: formatSize(result.us), flag: <FlagUS />, free: false },
-    { code: 'UK', sub: t.subBarleycorn, val: formatSize(result.uk), flag: <FlagUK />, free: false },
-    { code: 'JP', sub: t.subJis, val: result.jp.toFixed(1), flag: <FlagJP />, free: false },
-    { code: 'CN', sub: t.subGbt, val: `${formatSize(result.cn)} (${result.mondopoint})`, flag: <FlagCN />, free: false },
-    { code: 'KR', sub: t.subKsk, val: String(result.kr), flag: <FlagKR />, free: false },
-    { code: 'BR', sub: t.subAbnt, val: formatSize(result.br), flag: <FlagBR />, free: false },
+    { code: 'EU', sub: t.subParisPoint, val: formatSize(activeResult.eu), flag: <FlagEU />, free: true },
+    { code: `UA (${t.cmLabel.toUpperCase()})`, sub: t.subDstuMetric, val: formatSize(activeResult.ukr), flag: <FlagUA />, free: true },
+    { code: usLabel, sub: t.subBrannock, val: formatSize(activeResult.us), flag: <FlagUS />, free: false },
+    { code: 'UK', sub: t.subBarleycorn, val: formatSize(activeResult.uk), flag: <FlagUK />, free: false },
+    { code: 'JP', sub: t.subJis, val: activeResult.jp.toFixed(1), flag: <FlagJP />, free: false },
+    { code: 'CN', sub: t.subGbt, val: `${formatSize(activeResult.cn)} (${activeResult.mondopoint})`, flag: <FlagCN />, free: false },
+    { code: 'KR', sub: t.subKsk, val: String(activeResult.kr), flag: <FlagKR />, free: false },
+    { code: 'BR', sub: t.subAbnt, val: formatSize(activeResult.br), flag: <FlagBR />, free: false },
   ]
 
   return (
     <div
-      className={`relative flex flex-col h-[100dvh] max-h-[100dvh] w-full max-w-[100vw] transition-colors duration-300 ${cBg} ${cText} overflow-hidden select-none`}
+      className={`relative flex flex-col min-h-[100dvh] w-full max-w-[100vw] transition-colors duration-300 ${cBg} ${cText} overflow-x-hidden select-none`}
     >
       <style>{`
         * { -webkit-tap-highlight-color: transparent !important; -webkit-touch-callout: none; }
@@ -408,26 +423,42 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        @keyframes xrayLaser {
+          0% { transform: translateX(8px); opacity: 0.25; }
+          50% { opacity: 0.9; }
+          100% { transform: translateX(275px); opacity: 0.25; }
+        }
+        @keyframes nodePulse {
+          0% { transform: scale(0.9); opacity: 0.85; }
+          70% { transform: scale(1.85); opacity: 0; }
+          100% { transform: scale(1.85); opacity: 0; }
+        }
         .pro-shimmer {
-          background: linear-gradient(120deg, rgba(212,175,55,0.10), rgba(212,175,55,0.24), rgba(212,175,55,0.10));
+          background: linear-gradient(120deg, rgba(212,175,55,0.10), rgba(212,175,55,0.25), rgba(212,175,55,0.10));
           background-size: 200% 200%;
           animation: proGlow 4s ease infinite;
         }
+        .xray-laser-line {
+          animation: xrayLaser 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+        }
+        .bio-pulse {
+          transform-origin: center;
+          animation: nodePulse 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+        }
       `}</style>
 
-      {/* 1. ШАПКА БЕЗ ПЕРЕПОЛНЕНИЯ НА ВСЕХ ЯЗЫКАХ (RU / UK / DE / EN) */}
-      <header className={`px-3 pt-2 pb-1.5 border-b ${cLine} flex items-center justify-between gap-1.5 shrink-0 z-30`}>
+      {/* 1. ШАПКА (Без layoutId-багов, кнопка «Назад» работает мгновенно при любом выборе пола) */}
+      <header className={`px-3.5 pt-2.5 pb-2 border-b ${cLine} flex items-center justify-between gap-2 shrink-0 z-30`}>
         <button
           type="button"
-          onClick={handleBackClick}
-          className={`relative z-30 flex items-center gap-1 min-h-[36px] px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold uppercase tracking-[0.08em] outline-none border ${cLine} ${cCard} cursor-pointer shrink-0 active:opacity-75`}
+          onClick={triggerBackNavigation}
+          className={`flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-xl text-[12px] font-sans font-semibold uppercase tracking-[0.08em] outline-none border ${cLine} ${cCard} cursor-pointer shrink-0 active:scale-95 transition-transform`}
         >
-          <span className="text-sm leading-none">←</span>
+          <span className="text-base leading-none">←</span>
           <span>{t.back}</span>
         </button>
 
-        {/* Компактный переключатель пола (вмещается даже на узких 320–360px экранах) */}
-        <div className={`relative grid grid-cols-3 items-center rounded-full p-0.5 border ${cLine} ${cCard} min-w-0 flex-1 max-w-[260px]`}>
+        <div className={`grid grid-cols-3 items-center rounded-full p-0.5 border ${cLine} ${cCard} min-w-0 flex-1 max-w-[265px]`}>
           {(['men', 'women', 'kids'] as Gender[]).map((g) => {
             const active = gender === g
             return (
@@ -435,23 +466,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 key={g}
                 type="button"
                 onClick={() => handleGenderChange(g)}
-                className={`relative z-10 px-1.5 py-1 rounded-full text-[10px] font-sans font-semibold uppercase tracking-[0.03em] transition-colors border-none bg-transparent cursor-pointer truncate text-center ${
+                className={`px-2 py-1.5 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.04em] transition-all duration-200 border-none cursor-pointer truncate text-center ${
                   active
                     ? isDark
-                      ? 'text-[#0A0A0A]'
-                      : 'text-[#F2EFE9]'
-                    : cTextMuted
+                      ? 'bg-[#F4F0E8] text-[#0A0A0A] shadow-xs'
+                      : 'bg-[#1C1816] text-[#F2EFE9] shadow-xs'
+                    : `bg-transparent ${cTextMuted}`
                 }`}
               >
-                {active && (
-                  <motion.div
-                    layoutId="genderSegmentedPill"
-                    transition={{ type: 'spring', stiffness: 450, damping: 34 }}
-                    className={`absolute inset-0 rounded-full -z-10 shadow-xs ${
-                      isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
-                    }`}
-                  />
-                )}
                 {t[g]}
               </button>
             )
@@ -459,23 +481,37 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
       </header>
 
-      {/* 2. КОМПАКТНАЯ БИОМЕТРИЧЕСКАЯ КАПСУЛА */}
-      <section className="px-3 pt-1.5 shrink-0">
-        <div className={`relative rounded-2xl border ${cLine} ${cCard} px-3 pt-2 pb-2 overflow-hidden shadow-xs`}>
-          {/* Верхняя строка: Индекс стандарта + переключатель CM / MM */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <FlagEU />
-              <FlagUA />
-              <span className="text-[11.5px] font-sans font-semibold tracking-[0.08em] uppercase truncate">
-                EU {formatSize(result.eu)}
-              </span>
-              <span className={`text-[11px] font-sans ${cTextMuted} shrink-0`}>
-                · MP {result.mondopoint} {t.mmLabel}
-              </span>
+      {/* 2. ГЛАВНАЯ БИОМЕТРИЧЕСКАЯ СТАНЦИЯ С РЕНТГЕН-СКАНЕРОМ КОЛОДКИ */}
+      <section className="px-3.5 pt-2.5 shrink-0">
+        <div className={`relative rounded-2xl border ${cLine} ${cCard} p-3.5 overflow-hidden shadow-xs`}>
+          {/* Переключатель: [ Замер стопы | По стельке ] + [ СМ | ММ ] */}
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className={`inline-flex items-center rounded-xl p-0.5 border ${cLine} ${cCardElevated}`}>
+              {(['foot', 'insole'] as const).map((m) => {
+                const active = measureMode === m
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      hapticImpact('medium')
+                      setMeasureMode(m)
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold uppercase tracking-wider transition-all duration-200 border-none cursor-pointer ${
+                      active
+                        ? isDark
+                          ? 'bg-[#D4AF37] text-[#0A0A0A]'
+                          : 'bg-[#8C5A2B] text-[#F2EFE9]'
+                        : `bg-transparent ${cTextMuted}`
+                    }`}
+                  >
+                    {m === 'foot' ? t.modeFoot : t.modeInsole}
+                  </button>
+                )
+              })}
             </div>
 
-            <div className={`relative flex items-center rounded-lg p-0.5 border ${cLine} ${cCardElevated} shrink-0`}>
+            <div className={`inline-flex items-center rounded-xl p-0.5 border ${cLine} ${cCardElevated}`}>
               {(['cm', 'mm'] as const).map((u) => {
                 const active = unit === u
                 return (
@@ -486,23 +522,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       hapticImpact('light')
                       setUnit(u)
                     }}
-                    className={`relative z-10 px-2 py-0.5 rounded-md text-[10.5px] font-sans font-semibold uppercase tracking-wider transition-colors border-none bg-transparent cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-sans font-semibold uppercase tracking-wider transition-all duration-200 border-none cursor-pointer ${
                       active
                         ? isDark
-                          ? 'text-[#0A0A0A]'
-                          : 'text-[#F2EFE9]'
-                        : cTextMuted
+                          ? 'bg-[#F4F0E8] text-[#0A0A0A]'
+                          : 'bg-[#1C1816] text-[#F2EFE9]'
+                        : `bg-transparent ${cTextMuted}`
                     }`}
                   >
-                    {active && (
-                      <motion.div
-                        layoutId="unitSwitchPill"
-                        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                        className={`absolute inset-0 rounded-md -z-10 ${
-                          isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
-                        }`}
-                      />
-                    )}
                     {u === 'cm' ? t.cmLabel : t.mmLabel}
                   </button>
                 )
@@ -510,129 +537,254 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          {/* Барабан размера + кнопки - / + */}
-          <div className="flex items-center justify-between gap-2 my-1">
-            <button
-              type="button"
-              onPointerDown={(e) => startHold(-1, e)}
-              onPointerUp={stopHold}
-              onPointerLeave={stopHold}
-              onPointerCancel={stopHold}
-              disabled={footMm <= range.min}
-              aria-label="Decrease foot length"
-              className={`w-9 h-9 rounded-full border ${cLine} ${cCardElevated} ${cText} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-95`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
+          {/* КРУПНОЕ ТАБЛО: СЛЕВА — ЗАМЕР, СПРАВА — РЕКОМЕНДУЕМЫЙ РАЗМЕР EU */}
+          <div className="grid grid-cols-12 items-center gap-2 my-1">
+            {/* Левый блок: Кнопки - / + и крупное число замера */}
+            <div className="col-span-7 flex items-center justify-between gap-1.5">
+              <button
+                type="button"
+                onPointerDown={(e) => startHold(-1, e)}
+                onPointerUp={stopHold}
+                onPointerLeave={stopHold}
+                onPointerCancel={stopHold}
+                disabled={footMm <= range.min}
+                aria-label="Decrease"
+                className={`w-10 h-10 rounded-full border ${cLine} ${cCardElevated} ${cText} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-90 transition-transform`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
 
-            <div onClick={startEdit} className="flex-1 flex items-center justify-center cursor-pointer">
-              <div className="flex items-baseline justify-center gap-1">
-                {isEditing ? (
-                  <input
-                    ref={inputRef}
-                    value={editValue}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => setEditValue(e.target.value.replace(/[^0-9.,]/g, ''))}
-                    onBlur={commitEdit}
-                    onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                    className={`w-[100px] text-center text-[34px] font-serif leading-none bg-transparent outline-none border-b ${cLine} ${cText}`}
-                    inputMode="decimal"
+              <div onClick={startEdit} className="flex flex-col items-center cursor-pointer min-w-0">
+                <span className={`text-[10px] font-sans uppercase tracking-wider ${cTextMuted}`}>
+                  {measureMode === 'foot' ? t.footLengthLabel : t.insoleInputLabel}
+                </span>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  {isEditing ? (
+                    <input
+                      ref={inputRef}
+                      value={editValue}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setEditValue(e.target.value.replace(/[^0-9.,]/g, ''))}
+                      onBlur={commitEdit}
+                      onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                      className={`w-[96px] text-center text-[38px] font-serif leading-none bg-transparent outline-none border-b ${cLine} ${cText}`}
+                      inputMode="decimal"
+                    />
+                  ) : (
+                    <span className="text-[40px] font-serif leading-none tracking-tight tabular-nums">
+                      {displayValue}
+                    </span>
+                  )}
+                  <span className={`text-xs font-sans font-bold uppercase ${cTextMuted}`}>
+                    {unit === 'cm' ? t.cmLabel : t.mmLabel}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onPointerDown={(e) => startHold(1, e)}
+                onPointerUp={stopHold}
+                onPointerLeave={stopHold}
+                onPointerCancel={stopHold}
+                disabled={footMm >= range.max}
+                aria-label="Increase"
+                className={`w-10 h-10 rounded-full border ${cLine} ${cCardElevated} ${cText} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-90 transition-transform`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Правый блок: Крупный итоговый размер EU (с учётом сезона Зима/Мех и полноты) */}
+            <div className={`col-span-5 pl-3 border-l ${cLine} flex flex-col items-end justify-center`}>
+              <div className="flex items-center gap-1.5">
+                <FlagEU />
+                <span className={`text-[10px] font-sans uppercase tracking-wider font-semibold ${cTextMuted}`}>
+                  {t.yourSizeLabel}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-[40px] font-serif leading-none tracking-tight" style={{ color: accentHex }}>
+                  {formatSize(activeResult.eu)}
+                </span>
+                <span className={`text-xs font-sans font-semibold uppercase ${cTextMuted}`}>EU</span>
+              </div>
+              {proFit.styleSizeShiftEu > 0 ? (
+                <span
+                  className="text-[10px] font-sans font-semibold px-1.5 py-0.5 rounded mt-1"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(212,175,55,0.18)' : 'rgba(140,90,43,0.15)',
+                    color: accentHex,
+                  }}
+                >
+                  +{proFit.styleSizeShiftEu} EU {t.winterShiftBadge}
+                </span>
+              ) : (
+                <span className={`text-[10.5px] font-sans mt-0.5 ${cTextMuted}`}>
+                  MP {activeResult.mondopoint} · UA {formatSize(activeResult.ukr)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* ИНТЕРАКТИВНЫЙ РЕНТГЕН-СКАНЕР СТОПЫ ВНУТРИ КОЛОДКИ (Визуальный ВАУ-эффект + понятная физика запаса) */}
+          <div className={`relative rounded-xl border ${cLine} ${cCardElevated} p-2.5 my-2.5 overflow-hidden`}>
+            {/* Миллиметровая сетка */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-25"
+              style={{
+                backgroundImage: `linear-gradient(to right, ${trackBgColor} 1px, transparent 1px), linear-gradient(to bottom, ${trackBgColor} 1px, transparent 1px)`,
+                backgroundSize: '14px 14px',
+              }}
+            />
+
+            {/* Сканирующий лазерный луч */}
+            <div className="absolute inset-y-0 left-0 w-10 pointer-events-none xray-laser-line">
+              <div
+                className="w-[2px] h-full"
+                style={{
+                  background: `linear-gradient(to bottom, transparent, ${accentHex}, transparent)`,
+                  boxShadow: `0 0 12px ${accentHex}`,
+                }}
+              />
+            </div>
+
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <svg viewBox="0 0 300 88" className="w-full h-[78px] overflow-visible">
+                {/* Задняя опорная линия пятки */}
+                <line x1="20" y1="10" x2="20" y2="78" stroke={trackColor} strokeOpacity="0.4" strokeWidth="1" strokeDasharray="2 2" />
+                {/* Передняя граница стопы (270 мм) */}
+                <line x1="236" y1="12" x2="236" y2="76" stroke={trackColor} strokeOpacity="0.55" strokeWidth="1" strokeDasharray="2 2" />
+                {/* Передняя граница стельки/колодки с припуском (+10..16 мм) */}
+                <line
+                  x1={252 + lastAllowanceExtraPx}
+                  y1="8"
+                  x2={252 + lastAllowanceExtraPx}
+                  y2="80"
+                  stroke={accentHex}
+                  strokeWidth="1.5"
+                />
+
+                {/* Зона свободного припуска в носке (заштрихованный буфер между пальцами и носком ботинка) */}
+                <rect
+                  x="236"
+                  y="18"
+                  width={Math.max(12, 16 + lastAllowanceExtraPx)}
+                  height="52"
+                  rx="8"
+                  fill={accentHex}
+                  fillOpacity={isDark ? '0.18' : '0.15'}
+                />
+
+                <g
+                  style={{
+                    transform: `translate(135px, 44px) scale(${footScaleX}, ${footScaleY}) translate(-135px, -44px)`,
+                    transition: 'transform 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+                  }}
+                >
+                  {/* Внешний контур стельки / обувной колодки (например, 286 мм) */}
+                  <path
+                    d={`M 20,44 C 20,24 42,16 74,19 C 110,22 146,13 186,11 C 224,9 ${252 + lastAllowanceExtraPx},17 ${255 + lastAllowanceExtraPx},41 C ${258 + lastAllowanceExtraPx},61 230,74 192,74 C 150,74 118,63 82,64 C 48,65 20,61 20,44 Z`}
+                    fill={isDark ? 'rgba(212,175,55,0.08)' : 'rgba(140,90,43,0.08)'}
+                    stroke={accentHex}
+                    strokeWidth="1.6"
+                    strokeDasharray={shoeStyle === 'winter' ? '4 2' : 'none'}
                   />
-                ) : (
-                  <motion.span
-                    key={displayValue}
-                    initial={{ opacity: 0.7, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 520, damping: 32 }}
-                    className="text-[36px] font-serif leading-none tracking-tight"
-                  >
-                    {displayValue}
-                  </motion.span>
-                )}
-                <span className={`text-xs font-sans font-semibold uppercase ${cTextMuted}`}>
-                  {unit === 'cm' ? t.cmLabel : t.mmLabel}
+
+                  {/* Внутренний анатомический контур самой стопы (например, 270 мм) */}
+                  <path
+                    d="M 23,44 C 23,28 42,22 70,24 C 104,26 138,18 175,16 C 208,14 233,22 236,41 C 238,57 216,67 184,67 C 148,67 118,58 84,59 C 50,60 23,56 23,44 Z"
+                    fill={isDark ? 'rgba(244,240,232,0.16)' : 'rgba(28,24,22,0.14)'}
+                    stroke={trackColor}
+                    strokeWidth="1.6"
+                  />
+
+                  {/* Анатомическая ось пучков M1–M5 (ширина и обхват) */}
+                  <line x1="176" y1="15" x2="182" y2="67" stroke={accentHex} strokeWidth="1.5" strokeDasharray="3 2" />
+
+                  {/* Продольная ось стопы */}
+                  <line x1="24" y1="44" x2="235" y2="41" stroke={trackColor} strokeOpacity="0.35" strokeWidth="1" />
+
+                  {/* Пульсирующие биометрические узлы: Пятка, Пучки M1–M5, Мысок */}
+                  <g transform="translate(42, 44)">
+                    <circle r="5" fill={accentHex} className="bio-pulse" />
+                    <circle r="2.5" fill={accentHex} />
+                  </g>
+                  <g transform="translate(178, 26)">
+                    <circle r="5.5" fill={accentHex} className="bio-pulse" />
+                    <circle r="2.5" fill={accentHex} />
+                  </g>
+                  <g transform="translate(232, 41)">
+                    <circle r="4.5" fill={trackColor} className="bio-pulse" />
+                    <circle r="2.2" fill={trackColor} />
+                  </g>
+                </g>
+
+                {/* Подписи прямо на рентген-чертеже */}
+                <text x="128" y="47" textAnchor="middle" fill={trackColor} fontSize="10.5" fontWeight="700" fontFamily="sans-serif">
+                  {t.xrayFootTag}: {proFit.footMm} {t.mmLabel}
+                </text>
+                <text
+                  x={244 + lastAllowanceExtraPx / 2}
+                  y="32"
+                  textAnchor="middle"
+                  fill={accentHex}
+                  fontSize="9.5"
+                  fontWeight="700"
+                  fontFamily="sans-serif"
+                >
+                  +{proFit.allowanceMm}
+                </text>
+              </svg>
+            </div>
+
+            {/* Нижняя строка рентген-сканера: 3 чётких параметра крупным шрифтом */}
+            <div className={`grid grid-cols-3 gap-2 pt-2 mt-1 border-t ${cLine} text-center`}>
+              <div>
+                <span className={`text-[10px] uppercase block ${cTextMuted}`}>{t.xrayFootTag}</span>
+                <span className="text-[13px] font-sans font-bold">
+                  {proFit.footMm} {t.mmLabel} ({proFit.footCm.toFixed(1)} {t.cmLabel})
+                </span>
+              </div>
+              <div className={`border-l border-r ${cLine}`}>
+                <span className={`text-[10px] uppercase block ${cTextMuted}`}>{t.xrayBallTag}</span>
+                <span className="text-[13px] font-sans font-bold">
+                  {proFit.ballGirthMm} {t.mmLabel} · {proFit.widthMarks.eu}
+                </span>
+              </div>
+              <div>
+                <span className={`text-[10px] uppercase block ${cTextMuted}`}>{t.insoleLabel}</span>
+                <span className="text-[13px] font-sans font-bold" style={{ color: accentHex }}>
+                  {proFit.insoleMm} {t.mmLabel} (+{proFit.allowanceMm})
                 </span>
               </div>
             </div>
-
-            <button
-              type="button"
-              onPointerDown={(e) => startHold(1, e)}
-              onPointerUp={stopHold}
-              onPointerLeave={stopHold}
-              onPointerCancel={stopHold}
-              disabled={footMm >= range.max}
-              aria-label="Increase foot length"
-              className={`w-9 h-9 rounded-full border ${cLine} ${cCardElevated} ${cText} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 active:scale-95`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
           </div>
 
-          {/* 3-ЗОННАЯ ТЕЛЕМЕТРИЯ ПО СТАНДАРТАМ JIS S 5037 / ГОСТ 3927-88 / ISO 19407 (без переноса и наложения слов) */}
-          <div className={`grid grid-cols-3 gap-1 my-1.5 p-1.5 rounded-xl border ${cLine} ${cCardElevated}`}>
-            {/* Зона 1: Обхват пучков M1–M5 (JIS S 5037 / ГОСТ 3927-88) */}
-            <div className="flex flex-col px-1 min-w-0">
-              <span className={`text-[9.5px] font-sans truncate ${cTextMuted}`}>{t.zoneGirth}</span>
-              <span className="text-[11px] font-sans font-semibold truncate">
-                {proFit.ballGirthMm} {t.mmLabel}
-              </span>
-              <div className="w-full h-1 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: trackBgColor }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  animate={{ width: `${girthBarPct}%` }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                  style={{ backgroundColor: trackColor }}
-                />
-              </div>
-            </div>
-
-            {/* Зона 2: Ширина пучков M1–M5 (JIS S 5037) */}
-            <div className={`flex flex-col px-1.5 border-l border-r ${cLine} min-w-0`}>
-              <span className={`text-[9.5px] font-sans truncate ${cTextMuted}`}>{t.zoneArch}</span>
-              <span className="text-[11px] font-sans font-semibold truncate">
-                {proFit.ballWidthMm} {t.mmLabel} · {proFit.widthMarks.eu}
-              </span>
-              <div className="w-full h-1 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: trackBgColor }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  animate={{ width: `${widthBarPct}%` }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                  style={{ backgroundColor: accentHex }}
-                />
-              </div>
-            </div>
-
-            {/* Зона 3: Стелька и припуск (ISO 19407 Таблица 1) */}
-            <div className="flex flex-col px-1 min-w-0">
-              <span className={`text-[9.5px] font-sans truncate ${cTextMuted}`}>{t.zoneInsole}</span>
-              <span className="text-[11px] font-sans font-semibold truncate" style={{ color: accentHex }}>
-                {proFit.insoleMm} {t.mmLabel}
-              </span>
-              <div className="w-full h-1 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: trackBgColor }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  animate={{ width: `${insoleBarPct}%` }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                  style={{ backgroundColor: accentHex }}
-                />
-              </div>
-            </div>
+          {/* ЯСНАЯ ПОДСКАЗКА ПРОТИВ ОШИБКИ С ПОЛЗУНКОМ */}
+          <div className={`text-[11px] font-sans leading-snug px-2.5 py-1.5 rounded-lg border ${cLine} ${cCardElevated} mb-2`}>
+            <span>{t.builtInAllowanceHint} </span>
+            <strong style={{ color: accentHex }}>EU {formatSize(activeResult.eu)}</strong>
+            <span>
+              {' '}
+              ({t.insoleLabel.toLowerCase()} <strong>{proFit.insoleMm} {t.mmLabel}</strong> = {t.xrayFootTag.toLowerCase()}{' '}
+              <strong>{proFit.footMm} {t.mmLabel}</strong> + <strong>{proFit.allowanceMm} {t.mmLabel}</strong>).
+            </span>
           </div>
 
-          {/* 3. МАГНИТНАЯ ШКАЛА */}
-          <div className="relative w-full pt-0.5">
+          {/* 3. МАГНИТНАЯ ШКАЛА-РУЛЕТКА */}
+          <div className="relative w-full pt-1">
             <input
               type="range"
-              min={range.min}
-              max={range.max}
+              min={sliderMin}
+              max={sliderMax}
               step={1}
-              value={footMm}
+              value={currentActiveMm}
               onChange={handleSliderChange}
               onPointerDown={() => {
                 setIsDraggingSlider(true)
@@ -643,17 +795,17 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 hapticImpact('light')
               }}
               onPointerCancel={() => setIsDraggingSlider(false)}
-              className="w-full h-7 absolute inset-x-0 -top-0.5 z-30 opacity-0 cursor-pointer"
+              className="w-full h-9 absolute inset-x-0 -top-1 z-30 opacity-0 cursor-pointer"
             />
 
-            <div className="relative h-5 flex items-end justify-between px-1 pointer-events-none">
+            <div className="relative h-6 flex items-end justify-between px-1 pointer-events-none">
               {Array.from({ length: RULER_TICKS }).map((_, idx) => {
                 const tickPct = (idx / (RULER_TICKS - 1)) * 100
                 const dist = Math.abs(tickPct - pct)
                 const proximity = Math.max(0, 1 - dist / 14)
-                const baseHeight = idx % 4 === 0 ? 8 : 4
-                const dynamicHeight = baseHeight + proximity * 9
-                const isMajor = idx % 4 === 0
+                const baseHeight = idx % 5 === 0 ? 10 : 5
+                const dynamicHeight = baseHeight + proximity * 11
+                const isMajor = idx % 5 === 0
 
                 return (
                   <div
@@ -662,7 +814,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     style={{
                       height: `${dynamicHeight}px`,
                       backgroundColor: proximity > 0.55 ? accentHex : trackColor,
-                      opacity: proximity > 0.2 ? 0.95 : isMajor ? 0.45 : 0.22,
+                      opacity: proximity > 0.2 ? 0.95 : isMajor ? 0.48 : 0.22,
                     }}
                   />
                 )
@@ -671,40 +823,40 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               <div
                 className="absolute top-1/2 -translate-y-1/2 z-20 pointer-events-none transition-transform duration-75"
                 style={{
-                  left: `calc(${pct}% - 10px)`,
-                  transform: `translateY(-50%) scale(${isDraggingSlider ? 1.18 : 1})`,
+                  left: `calc(${pct}% - 12px)`,
+                  transform: `translateY(-50%) scale(${isDraggingSlider ? 1.2 : 1})`,
                 }}
               >
                 <div
-                  className="w-5 h-5 rounded-full shadow-md flex items-center justify-center"
+                  className="w-6 h-6 rounded-full shadow-md flex items-center justify-center"
                   style={{
                     backgroundColor: trackColor,
-                    border: `2px solid ${isDark ? '#0A0A0A' : '#F2EFE9'}`,
+                    border: `2.5px solid ${isDark ? '#0A0A0A' : '#F2EFE9'}`,
                   }}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentHex }} />
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accentHex }} />
                 </div>
               </div>
             </div>
 
-            <div className={`flex justify-between items-center text-[10px] font-sans font-medium ${cTextMuted} mt-0.5 px-0.5`}>
+            <div className={`flex justify-between items-center text-[11px] font-sans font-semibold ${cTextMuted} mt-1 px-0.5`}>
               <span>
-                {unit === 'cm' ? (range.min / 10).toFixed(1) : range.min} {unit === 'cm' ? t.cmLabel : t.mmLabel}
+                {unit === 'cm' ? (sliderMin / 10).toFixed(1) : sliderMin} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
-              <span className="text-[9.5px] uppercase tracking-[0.1em] truncate px-1">
-                {t.step1} · +{proFit.allowanceMm} {t.mmLabel}
+              <span className="text-[10.5px] uppercase tracking-[0.12em]">
+                {measureMode === 'foot' ? t.footLengthLabel : t.insoleInputLabel}
               </span>
               <span>
-                {unit === 'cm' ? (range.max / 10).toFixed(1) : range.max} {unit === 'cm' ? t.cmLabel : t.mmLabel}
+                {unit === 'cm' ? (sliderMax / 10).toFixed(1) : sliderMax} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4. НАВИГАЦИЯ ПО ВКЛАДКАМ */}
-      <nav className="px-3 pt-1.5 shrink-0">
-        <div className={`relative grid grid-cols-4 gap-1 p-0.5 rounded-xl border ${cLine} ${cCard}`}>
+      {/* 4. НАВИГАЦИЯ ПО ВКЛАДКАМ (Крупный читаемый шрифт 12px, без layoutId-фризов) */}
+      <nav className="px-3.5 pt-2 shrink-0">
+        <div className={`grid grid-cols-4 gap-1 p-1 rounded-xl border ${cLine} ${cCard}`}>
           {(
             [
               { id: 'world', label: t.tabWorld },
@@ -719,26 +871,17 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 key={tab.id}
                 type="button"
                 onClick={() => {
-                  hapticImpact('light')
+                  hapticImpact('medium')
                   setActiveTab(tab.id)
                 }}
-                className={`relative z-10 py-1.5 px-1 rounded-lg text-[10.5px] font-sans font-semibold uppercase tracking-[0.04em] transition-colors border-none bg-transparent cursor-pointer truncate ${
+                className={`py-2 px-1 rounded-lg text-[12px] font-sans font-semibold uppercase tracking-[0.05em] transition-all duration-200 border-none cursor-pointer truncate ${
                   active
                     ? isDark
-                      ? 'text-[#0A0A0A]'
-                      : 'text-[#F2EFE9]'
-                    : cTextMuted
+                      ? 'bg-[#F4F0E8] text-[#0A0A0A] shadow-xs'
+                      : 'bg-[#1C1816] text-[#F2EFE9] shadow-xs'
+                    : `bg-transparent ${cTextMuted}`
                 }`}
               >
-                {active && (
-                  <motion.div
-                    layoutId="activeTabPill"
-                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-                    className={`absolute inset-0 rounded-lg -z-10 shadow-xs ${
-                      isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
-                    }`}
-                  />
-                )}
                 {tab.label}
               </button>
             )
@@ -746,18 +889,18 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
       </nav>
 
-      {/* 5. РАБОЧАЯ ОБЛАСТЬ ВКЛАДОК (адаптивно сжимается и прокручивается без обрезки на iPhone/Android) */}
-      <main className="flex-1 min-h-0 px-3 pt-1.5 pb-2 overflow-y-auto scrollbar-hide flex flex-col justify-between gap-1.5">
+      {/* 5. РАБОЧАЯ ОБЛАСТЬ ВКЛАДОК (Крупные цифры 26px и читаемые подписи) */}
+      <main className="flex-1 px-3.5 pt-2 pb-4 flex flex-col justify-between gap-2.5">
         <AnimatePresence mode="wait">
           {/* ВКЛАДКА 1: 8 МИРОВЫХ СТАНДАРТОВ */}
           {activeTab === 'world' && (
             <motion.div
               key="world"
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14 }}
-              className="grid grid-cols-2 gap-1.5"
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
+              className="grid grid-cols-2 gap-2"
             >
               {worldSystems.map((item) => {
                 const unlocked = item.free || isProPurchased
@@ -768,35 +911,30 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       if (!unlocked) handleProClick()
                       else hapticSelection()
                     }}
-                    className={`relative rounded-xl border ${cLine} ${cCard} px-2.5 py-2 flex items-center justify-between gap-1.5 ${
+                    className={`relative rounded-xl border ${cLine} ${cCard} px-3.5 py-3 flex items-center justify-between gap-2 ${
                       !unlocked ? 'cursor-pointer active:scale-[0.98]' : ''
                     }`}
                   >
                     <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         {item.flag}
-                        <span className="text-[11.5px] font-sans font-semibold uppercase tracking-[0.04em] truncate">
+                        <span className="text-[13.5px] font-sans font-bold uppercase tracking-[0.05em] truncate">
                           {item.code}
                         </span>
                       </div>
-                      <span className={`text-[10px] font-sans ${cTextMuted} truncate mt-0.5`}>
+                      <span className={`text-[11px] font-sans ${cTextMuted} truncate mt-0.5`}>
                         {item.sub}
                       </span>
                     </div>
 
                     {unlocked ? (
-                      <motion.span
-                        key={item.val}
-                        initial={{ scale: 0.94, opacity: 0.65 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="font-serif text-[21px] leading-none tracking-tight shrink-0"
-                      >
+                      <span className="font-serif text-[26px] leading-none tracking-tight shrink-0 tabular-nums">
                         {item.val}
-                      </motion.span>
+                      </span>
                     ) : (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="font-serif text-base blur-[4px] opacity-40 select-none">42.5</span>
-                        <span className={`p-1 rounded-md border ${cLine} ${cTextMuted}`}>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-serif text-xl blur-[4px] opacity-40 select-none">42.5</span>
+                        <span className={`p-1.5 rounded-lg border ${cLine} ${cTextMuted}`}>
                           <LockIcon />
                         </span>
                       </div>
@@ -807,18 +945,18 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
-          {/* ВКЛАДКА 2: КОЛОДКА, СТЕЛЬКА И ПОЛНОТА */}
+          {/* ВКЛАДКА 2: КОЛОДКА, СЕЗОН (ЗИМА/МЕХ) И ПОЛНОТА */}
           {activeTab === 'fit' && (
             <motion.div
               key="fit"
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14 }}
-              className="flex flex-col gap-1.5"
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col gap-2"
             >
-              <div className={`rounded-xl border ${cLine} ${cCard} p-2.5 flex flex-col gap-2`}>
-                <div className="flex flex-wrap gap-1">
+              <div className={`rounded-xl border ${cLine} ${cCard} p-3 flex flex-col gap-2.5`}>
+                <div className="flex flex-wrap gap-1.5">
                   {(
                     [
                       { id: 'sneakers', label: t.styleSneakers },
@@ -832,14 +970,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       key={st.id}
                       type="button"
                       onClick={() => {
-                        hapticImpact('light')
+                        hapticImpact('medium')
                         setShoeStyle(st.id)
                       }}
-                      className={`px-2.5 py-1 rounded-lg text-[10.5px] font-sans font-medium uppercase tracking-wider border cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-[12px] font-sans font-semibold uppercase tracking-wider border cursor-pointer transition-colors ${
                         shoeStyle === st.id
                           ? isDark
-                            ? 'border-[#F4F0E8] bg-[#F4F0E8] text-[#0A0A0A] font-semibold'
-                            : 'border-[#1C1816] bg-[#1C1816] text-[#F2EFE9] font-semibold'
+                            ? 'border-[#F4F0E8] bg-[#F4F0E8] text-[#0A0A0A]'
+                            : 'border-[#1C1816] bg-[#1C1816] text-[#F2EFE9]'
                           : `${cLine} bg-transparent ${cTextMuted}`
                       }`}
                     >
@@ -848,7 +986,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-2 gap-1">
+                <div className="grid grid-cols-2 gap-1.5">
                   {(
                     [
                       { id: 'narrow', label: t.widthNarrow },
@@ -861,14 +999,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       key={wf.id}
                       type="button"
                       onClick={() => {
-                        hapticImpact('light')
+                        hapticImpact('medium')
                         setWidthFit(wf.id)
                       }}
-                      className={`py-1.5 px-2 rounded-lg text-[10.5px] font-sans font-medium uppercase tracking-wider border cursor-pointer truncate ${
+                      className={`py-2 px-2.5 rounded-lg text-[12px] font-sans font-semibold uppercase tracking-wider border cursor-pointer truncate transition-colors ${
                         widthFit === wf.id
                           ? isDark
-                            ? 'border-[#D4AF37] bg-[#D4AF37]/20 text-[#F4F0E8] font-semibold'
-                            : 'border-[#8C5A2B] bg-[#8C5A2B]/15 text-[#1C1816] font-semibold'
+                            ? 'border-[#D4AF37] bg-[#D4AF37]/25 text-[#F4F0E8]'
+                            : 'border-[#8C5A2B] bg-[#8C5A2B]/20 text-[#1C1816]'
                           : `${cLine} bg-transparent ${cTextMuted}`
                       }`}
                     >
@@ -882,46 +1020,47 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 onClick={() => {
                   if (!isProPurchased) handleProClick()
                 }}
-                className={`rounded-xl border ${cLine} ${cCard} p-3 grid grid-cols-2 gap-2.5 ${
+                className={`rounded-xl border ${cLine} ${cCard} p-3.5 grid grid-cols-2 gap-3 ${
                   !isProPurchased ? 'cursor-pointer' : ''
                 }`}
               >
-                <div className="min-w-0">
-                  <span className={`text-[10px] uppercase tracking-wider block truncate ${cTextMuted}`}>
+                <div>
+                  <span className={`text-[11px] font-semibold uppercase tracking-wider block ${cTextMuted}`}>
                     {t.insoleLabel} / {t.allowanceLabel}
                   </span>
-                  <span className={`font-serif text-xl block mt-0.5 ${!isProPurchased ? 'blur-[4px]' : ''}`}>
-                    {proFit.insoleMm} {t.mmLabel} ({proFit.insoleCm} {t.cmLabel})
+                  <span className={`font-serif text-[24px] block mt-0.5 ${!isProPurchased ? 'blur-[4px]' : ''}`}>
+                    {proFit.insoleMm} {t.mmLabel} ({proFit.insoleCm.toFixed(1)} {t.cmLabel})
                   </span>
-                  <span className={`block text-[10.5px] mt-0.5 ${cTextMuted}`}>
-                    +{proFit.allowanceMm} {t.mmLabel} · ISO {proFit.isoLastRangeMm[0]}–{proFit.isoLastRangeMm[1]} {t.mmLabel}
+                  <span className={`block text-[11.5px] mt-0.5 ${cTextMuted}`}>
+                    {t.xrayFootTag} {proFit.footMm} + {proFit.allowanceMm} {t.mmLabel} →{' '}
+                    <strong style={{ color: accentHex }}>EU {formatSize(activeResult.eu)}</strong>
                   </span>
                 </div>
 
-                <div className="min-w-0">
-                  <span className={`text-[10px] uppercase tracking-wider block truncate ${cTextMuted}`}>
+                <div>
+                  <span className={`text-[11px] font-semibold uppercase tracking-wider block ${cTextMuted}`}>
                     {t.widthLabel} / {t.girthLabel}
                   </span>
-                  <span className={`font-serif text-xl block mt-0.5 ${!isProPurchased ? 'blur-[4px]' : ''}`}>
+                  <span className={`font-serif text-[24px] block mt-0.5 ${!isProPurchased ? 'blur-[4px]' : ''}`}>
                     {proFit.ballWidthMm} / {proFit.ballGirthMm} {t.mmLabel}
                   </span>
-                  <span className={`block text-[10.5px] mt-0.5 ${cTextMuted} ${!isProPurchased ? 'blur-[3px]' : ''}`}>
-                    EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · UK {proFit.widthMarks.uk} · JP {proFit.widthMarks.jp}
+                  <span className={`block text-[11.5px] mt-0.5 ${cTextMuted} ${!isProPurchased ? 'blur-[3px]' : ''}`}>
+                    EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · JP {proFit.widthMarks.jp}
                   </span>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ВКЛАДКА 3: МАТРИЦА ПОСАДКИ БРЕНДОВ (без Cardio, без обрезки описаний) */}
+          {/* ВКЛАДКА 3: МАТРИЦА ПОСАДКИ БРЕНДОВ */}
           {activeTab === 'brands' && (
             <motion.div
               key="brands"
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14 }}
-              className="flex flex-col gap-1.5"
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col gap-2"
             >
               {proFit.brandMatrix.map((row: BrandFitEntry) => (
                 <div
@@ -930,36 +1069,36 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     if (!isProPurchased) handleProClick()
                     else hapticSelection()
                   }}
-                  className={`rounded-xl border ${cLine} ${cCard} px-3 py-2 flex items-center justify-between gap-2 ${
+                  className={`rounded-xl border ${cLine} ${cCard} px-3.5 py-2.5 flex items-center justify-between gap-2.5 ${
                     !isProPurchased ? 'cursor-pointer' : ''
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[12px] font-sans font-semibold uppercase tracking-wider">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-sans font-bold uppercase tracking-wider">
                         {row.brand}
                       </span>
-                      <span className={`text-[9.5px] uppercase px-1.5 py-0.2 rounded border ${cLine} ${cTextMuted}`}>
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border ${cLine} ${cTextMuted}`}>
                         {row.category}
                       </span>
                     </div>
-                    <p className={`text-[10.5px] font-sans leading-snug ${cTextMuted} line-clamp-2 mt-0.5`}>
+                    <p className={`text-[11.5px] font-sans leading-snug ${cTextMuted} mt-0.5`}>
                       {row.offsetNote[safeLang]}
                     </p>
                   </div>
 
                   {isProPurchased ? (
                     <div className="text-right shrink-0">
-                      <span className="font-serif text-[16px] block leading-tight">
+                      <span className="font-serif text-[19px] block leading-tight">
                         EU {row.eu} · US {row.us}
                       </span>
-                      <span className={`text-[10px] font-sans ${cTextMuted}`}>
+                      <span className={`text-[11px] font-sans ${cTextMuted}`}>
                         UK {row.uk} · JP {row.jp}
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="font-serif text-sm blur-[4px] opacity-40 select-none">EU 42.5</span>
+                      <span className="font-serif text-base blur-[4px] opacity-40 select-none">EU 42.5</span>
                       <LockIcon />
                     </div>
                   )}
@@ -972,19 +1111,21 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           {activeTab === 'guide' && (
             <motion.div
               key="guide"
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14 }}
-              className={`rounded-xl border ${cLine} ${cCard} p-3 flex flex-col gap-2`}
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.15 }}
+              className={`rounded-xl border ${cLine} ${cCard} p-4 flex flex-col gap-2.5`}
             >
-              <p className="text-[12px] font-sans leading-snug">{t.measureGuide1}</p>
-              <p className="text-[12px] font-sans leading-snug">{t.measureGuide2}</p>
-              <p className="text-[12px] font-sans leading-snug">{t.measureGuide3}</p>
-              <p className={`text-[11px] font-sans italic pt-1.5 border-t ${cLine} ${cTextMuted}`}>
+              <p className="text-[13px] font-sans leading-relaxed">{t.measureGuide1}</p>
+              <p className="text-[13px] font-sans leading-relaxed">{t.measureGuide2}</p>
+              <p className="text-[13px] font-sans leading-relaxed font-semibold" style={{ color: accentHex }}>
+                {t.measureGuide3}
+              </p>
+              <p className={`text-[12px] font-sans italic pt-2 border-t ${cLine} ${cTextMuted}`}>
                 {t.measureTip}
               </p>
-              <div className={`pt-1.5 border-t ${cLine} text-[10px] font-sans ${cTextMuted}`}>
+              <div className={`pt-2 border-t ${cLine} text-[11px] font-sans ${cTextMuted}`}>
                 <div>{t.disclaimer}</div>
                 <div className="mt-0.5">{t.standardsNote}</div>
               </div>
@@ -992,26 +1133,26 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           )}
         </AnimatePresence>
 
-        {/* 6. НИЖНИЙ БАР СТАТУСА ИЛИ ПОКУПКИ PRO (компактный, всегда виден на экране iPhone и Android) */}
-        <div className="shrink-0 pt-0.5">
+        {/* 6. НИЖНИЙ БАР СТАТУСА ИЛИ ПОКУПКИ PRO */}
+        <div className="shrink-0 pt-1">
           {statusError && (
-            <div className="mb-1 px-2.5 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-[11px] text-center">
+            <div className="mb-1.5 px-3 py-2 rounded-lg border border-red-500/40 bg-red-500/10 text-[12px] text-center">
               {statusError}
             </div>
           )}
 
           {!isProPurchased ? (
-            <div className={`rounded-xl border ${cLine} pro-shimmer px-3 py-2 flex flex-col gap-1.5`}>
+            <div className={`rounded-xl border ${cLine} pro-shimmer p-3 flex flex-col gap-2`}>
               <div>
-                <h3 className="font-serif text-sm tracking-tight leading-tight">{t.proTitle}</h3>
-                <p className={`text-[10.5px] font-sans leading-tight mt-0.5 ${cTextMuted}`}>{t.proDesc}</p>
+                <h3 className="font-serif text-base tracking-tight leading-snug">{t.proTitle}</h3>
+                <p className={`text-[11.5px] font-sans leading-snug mt-0.5 ${cTextMuted}`}>{t.proDesc}</p>
               </div>
 
               <button
                 type="button"
                 onClick={handleProClick}
                 disabled={isPurchasing}
-                className={`w-full py-2 px-3 rounded-lg border ${cLine} flex items-center justify-center gap-1.5 text-[11px] font-sans font-semibold uppercase tracking-[0.1em] cursor-pointer active:scale-[0.99] ${
+                className={`w-full py-3 px-4 rounded-xl border ${cLine} flex items-center justify-center gap-2 text-[12px] font-sans font-bold uppercase tracking-[0.12em] cursor-pointer active:scale-[0.98] transition-transform ${
                   isDark ? 'bg-[#F4F0E8] text-[#0A0A0A]' : 'bg-[#1C1816] text-[#F2EFE9]'
                 }`}
               >
@@ -1026,9 +1167,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </button>
             </div>
           ) : (
-            <div className={`rounded-xl border ${cLine} ${cCard} px-3 py-2 flex items-center justify-between text-[10px] font-sans font-medium uppercase tracking-[0.1em] ${cTextMuted}`}>
+            <div className={`rounded-xl border ${cLine} ${cCard} px-4 py-2.5 flex items-center justify-between text-[11px] font-sans font-semibold uppercase tracking-[0.12em] ${cTextMuted}`}>
               <span className="truncate">{t.subtitle}</span>
-              <span className="shrink-0 ml-2 font-semibold" style={{ color: accentHex }}>
+              <span className="shrink-0 ml-2 font-bold" style={{ color: accentHex }}>
                 ★ {t.proActiveBadge}
               </span>
             </div>
