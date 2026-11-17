@@ -1565,6 +1565,131 @@ type ZoneMaterialRegistry = Record<SneakerZoneKey, THREE_TYPES.MeshStandardMater
  * ИСПРАВЛЕНО (AUDIT-09): Освобождает заменённые исходные материалы GLB после клонирования
  * и сохраняет рельефные карты (normalMap, roughnessMap, aoMap).
  */
+/**
+ * Автоматическая дорезка старой версии sneaker_modular.glb на клиенте (если в кэше или public/
+ * осталась версия, где ToeBox содержал всего 215 вершин, а Outsole заходил на клипсу пятки).
+ */
+function ensureCleanGlbSegmentation(THREE: ThreeLib, root: THREE_TYPES.Object3D) {
+  let toeBoxVerts = 0
+  const meshesByName: Record<string, THREE_TYPES.Mesh> = {}
+
+  root.traverse((obj) => {
+    const m = obj as THREE_TYPES.Mesh
+    if (!m.isMesh || !m.geometry) return
+    const key = (m.name || '').trim()
+    meshesByName[key] = m
+    if (key.toLowerCase() === 'toebox') {
+      toeBoxVerts = m.geometry.attributes.position?.count || 0
+    }
+  })
+
+  // Если загружен уже переработанный GLB (в котором ToeBox > 600 вершин), переразбивка не требуется
+  if (toeBoxVerts === 0 || toeBoxVerts > 600) return
+
+  const splitMeshByPredicate = (
+    srcMesh: THREE_TYPES.Mesh,
+    targetZoneName: string,
+    predicate: (cx: number, cy: number, cz: number, ny: number, lum: number) => boolean
+  ) => {
+    const geom = srcMesh.geometry
+    const posAttr = geom.attributes.position
+    const normAttr = geom.attributes.normal
+    const colAttr = geom.attributes.color
+    const indexAttr = geom.index
+    if (!posAttr || !indexAttr) return
+
+    const indices = indexAttr.array
+    const keepIndices: number[] = []
+    const moveIndices: number[] = []
+
+    for (let i = 0; i < indices.length; i += 3) {
+      const i0 = indices[i]
+      const i1 = indices[i + 1]
+      const i2 = indices[i + 2]
+      const cx = (posAttr.getX(i0) + posAttr.getX(i1) + posAttr.getX(i2)) / 3
+      const cy = (posAttr.getY(i0) + posAttr.getY(i1) + posAttr.getY(i2)) / 3
+      const cz = (posAttr.getZ(i0) + posAttr.getZ(i1) + posAttr.getZ(i2)) / 3
+      const ny = normAttr
+        ? (normAttr.getY(i0) + normAttr.getY(i1) + normAttr.getY(i2)) / 3
+        : 1
+      const lum = colAttr
+        ? (colAttr.getX(i0) + colAttr.getX(i1) + colAttr.getX(i2)) / 3
+        : 0.5
+
+      if (predicate(cx, cy, cz, ny, lum)) {
+        moveIndices.push(i0, i1, i2)
+      } else {
+        keepIndices.push(i0, i1, i2)
+      }
+    }
+
+    if (moveIndices.length === 0) return
+
+    geom.setIndex(keepIndices)
+    geom.computeBoundingSphere()
+
+    const movedGeom = geom.clone()
+    movedGeom.setIndex(moveIndices)
+    movedGeom.computeBoundingSphere()
+
+    const movedMesh = new THREE.Mesh(movedGeom, srcMesh.material)
+    movedMesh.name = targetZoneName
+    srcMesh.parent?.add(movedMesh)
+  }
+
+  // 1. Выделяем U-образную сетчатую деку мыска (ToeBox) из монолитного Vamp
+  if (meshesByName['Vamp']) {
+    splitMeshByPredicate(meshesByName['Vamp'], 'ToeBox', (cx, cy, cz, ny) => {
+      const dz = Math.max(0, cz - 0.44)
+      const uSeam = Math.pow((cx - 0.012) / 0.285, 2) + Math.pow(dz / 0.61, 2)
+      const yDeckFloor = -0.10 - 0.26 * Math.max(0, Math.min(1, (cz - 0.28) / 0.76))
+      return cz > 0.22 && cz < 1.06 && uSeam < 1.0 && cy > yDeckFloor && ny > 0.06
+    })
+  }
+
+  // 2. Отделяем заднюю клипсу ENCAP / верхний край межподошвы от протектора Outsole
+  if (meshesByName['Outsole']) {
+    splitMeshByPredicate(meshesByName['Outsole'], 'Midsole', (_cx, cy, cz) => {
+      if (cz > 1.16) return false
+      const toeRise = Math.pow(Math.max(0, (cz - 0.90) / 0.48), 1.55) * 0.21
+      const ySplit = -0.440 + 0.018 * ((cz + 1.38) / 2.76) + toeRise
+      return cy > ySplit
+    })
+  }
+
+  // 3. Очищаем контур логотипа N (Swoosh) от захваченных участков берцев Quarters и межподошвы
+  if (meshesByName['Swoosh']) {
+    splitMeshByPredicate(meshesByName['Swoosh'], 'Midsole', (_cx, cy) => cy < -0.24)
+    splitMeshByPredicate(meshesByName['Swoosh'], 'Quarters', (_cx, cy, cz, _ny, lum) => {
+      return (
+        lum < 0.57 ||
+        cz < -0.25 ||
+        cz > 0.23 ||
+        cy > 0.22 ||
+        (cz < -0.12 && cy > 0.08)
+      )
+    })
+  }
+
+  // 4. Выравниваем границу HeelCounter / Collar / Quarters / заднего хлястика Swoosh
+  ;(['HeelCounter', 'Collar'] as const).forEach((name) => {
+    const mesh = meshesByName[name]
+    if (!mesh) return
+    splitMeshByPredicate(mesh, 'Midsole', (_cx, cy) => cy < -0.215)
+    splitMeshByPredicate(mesh, 'Quarters', (_cx, cy, cz) => cy >= -0.215 && cz > -0.48 && cy < 0.16)
+    splitMeshByPredicate(
+      mesh,
+      'Swoosh',
+      (cx, cy, cz) => cz < -1.02 && cy > 0.22 && Math.abs(cx) < 0.22
+    )
+    const targetZone = name === 'HeelCounter' ? 'Collar' : 'HeelCounter'
+    splitMeshByPredicate(mesh, targetZone, (_cx, cy, cz) => {
+      const yCollarSeam = 0.075 + 0.13 * ((cz + 1.28) / 0.82)
+      return name === 'HeelCounter' ? cy >= yCollarSeam : cy < yCollarSeam
+    })
+  })
+}
+
 function bindGlbMaterialsPreservingTextures(
   THREE: ThreeLib,
   root: THREE_TYPES.Object3D,
@@ -2013,6 +2138,7 @@ export function Sneaker3D({
                   disposeObject3DResources(pivotGroup, baseMaterialsSet)
                   pivotGroup.clear()
 
+                  ensureCleanGlbSegmentation(THREE, gltf.scene)
                   bindGlbMaterialsPreservingTextures(
                     THREE,
                     gltf.scene,
