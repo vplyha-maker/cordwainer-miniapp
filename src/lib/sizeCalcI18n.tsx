@@ -1,7 +1,6 @@
 /**
  * src/lib/sizeCalcI18n.tsx
- * Локализация (RU / UK / DE / EN), SVG-флаги и усиленный тактильный движок
- * для Android (Samsung One UI / Xiaomi / Pixel) и iPhone (Taptic Engine).
+ * Локализация (RU / UK / DE / EN), SVG-флаги и кроссплатформенный виброотклик (iOS + Android).
  */
 import React from 'react'
 
@@ -12,11 +11,6 @@ export const PRO_PRICE_STARS = 150
 let sharedAudioCtx: AudioContext | null = null
 let lastHapticTimestamp = 0
 
-/**
- * Двухчастотный тактильно-акустический импульс штангенциркуля (работает и на iPhone, и на Android!)
- * Сочетает низкочастотный толчок (125 Гц) и сухой механический щелчок микрометра (880 Гц),
- * который хорошо воспроизводится динамиками Android-смартфонов.
- */
 function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') {
   try {
     const AudioCtx =
@@ -31,7 +25,6 @@ function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') 
     }
     const now = sharedAudioCtx.currentTime
 
-    // 1. Низкочастотный тактильный резонанс
     const oscLow = sharedAudioCtx.createOscillator()
     const gainLow = sharedAudioCtx.createGain()
     const duration = intensity === 'tick' ? 0.008 : intensity === 'light' ? 0.011 : 0.015
@@ -49,7 +42,6 @@ function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') 
     oscLow.start(now)
     oscLow.stop(now + duration)
 
-    // 2. Короткий механический щелчок храповика микрометра (слышен и ощутим на Android)
     const oscClick = sharedAudioCtx.createOscillator()
     const gainClick = sharedAudioCtx.createGain()
     const clickDur = 0.0035
@@ -67,9 +59,6 @@ function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') 
   } catch {}
 }
 
-/**
- * Прямой вызов нативного моста Telegram для Android (TelegramWebviewProxy) + WebApp SDK + Vibrator API
- */
 function triggerNativeTelegramHaptic(style: 'light' | 'medium' | 'heavy' | 'rigid') {
   const win = window as unknown as {
     Telegram?: {
@@ -88,7 +77,6 @@ function triggerNativeTelegramHaptic(style: 'light' | 'medium' | 'heavy' | 'rigi
     }
   }
 
-  // 1. Стандартный SDK Telegram (на Android используем 'medium'/'rigid', т.к. 'light'/selectionChanged глушится на Samsung)
   try {
     const hf = win.Telegram?.WebApp?.HapticFeedback
     if (hf?.impactOccurred) {
@@ -98,7 +86,6 @@ function triggerNativeTelegramHaptic(style: 'light' | 'medium' | 'heavy' | 'rigi
     }
   } catch {}
 
-  // 2. Прямой вызов Android Java-моста TelegramWebviewProxy
   try {
     if (typeof win.TelegramWebviewProxy?.postEvent === 'function') {
       win.TelegramWebviewProxy.postEvent(
@@ -113,7 +100,6 @@ function triggerNativeTelegramHaptic(style: 'light' | 'medium' | 'heavy' | 'rigi
     }
   } catch {}
 
-  // 3. Браузерный вибратор Android Chrome
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate(style === 'heavy' ? 35 : 22)
@@ -126,7 +112,6 @@ export function hapticSelection() {
   if (now - lastHapticTimestamp < 36) return
   lastHapticTimestamp = now
 
-  // На Android 'medium' реально включает мотор вибрации в Telegram (в отличие от беззвучного selectionChanged)
   triggerNativeTelegramHaptic('medium')
   playTapticMicroPulse('tick')
 }
@@ -146,8 +131,10 @@ export type TranslationBundle = {
   footLengthLabel: string
   insoleInputLabel: string
   yourSizeLabel: string
-  builtInAllowanceHint: string
-  winterShiftBadge: string
+  reserveActiveBadge: string
+  baseFitBadge: string
+  annotationFootMode: (eu: string, ua: string, footMm: number, insoleMm: number, addMm: number) => string
+  annotationInsoleMode: (insoleMm: number, addMm: number, footMm: number, eu: string, ua: string) => string
   men: string
   women: string
   kids: string
@@ -157,17 +144,14 @@ export type TranslationBundle = {
   allowanceLabel: string
   widthLabel: string
   girthLabel: string
-  xrayFootTag: string
-  xrayInsoleTag: string
-  xrayBallTag: string
-  subParisPoint: string
-  subDstuMetric: string
-  subBrannock: string
-  subBarleycorn: string
-  subJis: string
-  subGbt: string
-  subKsk: string
-  subAbnt: string
+  footTag: string
+  ballTag: string
+  subUa: string
+  subEu: string
+  subUs: string
+  subUk: string
+  subJp: string
+  subBrCn: string
   tabWorld: string
   tabFit: string
   tabBrands: string
@@ -186,12 +170,12 @@ export type TranslationBundle = {
   proBtn: string
   proActiveBadge: string
   loading: string
+  guideFootTitle: string
   measureGuide1: string
   measureGuide2: string
+  guideInsoleTitle: string
   measureGuide3: string
   measureTip: string
-  disclaimer: string
-  standardsNote: string
   openInTelegramErr: string
   paymentCancelledErr: string
   serverErrPrefix: string
@@ -200,34 +184,35 @@ export type TranslationBundle = {
 export const I18N: Record<SupportedLang, TranslationBundle> = {
   ru: {
     back: 'Назад',
-    subtitle: 'Cordwainer Biometric Caliper',
-    modeFoot: 'Замер стопы',
+    subtitle: 'Cordwainer Laser Caliper',
+    modeFoot: 'По стопе',
     modeInsole: 'По стельке',
     footLengthLabel: 'Длина стопы',
     insoleInputLabel: 'Длина стельки',
     yourSizeLabel: 'Ваш размер',
-    builtInAllowanceHint: 'Не прибавляйте стельку на ползунке: внутри размера',
-    winterShiftBadge: 'с учётом запаса',
+    reserveActiveBadge: 'С запасом (зима / бег)',
+    baseFitBadge: 'Основной размер',
+    annotationFootMode: (eu, ua, footMm, insoleMm, addMm) =>
+      `Режим «По стопе»: для ноги ${footMm} мм ваш размер ${ua} UA (${eu} EU). Запас +${addMm} мм (стелька ${insoleMm} мм) уже внутри обуви.`,
+    annotationInsoleMode: (insoleMm, addMm, footMm, eu, ua) =>
+      `Режим «По стельке»: из длины стельки ${insoleMm} мм вычтен запас −${addMm} мм (стопа ${footMm} мм) → ваш размер ${ua} UA (${eu} EU).`,
     men: 'Мужской',
     women: 'Женский',
     kids: 'Детский',
     cmLabel: 'см',
     mmLabel: 'мм',
-    insoleLabel: 'Стелька внутри',
-    allowanceLabel: 'Запас мыска',
+    insoleLabel: 'Стелька',
+    allowanceLabel: 'Запас',
     widthLabel: 'Ширина пучков',
     girthLabel: 'Обхват пучков',
-    xrayFootTag: 'Стопа',
-    xrayInsoleTag: 'Стелька',
-    xrayBallTag: 'Обхват M1–M5',
-    subParisPoint: 'Paris Point (2/3 см)',
-    subDstuMetric: 'ДСТУ / ГОСТ · см',
-    subBrannock: 'Brannock США',
-    subBarleycorn: 'Barleycorn (1/3")',
-    subJis: 'JIS S 5037 (см)',
-    subGbt: 'GB/T 3293.1',
-    subKsk: 'KS K 3405 (мм)',
-    subAbnt: 'ABNT NBR (EU−2)',
+    footTag: 'Стопа',
+    ballTag: 'Обхват M1–M5',
+    subUa: 'Украина',
+    subEu: 'Европа',
+    subUs: 'США',
+    subUk: 'Британия',
+    subJp: 'См (мм) на язычке',
+    subBrCn: 'Бразилия · Китай',
     tabWorld: 'Мировые',
     tabFit: 'Колодка',
     tabBrands: 'Бренды',
@@ -241,51 +226,52 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     widthStandard: 'Стандарт (G)',
     widthWide: 'Широкая (H)',
     widthExtraWide: 'Экстра (K)',
-    proTitle: 'PRO Паспорт Колодки & 8 стран',
-    proDesc: 'US, UK, Япония (JP), Китай (CN), Корея (KR), Бразилия (BR), полнота E–K (JIS / ГОСТ) и матрица брендов.',
+    proTitle: 'PRO Паспорт Колодки & Все страны',
+    proDesc: 'США (US), Британия (UK), Япония (JP/CM), Бразилия, Китай, полнота E–K и шпаргалка брендов.',
     proBtn: `ОТКРЫТЬ PRO ДОСТУП · ${PRO_PRICE_STARS} ⭐️`,
     proActiveBadge: 'PRO АКТИВЕН',
     loading: 'ПРОВЕРКА ТРАНЗАКЦИИ...',
-    measureGuide1: '1. Встаньте на лист бумаги в носках, распределив вес равномерно на обе ноги.',
-    measureGuide2: '2. Отметьте пятку и самый длинный палец вертикальным карандашом (90°) — это ваша длина стопы (например, 270 мм).',
-    measureGuide3: '3. ВАЖНО: В размер EU 42.5 (для стопы 270 мм) заводской запас стельки (+12…15 мм, т.е. стелька 282–285 мм) УЖЕ ЗАЛОЖЕН. Не выставляйте длину стельки в режиме «Замер стопы»!',
-    measureTip: 'Если вы измерили линейкой вынутую стельку (например, 285 мм), переключите кнопку сверху на «По стельке».',
-    disclaimer: 'Расчёты строго по таблицам ГОСТ Р 57425-2017 (ISO 19407) и ISO 9407 (Mondopoint).',
-    standardsNote: 'Полнота и обхват пучков: JIS S 5037 · ГОСТ 3927-88 · US Brannock.',
+    guideFootTitle: 'Способ 1 — Замер по стопе (рекомендуется)',
+    measureGuide1: 'Встаньте на лист бумаги в носках вечером, отметьте пятку и самый длинный палец вертикальным карандашом (90°). Например, 270 мм (27 см) = 42 UA / 42.5 EU.',
+    measureGuide2: 'Для зимней и беговой обуви включите во вкладке «Колодка» режим «Зима / Мех» или «Бег» — калькулятор сам добавит запас (+0.5 см → 42.5 / 43).',
+    guideInsoleTitle: 'Способ 2 — Замер по вынутой стельке',
+    measureGuide3: 'Если вы измерили линейкой вынутую стельку (например, 280–285 мм), переключите кнопку сверху на «По стельке» — калькулятор сам вычтет припуск и покажет точный размер.',
+    measureTip: 'При заказе онлайн всегда сверяйтесь с графой CM или JP на язычке (27.0 см на лето/демисезон, 27.5 см на зиму и бег).',
     openInTelegramErr: 'Откройте мини-приложение внутри Telegram для оплаты Stars.',
     paymentCancelledErr: 'Оплата была отменена или не завершена.',
     serverErrPrefix: 'Ошибка соединения',
   },
   uk: {
     back: 'Назад',
-    subtitle: 'Cordwainer Biometric Caliper',
-    modeFoot: 'Замір стопи',
+    subtitle: 'Cordwainer Laser Caliper',
+    modeFoot: 'По стопі',
     modeInsole: 'По устілці',
     footLengthLabel: 'Довжина стопи',
     insoleInputLabel: 'Довжина устілки',
     yourSizeLabel: 'Ваш розмір',
-    builtInAllowanceHint: 'Не додавайте устілку на повзунку: всередині розміру',
-    winterShiftBadge: 'з урахуванням запасу',
+    reserveActiveBadge: 'Із запасом (зима / біг)',
+    baseFitBadge: 'Основний розмір',
+    annotationFootMode: (eu, ua, footMm, insoleMm, addMm) =>
+      `Режим «По стопі»: для ноги ${footMm} мм ваш розмір ${ua} UA (${eu} EU). Запас +${addMm} мм (устілка ${insoleMm} мм) уже всередині взуття.`,
+    annotationInsoleMode: (insoleMm, addMm, footMm, eu, ua) =>
+      `Режим «По устілці»: з довжини устілки ${insoleMm} мм віднято запас −${addMm} мм (стопа ${footMm} мм) → ваш розмір ${ua} UA (${eu} EU).`,
     men: 'Чоловічий',
     women: 'Жіночий',
     kids: 'Дитячий',
     cmLabel: 'см',
     mmLabel: 'мм',
-    insoleLabel: 'Устілка всередині',
-    allowanceLabel: 'Запас миска',
+    insoleLabel: 'Устілка',
+    allowanceLabel: 'Запас',
     widthLabel: 'Ширина пучків',
     girthLabel: 'Обхват пучків',
-    xrayFootTag: 'Стопа',
-    xrayInsoleTag: 'Устілка',
-    xrayBallTag: 'Обхват M1–M5',
-    subParisPoint: 'Paris Point (2/3 см)',
-    subDstuMetric: 'ДСТУ · Метричний см',
-    subBrannock: 'Brannock США',
-    subBarleycorn: 'Barleycorn (1/3")',
-    subJis: 'JIS S 5037 (см)',
-    subGbt: 'GB/T 3293.1',
-    subKsk: 'KS K 3405 (мм)',
-    subAbnt: 'ABNT NBR (EU−2)',
+    footTag: 'Стопа',
+    ballTag: 'Обхват M1–M5',
+    subUa: 'Україна',
+    subEu: 'Європа',
+    subUs: 'США',
+    subUk: 'Британія',
+    subJp: 'См (мм) на язичку',
+    subBrCn: 'Бразилія · Китай',
     tabWorld: 'Світові',
     tabFit: 'Колодка',
     tabBrands: 'Бренди',
@@ -299,51 +285,52 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     widthStandard: 'Стандарт (G)',
     widthWide: 'Широка (H)',
     widthExtraWide: 'Екстра (K)',
-    proTitle: 'PRO Паспорт Колодки & 8 країн',
-    proDesc: 'US, UK, Японія (JP), Китай (CN), Корея (KR), Бразилія (BR), повнота E–K (JIS / ДСТУ) та матриця брендів.',
+    proTitle: 'PRO Паспорт Колодки & Усі країни',
+    proDesc: 'США (US), Британія (UK), Японія (JP/CM), Бразилія, Китай, повнота E–K та шпаргалка брендів.',
     proBtn: `ВІДКРИТИ PRO ДОСТУП · ${PRO_PRICE_STARS} ⭐️`,
     proActiveBadge: 'PRO АКТИВНИЙ',
     loading: 'ПЕРЕВІРКА ТРАНЗАКЦІЇ...',
-    measureGuide1: '1. Станьте на аркуш паперу в шкарпетках, рівномірно розподіливши вагу на обидві ноги.',
-    measureGuide2: '2. Позначте п’яту та найдовший палець вертикальним олівцем (90°) — це ваша довжина стопи (наприклад, 270 мм).',
-    measureGuide3: '3. ВАЖЛИВО: У розмір EU 42.5 (для стопи 270 мм) заводський запас устілки (+12…15 мм, тобто устілка 282–285 мм) ВЖЕ ЗАКЛАДЕНО. Не виставляйте довжину устілки в режимі «Замір стопи»!',
-    measureTip: 'Якщо ви виміряли лінійкою вийняту устілку (наприклад, 285 мм), перемкніть кнопку зверху на «По устілці».',
-    disclaimer: 'Розрахунки за таблицями ISO 19407:2023 та ISO 9407 (Mondopoint).',
-    standardsNote: 'Повнота та обхват пучків: JIS S 5037 · ДСТУ ГОСТ 3927 · US Brannock.',
+    guideFootTitle: 'Спосіб 1 — Замір по стопі (рекомендовано)',
+    measureGuide1: 'Станьте на аркуш паперу в шкарпетках увечері, позначте п’яту та найдовший палець вертикальним олівцем (90°). Наприклад, 270 мм (27 см) = 42 UA / 42.5 EU.',
+    measureGuide2: 'Для зимового та бігового взуття увімкніть у вкладці «Колодка» режим «Зима / Хутро» або «Біг» — калькулятор сам додасть запас (+0.5 см → 42.5 / 43).',
+    guideInsoleTitle: 'Спосіб 2 — Замір по вийнятій устілці',
+    measureGuide3: 'Якщо ви виміряли лінійкою вийняту устілку (наприклад, 280–285 мм), перемкніть кнопку зверху на «По устілці» — калькулятор сам відніме припуск і покаже точний розмір.',
+    measureTip: 'Під час замовлення онлайн завжди звіряйтеся з графою CM або JP на язичку (27.0 см на літо/демісезон, 27.5 см на зиму та біг).',
     openInTelegramErr: 'Відкрийте міні-додаток усередині Telegram для оплати Stars.',
     paymentCancelledErr: 'Оплату було скасовано або не завершено.',
     serverErrPrefix: 'Помилка з’єднання',
   },
   de: {
     back: 'Zurück',
-    subtitle: 'Cordwainer Biometric Caliper',
+    subtitle: 'Cordwainer Laser Caliper',
     modeFoot: 'Fußlänge',
     modeInsole: 'Innensohle',
     footLengthLabel: 'Fußlänge',
     insoleInputLabel: 'Sohlenlänge',
     yourSizeLabel: 'Ihre Größe',
-    builtInAllowanceHint: 'Zugabe nicht am Regler addieren: In Größe',
-    winterShiftBadge: 'inkl. Zugabe',
+    reserveActiveBadge: 'Mit Reserve (Winter / Run)',
+    baseFitBadge: 'Basisgröße',
+    annotationFootMode: (eu, ua, footMm, insoleMm, addMm) =>
+      `Modus „Fußlänge“: Für ${footMm} mm Fuß ist Ihre Größe ${eu} EU (${ua} UA). +${addMm} mm Zugabe (${insoleMm} mm Sohle) ist bereits integriert.`,
+    annotationInsoleMode: (insoleMm, addMm, footMm, eu, ua) =>
+      `Modus „Innensohle“: Von ${insoleMm} mm Sohlenlänge wurden −${addMm} mm Zugabe abgezogen (${footMm} mm Fuß) → Größe ${eu} EU (${ua} UA).`,
     men: 'Herren',
     women: 'Damen',
     kids: 'Kinder',
     cmLabel: 'cm',
     mmLabel: 'mm',
     insoleLabel: 'Innensohle',
-    allowanceLabel: 'Zehenzugabe',
+    allowanceLabel: 'Zugabe',
     widthLabel: 'Ballenbreite',
     girthLabel: 'Ballenumfang',
-    xrayFootTag: 'Fuß',
-    xrayInsoleTag: 'Sohle',
-    xrayBallTag: 'Umfang M1–M5',
-    subParisPoint: 'Pariser Stich (2/3 cm)',
-    subDstuMetric: 'DSTU · Metrisch (cm)',
-    subBrannock: 'US Brannock',
-    subBarleycorn: 'Barleycorn (1/3 Zoll)',
-    subJis: 'JIS S 5037 (cm)',
-    subGbt: 'GB/T 3293.1 (China)',
-    subKsk: 'KS K 3405 (mm)',
-    subAbnt: 'ABNT NBR (EU−2)',
+    footTag: 'Fuß',
+    ballTag: 'Umfang M1–M5',
+    subUa: 'Ukraine',
+    subEu: 'Europa',
+    subUs: 'USA',
+    subUk: 'Großbritannien',
+    subJp: 'cm (mm) Etikett',
+    subBrCn: 'Brasilien · China',
     tabWorld: 'Weltweit',
     tabFit: 'Leisten',
     tabBrands: 'Marken',
@@ -357,51 +344,52 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     widthStandard: 'Standard (G)',
     widthWide: 'Weit (H)',
     widthExtraWide: 'Spezial (K)',
-    proTitle: 'PRO Leisten-Pass & 8 Normen',
-    proDesc: 'US, UK, Japan (JP), China (CN), Korea (KR), Brasilien (BR), Schuhweite E–K (Ballenumfang in mm) & Marken-Matrix.',
+    proTitle: 'PRO Leisten-Pass & Alle Normen',
+    proDesc: 'USA (US), UK, Japan (JP/CM), Brasilien, China, Schuhweite E–K und Marken-Matrix.',
     proBtn: `PRO FREISCHALTEN · ${PRO_PRICE_STARS} ⭐️`,
     proActiveBadge: 'PRO AKTIV',
     loading: 'TRANSAKTION LÄUFT...',
-    measureGuide1: '1. Stellen Sie sich in Socken mit gleichmäßig verteiltem Gewicht auf ein Blatt Papier.',
-    measureGuide2: '2. Markieren Sie Ferse und längsten Zeh mit senkrechtem Stift (90°) — das ist Ihre Fußlänge (z. B. 270 mm).',
-    measureGuide3: '3. WICHTIG: In Größe EU 42.5 (für 270 mm Fuß) ist die Innensohlen-Zugabe (+12…15 mm, also 282–285 mm Sohle) BEREITS ENTHALTEN!',
-    measureTip: 'Wenn Sie eine herausgenommene Innensohle gemessen haben, schalten Sie oben auf „Innensohle“ um.',
-    disclaimer: 'Berechnung exakt nach ISO 19407:2023 und ISO 9407 (Mondopoint in mm).',
-    standardsNote: 'Ballenweite nach JIS S 5037 · EU-Schuhweite E–K · US Brannock · DSTU / GOST.',
+    guideFootTitle: 'Methode 1 — Fußlänge messen (empfohlen)',
+    measureGuide1: 'Stellen Sie sich abends in Socken auf Papier und markieren Sie Ferse und längsten Zeh (90°). Z. B. 270 mm (27 cm) = 42.5 EU / 42 UA.',
+    measureGuide2: 'Für Winter- und Laufschuhe wählen Sie unter „Leisten“ den Modus „Winter / Pelz“ oder „Running“ (+0,5 cm Reserve → 43 EU).',
+    guideInsoleTitle: 'Methode 2 — Herausgenommene Innensohle messen',
+    measureGuide3: 'Wenn Sie eine Innensohle gemessen haben (z. B. 280–285 mm), schalten Sie oben auf „Innensohle“ um — die Zugabe wird automatisch abgezogen.',
+    measureTip: 'Achten Sie beim Online-Kauf immer auf die Angabe CM oder JP im Schuhetikett (27.0 cm regulär, 27.5 cm für Winter/Running).',
     openInTelegramErr: 'Bitte öffnen Sie die Mini-App in Telegram für Stars-Zahlungen.',
     paymentCancelledErr: 'Zahlung wurde abgebrochen oder nicht abgeschlossen.',
     serverErrPrefix: 'Verbindungsfehler',
   },
   en: {
     back: 'Back',
-    subtitle: 'Cordwainer Biometric Caliper',
+    subtitle: 'Cordwainer Laser Caliper',
     modeFoot: 'By Foot',
     modeInsole: 'By Insole',
     footLengthLabel: 'Foot Length',
     insoleInputLabel: 'Insole Length',
     yourSizeLabel: 'Your Size',
-    builtInAllowanceHint: 'Do not add insole on slider: inside size',
-    winterShiftBadge: 'with allowance',
+    reserveActiveBadge: 'With Reserve (Winter / Run)',
+    baseFitBadge: 'Standard Size',
+    annotationFootMode: (eu, ua, footMm, insoleMm, addMm) =>
+      `Foot Mode: For a ${footMm} mm foot, your size is ${eu} EU (${ua} UA). The +${addMm} mm allowance (${insoleMm} mm insole) is built-in.`,
+    annotationInsoleMode: (insoleMm, addMm, footMm, eu, ua) =>
+      `Insole Mode: Subtracted −${addMm} mm allowance from ${insoleMm} mm insole (${footMm} mm foot) → your size is ${eu} EU (${ua} UA).`,
     men: 'Men',
     women: 'Women',
     kids: 'Kids',
     cmLabel: 'cm',
     mmLabel: 'mm',
-    insoleLabel: 'Internal Insole',
-    allowanceLabel: 'Toe Box Space',
+    insoleLabel: 'Insole',
+    allowanceLabel: 'Allowance',
     widthLabel: 'Ball Width',
     girthLabel: 'Ball Girth',
-    xrayFootTag: 'Foot',
-    xrayInsoleTag: 'Insole',
-    xrayBallTag: 'Girth M1–M5',
-    subParisPoint: 'Paris Point (2/3 cm)',
-    subDstuMetric: 'DSTU · Metric (cm)',
-    subBrannock: 'US Brannock',
-    subBarleycorn: 'Barleycorn (1/3 in)',
-    subJis: 'JIS S 5037 (cm)',
-    subGbt: 'GB/T 3293.1',
-    subKsk: 'KS K 3405 (mm)',
-    subAbnt: 'ABNT NBR (EU−2)',
+    footTag: 'Foot',
+    ballTag: 'Girth M1–M5',
+    subUa: 'Ukraine',
+    subEu: 'Europe',
+    subUs: 'USA',
+    subUk: 'United Kingdom',
+    subJp: 'cm (mm) Tag',
+    subBrCn: 'Brazil · China',
     tabWorld: 'Global',
     tabFit: 'Last Fit',
     tabBrands: 'Brands',
@@ -415,17 +403,17 @@ export const I18N: Record<SupportedLang, TranslationBundle> = {
     widthStandard: 'Standard (G)',
     widthWide: 'Wide (H)',
     widthExtraWide: 'X-Wide (K)',
-    proTitle: 'PRO Last Passport & 8 Systems',
-    proDesc: 'Unlock US, UK, Japan (JP), China (CN), Korea (KR), Brazil (BR), E–K width & ball girth in mm, and brand matrix.',
+    proTitle: 'PRO Last Passport & Global Sizes',
+    proDesc: 'Unlock US, UK, Japan (JP/CM), Brazil, China, E–K width & ball girth in mm, and brand matrix.',
     proBtn: `UNLOCK PRO ACCESS · ${PRO_PRICE_STARS} ⭐️`,
     proActiveBadge: 'PRO ACTIVE',
     loading: 'VERIFYING...',
-    measureGuide1: '1. Stand on a sheet of paper in socks with weight evenly distributed on both feet.',
-    measureGuide2: '2. Mark the heel and longest toe with a vertical pen (90°) — this is your foot length (e.g. 270 mm).',
-    measureGuide3: '3. IMPORTANT: Size EU 42.5 (for a 270 mm foot) ALREADY has +12…15 mm insole space built-in (282–285 mm insole). Never enter insole length in "By Foot" mode!',
-    measureTip: 'If you measured a removable shoe insole with a ruler, switch the top mode to "By Insole".',
-    disclaimer: 'Calculated per ISO 19407:2023 and ISO 9407 (Mondopoint in mm).',
-    standardsNote: 'Forefoot width & girth per JIS S 5037 · EU E–K · US Brannock · DSTU.',
+    guideFootTitle: 'Method 1 — Measure Your Foot (Recommended)',
+    measureGuide1: 'Stand on paper in socks in the evening and mark heel and longest toe (90°). E.g. 270 mm (27 cm) = 42.5 EU / 9 US.',
+    measureGuide2: 'For winter boots or running shoes, select "Winter Fur" or "Run / Trek" in Last Fit — it automatically adds reserve (+0.5 cm → 43 EU / 9.5 US).',
+    guideInsoleTitle: 'Method 2 — Measure a Removable Insole',
+    measureGuide3: 'If you measured a shoe insole with a ruler (e.g. 280–285 mm), switch the top button to "By Insole" — the allowance is subtracted automatically.',
+    measureTip: 'When shopping online, always check the CM or JP box on the shoe tongue label (27.0 cm regular, 27.5 cm for winter/running).',
     openInTelegramErr: 'Please open the Mini App inside Telegram to pay with Stars.',
     paymentCancelledErr: 'Payment was cancelled or failed.',
     serverErrPrefix: 'Connection error',
@@ -476,25 +464,6 @@ export const FlagJP: React.FC = () => (
   <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
     <rect width="18" height="12" fill="#FFFFFF" />
     <circle cx="9" cy="6" r="3.4" fill="#BC002D" />
-  </svg>
-)
-
-export const FlagCN: React.FC = () => (
-  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
-    <rect width="18" height="12" fill="#DE2910" />
-    <circle cx="3.8" cy="3.6" r="1.4" fill="#FFDE00" />
-    <circle cx="6.5" cy="1.8" r="0.45" fill="#FFDE00" />
-    <circle cx="7.6" cy="3.0" r="0.45" fill="#FFDE00" />
-    <circle cx="7.4" cy="4.6" r="0.45" fill="#FFDE00" />
-    <circle cx="6.3" cy="5.8" r="0.45" fill="#FFDE00" />
-  </svg>
-)
-
-export const FlagKR: React.FC = () => (
-  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
-    <rect width="18" height="12" fill="#FFFFFF" />
-    <circle cx="9" cy="6" r="2.8" fill="#CD2E3A" />
-    <path d="M6.2 6 A2.8 2.8 0 0 0 11.8 6 A1.4 1.4 0 0 1 9 6 A1.4 1.4 0 0 0 6.2 6 Z" fill="#0047A0" />
   </svg>
 )
 
