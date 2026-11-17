@@ -786,7 +786,7 @@ function SlideItem({
             preload="none"
             loop
             playsInline
-            // @ts-expect-error — поддержка старых версий WebKit на iOS
+            
             webkit-playsinline="true"
             muted={isMuted}
             poster={slide.poster}
