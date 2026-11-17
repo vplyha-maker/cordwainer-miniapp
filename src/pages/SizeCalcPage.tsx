@@ -63,6 +63,7 @@ export type ProFitResult = {
   ballWidthMm: number
   ballGirthMm: number
   instepGirthMm: number
+  heelSeatMm: number
   widthMarks: WidthMarks
   brandMatrix: BrandFitEntry[]
 }
@@ -81,21 +82,77 @@ const STYLE_ALLOWANCES: Record<
 }
 
 /**
- * Расширяет базовый результат convertShoeSize мировыми стандартами JP, CN, KR, BR.
- * Полностью совместимо как со старой, так и с новой версией ../lib/shoeSizes.
+ * Apple Taptic Engine + Telegram Haptic Feedback Engine
+ * Обеспечивает мгновенный тактильный отклик при каждом шаге ползунка, нажатиях кнопок и переключениях.
  */
+let sharedAudioCtx: AudioContext | null = null
+
+function playTapticMicroPulse(intensity: 'tick' | 'light' | 'medium' | 'heavy') {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioCtx) return
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new AudioCtx()
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {})
+    }
+    const now = sharedAudioCtx.currentTime
+    const osc = sharedAudioCtx.createOscillator()
+    const gain = sharedAudioCtx.createGain()
+
+    // Короткий низкочастотный импульс по стандарту Apple Taptic Engine
+    const freq = intensity === 'tick' ? 155 : intensity === 'light' ? 135 : intensity === 'medium' ? 115 : 95
+    const duration = intensity === 'tick' ? 0.004 : intensity === 'light' ? 0.006 : 0.009
+    const peakGain = intensity === 'tick' ? 0.035 : intensity === 'light' ? 0.05 : 0.08
+
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(freq, now)
+    osc.frequency.exponentialRampToValueAtTime(40, now + duration)
+
+    gain.gain.setValueAtTime(peakGain, now)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration)
+
+    osc.connect(gain)
+    gain.connect(sharedAudioCtx.destination)
+    osc.start(now)
+    osc.stop(now + duration)
+  } catch {}
+}
+
+function hapticSelection() {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback?.selectionChanged) {
+      tg.HapticFeedback.selectionChanged()
+    } else if (navigator.vibrate) {
+      navigator.vibrate(6)
+    }
+  } catch {}
+  playTapticMicroPulse('tick')
+}
+
+function hapticImpact(style: 'light' | 'medium' | 'heavy' = 'light') {
+  try {
+    const tg = (window as any).Telegram?.WebApp
+    if (tg?.HapticFeedback?.impactOccurred) {
+      tg.HapticFeedback.impactOccurred(style)
+    } else if (navigator.vibrate) {
+      navigator.vibrate(style === 'light' ? 12 : style === 'heavy' ? 32 : 20)
+    }
+  } catch {}
+  playTapticMicroPulse(style)
+}
+
 function computeExtendedSize(footMm: number, gender: Gender): ExtendedSizeResult {
   const base = convertShoeSize(footMm, gender)
-  // Японский стандарт JIS S 5037: длина стопы в см с шагом 0.5
   const jp = Math.round((base.mondopoint / 10) * 2) / 2
-  // Китайский стандарт GB/T 3293.1: (см * 2) - 10
   const cn = Math.round((jp * 2 - 10) * 2) / 2
-  // Корейский стандарт KS K 3405: Mondopoint в мм
   const kr = base.mondopoint
-  // Бразильский стандарт ABNT NBR 13310: EU - 2
-  const br = gender === 'kids'
-    ? Math.max(17, Math.round((base.eu - 2) * 2) / 2)
-    : Math.round((base.eu - 2) * 2) / 2
+  const br =
+    gender === 'kids'
+      ? Math.max(17, Math.round((base.eu - 2) * 2) / 2)
+      : Math.round((base.eu - 2) * 2) / 2
 
   return {
     mondopoint: base.mondopoint,
@@ -156,6 +213,7 @@ function calculateProFit(
   const ballWidthMm = Math.round(footMm * genderWidthFactor + widthDeltaMm)
   const ballGirthMm = Math.round(footMm * genderGirthFactor + girthDeltaMm)
   const instepGirthMm = Math.round(ballGirthMm * 1.03)
+  const heelSeatMm = Math.round(ballWidthMm * 0.66)
 
   const widthMap: Record<WidthFit, WidthMarks> = {
     narrow: {
@@ -211,16 +269,16 @@ function calculateProFit(
     },
     {
       brand: 'New Balance',
-      category: 'Lifestyle / Run',
+      category: 'Lifestyle',
       eu: formatSize(baseSize.eu + wShift),
       us: `${formatSize(baseSize.us)} (${widthFit === 'wide' || widthFit === 'extraWide' ? '2E' : 'D'})`,
       uk: formatSize(baseSize.uk),
       jp: formatSize(baseSize.jp),
       offsetNote: {
-        ru: 'Эталонная колодка US Brannock, доступны полноты D/2E',
-        uk: 'Еталонна колодка US Brannock, доступні повноти D/2E',
-        de: 'Referenz-Passform nach US Brannock (Weiten D/2E)',
-        en: 'True to US Brannock standard with D/2E widths',
+        ru: 'Эталон US Brannock · доступны полноты D и 2E',
+        uk: 'Еталон US Brannock · доступні повноти D та 2E',
+        de: 'Referenz nach US Brannock · Weiten D und 2E',
+        en: 'True to US Brannock · D and 2E widths available',
       },
     },
     {
@@ -243,17 +301,17 @@ function calculateProFit(
       eu: formatSize(baseSize.eu + 0.5),
       us: formatSize(baseSize.us + 0.5),
       uk: formatSize(baseSize.uk + 0.5),
-      jp: `${baseSize.jp.toFixed(1)} cm`,
+      jp: `${baseSize.jp.toFixed(1)}`,
       offsetNote: {
-        ru: 'Маркировка строго по длине стопы в см (JIS S 5037)',
-        uk: 'Маркування суворо за довжиною стопи в см (JIS S 5037)',
+        ru: 'Японский стандарт JIS S 5037 строго по стопе в см',
+        uk: 'Японський стандарт JIS S 5037 суворо по стопі в см',
         de: 'Exakte Zentimeter-Markierung nach JIS S 5037',
         en: 'Exact centimeter foot-length marking (JIS S 5037)',
       },
     },
     {
       brand: 'Cardio / Dress Last',
-      category: 'Classic / Leather',
+      category: 'Classic',
       eu: formatSize(Math.round(baseSize.eu)),
       us: formatSize(baseSize.us),
       uk: formatSize(baseSize.uk),
@@ -275,32 +333,33 @@ function calculateProFit(
     ballWidthMm,
     ballGirthMm,
     instepGirthMm,
+    heelSeatMm,
     widthMarks: widthMap[widthFit],
     brandMatrix,
   }
 }
 
 const FlagEU = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#003399" />
     <g fill="#FFCC00">
       {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
         const a = (i * 30 - 90) * (Math.PI / 180)
-        return <circle key={i} cx={9 + 3.8 * Math.cos(a)} cy={6 + 3.8 * Math.sin(a)} r="0.55" />
+        return <circle key={i} cx={9 + 3.8 * Math.cos(a)} cy={6 + 3.8 * Math.sin(a)} r="0.6" />
       })}
     </g>
   </svg>
 )
 
 const FlagUA = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="6" fill="#0057B7" />
     <rect y="6" width="18" height="6" fill="#FFD700" />
   </svg>
 )
 
 const FlagUK = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#012169" />
     <path d="M0 0 L18 12 M18 0 L0 12" stroke="#fff" strokeWidth="2" />
     <path d="M0 0 L18 12 M18 0 L0 12" stroke="#C8102E" strokeWidth="1" />
@@ -310,7 +369,7 @@ const FlagUK = () => (
 )
 
 const FlagUS = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#B22234" />
     <rect y="1.33" width="18" height="1.33" fill="#fff" />
     <rect y="4" width="18" height="1.33" fill="#fff" />
@@ -321,14 +380,14 @@ const FlagUS = () => (
 )
 
 const FlagJP = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0 border border-current/15">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
     <rect width="18" height="12" fill="#FFFFFF" />
     <circle cx="9" cy="6" r="3.4" fill="#BC002D" />
   </svg>
 )
 
 const FlagCN = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#DE2910" />
     <circle cx="3.8" cy="3.6" r="1.4" fill="#FFDE00" />
     <circle cx="6.5" cy="1.8" r="0.45" fill="#FFDE00" />
@@ -339,7 +398,7 @@ const FlagCN = () => (
 )
 
 const FlagKR = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0 border border-current/15">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 border border-current/15 shadow-xs">
     <rect width="18" height="12" fill="#FFFFFF" />
     <circle cx="9" cy="6" r="2.8" fill="#CD2E3A" />
     <path d="M6.2 6 A2.8 2.8 0 0 0 11.8 6 A1.4 1.4 0 0 1 9 6 A1.4 1.4 0 0 0 6.2 6 Z" fill="#0047A0" />
@@ -347,7 +406,7 @@ const FlagKR = () => (
 )
 
 const FlagBR = () => (
-  <svg width="15" height="10" viewBox="0 0 18 12" className="rounded-[1.5px] overflow-hidden shrink-0">
+  <svg width="18" height="12" viewBox="0 0 18 12" className="rounded-[2px] overflow-hidden shrink-0 shadow-xs">
     <rect width="18" height="12" fill="#009739" />
     <polygon points="9,1.4 16.2,6 9,10.6 1.8,6" fill="#FEDD00" />
     <circle cx="9" cy="6" r="2.2" fill="#012169" />
@@ -355,23 +414,14 @@ const FlagBR = () => (
 )
 
 const LockIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
     <path d="M7 11V7a5 5 0 0110 0v4"></path>
   </svg>
 )
 
-function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
-  try {
-    const tg = (window as any).Telegram?.WebApp
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
-    else if (navigator.vibrate) navigator.vibrate(style === 'light' ? 12 : style === 'heavy' ? 35 : 22)
-  } catch {}
-}
-
 type TranslationBundle = {
   back: string
-  title: string
   subtitle: string
   step1: string
   men: string
@@ -383,6 +433,9 @@ type TranslationBundle = {
   allowanceLabel: string
   widthLabel: string
   girthLabel: string
+  zoneHeel: string
+  zoneArch: string
+  zoneToe: string
   tabWorld: string
   tabFit: string
   tabBrands: string
@@ -415,9 +468,8 @@ type TranslationBundle = {
 const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
   ru: {
     back: 'Назад',
-    title: 'Анатомия размера',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Длина стопы',
+    step1: 'Шкала длины стопы',
     men: 'Мужской',
     women: 'Женский',
     kids: 'Детский',
@@ -427,10 +479,13 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
     allowanceLabel: 'Припуск',
     widthLabel: 'Ширина пучков',
     girthLabel: 'Обхват пучков',
-    tabWorld: 'Мировые (8)',
-    tabFit: 'Колодка PRO',
-    tabBrands: 'Бренды PRO',
-    tabGuide: 'Замер · ISO',
+    zoneHeel: 'Пятка',
+    zoneArch: 'Пучки M1–M5',
+    zoneToe: 'Запас мыска',
+    tabWorld: 'Мировые',
+    tabFit: 'Колодка',
+    tabBrands: 'Бренды',
+    tabGuide: 'Замер',
     styleSneakers: 'Кроссовки',
     styleClassic: 'Классика',
     styleWinter: 'Зима / Мех',
@@ -446,8 +501,8 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
     proActiveBadge: 'PRO АКТИВЕН',
     loading: 'ПРОВЕРКА ТРАНЗАКЦИИ...',
     measureGuide1: '1. Встаньте на лист бумаги в носках, распределив вес на обе ноги.',
-    measureGuide2: '2. Очертите контур стопы, удерживая карандаш строго под углом 90°.',
-    measureGuide3: '3. Измерьте дистанцию от крайней точки пятки до самого длинного пальца.',
+    measureGuide2: '2. Очертите контур стопы, удерживая карандаш строго вертикально (90°).',
+    measureGuide3: '3. Измерьте расстояние от крайней точки пятки до самого длинного пальца.',
     measureTip: 'Проводите замер вечером — к концу дня свод стопы удлиняется на 2–3 мм.',
     disclaimer: 'Базовые расчёты по ISO 19407:2023 и ISO 9407 (Mondopoint).',
     standardsNote: 'JIS S 5037 (Япония) · GB/T 3293.1 (Китай) · KS K 3405 (Корея) · ДСТУ / ГОСТ.',
@@ -457,9 +512,8 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
   },
   uk: {
     back: 'Назад',
-    title: 'Анатомія розміру',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Довжина стопи',
+    step1: 'Шкала довжини стопи',
     men: 'Чоловічий',
     women: 'Жіночий',
     kids: 'Дитячий',
@@ -469,10 +523,13 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
     allowanceLabel: 'Припуск',
     widthLabel: 'Ширина пучків',
     girthLabel: 'Обхват пучків',
-    tabWorld: 'Світові (8)',
-    tabFit: 'Колодка PRO',
-    tabBrands: 'Бренди PRO',
-    tabGuide: 'Замір · ISO',
+    zoneHeel: 'П’ята',
+    zoneArch: 'Пучки M1–M5',
+    zoneToe: 'Запас миска',
+    tabWorld: 'Світові',
+    tabFit: 'Колодка',
+    tabBrands: 'Бренди',
+    tabGuide: 'Замір',
     styleSneakers: 'Кросівки',
     styleClassic: 'Класика',
     styleWinter: 'Зима / Хутро',
@@ -488,8 +545,8 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
     proActiveBadge: 'PRO АКТИВНИЙ',
     loading: 'ПЕРЕВІРКА ТРАНЗАКЦІЇ...',
     measureGuide1: '1. Станьте на аркуш паперу в шкарпетках, розподіливши вагу на обидві ноги.',
-    measureGuide2: '2. Окресліть контур стопи, тримаючи олівець суворо під кутом 90°.',
-    measureGuide3: '3. Виміряйте дистанцію від крайньої точки п’яти до найдовшого пальця.',
+    measureGuide2: '2. Окресліть контур стопи, тримаючи олівець суворо вертикально (90°).',
+    measureGuide3: '3. Виміряйте відстань від крайньої точки п’яти до найдовшого пальця.',
     measureTip: 'Виконуйте замір увечері — до кінця дня склепіння стопи видовжується на 2–3 мм.',
     disclaimer: 'Базові розрахунки за ISO 19407:2023 та ISO 9407 (Mondopoint).',
     standardsNote: 'JIS S 5037 (Японія) · GB/T 3293.1 (Китай) · KS K 3405 (Корея) · ДСТУ.',
@@ -499,9 +556,8 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
   },
   de: {
     back: 'Zurück',
-    title: 'Größen-Anatomie',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Fußlänge',
+    step1: 'Fußlängen-Skala',
     men: 'Herren',
     women: 'Damen',
     kids: 'Kinder',
@@ -511,10 +567,13 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
     allowanceLabel: 'Zugabe',
     widthLabel: 'Ballenbreite',
     girthLabel: 'Ballenumfang',
-    tabWorld: 'Weltweit (8)',
-    tabFit: 'Leisten PRO',
-    tabBrands: 'Marken PRO',
-    tabGuide: 'Messen · ISO',
+    zoneHeel: 'Ferse',
+    zoneArch: 'Ballen M1–M5',
+    zoneToe: 'Zehenraum',
+    tabWorld: 'Weltweit',
+    tabFit: 'Leisten',
+    tabBrands: 'Marken',
+    tabGuide: 'Messen',
     styleSneakers: 'Sneaker',
     styleClassic: 'Klassisch',
     styleWinter: 'Winter / Pelz',
@@ -541,9 +600,8 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
   },
   en: {
     back: 'Back',
-    title: 'Size Anatomy',
     subtitle: 'Cordwainer Biometric Caliper',
-    step1: 'Foot Length',
+    step1: 'Foot Length Scale',
     men: 'Men',
     women: 'Women',
     kids: 'Kids',
@@ -553,10 +611,13 @@ const I18N: Record<'ru' | 'uk' | 'de' | 'en', TranslationBundle> = {
     allowanceLabel: 'Allowance',
     widthLabel: 'Ball Width',
     girthLabel: 'Ball Girth',
-    tabWorld: 'Global (8)',
-    tabFit: 'Last Fit PRO',
-    tabBrands: 'Brands PRO',
-    tabGuide: 'Guide · ISO',
+    zoneHeel: 'Heel Cup',
+    zoneArch: 'Forefoot M1–M5',
+    zoneToe: 'Toe Box',
+    tabWorld: 'Global',
+    tabFit: 'Last Fit',
+    tabBrands: 'Brands',
+    tabGuide: 'Guide',
     styleSneakers: 'Sneakers',
     styleClassic: 'Classic',
     styleWinter: 'Winter Fur',
@@ -612,18 +673,28 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('world')
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
+  const [isDraggingSlider, setIsDraggingSlider] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
 
   const [isProPurchased, setIsProPurchased] = useState(false)
   const [isPurchasing, setIsPurchasing] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const lastHapticMmRef = useRef<number>(footMm)
+  const holdTimerRef = useRef<number | null>(null)
+  const holdIntervalRef = useRef<number | null>(null)
+
   const range = RANGES[gender]
 
   const handleGenderChange = useCallback((g: Gender) => {
+    hapticImpact('light')
     setGender(g)
     const r = RANGES[g]
-    setFootMm((prev) => Math.min(r.max, Math.max(r.min, prev)))
+    setFootMm((prev) => {
+      const clamped = Math.min(r.max, Math.max(r.min, prev))
+      lastHapticMmRef.current = clamped
+      return clamped
+    })
   }, [])
 
   const result = useMemo(() => computeExtendedSize(footMm, gender), [footMm, gender])
@@ -638,9 +709,10 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const verifyPurchaseOnServer = useCallback(async (uid: number | string) => {
     try {
-      const res = await fetch(`/api/check-purchase?userId=${encodeURIComponent(String(uid))}&productId=pro_sizes`, {
-        cache: 'no-store',
-      })
+      const res = await fetch(
+        `/api/check-purchase?userId=${encodeURIComponent(String(uid))}&productId=pro_sizes`,
+        { cache: 'no-store' }
+      )
       if (!res.ok) return false
       const data = await res.json()
       if (data?.purchased) {
@@ -677,12 +749,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     const rawInitData = typeof tg?.initData === 'string' ? tg.initData : ''
 
     if (!userId || !rawInitData) {
+      hapticImpact('medium')
       setStatusError(t.openInTelegramErr)
       return
     }
 
     setIsPurchasing(true)
-    haptic('light')
+    hapticImpact('medium')
 
     try {
       const response = await fetch('/api/create-invoice', {
@@ -701,7 +774,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       const data = await response.json()
 
       if (response.status === 409 && data?.alreadyPurchased) {
-        haptic('heavy')
+        hapticImpact('heavy')
         setIsProPurchased(true)
         try {
           localStorage.setItem(`cordwainer_pro_sizes_${userId}`, '1')
@@ -716,7 +789,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
       tg.openInvoice(data.invoiceLink, async (status: string) => {
         if (status === 'paid' || status === 'pending') {
-          haptic('heavy')
+          hapticImpact('heavy')
           setIsProPurchased(true)
           try {
             localStorage.setItem(`cordwainer_pro_sizes_${userId}`, '1')
@@ -737,6 +810,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   }
 
   const startEdit = () => {
+    hapticImpact('light')
     setEditValue(unit === 'cm' ? (footMm / 10).toFixed(1) : String(Math.round(footMm)))
     setIsEditing(true)
   }
@@ -744,20 +818,71 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const commitEdit = () => {
     const raw = parseFloat(editValue.replace(',', '.'))
     if (!isNaN(raw)) {
-      const mm = unit === 'cm' ? raw * 10 : raw
-      setFootMm(Math.min(range.max, Math.max(range.min, mm)))
-      haptic('light')
+      const mm = Math.round(unit === 'cm' ? raw * 10 : raw)
+      const clamped = Math.min(range.max, Math.max(range.min, mm))
+      setFootMm(clamped)
+      lastHapticMmRef.current = clamped
+      hapticImpact('medium')
     }
     setIsEditing(false)
   }
 
-  const stepValue = (delta: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setFootMm((prev) => {
-      const next = Math.min(range.max, Math.max(range.min, prev + delta))
-      if (next !== prev) haptic('light')
-      return next
-    })
+  const applyStep = useCallback(
+    (delta: number) => {
+      setFootMm((prev) => {
+        const next = Math.min(range.max, Math.max(range.min, prev + delta))
+        if (next !== prev) {
+          lastHapticMmRef.current = next
+          hapticSelection()
+        }
+        return next
+      })
+    },
+    [range.max, range.min]
+  )
+
+  const stopHold = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+    if (holdIntervalRef.current !== null) {
+      window.clearInterval(holdIntervalRef.current)
+      holdIntervalRef.current = null
+    }
+  }, [])
+
+  const startHold = useCallback(
+    (delta: number, e: React.PointerEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      stopHold()
+      hapticImpact('light')
+      setFootMm((prev) => {
+        const next = Math.min(range.max, Math.max(range.min, prev + delta))
+        lastHapticMmRef.current = next
+        return next
+      })
+      holdTimerRef.current = window.setTimeout(() => {
+        holdIntervalRef.current = window.setInterval(() => {
+          applyStep(delta)
+        }, 70)
+      }, 320)
+    },
+    [applyStep, range.max, range.min, stopHold]
+  )
+
+  useEffect(() => {
+    return () => stopHold()
+  }, [stopHold])
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextMm = Number(e.target.value)
+    setFootMm(nextMm)
+    if (nextMm !== lastHapticMmRef.current) {
+      lastHapticMmRef.current = nextMm
+      hapticSelection()
+    }
   }
 
   useEffect(() => {
@@ -766,28 +891,20 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const usLabel = gender === 'kids' ? 'US K' : gender === 'men' ? 'US M' : 'US W'
 
-  const blueprintScaleX = 0.86 + (pct / 100) * 0.2
-  const blueprintScaleY =
-    widthFit === 'narrow'
-      ? 0.91
-      : widthFit === 'standard'
-        ? 1.0
-        : widthFit === 'wide'
-          ? 1.08
-          : 1.15
-
+  // Цветовая система Quiet Luxury 2026
   const cBg = isDark ? 'bg-[#0A0A0A]' : 'bg-[#F2EFE9]'
-  const cCard = isDark ? 'bg-[#121212]/90' : 'bg-[#EAE5DC]/85'
+  const cCard = isDark ? 'bg-[#141414]' : 'bg-[#EAE4DA]'
+  const cCardElevated = isDark ? 'bg-[#1C1C1E]' : 'bg-[#E2DBD0]'
   const cText = isDark ? 'text-[#F4F0E8]' : 'text-[#1C1816]'
-  const cTextMuted = isDark ? 'text-[#F4F0E8]/55' : 'text-[#1C1816]/55'
-  const cLine = isDark ? 'border-[#F4F0E8]/15' : 'border-[#1C1816]/15'
-  const accentStroke = isDark ? '#D4AF37' : '#8C6239'
+  const cTextMuted = isDark ? 'text-[#F4F0E8]/60' : 'text-[#1C1816]/60'
+  const cLine = isDark ? 'border-[#F4F0E8]/14' : 'border-[#1C1816]/14'
+  const accentHex = isDark ? '#D4AF37' : '#8C5A2B'
   const trackColor = isDark ? '#F4F0E8' : '#1C1816'
-  const trackBgColor = isDark ? 'rgba(244,240,232,0.14)' : 'rgba(28,24,22,0.14)'
+  const trackBgColor = isDark ? 'rgba(244,240,232,0.16)' : 'rgba(28,24,22,0.16)'
 
   const worldSystems = [
     { code: 'EU', sub: 'Paris Point', val: formatSize(result.eu), flag: <FlagEU />, free: true },
-    { code: 'UA / СМ', sub: 'ДСТУ / Метр.', val: formatSize(result.ukr), flag: <FlagUA />, free: true },
+    { code: 'UA / СМ', sub: 'ДСТУ · Метр.', val: formatSize(result.ukr), flag: <FlagUA />, free: true },
     { code: usLabel, sub: 'Brannock', val: formatSize(result.us), flag: <FlagUS />, free: false },
     { code: 'UK', sub: 'Barleycorn', val: formatSize(result.uk), flag: <FlagUK />, free: false },
     { code: 'JP', sub: 'JIS S 5037 (cm)', val: result.jp.toFixed(1), flag: <FlagJP />, free: false },
@@ -795,6 +912,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     { code: 'KR', sub: 'KS K 3405 (mm)', val: String(result.kr), flag: <FlagKR />, free: false },
     { code: 'BR', sub: 'ABNT NBR', val: formatSize(result.br), flag: <FlagBR />, free: false },
   ]
+
+  // Генерируем 33 деления для магнитной шкалы-верньера (Apple Watch / iOS Camera style)
+  const RULER_TICKS = 33
 
   return (
     <div
@@ -805,283 +925,326 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        @keyframes caliperScan {
-          0% { transform: translateX(0%); opacity: 0.15; }
-          50% { opacity: 0.75; }
-          100% { transform: translateX(100%); opacity: 0.15; }
-        }
-        @keyframes pulseRing {
-          0% { transform: scale(0.85); opacity: 0.9; }
-          70% { transform: scale(1.75); opacity: 0; }
-          100% { transform: scale(1.75); opacity: 0; }
-        }
-        @keyframes shimmerBorder {
+        @keyframes proGlow {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
-        .scan-beam {
-          animation: caliperScan 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
-        }
-        .bio-node-ring {
-          transform-origin: center;
-          animation: pulseRing 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-        }
         .pro-shimmer {
-          background: linear-gradient(120deg, rgba(212,175,55,0.08), rgba(212,175,55,0.24), rgba(212,175,55,0.08));
+          background: linear-gradient(120deg, rgba(212,175,55,0.10), rgba(212,175,55,0.26), rgba(212,175,55,0.10));
           background-size: 200% 200%;
-          animation: shimmerBorder 4s ease infinite;
+          animation: proGlow 4s ease infinite;
+        }
+        .apple-btn {
+          transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s ease, opacity 0.18s ease;
+        }
+        .apple-btn:active {
+          transform: scale(0.91);
         }
       `}</style>
 
-      {/* 1. КОМПАКТНАЯ ВЕРХНЯЯ ПАНЕЛЬ */}
-      <header className={`px-4 pt-3 pb-2.5 border-b ${cLine} flex items-center justify-between gap-2 shrink-0 z-20`}>
+      {/* 1. ВЕРХНИЙ БАР БЕЗ ПЕРЕПОЛНЕНИЯ (Кнопка Назад + Apple iOS Segmented Gender Control) */}
+      <header className={`px-3.5 pt-2.5 pb-2 border-b ${cLine} flex items-center justify-between gap-2 shrink-0 z-20`}>
         <button
           onClick={() => {
-            haptic('light')
+            hapticImpact('light')
             onBack()
           }}
-          className={`flex items-center gap-1.5 text-[10px] font-sans uppercase tracking-[0.18em] outline-none border-none bg-transparent cursor-pointer ${cTextMuted} hover:opacity-100 transition-opacity`}
+          className={`apple-btn flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-sans font-medium uppercase tracking-[0.14em] outline-none border-none bg-transparent cursor-pointer shrink-0 ${cTextMuted} hover:opacity-100`}
         >
-          <span>←</span>
+          <span className="text-sm leading-none">←</span>
           <span>{t.back}</span>
         </button>
 
-        <div className={`flex items-center rounded-full p-0.5 border ${cLine} ${cCard}`}>
-          {(['men', 'women', 'kids'] as Gender[]).map((g) => (
-            <button
-              key={g}
-              onClick={() => {
-                haptic('light')
-                handleGenderChange(g)
-              }}
-              className={`px-2.5 py-1 rounded-full text-[9px] font-sans uppercase tracking-[0.14em] transition-all border-none cursor-pointer ${
-                gender === g
-                  ? isDark
-                    ? 'bg-[#F4F0E8] text-[#0A0A0A] font-medium'
-                    : 'bg-[#1C1816] text-[#F2EFE9] font-medium'
-                  : `bg-transparent ${cTextMuted}`
-              }`}
-            >
-              {t[g]}
-            </button>
-          ))}
-        </div>
-
-        <div className={`flex items-center rounded-full p-0.5 border ${cLine} ${cCard}`}>
-          {(['cm', 'mm'] as const).map((u) => (
-            <button
-              key={u}
-              onClick={() => {
-                haptic('light')
-                setUnit(u)
-              }}
-              className={`px-2 py-1 rounded-full text-[9px] font-sans uppercase tracking-wider transition-all border-none cursor-pointer ${
-                unit === u
-                  ? isDark
-                    ? 'bg-[#F4F0E8]/20 text-[#F4F0E8] font-medium'
-                    : 'bg-[#1C1816]/15 text-[#1C1816] font-medium'
-                  : `bg-transparent ${cTextMuted}`
-              }`}
-            >
-              {u === 'cm' ? t.cmLabel : t.mmLabel}
-            </button>
-          ))}
+        {/* Пол (Мужской / Женский / Детский) с плавающей капсулой в стиле iOS */}
+        <div className={`relative flex items-center rounded-full p-1 border ${cLine} ${cCard} min-w-0`}>
+          {(['men', 'women', 'kids'] as Gender[]).map((g) => {
+            const active = gender === g
+            return (
+              <button
+                key={g}
+                onClick={() => handleGenderChange(g)}
+                className={`relative z-10 px-3 py-1 rounded-full text-[11px] font-sans font-medium uppercase tracking-[0.08em] transition-colors border-none bg-transparent cursor-pointer whitespace-nowrap ${
+                  active
+                    ? isDark
+                      ? 'text-[#0A0A0A]'
+                      : 'text-[#F2EFE9]'
+                    : cTextMuted
+                }`}
+              >
+                {active && (
+                  <motion.div
+                    layoutId="genderSegmentedPill"
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    className={`absolute inset-0 rounded-full -z-10 shadow-xs ${
+                      isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
+                    }`}
+                  />
+                )}
+                {t[g]}
+              </button>
+            )
+          })}
         </div>
       </header>
 
-      {/* 2. ЖИВОЙ БИОМЕТРИЧЕСКИЙ ЧЕРТЁЖ СТОПЫ И КАЛИПЕР */}
-      <section className="px-4 pt-2.5 shrink-0">
-        <div className={`relative rounded-xl border ${cLine} ${cCard} px-3.5 py-2.5 overflow-hidden`}>
-          <div
-            className="absolute inset-0 pointer-events-none opacity-20"
-            style={{
-              backgroundImage: `linear-gradient(to right, ${trackBgColor} 1px, transparent 1px), linear-gradient(to bottom, ${trackBgColor} 1px, transparent 1px)`,
-              backgroundSize: '14px 14px',
-            }}
-          />
-
-          <div className="absolute inset-y-0 left-0 w-1/3 pointer-events-none scan-beam">
-            <div
-              className="w-[1.5px] h-full"
-              style={{
-                background: `linear-gradient(to bottom, transparent, ${accentStroke}, transparent)`,
-                boxShadow: `0 0 12px ${accentStroke}`,
-              }}
-            />
-          </div>
-
-          <div className="relative z-10 flex items-center justify-between gap-3">
-            <div className="flex flex-col justify-between shrink-0">
-              <div className="flex items-center gap-1.5 mb-1">
-                <FlagEU />
-                <FlagUA />
-                <span className={`text-[8px] font-sans uppercase tracking-[0.22em] ${cTextMuted}`}>
-                  EU {formatSize(result.eu)} · MP {result.mondopoint}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 my-0.5">
-                <button
-                  onClick={(e) => stepValue(-1, e)}
-                  disabled={footMm <= range.min}
-                  className={`w-7 h-7 flex items-center justify-center rounded-full border ${cLine} ${cText} active:scale-90 transition-transform disabled:opacity-25 bg-transparent cursor-pointer`}
-                >
-                  <span className="text-sm leading-none">−</span>
-                </button>
-
-                <div onClick={startEdit} className="min-w-[68px] text-center cursor-pointer">
-                  {isEditing ? (
-                    <input
-                      ref={inputRef}
-                      value={editValue}
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => setEditValue(e.target.value.replace(/[^0-9.,]/g, ''))}
-                      onBlur={commitEdit}
-                      onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                      className={`w-[70px] text-center text-3xl font-serif leading-none bg-transparent outline-none border-b ${cLine} ${cText}`}
-                      inputMode="decimal"
-                    />
-                  ) : (
-                    <motion.span
-                      key={displayValue}
-                      initial={{ opacity: 0.5, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.16 }}
-                      className="text-3xl font-serif leading-none tracking-tight inline-block"
-                    >
-                      {displayValue}
-                    </motion.span>
-                  )}
-                  <span className={`ml-1 text-[10px] font-sans ${cTextMuted}`}>
-                    {unit === 'cm' ? t.cmLabel : t.mmLabel}
-                  </span>
-                </div>
-
-                <button
-                  onClick={(e) => stepValue(1, e)}
-                  disabled={footMm >= range.max}
-                  className={`w-7 h-7 flex items-center justify-center rounded-full border ${cLine} ${cText} active:scale-90 transition-transform disabled:opacity-25 bg-transparent cursor-pointer`}
-                >
-                  <span className="text-sm leading-none">+</span>
-                </button>
-              </div>
-
-              <div className={`text-[9px] font-sans ${cTextMuted} flex items-center gap-2 mt-0.5`}>
-                <span>
-                  {t.insoleLabel}: <strong className={cText}>{proFit.insoleMm} {t.mmLabel}</strong>
-                </span>
-                <span>·</span>
-                <span>+{proFit.allowanceMm} {t.mmLabel}</span>
-              </div>
+      {/* 2. ЦЕНТРАЛЬНАЯ БИОМЕТРИЧЕСКАЯ КАПСУЛА 2026 (Apple Taptic Drum + 3-Zone Telemetry) */}
+      <section className="px-3.5 pt-2.5 shrink-0">
+        <div className={`relative rounded-2xl border ${cLine} ${cCard} px-4 pt-3 pb-3 overflow-hidden shadow-xs`}>
+          {/* Верхняя строка капсулы: Индекс стандарта + переключатель СМ / ММ */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <FlagEU />
+              <FlagUA />
+              <span className="text-[12px] font-sans font-semibold tracking-[0.12em] uppercase">
+                EU {formatSize(result.eu)}
+              </span>
+              <span className={`text-[11px] font-sans ${cTextMuted}`}>
+                · MP {result.mondopoint}
+              </span>
             </div>
 
-            <div className="flex-1 flex flex-col items-end justify-center min-w-[140px]">
-              <svg viewBox="0 0 220 82" className="w-full max-w-[195px] h-[66px] overflow-visible">
-                <line x1="18" y1="8" x2="18" y2="74" stroke={trackColor} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="2 2" />
-                <line x1="184" y1="8" x2="184" y2="74" stroke={trackColor} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="2 2" />
-                <line x1="202" y1="8" x2="202" y2="74" stroke={accentStroke} strokeOpacity="0.8" strokeWidth="1" />
+            {/* Переключатель СМ / ММ внутри карточки (никогда не вылезает за экран) */}
+            <div className={`relative flex items-center rounded-lg p-0.5 border ${cLine} ${cCardElevated}`}>
+              {(['cm', 'mm'] as const).map((u) => {
+                const active = unit === u
+                return (
+                  <button
+                    key={u}
+                    onClick={() => {
+                      hapticImpact('light')
+                      setUnit(u)
+                    }}
+                    className={`relative z-10 px-2.5 py-0.5 rounded-md text-[11px] font-sans font-semibold uppercase tracking-wider transition-colors border-none bg-transparent cursor-pointer ${
+                      active
+                        ? isDark
+                          ? 'text-[#0A0A0A]'
+                          : 'text-[#F2EFE9]'
+                        : cTextMuted
+                    }`}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId="unitSwitchPill"
+                        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                        className={`absolute inset-0 rounded-md -z-10 ${
+                          isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
+                        }`}
+                      />
+                    )}
+                    {u === 'cm' ? t.cmLabel : t.mmLabel}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-                <g
-                  style={{
-                    transform: `translate(110px, 41px) scale(${blueprintScaleX}, ${blueprintScaleY}) translate(-110px, -41px)`,
-                    transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1)',
-                  }}
-                >
-                  <path
-                    d="M20,41 C20,25 36,19 58,21 C82,23 108,16 138,14 C166,12 196,19 200,38 C203,54 182,67 152,67 C122,67 98,58 72,59 C44,60 20,56 20,41 Z"
-                    fill="none"
-                    stroke={accentStroke}
-                    strokeWidth="1.1"
-                    strokeDasharray="3 2"
-                    opacity="0.7"
-                  />
-
-                  <path
-                    d="M22,41 C22,27 36,22 56,24 C80,26 105,19 132,17 C157,15 181,22 183,38 C185,52 167,63 142,63 C115,63 94,55 70,56 C44,57 22,53 22,41 Z"
-                    fill={isDark ? 'rgba(244,240,232,0.08)' : 'rgba(28,24,22,0.08)'}
-                    stroke={trackColor}
-                    strokeWidth="1.4"
-                  />
-
-                  <line x1="134" y1="16" x2="138" y2="63" stroke={accentStroke} strokeWidth="1.1" strokeDasharray="2 2" />
-                  <line x1="22" y1="41" x2="183" y2="38" stroke={trackColor} strokeOpacity="0.3" strokeWidth="0.9" />
-
-                  <g transform="translate(38, 41)">
-                    <circle r="4.5" fill={accentStroke} className="bio-node-ring" />
-                    <circle r="2.2" fill={accentStroke} />
-                  </g>
-                  <g transform="translate(135, 26)">
-                    <circle r="4.5" fill={accentStroke} className="bio-node-ring" />
-                    <circle r="2.2" fill={accentStroke} />
-                  </g>
-                  <g transform="translate(178, 37)">
-                    <circle r="4" fill={trackColor} className="bio-node-ring" />
-                    <circle r="2" fill={trackColor} />
-                  </g>
-                </g>
-
-                <line x1="18" y1="72" x2="184" y2="72" stroke={trackColor} strokeOpacity="0.5" strokeWidth="0.9" />
-                <line x1="184" y1="72" x2="202" y2="72" stroke={accentStroke} strokeWidth="1.4" />
-                <text x="100" y="80" textAnchor="middle" fill={trackColor} opacity="0.65" fontSize="7.5" fontFamily="sans-serif">
-                  {Math.round(footMm)} mm + {proFit.allowanceMm} mm
-                </text>
+          {/* Главный барабан размера + Кнопки - / + по стандарту Apple HIG (44x44px + удержание) */}
+          <div className="flex items-center justify-between gap-3 my-1">
+            <button
+              onPointerDown={(e) => startHold(-1, e)}
+              onPointerUp={stopHold}
+              onPointerLeave={stopHold}
+              onPointerCancel={stopHold}
+              disabled={footMm <= range.min}
+              aria-label="Decrease foot length"
+              className={`apple-btn w-11 h-11 rounded-full border ${cLine} ${cCardElevated} ${cText} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 shadow-2xs`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
+            </button>
+
+            <div onClick={startEdit} className="flex-1 flex flex-col items-center justify-center cursor-pointer">
+              <div className="flex items-baseline justify-center gap-1.5">
+                {isEditing ? (
+                  <input
+                    ref={inputRef}
+                    value={editValue}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setEditValue(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    onBlur={commitEdit}
+                    onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                    className={`w-[115px] text-center text-[44px] font-serif leading-none bg-transparent outline-none border-b ${cLine} ${cText}`}
+                    inputMode="decimal"
+                  />
+                ) : (
+                  <motion.span
+                    key={displayValue}
+                    initial={{ opacity: 0.65, scale: 0.96, y: 2 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ type: 'spring', stiffness: 520, damping: 30 }}
+                    className="text-[46px] font-serif leading-none tracking-tight"
+                  >
+                    {displayValue}
+                  </motion.span>
+                )}
+                <span className={`text-sm font-sans font-medium uppercase ${cTextMuted}`}>
+                  {unit === 'cm' ? t.cmLabel : t.mmLabel}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onPointerDown={(e) => startHold(1, e)}
+              onPointerUp={stopHold}
+              onPointerLeave={stopHold}
+              onPointerCancel={stopHold}
+              disabled={footMm >= range.max}
+              aria-label="Increase foot length"
+              className={`apple-btn w-11 h-11 rounded-full border ${cLine} ${cCardElevated} ${cText} flex items-center justify-center disabled:opacity-25 cursor-pointer shrink-0 shadow-2xs`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* 2026 BIOMETRIC TELEMETRY BAR (Вместо примитивного контура стельки — 3-зонная телеметрия колодки) */}
+          <div className={`grid grid-cols-3 gap-1.5 my-2.5 p-2 rounded-xl border ${cLine} ${cCardElevated}`}>
+            {/* Зона 1: Пятка (Heel Seat) */}
+            <div className="flex flex-col px-1.5">
+              <div className="flex items-center justify-between text-[10px] font-sans">
+                <span className={cTextMuted}>{t.zoneHeel}</span>
+                <span className="font-semibold">{proFit.heelSeatMm} {t.mmLabel}</span>
+              </div>
+              <div className="w-full h-1 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: trackBgColor }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  animate={{ width: `${Math.min(100, Math.max(35, pct * 0.8 + 20))}%` }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                  style={{ backgroundColor: trackColor }}
+                />
+              </div>
+            </div>
+
+            {/* Зона 2: Пучки M1-M5 (Forefoot Ball Width) */}
+            <div className={`flex flex-col px-1.5 border-l border-r ${cLine}`}>
+              <div className="flex items-center justify-between text-[10px] font-sans">
+                <span className={cTextMuted}>{t.zoneArch}</span>
+                <span className="font-semibold">{proFit.ballWidthMm} {t.mmLabel}</span>
+              </div>
+              <div className="w-full h-1 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: trackBgColor }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  animate={{
+                    width:
+                      widthFit === 'narrow'
+                        ? '48%'
+                        : widthFit === 'standard'
+                          ? '68%'
+                          : widthFit === 'wide'
+                            ? '85%'
+                            : '98%',
+                  }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                  style={{ backgroundColor: accentHex }}
+                />
+              </div>
+            </div>
+
+            {/* Зона 3: Стелька и Припуск мыска (Insole & Toe Box) */}
+            <div className="flex flex-col px-1.5">
+              <div className="flex items-center justify-between text-[10px] font-sans">
+                <span className={cTextMuted}>{t.insoleLabel}</span>
+                <span className="font-semibold" style={{ color: accentHex }}>
+                  {proFit.insoleMm} {t.mmLabel}
+                </span>
+              </div>
+              <div className="w-full h-1 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: trackBgColor }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  animate={{ width: `${Math.min(100, (proFit.allowanceMm / 18) * 100)}%` }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                  style={{ backgroundColor: accentHex }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* 3. ПРЕЦИЗИОННЫЙ СЛАЙДЕР-ШТАНГЕНЦИРКУЛЬ */}
-          <div className="relative w-full pt-2 pb-0.5">
+          {/* 3. МАГНИТНАЯ ШКАЛА-РУЛЕТКА В СТИЛЕ APPLE WATCH / iOS CAMERA */}
+          <div className="relative w-full pt-1 pb-0.5">
             <input
               type="range"
               min={range.min}
               max={range.max}
               step={1}
               value={footMm}
-              onChange={(e) => setFootMm(Number(e.target.value))}
-              onPointerUp={() => haptic('light')}
-              className="w-full h-6 absolute inset-x-0 -top-1 z-20 opacity-0 cursor-pointer"
+              onChange={handleSliderChange}
+              onPointerDown={() => {
+                setIsDraggingSlider(true)
+                hapticImpact('light')
+              }}
+              onPointerUp={() => {
+                setIsDraggingSlider(false)
+                hapticImpact('light')
+              }}
+              onPointerCancel={() => setIsDraggingSlider(false)}
+              className="w-full h-9 absolute inset-x-0 -top-1 z-30 opacity-0 cursor-pointer"
             />
-            <div className="w-full h-[2px] relative rounded-full" style={{ backgroundColor: trackBgColor }}>
+
+            {/* Магнитная волна делений шкалы */}
+            <div className="relative h-7 flex items-end justify-between px-1 pointer-events-none">
+              {Array.from({ length: RULER_TICKS }).map((_, idx) => {
+                const tickPct = (idx / (RULER_TICKS - 1)) * 100
+                const dist = Math.abs(tickPct - pct)
+                // Эффект магнитной линзы Apple: ближние к бегунку деления вырастают
+                const proximity = Math.max(0, 1 - dist / 14)
+                const baseHeight = idx % 4 === 0 ? 10 : 5
+                const dynamicHeight = baseHeight + proximity * 12
+                const isMajor = idx % 4 === 0
+
+                return (
+                  <div
+                    key={idx}
+                    className="w-[1.5px] rounded-full transition-all duration-75"
+                    style={{
+                      height: `${dynamicHeight}px`,
+                      backgroundColor: proximity > 0.55 ? accentHex : trackColor,
+                      opacity: proximity > 0.2 ? 0.95 : isMajor ? 0.45 : 0.22,
+                    }}
+                  />
+                )
+              })}
+
+              {/* Тактильная головка микрометра (Apple Knob) */}
               <div
-                className="absolute top-0 left-0 h-full rounded-full transition-all duration-75"
-                style={{ width: `${pct}%`, backgroundColor: trackColor }}
-              />
-              <div
-                className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full shadow-md transition-transform duration-75"
+                className="absolute top-1/2 -translate-y-1/2 z-20 pointer-events-none transition-transform duration-75"
                 style={{
-                  left: `calc(${pct}% - 7px)`,
-                  backgroundColor: trackColor,
-                  border: `2px solid ${isDark ? '#0A0A0A' : '#F2EFE9'}`,
+                  left: `calc(${pct}% - 12px)`,
+                  transform: `translateY(-50%) scale(${isDraggingSlider ? 1.22 : 1})`,
                 }}
-              />
+              >
+                <div
+                  className="w-6 h-6 rounded-full shadow-md flex items-center justify-center"
+                  style={{
+                    backgroundColor: trackColor,
+                    border: `2.5px solid ${isDark ? '#0A0A0A' : '#F2EFE9'}`,
+                  }}
+                >
+                  <div
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: accentHex }}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center mt-1.5 px-0.5">
-              {Array.from({ length: 21 }).map((_, idx) => (
-                <span
-                  key={idx}
-                  className="block w-[1px]"
-                  style={{
-                    height: idx % 5 === 0 ? '5px' : '2.5px',
-                    backgroundColor: trackColor,
-                    opacity: idx % 5 === 0 ? 0.45 : 0.2,
-                  }}
-                />
-              ))}
-            </div>
-            <div className={`flex justify-between text-[8.5px] font-sans ${cTextMuted} mt-0.5`}>
+            <div className={`flex justify-between items-center text-[11px] font-sans font-medium ${cTextMuted} mt-1 px-0.5`}>
               <span>{unit === 'cm' ? (range.min / 10).toFixed(1) : range.min}</span>
-              <span className="uppercase tracking-[0.2em]">{t.step1}</span>
+              <span className="text-[10px] uppercase tracking-[0.16em]">
+                {t.step1} · +{proFit.allowanceMm} {t.mmLabel}
+              </span>
               <span>{unit === 'cm' ? (range.max / 10).toFixed(1) : range.max}</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4. НАВИГАЦИЯ ПО ВКЛАДКАМ */}
-      <nav className="px-4 pt-2.5 shrink-0">
-        <div className={`grid grid-cols-4 gap-1 p-1 rounded-xl border ${cLine} ${cCard}`}>
+      {/* 4. НАВИГАЦИЯ ПО ВКЛАДКАМ В СТИЛЕ APPLE iOS (Крупный шрифт, без обрезания точек "...") */}
+      <nav className="px-3.5 pt-2 shrink-0">
+        <div className={`relative grid grid-cols-4 gap-1 p-1 rounded-xl border ${cLine} ${cCard}`}>
           {(
             [
               { id: 'world', label: t.tabWorld },
@@ -1095,17 +1258,26 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               <button
                 key={tab.id}
                 onClick={() => {
-                  haptic('light')
+                  hapticImpact('light')
                   setActiveTab(tab.id)
                 }}
-                className={`py-1.5 px-1 rounded-lg text-[9px] font-sans uppercase tracking-[0.1em] transition-all border-none cursor-pointer truncate ${
+                className={`relative z-10 py-2 px-1 rounded-lg text-[11.5px] font-sans font-semibold uppercase tracking-[0.06em] transition-colors border-none bg-transparent cursor-pointer whitespace-nowrap ${
                   active
                     ? isDark
-                      ? 'bg-[#F4F0E8] text-[#0A0A0A] font-medium shadow-sm'
-                      : 'bg-[#1C1816] text-[#F2EFE9] font-medium shadow-sm'
-                    : `bg-transparent ${cTextMuted} hover:opacity-100`
+                      ? 'text-[#0A0A0A]'
+                      : 'text-[#F2EFE9]'
+                    : cTextMuted
                 }`}
               >
+                {active && (
+                  <motion.div
+                    layoutId="activeTabPill"
+                    transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    className={`absolute inset-0 rounded-lg -z-10 shadow-xs ${
+                      isDark ? 'bg-[#F4F0E8]' : 'bg-[#1C1816]'
+                    }`}
+                  />
+                )}
                 {tab.label}
               </button>
             )
@@ -1113,17 +1285,18 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         </div>
       </nav>
 
-      {/* 5. РАБОЧАЯ ОБЛАСТЬ ВКЛАДОК */}
-      <main className="flex-1 px-4 pt-2.5 pb-3 overflow-y-auto scrollbar-hide flex flex-col justify-between gap-2.5">
+      {/* 5. РАБОЧАЯ ОБЛАСТЬ ВКЛАДОК (Крупные читаемые шрифты, равномерное заполнение экрана) */}
+      <main className="flex-1 px-3.5 pt-2 pb-3 overflow-y-auto scrollbar-hide flex flex-col justify-between gap-2">
         <AnimatePresence mode="wait">
+          {/* ВКЛАДКА 1: 8 МИРОВЫХ СТАНДАРТОВ */}
           {activeTab === 'world' && (
             <motion.div
               key="world"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="grid grid-cols-2 gap-2"
+              transition={{ duration: 0.16 }}
+              className="grid grid-cols-2 gap-2 my-auto"
             >
               {worldSystems.map((item) => {
                 const unlocked = item.free || isProPurchased
@@ -1132,34 +1305,35 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     key={item.code}
                     onClick={() => {
                       if (!unlocked) handleProClick()
+                      else hapticSelection()
                     }}
-                    className={`relative rounded-xl border ${cLine} ${cCard} px-3 py-2.5 flex items-center justify-between transition-all ${
-                      !unlocked ? 'cursor-pointer active:scale-[0.98]' : ''
+                    className={`apple-btn relative rounded-xl border ${cLine} ${cCard} px-3.5 py-3 flex items-center justify-between ${
+                      !unlocked ? 'cursor-pointer' : ''
                     }`}
                   >
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         {item.flag}
-                        <span className="text-[10px] font-sans font-medium uppercase tracking-[0.15em] truncate">
+                        <span className="text-[13px] font-sans font-semibold uppercase tracking-[0.08em] truncate">
                           {item.code}
                         </span>
                       </div>
-                      <span className={`text-[8.5px] font-sans ${cTextMuted} truncate`}>{item.sub}</span>
+                      <span className={`text-[11px] font-sans ${cTextMuted} truncate`}>{item.sub}</span>
                     </div>
 
                     {unlocked ? (
                       <motion.span
                         key={item.val}
-                        initial={{ scale: 0.92, opacity: 0.5 }}
+                        initial={{ scale: 0.92, opacity: 0.6 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="font-serif text-2xl leading-none tracking-tight shrink-0"
+                        className="font-serif text-[26px] leading-none tracking-tight shrink-0 ml-1"
                       >
                         {item.val}
                       </motion.span>
                     ) : (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="font-serif text-xl blur-[5px] opacity-40 select-none">42.5</span>
-                        <span className={`p-1 rounded-md border ${cLine} ${cTextMuted}`}>
+                        <span className={`p-1.5 rounded-lg border ${cLine} ${cTextMuted}`}>
                           <LockIcon />
                         </span>
                       </div>
@@ -1170,17 +1344,18 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
+          {/* ВКЛАДКА 2: КОЛОДКА, СТЕЛЬКА И ПОЛНОТА */}
           {activeTab === 'fit' && (
             <motion.div
               key="fit"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="flex flex-col gap-2"
+              transition={{ duration: 0.16 }}
+              className="flex flex-col gap-2 my-auto"
             >
-              <div className={`rounded-xl border ${cLine} ${cCard} p-2.5`}>
-                <div className="flex flex-wrap gap-1 mb-2">
+              <div className={`rounded-xl border ${cLine} ${cCard} p-3 flex flex-col gap-2.5`}>
+                <div className="flex flex-wrap gap-1.5">
                   {(
                     [
                       { id: 'sneakers', label: t.styleSneakers },
@@ -1193,14 +1368,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     <button
                       key={st.id}
                       onClick={() => {
-                        haptic('light')
+                        hapticImpact('light')
                         setShoeStyle(st.id)
                       }}
-                      className={`px-2 py-1 rounded-md text-[9px] font-sans uppercase tracking-wider border transition-all cursor-pointer ${
+                      className={`apple-btn px-3 py-1.5 rounded-lg text-[11.5px] font-sans font-medium uppercase tracking-wider border cursor-pointer ${
                         shoeStyle === st.id
                           ? isDark
-                            ? 'border-[#F4F0E8] bg-[#F4F0E8]/15 text-[#F4F0E8]'
-                            : 'border-[#1C1816] bg-[#1C1816]/10 text-[#1C1816]'
+                            ? 'border-[#F4F0E8] bg-[#F4F0E8] text-[#0A0A0A] font-semibold'
+                            : 'border-[#1C1816] bg-[#1C1816] text-[#F2EFE9] font-semibold'
                           : `${cLine} bg-transparent ${cTextMuted}`
                       }`}
                     >
@@ -1209,7 +1384,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-2 gap-1.5">
                   {(
                     [
                       { id: 'narrow', label: t.widthNarrow },
@@ -1221,14 +1396,14 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     <button
                       key={wf.id}
                       onClick={() => {
-                        haptic('light')
+                        hapticImpact('light')
                         setWidthFit(wf.id)
                       }}
-                      className={`py-1 px-1 rounded-md text-[8.5px] font-sans uppercase tracking-wider border transition-all cursor-pointer truncate ${
+                      className={`apple-btn py-2 px-2.5 rounded-lg text-[11.5px] font-sans font-medium uppercase tracking-wider border cursor-pointer truncate ${
                         widthFit === wf.id
                           ? isDark
-                            ? 'border-[#D4AF37] bg-[#D4AF37]/20 text-[#F4F0E8]'
-                            : 'border-[#8C6239] bg-[#8C6239]/15 text-[#1C1816]'
+                            ? 'border-[#D4AF37] bg-[#D4AF37]/20 text-[#F4F0E8] font-semibold'
+                            : 'border-[#8C5A2B] bg-[#8C5A2B]/15 text-[#1C1816] font-semibold'
                           : `${cLine} bg-transparent ${cTextMuted}`
                       }`}
                     >
@@ -1242,89 +1417,84 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 onClick={() => {
                   if (!isProPurchased) handleProClick()
                 }}
-                className={`relative rounded-xl border ${cLine} ${cCard} p-3 grid grid-cols-2 gap-2.5 ${
+                className={`rounded-xl border ${cLine} ${cCard} p-3.5 grid grid-cols-2 gap-3 ${
                   !isProPurchased ? 'cursor-pointer' : ''
                 }`}
               >
                 <div>
-                  <span className={`text-[8.5px] uppercase tracking-wider block ${cTextMuted}`}>
+                  <span className={`text-[11px] uppercase tracking-wider block ${cTextMuted}`}>
                     {t.insoleLabel} / {t.allowanceLabel}
                   </span>
-                  <span className={`font-serif text-xl ${!isProPurchased ? 'blur-[4px]' : ''}`}>
+                  <span className={`font-serif text-2xl block mt-0.5 ${!isProPurchased ? 'blur-[4px]' : ''}`}>
                     {proFit.insoleMm} {t.mmLabel} ({proFit.insoleCm} {t.cmLabel})
                   </span>
-                  <span className={`block text-[9px] ${cTextMuted}`}>
+                  <span className={`block text-[11.5px] mt-0.5 ${cTextMuted}`}>
                     +{proFit.allowanceMm} {t.mmLabel} · Last {proFit.lastTraceMm} {t.mmLabel}
                   </span>
                 </div>
 
                 <div>
-                  <span className={`text-[8.5px] uppercase tracking-wider block ${cTextMuted}`}>
+                  <span className={`text-[11px] uppercase tracking-wider block ${cTextMuted}`}>
                     {t.widthLabel} / {t.girthLabel}
                   </span>
-                  <span className={`font-serif text-xl ${!isProPurchased ? 'blur-[4px]' : ''}`}>
+                  <span className={`font-serif text-2xl block mt-0.5 ${!isProPurchased ? 'blur-[4px]' : ''}`}>
                     {proFit.ballWidthMm} / {proFit.ballGirthMm} {t.mmLabel}
                   </span>
-                  <span className={`block text-[9px] ${cTextMuted} ${!isProPurchased ? 'blur-[3px]' : ''}`}>
-                    EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · JP {proFit.widthMarks.jp} · ГОСТ {proFit.widthMarks.gost}
+                  <span className={`block text-[11.5px] mt-0.5 ${cTextMuted} ${!isProPurchased ? 'blur-[3px]' : ''}`}>
+                    EU {proFit.widthMarks.eu} · US {proFit.widthMarks.us} · JP {proFit.widthMarks.jp}
                   </span>
                 </div>
-
-                {!isProPurchased && (
-                  <div className="col-span-2 flex items-center justify-center gap-1.5 pt-1 text-[9px] uppercase tracking-[0.15em] opacity-80">
-                    <LockIcon />
-                    <span>PRO Biometric Fit</span>
-                  </div>
-                )}
               </div>
             </motion.div>
           )}
 
+          {/* ВКЛАДКА 3: МАТРИЦА ПОСАДКИ БРЕНДОВ */}
           {activeTab === 'brands' && (
             <motion.div
               key="brands"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="flex flex-col gap-1.5"
+              transition={{ duration: 0.16 }}
+              className="flex flex-col gap-1.5 my-auto"
             >
               {proFit.brandMatrix.map((row: BrandFitEntry) => (
                 <div
                   key={row.brand}
                   onClick={() => {
                     if (!isProPurchased) handleProClick()
+                    else hapticSelection()
                   }}
-                  className={`rounded-xl border ${cLine} ${cCard} px-3 py-2 flex items-center justify-between gap-2 ${
+                  className={`rounded-xl border ${cLine} ${cCard} px-3.5 py-2.5 flex items-center justify-between gap-2 ${
                     !isProPurchased ? 'cursor-pointer' : ''
                   }`}
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-sans font-medium uppercase tracking-wider">
+                      <span className="text-[13px] font-sans font-semibold uppercase tracking-wider">
                         {row.brand}
                       </span>
-                      <span className={`text-[8px] uppercase px-1.5 py-0.5 rounded border ${cLine} ${cTextMuted}`}>
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border ${cLine} ${cTextMuted}`}>
                         {row.category}
                       </span>
                     </div>
-                    <p className={`text-[9px] font-sans ${cTextMuted} truncate mt-0.5`}>
+                    <p className={`text-[11.5px] font-sans ${cTextMuted} truncate mt-0.5`}>
                       {row.offsetNote[safeLang]}
                     </p>
                   </div>
 
                   {isProPurchased ? (
                     <div className="text-right shrink-0">
-                      <span className="font-serif text-base block leading-tight">
+                      <span className="font-serif text-[19px] block leading-tight">
                         EU {row.eu} · US {row.us}
                       </span>
-                      <span className={`text-[8.5px] font-sans ${cTextMuted}`}>
+                      <span className={`text-[11px] font-sans ${cTextMuted}`}>
                         UK {row.uk} · JP {row.jp}
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="font-serif text-sm blur-[4px] opacity-40 select-none">EU 42.5</span>
+                      <span className="font-serif text-base blur-[4px] opacity-40 select-none">EU 42.5</span>
                       <LockIcon />
                     </div>
                   )}
@@ -1333,22 +1503,23 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
+          {/* ВКЛАДКА 4: ИНСТРУКЦИЯ ЗАМЕРА И ISO */}
           {activeTab === 'guide' && (
             <motion.div
               key="guide"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className={`rounded-xl border ${cLine} ${cCard} p-3.5 flex flex-col gap-2`}
+              transition={{ duration: 0.16 }}
+              className={`rounded-xl border ${cLine} ${cCard} p-4 flex flex-col gap-2.5 my-auto`}
             >
-              <p className="text-[11px] font-sans leading-relaxed">{t.measureGuide1}</p>
-              <p className="text-[11px] font-sans leading-relaxed">{t.measureGuide2}</p>
-              <p className="text-[11px] font-sans leading-relaxed">{t.measureGuide3}</p>
-              <p className={`text-[10px] font-sans italic pt-1 border-t ${cLine} ${cTextMuted}`}>
+              <p className="text-[13px] font-sans leading-relaxed">{t.measureGuide1}</p>
+              <p className="text-[13px] font-sans leading-relaxed">{t.measureGuide2}</p>
+              <p className="text-[13px] font-sans leading-relaxed">{t.measureGuide3}</p>
+              <p className={`text-[12px] font-sans italic pt-2 border-t ${cLine} ${cTextMuted}`}>
                 {t.measureTip}
               </p>
-              <div className={`pt-1.5 border-t ${cLine} text-[9px] font-sans ${cTextMuted}`}>
+              <div className={`pt-2 border-t ${cLine} text-[11px] font-sans ${cTextMuted}`}>
                 <div>{t.disclaimer}</div>
                 <div className="mt-0.5">{t.standardsNote}</div>
               </div>
@@ -1356,27 +1527,25 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           )}
         </AnimatePresence>
 
-        {/* 6. КОММЕРЧЕСКИЙ БЛОК РАЗБЛОКИРОВКИ PRO */}
+        {/* 6. НИЖНИЙ БАР СТАТУСА ИЛИ ПОКУПКИ PRO */}
         <div className="shrink-0">
           {statusError && (
-            <div className="mb-1.5 px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 text-[10px] text-center">
+            <div className="mb-1.5 px-3 py-2 rounded-lg border border-red-500/40 bg-red-500/10 text-[12px] text-center">
               {statusError}
             </div>
           )}
 
           {!isProPurchased ? (
             <div className={`rounded-xl border ${cLine} pro-shimmer p-3 flex flex-col gap-2`}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="font-serif text-sm tracking-tight leading-none mb-1">{t.proTitle}</h3>
-                  <p className={`text-[9.5px] font-sans leading-snug ${cTextMuted}`}>{t.proDesc}</p>
-                </div>
+              <div>
+                <h3 className="font-serif text-base tracking-tight leading-none mb-1">{t.proTitle}</h3>
+                <p className={`text-[11.5px] font-sans leading-snug ${cTextMuted}`}>{t.proDesc}</p>
               </div>
 
               <button
                 onClick={handleProClick}
                 disabled={isPurchasing}
-                className={`w-full py-2.5 px-4 rounded-lg border ${cLine} flex items-center justify-center gap-2 text-[10px] font-sans font-medium uppercase tracking-[0.18em] transition-all active:scale-[0.98] cursor-pointer ${
+                className={`apple-btn w-full py-3 px-4 rounded-xl border ${cLine} flex items-center justify-center gap-2 text-[12px] font-sans font-semibold uppercase tracking-[0.14em] cursor-pointer ${
                   isDark ? 'bg-[#F4F0E8] text-[#0A0A0A]' : 'bg-[#1C1816] text-[#F2EFE9]'
                 }`}
               >
@@ -1391,9 +1560,11 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </button>
             </div>
           ) : (
-            <div className={`rounded-xl border ${cLine} ${cCard} px-3 py-2 flex items-center justify-between text-[9px] font-sans uppercase tracking-[0.2em] ${cTextMuted}`}>
-              <span>{t.subtitle}</span>
-              <span className="text-[#D4AF37] font-medium">★ {t.proActiveBadge}</span>
+            <div className={`rounded-xl border ${cLine} ${cCard} px-4 py-2.5 flex items-center justify-between text-[11px] font-sans font-medium uppercase tracking-[0.14em] ${cTextMuted}`}>
+              <span className="truncate">{t.subtitle}</span>
+              <span className="shrink-0 ml-2 font-semibold" style={{ color: accentHex }}>
+                ★ {t.proActiveBadge}
+              </span>
             </div>
           )}
         </div>
