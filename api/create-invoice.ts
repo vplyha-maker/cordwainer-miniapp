@@ -4,8 +4,9 @@ import { neon } from '@neondatabase/serverless';
 const PRODUCT_ID_REGEX = /^[a-z0-9_-]{2,32}$/i;
 const MAX_AUTH_AGE_SECONDS = 86400; // 24 часа
 
-// Рыночная стоимость разовой разблокировки PRO-модулей в Telegram Stars (~$4.99 USD)
+// Рыночная стоимость разовой разблокировки PRO-модулей в Telegram Stars
 export const PRO_MODULE_PRICE_STARS = 250;
+export const PRO_VIDEOS_PRICE_STARS = 350;
 
 interface VerifiedTelegramUser {
   id: number;
@@ -20,6 +21,12 @@ interface ProductConfig {
 }
 
 const PRODUCT_CATALOG: Record<string, ProductConfig> = {
+  pro_videos: {
+    title: 'PRO: Полный AI-видео Лукбук обуви',
+    description:
+      'Пожизненный доступ ко всей видео-энциклопедии фасонов обуви и всем будущим AI-пополнениям коллекции',
+    amount: PRO_VIDEOS_PRICE_STARS,
+  },
   pro_colors: {
     title: 'PRO: Палитры и схемы Иттена',
     description:
@@ -187,6 +194,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
+  // Цена строго берётся из серверного каталога PRODUCT_CATALOG (игнорируя клиентский amountStars)
   const productMeta = PRODUCT_CATALOG[rawProductId] ?? DEFAULT_PRODUCT_CONFIG;
   const url = `https://api.telegram.org/bot${token}/createInvoiceLink`;
 
