@@ -5,6 +5,7 @@ const PRODUCT_ID_REGEX = /^[a-z0-9_-]{2,32}$/i;
 const MAX_AUTH_AGE_SECONDS = 86400; // 24 часа
 
 // Рыночная стоимость разовой разблокировки PRO-модулей в Telegram Stars
+export const PRO_SIZES_PRICE_STARS = 150;
 export const PRO_MODULE_PRICE_STARS = 250;
 export const PRO_VIDEOS_PRICE_STARS = 350;
 
@@ -21,6 +22,12 @@ interface ProductConfig {
 }
 
 const PRODUCT_CATALOG: Record<string, ProductConfig> = {
+  pro_sizes: {
+    title: 'PRO: Мировые стандарты, Полнота и Матрица брендов',
+    description:
+      'Пожизненный доступ к 8 мировым системам (US, UK, JP, CN, KR, BR), расчёту полноты (E–H / 2E–4E), длины стельки по типу обуви и матрице посадки брендов',
+    amount: PRO_SIZES_PRICE_STARS,
+  },
   pro_videos: {
     title: 'PRO: Полный AI-видео Лукбук обуви',
     description:
