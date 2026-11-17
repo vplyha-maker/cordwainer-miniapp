@@ -1,4 +1,4 @@
-```typescript
+
 /**
  * Accurate shoe size conversion & anatomical fit engine
  * based on ISO 19407:2023 / ISO/TS 19407, Mondopoint (ISO 9407),
