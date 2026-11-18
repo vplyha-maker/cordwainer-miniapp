@@ -39,7 +39,54 @@ function getWin(): ExtendedWindow {
 }
 
 // ---------------------------------------------------------------------------
-// 1. HAUTE-COUTURE DIDONE VECTOR GLYPHS (Noto Serif Display & Italic, 0 KB Font Latency)
+// 0. MOLLANI CALLIGRAPHIC SCRIPT FONT LOADER & BRAND WORDMARK CONFIG
+// ---------------------------------------------------------------------------
+const BRAND_WORDMARK = 'Cordwaine'
+const MOLLANI_FONT_URL =
+  'https://cdn.jsdelivr.net/gh/baechu-rpg/fonts@f3f7b6e3d8eec01179149bbcdfb30ec3deb5af15/Mollani-Regular.ttf'
+
+let mollaniFontReady = false
+let mollaniLoadPromise: Promise<boolean> | null = null
+
+function ensureMollaniFont(): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve(false)
+  }
+  if (mollaniFontReady) return Promise.resolve(true)
+  if (mollaniLoadPromise) return mollaniLoadPromise
+
+  mollaniLoadPromise = (async () => {
+    try {
+      if (typeof FontFace !== 'undefined') {
+        const face = new FontFace('Mollani', `url(${MOLLANI_FONT_URL}) format('truetype')`, {
+          weight: 'normal',
+          style: 'normal',
+          display: 'swap',
+        })
+        const loaded = await face.load()
+        document.fonts.add(loaded)
+        mollaniFontReady = true
+        return true
+      }
+      if (document.fonts && typeof document.fonts.load === 'function') {
+        await document.fonts.load('64px "Mollani"')
+        mollaniFontReady = document.fonts.check('64px "Mollani"')
+        return mollaniFontReady
+      }
+    } catch {
+      mollaniFontReady = false
+    }
+    return false
+  })()
+
+  return mollaniLoadPromise
+}
+
+// Kick off font preload immediately at module evaluation
+void ensureMollaniFont()
+
+// ---------------------------------------------------------------------------
+// 1. HAUTE-COUTURE DIDONE VECTOR GLYPHS (For 13x13 Matrix & Fallback, 0 KB Latency)
 // Pre-compiled into GPU Path2D objects once at module load for 0.00ms per-frame allocation
 // ---------------------------------------------------------------------------
 const DIDONE_GLYPH_PATHS: Record<string, string> = {
@@ -519,14 +566,12 @@ function createPrebakedTextures(): PrebakedTextures | null {
 
     let p = 0
     for (let y = 0; y < bgH; y++) {
-      // Normalized screen coordinates in [-1, 1] so the 3D spotlight vignette frames mobile screens properly
       const nyScr = (1.0 - y / (bgH - 1) - 0.52) * 2.0
       const pY = nyScr * 1.0
       for (let x = 0; x < bgW; x++) {
         const nxScr = (x / (bgW - 1) - 0.5) * 2.0
         const pX = nxScr * 0.5
 
-        // Anisotropic silk & fine calfskin heightfield derivatives
         const u1 = pX * 6.0 + pY * 2.4
         const v1 = pY * 5.2 - pX * 2.8
         const hX = Math.cos(u1) * Math.sin(v1) * 0.12
@@ -550,16 +595,11 @@ function createPrebakedTextures(): PrebakedTextures | null {
         const specDot = Math.max(snx * hx * hInv + sny * hy * hInv + snz * hz * hInv, 0.0)
         const spec = Math.pow(specDot, 24.0)
 
-        // Elliptical screen-space distance (0 at center, ~1.0 at edges, ~1.35 at corners)
         const dist = Math.sqrt(nxScr * nxScr * 0.85 + nyScr * nyScr * 0.68)
         const centerGlow = Math.exp(-dist * dist * 1.65)
         const vig = Math.max(0.0, Math.min(1.0, (1.22 - dist) / (1.22 - 0.12)))
         const vigSmooth = vig * vig * (3.0 - 2.0 * vig)
 
-        // Exact iPhone 1000057245.mp4 Neutral Alabaster-Pearl & Smoked-Pewter Stone Palette (Zero yellow!)
-        // Outer edge: Smoked Pewter (#54514D -> 0.329, 0.318, 0.302)
-        // Mid stone: Cool Platinum Stone (#BDBAB4 -> 0.741, 0.729, 0.706)
-        // Center spotlight: Luminous Alabaster Pearl (#F2F1EE -> 0.949, 0.945, 0.933)
         let r = 0.329 + (0.741 - 0.329) * vigSmooth
         let g = 0.318 + (0.729 - 0.318) * vigSmooth
         let b = 0.302 + (0.706 - 0.302) * vigSmooth
@@ -732,9 +772,8 @@ export function WelcomePage({
   lang,
   setLang,
 }: WelcomePageProps) {
-  // Always launch with the signature intro animation ('intro') automatically on mount!
+  // Always launch with the signature intro animation ('intro') automatically on mount
   const [phase, setPhase] = useState<'intro' | 'complete'>('intro')
-  const [showPhilosophy, setShowPhilosophy] = useState(false)
   const [soundOn, setSoundOn] = useState(() => sound.enabled)
   const [runId, setRunId] = useState(0)
 
@@ -742,8 +781,9 @@ export function WelcomePage({
   const skipRequestedRef = useRef(false)
   const matrixCells = useMemo(() => buildMatrixCells(), [])
 
-  // Configure Telegram WebApp header & background colors to Smoked Pewter-Stone (#6E6B66)
+  // Preload Mollani font and configure Telegram WebApp header & background colors
   useEffect(() => {
+    void ensureMollaniFont()
     try {
       const bgHex = '#6E6B66'
       getWin().Telegram?.WebApp?.setHeaderColor?.(bgHex)
@@ -829,7 +869,6 @@ export function WelcomePage({
 
     skipRequestedRef.current = false
     setPhase('intro')
-    setShowPhilosophy(false)
 
     // Milestone flags for synchronized audio & haptics across the choreography
     let mSpawn = false
@@ -837,8 +876,6 @@ export function WelcomePage({
     let mWord0 = false
     let mWord1 = false
     let mWord2 = false
-    let mPhilosophyOn = false
-    let mPhilosophyOff = false
     let mLogoLock = false
     let mLightSweep = false
     let mDone = false
@@ -847,13 +884,42 @@ export function WelcomePage({
     let lastNow = performance.now()
     let simTime = 0.0
 
+    // Helper to draw the assembled wordmark in Mollani calligraphic font (with Didone fallback)
+    const drawWordmarkGlyphs = (fillColor: string) => {
+      ctx.fillStyle = fillColor
+      const canUseMollani =
+        mollaniFontReady ||
+        (typeof document !== 'undefined' &&
+          Boolean(document.fonts?.check?.('60px "Mollani"')))
+
+      if (canUseMollani) {
+        ctx.save()
+        ctx.font = '400 64px "Mollani", "Cormorant Garamond", Georgia, serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(BRAND_WORDMARK, 0, 3)
+        ctx.restore()
+      } else {
+        for (let i = 0; i < LOGO_TARGETS.length; i++) {
+          const lt = LOGO_TARGETS[i]
+          const g = paths.glyphs[lt.char]
+          if (!g) continue
+          ctx.save()
+          ctx.translate(lt.x, lt.y)
+          ctx.scale(lt.scale, lt.scale)
+          ctx.fill(g)
+          ctx.restore()
+        }
+      }
+    }
+
     const renderFrame = (now: number) => {
       const rawDt = (now - lastNow) / 1000
       lastNow = now
       const dt = Math.max(0.001, Math.min(0.033, rawDt))
 
-      if (skipRequestedRef.current && simTime < 4.5) {
-        simTime = 4.5
+      if (skipRequestedRef.current && simTime < 4.2) {
+        simTime = 4.2
         mDone = true
       } else {
         simTime += dt
@@ -886,24 +952,17 @@ export function WelcomePage({
           haptic('medium')
           sound.softTick(1.28)
         }
-        if (!mPhilosophyOn && elapsed >= 2.82) {
-          mPhilosophyOn = true
-          setShowPhilosophy(true)
-        }
-        if (!mLogoLock && elapsed >= 2.95) {
+        if (!mLogoLock && elapsed >= 2.85) {
           mLogoLock = true
           haptic('heavy')
           sound.feltChord()
         }
-        if (!mLightSweep && elapsed >= 3.25) {
+        if (!mLightSweep && elapsed >= 3.22) {
           mLightSweep = true
           sound.goldenShimmer()
         }
-        if (!mPhilosophyOff && elapsed >= 3.85) {
-          mPhilosophyOff = true
-          setShowPhilosophy(false)
-        }
-        if (!mDone && elapsed >= 4.15) {
+        // Complete intro once so "THE ART OF SHOEMAKING" and the bottom block glide up together
+        if (!mDone && elapsed >= 3.85) {
           mDone = true
           setPhase('complete')
         }
@@ -911,7 +970,7 @@ export function WelcomePage({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      // 1. Blit pre-baked Alabaster-Pearl & Smoked-Pewter 3D spotlight background in 0.05ms
+      // 1. Blit pre-baked Alabaster-Pearl & Smoked-Pewter 3D spotlight background
       ctx.globalAlpha = 1.0
       ctx.drawImage(textures.bgCanvas, 0, 0, viewW, viewH)
 
@@ -922,7 +981,7 @@ export function WelcomePage({
       const cellGlyphScale = (cellStep * 0.43) / 24.0
       const logoMasterScale = Math.min((viewW * 0.82) / 248.0, 1.44)
 
-      // 2. Signature breathing pearl halo behind logo (using pre-rendered sprite)
+      // 2. Signature breathing pearl halo behind logo
       if (elapsed > 1.8) {
         const haloIn = easeOutCubic(clamp01((elapsed - 1.8) / 1.1))
         const breathe = 0.5 + 0.5 * Math.sin(elapsed * 1.65)
@@ -938,7 +997,7 @@ export function WelcomePage({
       }
 
       // 3. Matrix letters (Stages 1 -> 2 -> 3)
-      if (elapsed < 3.45) {
+      if (elapsed < 3.25) {
         for (let i = 0; i < TOTAL_CELLS; i++) {
           const cell = matrixCells[i]
           const glyph = paths.glyphs[cell.char]
@@ -991,8 +1050,8 @@ export function WelcomePage({
               alpha *= 1 - flyP
             }
           } else {
-            const stagger = cell.logoIndex * 0.032
-            const flyP = easeInOutQuart(clamp01((elapsed - (1.72 + stagger)) / 1.15))
+            const stagger = cell.logoIndex * 0.03
+            const flyP = easeInOutQuart(clamp01((elapsed - (1.72 + stagger)) / 1.05))
             const targetSpec = LOGO_TARGETS[cell.logoIndex]
             const targetX = centerX + targetSpec.x * logoMasterScale
             const targetY = centerY + targetSpec.y * logoMasterScale
@@ -1004,7 +1063,7 @@ export function WelcomePage({
             rot = rot * (1 - flyP)
             scale = scale + (targetScale - scale) * flyP
 
-            const handoffP = clamp01((elapsed - 2.88) / 0.32)
+            const handoffP = clamp01((elapsed - 2.52) / 0.48)
             alpha = (1 - handoffP) * Math.min(1, spawnP * 1.15)
           }
 
@@ -1021,26 +1080,16 @@ export function WelcomePage({
         }
       }
 
-      // 4. Assembled Haute-Couture Didone Wordmark ("the" + Diamond Rules + "Cordwaine" + Calligraphic Gold Swash)
-      if (elapsed > 2.45) {
-        const lockupAlpha = easeOutCubic(clamp01((elapsed - 2.52) / 0.48))
+      // 4. Assembled Wordmark ("the" + Diamond Rules + "Cordwaine" in Mollani + Calligraphic Gold Swash)
+      if (elapsed > 2.42) {
+        const lockupAlpha = easeOutCubic(clamp01((elapsed - 2.46) / 0.54))
         ctx.save()
         ctx.translate(centerX, centerY)
         ctx.scale(logoMasterScale, logoMasterScale)
 
-        // 4A. Render C-O-R-D-W-A-I-N-E in Deep Obsidian (#141210)
+        // 4A. Render "Cordwaine" in Mollani font in Deep Obsidian (#141210)
         ctx.globalAlpha = lockupAlpha
-        ctx.fillStyle = '#141210'
-        for (let i = 0; i < LOGO_TARGETS.length; i++) {
-          const lt = LOGO_TARGETS[i]
-          const g = paths.glyphs[lt.char]
-          if (!g) continue
-          ctx.save()
-          ctx.translate(lt.x, lt.y)
-          ctx.scale(lt.scale, lt.scale)
-          ctx.fill(g)
-          ctx.restore()
-        }
+        drawWordmarkGlyphs('#141210')
 
         // 4B. Render italic "the" & symmetrical diamond-tipped hairline dividers
         const crownP = easeOutCubic(clamp01((elapsed - 2.68) / 0.52))
@@ -1056,8 +1105,8 @@ export function WelcomePage({
           ctx.restore()
         }
 
-        // 4C. Progressive Golden Swash Draw beneath C-O-R-D
-        const swashP = easeOutCubic(clamp01((elapsed - 3.05) / 0.62))
+        // 4C. Progressive Golden Swash Draw beneath wordmark
+        const swashP = easeOutCubic(clamp01((elapsed - 3.02) / 0.62))
         if (swashP > 0) {
           ctx.save()
           ctx.beginPath()
@@ -1069,28 +1118,19 @@ export function WelcomePage({
           ctx.restore()
         }
 
-        // 4D. Golden Specular Light Sweep across the assembled wordmark
+        // 4D. Golden Specular Light Sweep across the assembled Mollani wordmark
         const sweepP = clamp01((elapsed - 3.12) / 0.78)
         if (sweepP > 0 && sweepP < 1) {
-          const bandX = -145 + sweepP * 290
+          const bandX = -155 + sweepP * 310
           ctx.save()
           ctx.beginPath()
-          ctx.rect(bandX - 24, -36, 48, 66)
+          ctx.rect(bandX - 28, -48, 56, 96)
           ctx.clip()
 
           const env = Math.sin(sweepP * Math.PI)
           ctx.globalAlpha = env * 0.88
+          drawWordmarkGlyphs('#C99B53')
           ctx.fillStyle = '#C99B53'
-          for (let i = 0; i < LOGO_TARGETS.length; i++) {
-            const lt = LOGO_TARGETS[i]
-            const g = paths.glyphs[lt.char]
-            if (!g) continue
-            ctx.save()
-            ctx.translate(lt.x, lt.y)
-            ctx.scale(lt.scale, lt.scale)
-            ctx.fill(g)
-            ctx.restore()
-          }
           ctx.fill(paths.thePath)
           ctx.fill(paths.swashPath)
           ctx.restore()
@@ -1120,7 +1160,6 @@ export function WelcomePage({
     sound.softTick(1.05)
     if (phase !== 'complete') {
       skipRequestedRef.current = true
-      setShowPhilosophy(false)
       setPhase('complete')
     } else {
       setRunId((n) => n + 1)
@@ -1169,14 +1208,23 @@ export function WelcomePage({
         touchAction: 'manipulation',
       }}
     >
-      {/* Single Hardware-Accelerated Canvas (Alabaster-Pearl & Smoked-Pewter 3D Spotlight + Didone Vector Engine) */}
+      {/* Hidden DOM font-preloader so CSS immediately fetches Mollani-Regular.ttf on first mount */}
+      <span
+        aria-hidden="true"
+        className="fixed -top-96 left-0 opacity-0 pointer-events-none select-none"
+        style={{ fontFamily: '"Mollani", serif' }}
+      >
+        {BRAND_WORDMARK}
+      </span>
+
+      {/* Single Hardware-Accelerated Canvas (Alabaster-Pearl & Smoked-Pewter 3D Spotlight + Mollani Wordmark) */}
       <canvas
         ref={canvasRef}
         aria-label="The Cordwaine"
         className="fixed inset-0 w-full h-full pointer-events-none block"
       />
 
-      {/* Top Bar: Skip/Replay + Sound Toggle + Luminous Pearl Language Switcher (iPhone 1000057245 style) */}
+      {/* Top Bar: Skip/Replay + Sound Toggle + Luminous Pearl Language Switcher */}
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8"
         style={{
@@ -1212,7 +1260,7 @@ export function WelcomePage({
           </button>
         </div>
 
-        {/* Luminous Pearl Segmented Language Switcher (Exact iPhone 1000057245 look) */}
+        {/* Luminous Pearl Segmented Language Switcher */}
         <div
           role="tablist"
           aria-label="Language switcher"
@@ -1254,38 +1302,39 @@ export function WelcomePage({
         </div>
       </header>
 
-      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING") */}
+      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING")
+          Appears ONLY ONCE simultaneously with the bottom navigation block, floating up from below */}
       <div
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center justify-center text-center px-6"
-        style={{ top: '54.5%' }}
+        style={{ top: '54.8%' }}
       >
         <p
-          className={`text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-sans font-medium transition-all duration-700 ease-out ${
-            showPhilosophy
-              ? 'opacity-95 translate-y-0 blur-0'
-              : isComplete
-              ? 'opacity-70 translate-y-0 blur-0'
-              : 'opacity-0 translate-y-2 blur-[2px]'
+          className={`text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-sans font-medium transition-all duration-900 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isComplete
+              ? 'opacity-80 translate-y-0 blur-0'
+              : 'opacity-0 translate-y-8 blur-[2px]'
           }`}
         >
           THE ART OF SHOEMAKING
         </p>
         <p
-          className={`mt-1.5 text-[11px] italic tracking-[0.12em] text-[#141210]/60 transition-all duration-700 delay-100 ease-out ${
-            isComplete ? 'opacity-85 translate-y-0' : 'opacity-0 translate-y-2'
+          className={`mt-1.5 text-[11px] italic tracking-[0.12em] text-[#141210]/60 transition-all duration-900 delay-100 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isComplete
+              ? 'opacity-85 translate-y-0 blur-0'
+              : 'opacity-0 translate-y-8 blur-[2px]'
           }`}
         >
           {t.atelierSub}
         </p>
       </div>
 
-      {/* Bottom Typographic Navigation & Primary Entry CTA */}
+      {/* Bottom Typographic Navigation & Primary Entry CTA — Smoothly floats up from the bottom */}
       <footer
-        className={`fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 transition-all duration-700 ease-out ${
+        className={`fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           isComplete
             ? 'opacity-100 translate-y-0 pointer-events-auto'
-            : 'opacity-0 translate-y-3 pointer-events-none'
+            : 'opacity-0 translate-y-16 pointer-events-none'
         }`}
         style={{
           paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 18px, 24px)',
@@ -1294,7 +1343,9 @@ export function WelcomePage({
         {/* 3 Typographic Chapter Links */}
         <nav
           aria-label="Atelier chapters"
-          className="flex items-center justify-center gap-6 sm:gap-9 mb-6"
+          className={`flex items-center justify-center gap-6 sm:gap-9 mb-6 transition-all duration-900 delay-75 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            isComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
         >
           <button
             type="button"
@@ -1335,7 +1386,9 @@ export function WelcomePage({
         <button
           type="button"
           onClick={() => handleAction(onStart, true)}
-          className="group flex flex-col items-center gap-2.5 pt-1 text-[#141210]/95 hover:text-[#141210] active:scale-95 transition-all duration-300 cursor-pointer"
+          className={`group flex flex-col items-center gap-2.5 pt-1 text-[#141210]/95 hover:text-[#141210] active:scale-95 transition-all duration-900 delay-150 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer ${
+            isComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          }`}
         >
           <span className="text-[11px] uppercase tracking-[0.38em] font-sans font-medium pl-[0.38em]">
             {t.enter}
@@ -1350,6 +1403,13 @@ export function WelcomePage({
       </footer>
 
       <style>{`
+        @font-face {
+          font-family: 'Mollani';
+          src: url('${MOLLANI_FONT_URL}') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: swap;
+        }
         @keyframes cordwainePulseLine {
           0% { transform: translateY(-100%); opacity: 0; }
           45% { opacity: 0.95; }
