@@ -13,13 +13,14 @@ type WelcomePageProps = {
 }
 
 // ============================================================================
-// Multi-Channel Haptic & Acoustic-Tactile Engine
-// Works reliably across iPhone (iOS Taptic Engine) AND Android (Samsung One UI 7, Xiaomi HyperOS):
-//   Channel 1: Telegram.WebApp.HapticFeedback.impactOccurred('medium' | 'heavy')
-//              (Avoids selectionChanged() on Android because Samsung suppresses CLOCK_TICK)
-//   Channel 2: Direct native bridge TelegramWebviewProxy.postEvent('web_app_trigger_haptic_feedback', ...)
-//   Channel 3: Dual-frequency AudioContext tactile micro-impulse (155->48 Hz body + 1050->260 Hz click)
-//   Channel 4: navigator.vibrate + iOS 18 switch fallback
+// 1. Multi-Channel Haptic + Procedural Atelier Sound Engine (0 KB Bundle Size)
+//    - Haptics: Telegram HapticFeedback ('medium'/'heavy') + TelegramWebviewProxy
+//      + dual-frequency tactile pulse + navigator.vibrate + iOS switch fallback
+//    - Procedural Soundtrack (Variant A):
+//      * 0.0-0.8s: Archival paper/leather pattern rustle (filtered pink noise)
+//      * 0.8-2.0s: Vortex convergence air sweep + 12 ascending tuning-fork notes
+//      * 2.0-2.7s: Warm Felt Piano chord (Dm9: D3-A3-C4-E4-F4) on logo lock
+//      * 2.7-3.3s: Golden harmonic shimmer (A5-D6) during light glint & underline draw
 // ============================================================================
 type HapticStyle = 'selection' | 'light' | 'medium' | 'heavy' | 'success'
 
@@ -34,6 +35,7 @@ declare global {
 
 let lastHapticTime = 0
 let sharedAudioCtx: AudioContext | null = null
+let noiseBuffer: AudioBuffer | null = null
 let iosSwitchLabel: HTMLLabelElement | null = null
 
 function getOrInitAudioContext(): AudioContext | null {
@@ -52,7 +54,149 @@ function getOrInitAudioContext(): AudioContext | null {
   }
 }
 
-// Dual-frequency tactile impulse (low-end LRA thump + crisp high transient)
+function getPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
+  if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer
+  const len = ctx.sampleRate * 1.5
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate)
+  const data = buf.getChannelData(0)
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
+  for (let i = 0; i < len; i++) {
+    const white = Math.random() * 2 - 1
+    b0 = 0.99886 * b0 + white * 0.0555179
+    b1 = 0.99332 * b1 + white * 0.0750759
+    b2 = 0.96900 * b2 + white * 0.1538520
+    b3 = 0.86650 * b3 + white * 0.3104856
+    b4 = 0.55000 * b4 + white * 0.5329522
+    b5 = -0.7616 * b5 - white * 0.0168980
+    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04
+    b6 = white * 0.115926
+  }
+  noiseBuffer = buf
+  return buf
+}
+
+// Procedural Atelier Soundtrack Events
+function playAtelierSound(
+  type: 'rustle' | 'convergeSweep' | 'chimeNote' | 'feltChord' | 'goldenGlint',
+  noteIndex = 0,
+  soundEnabled = true
+) {
+  if (!soundEnabled) return
+  const ctx = getOrInitAudioContext()
+  if (!ctx || ctx.state !== 'running') return
+  const now = ctx.currentTime
+
+  try {
+    if (type === 'rustle') {
+      // Soft archival pattern card / leather rustle (0.0 - 0.8s)
+      const src = ctx.createBufferSource()
+      src.buffer = getPinkNoiseBuffer(ctx)
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.setValueAtTime(680, now)
+      filter.frequency.exponentialRampToValueAtTime(1120, now + 0.55)
+      filter.Q.value = 1.8
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.001, now)
+      gain.gain.linearRampToValueAtTime(0.09, now + 0.12)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65)
+
+      src.connect(filter)
+      filter.connect(gain)
+      gain.connect(ctx.destination)
+      src.start(now)
+      src.stop(now + 0.68)
+    } else if (type === 'convergeSweep') {
+      // Warm suede air whoosh as letters spiral toward the center (0.8 - 2.0s)
+      const src = ctx.createBufferSource()
+      src.buffer = getPinkNoiseBuffer(ctx)
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(220, now)
+      filter.frequency.exponentialRampToValueAtTime(880, now + 0.65)
+      filter.frequency.exponentialRampToValueAtTime(180, now + 1.15)
+
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.001, now)
+      gain.gain.linearRampToValueAtTime(0.11, now + 0.45)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.18)
+
+      src.connect(filter)
+      filter.connect(gain)
+      gain.connect(ctx.destination)
+      src.start(now)
+      src.stop(now + 1.2)
+    } else if (type === 'chimeNote') {
+      // 12 ascending tuning-fork / celesta notes (D minor pentatonic / add9)
+      const freqs = [293.66, 329.63, 349.23, 392.0, 440.0, 523.25, 587.33, 659.25, 698.46, 783.99, 880.0, 1046.5]
+      const freq = freqs[noteIndex % freqs.length]
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now)
+
+      gain.gain.setValueAtTime(0.001, now)
+      gain.gain.linearRampToValueAtTime(0.032, now + 0.012)
+      gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.42)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now)
+      osc.stop(now + 0.44)
+    } else if (type === 'feltChord') {
+      // Nils Frahm-style Warm Felt Piano Chord (Dm9: D2, A2, F3, A3, C4, E4) at 2.0s logo lock
+      const chord = [73.42, 110.0, 174.61, 220.0, 261.63, 329.63]
+      chord.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const filter = ctx.createBiquadFilter()
+        const gain = ctx.createGain()
+
+        osc.type = idx < 2 ? 'triangle' : 'sine'
+        osc.frequency.setValueAtTime(freq, now)
+        // Subtle analog detune warmth
+        osc.detune.setValueAtTime((idx - 2.5) * 3.5, now)
+
+        filter.type = 'lowpass'
+        filter.frequency.setValueAtTime(520, now)
+        filter.frequency.exponentialRampToValueAtTime(160, now + 2.4)
+
+        const onset = now + idx * 0.018
+        const amp = idx < 2 ? 0.055 : 0.035
+        gain.gain.setValueAtTime(0.0005, onset)
+        gain.gain.linearRampToValueAtTime(amp, onset + 0.06)
+        gain.gain.exponentialRampToValueAtTime(0.0005, onset + 2.5)
+
+        osc.connect(filter)
+        filter.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(onset)
+        osc.stop(onset + 2.55)
+      })
+    } else if (type === 'goldenGlint') {
+      // Delicate golden harmonic shimmer during the 2.7-3.3s light sweep & underline draw
+      const shimmer = [880.0, 1174.66, 1318.51, 1760.0]
+      shimmer.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, now + idx * 0.07)
+
+        const t0 = now + idx * 0.07
+        gain.gain.setValueAtTime(0.0005, t0)
+        gain.gain.linearRampToValueAtTime(0.018, t0 + 0.08)
+        gain.gain.exponentialRampToValueAtTime(0.0004, t0 + 0.75)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(t0)
+        osc.stop(t0 + 0.78)
+      })
+    }
+  } catch {}
+}
+
+// Dual-frequency tactile micro-impulse for physical button & lock-in feedback
 function playDualFreqTactilePulse(style: HapticStyle) {
   const ctx = getOrInitAudioContext()
   if (!ctx || ctx.state !== 'running') return
@@ -61,7 +205,6 @@ function playDualFreqTactilePulse(style: HapticStyle) {
     const isStrong = style === 'medium' || style === 'heavy' || style === 'success'
     const dur = isStrong ? 0.022 : 0.014
 
-    // Oscillator 1: Sub-bass physical body thump (155 Hz -> 48 Hz)
     const oscLow = ctx.createOscillator()
     const gainLow = ctx.createGain()
     oscLow.type = 'sine'
@@ -76,7 +219,6 @@ function playDualFreqTactilePulse(style: HapticStyle) {
     oscLow.start(now)
     oscLow.stop(now + dur + 0.002)
 
-    // Oscillator 2: Crisp mechanical micro-click transient (1080 Hz -> 260 Hz over 5ms)
     const oscHigh = ctx.createOscillator()
     const gainHigh = ctx.createGain()
     oscHigh.type = 'triangle'
@@ -126,8 +268,6 @@ function triggerHaptic(style: HapticStyle = 'light', force = false) {
   lastHapticTime = now
 
   const android = isAndroidDevice()
-  // On Android (Samsung One UI 7 / Xiaomi), selectionChanged() (CLOCK_TICK) and 'light' are often suppressed;
-  // promote all tactile feedback on Android to 'medium' or 'heavy'
   const impactLevel: 'light' | 'medium' | 'heavy' =
     style === 'heavy' || style === 'success'
       ? 'heavy'
@@ -137,7 +277,6 @@ function triggerHaptic(style: HapticStyle = 'light', force = false) {
       ? 'medium'
       : 'light'
 
-  // Channel 1: Official Telegram WebApp HapticFeedback API
   let handledByTg = false
   try {
     const tgHaptic = window.Telegram?.WebApp?.HapticFeedback
@@ -154,7 +293,6 @@ function triggerHaptic(style: HapticStyle = 'light', force = false) {
     }
   } catch {}
 
-  // Channel 2: Direct native bridge TelegramWebviewProxy.postEvent (bypasses SDK wrappers on Android)
   try {
     if (window.TelegramWebviewProxy?.postEvent) {
       window.TelegramWebviewProxy.postEvent(
@@ -176,10 +314,8 @@ function triggerHaptic(style: HapticStyle = 'light', force = false) {
     }
   } catch {}
 
-  // Channel 3: Dual-frequency AudioContext tactile impulse
   playDualFreqTactilePulse(style)
 
-  // Channel 4: Hardware navigator.vibrate (Android WebView / Chrome) + iOS switch fallback
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       if (style === 'success' || style === 'heavy') {
@@ -252,8 +388,8 @@ const BG_GRID: Array<[GlyphKey, Array<[number, number]>]> = [
   ['G12', [[936,306],[564,757],[750,717],[812,347]]],
 ]
 
-const LOGO_MAIN_D = 'M-150.488,0.764Q-158.903,0.715 -163.764,-3.905A16.572,16.572 0 0,1 -168.631,-16.527A16.572,16.572 0 0,1 -163.764,-29.15Q-158.903,-33.764 -150.488,-33.764A27.844,27.844 0 0,1 -143.613,-32.884A21.794,21.794 0 0,1 -137.618,-30.464L-136.407,-22.654H-136.903Q-139.268,-32.12 -150.542,-32.12A13.269,13.269 0 0,0 -160.882,-27.94A16.384,16.384 0 0,0 -164.681,-16.5A18.549,18.549 0 0,0 -162.972,-8.277A12.545,12.545 0 0,0 -158.023,-2.86A14.488,14.488 0 0,0 -150.488,-0.935A20.055,20.055 0 0,0 -142.986,-2.227A11.917,11.917 0 0,0 -137.639,-6.49A13.923,13.923 0 0,0 -135.246,-13.86H-134.751L-135.363,-6.325A14.474,14.474 0 0,1 -141.577,-1.131A20.824,20.824 0 0,1 -150.488,0.764ZM-121.295,-31.57A19.916,19.916 0 0,1 -111.976,-33.77A20.122,20.122 0 0,1 -102.656,-31.598A16.99,16.99 0 0,1 -95.919,-25.465A16.427,16.427 0 0,1 -93.41,-16.5A16.427,16.427 0 0,1 -95.912,-7.535A16.99,16.99 0 0,1 -102.65,-1.402A18.83,18.83 0 0,1 -111.34,0.764A22.542,22.542 0 0,1 -119.205,-0.495A18.162,18.162 0 0,1 -125.118,-4.009A16.274,16.274 0 0,1 -129.077,-9.509A18.454,18.454 0 0,1 -130.535,-17.126A15.356,15.356 0 0,1 -128.032,-25.459A16.792,16.792 0 0,1 -121.295,-31.57ZM-122.34,-5.225A13.774,13.774 0 0,0 -112,-0.88A13.732,13.732 0 0,0 -101.66,-5.252A15.609,15.609 0 0,0 -97.486,-16.5A15.609,15.609 0 0,0 -101.666,-27.747A13.732,13.732 0 0,0 -112,-32.12A13.645,13.645 0 0,0 -122.312,-27.747A15.667,15.667 0 0,0 -126.465,-16.5A15.826,15.826 0 0,0 -122.34,-5.225ZM-76.933,-31.295H-79.847V-3.514A2.949,2.949 0 0,0 -78.308,-0.935A3.309,3.309 0 0,0 -76.713,-0.55H-75.998L-75.942,0H-87.218V-0.55H-86.454A3.056,3.056 0 0,0 -84.275,-1.402A2.727,2.727 0 0,0 -83.367,-3.465V-29.59A2.642,2.642 0 0,0 -84.275,-31.625A3.118,3.118 0 0,0 -86.444,-32.45H-87.208V-33H-73.412A12.846,12.846 0 0,1 -65.245,-30.635A7.535,7.535 0 0,1 -62.248,-24.42A9.054,9.054 0 0,1 -64.668,-17.985A9.472,9.472 0 0,1 -70.828,-15.015A12.43,12.43 0 0,1 -66.593,-10.725Q-66.647,-10.725 -64.695,-8.305T-61.56,-4.537Q-60.377,-3.19 -59.608,-2.475A6.608,6.608 0 0,0 -54.933,-0.55V0H-56.638A11.877,11.877 0 0,1 -63.457,-1.705A16.121,16.121 0 0,1 -66.868,-4.84Q-67.194,-5.28 -69.639,-8.717T-72.257,-12.375Q-75.228,-16.06 -77.812,-16.06V-16.61Q-71.377,-16.61 -70.058,-17.27A6.218,6.218 0 0,0 -67.582,-19.256A8.953,8.953 0 0,0 -66.207,-24.096A6.661,6.661 0 0,0 -68.194,-29.266A8.218,8.218 0 0,0 -73.529,-31.252Q-75.007,-31.295 -76.933,-31.295ZM-15.85,-16.5A15.687,15.687 0 0,1 -20.608,-4.431A18.181,18.181 0 0,1 -33.505,0H-51.875V-0.55H-51.16A2.985,2.985 0 0,0 -48.96,-1.43A3.056,3.056 0 0,0 -48.025,-3.514V-29.486A2.939,2.939 0 0,0 -48.987,-31.625A3.19,3.19 0 0,0 -51.215,-32.45H-51.875V-33H-33.505A20.851,20.851 0 0,1 -24.128,-31.014A14.14,14.14 0 0,1 -17.995,-25.294A17.386,17.386 0 0,1 -15.85,-16.5ZM-44.45,-31.35V-1.65H-33.505A12.962,12.962 0 0,0 -23.495,-5.637A15.382,15.382 0 0,0 -19.81,-16.5A15.382,15.382 0 0,0 -23.495,-27.362A12.962,12.962 0 0,0 -33.505,-31.35ZM34.1,-33V-32.45H33.66A3.667,3.667 0 0,0 31.46,-31.653A6.264,6.264 0 0,0 29.703,-29.26L19.525,0.764H18.975L11.275,-20.075L3.575,0.764H3.025L-7.562,-29.26A5.806,5.806 0 0,0 -9.274,-31.652A3.514,3.514 0 0,0 -11.489,-32.45H-11.917V-33H-2.017V-32.45H-2.457A1.757,1.757 0 0,0 -3.954,-31.707A2.368,2.368 0 0,0 -4.443,-30.36A5.194,5.194 0 0,0 -4.259,-29.095L4.4,-5.225L10.725,-22.55L9.35,-26.345A4.889,4.889 0 0,0 7.899,-28.6A3.208,3.208 0 0,0 5.836,-29.342H5.408V-29.892H15.308V-29.342H14.85A1.757,1.757 0 0,0 13.353,-28.6A2.368,2.368 0 0,0 12.864,-27.252A5.194,5.194 0 0,0 13.047,-25.987L20.075,-5.225L28.05,-28.985A3.819,3.819 0 0,0 28.325,-30.333A2.368,2.368 0 0,0 27.775,-31.707A1.91,1.91 0 0,0 26.125,-32.45H25.697V-33ZM72.067,-0.55H72.507V0H61.233V-0.55H61.672A1.89,1.89 0 0,0 63.267,-1.265A2.255,2.255 0 0,0 63.817,-2.612A3.595,3.595 0 0,0 63.597,-3.85L60.569,-11.165H46.657L43.633,-4.015A3.761,3.761 0 0,0 43.358,-2.667A2.37,2.37 0 0,0 43.907,-1.292A1.922,1.922 0 0,0 45.558,-0.55H45.998V0H35.493V-0.55H35.933A4.169,4.169 0 0,0 38.264,-1.347A5.873,5.873 0 0,0 40.222,-3.74Q52.267,-29.486 52.763,-30.69A13.304,13.304 0 0,0 53.752,-33.764H54.248L67.832,-3.74A4.783,4.783 0 0,0 72.067,-0.55ZM47.373,-12.815H59.913L53.752,-27.885ZM79.555,-0.55A4.013,4.013 0 0,0 82.14,-1.43A2.611,2.611 0 0,0 83.24,-3.514V-29.486A2.611,2.611 0 0,0 82.14,-31.576A4.094,4.094 0 0,0 79.5,-32.45H78.785V-33H91.215V-32.45H90.5A4.072,4.072 0 0,0 87.942,-31.625A2.826,2.826 0 0,0 86.76,-29.59V-3.465A2.703,2.703 0 0,0 87.915,-1.402A4.097,4.097 0 0,0 90.5,-0.55H91.215L91.264,0H78.785V-0.55ZM135.562,-32.45A3.008,3.008 0 0,0 133.472,-31.652A2.719,2.719 0 0,0 132.537,-29.7V-6.264A45.375,45.375 0 0,0 132.923,-0.214L133.032,0.764H132.537L103.938,-26.345V-3.41A2.678,2.678 0 0,0 104.817,-1.375A3.02,3.02 0 0,0 106.956,-0.55H107.891V0H97.502V-0.55H98.438A3.02,3.02 0 0,0 100.576,-1.375A2.678,2.678 0 0,0 101.456,-3.41V-26.95A41.876,41.876 0 0,0 101.071,-32.945L100.961,-33.825L101.573,-33.77L130.118,-6.875V-29.7A2.93,2.93 0 0,0 129.127,-31.652A3.008,3.008 0 0,0 127.037,-32.45H126.102V-33H136.491V-32.45ZM141.78,-0.55A3.132,3.132 0 0,0 144.007,-1.402A2.92,2.92 0 0,0 144.97,-3.465V-29.59A2.608,2.608 0 0,0 144.035,-31.625A3.291,3.291 0 0,0 141.78,-32.45H141.016V-33H157.07A21.037,21.037 0 0,0 161.03,-33.33A12.833,12.833 0 0,0 163.23,-33.88V-27.616L162.619,-27.671V-28.496A2.8,2.8 0 0,0 161.855,-30.482A2.587,2.587 0 0,0 159.869,-31.307H148.435V-17.337H157.84A2.11,2.11 0 0,0 159.521,-17.997A2.415,2.415 0 0,0 160.098,-19.647V-20.362H160.709V-12.662H160.098V-13.377A2.093,2.093 0 0,0 158.943,-15.467A3.868,3.868 0 0,0 158.008,-15.687H148.435V-1.717H157.07A9.342,9.342 0 0,0 161.333,-2.597A7.42,7.42 0 0,0 163.972,-4.675A18.666,18.666 0 0,0 165.815,-7.865H166.365L163.34,0H141.01V-0.55Z'
-const LOGO_TAIL_D = 'M 594.5 142.8 C 602.0 154.5, 634.0 156.8, 665.5 144.2 C 660.2 146.4, 633.5 153.2, 603.5 143.2 C 599.5 141.9, 596.5 141.8, 594.5 142.8 Z'
+const LOGO_MAIN_D = 'M-152.198,0.91Q-162.223,0.852 -168.014,-4.652A19.742,19.742 0 0,1 -173.813,-19.689A19.742,19.742 0 0,1 -168.014,-34.726Q-162.223,-40.222 -152.198,-40.222A33.17,33.17 0 0,1 -144.008,-39.174A25.962,25.962 0 0,1 -136.867,-36.291L-135.425,-26.987H-136.015Q-138.832,-38.264 -152.264,-38.264A15.807,15.807 0 0,0 -164.581,-33.284A19.518,19.518 0 0,0 -169.106,-19.656A22.097,22.097 0 0,0 -167.071,-9.861A14.944,14.944 0 0,0 -161.174,-3.407A17.259,17.259 0 0,0 -152.198,-1.114A23.891,23.891 0 0,0 -143.262,-2.654A14.196,14.196 0 0,0 -136.892,-7.731A16.586,16.586 0 0,0 -134.042,-16.511H-133.452L-134.18,-7.535A17.243,17.243 0 0,1 -141.584,-1.347A24.807,24.807 0 0,1 -152.198,0.91ZM-120.004,-30.583A19.293,19.293 0 0,1 -110.976,-32.714A19.493,19.493 0 0,1 -101.948,-30.609A16.459,16.459 0 0,1 -95.422,-24.669A15.913,15.913 0 0,1 -92.991,-15.984A15.913,15.913 0 0,1 -95.416,-7.299A16.459,16.459 0 0,1 -101.942,-1.359A18.241,18.241 0 0,1 -110.361,0.74A21.837,21.837 0 0,1 -117.98,-0.48A17.594,17.594 0 0,1 -123.707,-3.884A15.765,15.765 0 0,1 -127.543,-9.212A17.877,17.877 0 0,1 -128.955,-16.591A14.875,14.875 0 0,1 -126.531,-24.663A16.267,16.267 0 0,1 -120.004,-30.583ZM-121.017,-5.062A13.344,13.344 0 0,0 -111,-0.852A13.302,13.302 0 0,0 -100.983,-5.088A15.121,15.121 0 0,0 -96.94,-15.984A15.121,15.121 0 0,0 -100.989,-26.88A13.302,13.302 0 0,0 -111,-31.116A13.218,13.218 0 0,0 -120.99,-26.88A15.177,15.177 0 0,0 -125.013,-15.984A15.331,15.331 0 0,0 -121.017,-5.062ZM-76.81,-30.316H-79.633V-3.404A2.856,2.856 0 0,0 -78.142,-0.906A3.206,3.206 0 0,0 -76.596,-0.533H-75.904L-75.85,0H-86.773V-0.533H-86.033A2.96,2.96 0 0,0 -83.922,-1.359A2.642,2.642 0 0,0 -83.043,-3.357V-28.665A2.559,2.559 0 0,0 -83.922,-30.636A3.021,3.021 0 0,0 -86.024,-31.435H-86.764V-31.968H-73.4A12.444,12.444 0 0,1 -65.488,-29.677A7.299,7.299 0 0,1 -62.584,-23.656A8.77,8.77 0 0,1 -64.928,-17.423A9.176,9.176 0 0,1 -70.895,-14.545A12.041,12.041 0 0,1 -66.793,-10.39Q-66.846,-10.39 -64.955,-8.045T-61.918,-4.396Q-60.772,-3.09 -60.026,-2.398A6.401,6.401 0 0,0 -55.498,-0.533V0H-57.149A11.506,11.506 0 0,1 -63.756,-1.652A15.617,15.617 0 0,1 -67.059,-4.689Q-67.376,-5.115 -69.744,-8.445T-72.281,-11.988Q-75.158,-15.558 -77.662,-15.558V-16.091Q-71.428,-16.091 -70.15,-16.73A6.024,6.024 0 0,0 -67.752,-18.654A8.673,8.673 0 0,0 -66.42,-23.343A6.453,6.453 0 0,0 -68.344,-28.351A7.961,7.961 0 0,0 -73.512,-30.275Q-74.945,-30.316 -76.81,-30.316ZM-17.418,-15.984A15.197,15.197 0 0,1 -22.026,-4.292A17.612,17.612 0 0,1 -34.52,0H-52.316V-0.533H-51.623A2.892,2.892 0 0,0 -49.492,-1.385A2.96,2.96 0 0,0 -48.586,-3.404V-28.564A2.848,2.848 0 0,0 -49.519,-30.636A3.09,3.09 0 0,0 -51.677,-31.435H-52.316V-31.968H-34.52A20.199,20.199 0 0,1 -25.436,-30.044A13.697,13.697 0 0,1 -19.496,-24.503A16.842,16.842 0 0,1 -17.418,-15.984ZM-45.123,-30.37V-1.598H-34.52A12.556,12.556 0 0,0 -24.824,-5.461A14.901,14.901 0 0,0 -21.254,-15.984A14.901,14.901 0 0,0 -24.824,-26.507A12.556,12.556 0 0,0 -34.52,-30.37ZM31.378,-31.968V-31.435H30.951A3.552,3.552 0 0,0 28.82,-30.663A6.068,6.068 0 0,0 27.118,-28.345L17.258,0.74H16.726L9.266,-19.447L1.807,0.74H1.274L-8.982,-28.345A5.624,5.624 0 0,0 -10.64,-30.663A3.404,3.404 0 0,0 -12.786,-31.435H-13.2V-31.968H-3.61V-31.435H-4.036A1.702,1.702 0 0,0 -5.486,-30.716A2.294,2.294 0 0,0 -5.96,-29.411A5.032,5.032 0 0,0 -5.782,-28.185L2.606,-5.062L8.734,-21.845L7.402,-25.521A4.736,4.736 0 0,0 5.996,-27.706A3.108,3.108 0 0,0 3.998,-28.425H3.583V-28.958H13.174V-28.425H12.73A1.702,1.702 0 0,0 11.279,-27.706A2.294,2.294 0 0,0 10.806,-26.4A5.032,5.032 0 0,0 10.983,-25.175L17.791,-5.062L25.517,-28.079A3.7,3.7 0 0,0 25.783,-29.384A2.294,2.294 0 0,0 25.25,-30.716A1.85,1.85 0 0,0 23.652,-31.435H23.238V-31.968ZM68.502,-0.533H68.929V0H58.006V-0.533H58.433A1.831,1.831 0 0,0 59.978,-1.225A2.184,2.184 0 0,0 60.51,-2.531A3.482,3.482 0 0,0 60.297,-3.73L57.364,-10.816H43.887L40.957,-3.889A3.644,3.644 0 0,0 40.69,-2.584A2.295,2.295 0 0,0 41.223,-1.252A1.862,1.862 0 0,0 42.822,-0.533H43.248V0H33.071V-0.533H33.498A4.039,4.039 0 0,0 35.756,-1.305A5.689,5.689 0 0,0 37.653,-3.623Q49.322,-28.564 49.801,-29.73A12.888,12.888 0 0,0 50.76,-32.708H51.24L64.4,-3.623A4.634,4.634 0 0,0 68.502,-0.533ZM44.58,-12.414H56.728L50.76,-27.013ZM75.725,-0.533A3.888,3.888 0 0,0 78.229,-1.385A2.529,2.529 0 0,0 79.295,-3.404V-28.564A2.529,2.529 0 0,0 78.229,-30.589A3.966,3.966 0 0,0 75.672,-31.435H74.979V-31.968H87.021V-31.435H86.328A3.944,3.944 0 0,0 83.85,-30.636A2.738,2.738 0 0,0 82.705,-28.665V-3.357A2.618,2.618 0 0,0 83.824,-1.359A3.969,3.969 0 0,0 86.328,-0.533H87.021L87.068,0H74.979V-0.533ZM130.982,-31.435A2.914,2.914 0 0,0 128.957,-30.663A2.634,2.634 0 0,0 128.052,-28.771V-6.068A43.956,43.956 0 0,0 128.425,-0.207L128.531,0.74H128.052L100.346,-25.521V-3.303A2.594,2.594 0 0,0 101.198,-1.332A2.926,2.926 0 0,0 103.27,-0.533H104.176V0H94.112V-0.533H95.018A2.926,2.926 0 0,0 97.09,-1.332A2.594,2.594 0 0,0 97.942,-3.303V-26.107A40.567,40.567 0 0,0 97.57,-31.915L97.463,-32.767L98.055,-32.714L125.707,-6.66V-28.771A2.839,2.839 0 0,0 124.748,-30.663A2.914,2.914 0 0,0 122.724,-31.435H121.818V-31.968H131.882V-31.435ZM137.131,-0.533A3.034,3.034 0 0,0 139.289,-1.359A2.828,2.828 0 0,0 140.221,-3.357V-28.665A2.526,2.526 0 0,0 139.315,-30.636A3.188,3.188 0 0,0 137.131,-31.435H136.391V-31.968H151.943A20.38,20.38 0 0,0 155.779,-32.288A12.432,12.432 0 0,0 157.91,-32.82V-26.752L157.318,-26.806V-27.605A2.713,2.713 0 0,0 156.578,-29.529A2.506,2.506 0 0,0 154.654,-30.328H143.578V-16.795H152.689A2.044,2.044 0 0,0 154.317,-17.434A2.34,2.34 0 0,0 154.876,-19.033V-19.725H155.468V-12.266H154.876V-12.959A2.028,2.028 0 0,0 153.757,-14.984A3.747,3.747 0 0,0 152.851,-15.197H143.578V-1.664H151.943A9.05,9.05 0 0,0 156.072,-2.516A7.188,7.188 0 0,0 158.629,-4.529A18.083,18.083 0 0,0 160.414,-7.619H160.947L158.017,0H136.385V-0.533Z'
+const LOGO_TAIL_D = 'M 591.0 143.2 C 600.0 156.2, 636.0 158.0, 672.0 144.4 C 665.5 146.8, 635.5 154.2, 601.5 143.6 C 597.0 142.2, 593.5 142.1, 591.0 143.2 Z'
 const LOGO_THE_D = 'M-5.525-9.23a.753.753,0,0,0,.312-.962H-8.047l.754-2.548a.874.874,0,0,0-.988-.156l-1.456,2.574-2.08.364a.652.652,0,0,0-.286.728h2.028L-12.6-1.82a5,5,0,0,0-.364,1.482.777.777,0,0,0,.7.7c1.092,0,3.536-1.586,4.992-3.744.052-.312-.1-.468-.364-.468a9.519,9.519,0,0,1-2.964,2.34c-.208,0-.338-.156-.182-.65L-8.359-9.23Zm7.2-9.36a14.242,14.242,0,0,0-3.042.6.253.253,0,0,0-.078.338l.546.364c.416.286.286.65-.286,2.366L-6.123-.312c-.208.6.468.676.754.676A.476.476,0,0,0-4.9.052,42.115,42.115,0,0,1-1.755-5.356a16.414,16.414,0,0,1,3.3-3.458,2.828,2.828,0,0,1,1.4-.7c.364,0,.546.286.546.78A26.721,26.721,0,0,1,1.625-2.028c-.39.91-.65,1.3-1.04,1.3a1.5,1.5,0,0,1-.676-.338.62.62,0,0,0-.364-.156.825.825,0,0,0-.7.832c0,.208.1.754.962.754A2.858,2.858,0,0,0,1.7-.65a9.125,9.125,0,0,0,1.69-2.132A14.924,14.924,0,0,0,5.421-8.866c0-.91-.416-1.742-1.56-1.742a4.455,4.455,0,0,0-2.47,1.014A16.493,16.493,0,0,0-2.717-5.3l-.052-.052L-.091-13.13l1.872-5.3Zm11.83,7.982a4.991,4.991,0,0,0-3.12,1.248A9.772,9.772,0,0,0,6.513-2.366c0,1.274.546,2.73,2.106,2.73,1.092,0,2.574-.416,4.16-2.366a.349.349,0,0,0-.338-.442C11.3-1.456,10.647-.936,9.711-.936A1.333,1.333,0,0,1,8.463-2.418a6.544,6.544,0,0,1,.364-2.314c3.744-1.04,6.318-2.34,6.318-4.316A1.63,1.63,0,0,0,13.507-10.608Zm-.52.806a.555.555,0,0,1,.6.6,2.935,2.935,0,0,1-1.014,1.768A7.555,7.555,0,0,1,9.087-5.512a10.348,10.348,0,0,1,1.924-3.042C11.947-9.568,12.623-9.8,12.987-9.8Z'
 
 const EASES = {
@@ -272,13 +408,7 @@ const EASES = {
       : t < 0.5
       ? Math.pow(2, 20 * t - 10) / 2
       : (2 - Math.pow(2, -20 * t + 10)) / 2,
-  sineOut: (t: number) => Math.sin((t * Math.PI) / 2),
   sineInOut: (t: number) => -(Math.cos(Math.PI * t) - 1) / 2,
-  backOut2: (t: number) => {
-    const c1 = 2
-    const c3 = c1 + 1
-    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
-  },
 }
 
 function clamp01(v: number): number {
@@ -305,8 +435,8 @@ function setFastSvgTransform(
   sc: number,
   rotDeg: number
 ) {
-  if (rotDeg === 0 && sc === 1) {
-    if (x === 0 && y === 0) {
+  if (Math.abs(rotDeg) < 0.05 && Math.abs(sc - 1) < 0.005) {
+    if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) {
       el.removeAttribute('transform')
     } else {
       el.setAttribute('transform', `translate(${x.toFixed(2)},${y.toFixed(2)})`)
@@ -331,8 +461,12 @@ interface GlyphNode extends SVGGElement {
   _oy?: number
   _dist?: number
   _dir?: { x: number; y: number }
+  _orbitX?: number
+  _orbitY?: number
+  _orbitRot?: number
+  _convergeX?: number
+  _convergeY?: number
   _hidden?: boolean
-  _resting?: boolean
 }
 
 interface RuleNode extends SVGPathElement {
@@ -348,7 +482,7 @@ interface PreparedStage {
   homes: Box[]
   flights: Array<{ x: number; y: number; scale: number } | null>
   logoLetters: SVGPathElement[]
-  tail: SVGGElement
+  tailClipRect: SVGRectElement
   rules: RuleNode[]
   glintGroup: SVGGElement
   glint: SVGRectElement
@@ -428,12 +562,26 @@ export function WelcomePage({
 }: WelcomePageProps) {
   const [introFinished, setIntroFinished] = useState(false)
   const [stageReady, setStageReady] = useState(false)
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('cordwainer_sound') !== '0'
+    } catch {
+      return true
+    }
+  })
+
+  const soundEnabledRef = useRef(soundEnabled)
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled
+  }, [soundEnabled])
 
   const heroRef = useRef<HTMLElement | null>(null)
   const stageWrapRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const logoSourceRef = useRef<SVGSVGElement | null>(null)
+  const philosophyRef = useRef<HTMLDivElement | null>(null)
   const bottomNavRef = useRef<HTMLElement | null>(null)
+  const breathGlowRef = useRef<HTMLDivElement | null>(null)
 
   const stageRef = useRef<PreparedStage | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -453,8 +601,6 @@ export function WelcomePage({
     renderAtTime: null,
   })
 
-  // 1. Immediately signal Telegram WebApp.ready() & sync #191714 header so Telegram dismisses its native splash fast,
-  // and load Google Font asynchronously without blocking window.onload!
   useEffect(() => {
     const syncTelegramChrome = () => {
       try {
@@ -473,7 +619,6 @@ export function WelcomePage({
     const obs = new MutationObserver(syncTelegramChrome)
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
 
-    // Non-blocking async font injection so Telegram splash doesn't wait on fonts.googleapis.com
     const fontId = 'cordwaine-cormorant-font'
     if (!document.getElementById(fontId)) {
       const link = document.createElement('link')
@@ -484,7 +629,6 @@ export function WelcomePage({
       document.head.appendChild(link)
     }
 
-    // Unlock Web Audio context on first user touch/pointer anywhere on the page
     const unlockAudio = () => {
       getOrInitAudioContext()
     }
@@ -500,7 +644,6 @@ export function WelcomePage({
     }
   }, [])
 
-  // Restore or initialize saved language
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
     const supportedLangs: Lang[] = ['ru', 'uk', 'de']
@@ -526,8 +669,9 @@ export function WelcomePage({
     const svg = svgRef.current
     const stageWrap = stageWrapRef.current
     const hero = heroRef.current
+    const philosophy = philosophyRef.current
     const bottomNav = bottomNavRef.current
-    if (!S || !svg || !stageWrap || !hero || !bottomNav) return
+    if (!S || !svg || !stageWrap || !hero || !philosophy || !bottomNav) return
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
@@ -538,7 +682,7 @@ export function WelcomePage({
       homes,
       flights,
       logoLetters,
-      tail,
+      tailClipRect,
       rules,
       glintGroup,
       glint,
@@ -546,88 +690,91 @@ export function WelcomePage({
       stageToLocal,
     } = S
 
-    const rand = (a: number, b: number) => a + Math.random() * (b - a)
-    const shuffled = <T,>(arr: T[]): T[] => {
-      const a = arr.slice()
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        const tmp = a[i]
-        a[i] = a[j]
-        a[j] = tmp
-      }
-      return a
-    }
+    // ========================================================================
+    // Controlled "Chaos -> Order" Geometry (Golden-Angle Spiral Convergence)
+    // Instead of random jerking, every element starts in a harmonious orbital
+    // constellation around the center, smoothly rotating and converging inward
+    // so that out of many elements, a single craft is born.
+    // ========================================================================
+    const vb = svg.viewBox.baseVal
+    const centerStageX = vb.width / 2
+    const centerStageY = vb.height / 2
 
-    const scrambleOffsets = () => {
-      const order = shuffled(allGlyphs.map((_, i) => i))
-      return allGlyphs.map((g, i) => {
-        const from = homes[i]
-        const to = homes[order[i]]
-        const a = stageToLocal(g, from.cx, from.cy)
-        const b = stageToLocal(g, to.cx, to.cy)
-        return { x: b.x - a.x, y: b.y - a.y }
-      })
-    }
+    allGlyphs.forEach((g, i) => {
+      const h = homes[i]
+      const dx = h.cx - centerStageX
+      const dy = h.cy - centerStageY
+      const radius = Math.hypot(dx, dy)
+      const baseAngle = Math.atan2(dy, dx)
 
-    const startOff = scrambleOffsets()
-    const hop1Off = scrambleOffsets()
-    const hop2Off = scrambleOffsets()
-    const startRot = allGlyphs.map(() => rand(-22, 22))
-    const popStagger = allGlyphs.map(() => Math.random() * 0.48)
-    const hop1Stagger = allGlyphs.map(() => Math.random() * 0.22)
-    const hop2Stagger = allGlyphs.map(() => Math.random() * 0.22)
-    const resOtherStagger = otherGlyphs.map(() => Math.random() * 0.32)
-    const resWordStagger = wordGlyphs.map(() => Math.random() * 0.2)
-    const flyRot = wordGlyphs.map((_, k) => (k < 3 ? rand(-2, 2) : rand(-3.5, 3.5)))
+      // Golden angle offset creates a balanced, organic vortex constellation
+      const swirlAngle = baseAngle + (i % 2 === 0 ? 0.42 : -0.42)
+      const expandedRadius = radius * 1.24 + 18
+      const startStageX = centerStageX + Math.cos(swirlAngle) * expandedRadius
+      const startStageY = centerStageY + Math.sin(swirlAngle) * expandedRadius
 
-    allGlyphs.forEach((g) => {
+      const localHome = stageToLocal(g, h.cx, h.cy)
+      const localStart = stageToLocal(g, startStageX, startStageY)
+      const localCenter = stageToLocal(g, centerStageX, centerStageY + (dy * 0.22))
+
+      g._orbitX = localStart.x - localHome.x
+      g._orbitY = localStart.y - localHome.y
+      // Smooth initial rotation tangent to the spiral (no jagged random angles)
+      g._orbitRot = ((swirlAngle * 180) / Math.PI) * 0.18 + (i % 2 === 0 ? 14 : -14)
+
+      // Convergence target for background letters (flowing gently toward the central logo axis)
+      g._convergeX = (localCenter.x - localHome.x) * 0.52
+      g._convergeY = (localCenter.y - localHome.y) * 0.62
+
       g.style.display = ''
       g._hidden = false
-      g._resting = false
     })
     glintGroup.style.display = 'none'
 
-    const hapticFlags = {
-      hop1: false,
-      hop2: false,
-      resolve: false,
-      spelled: new Array(wordGlyphs.length).fill(false),
-      flyStart: false,
-      settled: false,
+    const soundAndHapticFlags = {
+      rustle: false,
+      converge: false,
+      chimes: new Array(wordGlyphs.length).fill(false),
+      logoLock: false,
+      goldenGlint: false,
+      done: false,
     }
 
-    // Zero-black-gap timeline (starts immediately at t=0 when Telegram opens the WebView):
-    // 1. popIn:   0.00 .. 0.90 (dur 0.42, spread 0.48)
-    // 2. hop1:    0.82 .. 1.52 (dur 0.48, spread 0.22)
-    // 3. hop2:    1.58 .. 2.28 (dur 0.48, spread 0.22)
-    // 4. resolve: 2.34 .. 3.46 (dur 0.80, spread 0.32)
-    // 5. spell:   3.55 .. 4.50 (each 0.055, dur 0.32)
-    // 6. disperse:4.72 .. 6.02 (dur 0.72, spread 0.58)
-    // 7. fly:     4.95 .. 6.55 (dur 1.32, each 0.026 — lush, visible 2-axis arc flight!)
-    // 8. morph:   5.95 .. 6.68 (dur 0.45, each 0.026)
-    // 9. settle:  6.15 .. 7.55 (dur 1.40)
-    const TOTAL_DURATION = 7.6
+    // ========================================================================
+    // EXACT 3.8-SECOND SCENARIO TIMING:
+    //   Stage 1 (0.0 - 0.8s, 0.8s): Появление букв (Letters emerge & rotate gently)
+    //   Stage 2 (0.8 - 2.0s, 1.2s): Схождение букв к центру (Spiral convergence into CORDWAINE)
+    //   Stage 3 (2.0 - 2.7s, 0.7s): Формирование логотипа + "THE ART OF SHOEMAKING" (1s)
+    //   Stage 4 (2.7 - 3.3s, 0.6s): Золотая прорисовка (Light glint + separate underline draw)
+    //   Stage 5 (3.3 - 3.8s, 0.5s): Появление главной страницы + Фирменное дыхание
+    // ========================================================================
+    const TOTAL_DURATION = 3.8
 
-    const renderAtTime = (t: number, withHaptics = false) => {
-      if (withHaptics) {
-        if (!hapticFlags.hop1 && t >= 0.85) {
-          hapticFlags.hop1 = true
-          triggerHaptic('selection')
+    const renderAtTime = (t: number, withEffects = false) => {
+      const snd = soundEnabledRef.current
+
+      if (withEffects) {
+        if (!soundAndHapticFlags.rustle && t >= 0.04) {
+          soundAndHapticFlags.rustle = true
+          playAtelierSound('rustle', 0, snd)
         }
-        if (!hapticFlags.hop2 && t >= 1.62) {
-          hapticFlags.hop2 = true
+        if (!soundAndHapticFlags.converge && t >= 0.82) {
+          soundAndHapticFlags.converge = true
           triggerHaptic('selection')
+          playAtelierSound('convergeSweep', 0, snd)
         }
-        if (!hapticFlags.resolve && t >= 2.95) {
-          hapticFlags.resolve = true
+        if (!soundAndHapticFlags.logoLock && t >= 2.02) {
+          soundAndHapticFlags.logoLock = true
+          triggerHaptic('medium', true)
+          playAtelierSound('feltChord', 0, snd)
+        }
+        if (!soundAndHapticFlags.goldenGlint && t >= 2.7) {
+          soundAndHapticFlags.goldenGlint = true
           triggerHaptic('light')
+          playAtelierSound('goldenGlint', 0, snd)
         }
-        if (!hapticFlags.flyStart && t >= 4.98) {
-          hapticFlags.flyStart = true
-          triggerHaptic('medium')
-        }
-        if (!hapticFlags.settled && t >= 6.22) {
-          hapticFlags.settled = true
+        if (!soundAndHapticFlags.done && t >= 3.35) {
+          soundAndHapticFlags.done = true
           triggerHaptic('success', true)
         }
       }
@@ -636,123 +783,89 @@ export function WelcomePage({
         const isWord = i < wordGlyphs.length
         const k = isWord ? i : i - wordGlyphs.length
 
-        if (!isWord && g._hidden && t >= 6.1) return
+        if (!isWord && g._hidden && t >= 2.3) return
 
-        let x = startOff[i].x
-        let y = startOff[i].y
-        let sc = 0.42
-        let rot = startRot[i]
+        const ox0 = g._orbitX ?? 0
+        const oy0 = g._orbitY ?? 0
+        const rot0 = g._orbitRot ?? 0
+        const dist = g._dist ?? 0.5
+
+        let x = ox0
+        let y = oy0
+        let sc = 0.72
+        let rot = rot0
         let op = 0
 
-        // 1. Pop in immediately (no black screen delay)
-        const tPop = clamp01((t - popStagger[i]) / 0.42)
-        if (tPop > 0) {
-          const e = EASES.backOut2(tPop)
-          sc = lerp(0.42, 1, e)
-          rot = lerp(startRot[i], 0, e)
-          op = clamp01(tPop * 2.8)
+        // Stage 1 (0.0 - 0.8s): Smooth emergence & gentle rotation toward grid order
+        const emergeStagger = dist * 0.22
+        const tEmerge = clamp01((t - emergeStagger) / (0.8 - emergeStagger))
+        if (tEmerge > 0) {
+          const e = EASES.power2Out(tEmerge)
+          const eMove = EASES.sineInOut(tEmerge)
+          op = isWord ? lerp(0, 1, e) : lerp(0, 0.68, e)
+          sc = lerp(0.72, 1, e)
+          // Gently drift 65% of the way from orbital ring toward grid alignment while rotating smoothly
+          x = lerp(ox0, ox0 * 0.35, eMove)
+          y = lerp(oy0, oy0 * 0.35, eMove)
+          rot = lerp(rot0, rot0 * 0.35, eMove)
         }
 
-        // 2. Hop 1
-        const tH1 = clamp01((t - (0.82 + hop1Stagger[i])) / 0.48)
-        if (tH1 > 0) {
-          const e = EASES.power3InOut(tH1)
-          x = lerp(startOff[i].x, hop1Off[i].x, e)
-          y = lerp(startOff[i].y, hop1Off[i].y, e)
-        }
-
-        // 3. Hop 2
-        const tH2 = clamp01((t - (1.58 + hop2Stagger[i])) / 0.48)
-        if (tH2 > 0) {
-          const e = EASES.power3InOut(tH2)
-          x = lerp(hop1Off[i].x, hop2Off[i].x, e)
-          y = lerp(hop1Off[i].y, hop2Off[i].y, e)
-        }
-
-        // 4. Resolve into 13x13 matrix
-        const rStart = isWord ? 2.46 + resWordStagger[k] : 2.34 + resOtherStagger[k]
-        const tRes = clamp01((t - rStart) / 0.8)
-        if (tRes > 0) {
-          const e = EASES.expoInOut(tRes)
-          x = lerp(hop2Off[i].x, 0, e)
-          y = lerp(hop2Off[i].y, 0, e)
-        }
-
-        // 5. Spell & 6. Disperse / Fly
+        // Stage 2 (0.8 - 2.0s): Controlled convergence to the center & alignment into CORDWAINE
         if (!isWord) {
-          const tDim = clamp01((t - 3.55) / 0.65)
-          if (tDim > 0) {
-            op = lerp(1, 0.16, EASES.power2Out(tDim))
-          }
+          const convStagger = (1 - dist) * 0.25
+          const tConv = clamp01((t - (0.8 + convStagger)) / 1.05)
+          if (tConv > 0) {
+            const ePos = EASES.power3InOut(tConv)
+            const eFade = EASES.power2In(tConv)
+            const cx = g._convergeX ?? 0
+            const cy = g._convergeY ?? 0
+            x = lerp(ox0 * 0.35, cx, ePos)
+            y = lerp(oy0 * 0.35, cy, ePos)
+            rot = lerp(rot0 * 0.35, 0, ePos)
+            sc = lerp(1, 0.52, eFade)
+            op = lerp(0.68, 0, eFade)
 
-          const dist = g._dist ?? 0.5
-          const dir = g._dir ?? { x: 0, y: 1 }
-          const dStart = 4.72 + dist * 0.58
-          const tDisp = clamp01((t - dStart) / 0.72)
-          if (tDisp > 0) {
-            g._resting = false
-            const e = EASES.power2In(tDisp)
-            op = lerp(0.16, 0, e)
-            sc = lerp(1, 0.5, e)
-            x = lerp(0, dir.x * 14, e)
-            y = lerp(0, dir.y * 14 + 6, e)
-            if (tDisp >= 1 && !g._hidden) {
+            if (tConv >= 1 && !g._hidden) {
               g._hidden = true
               g.style.display = 'none'
               return
-            } else if (tDisp < 1 && g._hidden) {
+            } else if (tConv < 1 && g._hidden) {
               g._hidden = false
               g.style.display = ''
             }
-          } else if (tRes >= 1 && t < dStart) {
-            if (!g._resting) {
-              g._resting = true
-              g.removeAttribute('transform')
-            }
-            g.style.opacity = String(op.toFixed(3))
-            return
           }
         } else {
-          const sStart = 3.55 + k * 0.055
-          const tFill = clamp01((t - sStart) / 0.32)
-          if (withHaptics && !hapticFlags.spelled[k] && t >= sStart) {
-            hapticFlags.spelled[k] = true
-            triggerHaptic('selection')
+          // Word letters (THE + CORDWAINE) glow gold and converge smoothly into the central logo
+          const chimeTime = 0.88 + k * 0.075
+          if (withEffects && !soundAndHapticFlags.chimes[k] && t >= chimeTime) {
+            soundAndHapticFlags.chimes[k] = true
+            playAtelierSound('chimeNote', k, snd)
+            if (k % 3 === 0) triggerHaptic('selection')
           }
 
+          const tGold = clamp01((t - (0.65 + k * 0.04)) / 0.45)
           const pathEl = g.firstElementChild as SVGPathElement | null
-          if (pathEl && t >= 3.5 && t <= 4.7) {
-            pathEl.setAttribute('fill', lerpInkColor(EASES.power2Out(tFill)))
-          } else if (pathEl && t > 4.7) {
-            pathEl.setAttribute('fill', '#f4e7cf')
+          if (pathEl) {
+            pathEl.setAttribute('fill', lerpInkColor(EASES.power2Out(tGold)))
           }
 
-          if (t > sStart && t < sStart + 0.44) {
-            const dt = t - sStart
-            if (dt <= 0.15) sc = lerp(1, 1.15, EASES.power2Out(dt / 0.15))
-            else sc = lerp(1.15, 1, EASES.power2InOut((dt - 0.15) / 0.29))
+          const f = flights[k]
+          const fStagger = k * 0.022
+          const tConv = clamp01((t - (0.8 + fStagger)) / (1.2 - fStagger * 0.5))
+          if (tConv > 0 && f) {
+            // X and Y use distinct easing curves for a graceful inward spiral arc
+            const ex = EASES.expoInOut(tConv)
+            const ey = EASES.power3InOut(tConv)
+            x = lerp(ox0 * 0.35, f.x, ex)
+            y = lerp(oy0 * 0.35, f.y, ey)
+            const targetScale = k < 3 ? f.scale * 0.72 : f.scale
+            sc = lerp(1, targetScale, ex)
+            rot = lerp(rot0 * 0.35, 0, ey)
           }
 
-          // 6. Lush 1.32s curved 2-axis flight into the logo
-          const fStart = 4.95 + k * 0.026
-          const tFly = clamp01((t - fStart) / 1.32)
-          if (tFly > 0) {
-            const f = flights[k]
-            if (f) {
-              x = lerp(0, f.x, EASES.expoInOut(tFly))
-              y = lerp(0, f.y, EASES.power3InOut(tFly))
-              const targetScale = k < 3 ? f.scale * 0.72 : f.scale
-              sc = lerp(1, targetScale, EASES.expoInOut(tFly))
-              if (tFly <= 0.5) rot = lerp(0, flyRot[k], EASES.sineOut(tFly * 2))
-              else rot = lerp(flyRot[k], 0, EASES.sineInOut((tFly - 0.5) * 2))
-            } else {
-              op = lerp(1, 0, clamp01((t - fStart) / 0.35))
-            }
-          }
-
-          // 7. Smooth cross-fade into final logo letterforms right as flight lands
-          const mStart = (k < 3 ? 5.72 : 5.95) + k * 0.026
-          const mDur = k < 3 ? 0.4 : 0.45
+          // Stage 3 (2.0 - 2.7s): Lock into crisp final logo vector paths
+          const mStart = (k < 3 ? 1.88 : 1.98) + k * 0.015
+          const mDur = 0.35
           const tMorph = clamp01((t - mStart) / mDur)
           if (tMorph > 0) {
             op = lerp(1, 0, EASES.power1InOut(tMorph))
@@ -765,16 +878,15 @@ export function WelcomePage({
         g.style.opacity = String(op.toFixed(3))
       })
 
-      // Logo letters fade in
+      // Stage 3 (2.0 - 2.7s): Final logo letters lock in at the center
       logoLetters.forEach((el, k) => {
-        const mStart = (k < 3 ? 5.72 : 5.95) + k * 0.026
-        const mDur = k < 3 ? 0.42 : 0.45
-        const tMorph = clamp01((t - mStart) / mDur)
+        const mStart = (k < 3 ? 1.88 : 1.98) + k * 0.015
+        const tMorph = clamp01((t - mStart) / 0.38)
         el.style.opacity = String(EASES.power1InOut(tMorph).toFixed(3))
       })
 
-      // Rules grow outward from 'the'
-      const tRules = clamp01((t - 6.1) / 0.7)
+      // Upper rules flanking '_the_' draw outward (2.15 - 2.70s)
+      const tRules = clamp01((t - 2.15) / 0.55)
       const eRules = EASES.expoOut(tRules)
       rules.forEach((r) => {
         const px = r._pivotX ?? 0
@@ -786,44 +898,53 @@ export function WelcomePage({
         )
       })
 
-      // Bespoke swash under C-O-R slides in
-      const tTail = clamp01((t - 6.18) / 0.7)
-      const eTail = EASES.power3Out(tTail)
-      tail.style.opacity = String(eTail.toFixed(3))
-      tail.setAttribute('transform', `translate(${lerp(-10, 0, eTail).toFixed(2)}, 0)`)
+      // Brand philosophy "THE ART OF SHOEMAKING" appears under logo for ~1 second (2.05 - 3.35s), then dissolves
+      let philOpacity = 0
+      let philY = 6
+      if (t >= 2.0 && t <= 3.45) {
+        const tIn = clamp01((t - 2.0) / 0.32)
+        const tOut = clamp01((t - 3.05) / 0.38)
+        philOpacity = EASES.power2Out(tIn) * (1 - EASES.power2In(tOut))
+        philY = lerp(6, 0, EASES.power2Out(tIn)) - lerp(0, 4, EASES.power2In(tOut))
+      }
+      philosophy.style.opacity = String(philOpacity.toFixed(3))
+      philosophy.style.transform = `translate3d(0, ${philY.toFixed(1)}px, 0)`
 
-      // 8. Settle: grow stage, bloom radial glow, sweep masked glint
-      const tSettle = clamp01((t - 6.12) / 1.45)
-      const eSettle = EASES.expoInOut(tSettle)
-      stageWrap.style.transform = `translate3d(0, -20px, 0) scale(${lerp(1, 1.18, eSettle).toFixed(4)})`
+      // Stage 4 (2.7 - 3.3s, 0.6s): Golden Light Sweep + Separate Underline Draw
+      const tUnderline = clamp01((t - 2.72) / 0.56)
+      const eUnderline = EASES.expoInOut(tUnderline)
+      // Reveal calligraphic underline swash left-to-right (x = 588 .. 676, width = 88)
+      tailClipRect.setAttribute('width', String((88 * eUnderline).toFixed(1)))
 
-      const tGlow = clamp01((t - 6.2) / 1.35)
-      hero.style.setProperty('--glow', String(EASES.power2Out(tGlow).toFixed(3)))
-
-      const tGlint = clamp01((t - 6.32) / 1.1)
+      const tGlint = clamp01((t - 2.7) / 0.6)
       if (tGlint > 0 && tGlint < 1) {
         if (glintGroup.style.display !== '') glintGroup.style.display = ''
         glint.setAttribute(
           'x',
-          String(lerp(lb.x - 60, lb.x + lb.width + 20, EASES.power2InOut(tGlint)).toFixed(1))
+          String(lerp(lb.x - 55, lb.x + lb.width + 20, EASES.power2InOut(tGlint)).toFixed(1))
         )
       } else if (glintGroup.style.display !== 'none') {
         glintGroup.style.display = 'none'
       }
 
-      // Bottom navigation: softly visible after grid resolve (t >= 2.8s), full brightness on settle
-      const tEarlyNav = clamp01((t - 2.8) / 0.6)
-      const tFullNav = clamp01((t - 6.25) / 0.65)
-      const navOpacity = lerp(0, 0.42, EASES.power2Out(tEarlyNav)) + lerp(0, 0.58, EASES.power2Out(tFullNav))
-      const navY = lerp(12, 0, EASES.power2Out(Math.max(tEarlyNav, tFullNav)))
-      bottomNav.style.opacity = String(clamp01(navOpacity).toFixed(3))
-      bottomNav.style.transform = `translate3d(0, ${navY.toFixed(1)}px, 0)`
-      bottomNav.style.pointerEvents = t >= 2.6 ? 'auto' : 'none'
+      // Gentle scale settle of the center stage (2.0 - 3.3s)
+      const tSettle = clamp01((t - 2.0) / 1.3)
+      const eSettle = EASES.expoInOut(tSettle)
+      stageWrap.style.transform = `translate3d(0, -18px, 0) scale(${lerp(1, 1.16, eSettle).toFixed(4)})`
+
+      const tGlow = clamp01((t - 2.05) / 1.2)
+      hero.style.setProperty('--glow', String(EASES.power2Out(tGlow).toFixed(3)))
+
+      // Stage 5 (3.3 - 3.8s, 0.5s): Main page navigation appears smoothly
+      const tNav = clamp01((t - 3.3) / 0.5)
+      const eNav = EASES.power2Out(tNav)
+      bottomNav.style.opacity = String(eNav.toFixed(3))
+      bottomNav.style.transform = `translate3d(0, ${lerp(12, 0, eNav).toFixed(1)}px, 0)`
+      bottomNav.style.pointerEvents = t >= 3.1 ? 'auto' : 'none'
     }
 
     setIntroFinished(false)
-    // Pre-seed at t=0.06 so the very first visible frame already has letters popping in (zero black screen!)
-    renderAtTime(0.06, false)
+    renderAtTime(0.04, false)
     setStageReady(true)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -833,11 +954,11 @@ export function WelcomePage({
       return
     }
 
-    const now = performance.now() - 60
+    const now = performance.now() - 40
     animStateRef.current = {
       mode: 'playing',
       startTime: now,
-      currentTime: 0.06,
+      currentTime: 0.04,
       skipStartTime: 0,
       skipFromTime: 0,
       renderAtTime: (timeVal: number) => renderAtTime(timeVal, false),
@@ -855,12 +976,12 @@ export function WelcomePage({
           return
         }
         renderAtTime(elapsed, true)
-        if (elapsed >= 6.3) {
+        if (elapsed >= 3.35) {
           setIntroFinished(true)
         }
         rafRef.current = requestAnimationFrame(tick)
       } else if (st.mode === 'skipping') {
-        const p = clamp01((ts - st.skipStartTime) / 550)
+        const p = clamp01((ts - st.skipStartTime) / 380)
         const eased = EASES.power2InOut(p)
         const tCur = lerp(st.skipFromTime, TOTAL_DURATION, eased)
         st.currentTime = tCur
@@ -878,7 +999,6 @@ export function WelcomePage({
     rafRef.current = requestAnimationFrame(tick)
   }, [])
 
-  // Prepare SVG stage IMMEDIATELY on mount (zero loader delay; Telegram already showed its native splash)
   useEffect(() => {
     if (stageRef.current) return
     const svg = svgRef.current
@@ -1012,7 +1132,7 @@ export function WelcomePage({
     const logoG = logoInner.querySelector('g') as SVGGElement
     const parts = Array.from(logoG.children) as SVGPathElement[]
     const tailPath = parts[1]
-    const tail = mk('g', { class: 'logo-tail' }) as SVGGElement
+    const tail = mk('g', { class: 'logo-tail', 'clip-path': 'url(#qt-tail-clip)' }) as SVGGElement
     tailPath.parentNode?.insertBefore(tail, tailPath)
     tail.appendChild(tailPath)
 
@@ -1034,6 +1154,18 @@ export function WelcomePage({
 
     const lb = logoG.getBBox()
     const defs = mk('defs')
+
+    // Clip-path for separate progressive drawing of the underline swash (2.7 - 3.3s)
+    const tailClip = mk('clipPath', { id: 'qt-tail-clip' })
+    const tailClipRect = mk('rect', {
+      x: 588,
+      y: 135,
+      width: 0,
+      height: 30,
+    }) as SVGRectElement
+    tailClip.appendChild(tailClipRect)
+
+    // Warm golden gradient for the 2.7 - 3.3s light sweep across the letters
     const grad = mk('linearGradient', {
       id: 'qt-glint-grad',
       x1: 0,
@@ -1043,13 +1175,15 @@ export function WelcomePage({
     })
     ;(
       [
-        [0, 0],
-        [0.5, 0.9],
-        [1, 0],
-      ] as Array<[number, number]>
-    ).forEach(([o, a]) =>
+        [0, '#e6c687', 0],
+        [0.35, '#fbe8c2', 0.65],
+        [0.5, '#fffdf7', 1],
+        [0.65, '#fbe8c2', 0.65],
+        [1, '#e6c687', 0],
+      ] as Array<[number, string, number]>
+    ).forEach(([o, col, a]) =>
       grad.appendChild(
-        mk('stop', { offset: o, 'stop-color': '#fff6e6', 'stop-opacity': a })
+        mk('stop', { offset: o, 'stop-color': col, 'stop-opacity': a })
       )
     )
     const mask = mk('mask', {
@@ -1066,13 +1200,13 @@ export function WelcomePage({
         mk('use', { href: `#${el.id}`, fill: '#fff', style: 'fill:#fff' })
       )
     })
-    defs.append(grad, mask)
+    defs.append(tailClip, grad, mask)
     logoG.appendChild(defs)
     const glintGroup = mk('g', { mask: 'url(#qt-logo-mask)', style: 'display:none' }) as SVGGElement
     const glint = mk('rect', {
-      x: lb.x - 60,
+      x: lb.x - 55,
       y: lb.y - 20,
-      width: 46,
+      width: 52,
       height: lb.height + 40,
       fill: 'url(#qt-glint-grad)',
     }) as SVGRectElement
@@ -1110,8 +1244,8 @@ export function WelcomePage({
     const maxDist = Math.max(
       ...homes.map((h) => Math.hypot(h.cx - wordsCenter.x, h.cy - wordsCenter.y))
     )
-    otherGlyphs.forEach((g, k) => {
-      const h = homes[wordGlyphs.length + k]
+    allGlyphs.forEach((g, idx) => {
+      const h = homes[idx]
       g._dist = Math.hypot(h.cx - wordsCenter.x, h.cy - wordsCenter.y) / maxDist
       g._dir = {
         x: (h.cx - wordsCenter.x) / maxDist,
@@ -1126,7 +1260,7 @@ export function WelcomePage({
       homes,
       flights,
       logoLetters,
-      tail,
+      tailClipRect,
       rules,
       glintGroup,
       glint,
@@ -1152,9 +1286,25 @@ export function WelcomePage({
   }, [])
 
   const handleReplay = useCallback(() => {
+    getOrInitAudioContext()
     triggerHaptic('medium', true)
     buildAndPlayTimeline()
   }, [buildAndPlayTimeline])
+
+  const toggleSound = useCallback(() => {
+    getOrInitAudioContext()
+    triggerHaptic('selection', true)
+    setSoundEnabled((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('cordwainer_sound', next ? '1' : '0')
+      } catch {}
+      if (next) {
+        playAtelierSound('chimeNote', 6, true)
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1205,7 +1355,7 @@ export function WelcomePage({
     <main
       ref={heroRef}
       onClick={() => {
-        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 1.0) {
+        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 0.6) {
           handleSkip()
         }
       }}
@@ -1220,32 +1370,34 @@ export function WelcomePage({
       }
       className="relative grid h-[100dvh] w-full place-items-center overflow-hidden select-none isolate antialiased"
     >
-      {/* GPU-composited warm radial glow behind the assembled logo */}
+      {/* Signature Breathing Glow behind the assembled logo (subtle, almost imperceptible pulse after intro) */}
       <div
+        ref={breathGlowRef}
         aria-hidden="true"
         style={{
-          width: '72vmin',
-          height: '42vmin',
-          background: 'radial-gradient(closest-side, rgba(244, 231, 207, 0.115), transparent)',
+          width: '74vmin',
+          height: '44vmin',
+          background: 'radial-gradient(closest-side, rgba(244, 231, 207, 0.12), transparent)',
           opacity: 'var(--glow, 0)',
-          willChange: 'opacity',
+          willChange: 'opacity, transform',
+          animation: introFinished ? 'cordwaineBreath 5.6s ease-in-out infinite' : 'none',
         }}
         className="pointer-events-none absolute top-1/2 left-1/2 z-0 -translate-x-1/2 -translate-y-1/2"
       />
 
-      {/* 1. TOP BAR: Localized Skip/Replay + Apple-style liquid pill switcher (ru / ukr / de) */}
+      {/* 1. TOP BAR: Replay/Skip + Sound Toggle + Apple-style liquid pill switcher (ru / ukr / de) */}
       <header
         onClick={(e) => e.stopPropagation()}
         className="absolute top-0 right-0 left-0 z-40 flex items-center justify-between px-6 pt-4"
       >
-        <div>
+        <div className="flex items-center gap-3">
           {!introFinished ? (
             <button
               type="button"
               onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleSkip}
               style={{ color: 'rgba(213, 197, 171, 0.55)' }}
-              className="min-h-[38px] border-0 bg-transparent py-2 pr-4 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
+              className="min-h-[38px] border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
             >
               {t.skip}
             </button>
@@ -1255,7 +1407,7 @@ export function WelcomePage({
               onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleReplay}
               style={{ color: 'rgba(213, 197, 171, 0.55)' }}
-              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-4 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
+              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
                 <path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
@@ -1263,6 +1415,21 @@ export function WelcomePage({
               <span>{t.replay}</span>
             </button>
           )}
+
+          {/* Subtle Atelier Sound Toggle (♪) */}
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-label={soundEnabled ? 'Mute sound' : 'Enable sound'}
+            style={{
+              color: soundEnabled ? '#f4e7cf' : 'rgba(213, 197, 171, 0.35)',
+              borderColor: 'rgba(213, 197, 171, 0.14)',
+              background: soundEnabled ? 'rgba(244, 231, 207, 0.08)' : 'transparent',
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] transition-all duration-300 active:scale-90 cursor-pointer outline-none"
+          >
+            {soundEnabled ? '♪' : '✕'}
+          </button>
         </div>
 
         {/* Apple-style liquid glass segmented switcher: ru | ukr | de */}
@@ -1318,16 +1485,16 @@ export function WelcomePage({
         </div>
       </header>
 
-      {/* 2. HERO STAGE: 13x13 Vector Letter Grid & Assembled CORDWAINE Logo */}
+      {/* 2. HERO STAGE: Controlled Spiral Matrix -> Assembled Cordwaine Logo */}
       <div
         ref={stageWrapRef}
         style={{
           width: 'min(78vw, 54vh)',
           visibility: stageReady ? 'visible' : 'hidden',
-          transform: 'translate3d(0, -20px, 0)',
+          transform: 'translate3d(0, -18px, 0)',
           willChange: 'transform',
         }}
-        className="relative z-10"
+        className="relative z-10 flex flex-col items-center"
       >
         <svg
           ref={svgRef}
@@ -1371,6 +1538,21 @@ export function WelcomePage({
             </g>
           </g>
         </svg>
+
+        {/* Ephemeral Brand Philosophy: "THE ART OF SHOEMAKING" (appears for ~1s below logo, then dissolves) */}
+        <div
+          ref={philosophyRef}
+          aria-hidden="true"
+          style={{
+            opacity: 0,
+            transform: 'translate3d(0, 6px, 0)',
+            color: 'rgba(213, 197, 171, 0.72)',
+            willChange: 'opacity, transform',
+          }}
+          className="pointer-events-none absolute top-[61%] right-0 left-0 text-center text-[10.5px] font-normal uppercase tracking-[0.36em]"
+        >
+          THE ART OF SHOEMAKING
+        </div>
       </div>
 
       {/* Hidden source for the final logo; moved into stage on mount */}
@@ -1478,6 +1660,10 @@ export function WelcomePage({
         @keyframes qtCue {
           0% { transform: translateY(-100%); }
           100% { transform: translateY(260%); }
+        }
+        @keyframes cordwaineBreath {
+          0%, 100% { opacity: 0.78; transform: translate(-50%, -50%) scale(0.97); }
+          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
         }
       `}</style>
     </main>
