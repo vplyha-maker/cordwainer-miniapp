@@ -1,3 +1,4 @@
+```react
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { Lang, FavoriteItem } from '../App'
 
@@ -13,14 +14,123 @@ type WelcomePageProps = {
 }
 
 // ============================================================================
-// 1. Multi-Channel Haptic + Procedural Atelier Sound Engine (0 KB Bundle Size)
+// 1. WebGL Ray-Cast Silk & Travertine Light Shader (0 KB external deps, 60 FPS)
+//    - Raymarched / normal-mapped flowing satin relief on Luminous Atelier Ivory
+//    - Physically-inspired GGX microfacet specular + volumetric golden light sweep
+//    - Subtle signature breathing radiance behind the assembled 'Cordwaine' logo
+// ============================================================================
+const VERTEX_SHADER_SRC = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() {
+    v_uv = a_pos * 0.5 + 0.5;
+    gl_Position = vec4(a_pos, 0.0, 1.0);
+  }
+`
+
+const FRAGMENT_SHADER_SRC = `
+  precision highp float;
+  varying vec2 v_uv;
+  uniform vec2 u_res;
+  uniform float u_time;
+  uniform float u_converge;
+  uniform float u_glint;
+  uniform float u_breath;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+      u.y
+    );
+  }
+
+  // 3-octave domain-warped silk/travertine heightfield
+  float silkHeight(vec2 p, float t) {
+    vec2 q = vec2(
+      noise(p * 1.4 + vec2(t * 0.07, -t * 0.05)),
+      noise(p * 1.4 + vec2(-t * 0.06, t * 0.08) + 4.2)
+    );
+    float f = noise(p * 1.8 + q * 1.15 + t * 0.04);
+    f += 0.5 * noise(p * 3.4 - q * 0.8);
+    return f * 0.66;
+  }
+
+  void main() {
+    vec2 aspect = vec2(u_res.x / max(u_res.y, 1.0), 1.0);
+    vec2 uv = (v_uv - 0.5) * aspect;
+    float t = u_time;
+
+    // Ray-cast surface normal via central finite differences
+    float eps = 0.012;
+    float hC = silkHeight(uv, t);
+    float hX = silkHeight(uv + vec2(eps, 0.0), t);
+    float hY = silkHeight(uv + vec2(0.0, eps), t);
+    vec3 normal = normalize(vec3((hC - hX) * 2.2, (hC - hY) * 2.2, 1.0));
+
+    // View ray & warm directional atelier key-light
+    vec3 viewDir = normalize(vec3(uv * 0.35, 1.0));
+    vec3 lightPos = vec3(sin(t * 0.22) * 0.45, 0.42 + cos(t * 0.17) * 0.15, 1.35);
+    vec3 lightDir = normalize(lightPos - vec3(uv, 0.0));
+    vec3 halfVec = normalize(lightDir + viewDir);
+
+    // Diffuse & microfacet satin specular
+    float diff = max(dot(normal, lightDir), 0.0);
+    float spec = pow(max(dot(normal, halfVec), 0.0), 22.0);
+    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+
+    // Base Luminous Atelier Ivory / Warm Travertine palette
+    vec3 ivoryBase = vec3(0.961, 0.941, 0.910);   // #F5F0E8
+    vec3 silkShadow = vec3(0.843, 0.796, 0.722);  // #E6DEC1 warm limestone
+    vec3 champGold = vec3(0.847, 0.725, 0.502);   // #D8B980 champagne gold
+
+    vec3 col = mix(silkShadow, ivoryBase, 0.55 + 0.45 * diff);
+    col += champGold * spec * 0.24;
+    col += vec3(1.0, 0.98, 0.94) * fresnel * 0.05;
+
+    // Converging golden caustic ring during Chaos -> Order
+    float distCenter = length(uv);
+    float ringRadius = mix(0.68, 0.08, u_converge);
+    float causticRing = exp(-pow((distCenter - ringRadius) * 5.2, 2.0)) * (1.0 - u_converge * 0.7);
+    col += champGold * causticRing * 0.18;
+
+    // Raytraced diagonal golden light sweep synchronized with logo glint (4.0 - 5.2s)
+    if (u_glint > 0.001 && u_glint < 0.999) {
+      float beamX = mix(-0.85, 0.85, u_glint);
+      float beam = exp(-pow((uv.x - beamX + uv.y * 0.28) * 6.5, 2.0));
+      float maskY = exp(-pow(uv.y * 2.8, 2.0));
+      col += vec3(0.88, 0.72, 0.45) * beam * maskY * 0.34 * sin(u_glint * 3.14159);
+    }
+
+    // Signature Breathing Glow behind the assembled logo (subtle, meditative)
+    float breathPulse = 0.88 + 0.12 * sin(t * 1.15);
+    float centerGlow = exp(-pow(distCenter * 2.7, 2.0)) * u_breath * breathPulse;
+    col = mix(col, vec3(0.992, 0.976, 0.945), centerGlow * 0.55);
+
+    // Very soft, airy warm edge vignette (never heavy or dark)
+    float vig = smoothstep(1.15, 0.25, distCenter);
+    col = mix(vec3(0.886, 0.851, 0.796), col, 0.72 + 0.28 * vig);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`
+
+// ============================================================================
+// 2. Multi-Channel Haptic + Luxury Atelier Sound Engine (0 KB Bundle Size)
 //    - Haptics: Telegram HapticFeedback ('medium'/'heavy') + TelegramWebviewProxy
 //      + dual-frequency tactile pulse + navigator.vibrate + iOS switch fallback
-//    - Procedural Soundtrack (Variant A):
-//      * 0.0-0.8s: Archival paper/leather pattern rustle (filtered pink noise)
-//      * 0.8-2.0s: Vortex convergence air sweep + 12 ascending tuning-fork notes
-//      * 2.0-2.7s: Warm Felt Piano chord (Dm9: D3-A3-C4-E4-F4) on logo lock
-//      * 2.7-3.3s: Golden harmonic shimmer (A5-D6) during light glint & underline draw
+//    - Luxury Soundscape (no cheap beeps!):
+//      * 0.0-1.2s: Soft linen/leather pattern whisper
+//      * 1.2-3.0s: Warm suede air swell as letters spiral inward
+//      * 3.0-4.0s: Deep Nils Frahm-style Felt Piano chord (Dmaj9)
+//      * 4.0-5.2s: Single crystalline harmonic shimmer on golden light sweep
 // ============================================================================
 type HapticStyle = 'selection' | 'light' | 'medium' | 'heavy' | 'success'
 
@@ -56,7 +166,7 @@ function getOrInitAudioContext(): AudioContext | null {
 
 function getPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
   if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer
-  const len = ctx.sampleRate * 1.5
+  const len = ctx.sampleRate * 2.0
   const buf = ctx.createBuffer(1, len, ctx.sampleRate)
   const data = buf.getChannelData(0)
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
@@ -68,17 +178,15 @@ function getPinkNoiseBuffer(ctx: AudioContext): AudioBuffer {
     b3 = 0.86650 * b3 + white * 0.3104856
     b4 = 0.55000 * b4 + white * 0.5329522
     b5 = -0.7616 * b5 - white * 0.0168980
-    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04
+    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.035
     b6 = white * 0.115926
   }
   noiseBuffer = buf
   return buf
 }
 
-// Procedural Atelier Soundtrack Events
-function playAtelierSound(
-  type: 'rustle' | 'convergeSweep' | 'chimeNote' | 'feltChord' | 'goldenGlint',
-  noteIndex = 0,
+function playLuxurySound(
+  type: 'linenWhisper' | 'suedeSwell' | 'feltChord' | 'goldenShimmer' | 'softTick',
   soundEnabled = true
 ) {
   if (!soundEnabled) return
@@ -87,66 +195,47 @@ function playAtelierSound(
   const now = ctx.currentTime
 
   try {
-    if (type === 'rustle') {
-      // Soft archival pattern card / leather rustle (0.0 - 0.8s)
+    if (type === 'linenWhisper') {
       const src = ctx.createBufferSource()
       src.buffer = getPinkNoiseBuffer(ctx)
       const filter = ctx.createBiquadFilter()
       filter.type = 'bandpass'
-      filter.frequency.setValueAtTime(680, now)
-      filter.frequency.exponentialRampToValueAtTime(1120, now + 0.55)
-      filter.Q.value = 1.8
+      filter.frequency.setValueAtTime(520, now)
+      filter.frequency.exponentialRampToValueAtTime(920, now + 0.9)
+      filter.Q.value = 1.4
 
       const gain = ctx.createGain()
-      gain.gain.setValueAtTime(0.001, now)
-      gain.gain.linearRampToValueAtTime(0.09, now + 0.12)
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65)
+      gain.gain.setValueAtTime(0.0005, now)
+      gain.gain.linearRampToValueAtTime(0.06, now + 0.25)
+      gain.gain.exponentialRampToValueAtTime(0.0005, now + 1.05)
 
       src.connect(filter)
       filter.connect(gain)
       gain.connect(ctx.destination)
       src.start(now)
-      src.stop(now + 0.68)
-    } else if (type === 'convergeSweep') {
-      // Warm suede air whoosh as letters spiral toward the center (0.8 - 2.0s)
+      src.stop(now + 1.1)
+    } else if (type === 'suedeSwell') {
       const src = ctx.createBufferSource()
       src.buffer = getPinkNoiseBuffer(ctx)
       const filter = ctx.createBiquadFilter()
       filter.type = 'lowpass'
-      filter.frequency.setValueAtTime(220, now)
-      filter.frequency.exponentialRampToValueAtTime(880, now + 0.65)
-      filter.frequency.exponentialRampToValueAtTime(180, now + 1.15)
+      filter.frequency.setValueAtTime(180, now)
+      filter.frequency.exponentialRampToValueAtTime(640, now + 0.95)
+      filter.frequency.exponentialRampToValueAtTime(140, now + 1.7)
 
       const gain = ctx.createGain()
-      gain.gain.setValueAtTime(0.001, now)
-      gain.gain.linearRampToValueAtTime(0.11, now + 0.45)
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.18)
+      gain.gain.setValueAtTime(0.0005, now)
+      gain.gain.linearRampToValueAtTime(0.085, now + 0.75)
+      gain.gain.exponentialRampToValueAtTime(0.0005, now + 1.75)
 
       src.connect(filter)
       filter.connect(gain)
       gain.connect(ctx.destination)
       src.start(now)
-      src.stop(now + 1.2)
-    } else if (type === 'chimeNote') {
-      // 12 ascending tuning-fork / celesta notes (D minor pentatonic / add9)
-      const freqs = [293.66, 329.63, 349.23, 392.0, 440.0, 523.25, 587.33, 659.25, 698.46, 783.99, 880.0, 1046.5]
-      const freq = freqs[noteIndex % freqs.length]
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(freq, now)
-
-      gain.gain.setValueAtTime(0.001, now)
-      gain.gain.linearRampToValueAtTime(0.032, now + 0.012)
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.42)
-
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(now)
-      osc.stop(now + 0.44)
+      src.stop(now + 1.8)
     } else if (type === 'feltChord') {
-      // Nils Frahm-style Warm Felt Piano Chord (Dm9: D2, A2, F3, A3, C4, E4) at 2.0s logo lock
-      const chord = [73.42, 110.0, 174.61, 220.0, 261.63, 329.63]
+      // Warm, unhurried Felt Piano Dmaj9 (D2, A2, F#3, A3, C#4, E4)
+      const chord = [73.42, 110.0, 185.0, 220.0, 277.18, 329.63]
       chord.forEach((freq, idx) => {
         const osc = ctx.createOscillator()
         const filter = ctx.createBiquadFilter()
@@ -154,64 +243,71 @@ function playAtelierSound(
 
         osc.type = idx < 2 ? 'triangle' : 'sine'
         osc.frequency.setValueAtTime(freq, now)
-        // Subtle analog detune warmth
-        osc.detune.setValueAtTime((idx - 2.5) * 3.5, now)
+        osc.detune.setValueAtTime((idx - 2.5) * 3.0, now)
 
         filter.type = 'lowpass'
-        filter.frequency.setValueAtTime(520, now)
-        filter.frequency.exponentialRampToValueAtTime(160, now + 2.4)
+        filter.frequency.setValueAtTime(420, now)
+        filter.frequency.exponentialRampToValueAtTime(140, now + 3.2)
 
-        const onset = now + idx * 0.018
-        const amp = idx < 2 ? 0.055 : 0.035
-        gain.gain.setValueAtTime(0.0005, onset)
-        gain.gain.linearRampToValueAtTime(amp, onset + 0.06)
-        gain.gain.exponentialRampToValueAtTime(0.0005, onset + 2.5)
+        const onset = now + idx * 0.032
+        const amp = idx < 2 ? 0.048 : 0.028
+        gain.gain.setValueAtTime(0.0004, onset)
+        gain.gain.linearRampToValueAtTime(amp, onset + 0.09)
+        gain.gain.exponentialRampToValueAtTime(0.0004, onset + 3.4)
 
         osc.connect(filter)
         filter.connect(gain)
         gain.connect(ctx.destination)
         osc.start(onset)
-        osc.stop(onset + 2.55)
+        osc.stop(onset + 3.45)
       })
-    } else if (type === 'goldenGlint') {
-      // Delicate golden harmonic shimmer during the 2.7-3.3s light sweep & underline draw
-      const shimmer = [880.0, 1174.66, 1318.51, 1760.0]
-      shimmer.forEach((freq, idx) => {
+    } else if (type === 'goldenShimmer') {
+      // Single pure harmonic bloom (no 8-bit arpeggio!)
+      ;[587.33, 880.0, 1318.51].forEach((freq, idx) => {
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
         osc.type = 'sine'
-        osc.frequency.setValueAtTime(freq, now + idx * 0.07)
-
-        const t0 = now + idx * 0.07
-        gain.gain.setValueAtTime(0.0005, t0)
-        gain.gain.linearRampToValueAtTime(0.018, t0 + 0.08)
-        gain.gain.exponentialRampToValueAtTime(0.0004, t0 + 0.75)
-
+        osc.frequency.setValueAtTime(freq, now)
+        const t0 = now + idx * 0.04
+        gain.gain.setValueAtTime(0.0004, t0)
+        gain.gain.linearRampToValueAtTime(0.014, t0 + 0.18)
+        gain.gain.exponentialRampToValueAtTime(0.0004, t0 + 1.35)
         osc.connect(gain)
         gain.connect(ctx.destination)
         osc.start(t0)
-        osc.stop(t0 + 0.78)
+        osc.stop(t0 + 1.4)
       })
+    } else if (type === 'softTick') {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(660, now)
+      gain.gain.setValueAtTime(0.0005, now)
+      gain.gain.linearRampToValueAtTime(0.018, now + 0.008)
+      gain.gain.exponentialRampToValueAtTime(0.0004, now + 0.18)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now)
+      osc.stop(now + 0.2)
     }
   } catch {}
 }
 
-// Dual-frequency tactile micro-impulse for physical button & lock-in feedback
 function playDualFreqTactilePulse(style: HapticStyle) {
   const ctx = getOrInitAudioContext()
   if (!ctx || ctx.state !== 'running') return
   try {
     const now = ctx.currentTime
     const isStrong = style === 'medium' || style === 'heavy' || style === 'success'
-    const dur = isStrong ? 0.022 : 0.014
+    const dur = isStrong ? 0.02 : 0.013
 
     const oscLow = ctx.createOscillator()
     const gainLow = ctx.createGain()
     oscLow.type = 'sine'
-    oscLow.frequency.setValueAtTime(isStrong ? 165 : 145, now)
+    oscLow.frequency.setValueAtTime(isStrong ? 155 : 138, now)
     oscLow.frequency.exponentialRampToValueAtTime(46, now + dur)
 
-    gainLow.gain.setValueAtTime(isStrong ? 0.22 : 0.14, now)
+    gainLow.gain.setValueAtTime(isStrong ? 0.18 : 0.11, now)
     gainLow.gain.exponentialRampToValueAtTime(0.001, now + dur)
 
     oscLow.connect(gainLow)
@@ -222,16 +318,16 @@ function playDualFreqTactilePulse(style: HapticStyle) {
     const oscHigh = ctx.createOscillator()
     const gainHigh = ctx.createGain()
     oscHigh.type = 'triangle'
-    oscHigh.frequency.setValueAtTime(isStrong ? 1150 : 980, now)
-    oscHigh.frequency.exponentialRampToValueAtTime(240, now + 0.006)
+    oscHigh.frequency.setValueAtTime(isStrong ? 1050 : 920, now)
+    oscHigh.frequency.exponentialRampToValueAtTime(240, now + 0.005)
 
-    gainHigh.gain.setValueAtTime(isStrong ? 0.09 : 0.055, now)
-    gainHigh.gain.exponentialRampToValueAtTime(0.001, now + 0.006)
+    gainHigh.gain.setValueAtTime(isStrong ? 0.065 : 0.04, now)
+    gainHigh.gain.exponentialRampToValueAtTime(0.001, now + 0.005)
 
     oscHigh.connect(gainHigh)
     gainHigh.connect(ctx.destination)
     oscHigh.start(now)
-    oscHigh.stop(now + 0.007)
+    oscHigh.stop(now + 0.006)
   } catch {}
 }
 
@@ -397,7 +493,6 @@ const EASES = {
   power2Out: (t: number) => 1 - (1 - t) * (1 - t),
   power2In: (t: number) => t * t,
   power2InOut: (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
-  power3Out: (t: number) => 1 - Math.pow(1 - t, 3),
   power3InOut: (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
   expoOut: (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
   expoInOut: (t: number) =>
@@ -419,10 +514,11 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
 }
 
-function lerpInkColor(t: number): string {
-  const r = Math.round(lerp(213, 244, t))
-  const g = Math.round(lerp(197, 231, t))
-  const b = Math.round(lerp(171, 207, t))
+function lerpEditorialInk(t: number): string {
+  // Muted bronze-taupe (#827464) -> Deep Espresso Charcoal (#1D1916)
+  const r = Math.round(lerp(130, 29, t))
+  const g = Math.round(lerp(116, 25, t))
+  const b = Math.round(lerp(100, 22, t))
   return `rgb(${r}, ${g}, ${b})`
 }
 
@@ -460,7 +556,6 @@ interface GlyphNode extends SVGGElement {
   _ox?: number
   _oy?: number
   _dist?: number
-  _dir?: { x: number; y: number }
   _orbitX?: number
   _orbitY?: number
   _orbitRot?: number
@@ -575,32 +670,31 @@ export function WelcomePage({
     soundEnabledRef.current = soundEnabled
   }, [soundEnabled])
 
-  const heroRef = useRef<HTMLElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const stageWrapRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const logoSourceRef = useRef<SVGSVGElement | null>(null)
   const philosophyRef = useRef<HTMLDivElement | null>(null)
   const bottomNavRef = useRef<HTMLElement | null>(null)
-  const breathGlowRef = useRef<HTMLDivElement | null>(null)
 
   const stageRef = useRef<PreparedStage | null>(null)
   const rafRef = useRef<number | null>(null)
+  const shaderStateRef = useRef({ converge: 0, glint: 0, breath: 0 })
   const animStateRef = useRef<{
     mode: 'playing' | 'skipping' | 'done'
     startTime: number
     currentTime: number
     skipStartTime: number
     skipFromTime: number
-    renderAtTime: ((t: number) => void) | null
   }>({
     mode: 'playing',
     startTime: 0,
     currentTime: 0,
     skipStartTime: 0,
     skipFromTime: 0,
-    renderAtTime: null,
   })
 
+  // Sync Telegram chrome to Luminous Atelier Ivory (#F4EFE6)
   useEffect(() => {
     const syncTelegramChrome = () => {
       try {
@@ -608,9 +702,9 @@ export function WelcomePage({
         if (!wa) return
         ;(wa.ready as (() => void) | undefined)?.()
         ;(wa.expand as (() => void) | undefined)?.()
-        ;(wa.setHeaderColor as ((c: string) => void) | undefined)?.('#191714')
-        ;(wa.setBackgroundColor as ((c: string) => void) | undefined)?.('#191714')
-        ;(wa.setBottomBarColor as ((c: string) => void) | undefined)?.('#100f0d')
+        ;(wa.setHeaderColor as ((c: string) => void) | undefined)?.('#F4EFE6')
+        ;(wa.setBackgroundColor as ((c: string) => void) | undefined)?.('#F4EFE6')
+        ;(wa.setBottomBarColor as ((c: string) => void) | undefined)?.('#EAE2D4')
       } catch {}
     }
     syncTelegramChrome()
@@ -644,6 +738,7 @@ export function WelcomePage({
     }
   }, [])
 
+  // Restore or initialize saved language
   useEffect(() => {
     const savedLang = localStorage.getItem('app_lang') as Lang
     const supportedLangs: Lang[] = ['ru', 'uk', 'de']
@@ -664,21 +759,102 @@ export function WelcomePage({
     } catch {}
   }, [lang, setLang])
 
+  // Initialize GPU WebGL Ray-Cast Shader Loop (independent 60fps canvas + unified uniform state)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const gl =
+      canvas.getContext('webgl', { alpha: false, antialias: false, powerPreference: 'high-performance' }) ||
+      (canvas.getContext('experimental-webgl') as WebGLRenderingContext | null)
+    if (!gl) return
+
+    const compile = (type: number, src: string) => {
+      const sh = gl.createShader(type)
+      if (!sh) return null
+      gl.shaderSource(sh, src)
+      gl.compileShader(sh)
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        gl.deleteShader(sh)
+        return null
+      }
+      return sh
+    }
+
+    const vs = compile(gl.VERTEX_SHADER, VERTEX_SHADER_SRC)
+    const fs = compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER_SRC)
+    if (!vs || !fs) return
+
+    const prog = gl.createProgram()
+    if (!prog) return
+    gl.attachShader(prog, vs)
+    gl.attachShader(prog, fs)
+    gl.linkProgram(prog)
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return
+
+    gl.useProgram(prog)
+    const buf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
+    const aPos = gl.getAttribLocation(prog, 'a_pos')
+    gl.enableVertexAttribArray(aPos)
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0)
+
+    const uRes = gl.getUniformLocation(prog, 'u_res')
+    const uTime = gl.getUniformLocation(prog, 'u_time')
+    const uConverge = gl.getUniformLocation(prog, 'u_converge')
+    const uGlint = gl.getUniformLocation(prog, 'u_glint')
+    const uBreath = gl.getUniformLocation(prog, 'u_breath')
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      const w = Math.floor(window.innerWidth * dpr)
+      const h = Math.floor(window.innerHeight * dpr)
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+        gl.viewport(0, 0, w, h)
+      }
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    let glRaf = 0
+    const startMs = performance.now()
+    const renderShader = (now: number) => {
+      const tSec = (now - startMs) / 1000
+      gl.uniform2f(uRes, canvas.width, canvas.height)
+      gl.uniform1f(uTime, tSec)
+      gl.uniform1f(uConverge, shaderStateRef.current.converge)
+      gl.uniform1f(uGlint, shaderStateRef.current.glint)
+      gl.uniform1f(uBreath, shaderStateRef.current.breath)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+      glRaf = requestAnimationFrame(renderShader)
+    }
+    glRaf = requestAnimationFrame(renderShader)
+
+    return () => {
+      cancelAnimationFrame(glRaf)
+      window.removeEventListener('resize', resize)
+      gl.deleteProgram(prog)
+      gl.deleteShader(vs)
+      gl.deleteShader(fs)
+      gl.deleteBuffer(buf)
+    }
+  }, [])
+
   const buildAndPlayTimeline = useCallback(() => {
     const S = stageRef.current
     const svg = svgRef.current
     const stageWrap = stageWrapRef.current
-    const hero = heroRef.current
     const philosophy = philosophyRef.current
     const bottomNav = bottomNavRef.current
-    if (!S || !svg || !stageWrap || !hero || !philosophy || !bottomNav) return
+    if (!S || !svg || !stageWrap || !philosophy || !bottomNav) return
 
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
     const {
       allGlyphs,
       wordGlyphs,
-      otherGlyphs,
       homes,
       flights,
       logoLetters,
@@ -690,12 +866,6 @@ export function WelcomePage({
       stageToLocal,
     } = S
 
-    // ========================================================================
-    // Controlled "Chaos -> Order" Geometry (Golden-Angle Spiral Convergence)
-    // Instead of random jerking, every element starts in a harmonious orbital
-    // constellation around the center, smoothly rotating and converging inward
-    // so that out of many elements, a single craft is born.
-    // ========================================================================
     const vb = svg.viewBox.baseVal
     const centerStageX = vb.width / 2
     const centerStageY = vb.height / 2
@@ -707,22 +877,18 @@ export function WelcomePage({
       const radius = Math.hypot(dx, dy)
       const baseAngle = Math.atan2(dy, dx)
 
-      // Golden angle offset creates a balanced, organic vortex constellation
-      const swirlAngle = baseAngle + (i % 2 === 0 ? 0.42 : -0.42)
-      const expandedRadius = radius * 1.24 + 18
+      const swirlAngle = baseAngle + (i % 2 === 0 ? 0.55 : -0.55)
+      const expandedRadius = radius * 1.28 + 22
       const startStageX = centerStageX + Math.cos(swirlAngle) * expandedRadius
       const startStageY = centerStageY + Math.sin(swirlAngle) * expandedRadius
 
       const localHome = stageToLocal(g, h.cx, h.cy)
       const localStart = stageToLocal(g, startStageX, startStageY)
-      const localCenter = stageToLocal(g, centerStageX, centerStageY + (dy * 0.22))
+      const localCenter = stageToLocal(g, centerStageX, centerStageY + dy * 0.2)
 
       g._orbitX = localStart.x - localHome.x
       g._orbitY = localStart.y - localHome.y
-      // Smooth initial rotation tangent to the spiral (no jagged random angles)
-      g._orbitRot = ((swirlAngle * 180) / Math.PI) * 0.18 + (i % 2 === 0 ? 14 : -14)
-
-      // Convergence target for background letters (flowing gently toward the central logo axis)
+      g._orbitRot = ((swirlAngle * 180) / Math.PI) * 0.22 + (i % 2 === 0 ? 18 : -18)
       g._convergeX = (localCenter.x - localHome.x) * 0.52
       g._convergeY = (localCenter.y - localHome.y) * 0.62
 
@@ -732,58 +898,62 @@ export function WelcomePage({
     glintGroup.style.display = 'none'
 
     const soundAndHapticFlags = {
-      rustle: false,
-      converge: false,
-      chimes: new Array(wordGlyphs.length).fill(false),
+      whisper: false,
+      swell: false,
       logoLock: false,
-      goldenGlint: false,
+      goldenShimmer: false,
       done: false,
     }
 
     // ========================================================================
-    // EXACT 3.8-SECOND SCENARIO TIMING:
-    //   Stage 1 (0.0 - 0.8s, 0.8s): Появление букв (Letters emerge & rotate gently)
-    //   Stage 2 (0.8 - 2.0s, 1.2s): Схождение букв к центру (Spiral convergence into CORDWAINE)
-    //   Stage 3 (2.0 - 2.7s, 0.7s): Формирование логотипа + "THE ART OF SHOEMAKING" (1s)
-    //   Stage 4 (2.7 - 3.3s, 0.6s): Золотая прорисовка (Light glint + separate underline draw)
-    //   Stage 5 (3.3 - 3.8s, 0.5s): Появление главной страницы + Фирменное дыхание
+    // UNHURRIED HIGH-FASHION EDITORIAL TIMING (6.2s total):
+    //   Stage 1 (0.0 - 1.2s): Появление и плавное вращение букв по спирали
+    //   Stage 2 (1.2 - 3.0s): Управляемое схождение к центру (Chaos -> Order)
+    //   Stage 3 (3.0 - 4.0s): Фиксация логотипа 'Cordwaine' + 'THE ART OF SHOEMAKING'
+    //   Stage 4 (4.0 - 5.2s): Трассированный золотой блик + раздельное подчёркивание
+    //   Stage 5 (5.2 - 6.2s): Появление главной навигации + фирменное дыхание
     // ========================================================================
-    const TOTAL_DURATION = 3.8
+    const TOTAL_DURATION = 6.2
 
     const renderAtTime = (t: number, withEffects = false) => {
       const snd = soundEnabledRef.current
 
       if (withEffects) {
-        if (!soundAndHapticFlags.rustle && t >= 0.04) {
-          soundAndHapticFlags.rustle = true
-          playAtelierSound('rustle', 0, snd)
+        if (!soundAndHapticFlags.whisper && t >= 0.08) {
+          soundAndHapticFlags.whisper = true
+          playLuxurySound('linenWhisper', snd)
         }
-        if (!soundAndHapticFlags.converge && t >= 0.82) {
-          soundAndHapticFlags.converge = true
+        if (!soundAndHapticFlags.swell && t >= 1.25) {
+          soundAndHapticFlags.swell = true
           triggerHaptic('selection')
-          playAtelierSound('convergeSweep', 0, snd)
+          playLuxurySound('suedeSwell', snd)
         }
-        if (!soundAndHapticFlags.logoLock && t >= 2.02) {
+        if (!soundAndHapticFlags.logoLock && t >= 3.05) {
           soundAndHapticFlags.logoLock = true
           triggerHaptic('medium', true)
-          playAtelierSound('feltChord', 0, snd)
+          playLuxurySound('feltChord', snd)
         }
-        if (!soundAndHapticFlags.goldenGlint && t >= 2.7) {
-          soundAndHapticFlags.goldenGlint = true
+        if (!soundAndHapticFlags.goldenShimmer && t >= 4.02) {
+          soundAndHapticFlags.goldenShimmer = true
           triggerHaptic('light')
-          playAtelierSound('goldenGlint', 0, snd)
+          playLuxurySound('goldenShimmer', snd)
         }
-        if (!soundAndHapticFlags.done && t >= 3.35) {
+        if (!soundAndHapticFlags.done && t >= 5.25) {
           soundAndHapticFlags.done = true
           triggerHaptic('success', true)
         }
       }
 
+      // Update WebGL raytraced shader uniforms in exact lockstep
+      shaderStateRef.current.converge = EASES.sineInOut(clamp01((t - 1.0) / 2.2))
+      shaderStateRef.current.glint = t >= 4.0 && t <= 5.2 ? EASES.power2InOut(clamp01((t - 4.0) / 1.2)) : 0
+      shaderStateRef.current.breath = EASES.power2Out(clamp01((t - 3.2) / 1.6))
+
       allGlyphs.forEach((g, i) => {
         const isWord = i < wordGlyphs.length
         const k = isWord ? i : i - wordGlyphs.length
 
-        if (!isWord && g._hidden && t >= 2.3) return
+        if (!isWord && g._hidden && t >= 3.3) return
 
         const ox0 = g._orbitX ?? 0
         const oy0 = g._orbitY ?? 0
@@ -796,34 +966,33 @@ export function WelcomePage({
         let rot = rot0
         let op = 0
 
-        // Stage 1 (0.0 - 0.8s): Smooth emergence & gentle rotation toward grid order
-        const emergeStagger = dist * 0.22
-        const tEmerge = clamp01((t - emergeStagger) / (0.8 - emergeStagger))
+        // Stage 1 (0.0 - 1.2s): Unhurried emergence & graceful spiral rotation
+        const emergeStagger = dist * 0.35
+        const tEmerge = clamp01((t - emergeStagger) / (1.2 - emergeStagger * 0.6))
         if (tEmerge > 0) {
           const e = EASES.power2Out(tEmerge)
           const eMove = EASES.sineInOut(tEmerge)
-          op = isWord ? lerp(0, 1, e) : lerp(0, 0.68, e)
+          op = isWord ? lerp(0, 1, e) : lerp(0, 0.55, e)
           sc = lerp(0.72, 1, e)
-          // Gently drift 65% of the way from orbital ring toward grid alignment while rotating smoothly
-          x = lerp(ox0, ox0 * 0.35, eMove)
-          y = lerp(oy0, oy0 * 0.35, eMove)
-          rot = lerp(rot0, rot0 * 0.35, eMove)
+          x = lerp(ox0, ox0 * 0.32, eMove)
+          y = lerp(oy0, oy0 * 0.32, eMove)
+          rot = lerp(rot0, rot0 * 0.32, eMove)
         }
 
-        // Stage 2 (0.8 - 2.0s): Controlled convergence to the center & alignment into CORDWAINE
+        // Stage 2 (1.2 - 3.0s): Smooth convergence into 'Cordwaine'
         if (!isWord) {
-          const convStagger = (1 - dist) * 0.25
-          const tConv = clamp01((t - (0.8 + convStagger)) / 1.05)
+          const convStagger = (1 - dist) * 0.38
+          const tConv = clamp01((t - (1.2 + convStagger)) / 1.45)
           if (tConv > 0) {
             const ePos = EASES.power3InOut(tConv)
             const eFade = EASES.power2In(tConv)
             const cx = g._convergeX ?? 0
             const cy = g._convergeY ?? 0
-            x = lerp(ox0 * 0.35, cx, ePos)
-            y = lerp(oy0 * 0.35, cy, ePos)
-            rot = lerp(rot0 * 0.35, 0, ePos)
-            sc = lerp(1, 0.52, eFade)
-            op = lerp(0.68, 0, eFade)
+            x = lerp(ox0 * 0.32, cx, ePos)
+            y = lerp(oy0 * 0.32, cy, ePos)
+            rot = lerp(rot0 * 0.32, 0, ePos)
+            sc = lerp(1, 0.5, eFade)
+            op = lerp(0.55, 0, eFade)
 
             if (tConv >= 1 && !g._hidden) {
               g._hidden = true
@@ -835,37 +1004,28 @@ export function WelcomePage({
             }
           }
         } else {
-          // Word letters (THE + CORDWAINE) glow gold and converge smoothly into the central logo
-          const chimeTime = 0.88 + k * 0.075
-          if (withEffects && !soundAndHapticFlags.chimes[k] && t >= chimeTime) {
-            soundAndHapticFlags.chimes[k] = true
-            playAtelierSound('chimeNote', k, snd)
-            if (k % 3 === 0) triggerHaptic('selection')
-          }
-
-          const tGold = clamp01((t - (0.65 + k * 0.04)) / 0.45)
+          const tDarken = clamp01((t - (0.95 + k * 0.05)) / 0.7)
           const pathEl = g.firstElementChild as SVGPathElement | null
           if (pathEl) {
-            pathEl.setAttribute('fill', lerpInkColor(EASES.power2Out(tGold)))
+            pathEl.setAttribute('fill', lerpEditorialInk(EASES.power2Out(tDarken)))
           }
 
           const f = flights[k]
-          const fStagger = k * 0.022
-          const tConv = clamp01((t - (0.8 + fStagger)) / (1.2 - fStagger * 0.5))
+          const fStagger = k * 0.032
+          const tConv = clamp01((t - (1.2 + fStagger)) / (1.8 - fStagger * 0.5))
           if (tConv > 0 && f) {
-            // X and Y use distinct easing curves for a graceful inward spiral arc
             const ex = EASES.expoInOut(tConv)
             const ey = EASES.power3InOut(tConv)
-            x = lerp(ox0 * 0.35, f.x, ex)
-            y = lerp(oy0 * 0.35, f.y, ey)
+            x = lerp(ox0 * 0.32, f.x, ex)
+            y = lerp(oy0 * 0.32, f.y, ey)
             const targetScale = k < 3 ? f.scale * 0.72 : f.scale
             sc = lerp(1, targetScale, ex)
-            rot = lerp(rot0 * 0.35, 0, ey)
+            rot = lerp(rot0 * 0.32, 0, ey)
           }
 
-          // Stage 3 (2.0 - 2.7s): Lock into crisp final logo vector paths
-          const mStart = (k < 3 ? 1.88 : 1.98) + k * 0.015
-          const mDur = 0.35
+          // Stage 3 (3.0 - 4.0s): Morph into final logo paths
+          const mStart = (k < 3 ? 2.82 : 2.96) + k * 0.02
+          const mDur = 0.45
           const tMorph = clamp01((t - mStart) / mDur)
           if (tMorph > 0) {
             op = lerp(1, 0, EASES.power1InOut(tMorph))
@@ -878,15 +1038,15 @@ export function WelcomePage({
         g.style.opacity = String(op.toFixed(3))
       })
 
-      // Stage 3 (2.0 - 2.7s): Final logo letters lock in at the center
+      // Stage 3 (3.0 - 4.0s): Final 'Cordwaine' logo locks in at center
       logoLetters.forEach((el, k) => {
-        const mStart = (k < 3 ? 1.88 : 1.98) + k * 0.015
-        const tMorph = clamp01((t - mStart) / 0.38)
+        const mStart = (k < 3 ? 2.82 : 2.96) + k * 0.02
+        const tMorph = clamp01((t - mStart) / 0.48)
         el.style.opacity = String(EASES.power1InOut(tMorph).toFixed(3))
       })
 
-      // Upper rules flanking '_the_' draw outward (2.15 - 2.70s)
-      const tRules = clamp01((t - 2.15) / 0.55)
+      // Hairline rules flanking '_the_' draw outward (3.15 - 3.95s)
+      const tRules = clamp01((t - 3.15) / 0.8)
       const eRules = EASES.expoOut(tRules)
       rules.forEach((r) => {
         const px = r._pivotX ?? 0
@@ -898,25 +1058,24 @@ export function WelcomePage({
         )
       })
 
-      // Brand philosophy "THE ART OF SHOEMAKING" appears under logo for ~1 second (2.05 - 3.35s), then dissolves
+      // Brand philosophy "THE ART OF SHOEMAKING" appears for ~1.1s (3.1 - 4.8s), then dissolves gracefully
       let philOpacity = 0
-      let philY = 6
-      if (t >= 2.0 && t <= 3.45) {
-        const tIn = clamp01((t - 2.0) / 0.32)
-        const tOut = clamp01((t - 3.05) / 0.38)
+      let philY = 8
+      if (t >= 3.05 && t <= 4.9) {
+        const tIn = clamp01((t - 3.05) / 0.42)
+        const tOut = clamp01((t - 4.35) / 0.5)
         philOpacity = EASES.power2Out(tIn) * (1 - EASES.power2In(tOut))
-        philY = lerp(6, 0, EASES.power2Out(tIn)) - lerp(0, 4, EASES.power2In(tOut))
+        philY = lerp(8, 0, EASES.power2Out(tIn)) - lerp(0, 4, EASES.power2In(tOut))
       }
       philosophy.style.opacity = String(philOpacity.toFixed(3))
       philosophy.style.transform = `translate3d(0, ${philY.toFixed(1)}px, 0)`
 
-      // Stage 4 (2.7 - 3.3s, 0.6s): Golden Light Sweep + Separate Underline Draw
-      const tUnderline = clamp01((t - 2.72) / 0.56)
+      // Stage 4 (4.0 - 5.2s): Separate Calligraphic Underline Draw + Golden Light Sweep
+      const tUnderline = clamp01((t - 4.05) / 0.95)
       const eUnderline = EASES.expoInOut(tUnderline)
-      // Reveal calligraphic underline swash left-to-right (x = 588 .. 676, width = 88)
-      tailClipRect.setAttribute('width', String((88 * eUnderline).toFixed(1)))
+      tailClipRect.setAttribute('width', String((92 * eUnderline).toFixed(1)))
 
-      const tGlint = clamp01((t - 2.7) / 0.6)
+      const tGlint = clamp01((t - 4.0) / 1.2)
       if (tGlint > 0 && tGlint < 1) {
         if (glintGroup.style.display !== '') glintGroup.style.display = ''
         glint.setAttribute(
@@ -927,24 +1086,21 @@ export function WelcomePage({
         glintGroup.style.display = 'none'
       }
 
-      // Gentle scale settle of the center stage (2.0 - 3.3s)
-      const tSettle = clamp01((t - 2.0) / 1.3)
+      // Gentle scale settle of the center stage
+      const tSettle = clamp01((t - 3.0) / 2.2)
       const eSettle = EASES.expoInOut(tSettle)
-      stageWrap.style.transform = `translate3d(0, -18px, 0) scale(${lerp(1, 1.16, eSettle).toFixed(4)})`
+      stageWrap.style.transform = `translate3d(0, -20px, 0) scale(${lerp(1, 1.14, eSettle).toFixed(4)})`
 
-      const tGlow = clamp01((t - 2.05) / 1.2)
-      hero.style.setProperty('--glow', String(EASES.power2Out(tGlow).toFixed(3)))
-
-      // Stage 5 (3.3 - 3.8s, 0.5s): Main page navigation appears smoothly
-      const tNav = clamp01((t - 3.3) / 0.5)
+      // Stage 5 (5.2 - 6.2s): Editorial Navigation Reveal
+      const tNav = clamp01((t - 5.15) / 0.95)
       const eNav = EASES.power2Out(tNav)
       bottomNav.style.opacity = String(eNav.toFixed(3))
-      bottomNav.style.transform = `translate3d(0, ${lerp(12, 0, eNav).toFixed(1)}px, 0)`
-      bottomNav.style.pointerEvents = t >= 3.1 ? 'auto' : 'none'
+      bottomNav.style.transform = `translate3d(0, ${lerp(14, 0, eNav).toFixed(1)}px, 0)`
+      bottomNav.style.pointerEvents = t >= 4.9 ? 'auto' : 'none'
     }
 
     setIntroFinished(false)
-    renderAtTime(0.04, false)
+    renderAtTime(0.05, false)
     setStageReady(true)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -954,14 +1110,13 @@ export function WelcomePage({
       return
     }
 
-    const now = performance.now() - 40
+    const now = performance.now() - 50
     animStateRef.current = {
       mode: 'playing',
       startTime: now,
-      currentTime: 0.04,
+      currentTime: 0.05,
       skipStartTime: 0,
       skipFromTime: 0,
-      renderAtTime: (timeVal: number) => renderAtTime(timeVal, false),
     }
 
     const tick = (ts: number) => {
@@ -976,12 +1131,12 @@ export function WelcomePage({
           return
         }
         renderAtTime(elapsed, true)
-        if (elapsed >= 3.35) {
+        if (elapsed >= 5.25) {
           setIntroFinished(true)
         }
         rafRef.current = requestAnimationFrame(tick)
       } else if (st.mode === 'skipping') {
-        const p = clamp01((ts - st.skipStartTime) / 380)
+        const p = clamp01((ts - st.skipStartTime) / 450)
         const eased = EASES.power2InOut(p)
         const tCur = lerp(st.skipFromTime, TOTAL_DURATION, eased)
         st.currentTime = tCur
@@ -1045,7 +1200,7 @@ export function WelcomePage({
       const parent = path.parentNode
       if (!parent) return []
       const attrs: Record<string, string> = {
-        fill: path.getAttribute('fill') || '#d5c5ab',
+        fill: path.getAttribute('fill') || '#1D1916',
       }
       const tr = path.getAttribute('transform')
       if (tr) attrs.transform = tr
@@ -1155,17 +1310,16 @@ export function WelcomePage({
     const lb = logoG.getBBox()
     const defs = mk('defs')
 
-    // Clip-path for separate progressive drawing of the underline swash (2.7 - 3.3s)
     const tailClip = mk('clipPath', { id: 'qt-tail-clip' })
     const tailClipRect = mk('rect', {
-      x: 588,
+      x: 586,
       y: 135,
       width: 0,
       height: 30,
     }) as SVGRectElement
     tailClip.appendChild(tailClipRect)
 
-    // Warm golden gradient for the 2.7 - 3.3s light sweep across the letters
+    // Burnished 24k Champagne Gold sweep gradient on light ivory
     const grad = mk('linearGradient', {
       id: 'qt-glint-grad',
       x1: 0,
@@ -1175,11 +1329,11 @@ export function WelcomePage({
     })
     ;(
       [
-        [0, '#e6c687', 0],
-        [0.35, '#fbe8c2', 0.65],
-        [0.5, '#fffdf7', 1],
-        [0.65, '#fbe8c2', 0.65],
-        [1, '#e6c687', 0],
+        [0, '#b58d4c', 0],
+        [0.35, '#e8ca8c', 0.78],
+        [0.5, '#fffaf0', 1],
+        [0.65, '#e8ca8c', 0.78],
+        [1, '#b58d4c', 0],
       ] as Array<[number, string, number]>
     ).forEach(([o, col, a]) =>
       grad.appendChild(
@@ -1206,7 +1360,7 @@ export function WelcomePage({
     const glint = mk('rect', {
       x: lb.x - 55,
       y: lb.y - 20,
-      width: 52,
+      width: 56,
       height: lb.height + 40,
       fill: 'url(#qt-glint-grad)',
     }) as SVGRectElement
@@ -1247,10 +1401,6 @@ export function WelcomePage({
     allGlyphs.forEach((g, idx) => {
       const h = homes[idx]
       g._dist = Math.hypot(h.cx - wordsCenter.x, h.cy - wordsCenter.y) / maxDist
-      g._dir = {
-        x: (h.cx - wordsCenter.x) / maxDist,
-        y: (h.cy - wordsCenter.y) / maxDist,
-      }
     })
 
     stageRef.current = {
@@ -1300,7 +1450,7 @@ export function WelcomePage({
         localStorage.setItem('cordwainer_sound', next ? '1' : '0')
       } catch {}
       if (next) {
-        playAtelierSound('chimeNote', 6, true)
+        playLuxurySound('softTick', true)
       }
       return next
     })
@@ -1353,36 +1503,25 @@ export function WelcomePage({
 
   return (
     <main
-      ref={heroRef}
       onClick={() => {
-        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 0.6) {
+        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 0.8) {
           handleSkip()
         }
       }}
       style={
         {
-          '--glow': 0,
-          background:
-            'radial-gradient(120% 90% at 50% 45%, transparent 35%, #100f0d 100%), #191714',
-          color: '#d5c5ab',
+          background: '#F4EFE6',
+          color: '#1D1916',
           fontFamily: '"Cormorant Garamond", "Cormorant", "Playfair Display", Georgia, serif',
         } as React.CSSProperties
       }
       className="relative grid h-[100dvh] w-full place-items-center overflow-hidden select-none isolate antialiased"
     >
-      {/* Signature Breathing Glow behind the assembled logo (subtle, almost imperceptible pulse after intro) */}
-      <div
-        ref={breathGlowRef}
+      {/* 0. GPU WebGL Ray-Cast Silk & Caustic Light Canvas */}
+      <canvas
+        ref={canvasRef}
         aria-hidden="true"
-        style={{
-          width: '74vmin',
-          height: '44vmin',
-          background: 'radial-gradient(closest-side, rgba(244, 231, 207, 0.12), transparent)',
-          opacity: 'var(--glow, 0)',
-          willChange: 'opacity, transform',
-          animation: introFinished ? 'cordwaineBreath 5.6s ease-in-out infinite' : 'none',
-        }}
-        className="pointer-events-none absolute top-1/2 left-1/2 z-0 -translate-x-1/2 -translate-y-1/2"
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
       />
 
       {/* 1. TOP BAR: Replay/Skip + Sound Toggle + Apple-style liquid pill switcher (ru / ukr / de) */}
@@ -1396,8 +1535,8 @@ export function WelcomePage({
               type="button"
               onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleSkip}
-              style={{ color: 'rgba(213, 197, 171, 0.55)' }}
-              className="min-h-[38px] border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
+              style={{ color: 'rgba(29, 25, 22, 0.52)' }}
+              className="min-h-[38px] border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#1D1916] active:scale-95 cursor-pointer"
             >
               {t.skip}
             </button>
@@ -1406,8 +1545,8 @@ export function WelcomePage({
               type="button"
               onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleReplay}
-              style={{ color: 'rgba(213, 197, 171, 0.55)' }}
-              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
+              style={{ color: 'rgba(29, 25, 22, 0.52)' }}
+              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#1D1916] active:scale-95 cursor-pointer"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
                 <path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
@@ -1416,39 +1555,38 @@ export function WelcomePage({
             </button>
           )}
 
-          {/* Subtle Atelier Sound Toggle (♪) */}
           <button
             type="button"
             onClick={toggleSound}
             aria-label={soundEnabled ? 'Mute sound' : 'Enable sound'}
             style={{
-              color: soundEnabled ? '#f4e7cf' : 'rgba(213, 197, 171, 0.35)',
-              borderColor: 'rgba(213, 197, 171, 0.14)',
-              background: soundEnabled ? 'rgba(244, 231, 207, 0.08)' : 'transparent',
+              color: soundEnabled ? '#1D1916' : 'rgba(29, 25, 22, 0.35)',
+              borderColor: 'rgba(29, 25, 22, 0.14)',
+              background: soundEnabled ? 'rgba(255, 255, 255, 0.55)' : 'transparent',
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] transition-all duration-300 active:scale-90 cursor-pointer outline-none"
+            className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] backdrop-blur-md transition-all duration-300 active:scale-90 cursor-pointer outline-none"
           >
             {soundEnabled ? '♪' : '✕'}
           </button>
         </div>
 
-        {/* Apple-style liquid glass segmented switcher: ru | ukr | de */}
+        {/* Apple-style liquid glass segmented switcher on Luminous Ivory: ru | ukr | de */}
         <div
           role="tablist"
           aria-label="Language switcher"
           style={{
-            background: 'rgba(213, 197, 171, 0.06)',
-            borderColor: 'rgba(213, 197, 171, 0.15)',
+            background: 'rgba(29, 25, 22, 0.055)',
+            borderColor: 'rgba(29, 25, 22, 0.12)',
           }}
-          className="relative grid grid-cols-3 items-center rounded-full border p-[3px] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]"
+          className="relative grid grid-cols-3 items-center rounded-full border p-[3px] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(29,25,22,0.04)]"
         >
           <span
             aria-hidden="true"
             style={{
               transform: `translate3d(${activeLangIdx * 100}%, 0, 0)`,
-              background: 'rgba(244, 231, 207, 0.16)',
+              background: 'rgba(255, 255, 255, 0.88)',
               boxShadow:
-                '0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0.5px rgba(255, 255, 255, 0.18)',
+                '0 2px 8px rgba(29, 25, 22, 0.10), inset 0 1px 0.5px rgba(255, 255, 255, 0.95)',
               transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
             className="pointer-events-none absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full"
@@ -1471,7 +1609,7 @@ export function WelcomePage({
                   setLang(item.code)
                 }}
                 style={{
-                  color: active ? '#f4e7cf' : 'rgba(213, 197, 171, 0.48)',
+                  color: active ? '#1D1916' : 'rgba(29, 25, 22, 0.48)',
                   fontFamily:
                     '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif',
                   transition: 'color 280ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -1491,7 +1629,7 @@ export function WelcomePage({
         style={{
           width: 'min(78vw, 54vh)',
           visibility: stageReady ? 'visible' : 'hidden',
-          transform: 'translate3d(0, -18px, 0)',
+          transform: 'translate3d(0, -20px, 0)',
           willChange: 'transform',
         }}
         className="relative z-10 flex flex-col items-center"
@@ -1507,22 +1645,22 @@ export function WelcomePage({
         >
           <g id="grid" transform="translate(-551.238 -243.824)">
             <g id="the">
-              <path id="the-t" d={GLYPHS.T} transform="translate(626 347)" fill="#d5c5ab" />
-              <path id="the-h" d={GLYPHS.H} transform="translate(657 347)" fill="#d5c5ab" />
-              <path id="the-e" d={GLYPHS.E} transform="translate(688 347)" fill="#d5c5ab" />
+              <path id="the-t" d={GLYPHS.T} transform="translate(626 347)" fill="#827464" />
+              <path id="the-h" d={GLYPHS.H} transform="translate(657 347)" fill="#827464" />
+              <path id="the-e" d={GLYPHS.E} transform="translate(688 347)" fill="#827464" />
             </g>
             <g id="cord">
-              <path id="cord-c" d={GLYPHS.C} transform="translate(688 470)" fill="#d5c5ab" />
-              <path id="cord-o" d={GLYPHS.O} transform="translate(719 470)" fill="#d5c5ab" />
-              <path id="cord-r" d={GLYPHS.R} transform="translate(750 470)" fill="#d5c5ab" />
-              <path id="cord-d" d={GLYPHS.D} transform="translate(781 470)" fill="#d5c5ab" />
+              <path id="cord-c" d={GLYPHS.C} transform="translate(688 470)" fill="#827464" />
+              <path id="cord-o" d={GLYPHS.O} transform="translate(719 470)" fill="#827464" />
+              <path id="cord-r" d={GLYPHS.R} transform="translate(750 470)" fill="#827464" />
+              <path id="cord-d" d={GLYPHS.D} transform="translate(781 470)" fill="#827464" />
             </g>
             <g id="waine">
-              <path id="waine-w" d={GLYPHS.W} transform="translate(781 593)" fill="#d5c5ab" />
-              <path id="waine-a" d={GLYPHS.A} transform="translate(812 593)" fill="#d5c5ab" />
-              <path id="waine-i" d={GLYPHS.I} transform="translate(843 593)" fill="#d5c5ab" />
-              <path id="waine-n" d={GLYPHS.N} transform="translate(874 593)" fill="#d5c5ab" />
-              <path id="waine-e" d={GLYPHS.E} transform="translate(905 593)" fill="#d5c5ab" />
+              <path id="waine-w" d={GLYPHS.W} transform="translate(781 593)" fill="#827464" />
+              <path id="waine-a" d={GLYPHS.A} transform="translate(812 593)" fill="#827464" />
+              <path id="waine-i" d={GLYPHS.I} transform="translate(843 593)" fill="#827464" />
+              <path id="waine-n" d={GLYPHS.N} transform="translate(874 593)" fill="#827464" />
+              <path id="waine-e" d={GLYPHS.E} transform="translate(905 593)" fill="#827464" />
             </g>
             <g id="everything-else">
               {BG_GRID.map(([glyphKey, coords]) =>
@@ -1531,7 +1669,7 @@ export function WelcomePage({
                     key={`${glyphKey}-${x}-${y}-${idx}`}
                     d={GLYPHS[glyphKey]}
                     transform={`translate(${x} ${y})`}
-                    fill="#d5c5ab"
+                    fill="#827464"
                   />
                 ))
               )}
@@ -1539,17 +1677,17 @@ export function WelcomePage({
           </g>
         </svg>
 
-        {/* Ephemeral Brand Philosophy: "THE ART OF SHOEMAKING" (appears for ~1s below logo, then dissolves) */}
+        {/* Ephemeral Brand Philosophy: "THE ART OF SHOEMAKING" */}
         <div
           ref={philosophyRef}
           aria-hidden="true"
           style={{
             opacity: 0,
-            transform: 'translate3d(0, 6px, 0)',
-            color: 'rgba(213, 197, 171, 0.72)',
+            transform: 'translate3d(0, 8px, 0)',
+            color: 'rgba(130, 102, 62, 0.85)',
             willChange: 'opacity, transform',
           }}
-          className="pointer-events-none absolute top-[61%] right-0 left-0 text-center text-[10.5px] font-normal uppercase tracking-[0.36em]"
+          className="pointer-events-none absolute top-[61%] right-0 left-0 text-center text-[10.5px] font-medium uppercase tracking-[0.36em]"
         >
           THE ART OF SHOEMAKING
         </div>
@@ -1566,11 +1704,11 @@ export function WelcomePage({
           viewBox="0 0 328.46 67.425"
         >
           <g transform="translate(-586.87 -85.41)">
-            <path d={LOGO_MAIN_D} transform="translate(750 143)" fill="#d5c5ab" />
-            <path d={LOGO_TAIL_D} fill="#d5c5ab" />
-            <path d={LOGO_THE_D} transform="translate(650 104)" fill="#d5c5ab" />
-            <path d="M77,.5H0v-1H77Z" transform="translate(667 104)" fill="#d5c5ab" />
-            <path d="M11,.5H0v-1H11Z" transform="translate(623 104)" fill="#d5c5ab" />
+            <path d={LOGO_MAIN_D} transform="translate(750 143)" fill="#1D1916" />
+            <path d={LOGO_TAIL_D} fill="#9E7B42" />
+            <path d={LOGO_THE_D} transform="translate(650 104)" fill="#7A5C38" />
+            <path d="M77,.5H0v-1H77Z" transform="translate(667 104)" fill="#9E7B42" />
+            <path d="M11,.5H0v-1H11Z" transform="translate(623 104)" fill="#9E7B42" />
           </g>
         </svg>
       </div>
@@ -1581,7 +1719,7 @@ export function WelcomePage({
         onClick={(e) => e.stopPropagation()}
         style={{
           opacity: 0,
-          transform: 'translate3d(0, 12px, 0)',
+          transform: 'translate3d(0, 14px, 0)',
           pointerEvents: 'none',
           willChange: 'opacity, transform',
         }}
@@ -1597,7 +1735,7 @@ export function WelcomePage({
               {idx > 0 && (
                 <span
                   aria-hidden="true"
-                  style={{ color: 'rgba(213, 197, 171, 0.45)' }}
+                  style={{ color: 'rgba(130, 102, 62, 0.45)' }}
                   className="select-none text-[13px]"
                 >
                   ·
@@ -1611,11 +1749,11 @@ export function WelcomePage({
                   item.onClick?.()
                 }}
                 style={{
-                  color: '#d5c5ab',
+                  color: '#2A231E',
                   transition:
                     'color 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
-                className="min-h-[40px] border-0 bg-transparent px-2 py-1.5 text-[18px] font-normal tracking-[0.05em] outline-none hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
+                className="min-h-[40px] border-0 bg-transparent px-2 py-1.5 text-[18px] font-normal tracking-[0.05em] outline-none hover:text-[#7A5C38] active:scale-95 cursor-pointer"
               >
                 {item.label}
               </button>
@@ -1632,22 +1770,22 @@ export function WelcomePage({
             onStart?.()
           }}
           style={{
-            color: '#f4e7cf',
+            color: '#1D1916',
             transition: 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1), color 280ms ease',
           }}
           className="group flex flex-col items-center gap-2.5 border-0 bg-transparent px-6 py-1 outline-none active:scale-95 cursor-pointer"
         >
-          <span className="text-[13px] font-normal uppercase tracking-[0.35em]">
+          <span className="text-[13px] font-medium uppercase tracking-[0.35em]">
             {t.enter}
           </span>
           <i
             aria-hidden="true"
-            style={{ background: 'rgba(213, 197, 171, 0.16)' }}
+            style={{ background: 'rgba(122, 92, 56, 0.22)' }}
             className="relative block h-[36px] w-[1px] overflow-hidden"
           >
             <span
               style={{
-                background: '#d5c5ab',
+                background: '#7A5C38',
                 animation: 'qtCue 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite',
               }}
               className="absolute top-0 left-0 block h-[40%] w-full"
@@ -1660,10 +1798,6 @@ export function WelcomePage({
         @keyframes qtCue {
           0% { transform: translateY(-100%); }
           100% { transform: translateY(260%); }
-        }
-        @keyframes cordwaineBreath {
-          0%, 100% { opacity: 0.78; transform: translate(-50%, -50%) scale(0.97); }
-          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
         }
       `}</style>
     </main>
