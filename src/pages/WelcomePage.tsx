@@ -1,3 +1,4 @@
+```react
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { Lang, FavoriteItem } from '../App'
 
@@ -13,12 +14,85 @@ type WelcomePageProps = {
 }
 
 // ============================================================================
-// Multi-Platform Haptic Engine (iPhone Taptic Engine + Samsung One UI 7 + Xiaomi HyperOS)
+// Multi-Channel Haptic & Acoustic-Tactile Engine
+// Works reliably across iPhone (iOS Taptic Engine) AND Android (Samsung One UI 7, Xiaomi HyperOS):
+//   Channel 1: Telegram.WebApp.HapticFeedback.impactOccurred('medium' | 'heavy')
+//              (Avoids selectionChanged() on Android because Samsung suppresses CLOCK_TICK)
+//   Channel 2: Direct native bridge TelegramWebviewProxy.postEvent('web_app_trigger_haptic_feedback', ...)
+//   Channel 3: Dual-frequency AudioContext tactile micro-impulse (155->48 Hz body + 1050->260 Hz click)
+//   Channel 4: navigator.vibrate + iOS 18 switch fallback
 // ============================================================================
 type HapticStyle = 'selection' | 'light' | 'medium' | 'heavy' | 'success'
 
+declare global {
+  interface Window {
+    TelegramWebviewProxy?: {
+      postEvent?: (eventType: string, eventData: string) => void
+    }
+    webkitAudioContext?: typeof AudioContext
+  }
+}
+
 let lastHapticTime = 0
+let sharedAudioCtx: AudioContext | null = null
 let iosSwitchLabel: HTMLLabelElement | null = null
+
+function getOrInitAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  try {
+    if (!sharedAudioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      if (Ctx) sharedAudioCtx = new Ctx()
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {})
+    }
+    return sharedAudioCtx
+  } catch {
+    return null
+  }
+}
+
+// Dual-frequency tactile impulse (low-end LRA thump + crisp high transient)
+function playDualFreqTactilePulse(style: HapticStyle) {
+  const ctx = getOrInitAudioContext()
+  if (!ctx || ctx.state !== 'running') return
+  try {
+    const now = ctx.currentTime
+    const isStrong = style === 'medium' || style === 'heavy' || style === 'success'
+    const dur = isStrong ? 0.022 : 0.014
+
+    // Oscillator 1: Sub-bass physical body thump (155 Hz -> 48 Hz)
+    const oscLow = ctx.createOscillator()
+    const gainLow = ctx.createGain()
+    oscLow.type = 'sine'
+    oscLow.frequency.setValueAtTime(isStrong ? 165 : 145, now)
+    oscLow.frequency.exponentialRampToValueAtTime(46, now + dur)
+
+    gainLow.gain.setValueAtTime(isStrong ? 0.22 : 0.14, now)
+    gainLow.gain.exponentialRampToValueAtTime(0.001, now + dur)
+
+    oscLow.connect(gainLow)
+    gainLow.connect(ctx.destination)
+    oscLow.start(now)
+    oscLow.stop(now + dur + 0.002)
+
+    // Oscillator 2: Crisp mechanical micro-click transient (1080 Hz -> 260 Hz over 5ms)
+    const oscHigh = ctx.createOscillator()
+    const gainHigh = ctx.createGain()
+    oscHigh.type = 'triangle'
+    oscHigh.frequency.setValueAtTime(isStrong ? 1150 : 980, now)
+    oscHigh.frequency.exponentialRampToValueAtTime(240, now + 0.006)
+
+    gainHigh.gain.setValueAtTime(isStrong ? 0.09 : 0.055, now)
+    gainHigh.gain.exponentialRampToValueAtTime(0.001, now + 0.006)
+
+    oscHigh.connect(gainHigh)
+    gainHigh.connect(ctx.destination)
+    oscHigh.start(now)
+    oscHigh.stop(now + 0.007)
+  } catch {}
+}
 
 function ensureIosSwitchFallback(): HTMLLabelElement | null {
   if (typeof document === 'undefined') return null
@@ -40,47 +114,87 @@ function ensureIosSwitchFallback(): HTMLLabelElement | null {
   }
 }
 
+function isAndroidDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  const tgPlatform = (window.Telegram?.WebApp as Record<string, unknown> | undefined)?.platform
+  if (tgPlatform === 'android' || tgPlatform === 'android_x') return true
+  return /Android/i.test(navigator.userAgent || '')
+}
+
 function triggerHaptic(style: HapticStyle = 'light', force = false) {
   const now = performance.now()
-  // Throttle rapid ticks (e.g. letter-by-letter spelling) to >= 42ms so Android LRA motors stay crisp
-  if (!force && now - lastHapticTime < 42) return
+  if (!force && now - lastHapticTime < 45) return
   lastHapticTime = now
 
-  let handledByTelegram = false
+  const android = isAndroidDevice()
+  // On Android (Samsung One UI 7 / Xiaomi), selectionChanged() (CLOCK_TICK) and 'light' are often suppressed;
+  // promote all tactile feedback on Android to 'medium' or 'heavy'
+  const impactLevel: 'light' | 'medium' | 'heavy' =
+    style === 'heavy' || style === 'success'
+      ? 'heavy'
+      : android
+      ? 'medium'
+      : style === 'medium'
+      ? 'medium'
+      : 'light'
+
+  // Channel 1: Official Telegram WebApp HapticFeedback API
+  let handledByTg = false
   try {
     const tgHaptic = window.Telegram?.WebApp?.HapticFeedback
     if (tgHaptic) {
-      if (style === 'selection') {
+      if (!android && style === 'selection') {
         tgHaptic.selectionChanged?.()
-      } else if (style === 'success') {
-        tgHaptic.notificationOccurred?.('success')
       } else {
-        tgHaptic.impactOccurred?.(style)
+        tgHaptic.impactOccurred?.(impactLevel)
+        if (style === 'success') {
+          tgHaptic.notificationOccurred?.('success')
+        }
       }
-      handledByTelegram = true
+      handledByTg = true
     }
   } catch {}
 
-  // Android One UI 7 (X-axis LRA) & Xiaomi HyperOS (CyberEngine) micro-pulse tuning via navigator.vibrate
+  // Channel 2: Direct native bridge TelegramWebviewProxy.postEvent (bypasses SDK wrappers on Android)
+  try {
+    if (window.TelegramWebviewProxy?.postEvent) {
+      window.TelegramWebviewProxy.postEvent(
+        'web_app_trigger_haptic_feedback',
+        JSON.stringify({
+          type: 'impact',
+          impact_style: impactLevel,
+        })
+      )
+      if (style === 'success') {
+        window.TelegramWebviewProxy.postEvent(
+          'web_app_trigger_haptic_feedback',
+          JSON.stringify({
+            type: 'notification',
+            notification_type: 'success',
+          })
+        )
+      }
+    }
+  } catch {}
+
+  // Channel 3: Dual-frequency AudioContext tactile impulse
+  playDualFreqTactilePulse(style)
+
+  // Channel 4: Hardware navigator.vibrate (Android WebView / Chrome) + iOS switch fallback
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      if (style === 'selection') {
-        navigator.vibrate(4)
-      } else if (style === 'light') {
-        navigator.vibrate(8)
-      } else if (style === 'medium') {
+      if (style === 'success' || style === 'heavy') {
+        navigator.vibrate([14, 24, 18])
+      } else if (style === 'medium' || android) {
         navigator.vibrate(14)
-      } else if (style === 'heavy') {
-        navigator.vibrate(22)
-      } else if (style === 'success') {
-        navigator.vibrate([8, 28, 14])
+      } else {
+        navigator.vibrate(8)
       }
       return
     }
   } catch {}
 
-  // iOS 17.4+ / iOS 18 Safari standalone fallback when outside Telegram WebApp
-  if (!handledByTelegram && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+  if (!handledByTg && !android) {
     const lbl = ensureIosSwitchFallback()
     lbl?.click()
   }
@@ -183,7 +297,6 @@ function lerpInkColor(t: number): string {
   return `rgb(${r}, ${g}, ${b})`
 }
 
-// Fast single-matrix SVG transform generator (avoids 5x string matrix parsing in Skia/WebView)
 function setFastSvgTransform(
   el: SVGGElement,
   x: number,
@@ -314,8 +427,6 @@ export function WelcomePage({
   lang,
   setLang,
 }: WelcomePageProps) {
-  const [loaderProgress, setLoaderProgress] = useState(0)
-  const [loaderDone, setLoaderDone] = useState(false)
   const [introFinished, setIntroFinished] = useState(false)
   const [stageReady, setStageReady] = useState(false)
 
@@ -343,26 +454,50 @@ export function WelcomePage({
     renderAtTime: null,
   })
 
-  // Enforce #191714 dark espresso header & background in Telegram WebApp (even if App.tsx toggles .dark)
+  // 1. Immediately signal Telegram WebApp.ready() & sync #191714 header so Telegram dismisses its native splash fast,
+  // and load Google Font asynchronously without blocking window.onload!
   useEffect(() => {
     const syncTelegramChrome = () => {
       try {
         const wa = window.Telegram?.WebApp as Record<string, unknown> | undefined
         if (!wa) return
+        ;(wa.ready as (() => void) | undefined)?.()
+        ;(wa.expand as (() => void) | undefined)?.()
         ;(wa.setHeaderColor as ((c: string) => void) | undefined)?.('#191714')
         ;(wa.setBackgroundColor as ((c: string) => void) | undefined)?.('#191714')
         ;(wa.setBottomBarColor as ((c: string) => void) | undefined)?.('#100f0d')
       } catch {}
     }
     syncTelegramChrome()
-    const t1 = window.setTimeout(syncTelegramChrome, 80)
-    const t2 = window.setTimeout(syncTelegramChrome, 300)
+    const t1 = window.setTimeout(syncTelegramChrome, 60)
+    const t2 = window.setTimeout(syncTelegramChrome, 240)
     const obs = new MutationObserver(syncTelegramChrome)
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+
+    // Non-blocking async font injection so Telegram splash doesn't wait on fonts.googleapis.com
+    const fontId = 'cordwaine-cormorant-font'
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement('link')
+      link.id = fontId
+      link.rel = 'stylesheet'
+      link.href =
+        'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap'
+      document.head.appendChild(link)
+    }
+
+    // Unlock Web Audio context on first user touch/pointer anywhere on the page
+    const unlockAudio = () => {
+      getOrInitAudioContext()
+    }
+    window.addEventListener('pointerdown', unlockAudio, { passive: true })
+    window.addEventListener('touchstart', unlockAudio, { passive: true })
+
     return () => {
       window.clearTimeout(t1)
       window.clearTimeout(t2)
       obs.disconnect()
+      window.removeEventListener('pointerdown', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
     }
   }, [])
 
@@ -439,15 +574,13 @@ export function WelcomePage({
     const hop1Off = scrambleOffsets()
     const hop2Off = scrambleOffsets()
     const startRot = allGlyphs.map(() => rand(-22, 22))
-    const popStagger = allGlyphs.map(() => Math.random() * 0.55)
-    const hop1Stagger = allGlyphs.map(() => Math.random() * 0.2)
-    const hop2Stagger = allGlyphs.map(() => Math.random() * 0.2)
-    const resOtherStagger = otherGlyphs.map(() => Math.random() * 0.3)
-    const resWordStagger = wordGlyphs.map(() => Math.random() * 0.18)
-    // Subtle mid-flight arc tilt (±3.5 deg) so CORDWAINE never looks crooked on morph
+    const popStagger = allGlyphs.map(() => Math.random() * 0.48)
+    const hop1Stagger = allGlyphs.map(() => Math.random() * 0.22)
+    const hop2Stagger = allGlyphs.map(() => Math.random() * 0.22)
+    const resOtherStagger = otherGlyphs.map(() => Math.random() * 0.32)
+    const resWordStagger = wordGlyphs.map(() => Math.random() * 0.2)
     const flyRot = wordGlyphs.map((_, k) => (k < 3 ? rand(-2, 2) : rand(-3.5, 3.5)))
 
-    // Reset visibility flags
     allGlyphs.forEach((g) => {
       g.style.display = ''
       g._hidden = false
@@ -455,7 +588,6 @@ export function WelcomePage({
     })
     glintGroup.style.display = 'none'
 
-    // Choreographed haptic milestone flags
     const hapticFlags = {
       hop1: false,
       hop2: false,
@@ -465,25 +597,25 @@ export function WelcomePage({
       settled: false,
     }
 
-    // Snappy 6.8s total timeline (down from 11.75s so users never wait 12s for navigation):
-    // 1. popIn:   0.04 .. 1.04 (dur 0.45, spread 0.55)
-    // 2. hop1:    0.95 .. 1.60 (dur 0.45, spread 0.20)
-    // 3. hop2:    1.66 .. 2.31 (dur 0.45, spread 0.20)
-    // 4. resolve: 2.36 .. 3.41 (dur 0.75, spread 0.30)
-    // 5. spell:   3.52 .. 4.45 (each 0.055, dur 0.30)
-    // 6. disperse:4.65 .. 5.85 (dur 0.65, spread 0.55)
-    // 7. fly:     4.92 .. 6.05 (dur 1.05, each 0.024)
-    // 8. morph:   5.65 .. 6.28 (dur 0.42, each 0.024)
-    // 9. settle:  5.85 .. 7.15 (dur 1.30)
-    const TOTAL_DURATION = 7.2
+    // Zero-black-gap timeline (starts immediately at t=0 when Telegram opens the WebView):
+    // 1. popIn:   0.00 .. 0.90 (dur 0.42, spread 0.48)
+    // 2. hop1:    0.82 .. 1.52 (dur 0.48, spread 0.22)
+    // 3. hop2:    1.58 .. 2.28 (dur 0.48, spread 0.22)
+    // 4. resolve: 2.34 .. 3.46 (dur 0.80, spread 0.32)
+    // 5. spell:   3.55 .. 4.50 (each 0.055, dur 0.32)
+    // 6. disperse:4.72 .. 6.02 (dur 0.72, spread 0.58)
+    // 7. fly:     4.95 .. 6.55 (dur 1.32, each 0.026 — lush, visible 2-axis arc flight!)
+    // 8. morph:   5.95 .. 6.68 (dur 0.45, each 0.026)
+    // 9. settle:  6.15 .. 7.55 (dur 1.40)
+    const TOTAL_DURATION = 7.6
 
-    const renderAtTime = (t: number, triggerHaptics = false) => {
-      if (triggerHaptics) {
-        if (!hapticFlags.hop1 && t >= 0.98) {
+    const renderAtTime = (t: number, withHaptics = false) => {
+      if (withHaptics) {
+        if (!hapticFlags.hop1 && t >= 0.85) {
           hapticFlags.hop1 = true
           triggerHaptic('selection')
         }
-        if (!hapticFlags.hop2 && t >= 1.68) {
+        if (!hapticFlags.hop2 && t >= 1.62) {
           hapticFlags.hop2 = true
           triggerHaptic('selection')
         }
@@ -491,13 +623,13 @@ export function WelcomePage({
           hapticFlags.resolve = true
           triggerHaptic('light')
         }
-        if (!hapticFlags.flyStart && t >= 4.95) {
+        if (!hapticFlags.flyStart && t >= 4.98) {
           hapticFlags.flyStart = true
-          triggerHaptic('light')
+          triggerHaptic('medium')
         }
-        if (!hapticFlags.settled && t >= 5.95) {
+        if (!hapticFlags.settled && t >= 6.22) {
           hapticFlags.settled = true
-          triggerHaptic('medium', true)
+          triggerHaptic('success', true)
         }
       }
 
@@ -505,26 +637,25 @@ export function WelcomePage({
         const isWord = i < wordGlyphs.length
         const k = isWord ? i : i - wordGlyphs.length
 
-        // Phase-cull hidden background glyphs after disperse completes
-        if (!isWord && g._hidden && t >= 5.9) return
+        if (!isWord && g._hidden && t >= 6.1) return
 
         let x = startOff[i].x
         let y = startOff[i].y
-        let sc = 0.4
+        let sc = 0.42
         let rot = startRot[i]
         let op = 0
 
-        // 1. Pop in
-        const tPop = clamp01((t - (0.04 + popStagger[i])) / 0.45)
+        // 1. Pop in immediately (no black screen delay)
+        const tPop = clamp01((t - popStagger[i]) / 0.42)
         if (tPop > 0) {
           const e = EASES.backOut2(tPop)
-          sc = lerp(0.4, 1, e)
+          sc = lerp(0.42, 1, e)
           rot = lerp(startRot[i], 0, e)
-          op = clamp01(tPop * 2.5)
+          op = clamp01(tPop * 2.8)
         }
 
         // 2. Hop 1
-        const tH1 = clamp01((t - (0.95 + hop1Stagger[i])) / 0.45)
+        const tH1 = clamp01((t - (0.82 + hop1Stagger[i])) / 0.48)
         if (tH1 > 0) {
           const e = EASES.power3InOut(tH1)
           x = lerp(startOff[i].x, hop1Off[i].x, e)
@@ -532,16 +663,16 @@ export function WelcomePage({
         }
 
         // 3. Hop 2
-        const tH2 = clamp01((t - (1.66 + hop2Stagger[i])) / 0.45)
+        const tH2 = clamp01((t - (1.58 + hop2Stagger[i])) / 0.48)
         if (tH2 > 0) {
           const e = EASES.power3InOut(tH2)
           x = lerp(hop1Off[i].x, hop2Off[i].x, e)
           y = lerp(hop1Off[i].y, hop2Off[i].y, e)
         }
 
-        // 4. Resolve
-        const rStart = isWord ? 2.48 + resWordStagger[k] : 2.36 + resOtherStagger[k]
-        const tRes = clamp01((t - rStart) / 0.75)
+        // 4. Resolve into 13x13 matrix
+        const rStart = isWord ? 2.46 + resWordStagger[k] : 2.34 + resOtherStagger[k]
+        const tRes = clamp01((t - rStart) / 0.8)
         if (tRes > 0) {
           const e = EASES.expoInOut(tRes)
           x = lerp(hop2Off[i].x, 0, e)
@@ -550,15 +681,15 @@ export function WelcomePage({
 
         // 5. Spell & 6. Disperse / Fly
         if (!isWord) {
-          const tDim = clamp01((t - 3.52) / 0.6)
+          const tDim = clamp01((t - 3.55) / 0.65)
           if (tDim > 0) {
             op = lerp(1, 0.16, EASES.power2Out(tDim))
           }
 
           const dist = g._dist ?? 0.5
           const dir = g._dir ?? { x: 0, y: 1 }
-          const dStart = 4.65 + dist * 0.55
-          const tDisp = clamp01((t - dStart) / 0.65)
+          const dStart = 4.72 + dist * 0.58
+          const tDisp = clamp01((t - dStart) / 0.72)
           if (tDisp > 0) {
             g._resting = false
             const e = EASES.power2In(tDisp)
@@ -575,7 +706,6 @@ export function WelcomePage({
               g.style.display = ''
             }
           } else if (tRes >= 1 && t < dStart) {
-            // Stationary between resolve and disperse: skip redundant matrix writes
             if (!g._resting) {
               g._resting = true
               g.removeAttribute('transform')
@@ -584,47 +714,46 @@ export function WelcomePage({
             return
           }
         } else {
-          const sStart = 3.52 + k * 0.055
-          const tFill = clamp01((t - sStart) / 0.3)
-          if (triggerHaptics && !hapticFlags.spelled[k] && t >= sStart) {
+          const sStart = 3.55 + k * 0.055
+          const tFill = clamp01((t - sStart) / 0.32)
+          if (withHaptics && !hapticFlags.spelled[k] && t >= sStart) {
             hapticFlags.spelled[k] = true
             triggerHaptic('selection')
           }
 
           const pathEl = g.firstElementChild as SVGPathElement | null
-          if (pathEl && t >= 3.45 && t <= 4.6) {
+          if (pathEl && t >= 3.5 && t <= 4.7) {
             pathEl.setAttribute('fill', lerpInkColor(EASES.power2Out(tFill)))
-          } else if (pathEl && t > 4.6) {
+          } else if (pathEl && t > 4.7) {
             pathEl.setAttribute('fill', '#f4e7cf')
           }
 
-          if (t > sStart && t < sStart + 0.42) {
+          if (t > sStart && t < sStart + 0.44) {
             const dt = t - sStart
-            if (dt <= 0.14) sc = lerp(1, 1.15, EASES.power2Out(dt / 0.14))
-            else sc = lerp(1.15, 1, EASES.power2InOut((dt - 0.14) / 0.28))
+            if (dt <= 0.15) sc = lerp(1, 1.15, EASES.power2Out(dt / 0.15))
+            else sc = lerp(1.15, 1, EASES.power2InOut((dt - 0.15) / 0.29))
           }
 
-          // 6. Fly along 2-axis curved arcs
-          const fStart = 4.92 + k * 0.024
-          const tFly = clamp01((t - fStart) / 1.05)
+          // 6. Lush 1.32s curved 2-axis flight into the logo
+          const fStart = 4.95 + k * 0.026
+          const tFly = clamp01((t - fStart) / 1.32)
           if (tFly > 0) {
             const f = flights[k]
             if (f) {
               x = lerp(0, f.x, EASES.expoInOut(tFly))
               y = lerp(0, f.y, EASES.power3InOut(tFly))
-              // For 'THE' (k < 3), scale down smoothly so uppercase T-H-E never collides above 'O'
               const targetScale = k < 3 ? f.scale * 0.72 : f.scale
               sc = lerp(1, targetScale, EASES.expoInOut(tFly))
               if (tFly <= 0.5) rot = lerp(0, flyRot[k], EASES.sineOut(tFly * 2))
               else rot = lerp(flyRot[k], 0, EASES.sineInOut((tFly - 0.5) * 2))
             } else {
-              op = lerp(1, 0, clamp01((t - fStart) / 0.3))
+              op = lerp(1, 0, clamp01((t - fStart) / 0.35))
             }
           }
 
-          // 7. Hand off to final logo letterforms ('THE' fades out slightly earlier to avoid overlapping O)
-          const mStart = (k < 3 ? 5.42 : 5.65) + k * 0.024
-          const mDur = k < 3 ? 0.36 : 0.42
+          // 7. Smooth cross-fade into final logo letterforms right as flight lands
+          const mStart = (k < 3 ? 5.72 : 5.95) + k * 0.026
+          const mDur = k < 3 ? 0.4 : 0.45
           const tMorph = clamp01((t - mStart) / mDur)
           if (tMorph > 0) {
             op = lerp(1, 0, EASES.power1InOut(tMorph))
@@ -639,14 +768,14 @@ export function WelcomePage({
 
       // Logo letters fade in
       logoLetters.forEach((el, k) => {
-        const mStart = (k < 3 ? 5.42 : 5.65) + k * 0.024
-        const mDur = k < 3 ? 0.38 : 0.42
+        const mStart = (k < 3 ? 5.72 : 5.95) + k * 0.026
+        const mDur = k < 3 ? 0.42 : 0.45
         const tMorph = clamp01((t - mStart) / mDur)
         el.style.opacity = String(EASES.power1InOut(tMorph).toFixed(3))
       })
 
       // Rules grow outward from 'the'
-      const tRules = clamp01((t - 5.78) / 0.65)
+      const tRules = clamp01((t - 6.1) / 0.7)
       const eRules = EASES.expoOut(tRules)
       rules.forEach((r) => {
         const px = r._pivotX ?? 0
@@ -659,21 +788,20 @@ export function WelcomePage({
       })
 
       // Bespoke swash under C-O-R slides in
-      const tTail = clamp01((t - 5.84) / 0.65)
+      const tTail = clamp01((t - 6.18) / 0.7)
       const eTail = EASES.power3Out(tTail)
       tail.style.opacity = String(eTail.toFixed(3))
       tail.setAttribute('transform', `translate(${lerp(-10, 0, eTail).toFixed(2)}, 0)`)
 
       // 8. Settle: grow stage, bloom radial glow, sweep masked glint
-      const tSettle = clamp01((t - 5.82) / 1.35)
+      const tSettle = clamp01((t - 6.12) / 1.45)
       const eSettle = EASES.expoInOut(tSettle)
       stageWrap.style.transform = `translate3d(0, -20px, 0) scale(${lerp(1, 1.18, eSettle).toFixed(4)})`
 
-      const tGlow = clamp01((t - 5.9) / 1.3)
+      const tGlow = clamp01((t - 6.2) / 1.35)
       hero.style.setProperty('--glow', String(EASES.power2Out(tGlow).toFixed(3)))
 
-      // Only enable SVG mask rasterization during the 1.05s glint sweep window
-      const tGlint = clamp01((t - 6.02) / 1.05)
+      const tGlint = clamp01((t - 6.32) / 1.1)
       if (tGlint > 0 && tGlint < 1) {
         if (glintGroup.style.display !== '') glintGroup.style.display = ''
         glint.setAttribute(
@@ -686,7 +814,7 @@ export function WelcomePage({
 
       // Bottom navigation: softly visible after grid resolve (t >= 2.8s), full brightness on settle
       const tEarlyNav = clamp01((t - 2.8) / 0.6)
-      const tFullNav = clamp01((t - 5.95) / 0.65)
+      const tFullNav = clamp01((t - 6.25) / 0.65)
       const navOpacity = lerp(0, 0.42, EASES.power2Out(tEarlyNav)) + lerp(0, 0.58, EASES.power2Out(tFullNav))
       const navY = lerp(12, 0, EASES.power2Out(Math.max(tEarlyNav, tFullNav)))
       bottomNav.style.opacity = String(clamp01(navOpacity).toFixed(3))
@@ -695,7 +823,8 @@ export function WelcomePage({
     }
 
     setIntroFinished(false)
-    renderAtTime(0.001, false)
+    // Pre-seed at t=0.06 so the very first visible frame already has letters popping in (zero black screen!)
+    renderAtTime(0.06, false)
     setStageReady(true)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -705,11 +834,11 @@ export function WelcomePage({
       return
     }
 
-    const now = performance.now()
+    const now = performance.now() - 60
     animStateRef.current = {
       mode: 'playing',
       startTime: now,
-      currentTime: 0,
+      currentTime: 0.06,
       skipStartTime: 0,
       skipFromTime: 0,
       renderAtTime: (timeVal: number) => renderAtTime(timeVal, false),
@@ -727,7 +856,7 @@ export function WelcomePage({
           return
         }
         renderAtTime(elapsed, true)
-        if (elapsed >= 6.0) {
+        if (elapsed >= 6.3) {
           setIntroFinished(true)
         }
         rafRef.current = requestAnimationFrame(tick)
@@ -739,7 +868,7 @@ export function WelcomePage({
         renderAtTime(tCur, false)
         if (p >= 1) {
           st.mode = 'done'
-          triggerHaptic('medium', true)
+          triggerHaptic('success', true)
           setIntroFinished(true)
           return
         }
@@ -750,36 +879,9 @@ export function WelcomePage({
     rafRef.current = requestAnimationFrame(tick)
   }, [])
 
-  // Fast 420ms loader
+  // Prepare SVG stage IMMEDIATELY on mount (zero loader delay; Telegram already showed its native splash)
   useEffect(() => {
-    let cancelled = false
-    const startMs = performance.now()
-    const MIN_TIME = 420
-
-    const loaderTick = (now: number) => {
-      if (cancelled) return
-      const elapsed = now - startMs
-      const p = clamp01(elapsed / MIN_TIME)
-      const eased = EASES.power2Out(p)
-      setLoaderProgress(eased)
-      if (p < 1) {
-        requestAnimationFrame(loaderTick)
-      } else {
-        setTimeout(() => {
-          if (cancelled) return
-          setLoaderDone(true)
-        }, 90)
-      }
-    }
-    requestAnimationFrame(loaderTick)
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!loaderDone || stageRef.current) return
+    if (stageRef.current) return
     const svg = svgRef.current
     const logoSvg = logoSourceRef.current
     if (!svg || !logoSvg) return
@@ -1039,10 +1141,10 @@ export function WelcomePage({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [loaderDone, buildAndPlayTimeline])
+  }, [buildAndPlayTimeline])
 
   const handleSkip = useCallback(() => {
-    triggerHaptic('light', true)
+    triggerHaptic('medium', true)
     const st = animStateRef.current
     if (st.mode !== 'playing') return
     st.mode = 'skipping'
@@ -1051,7 +1153,7 @@ export function WelcomePage({
   }, [])
 
   const handleReplay = useCallback(() => {
-    triggerHaptic('light', true)
+    triggerHaptic('medium', true)
     buildAndPlayTimeline()
   }, [buildAndPlayTimeline])
 
@@ -1104,8 +1206,7 @@ export function WelcomePage({
     <main
       ref={heroRef}
       onClick={() => {
-        // Tapping the stage while intro is playing smoothly fast-forwards to the assembled logo
-        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 1.2) {
+        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 1.0) {
           handleSkip()
         }
       }}
@@ -1120,43 +1221,6 @@ export function WelcomePage({
       }
       className="relative grid h-[100dvh] w-full place-items-center overflow-hidden select-none isolate antialiased"
     >
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap"
-      />
-
-      {/* 0. Fast Minimal Loader */}
-      <div
-        aria-hidden={loaderDone}
-        style={{
-          background: '#191714',
-          opacity: loaderDone ? 0 : 1,
-          pointerEvents: loaderDone ? 'none' : 'auto',
-          transition: 'opacity 420ms cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-        className="fixed inset-0 z-50 grid place-items-center content-center gap-[16px]"
-      >
-        <div
-          style={{ background: 'rgba(213, 197, 171, 0.14)' }}
-          className="relative h-[1px] w-[150px] overflow-hidden"
-        >
-          <span
-            style={{
-              background: '#d5c5ab',
-              transform: `scaleX(${loaderProgress})`,
-              transformOrigin: 'left center',
-            }}
-            className="absolute inset-0"
-          />
-        </div>
-        <span
-          style={{ color: 'rgba(213, 197, 171, 0.45)' }}
-          className="text-[12px] tracking-[0.3em] tabular-nums"
-        >
-          {Math.round(loaderProgress * 100)}
-        </span>
-      </div>
-
       {/* GPU-composited warm radial glow behind the assembled logo */}
       <div
         aria-hidden="true"
@@ -1179,7 +1243,7 @@ export function WelcomePage({
           {!introFinished ? (
             <button
               type="button"
-              onPointerDown={() => triggerHaptic('selection', true)}
+              onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleSkip}
               style={{ color: 'rgba(213, 197, 171, 0.55)' }}
               className="min-h-[38px] border-0 bg-transparent py-2 pr-4 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
@@ -1189,7 +1253,7 @@ export function WelcomePage({
           ) : (
             <button
               type="button"
-              onPointerDown={() => triggerHaptic('selection', true)}
+              onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleReplay}
               style={{ color: 'rgba(213, 197, 171, 0.55)' }}
               className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-4 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
@@ -1232,10 +1296,10 @@ export function WelcomePage({
                 role="tab"
                 aria-selected={active}
                 onPointerDown={() => {
-                  if (lang !== item.code) triggerHaptic('selection', true)
+                  if (lang !== item.code) triggerHaptic('medium', true)
                 }}
                 onClick={() => {
-                  triggerHaptic('light', true)
+                  triggerHaptic('medium', true)
                   localStorage.setItem('app_lang', item.code)
                   localStorage.setItem('cordwainer_lang', item.code)
                   setLang(item.code)
@@ -1360,9 +1424,9 @@ export function WelcomePage({
               )}
               <button
                 type="button"
-                onPointerDown={() => triggerHaptic('selection', true)}
+                onPointerDown={() => triggerHaptic('medium', true)}
                 onClick={() => {
-                  triggerHaptic('light', true)
+                  triggerHaptic('medium', true)
                   item.onClick?.()
                 }}
                 style={{
@@ -1381,9 +1445,9 @@ export function WelcomePage({
         {/* Scroll-cue style primary entry button: Войти */}
         <button
           type="button"
-          onPointerDown={() => triggerHaptic('light', true)}
+          onPointerDown={() => triggerHaptic('heavy', true)}
           onClick={() => {
-            triggerHaptic('medium', true)
+            triggerHaptic('success', true)
             onStart?.()
           }}
           style={{
