@@ -93,7 +93,6 @@ const THE_ITALIC_PATH_D =
 const DIAMOND_RULES_PATH_D =
   'M-92.00 -24.85L-25.80 -24.85L-24.00 -26.55L-22.20 -24.85L-22.20 -24.15L-24.00 -22.45L-25.80 -24.15L-92.00 -24.15ZM92.00 -24.85L25.80 -24.85L24.00 -26.55L22.20 -24.85L22.20 -24.15L24.00 -22.45L25.80 -24.15L92.00 -24.15Z'
 
-// Tapered calligraphic gold swash that flows cleanly under "ordwaine" without touching the C loop
 const RIGHT_UNDER_SWASH_PATH_D =
   'M-44.0 21.5Q-12.0 25.8 34.0 23.6Q78.0 21.4 116.0 16.8Q78.0 19.8 34.0 21.4Q-12.0 23.2 -44.0 21.5Z'
 
@@ -732,7 +731,6 @@ export function WelcomePage({
 
     const FONT_SPEC = '400 64px "Mollani", "Cormorant Garamond", Georgia, serif'
 
-    // Measure actual visual bounding box of Mollani wordmark (including tall 'C' & 'e' flourishes)
     const measureWordBounds = () => {
       ctx.save()
       ctx.font = FONT_SPEC
@@ -743,11 +741,9 @@ export function WelcomePage({
 
       const leftExt = Math.max(m.actualBoundingBoxLeft || 135, m.width * 0.5)
       const rightExt = Math.max(m.actualBoundingBoxRight || 135, m.width * 0.5)
-      // Extra optical margin for calligraphic curls so edges are never clipped
       const padLeft = leftExt + 14
       const padRight = rightExt + 16
       const totalSpan = padLeft + padRight
-      // Optical horizontal offset to keep the visual ink mass dead-center
       const opticalOffsetX = (leftExt - rightExt) * 0.5
 
       return { padLeft, padRight, totalSpan, opticalOffsetX }
@@ -821,17 +817,14 @@ export function WelcomePage({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      // 1. Blit pre-baked Alabaster-Pearl & Smoked-Pewter 3D spotlight background
       ctx.globalAlpha = 1.0
       ctx.drawImage(textures.bgCanvas, 0, 0, viewW, viewH)
 
       const bounds = measureWordBounds()
       const centerX = viewW * 0.5
       const centerY = viewH * 0.445
-      // Guarantee the entire Mollani wordmark + flourishes fit inside 84% of viewport width
       const logoMasterScale = Math.min((viewW * 0.84) / bounds.totalSpan, 1.32)
 
-      // 2. Signature breathing pearl halo behind the calligraphic wordmark
       const haloIn = easeOutCubic(clamp01((elapsed - 0.15) / 1.1))
       if (haloIn > 0) {
         const breathe = 0.5 + 0.5 * Math.sin(elapsed * 1.65)
@@ -850,7 +843,6 @@ export function WelcomePage({
       ctx.translate(centerX, centerY)
       ctx.scale(logoMasterScale, logoMasterScale)
 
-      // 3. Subtle Bespoke Atelier Compass Arc (Stage 1: 0.05s -> 2.1s)
       if (elapsed < 2.3) {
         const arcIn = easeOutCubic(clamp01((elapsed - 0.05) / 0.55))
         const arcOut = 1 - easeInOutCubic(clamp01((elapsed - 1.55) / 0.7))
@@ -867,7 +859,6 @@ export function WelcomePage({
         }
       }
 
-      // 4. Upper Crown: italic "the" & symmetrical diamond-tipped hairline dividers
       const crownP = easeOutCubic(clamp01((elapsed - 0.14) / 0.72))
       if (crownP > 0) {
         ctx.save()
@@ -890,7 +881,6 @@ export function WelcomePage({
         ctx.restore()
       }
 
-      // 5. Live Calligraphic Pen-Nib Write-On of "Cordwaine" in Mollani font
       const writeRaw = clamp01((elapsed - 0.46) / 1.72)
       const writeP = easeInOutCubic(writeRaw)
 
@@ -899,7 +889,6 @@ export function WelcomePage({
         const endX = bounds.padRight + bounds.opticalOffsetX
         const nibX = startX + (endX - startX) * writeP
 
-        // 5A. Settled Deep Obsidian Ink (#141210) behind the moving golden nib
         ctx.save()
         ctx.beginPath()
         ctx.rect(startX - 10, -76, nibX - (startX - 10), 152)
@@ -908,7 +897,6 @@ export function WelcomePage({
         drawMollaniWord('#141210', bounds.opticalOffsetX)
         ctx.restore()
 
-        // 5B. Warm Molten Gold Leading Edge right at the pen nib while writing
         if (writeRaw < 0.99) {
           const bandWidth = 44
           const edgeEnv = Math.sin(writeRaw * Math.PI)
@@ -931,7 +919,6 @@ export function WelcomePage({
           ctx.restore()
         }
 
-        // 5C. Floating Gold-Leaf Micro-Sparks released in the wake of the nib
         if (elapsed < 2.65) {
           for (let i = 0; i < motes.length; i++) {
             const m = motes[i]
@@ -954,7 +941,6 @@ export function WelcomePage({
         }
       }
 
-      // 6. Tapered Golden Under-Swash beneath "ordwaine"
       const swashP = easeOutCubic(clamp01((elapsed - 2.12) / 0.58))
       if (swashP > 0) {
         ctx.save()
@@ -967,7 +953,6 @@ export function WelcomePage({
         ctx.restore()
       }
 
-      // 7. Golden Specular Light Sweep across the completed signature
       const sweepP = clamp01((elapsed - 2.48) / 0.74)
       if (sweepP > 0 && sweepP < 1) {
         const sweepHalf = Math.max(bounds.padLeft, bounds.padRight) + 25
@@ -1070,14 +1055,14 @@ export function WelcomePage({
         {BRAND_WORDMARK}
       </span>
 
-      {/* Single Hardware-Accelerated Canvas (Alabaster-Pearl & Smoked-Pewter 3D Spotlight + Live Calligraphic Signature) */}
+      {/* Single Hardware-Accelerated Canvas */}
       <canvas
         ref={canvasRef}
         aria-label="The Cordwaine"
         className="fixed inset-0 w-full h-full pointer-events-none block"
       />
 
-      {/* Top Bar: Skip/Replay + Sound Toggle + Luminous Pearl Language Switcher */}
+      {/* Top Bar */}
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8"
         style={{
@@ -1155,102 +1140,90 @@ export function WelcomePage({
         </div>
       </header>
 
-      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING") */}
+      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING")
+          Uses GPU-accelerated @keyframes so Android WebView NEVER skips the float-up animation */}
       <div
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center justify-center text-center px-6"
         style={{ top: '56.5%' }}
       >
-        <p
-          className={`text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-sans font-medium transition-all duration-900 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            isComplete
-              ? 'opacity-80 translate-y-0 blur-0'
-              : 'opacity-0 translate-y-8 blur-[2px]'
-          }`}
-        >
-          THE ART OF SHOEMAKING
-        </p>
-        <p
-          className={`mt-1.5 text-[11px] italic tracking-[0.12em] text-[#141210]/60 transition-all duration-900 delay-100 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            isComplete
-              ? 'opacity-85 translate-y-0 blur-0'
-              : 'opacity-0 translate-y-8 blur-[2px]'
-          }`}
-        >
-          {t.atelierSub}
-        </p>
+        {isComplete && (
+          <>
+            <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-sans font-medium will-change-[transform,opacity] animate-[cordwaineFloatUpSub_900ms_cubic-bezier(0.22,1,0.36,1)_both]">
+              THE ART OF SHOEMAKING
+            </p>
+            <p className="mt-1.5 text-[11px] italic tracking-[0.12em] text-[#141210]/60 will-change-[transform,opacity] animate-[cordwaineFloatUp_950ms_cubic-bezier(0.22,1,0.36,1)_90ms_both]">
+              {t.atelierSub}
+            </p>
+          </>
+        )}
       </div>
 
-      {/* Bottom Typographic Navigation & Primary Entry CTA */}
-      <footer
-        className={`fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          isComplete
-            ? 'opacity-100 translate-y-0 pointer-events-auto'
-            : 'opacity-0 translate-y-16 pointer-events-none'
-        }`}
-        style={{
-          paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 18px, 24px)',
-        }}
-      >
-        <nav
-          aria-label="Atelier chapters"
-          className={`flex items-center justify-center gap-6 sm:gap-9 mb-6 transition-all duration-900 delay-75 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-            isComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}
+      {/* Bottom Typographic Navigation & Primary Entry CTA
+          Mounted on phase === 'complete' with explicit GPU keyframe animation for identical iOS & Android smoothness */}
+      {isComplete && (
+        <footer
+          className="fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 pointer-events-auto"
+          style={{
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 18px, 24px)',
+          }}
         >
+          <nav
+            aria-label="Atelier chapters"
+            className="flex items-center justify-center gap-6 sm:gap-9 mb-6 will-change-[transform,opacity] animate-[cordwaineFloatUp_950ms_cubic-bezier(0.22,1,0.36,1)_60ms_both]"
+          >
+            <button
+              type="button"
+              onClick={() => handleAction(onOpenMaterials ?? onStart)}
+              className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+            >
+              {t.ch1}
+            </button>
+
+            <span
+              aria-hidden="true"
+              className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
+            />
+
+            <button
+              type="button"
+              onClick={() => handleAction(onOpenStyles ?? onStart)}
+              className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+            >
+              {t.ch2}
+            </button>
+
+            <span
+              aria-hidden="true"
+              className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
+            />
+
+            <button
+              type="button"
+              onClick={() => handleAction(onOpenCalc ?? onStart)}
+              className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-colors duration-300 cursor-pointer"
+            >
+              {t.ch3}
+            </button>
+          </nav>
+
           <button
             type="button"
-            onClick={() => handleAction(onOpenMaterials ?? onStart)}
-            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-all duration-300 cursor-pointer"
+            onClick={() => handleAction(onStart, true)}
+            className="group flex flex-col items-center gap-2.5 pt-1 text-[#141210]/95 hover:text-[#141210] active:scale-95 transition-colors duration-300 cursor-pointer will-change-[transform,opacity] animate-[cordwaineFloatUp_1000ms_cubic-bezier(0.22,1,0.36,1)_160ms_both]"
           >
-            {t.ch1}
+            <span className="text-[11px] uppercase tracking-[0.38em] font-sans font-medium pl-[0.38em]">
+              {t.enter}
+            </span>
+            <span className="relative w-[1px] h-7 bg-[#141210]/25 overflow-hidden">
+              <span className="
+                absolute inset-x-0 top-0 h-3.5 bg-[#7A5A2F]
+                animate-[cordwainePulseLine_2.2s_ease-in-out_infinite]
+              " />
+            </span>
           </button>
-
-          <span
-            aria-hidden="true"
-            className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
-          />
-
-          <button
-            type="button"
-            onClick={() => handleAction(onOpenStyles ?? onStart)}
-            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-all duration-300 cursor-pointer"
-          >
-            {t.ch2}
-          </button>
-
-          <span
-            aria-hidden="true"
-            className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
-          />
-
-          <button
-            type="button"
-            onClick={() => handleAction(onOpenCalc ?? onStart)}
-            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-all duration-300 cursor-pointer"
-          >
-            {t.ch3}
-          </button>
-        </nav>
-
-        <button
-          type="button"
-          onClick={() => handleAction(onStart, true)}
-          className={`group flex flex-col items-center gap-2.5 pt-1 text-[#141210]/95 hover:text-[#141210] active:scale-95 transition-all duration-900 delay-150 ease-[cubic-bezier(0.22,1,0.36,1)] cursor-pointer ${
-            isComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-          }`}
-        >
-          <span className="text-[11px] uppercase tracking-[0.38em] font-sans font-medium pl-[0.38em]">
-            {t.enter}
-          </span>
-          <span className="relative w-[1px] h-7 bg-[#141210]/25 overflow-hidden">
-            <span className="
-              absolute inset-x-0 top-0 h-3.5 bg-[#7A5A2F]
-              animate-[cordwainePulseLine_2.2s_ease-in-out_infinite]
-            " />
-          </span>
-        </button>
-      </footer>
+        </footer>
+      )}
 
       <style>{`
         @font-face {
@@ -1259,6 +1232,26 @@ export function WelcomePage({
           font-weight: normal;
           font-style: normal;
           font-display: swap;
+        }
+        @keyframes cordwaineFloatUp {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, 44px, 0);
+          }
+          100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
+        @keyframes cordwaineFloatUpSub {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, 36px, 0);
+          }
+          100% {
+            opacity: 0.82;
+            transform: translate3d(0, 0, 0);
+          }
         }
         @keyframes cordwainePulseLine {
           0% { transform: translateY(-100%); opacity: 0; }
