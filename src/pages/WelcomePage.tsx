@@ -1,4 +1,3 @@
-```react
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { Lang, FavoriteItem } from '../App'
 
