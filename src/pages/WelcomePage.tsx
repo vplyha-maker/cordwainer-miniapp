@@ -12,10 +12,78 @@ type WelcomePageProps = {
   onChangeTab?: (tab: 'search' | 'settings' | 'profile') => void
 }
 
-function haptic(style: 'light' | 'medium' = 'light') {
+// ============================================================================
+// Multi-Platform Haptic Engine (iPhone Taptic Engine + Samsung One UI 7 + Xiaomi HyperOS)
+// ============================================================================
+type HapticStyle = 'selection' | 'light' | 'medium' | 'heavy' | 'success'
+
+let lastHapticTime = 0
+let iosSwitchLabel: HTMLLabelElement | null = null
+
+function ensureIosSwitchFallback(): HTMLLabelElement | null {
+  if (typeof document === 'undefined') return null
+  if (iosSwitchLabel && document.body.contains(iosSwitchLabel)) return iosSwitchLabel
   try {
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred(style)
+    const label = document.createElement('label')
+    label.setAttribute('aria-hidden', 'true')
+    label.style.cssText =
+      'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;'
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.setAttribute('switch', '')
+    label.appendChild(input)
+    document.body.appendChild(label)
+    iosSwitchLabel = label
+    return label
+  } catch {
+    return null
+  }
+}
+
+function triggerHaptic(style: HapticStyle = 'light', force = false) {
+  const now = performance.now()
+  // Throttle rapid ticks (e.g. letter-by-letter spelling) to >= 42ms so Android LRA motors stay crisp
+  if (!force && now - lastHapticTime < 42) return
+  lastHapticTime = now
+
+  let handledByTelegram = false
+  try {
+    const tgHaptic = window.Telegram?.WebApp?.HapticFeedback
+    if (tgHaptic) {
+      if (style === 'selection') {
+        tgHaptic.selectionChanged?.()
+      } else if (style === 'success') {
+        tgHaptic.notificationOccurred?.('success')
+      } else {
+        tgHaptic.impactOccurred?.(style)
+      }
+      handledByTelegram = true
+    }
   } catch {}
+
+  // Android One UI 7 (X-axis LRA) & Xiaomi HyperOS (CyberEngine) micro-pulse tuning via navigator.vibrate
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      if (style === 'selection') {
+        navigator.vibrate(4)
+      } else if (style === 'light') {
+        navigator.vibrate(8)
+      } else if (style === 'medium') {
+        navigator.vibrate(14)
+      } else if (style === 'heavy') {
+        navigator.vibrate(22)
+      } else if (style === 'success') {
+        navigator.vibrate([8, 28, 14])
+      }
+      return
+    }
+  } catch {}
+
+  // iOS 17.4+ / iOS 18 Safari standalone fallback when outside Telegram WebApp
+  if (!handledByTelegram && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    const lbl = ensureIosSwitchFallback()
+    lbl?.click()
+  }
 }
 
 const GLYPHS = {
@@ -72,10 +140,9 @@ const BG_GRID: Array<[GlyphKey, Array<[number, number]>]> = [
 ]
 
 const LOGO_MAIN_D = 'M-150.488,0.764Q-158.903,0.715 -163.764,-3.905A16.572,16.572 0 0,1 -168.631,-16.527A16.572,16.572 0 0,1 -163.764,-29.15Q-158.903,-33.764 -150.488,-33.764A27.844,27.844 0 0,1 -143.613,-32.884A21.794,21.794 0 0,1 -137.618,-30.464L-136.407,-22.654H-136.903Q-139.268,-32.12 -150.542,-32.12A13.269,13.269 0 0,0 -160.882,-27.94A16.384,16.384 0 0,0 -164.681,-16.5A18.549,18.549 0 0,0 -162.972,-8.277A12.545,12.545 0 0,0 -158.023,-2.86A14.488,14.488 0 0,0 -150.488,-0.935A20.055,20.055 0 0,0 -142.986,-2.227A11.917,11.917 0 0,0 -137.639,-6.49A13.923,13.923 0 0,0 -135.246,-13.86H-134.751L-135.363,-6.325A14.474,14.474 0 0,1 -141.577,-1.131A20.824,20.824 0 0,1 -150.488,0.764ZM-121.295,-31.57A19.916,19.916 0 0,1 -111.976,-33.77A20.122,20.122 0 0,1 -102.656,-31.598A16.99,16.99 0 0,1 -95.919,-25.465A16.427,16.427 0 0,1 -93.41,-16.5A16.427,16.427 0 0,1 -95.912,-7.535A16.99,16.99 0 0,1 -102.65,-1.402A18.83,18.83 0 0,1 -111.34,0.764A22.542,22.542 0 0,1 -119.205,-0.495A18.162,18.162 0 0,1 -125.118,-4.009A16.274,16.274 0 0,1 -129.077,-9.509A18.454,18.454 0 0,1 -130.535,-17.126A15.356,15.356 0 0,1 -128.032,-25.459A16.792,16.792 0 0,1 -121.295,-31.57ZM-122.34,-5.225A13.774,13.774 0 0,0 -112,-0.88A13.732,13.732 0 0,0 -101.66,-5.252A15.609,15.609 0 0,0 -97.486,-16.5A15.609,15.609 0 0,0 -101.666,-27.747A13.732,13.732 0 0,0 -112,-32.12A13.645,13.645 0 0,0 -122.312,-27.747A15.667,15.667 0 0,0 -126.465,-16.5A15.826,15.826 0 0,0 -122.34,-5.225ZM-76.933,-31.295H-79.847V-3.514A2.949,2.949 0 0,0 -78.308,-0.935A3.309,3.309 0 0,0 -76.713,-0.55H-75.998L-75.942,0H-87.218V-0.55H-86.454A3.056,3.056 0 0,0 -84.275,-1.402A2.727,2.727 0 0,0 -83.367,-3.465V-29.59A2.642,2.642 0 0,0 -84.275,-31.625A3.118,3.118 0 0,0 -86.444,-32.45H-87.208V-33H-73.412A12.846,12.846 0 0,1 -65.245,-30.635A7.535,7.535 0 0,1 -62.248,-24.42A9.054,9.054 0 0,1 -64.668,-17.985A9.472,9.472 0 0,1 -70.828,-15.015A12.43,12.43 0 0,1 -66.593,-10.725Q-66.647,-10.725 -64.695,-8.305T-61.56,-4.537Q-60.377,-3.19 -59.608,-2.475A6.608,6.608 0 0,0 -54.933,-0.55V0H-56.638A11.877,11.877 0 0,1 -63.457,-1.705A16.121,16.121 0 0,1 -66.868,-4.84Q-67.194,-5.28 -69.639,-8.717T-72.257,-12.375Q-75.228,-16.06 -77.812,-16.06V-16.61Q-71.377,-16.61 -70.058,-17.27A6.218,6.218 0 0,0 -67.582,-19.256A8.953,8.953 0 0,0 -66.207,-24.096A6.661,6.661 0 0,0 -68.194,-29.266A8.218,8.218 0 0,0 -73.529,-31.252Q-75.007,-31.295 -76.933,-31.295ZM-15.85,-16.5A15.687,15.687 0 0,1 -20.608,-4.431A18.181,18.181 0 0,1 -33.505,0H-51.875V-0.55H-51.16A2.985,2.985 0 0,0 -48.96,-1.43A3.056,3.056 0 0,0 -48.025,-3.514V-29.486A2.939,2.939 0 0,0 -48.987,-31.625A3.19,3.19 0 0,0 -51.215,-32.45H-51.875V-33H-33.505A20.851,20.851 0 0,1 -24.128,-31.014A14.14,14.14 0 0,1 -17.995,-25.294A17.386,17.386 0 0,1 -15.85,-16.5ZM-44.45,-31.35V-1.65H-33.505A12.962,12.962 0 0,0 -23.495,-5.637A15.382,15.382 0 0,0 -19.81,-16.5A15.382,15.382 0 0,0 -23.495,-27.362A12.962,12.962 0 0,0 -33.505,-31.35ZM34.1,-33V-32.45H33.66A3.667,3.667 0 0,0 31.46,-31.653A6.264,6.264 0 0,0 29.703,-29.26L19.525,0.764H18.975L11.275,-20.075L3.575,0.764H3.025L-7.562,-29.26A5.806,5.806 0 0,0 -9.274,-31.652A3.514,3.514 0 0,0 -11.489,-32.45H-11.917V-33H-2.017V-32.45H-2.457A1.757,1.757 0 0,0 -3.954,-31.707A2.368,2.368 0 0,0 -4.443,-30.36A5.194,5.194 0 0,0 -4.259,-29.095L4.4,-5.225L10.725,-22.55L9.35,-26.345A4.889,4.889 0 0,0 7.899,-28.6A3.208,3.208 0 0,0 5.836,-29.342H5.408V-29.892H15.308V-29.342H14.85A1.757,1.757 0 0,0 13.353,-28.6A2.368,2.368 0 0,0 12.864,-27.252A5.194,5.194 0 0,0 13.047,-25.987L20.075,-5.225L28.05,-28.985A3.819,3.819 0 0,0 28.325,-30.333A2.368,2.368 0 0,0 27.775,-31.707A1.91,1.91 0 0,0 26.125,-32.45H25.697V-33ZM72.067,-0.55H72.507V0H61.233V-0.55H61.672A1.89,1.89 0 0,0 63.267,-1.265A2.255,2.255 0 0,0 63.817,-2.612A3.595,3.595 0 0,0 63.597,-3.85L60.569,-11.165H46.657L43.633,-4.015A3.761,3.761 0 0,0 43.358,-2.667A2.37,2.37 0 0,0 43.907,-1.292A1.922,1.922 0 0,0 45.558,-0.55H45.998V0H35.493V-0.55H35.933A4.169,4.169 0 0,0 38.264,-1.347A5.873,5.873 0 0,0 40.222,-3.74Q52.267,-29.486 52.763,-30.69A13.304,13.304 0 0,0 53.752,-33.764H54.248L67.832,-3.74A4.783,4.783 0 0,0 72.067,-0.55ZM47.373,-12.815H59.913L53.752,-27.885ZM79.555,-0.55A4.013,4.013 0 0,0 82.14,-1.43A2.611,2.611 0 0,0 83.24,-3.514V-29.486A2.611,2.611 0 0,0 82.14,-31.576A4.094,4.094 0 0,0 79.5,-32.45H78.785V-33H91.215V-32.45H90.5A4.072,4.072 0 0,0 87.942,-31.625A2.826,2.826 0 0,0 86.76,-29.59V-3.465A2.703,2.703 0 0,0 87.915,-1.402A4.097,4.097 0 0,0 90.5,-0.55H91.215L91.264,0H78.785V-0.55ZM135.562,-32.45A3.008,3.008 0 0,0 133.472,-31.652A2.719,2.719 0 0,0 132.537,-29.7V-6.264A45.375,45.375 0 0,0 132.923,-0.214L133.032,0.764H132.537L103.938,-26.345V-3.41A2.678,2.678 0 0,0 104.817,-1.375A3.02,3.02 0 0,0 106.956,-0.55H107.891V0H97.502V-0.55H98.438A3.02,3.02 0 0,0 100.576,-1.375A2.678,2.678 0 0,0 101.456,-3.41V-26.95A41.876,41.876 0 0,0 101.071,-32.945L100.961,-33.825L101.573,-33.77L130.118,-6.875V-29.7A2.93,2.93 0 0,0 129.127,-31.652A3.008,3.008 0 0,0 127.037,-32.45H126.102V-33H136.491V-32.45ZM141.78,-0.55A3.132,3.132 0 0,0 144.007,-1.402A2.92,2.92 0 0,0 144.97,-3.465V-29.59A2.608,2.608 0 0,0 144.035,-31.625A3.291,3.291 0 0,0 141.78,-32.45H141.016V-33H157.07A21.037,21.037 0 0,0 161.03,-33.33A12.833,12.833 0 0,0 163.23,-33.88V-27.616L162.619,-27.671V-28.496A2.8,2.8 0 0,0 161.855,-30.482A2.587,2.587 0 0,0 159.869,-31.307H148.435V-17.337H157.84A2.11,2.11 0 0,0 159.521,-17.997A2.415,2.415 0 0,0 160.098,-19.647V-20.362H160.709V-12.662H160.098V-13.377A2.093,2.093 0 0,0 158.943,-15.467A3.868,3.868 0 0,0 158.008,-15.687H148.435V-1.717H157.07A9.342,9.342 0 0,0 161.333,-2.597A7.42,7.42 0 0,0 163.972,-4.675A18.666,18.666 0 0,0 165.815,-7.865H166.365L163.34,0H141.01V-0.55Z'
-const LOGO_TAIL_D = 'M145.285,197.09c-6.789-4.327-9.8-10.23-11.545-23.39-2.16-.315-1.1,5.035-.973,8.724a14.729,14.729,0,0,0-3.515.341,1.281,1.281,0,0,0-.838.755,1.914,1.914,0,0,0-.59-.221.7.7,0,0,0-.675.243,1.259,1.259,0,0,0,.2,1.458,1.751,1.751,0,0,0,.653.437,3.411,3.411,0,0,0,.259,1.516c1.907,2.743,7.2,6.763,11.6,9.679q.362.247.737.484l.02.013h0c14.744,9.281,44.824,6.772,50.473-5.867-5.953,9.543-29.846,13.805-45.8,5.829'
+const LOGO_TAIL_D = 'M 594.5 142.8 C 602.0 154.5, 634.0 156.8, 665.5 144.2 C 660.2 146.4, 633.5 153.2, 603.5 143.2 C 599.5 141.9, 596.5 141.8, 594.5 142.8 Z'
 const LOGO_THE_D = 'M-5.525-9.23a.753.753,0,0,0,.312-.962H-8.047l.754-2.548a.874.874,0,0,0-.988-.156l-1.456,2.574-2.08.364a.652.652,0,0,0-.286.728h2.028L-12.6-1.82a5,5,0,0,0-.364,1.482.777.777,0,0,0,.7.7c1.092,0,3.536-1.586,4.992-3.744.052-.312-.1-.468-.364-.468a9.519,9.519,0,0,1-2.964,2.34c-.208,0-.338-.156-.182-.65L-8.359-9.23Zm7.2-9.36a14.242,14.242,0,0,0-3.042.6.253.253,0,0,0-.078.338l.546.364c.416.286.286.65-.286,2.366L-6.123-.312c-.208.6.468.676.754.676A.476.476,0,0,0-4.9.052,42.115,42.115,0,0,1-1.755-5.356a16.414,16.414,0,0,1,3.3-3.458,2.828,2.828,0,0,1,1.4-.7c.364,0,.546.286.546.78A26.721,26.721,0,0,1,1.625-2.028c-.39.91-.65,1.3-1.04,1.3a1.5,1.5,0,0,1-.676-.338.62.62,0,0,0-.364-.156.825.825,0,0,0-.7.832c0,.208.1.754.962.754A2.858,2.858,0,0,0,1.7-.65a9.125,9.125,0,0,0,1.69-2.132A14.924,14.924,0,0,0,5.421-8.866c0-.91-.416-1.742-1.56-1.742a4.455,4.455,0,0,0-2.47,1.014A16.493,16.493,0,0,0-2.717-5.3l-.052-.052L-.091-13.13l1.872-5.3Zm11.83,7.982a4.991,4.991,0,0,0-3.12,1.248A9.772,9.772,0,0,0,6.513-2.366c0,1.274.546,2.73,2.106,2.73,1.092,0,2.574-.416,4.16-2.366a.349.349,0,0,0-.338-.442C11.3-1.456,10.647-.936,9.711-.936A1.333,1.333,0,0,1,8.463-2.418a6.544,6.544,0,0,1,.364-2.314c3.744-1.04,6.318-2.34,6.318-4.316A1.63,1.63,0,0,0,13.507-10.608Zm-.52.806a.555.555,0,0,1,.6.6,2.935,2.935,0,0,1-1.014,1.768A7.555,7.555,0,0,1,9.087-5.512a10.348,10.348,0,0,1,1.924-3.042C11.947-9.568,12.623-9.8,12.987-9.8Z'
 
-// Exact GSAP easing curves used by The Quiet Table
 const EASES = {
   power1InOut: (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
   power2Out: (t: number) => 1 - (1 - t) * (1 - t),
@@ -110,11 +177,39 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 function lerpInkColor(t: number): string {
-  // #d5c5ab (213, 197, 171) -> #f4e7cf (244, 231, 207)
   const r = Math.round(lerp(213, 244, t))
   const g = Math.round(lerp(197, 231, t))
   const b = Math.round(lerp(171, 207, t))
   return `rgb(${r}, ${g}, ${b})`
+}
+
+// Fast single-matrix SVG transform generator (avoids 5x string matrix parsing in Skia/WebView)
+function setFastSvgTransform(
+  el: SVGGElement,
+  x: number,
+  y: number,
+  ox: number,
+  oy: number,
+  sc: number,
+  rotDeg: number
+) {
+  if (rotDeg === 0 && sc === 1) {
+    if (x === 0 && y === 0) {
+      el.removeAttribute('transform')
+    } else {
+      el.setAttribute('transform', `translate(${x.toFixed(2)},${y.toFixed(2)})`)
+    }
+    return
+  }
+  const rad = (rotDeg * Math.PI) / 180
+  const cos = Math.cos(rad) * sc
+  const sin = Math.sin(rad) * sc
+  const tx = x + ox - cos * ox + sin * oy
+  const ty = y + oy - sin * ox - cos * oy
+  el.setAttribute(
+    'transform',
+    `matrix(${cos.toFixed(4)},${sin.toFixed(4)},${(-sin).toFixed(4)},${cos.toFixed(4)},${tx.toFixed(2)},${ty.toFixed(2)})`
+  )
 }
 
 type Box = { x: number; y: number; w: number; h: number; cx: number; cy: number }
@@ -124,6 +219,8 @@ interface GlyphNode extends SVGGElement {
   _oy?: number
   _dist?: number
   _dir?: { x: number; y: number }
+  _hidden?: boolean
+  _resting?: boolean
 }
 
 interface RuleNode extends SVGPathElement {
@@ -141,6 +238,7 @@ interface PreparedStage {
   logoLetters: SVGPathElement[]
   tail: SVGGElement
   rules: RuleNode[]
+  glintGroup: SVGGElement
   glint: SVGRectElement
   lb: DOMRect
   toStage: (el: SVGGraphicsElement) => DOMMatrix
@@ -245,12 +343,27 @@ export function WelcomePage({
     renderAtTime: null,
   })
 
-  // Set Telegram WebApp header & background to The Quiet Table deep espresso (#191714)
+  // Enforce #191714 dark espresso header & background in Telegram WebApp (even if App.tsx toggles .dark)
   useEffect(() => {
-    try {
-      window.Telegram?.WebApp?.setHeaderColor?.('#191714')
-      window.Telegram?.WebApp?.setBackgroundColor?.('#191714')
-    } catch {}
+    const syncTelegramChrome = () => {
+      try {
+        const wa = window.Telegram?.WebApp as Record<string, unknown> | undefined
+        if (!wa) return
+        ;(wa.setHeaderColor as ((c: string) => void) | undefined)?.('#191714')
+        ;(wa.setBackgroundColor as ((c: string) => void) | undefined)?.('#191714')
+        ;(wa.setBottomBarColor as ((c: string) => void) | undefined)?.('#100f0d')
+      } catch {}
+    }
+    syncTelegramChrome()
+    const t1 = window.setTimeout(syncTelegramChrome, 80)
+    const t2 = window.setTimeout(syncTelegramChrome, 300)
+    const obs = new MutationObserver(syncTelegramChrome)
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+      obs.disconnect()
+    }
   }, [])
 
   // Restore or initialize saved language
@@ -293,6 +406,7 @@ export function WelcomePage({
       logoLetters,
       tail,
       rules,
+      glintGroup,
       glint,
       lb,
       stageToLocal,
@@ -324,20 +438,75 @@ export function WelcomePage({
     const startOff = scrambleOffsets()
     const hop1Off = scrambleOffsets()
     const hop2Off = scrambleOffsets()
-    const startRot = allGlyphs.map(() => rand(-25, 25))
-    const popStagger = allGlyphs.map(() => Math.random() * 0.9)
-    const hop1Stagger = allGlyphs.map(() => Math.random() * 0.3)
-    const hop2Stagger = allGlyphs.map(() => Math.random() * 0.3)
-    const resOtherStagger = otherGlyphs.map(() => Math.random() * 0.45)
-    const resWordStagger = wordGlyphs.map(() => Math.random() * (0.45 * 0.6))
-    const flyRot = wordGlyphs.map(() => rand(-10, 10))
+    const startRot = allGlyphs.map(() => rand(-22, 22))
+    const popStagger = allGlyphs.map(() => Math.random() * 0.55)
+    const hop1Stagger = allGlyphs.map(() => Math.random() * 0.2)
+    const hop2Stagger = allGlyphs.map(() => Math.random() * 0.2)
+    const resOtherStagger = otherGlyphs.map(() => Math.random() * 0.3)
+    const resWordStagger = wordGlyphs.map(() => Math.random() * 0.18)
+    // Subtle mid-flight arc tilt (±3.5 deg) so CORDWAINE never looks crooked on morph
+    const flyRot = wordGlyphs.map((_, k) => (k < 3 ? rand(-2, 2) : rand(-3.5, 3.5)))
 
-    const TOTAL_DURATION = 11.75
+    // Reset visibility flags
+    allGlyphs.forEach((g) => {
+      g.style.display = ''
+      g._hidden = false
+      g._resting = false
+    })
+    glintGroup.style.display = 'none'
 
-    const renderAtTime = (t: number) => {
+    // Choreographed haptic milestone flags
+    const hapticFlags = {
+      hop1: false,
+      hop2: false,
+      resolve: false,
+      spelled: new Array(wordGlyphs.length).fill(false),
+      flyStart: false,
+      settled: false,
+    }
+
+    // Snappy 6.8s total timeline (down from 11.75s so users never wait 12s for navigation):
+    // 1. popIn:   0.04 .. 1.04 (dur 0.45, spread 0.55)
+    // 2. hop1:    0.95 .. 1.60 (dur 0.45, spread 0.20)
+    // 3. hop2:    1.66 .. 2.31 (dur 0.45, spread 0.20)
+    // 4. resolve: 2.36 .. 3.41 (dur 0.75, spread 0.30)
+    // 5. spell:   3.52 .. 4.45 (each 0.055, dur 0.30)
+    // 6. disperse:4.65 .. 5.85 (dur 0.65, spread 0.55)
+    // 7. fly:     4.92 .. 6.05 (dur 1.05, each 0.024)
+    // 8. morph:   5.65 .. 6.28 (dur 0.42, each 0.024)
+    // 9. settle:  5.85 .. 7.15 (dur 1.30)
+    const TOTAL_DURATION = 7.2
+
+    const renderAtTime = (t: number, triggerHaptics = false) => {
+      if (triggerHaptics) {
+        if (!hapticFlags.hop1 && t >= 0.98) {
+          hapticFlags.hop1 = true
+          triggerHaptic('selection')
+        }
+        if (!hapticFlags.hop2 && t >= 1.68) {
+          hapticFlags.hop2 = true
+          triggerHaptic('selection')
+        }
+        if (!hapticFlags.resolve && t >= 2.95) {
+          hapticFlags.resolve = true
+          triggerHaptic('light')
+        }
+        if (!hapticFlags.flyStart && t >= 4.95) {
+          hapticFlags.flyStart = true
+          triggerHaptic('light')
+        }
+        if (!hapticFlags.settled && t >= 5.95) {
+          hapticFlags.settled = true
+          triggerHaptic('medium', true)
+        }
+      }
+
       allGlyphs.forEach((g, i) => {
         const isWord = i < wordGlyphs.length
         const k = isWord ? i : i - wordGlyphs.length
+
+        // Phase-cull hidden background glyphs after disperse completes
+        if (!isWord && g._hidden && t >= 5.9) return
 
         let x = startOff[i].x
         let y = startOff[i].y
@@ -345,8 +514,8 @@ export function WelcomePage({
         let rot = startRot[i]
         let op = 0
 
-        // 1. Pop in, jumbled
-        const tPop = clamp01((t - (0.05 + popStagger[i])) / 0.7)
+        // 1. Pop in
+        const tPop = clamp01((t - (0.04 + popStagger[i])) / 0.45)
         if (tPop > 0) {
           const e = EASES.backOut2(tPop)
           sc = lerp(0.4, 1, e)
@@ -354,82 +523,109 @@ export function WelcomePage({
           op = clamp01(tPop * 2.5)
         }
 
-        // 2. Shuffle hop 1
-        const tH1 = clamp01((t - (1.55 + hop1Stagger[i])) / 0.65)
+        // 2. Hop 1
+        const tH1 = clamp01((t - (0.95 + hop1Stagger[i])) / 0.45)
         if (tH1 > 0) {
           const e = EASES.power3InOut(tH1)
           x = lerp(startOff[i].x, hop1Off[i].x, e)
           y = lerp(startOff[i].y, hop1Off[i].y, e)
         }
 
-        // 3. Shuffle hop 2
-        const tH2 = clamp01((t - (2.62 + hop2Stagger[i])) / 0.65)
+        // 3. Hop 2
+        const tH2 = clamp01((t - (1.66 + hop2Stagger[i])) / 0.45)
         if (tH2 > 0) {
           const e = EASES.power3InOut(tH2)
           x = lerp(hop1Off[i].x, hop2Off[i].x, e)
           y = lerp(hop1Off[i].y, hop2Off[i].y, e)
         }
 
-        // 4. Resolve into the 13x13 grid
-        const rStart = isWord ? 3.92 + resWordStagger[k] : 3.67 + resOtherStagger[k]
-        const tRes = clamp01((t - rStart) / 1.1)
+        // 4. Resolve
+        const rStart = isWord ? 2.48 + resWordStagger[k] : 2.36 + resOtherStagger[k]
+        const tRes = clamp01((t - rStart) / 0.75)
         if (tRes > 0) {
           const e = EASES.expoInOut(tRes)
           x = lerp(hop2Off[i].x, 0, e)
           y = lerp(hop2Off[i].y, 0, e)
         }
 
-        // 5. Spell THE / CORD / WAINE
+        // 5. Spell & 6. Disperse / Fly
         if (!isWord) {
-          const tDim = clamp01((t - 5.54) / 0.9)
+          const tDim = clamp01((t - 3.52) / 0.6)
           if (tDim > 0) {
             op = lerp(1, 0.16, EASES.power2Out(tDim))
           }
-          // 6. Disperse ripple outward
+
           const dist = g._dist ?? 0.5
           const dir = g._dir ?? { x: 0, y: 1 }
-          const dStart = 7.26 + dist * 0.9
-          const tDisp = clamp01((t - dStart) / 0.9)
+          const dStart = 4.65 + dist * 0.55
+          const tDisp = clamp01((t - dStart) / 0.65)
           if (tDisp > 0) {
+            g._resting = false
             const e = EASES.power2In(tDisp)
             op = lerp(0.16, 0, e)
             sc = lerp(1, 0.5, e)
             x = lerp(0, dir.x * 14, e)
             y = lerp(0, dir.y * 14 + 6, e)
+            if (tDisp >= 1 && !g._hidden) {
+              g._hidden = true
+              g.style.display = 'none'
+              return
+            } else if (tDisp < 1 && g._hidden) {
+              g._hidden = false
+              g.style.display = ''
+            }
+          } else if (tRes >= 1 && t < dStart) {
+            // Stationary between resolve and disperse: skip redundant matrix writes
+            if (!g._resting) {
+              g._resting = true
+              g.removeAttribute('transform')
+            }
+            g.style.opacity = String(op.toFixed(3))
+            return
           }
         } else {
-          const sStart = 5.54 + k * 0.075
-          const tFill = clamp01((t - sStart) / 0.4)
+          const sStart = 3.52 + k * 0.055
+          const tFill = clamp01((t - sStart) / 0.3)
+          if (triggerHaptics && !hapticFlags.spelled[k] && t >= sStart) {
+            hapticFlags.spelled[k] = true
+            triggerHaptic('selection')
+          }
+
           const pathEl = g.firstElementChild as SVGPathElement | null
-          if (pathEl) {
+          if (pathEl && t >= 3.45 && t <= 4.6) {
             pathEl.setAttribute('fill', lerpInkColor(EASES.power2Out(tFill)))
+          } else if (pathEl && t > 4.6) {
+            pathEl.setAttribute('fill', '#f4e7cf')
           }
 
-          if (t > sStart && t < sStart + 0.58) {
+          if (t > sStart && t < sStart + 0.42) {
             const dt = t - sStart
-            if (dt <= 0.18) sc = lerp(1, 1.16, EASES.power2Out(dt / 0.18))
-            else sc = lerp(1.16, 1, EASES.power2InOut((dt - 0.18) / 0.4))
+            if (dt <= 0.14) sc = lerp(1, 1.15, EASES.power2Out(dt / 0.14))
+            else sc = lerp(1.15, 1, EASES.power2InOut((dt - 0.14) / 0.28))
           }
 
-          // 6. Fly along 2-axis curved arcs into the logo
-          const fStart = 7.755 + k * 0.035
-          const tFly = clamp01((t - fStart) / 1.55)
+          // 6. Fly along 2-axis curved arcs
+          const fStart = 4.92 + k * 0.024
+          const tFly = clamp01((t - fStart) / 1.05)
           if (tFly > 0) {
             const f = flights[k]
             if (f) {
               x = lerp(0, f.x, EASES.expoInOut(tFly))
               y = lerp(0, f.y, EASES.power3InOut(tFly))
-              sc = lerp(1, f.scale, EASES.expoInOut(tFly))
+              // For 'THE' (k < 3), scale down smoothly so uppercase T-H-E never collides above 'O'
+              const targetScale = k < 3 ? f.scale * 0.72 : f.scale
+              sc = lerp(1, targetScale, EASES.expoInOut(tFly))
               if (tFly <= 0.5) rot = lerp(0, flyRot[k], EASES.sineOut(tFly * 2))
               else rot = lerp(flyRot[k], 0, EASES.sineInOut((tFly - 0.5) * 2))
             } else {
-              op = lerp(1, 0, clamp01((t - fStart) / 0.4))
+              op = lerp(1, 0, clamp01((t - fStart) / 0.3))
             }
           }
 
-          // 7. Hand off to final logo letterforms
-          const mStart = 8.955 + k * 0.035
-          const tMorph = clamp01((t - mStart) / 0.6)
+          // 7. Hand off to final logo letterforms ('THE' fades out slightly earlier to avoid overlapping O)
+          const mStart = (k < 3 ? 5.42 : 5.65) + k * 0.024
+          const mDur = k < 3 ? 0.36 : 0.42
+          const tMorph = clamp01((t - mStart) / mDur)
           if (tMorph > 0) {
             op = lerp(1, 0, EASES.power1InOut(tMorph))
           }
@@ -437,22 +633,20 @@ export function WelcomePage({
 
         const ox = g._ox ?? 0
         const oy = g._oy ?? 0
-        g.setAttribute(
-          'transform',
-          `translate(${x}, ${y}) translate(${ox}, ${oy}) rotate(${rot}) scale(${sc}) translate(${-ox}, ${-oy})`
-        )
-        g.style.opacity = String(op)
+        setFastSvgTransform(g, x, y, ox, oy, sc, rot)
+        g.style.opacity = String(op.toFixed(3))
       })
 
       // Logo letters fade in
       logoLetters.forEach((el, k) => {
-        const mStart = 8.955 + k * 0.035
-        const tMorph = clamp01((t - mStart) / 0.6)
-        el.style.opacity = String(EASES.power1InOut(tMorph))
+        const mStart = (k < 3 ? 5.42 : 5.65) + k * 0.024
+        const mDur = k < 3 ? 0.38 : 0.42
+        const tMorph = clamp01((t - mStart) / mDur)
+        el.style.opacity = String(EASES.power1InOut(tMorph).toFixed(3))
       })
 
       // Rules grow outward from 'the'
-      const tRules = clamp01((t - (8.955 + 0.25)) / 0.9)
+      const tRules = clamp01((t - 5.78) / 0.65)
       const eRules = EASES.expoOut(tRules)
       rules.forEach((r) => {
         const px = r._pivotX ?? 0
@@ -460,44 +654,53 @@ export function WelcomePage({
         const base = r._baseTransform ?? ''
         r.setAttribute(
           'transform',
-          `${base} translate(${px}, ${py}) scale(${eRules}, 1) translate(${-px}, ${-py})`
+          `${base} translate(${px}, ${py}) scale(${eRules.toFixed(4)}, 1) translate(${-px}, ${-py})`
         )
       })
 
-      // Sweeping tail slides in
-      const tTail = clamp01((t - (8.955 + 0.35)) / 0.9)
+      // Bespoke swash under C-O-R slides in
+      const tTail = clamp01((t - 5.84) / 0.65)
       const eTail = EASES.power3Out(tTail)
-      tail.style.opacity = String(eTail)
-      tail.setAttribute('transform', `translate(${lerp(-10, 0, eTail)}, 0)`)
+      tail.style.opacity = String(eTail.toFixed(3))
+      tail.setAttribute('transform', `translate(${lerp(-10, 0, eTail).toFixed(2)}, 0)`)
 
-      // 8. Settle: grow stage, bloom radial glow, sweep masked glint, reveal bottom UI
-      const tSettle = clamp01((t - 9.255) / 2.2)
+      // 8. Settle: grow stage, bloom radial glow, sweep masked glint
+      const tSettle = clamp01((t - 5.82) / 1.35)
       const eSettle = EASES.expoInOut(tSettle)
-      stageWrap.style.transform = `translateY(-22px) scale(${lerp(1, 1.18, eSettle)})`
+      stageWrap.style.transform = `translate3d(0, -20px, 0) scale(${lerp(1, 1.18, eSettle).toFixed(4)})`
 
-      const tGlow = clamp01((t - 9.555) / 2.2)
-      hero.style.setProperty('--glow', String(EASES.power2Out(tGlow)))
+      const tGlow = clamp01((t - 5.9) / 1.3)
+      hero.style.setProperty('--glow', String(EASES.power2Out(tGlow).toFixed(3)))
 
-      const tGlint = clamp01((t - 9.655) / 1.4)
-      glint.setAttribute(
-        'x',
-        String(lerp(lb.x - 60, lb.x + lb.width + 20, EASES.power2InOut(tGlint)))
-      )
+      // Only enable SVG mask rasterization during the 1.05s glint sweep window
+      const tGlint = clamp01((t - 6.02) / 1.05)
+      if (tGlint > 0 && tGlint < 1) {
+        if (glintGroup.style.display !== '') glintGroup.style.display = ''
+        glint.setAttribute(
+          'x',
+          String(lerp(lb.x - 60, lb.x + lb.width + 20, EASES.power2InOut(tGlint)).toFixed(1))
+        )
+      } else if (glintGroup.style.display !== 'none') {
+        glintGroup.style.display = 'none'
+      }
 
-      const tCue = clamp01((t - 9.955) / 0.9)
-      const eCue = EASES.power2Out(tCue)
-      bottomNav.style.opacity = String(eCue)
-      bottomNav.style.transform = `translate3d(0, ${lerp(12, 0, eCue)}px, 0)`
-      bottomNav.style.pointerEvents = tCue > 0.5 ? 'auto' : 'none'
+      // Bottom navigation: softly visible after grid resolve (t >= 2.8s), full brightness on settle
+      const tEarlyNav = clamp01((t - 2.8) / 0.6)
+      const tFullNav = clamp01((t - 5.95) / 0.65)
+      const navOpacity = lerp(0, 0.42, EASES.power2Out(tEarlyNav)) + lerp(0, 0.58, EASES.power2Out(tFullNav))
+      const navY = lerp(12, 0, EASES.power2Out(Math.max(tEarlyNav, tFullNav)))
+      bottomNav.style.opacity = String(clamp01(navOpacity).toFixed(3))
+      bottomNav.style.transform = `translate3d(0, ${navY.toFixed(1)}px, 0)`
+      bottomNav.style.pointerEvents = t >= 2.6 ? 'auto' : 'none'
     }
 
     setIntroFinished(false)
-    renderAtTime(0.001)
+    renderAtTime(0.001, false)
     setStageReady(true)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduceMotion) {
-      renderAtTime(TOTAL_DURATION)
+      renderAtTime(TOTAL_DURATION, false)
       setIntroFinished(true)
       return
     }
@@ -509,35 +712,34 @@ export function WelcomePage({
       currentTime: 0,
       skipStartTime: 0,
       skipFromTime: 0,
-      renderAtTime,
+      renderAtTime: (timeVal: number) => renderAtTime(timeVal, false),
     }
 
     const tick = (ts: number) => {
       const st = animStateRef.current
-      if (!st.renderAtTime) return
-
       if (st.mode === 'playing') {
         const elapsed = (ts - st.startTime) / 1000
         st.currentTime = elapsed
         if (elapsed >= TOTAL_DURATION) {
-          st.renderAtTime(TOTAL_DURATION)
+          renderAtTime(TOTAL_DURATION, true)
           st.mode = 'done'
           setIntroFinished(true)
           return
         }
-        st.renderAtTime(elapsed)
-        if (elapsed >= 9.95) {
+        renderAtTime(elapsed, true)
+        if (elapsed >= 6.0) {
           setIntroFinished(true)
         }
         rafRef.current = requestAnimationFrame(tick)
       } else if (st.mode === 'skipping') {
-        const p = clamp01((ts - st.skipStartTime) / 800)
+        const p = clamp01((ts - st.skipStartTime) / 550)
         const eased = EASES.power2InOut(p)
         const tCur = lerp(st.skipFromTime, TOTAL_DURATION, eased)
         st.currentTime = tCur
-        st.renderAtTime(tCur)
+        renderAtTime(tCur, false)
         if (p >= 1) {
           st.mode = 'done'
+          triggerHaptic('medium', true)
           setIntroFinished(true)
           return
         }
@@ -548,11 +750,11 @@ export function WelcomePage({
     rafRef.current = requestAnimationFrame(tick)
   }, [])
 
-  // Prepare SVG stage once after loader finishes (mirrors CodePen prepareStage)
+  // Fast 420ms loader
   useEffect(() => {
     let cancelled = false
     const startMs = performance.now()
-    const MIN_TIME = 900
+    const MIN_TIME = 420
 
     const loaderTick = (now: number) => {
       if (cancelled) return
@@ -566,7 +768,7 @@ export function WelcomePage({
         setTimeout(() => {
           if (cancelled) return
           setLoaderDone(true)
-        }, 180)
+        }, 90)
       }
     }
     requestAnimationFrame(loaderTick)
@@ -765,7 +967,7 @@ export function WelcomePage({
     })
     defs.append(grad, mask)
     logoG.appendChild(defs)
-    const glintGroup = mk('g', { mask: 'url(#qt-logo-mask)' })
+    const glintGroup = mk('g', { mask: 'url(#qt-logo-mask)', style: 'display:none' }) as SVGGElement
     const glint = mk('rect', {
       x: lb.x - 60,
       y: lb.y - 20,
@@ -825,6 +1027,7 @@ export function WelcomePage({
       logoLetters,
       tail,
       rules,
+      glintGroup,
       glint,
       lb,
       toStage,
@@ -839,7 +1042,7 @@ export function WelcomePage({
   }, [loaderDone, buildAndPlayTimeline])
 
   const handleSkip = useCallback(() => {
-    haptic('light')
+    triggerHaptic('light', true)
     const st = animStateRef.current
     if (st.mode !== 'playing') return
     st.mode = 'skipping'
@@ -848,7 +1051,7 @@ export function WelcomePage({
   }, [])
 
   const handleReplay = useCallback(() => {
-    haptic('light')
+    triggerHaptic('light', true)
     buildAndPlayTimeline()
   }, [buildAndPlayTimeline])
 
@@ -866,23 +1069,23 @@ export function WelcomePage({
       ch2: 'Силуэты',
       ch3: 'Расчёты',
       enter: 'Войти',
-      skip: 'Skip intro',
-      replay: 'Replay',
+      skip: 'Пропустить',
+      replay: 'Повтор',
     },
     uk: {
       ch1: 'Cardio',
       ch2: 'Силуети',
       ch3: 'Розрахунки',
       enter: 'Увійти',
-      skip: 'Skip intro',
-      replay: 'Replay',
+      skip: 'Пропустити',
+      replay: 'Повтор',
     },
     de: {
       ch1: 'Cardio',
       ch2: 'Silhouetten',
       ch3: 'Rechner',
       enter: 'Eintreten',
-      skip: 'Skip intro',
+      skip: 'Überspringen',
       replay: 'Replay',
     },
   }[lang]
@@ -900,6 +1103,12 @@ export function WelcomePage({
   return (
     <main
       ref={heroRef}
+      onClick={() => {
+        // Tapping the stage while intro is playing smoothly fast-forwards to the assembled logo
+        if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 1.2) {
+          handleSkip()
+        }
+      }}
       style={
         {
           '--glow': 0,
@@ -911,26 +1120,25 @@ export function WelcomePage({
       }
       className="relative grid h-[100dvh] w-full place-items-center overflow-hidden select-none isolate antialiased"
     >
-      {/* Load Google Font Cormorant Garamond for exact typographic parity */}
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap"
       />
 
-      {/* 0. Loader */}
+      {/* 0. Fast Minimal Loader */}
       <div
         aria-hidden={loaderDone}
         style={{
           background: '#191714',
           opacity: loaderDone ? 0 : 1,
           pointerEvents: loaderDone ? 'none' : 'auto',
-          transition: 'opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'opacity 420ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
-        className="fixed inset-0 z-50 grid place-items-center content-center gap-[18px]"
+        className="fixed inset-0 z-50 grid place-items-center content-center gap-[16px]"
       >
         <div
           style={{ background: 'rgba(213, 197, 171, 0.14)' }}
-          className="relative h-[1px] w-[160px] overflow-hidden"
+          className="relative h-[1px] w-[150px] overflow-hidden"
         >
           <span
             style={{
@@ -943,51 +1151,48 @@ export function WelcomePage({
         </div>
         <span
           style={{ color: 'rgba(213, 197, 171, 0.45)' }}
-          className="text-[13px] tracking-[0.3em] tabular-nums"
+          className="text-[12px] tracking-[0.3em] tabular-nums"
         >
           {Math.round(loaderProgress * 100)}
         </span>
       </div>
 
-      {/* Soft radial glow behind the assembled logo */}
+      {/* GPU-composited warm radial glow behind the assembled logo */}
       <div
         aria-hidden="true"
         style={{
-          width: '70vmin',
-          height: '40vmin',
-          background: 'radial-gradient(closest-side, rgba(244, 231, 207, 0.11), transparent)',
+          width: '72vmin',
+          height: '42vmin',
+          background: 'radial-gradient(closest-side, rgba(244, 231, 207, 0.115), transparent)',
           opacity: 'var(--glow, 0)',
+          willChange: 'opacity',
         }}
         className="pointer-events-none absolute top-1/2 left-1/2 z-0 -translate-x-1/2 -translate-y-1/2"
       />
 
-      {/* Fine film grain overlay */}
-      <div
-        aria-hidden="true"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        }}
-        className="pointer-events-none absolute -inset-1/2 z-20 opacity-[0.07] mix-blend-overlay"
-      />
-
-      {/* 1. TOP BAR: Replay / Skip + Apple-style smooth pill language switcher (ru / ukr / de) */}
-      <header className="absolute top-0 right-0 left-0 z-30 flex items-center justify-between px-6 pt-5">
+      {/* 1. TOP BAR: Localized Skip/Replay + Apple-style liquid pill switcher (ru / ukr / de) */}
+      <header
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-0 right-0 left-0 z-40 flex items-center justify-between px-6 pt-4"
+      >
         <div>
           {!introFinished ? (
             <button
               type="button"
+              onPointerDown={() => triggerHaptic('selection', true)}
               onClick={handleSkip}
-              style={{ color: 'rgba(213, 197, 171, 0.45)' }}
-              className="border-0 bg-transparent py-2 pr-3 text-[15px] font-medium italic tracking-[0.08em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] cursor-pointer"
+              style={{ color: 'rgba(213, 197, 171, 0.55)' }}
+              className="min-h-[38px] border-0 bg-transparent py-2 pr-4 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
             >
               {t.skip}
             </button>
           ) : (
             <button
               type="button"
+              onPointerDown={() => triggerHaptic('selection', true)}
               onClick={handleReplay}
-              style={{ color: 'rgba(213, 197, 171, 0.45)' }}
-              className="inline-flex items-center gap-2 border-0 bg-transparent py-2 pr-3 text-[15px] font-medium italic tracking-[0.08em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] cursor-pointer"
+              style={{ color: 'rgba(213, 197, 171, 0.55)' }}
+              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-4 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
                 <path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
@@ -1002,8 +1207,8 @@ export function WelcomePage({
           role="tablist"
           aria-label="Language switcher"
           style={{
-            background: 'rgba(213, 197, 171, 0.055)',
-            borderColor: 'rgba(213, 197, 171, 0.14)',
+            background: 'rgba(213, 197, 171, 0.06)',
+            borderColor: 'rgba(213, 197, 171, 0.15)',
           }}
           className="relative grid grid-cols-3 items-center rounded-full border p-[3px] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]"
         >
@@ -1011,10 +1216,10 @@ export function WelcomePage({
             aria-hidden="true"
             style={{
               transform: `translate3d(${activeLangIdx * 100}%, 0, 0)`,
-              background: 'rgba(244, 231, 207, 0.15)',
+              background: 'rgba(244, 231, 207, 0.16)',
               boxShadow:
-                '0 2px 8px rgba(0, 0, 0, 0.38), inset 0 1px 0.5px rgba(255, 255, 255, 0.16)',
-              transition: 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1)',
+                '0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0.5px rgba(255, 255, 255, 0.18)',
+              transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
             className="pointer-events-none absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full"
           />
@@ -1026,19 +1231,22 @@ export function WelcomePage({
                 type="button"
                 role="tab"
                 aria-selected={active}
+                onPointerDown={() => {
+                  if (lang !== item.code) triggerHaptic('selection', true)
+                }}
                 onClick={() => {
-                  haptic('light')
+                  triggerHaptic('light', true)
                   localStorage.setItem('app_lang', item.code)
                   localStorage.setItem('cordwainer_lang', item.code)
                   setLang(item.code)
                 }}
                 style={{
-                  color: active ? '#f4e7cf' : 'rgba(213, 197, 171, 0.45)',
+                  color: active ? '#f4e7cf' : 'rgba(213, 197, 171, 0.48)',
                   fontFamily:
                     '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif',
-                  transition: 'color 300ms cubic-bezier(0.22, 1, 0.36, 1)',
+                  transition: 'color 280ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
-                className="relative z-10 min-w-[42px] rounded-full border-0 bg-transparent px-2.5 py-1 text-center text-[11px] font-medium lowercase tracking-[0.04em] outline-none cursor-pointer"
+                className="relative z-10 min-w-[44px] rounded-full border-0 bg-transparent px-2.5 py-1.5 text-center text-[11px] font-medium lowercase tracking-[0.04em] outline-none cursor-pointer"
               >
                 {item.label}
               </button>
@@ -1051,9 +1259,9 @@ export function WelcomePage({
       <div
         ref={stageWrapRef}
         style={{
-          width: 'min(78vw, 55vh)',
+          width: 'min(78vw, 54vh)',
           visibility: stageReady ? 'visible' : 'hidden',
-          transform: 'translateY(-22px)',
+          transform: 'translate3d(0, -20px, 0)',
           willChange: 'transform',
         }}
         className="relative z-10"
@@ -1114,7 +1322,7 @@ export function WelcomePage({
         >
           <g transform="translate(-586.87 -85.41)">
             <path d={LOGO_MAIN_D} transform="translate(750 143)" fill="#d5c5ab" />
-            <path d={LOGO_TAIL_D} transform="translate(468.5 -49.879)" fill="#d5c5ab" />
+            <path d={LOGO_TAIL_D} fill="#d5c5ab" />
             <path d={LOGO_THE_D} transform="translate(650 104)" fill="#d5c5ab" />
             <path d="M77,.5H0v-1H77Z" transform="translate(667 104)" fill="#d5c5ab" />
             <path d="M11,.5H0v-1H11Z" transform="translate(623 104)" fill="#d5c5ab" />
@@ -1125,14 +1333,16 @@ export function WelcomePage({
       {/* 3. BOTTOM NAVIGATION: Pure typographic Cardio · Силуэты · Расчёты & Войти */}
       <footer
         ref={bottomNavRef}
+        onClick={(e) => e.stopPropagation()}
         style={{
           opacity: 0,
           transform: 'translate3d(0, 12px, 0)',
           pointerEvents: 'none',
+          willChange: 'opacity, transform',
         }}
-        className="absolute right-0 bottom-7 left-0 z-30 flex flex-col items-center gap-5 px-6"
+        className="absolute right-0 bottom-7 left-0 z-40 flex flex-col items-center gap-5 px-6"
       >
-        <nav aria-label="Chapters" className="flex items-center gap-7">
+        <nav aria-label="Chapters" className="flex items-center justify-center gap-6 sm:gap-8">
           {[
             { label: t.ch1, onClick: onOpenMaterials },
             { label: t.ch2, onClick: onOpenStyles },
@@ -1142,24 +1352,25 @@ export function WelcomePage({
               {idx > 0 && (
                 <span
                   aria-hidden="true"
-                  style={{ color: 'rgba(213, 197, 171, 0.35)' }}
-                  className="text-[12px]"
+                  style={{ color: 'rgba(213, 197, 171, 0.45)' }}
+                  className="select-none text-[13px]"
                 >
                   ·
                 </span>
               )}
               <button
                 type="button"
+                onPointerDown={() => triggerHaptic('selection', true)}
                 onClick={() => {
-                  haptic('light')
+                  triggerHaptic('light', true)
                   item.onClick?.()
                 }}
                 style={{
                   color: '#d5c5ab',
                   transition:
-                    'color 320ms cubic-bezier(0.22, 1, 0.36, 1), transform 320ms cubic-bezier(0.22, 1, 0.36, 1)',
+                    'color 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
-                className="border-0 bg-transparent px-1 py-1 text-[17.5px] font-normal tracking-[0.05em] outline-none hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
+                className="min-h-[40px] border-0 bg-transparent px-2 py-1.5 text-[18px] font-normal tracking-[0.05em] outline-none hover:text-[#f4e7cf] active:scale-95 cursor-pointer"
               >
                 {item.label}
               </button>
@@ -1170,23 +1381,24 @@ export function WelcomePage({
         {/* Scroll-cue style primary entry button: Войти */}
         <button
           type="button"
+          onPointerDown={() => triggerHaptic('light', true)}
           onClick={() => {
-            haptic('medium')
+            triggerHaptic('medium', true)
             onStart?.()
           }}
           style={{
             color: '#f4e7cf',
-            transition: 'transform 350ms cubic-bezier(0.22, 1, 0.36, 1), color 300ms ease',
+            transition: 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1), color 280ms ease',
           }}
-          className="group flex flex-col items-center gap-2.5 border-0 bg-transparent px-5 py-1 outline-none active:scale-95 cursor-pointer"
+          className="group flex flex-col items-center gap-2.5 border-0 bg-transparent px-6 py-1 outline-none active:scale-95 cursor-pointer"
         >
           <span className="text-[13px] font-normal uppercase tracking-[0.35em]">
             {t.enter}
           </span>
           <i
             aria-hidden="true"
-            style={{ background: 'rgba(213, 197, 171, 0.15)' }}
-            className="relative block h-[38px] w-[1px] overflow-hidden"
+            style={{ background: 'rgba(213, 197, 171, 0.16)' }}
+            className="relative block h-[36px] w-[1px] overflow-hidden"
           >
             <span
               style={{
