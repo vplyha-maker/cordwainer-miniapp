@@ -316,7 +316,6 @@ class SoundEngine {
     if (!c || !dest) return
     try {
       const t0 = c.currentTime
-      // Dmaj9 warm voicing: D3 (146.83), A3 (220.00), F#4 (369.99), A4 (440.00), E5 (659.25)
       const freqs = [146.83, 220.0, 369.99, 440.0, 659.25]
       const amps = [0.24, 0.19, 0.15, 0.12, 0.09]
       freqs.forEach((f, idx) => {
@@ -353,7 +352,7 @@ class SoundEngine {
     if (!c || !dest) return
     try {
       const t0 = c.currentTime
-      const notes = [587.33, 739.99, 880.0, 1174.66] // D5, F#5, A5, D6
+      const notes = [587.33, 739.99, 880.0, 1174.66]
       notes.forEach((freq, idx) => {
         const osc = c.createOscillator()
         const gain = c.createGain()
@@ -491,17 +490,9 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
   } catch {}
 }
 
-function hasVisitedBefore(): boolean {
-  try {
-    return localStorage.getItem('cordwainer_visited') === '1'
-  } catch {
-    return false
-  }
-}
-
 // ---------------------------------------------------------------------------
-// 4. PRE-BAKED RAY-CAST SILK & CASHMERE LIGHTING BUFFER (Computed ONCE in < 1.2ms)
-// Eliminates per-frame WebGL + 2D dual-canvas mailbox sync stalls on Android WebView
+// 4. PRE-BAKED RAY-CAST ALABASTER-PEARL & SMOKED-PEWTER 3D SPOTLIGHT BUFFER
+// Matches the exact iPhone 1000057245.mp4 palette (Zero yellow cast, rich 3D vignette)
 // ---------------------------------------------------------------------------
 type PrebakedTextures = {
   bgCanvas: HTMLCanvasElement
@@ -512,7 +503,7 @@ type PrebakedTextures = {
 function createPrebakedTextures(): PrebakedTextures | null {
   if (typeof document === 'undefined') return null
 
-  // 1. Ray-Cast Silk & Warm Pearl-Champagne Normal-Map Background (180x360)
+  // 1. Ray-Cast Alabaster-Pearl & Smoked-Pewter Normal-Map Spotlight (180x360)
   const bgW = 180
   const bgH = 360
   const bgCanvas = document.createElement('canvas')
@@ -522,27 +513,25 @@ function createPrebakedTextures(): PrebakedTextures | null {
   if (bgCtx) {
     const img = bgCtx.createImageData(bgW, bgH)
     const data = img.data
-    const aspect = bgW / bgH
 
-    // Normalized key & rim light directions
     const kLx = -0.22, kLy = 0.26, kLz = 0.94
     const rLx = 0.38, rLy = -0.32, rLz = 0.86
 
     let p = 0
     for (let y = 0; y < bgH; y++) {
-      const uvY = 1.0 - y / (bgH - 1) // 0 at bottom, 1 at top
-      const pY = uvY - 0.52
+      // Normalized screen coordinates in [-1, 1] so the 3D spotlight vignette frames mobile screens properly
+      const nyScr = (1.0 - y / (bgH - 1) - 0.52) * 2.0
+      const pY = nyScr * 1.0
       for (let x = 0; x < bgW; x++) {
-        const uvX = x / (bgW - 1)
-        const pX = (uvX - 0.5) * aspect
+        const nxScr = (x / (bgW - 1) - 0.5) * 2.0
+        const pX = nxScr * 0.5
 
-        // 3-octave anisotropic silk & fine calfskin heightfield derivatives
-        const u1 = pX * 5.2 + pY * 2.1
-        const v1 = pY * 4.5 - pX * 2.4
-        const hX = Math.cos(u1) * Math.sin(v1) * 0.14
-        const hY = Math.sin(u1) * Math.cos(v1) * 0.14
+        // Anisotropic silk & fine calfskin heightfield derivatives
+        const u1 = pX * 6.0 + pY * 2.4
+        const v1 = pY * 5.2 - pX * 2.8
+        const hX = Math.cos(u1) * Math.sin(v1) * 0.12
+        const hY = Math.sin(u1) * Math.cos(v1) * 0.12
 
-        // Surface normal (nx, ny, nz)
         const nx = -hX
         const ny = -hY
         const nz = 1.0
@@ -554,34 +543,36 @@ function createPrebakedTextures(): PrebakedTextures | null {
         const diffKey = Math.max(snx * kLx + sny * kLy + snz * kLz, 0.0)
         const diffRim = Math.max(snx * rLx + sny * rLy + snz * rLz, 0.0)
 
-        // Blinn-Phong half-vector specular
         const hx = kLx * 0.5
         const hy = kLy * 0.5
         const hz = (kLz + 1.0) * 0.5
         const hInv = 1.0 / Math.sqrt(hx * hx + hy * hy + hz * hz)
         const specDot = Math.max(snx * hx * hInv + sny * hy * hInv + snz * hz * hInv, 0.0)
-        const spec = Math.pow(specDot, 22.0)
+        const spec = Math.pow(specDot, 24.0)
 
-        const dist = Math.sqrt(pX * pX * 1.15 + pY * pY * 0.88)
-        const centerGlow = Math.exp(-dist * dist * 2.45)
-        const vig = Math.max(0.0, Math.min(1.0, (0.98 - dist) / (0.98 - 0.16)))
+        // Elliptical screen-space distance (0 at center, ~1.0 at edges, ~1.35 at corners)
+        const dist = Math.sqrt(nxScr * nxScr * 0.85 + nyScr * nyScr * 0.68)
+        const centerGlow = Math.exp(-dist * dist * 1.65)
+        const vig = Math.max(0.0, Math.min(1.0, (1.22 - dist) / (1.22 - 0.12)))
         const vigSmooth = vig * vig * (3.0 - 2.0 * vig)
 
-        // Base colors: Warm Cashmere Taupe (#8A7B69) -> Warm Sand (#CBBFAA) -> Pearl Champagne (#E5DCD1)
-        let r = 0.541 + (0.796 - 0.541) * vigSmooth
-        let g = 0.482 + (0.749 - 0.482) * vigSmooth
-        let b = 0.412 + (0.667 - 0.412) * vigSmooth
+        // Exact iPhone 1000057245.mp4 Neutral Alabaster-Pearl & Smoked-Pewter Stone Palette (Zero yellow!)
+        // Outer edge: Smoked Pewter (#54514D -> 0.329, 0.318, 0.302)
+        // Mid stone: Cool Platinum Stone (#BDBAB4 -> 0.741, 0.729, 0.706)
+        // Center spotlight: Luminous Alabaster Pearl (#F2F1EE -> 0.949, 0.945, 0.933)
+        let r = 0.329 + (0.741 - 0.329) * vigSmooth
+        let g = 0.318 + (0.729 - 0.318) * vigSmooth
+        let b = 0.302 + (0.706 - 0.302) * vigSmooth
 
-        const pearlMix = centerGlow * 0.68
-        r = r + (0.898 - r) * pearlMix
-        g = g + (0.863 - g) * pearlMix
-        b = b + (0.82 - b) * pearlMix
+        const pearlMix = centerGlow * 0.85
+        r = r + (0.949 - r) * pearlMix
+        g = g + (0.945 - g) * pearlMix
+        b = b + (0.933 - b) * pearlMix
 
-        r += (diffKey - 0.88) * 0.045 + diffRim * 0.022 + spec * 0.085 * centerGlow
-        g += (diffKey - 0.88) * 0.042 + diffRim * 0.019 + spec * 0.072 * centerGlow
-        b += (diffKey - 0.88) * 0.036 + diffRim * 0.015 + spec * 0.052 * centerGlow
+        r += (diffKey - 0.88) * 0.038 + diffRim * 0.018 + spec * 0.075 * centerGlow
+        g += (diffKey - 0.88) * 0.038 + diffRim * 0.018 + spec * 0.075 * centerGlow
+        b += (diffKey - 0.88) * 0.036 + diffRim * 0.017 + spec * 0.072 * centerGlow
 
-        // Deterministic dither to prevent 8-bit banding on Android AMOLED panels
         const dither = (((x * 13 + y * 29) & 7) / 7.0 - 0.5) * (1.2 / 255.0)
 
         data[p++] = Math.max(0, Math.min(255, Math.round((r + dither) * 255)))
@@ -593,30 +584,30 @@ function createPrebakedTextures(): PrebakedTextures | null {
     bgCtx.putImageData(img, 0, 0)
   }
 
-  // 2. Pre-rendered Radial Pearl-Gold Halo Sprite (256x256)
+  // 2. Pre-rendered Radial Pure-Pearl Halo Sprite (256x256)
   const glowCanvas = document.createElement('canvas')
   glowCanvas.width = 256
   glowCanvas.height = 256
   const gCtx = glowCanvas.getContext('2d')
   if (gCtx) {
     const grad = gCtx.createRadialGradient(128, 128, 4, 128, 128, 124)
-    grad.addColorStop(0, 'rgba(250, 244, 234, 0.56)')
-    grad.addColorStop(0.45, 'rgba(218, 198, 168, 0.22)')
-    grad.addColorStop(1, 'rgba(196, 178, 152, 0)')
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.62)')
+    grad.addColorStop(0.45, 'rgba(238, 236, 232, 0.24)')
+    grad.addColorStop(1, 'rgba(210, 207, 202, 0)')
     gCtx.fillStyle = grad
     gCtx.fillRect(0, 0, 256, 256)
   }
 
-  // 3. Pre-rendered Diagonal Golden Specular Ray Sprite (256x256)
+  // 3. Pre-rendered Diagonal Specular Ray Sprite (256x256)
   const rayCanvas = document.createElement('canvas')
   rayCanvas.width = 256
   rayCanvas.height = 256
   const rCtx = rayCanvas.getContext('2d')
   if (rCtx) {
     const rGrad = rCtx.createLinearGradient(28, 28, 228, 228)
-    rGrad.addColorStop(0, 'rgba(246, 232, 204, 0)')
-    rGrad.addColorStop(0.5, 'rgba(252, 240, 212, 0.55)')
-    rGrad.addColorStop(1, 'rgba(246, 232, 204, 0)')
+    rGrad.addColorStop(0, 'rgba(255, 252, 245, 0)')
+    rGrad.addColorStop(0.5, 'rgba(255, 252, 245, 0.58)')
+    rGrad.addColorStop(1, 'rgba(255, 252, 245, 0)')
     rCtx.fillStyle = rGrad
     rCtx.fillRect(0, 0, 256, 256)
   }
@@ -634,8 +625,8 @@ type WordTargetSpec = {
   char: string
   row: number
   col: number
-  wordGroup: 0 | 1 | 2 // 0 = THE, 1 = CORD, 2 = WAINE
-  logoIndex: number // -1 for THE, 0..8 for C-O-R-D-W-A-I-N-E
+  wordGroup: 0 | 1 | 2
+  logoIndex: number
 }
 
 const WORD_SPECS: WordTargetSpec[] = [
@@ -719,7 +710,6 @@ function buildMatrixCells(): MatrixCell[] {
   return cells
 }
 
-// Smooth easing curves
 function easeOutCubic(x: number): number {
   const t = Math.max(0, Math.min(1, x))
   return 1 - Math.pow(1 - t, 3)
@@ -742,21 +732,20 @@ export function WelcomePage({
   lang,
   setLang,
 }: WelcomePageProps) {
-  const [returning] = useState(hasVisitedBefore)
-  const [phase, setPhase] = useState<'intro' | 'complete'>(() =>
-    returning ? 'complete' : 'intro'
-  )
+  // Always launch with the signature intro animation ('intro') automatically on mount!
+  const [phase, setPhase] = useState<'intro' | 'complete'>('intro')
   const [showPhilosophy, setShowPhilosophy] = useState(false)
   const [soundOn, setSoundOn] = useState(() => sound.enabled)
   const [runId, setRunId] = useState(0)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const skipRequestedRef = useRef(false)
   const matrixCells = useMemo(() => buildMatrixCells(), [])
 
-  // Configure Telegram WebApp header & background colors to Warm Cashmere-Pearl (#C4B39B)
+  // Configure Telegram WebApp header & background colors to Smoked Pewter-Stone (#6E6B66)
   useEffect(() => {
     try {
-      const bgHex = '#C4B39B'
+      const bgHex = '#6E6B66'
       getWin().Telegram?.WebApp?.setHeaderColor?.(bgHex)
       getWin().Telegram?.WebApp?.setBackgroundColor?.(bgHex)
       getWin().Telegram?.WebApp?.expand?.()
@@ -812,7 +801,7 @@ export function WelcomePage({
   }[lang]
 
   // -------------------------------------------------------------------------
-  // SINGLE-CANVAS 60/120FPS ENGINE (Zero DOM Mutation, Zero Dual-Canvas Stall)
+  // SINGLE-CANVAS 60/120FPS ENGINE (Always plays automatically on launch)
   // -------------------------------------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current
@@ -838,16 +827,11 @@ export function WelcomePage({
     syncViewport()
     window.addEventListener('resize', syncViewport)
 
-    const isInstantComplete = returning && runId === 0
-    if (isInstantComplete) {
-      setPhase('complete')
-      setShowPhilosophy(false)
-    } else {
-      setPhase('intro')
-      setShowPhilosophy(false)
-    }
+    skipRequestedRef.current = false
+    setPhase('intro')
+    setShowPhilosophy(false)
 
-    // Milestone flags for synchronized audio & haptics across the 4.5s choreography
+    // Milestone flags for synchronized audio & haptics across the choreography
     let mSpawn = false
     let mOrbit = false
     let mWord0 = false
@@ -857,23 +841,27 @@ export function WelcomePage({
     let mPhilosophyOff = false
     let mLogoLock = false
     let mLightSweep = false
-    let mDone = isInstantComplete
+    let mDone = false
 
     let rafId = 0
     let lastNow = performance.now()
-    let simTime = isInstantComplete ? 5.0 : 0.0
+    let simTime = 0.0
 
     const renderFrame = (now: number) => {
-      // Clamp frame delta to max 33ms (30fps floor) so cold-start Android WebView frames
-      // never skip or jump over the matrix-to-logo flight choreography!
       const rawDt = (now - lastNow) / 1000
       lastNow = now
       const dt = Math.max(0.001, Math.min(0.033, rawDt))
-      simTime += dt
+
+      if (skipRequestedRef.current && simTime < 4.5) {
+        simTime = 4.5
+        mDone = true
+      } else {
+        simTime += dt
+      }
       const elapsed = simTime
 
       // Trigger audio & haptic milestones during active intro
-      if (!isInstantComplete) {
+      if (!skipRequestedRef.current) {
         if (!mSpawn && elapsed >= 0.06) {
           mSpawn = true
           haptic('light')
@@ -898,7 +886,7 @@ export function WelcomePage({
           haptic('medium')
           sound.softTick(1.28)
         }
-        if (!mPhilosophyOn && elapsed >= 2.25) {
+        if (!mPhilosophyOn && elapsed >= 2.82) {
           mPhilosophyOn = true
           setShowPhilosophy(true)
         }
@@ -911,7 +899,7 @@ export function WelcomePage({
           mLightSweep = true
           sound.goldenShimmer()
         }
-        if (!mPhilosophyOff && elapsed >= 3.65) {
+        if (!mPhilosophyOff && elapsed >= 3.85) {
           mPhilosophyOff = true
           setShowPhilosophy(false)
         }
@@ -923,7 +911,7 @@ export function WelcomePage({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-      // 1. Blit pre-baked ray-cast silk normal-map background in 0.05ms
+      // 1. Blit pre-baked Alabaster-Pearl & Smoked-Pewter 3D spotlight background in 0.05ms
       ctx.globalAlpha = 1.0
       ctx.drawImage(textures.bgCanvas, 0, 0, viewW, viewH)
 
@@ -934,12 +922,12 @@ export function WelcomePage({
       const cellGlyphScale = (cellStep * 0.43) / 24.0
       const logoMasterScale = Math.min((viewW * 0.82) / 248.0, 1.44)
 
-      // 2. Signature breathing pearl-gold halo behind logo (using pre-rendered sprite)
+      // 2. Signature breathing pearl halo behind logo (using pre-rendered sprite)
       if (elapsed > 1.8) {
         const haloIn = easeOutCubic(clamp01((elapsed - 1.8) / 1.1))
         const breathe = 0.5 + 0.5 * Math.sin(elapsed * 1.65)
         const haloR = (135 + breathe * 14) * logoMasterScale
-        ctx.globalAlpha = haloIn * (0.48 + breathe * 0.14)
+        ctx.globalAlpha = haloIn * (0.52 + breathe * 0.14)
         ctx.drawImage(
           textures.glowCanvas,
           centerX - haloR * 1.45,
@@ -970,7 +958,7 @@ export function WelcomePage({
           let y = homeY + Math.sin(curOrbitAng) * curOrbitR
           let rot = cell.spinStart * (1 - convP)
           let scale = cellGlyphScale * (0.58 + 0.42 * spawnP)
-          let alpha = spawnP * (cell.isWord ? 0.88 : 0.38)
+          let alpha = spawnP * (cell.isWord ? 0.9 : 0.36)
           let useGoldColor = false
 
           if (cell.isWord) {
@@ -993,7 +981,6 @@ export function WelcomePage({
               alpha *= 1 - fadeP
             }
           } else if (cell.logoIndex === -1) {
-            // T-H-E ascends into the italic "the" crown above CORDWAINE
             const flyP = easeInOutQuart(clamp01((elapsed - 1.72) / 0.95))
             if (flyP > 0) {
               const targetX = centerX + (cell.col - 6) * 10 * logoMasterScale
@@ -1004,13 +991,12 @@ export function WelcomePage({
               alpha *= 1 - flyP
             }
           } else {
-            // C-O-R-D-W-A-I-N-E smoothly arcs from matrix cell into Haute-Couture Didone wordmark
             const stagger = cell.logoIndex * 0.032
             const flyP = easeInOutQuart(clamp01((elapsed - (1.72 + stagger)) / 1.15))
             const targetSpec = LOGO_TARGETS[cell.logoIndex]
             const targetX = centerX + targetSpec.x * logoMasterScale
             const targetY = centerY + targetSpec.y * logoMasterScale
-            const targetScale = (logoMasterScale * targetSpec.scale)
+            const targetScale = logoMasterScale * targetSpec.scale
 
             const arcLift = Math.sin(flyP * Math.PI) * -14 * (1 - cell.logoIndex * 0.08)
             x = x + (targetX - x) * flyP
@@ -1029,7 +1015,7 @@ export function WelcomePage({
           if (Math.abs(rot) > 0.001) ctx.rotate(rot)
           ctx.scale(scale, scale)
           ctx.globalAlpha = alpha
-          ctx.fillStyle = useGoldColor ? '#8A6330' : cell.isWord ? '#16120E' : '#4A4035'
+          ctx.fillStyle = useGoldColor ? '#8E6835' : cell.isWord ? '#141210' : '#484540'
           ctx.fill(glyph)
           ctx.restore()
         }
@@ -1042,9 +1028,9 @@ export function WelcomePage({
         ctx.translate(centerX, centerY)
         ctx.scale(logoMasterScale, logoMasterScale)
 
-        // 4A. Render C-O-R-D-W-A-I-N-E in Deep Espresso-Obsidian (#15110D)
+        // 4A. Render C-O-R-D-W-A-I-N-E in Deep Obsidian (#141210)
         ctx.globalAlpha = lockupAlpha
-        ctx.fillStyle = '#15110D'
+        ctx.fillStyle = '#141210'
         for (let i = 0; i < LOGO_TARGETS.length; i++) {
           const lt = LOGO_TARGETS[i]
           const g = paths.glyphs[lt.char]
@@ -1062,10 +1048,10 @@ export function WelcomePage({
           ctx.save()
           ctx.globalAlpha = crownP
           ctx.translate(0, (1 - crownP) * 3.5)
-          ctx.fillStyle = '#755327'
+          ctx.fillStyle = '#7A5A2F'
           ctx.fill(paths.thePath)
           ctx.globalAlpha = crownP * 0.78
-          ctx.fillStyle = '#8B6839'
+          ctx.fillStyle = '#8C6B3F'
           ctx.fill(paths.rulesPath)
           ctx.restore()
         }
@@ -1078,7 +1064,7 @@ export function WelcomePage({
           ctx.rect(-125, 6, 115 * swashP, 26)
           ctx.clip()
           ctx.globalAlpha = Math.min(1, swashP * 1.15)
-          ctx.fillStyle = '#886332'
+          ctx.fillStyle = '#9E7840'
           ctx.fill(paths.swashPath)
           ctx.restore()
         }
@@ -1109,7 +1095,6 @@ export function WelcomePage({
           ctx.fill(paths.swashPath)
           ctx.restore()
 
-          // Subtle atmospheric diagonal ray sprite pass
           ctx.save()
           ctx.globalAlpha = env * 0.22
           ctx.drawImage(textures.rayCanvas, bandX - 55, -55, 110, 110)
@@ -1127,13 +1112,14 @@ export function WelcomePage({
       window.cancelAnimationFrame(rafId)
       window.removeEventListener('resize', syncViewport)
     }
-  }, [matrixCells, returning, runId])
+  }, [matrixCells, runId])
 
   const handleReplayOrSkip = useCallback(() => {
     sound.unlock()
     haptic('medium')
     sound.softTick(1.05)
     if (phase !== 'complete') {
+      skipRequestedRef.current = true
       setShowPhilosophy(false)
       setPhase('complete')
     } else {
@@ -1175,7 +1161,7 @@ export function WelcomePage({
   return (
     <div
       onPointerDown={() => sound.unlock()}
-      className="fixed inset-0 w-full h-[100lvh] min-h-screen overflow-hidden select-none bg-[#C4B39B] text-[#171310]"
+      className="fixed inset-0 w-full h-[100lvh] min-h-screen overflow-hidden select-none bg-[#6E6B66] text-[#141210]"
       style={{
         fontFamily:
           '"Cormorant Garamond", "Playfair Display", "Didot", "Bodoni MT", "Georgia", serif',
@@ -1183,14 +1169,14 @@ export function WelcomePage({
         touchAction: 'manipulation',
       }}
     >
-      {/* Single Hardware-Accelerated Canvas (Pre-baked Ray-Cast Silk + 60/120fps Didone Vector Engine) */}
+      {/* Single Hardware-Accelerated Canvas (Alabaster-Pearl & Smoked-Pewter 3D Spotlight + Didone Vector Engine) */}
       <canvas
         ref={canvasRef}
         aria-label="The Cordwaine"
         className="fixed inset-0 w-full h-full pointer-events-none block"
       />
 
-      {/* Top Bar: Skip/Replay + Sound Toggle + Apple-Style Language Switcher */}
+      {/* Top Bar: Skip/Replay + Sound Toggle + Luminous Pearl Language Switcher (iPhone 1000057245 style) */}
       <header
         className="relative z-20 flex items-center justify-between px-5 sm:px-8"
         style={{
@@ -1201,10 +1187,10 @@ export function WelcomePage({
           <button
             type="button"
             onClick={handleReplayOrSkip}
-            className="group inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-full text-[#171310]/75 hover:text-[#171310] active:scale-95 transition-all duration-300 cursor-pointer"
+            className="group inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-full text-[#141210]/80 hover:text-[#141210] active:scale-95 transition-all duration-300 cursor-pointer"
           >
             <span
-              className="text-[13px] text-[#7A5628] transition-transform duration-500 group-hover:-rotate-45"
+              className="text-[13px] text-[#7A5A2F] transition-transform duration-500 group-hover:-rotate-45"
               aria-hidden="true"
             >
               {isComplete ? '↻' : '⏭'}
@@ -1218,7 +1204,7 @@ export function WelcomePage({
             type="button"
             onClick={handleToggleSound}
             aria-label={soundOn ? 'Mute sound' : 'Enable sound'}
-            className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#171310]/15 bg-[#F5EFE6]/35 text-[#171310]/75 hover:text-[#171310] active:scale-95 transition-all duration-300 cursor-pointer"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-[#141210]/15 bg-[#FAF9F6]/45 text-[#141210]/80 hover:text-[#141210] active:scale-95 transition-all duration-300 cursor-pointer"
           >
             <span className="text-[11px] leading-none">
               {soundOn ? '♪' : '✕'}
@@ -1226,15 +1212,15 @@ export function WelcomePage({
           </button>
         </div>
 
-        {/* Apple-Style Segmented Pill Language Switcher */}
+        {/* Luminous Pearl Segmented Language Switcher (Exact iPhone 1000057245 look) */}
         <div
           role="tablist"
           aria-label="Language switcher"
-          className="relative grid grid-cols-3 items-center p-[3px] rounded-full border border-[#171310]/15 bg-[#EFE8DC]/55 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(23,19,16,0.06)] w-[138px] h-[32px]"
+          className="relative grid grid-cols-3 items-center p-[3px] rounded-full border border-[#141210]/12 bg-[#141210]/10 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(0,0,0,0.08)] w-[138px] h-[32px]"
         >
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute top-[3px] bottom-[3px] left-[3px] rounded-full bg-[#171310]/88 shadow-[0_2px_8px_rgba(23,19,16,0.22)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            className="pointer-events-none absolute top-[3px] bottom-[3px] left-[3px] rounded-full bg-[#FAF9F6] shadow-[0_2px_6px_rgba(20,18,16,0.16)] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
             style={{
               width: 'calc((100% - 6px) / 3)',
               transform: `translate3d(${langIndex * 100}%, 0, 0)`,
@@ -1257,8 +1243,8 @@ export function WelcomePage({
                 onClick={() => handleSelectLang(item.code)}
                 className={`relative z-10 flex items-center justify-center h-full rounded-full text-[11px] tracking-[0.06em] font-sans transition-colors duration-300 cursor-pointer ${
                   active
-                    ? 'text-[#F5EFE6] font-medium'
-                    : 'text-[#171310]/65 hover:text-[#171310]/90 font-normal'
+                    ? 'text-[#141210] font-semibold'
+                    : 'text-[#141210]/65 hover:text-[#141210]/90 font-normal'
                 }`}
               >
                 {item.label}
@@ -1275,19 +1261,19 @@ export function WelcomePage({
         style={{ top: '54.5%' }}
       >
         <p
-          className={`text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E4D23] font-sans font-medium transition-all duration-700 ease-out ${
+          className={`text-[10px] sm:text-[11px] uppercase tracking-[0.42em] text-[#6E5028] font-sans font-medium transition-all duration-700 ease-out ${
             showPhilosophy
               ? 'opacity-95 translate-y-0 blur-0'
               : isComplete
-              ? 'opacity-65 translate-y-0 blur-0'
+              ? 'opacity-70 translate-y-0 blur-0'
               : 'opacity-0 translate-y-2 blur-[2px]'
           }`}
         >
           THE ART OF SHOEMAKING
         </p>
         <p
-          className={`mt-1.5 text-[11px] italic tracking-[0.12em] text-[#171310]/55 transition-all duration-700 delay-100 ease-out ${
-            isComplete ? 'opacity-80 translate-y-0' : 'opacity-0 translate-y-2'
+          className={`mt-1.5 text-[11px] italic tracking-[0.12em] text-[#141210]/60 transition-all duration-700 delay-100 ease-out ${
+            isComplete ? 'opacity-85 translate-y-0' : 'opacity-0 translate-y-2'
           }`}
         >
           {t.atelierSub}
@@ -1313,33 +1299,33 @@ export function WelcomePage({
           <button
             type="button"
             onClick={() => handleAction(onOpenMaterials ?? onStart)}
-            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#171310]/85 hover:text-[#7A5628] active:scale-95 transition-all duration-300 cursor-pointer"
+            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-all duration-300 cursor-pointer"
           >
             {t.ch1}
           </button>
 
           <span
             aria-hidden="true"
-            className="w-1 h-1 rounded-full bg-[#7A5628]/55"
+            className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
           />
 
           <button
             type="button"
             onClick={() => handleAction(onOpenStyles ?? onStart)}
-            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#171310]/85 hover:text-[#7A5628] active:scale-95 transition-all duration-300 cursor-pointer"
+            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-all duration-300 cursor-pointer"
           >
             {t.ch2}
           </button>
 
           <span
             aria-hidden="true"
-            className="w-1 h-1 rounded-full bg-[#7A5628]/55"
+            className="w-1 h-1 rounded-full bg-[#7A5A2F]/60"
           />
 
           <button
             type="button"
             onClick={() => handleAction(onOpenCalc ?? onStart)}
-            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#171310]/85 hover:text-[#7A5628] active:scale-95 transition-all duration-300 cursor-pointer"
+            className="text-[15px] sm:text-[16px] tracking-[0.06em] text-[#141210]/90 hover:text-[#7A5A2F] active:scale-95 transition-all duration-300 cursor-pointer"
           >
             {t.ch3}
           </button>
@@ -1349,14 +1335,14 @@ export function WelcomePage({
         <button
           type="button"
           onClick={() => handleAction(onStart, true)}
-          className="group flex flex-col items-center gap-2.5 pt-1 text-[#171310]/90 hover:text-[#171310] active:scale-95 transition-all duration-300 cursor-pointer"
+          className="group flex flex-col items-center gap-2.5 pt-1 text-[#141210]/95 hover:text-[#141210] active:scale-95 transition-all duration-300 cursor-pointer"
         >
           <span className="text-[11px] uppercase tracking-[0.38em] font-sans font-medium pl-[0.38em]">
             {t.enter}
           </span>
-          <span className="relative w-[1px] h-7 bg-[#171310]/20 overflow-hidden">
+          <span className="relative w-[1px] h-7 bg-[#141210]/25 overflow-hidden">
             <span className="
-              absolute inset-x-0 top-0 h-3.5 bg-[#7A5628]
+              absolute inset-x-0 top-0 h-3.5 bg-[#7A5A2F]
               animate-[cordwainePulseLine_2.2s_ease-in-out_infinite]
             " />
           </span>
