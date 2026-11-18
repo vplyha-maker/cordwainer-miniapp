@@ -13,10 +13,12 @@ type WelcomePageProps = {
 }
 
 // ============================================================================
-// 1. WebGL Ray-Cast Silk & Travertine Light Shader (0 KB external deps, 60 FPS)
-//    - Raymarched / normal-mapped flowing satin relief on Luminous Atelier Ivory
-//    - Physically-inspired GGX microfacet specular + volumetric golden light sweep
-//    - Subtle signature breathing radiance behind the assembled 'Cordwaine' logo
+// 1. Cross-Platform Precision-Safe WebGL Ray-Cast Silk & Warm Stone Shader
+//    - Uses Dave Hoskins' polynomial sin-less hash so Android (Adreno/Mali/Xclipse)
+//      and iPhone (Apple GPU) render 100% identically without float precision blowout.
+//    - Warm Pearl-Champagne center (#E5DDD0) + Cashmere Taupe silk relief (#C9BDA9)
+//      + Smoked Umber studio vignette (#8A7B68) — never blinding white, never gloomy black.
+//    - No bullseye donut ring; smooth anisotropic key-light + subtle breathing glow.
 // ============================================================================
 const VERTEX_SHADER_SRC = `
   attribute vec2 a_pos;
@@ -28,16 +30,23 @@ const VERTEX_SHADER_SRC = `
 `
 
 const FRAGMENT_SHADER_SRC = `
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
   precision highp float;
+  #else
+  precision mediump float;
+  #endif
+
   varying vec2 v_uv;
   uniform vec2 u_res;
   uniform float u_time;
-  uniform float u_converge;
   uniform float u_glint;
   uniform float u_breath;
 
-  float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  // Sin-less polynomial hash: 100% identical on Android Adreno/Mali & iOS Apple GPU
+  float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
   }
 
   float noise(vec2 p) {
@@ -45,21 +54,21 @@ const FRAGMENT_SHADER_SRC = `
     vec2 f = fract(p);
     vec2 u = f * f * (3.0 - 2.0 * f);
     return mix(
-      mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
-      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+      mix(hash12(i + vec2(0.0, 0.0)), hash12(i + vec2(1.0, 0.0)), u.x),
+      mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x),
       u.y
     );
   }
 
-  // 3-octave domain-warped silk/travertine heightfield
+  // Flowing bespoke silk / warm parchment heightfield
   float silkHeight(vec2 p, float t) {
     vec2 q = vec2(
-      noise(p * 1.4 + vec2(t * 0.07, -t * 0.05)),
-      noise(p * 1.4 + vec2(-t * 0.06, t * 0.08) + 4.2)
+      noise(p * 1.25 + vec2(t * 0.045, -t * 0.035)),
+      noise(p * 1.25 + vec2(-t * 0.04, t * 0.05) + 3.7)
     );
-    float f = noise(p * 1.8 + q * 1.15 + t * 0.04);
-    f += 0.5 * noise(p * 3.4 - q * 0.8);
-    return f * 0.66;
+    float h = noise(p * 1.6 + q * 0.95 + t * 0.025) * 0.65;
+    h += noise(p * 3.1 - q * 0.6) * 0.35;
+    return h;
   }
 
   void main() {
@@ -67,69 +76,58 @@ const FRAGMENT_SHADER_SRC = `
     vec2 uv = (v_uv - 0.5) * aspect;
     float t = u_time;
 
-    // Ray-cast surface normal via central finite differences
-    float eps = 0.012;
+    // Ray-cast surface normal via finite differences
+    float eps = 0.015;
     float hC = silkHeight(uv, t);
     float hX = silkHeight(uv + vec2(eps, 0.0), t);
     float hY = silkHeight(uv + vec2(0.0, eps), t);
-    vec3 normal = normalize(vec3((hC - hX) * 2.2, (hC - hY) * 2.2, 1.0));
+    vec3 normal = normalize(vec3((hC - hX) * 2.6, (hC - hY) * 2.6, 1.0));
 
-    // View ray & warm directional atelier key-light
-    vec3 viewDir = normalize(vec3(uv * 0.35, 1.0));
-    vec3 lightPos = vec3(sin(t * 0.22) * 0.45, 0.42 + cos(t * 0.17) * 0.15, 1.35);
+    // Orbiting studio softbox key-light
+    vec3 viewDir = normalize(vec3(uv * 0.3, 1.0));
+    vec3 lightPos = vec3(sin(t * 0.18) * 0.4, 0.35 + cos(t * 0.14) * 0.15, 1.25);
     vec3 lightDir = normalize(lightPos - vec3(uv, 0.0));
     vec3 halfVec = normalize(lightDir + viewDir);
 
-    // Diffuse & microfacet satin specular
-    float diff = max(dot(normal, lightDir), 0.0);
-    float spec = pow(max(dot(normal, halfVec), 0.0), 22.0);
-    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+    float diff = clamp(dot(normal, lightDir), 0.0, 1.0);
+    float spec = pow(clamp(dot(normal, halfVec), 0.0, 1.0), 20.0);
 
-    // Base Luminous Atelier Ivory / Warm Travertine palette
-    vec3 ivoryBase = vec3(0.961, 0.941, 0.910);   // #F5F0E8
-    vec3 silkShadow = vec3(0.843, 0.796, 0.722);  // #E6DEC1 warm limestone
-    vec3 champGold = vec3(0.847, 0.725, 0.502);   // #D8B980 champagne gold
+    // Warm Pearl-Champagne & Cashmere Taupe palette (never blown-out white!)
+    vec3 pearlCenter = vec3(0.894, 0.859, 0.804);   // #E4DBD0 warm pearl stone
+    vec3 cashmereMid = vec3(0.796, 0.745, 0.671);   // #CBBFAB warm cashmere taupe
+    vec3 umberEdge   = vec3(0.545, 0.486, 0.416);   // #8B7C6A smoked bronze vignette
+    vec3 warmGold    = vec3(0.835, 0.686, 0.435);   // #D5AF6F antique gold
 
-    vec3 col = mix(silkShadow, ivoryBase, 0.55 + 0.45 * diff);
-    col += champGold * spec * 0.24;
-    col += vec3(1.0, 0.98, 0.94) * fresnel * 0.05;
+    vec3 baseCol = mix(cashmereMid, pearlCenter, 0.35 + 0.65 * diff);
+    baseCol += warmGold * spec * 0.11;
 
-    // Converging golden caustic ring during Chaos -> Order
-    float distCenter = length(uv);
-    float ringRadius = mix(0.68, 0.08, u_converge);
-    float causticRing = exp(-pow((distCenter - ringRadius) * 5.2, 2.0)) * (1.0 - u_converge * 0.7);
-    col += champGold * causticRing * 0.18;
-
-    // Raytraced diagonal golden light sweep synchronized with logo glint (4.0 - 5.2s)
+    // Diagonal golden studio light beam during Stage 4 (4.0 - 5.2s)
     if (u_glint > 0.001 && u_glint < 0.999) {
-      float beamX = mix(-0.85, 0.85, u_glint);
-      float beam = exp(-pow((uv.x - beamX + uv.y * 0.28) * 6.5, 2.0));
-      float maskY = exp(-pow(uv.y * 2.8, 2.0));
-      col += vec3(0.88, 0.72, 0.45) * beam * maskY * 0.34 * sin(u_glint * 3.14159);
+      float beamPos = mix(-0.75, 0.75, u_glint);
+      float beam = exp(-pow((uv.x - beamPos + uv.y * 0.25) * 5.5, 2.0));
+      float env = sin(u_glint * 3.14159);
+      baseCol = mix(baseCol, vec3(0.945, 0.890, 0.788), beam * env * 0.32);
     }
 
-    // Signature Breathing Glow behind the assembled logo (subtle, meditative)
-    float breathPulse = 0.88 + 0.12 * sin(t * 1.15);
-    float centerGlow = exp(-pow(distCenter * 2.7, 2.0)) * u_breath * breathPulse;
-    col = mix(col, vec3(0.992, 0.976, 0.945), centerGlow * 0.55);
+    // Subtle signature breathing aura behind the center logo (after 3.2s)
+    float dist = length(uv);
+    float breathWave = 0.5 + 0.5 * sin(t * 1.15);
+    float centerAura = exp(-pow(dist * 2.35, 2.0)) * u_breath * (0.75 + 0.25 * breathWave);
+    baseCol = mix(baseCol, vec3(0.933, 0.898, 0.839), centerAura * 0.38);
 
-    // Very soft, airy warm edge vignette (never heavy or dark)
-    float vig = smoothstep(1.15, 0.25, distCenter);
-    col = mix(vec3(0.886, 0.851, 0.796), col, 0.72 + 0.28 * vig);
+    // Rich studio vignette framing the stage (matches the iPhone look on all screens)
+    float vig = smoothstep(0.98, 0.18, dist);
+    vec3 finalCol = mix(umberEdge, baseCol, 0.38 + 0.62 * vig);
 
-    gl_FragColor = vec4(col, 1.0);
+    // Soft shoulder clamp so RGB never clips to 1.0 flat white on Android OLED
+    finalCol = clamp(finalCol, vec3(0.18), vec3(0.925));
+
+    gl_FragColor = vec4(finalCol, 1.0);
   }
 `
 
 // ============================================================================
 // 2. Multi-Channel Haptic + Luxury Atelier Sound Engine (0 KB Bundle Size)
-//    - Haptics: Telegram HapticFeedback ('medium'/'heavy') + TelegramWebviewProxy
-//      + dual-frequency tactile pulse + navigator.vibrate + iOS switch fallback
-//    - Luxury Soundscape (no cheap beeps!):
-//      * 0.0-1.2s: Soft linen/leather pattern whisper
-//      * 1.2-3.0s: Warm suede air swell as letters spiral inward
-//      * 3.0-4.0s: Deep Nils Frahm-style Felt Piano chord (Dmaj9)
-//      * 4.0-5.2s: Single crystalline harmonic shimmer on golden light sweep
 // ============================================================================
 type HapticStyle = 'selection' | 'light' | 'medium' | 'heavy' | 'success'
 
@@ -233,7 +231,6 @@ function playLuxurySound(
       src.start(now)
       src.stop(now + 1.8)
     } else if (type === 'feltChord') {
-      // Warm, unhurried Felt Piano Dmaj9 (D2, A2, F#3, A3, C#4, E4)
       const chord = [73.42, 110.0, 185.0, 220.0, 277.18, 329.63]
       chord.forEach((freq, idx) => {
         const osc = ctx.createOscillator()
@@ -261,7 +258,6 @@ function playLuxurySound(
         osc.stop(onset + 3.45)
       })
     } else if (type === 'goldenShimmer') {
-      // Single pure harmonic bloom (no 8-bit arpeggio!)
       ;[587.33, 880.0, 1318.51].forEach((freq, idx) => {
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
@@ -514,10 +510,10 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 function lerpEditorialInk(t: number): string {
-  // Muted bronze-taupe (#827464) -> Deep Espresso Charcoal (#1D1916)
-  const r = Math.round(lerp(130, 29, t))
-  const g = Math.round(lerp(116, 25, t))
-  const b = Math.round(lerp(100, 22, t))
+  // Warm bronze-taupe (#6E5D4B) -> Deep Espresso Charcoal (#181411)
+  const r = Math.round(lerp(110, 24, t))
+  const g = Math.round(lerp(93, 20, t))
+  const b = Math.round(lerp(75, 17, t))
   return `rgb(${r}, ${g}, ${b})`
 }
 
@@ -558,8 +554,8 @@ interface GlyphNode extends SVGGElement {
   _orbitX?: number
   _orbitY?: number
   _orbitRot?: number
-  _convergeX?: number
-  _convergeY?: number
+  _driftX?: number
+  _driftY?: number
   _hidden?: boolean
 }
 
@@ -669,6 +665,7 @@ export function WelcomePage({
     soundEnabledRef.current = soundEnabled
   }, [soundEnabled])
 
+  const mainRef = useRef<HTMLElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const stageWrapRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -678,7 +675,7 @@ export function WelcomePage({
 
   const stageRef = useRef<PreparedStage | null>(null)
   const rafRef = useRef<number | null>(null)
-  const shaderStateRef = useRef({ converge: 0, glint: 0, breath: 0 })
+  const shaderStateRef = useRef({ glint: 0, breath: 0 })
   const animStateRef = useRef<{
     mode: 'playing' | 'skipping' | 'done'
     startTime: number
@@ -693,7 +690,7 @@ export function WelcomePage({
     skipFromTime: 0,
   })
 
-  // Sync Telegram chrome to Luminous Atelier Ivory (#F4EFE6)
+  // Sync Telegram chrome to Warm Pearl Stone (#DDD3C4)
   useEffect(() => {
     const syncTelegramChrome = () => {
       try {
@@ -701,9 +698,9 @@ export function WelcomePage({
         if (!wa) return
         ;(wa.ready as (() => void) | undefined)?.()
         ;(wa.expand as (() => void) | undefined)?.()
-        ;(wa.setHeaderColor as ((c: string) => void) | undefined)?.('#F4EFE6')
-        ;(wa.setBackgroundColor as ((c: string) => void) | undefined)?.('#F4EFE6')
-        ;(wa.setBottomBarColor as ((c: string) => void) | undefined)?.('#EAE2D4')
+        ;(wa.setHeaderColor as ((c: string) => void) | undefined)?.('#DDD3C4')
+        ;(wa.setBackgroundColor as ((c: string) => void) | undefined)?.('#DDD3C4')
+        ;(wa.setBottomBarColor as ((c: string) => void) | undefined)?.('#C2B5A3')
       } catch {}
     }
     syncTelegramChrome()
@@ -758,7 +755,8 @@ export function WelcomePage({
     } catch {}
   }, [lang, setLang])
 
-  // Initialize GPU WebGL Ray-Cast Shader Loop (independent 60fps canvas + unified uniform state)
+  // Initialize Cross-Platform WebGL Shader Loop with ResizeObserver + per-frame size guard
+  // (Eliminates the bottom seam on Android One UI when Telegram WebApp expands!)
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -800,30 +798,39 @@ export function WelcomePage({
 
     const uRes = gl.getUniformLocation(prog, 'u_res')
     const uTime = gl.getUniformLocation(prog, 'u_time')
-    const uConverge = gl.getUniformLocation(prog, 'u_converge')
     const uGlint = gl.getUniformLocation(prog, 'u_glint')
     const uBreath = gl.getUniformLocation(prog, 'u_breath')
 
-    const resize = () => {
+    const syncCanvasSize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
-      const w = Math.floor(window.innerWidth * dpr)
-      const h = Math.floor(window.innerHeight * dpr)
-      if (canvas.width !== w || canvas.height !== h) {
+      const rect = canvas.getBoundingClientRect()
+      const cssW = Math.max(rect.width, window.innerWidth, document.documentElement.clientWidth)
+      const cssH = Math.max(rect.height, window.innerHeight, document.documentElement.clientHeight)
+      const w = Math.floor(cssW * dpr)
+      const h = Math.floor(cssH * dpr)
+      if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
         canvas.width = w
         canvas.height = h
         gl.viewport(0, 0, w, h)
       }
     }
-    resize()
-    window.addEventListener('resize', resize)
+    syncCanvasSize()
+
+    let ro: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(syncCanvasSize)
+      ro.observe(canvas)
+      if (mainRef.current) ro.observe(mainRef.current)
+    }
+    window.addEventListener('resize', syncCanvasSize)
 
     let glRaf = 0
     const startMs = performance.now()
     const renderShader = (now: number) => {
+      syncCanvasSize()
       const tSec = (now - startMs) / 1000
       gl.uniform2f(uRes, canvas.width, canvas.height)
       gl.uniform1f(uTime, tSec)
-      gl.uniform1f(uConverge, shaderStateRef.current.converge)
       gl.uniform1f(uGlint, shaderStateRef.current.glint)
       gl.uniform1f(uBreath, shaderStateRef.current.breath)
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
@@ -833,7 +840,8 @@ export function WelcomePage({
 
     return () => {
       cancelAnimationFrame(glRaf)
-      window.removeEventListener('resize', resize)
+      ro?.disconnect()
+      window.removeEventListener('resize', syncCanvasSize)
       gl.deleteProgram(prog)
       gl.deleteShader(vs)
       gl.deleteShader(fs)
@@ -876,25 +884,32 @@ export function WelcomePage({
       const radius = Math.hypot(dx, dy)
       const baseAngle = Math.atan2(dy, dx)
 
-      const swirlAngle = baseAngle + (i % 2 === 0 ? 0.55 : -0.55)
-      const expandedRadius = radius * 1.28 + 22
+      // Harmonious spiral starting positions around the stage
+      const swirlAngle = baseAngle + (i % 2 === 0 ? 0.48 : -0.48)
+      const expandedRadius = radius * 1.2 + 16
       const startStageX = centerStageX + Math.cos(swirlAngle) * expandedRadius
       const startStageY = centerStageY + Math.sin(swirlAngle) * expandedRadius
 
       const localHome = stageToLocal(g, h.cx, h.cy)
       const localStart = stageToLocal(g, startStageX, startStageY)
-      const localCenter = stageToLocal(g, centerStageX, centerStageY + dy * 0.2)
+
+      // Instead of clumping all 157 background letters into a central blob on top of 'CORDWAINE',
+      // background letters gently align toward their architectural matrix and then drift softly
+      // inward by 22% while dissolving into silk, leaving the center 100% clean for 'Cordwaine'!
+      const softInwardStageX = centerStageX + dx * 0.78
+      const softInwardStageY = centerStageY + dy * 0.78
+      const localSoftInward = stageToLocal(g, softInwardStageX, softInwardStageY)
 
       g._orbitX = localStart.x - localHome.x
       g._orbitY = localStart.y - localHome.y
-      g._orbitRot = ((swirlAngle * 180) / Math.PI) * 0.22 + (i % 2 === 0 ? 18 : -18)
-      g._convergeX = (localCenter.x - localHome.x) * 0.52
-      g._convergeY = (localCenter.y - localHome.y) * 0.62
+      g._orbitRot = ((swirlAngle * 180) / Math.PI) * 0.2 + (i % 2 === 0 ? 15 : -15)
+      g._driftX = localSoftInward.x - localHome.x
+      g._driftY = localSoftInward.y - localHome.y
 
       g.style.display = ''
       g._hidden = false
     })
-    glintGroup.style.display = 'none'
+    glintGroup.style.opacity = '0'
 
     const soundAndHapticFlags = {
       whisper: false,
@@ -904,14 +919,6 @@ export function WelcomePage({
       done: false,
     }
 
-    // ========================================================================
-    // UNHURRIED HIGH-FASHION EDITORIAL TIMING (6.2s total):
-    //   Stage 1 (0.0 - 1.2s): Появление и плавное вращение букв по спирали
-    //   Stage 2 (1.2 - 3.0s): Управляемое схождение к центру (Chaos -> Order)
-    //   Stage 3 (3.0 - 4.0s): Фиксация логотипа 'Cordwaine' + 'THE ART OF SHOEMAKING'
-    //   Stage 4 (4.0 - 5.2s): Трассированный золотой блик + раздельное подчёркивание
-    //   Stage 5 (5.2 - 6.2s): Появление главной навигации + фирменное дыхание
-    // ========================================================================
     const TOTAL_DURATION = 6.2
 
     const renderAtTime = (t: number, withEffects = false) => {
@@ -943,8 +950,6 @@ export function WelcomePage({
         }
       }
 
-      // Update WebGL raytraced shader uniforms in exact lockstep
-      shaderStateRef.current.converge = EASES.sineInOut(clamp01((t - 1.0) / 2.2))
       shaderStateRef.current.glint = t >= 4.0 && t <= 5.2 ? EASES.power2InOut(clamp01((t - 4.0) / 1.2)) : 0
       shaderStateRef.current.breath = EASES.power2Out(clamp01((t - 3.2) / 1.6))
 
@@ -952,7 +957,7 @@ export function WelcomePage({
         const isWord = i < wordGlyphs.length
         const k = isWord ? i : i - wordGlyphs.length
 
-        if (!isWord && g._hidden && t >= 3.3) return
+        if (!isWord && g._hidden && t >= 3.1) return
 
         const ox0 = g._orbitX ?? 0
         const oy0 = g._orbitY ?? 0
@@ -961,37 +966,34 @@ export function WelcomePage({
 
         let x = ox0
         let y = oy0
-        let sc = 0.72
+        let sc = 0.78
         let rot = rot0
         let op = 0
 
-        // Stage 1 (0.0 - 1.2s): Unhurried emergence & graceful spiral rotation
-        const emergeStagger = dist * 0.35
-        const tEmerge = clamp01((t - emergeStagger) / (1.2 - emergeStagger * 0.6))
+        // Stage 1 (0.0 - 1.2s): Smooth emergence & rotation into architectural alignment
+        const emergeStagger = dist * 0.32
+        const tEmerge = clamp01((t - emergeStagger) / (1.2 - emergeStagger * 0.5))
         if (tEmerge > 0) {
           const e = EASES.power2Out(tEmerge)
           const eMove = EASES.sineInOut(tEmerge)
-          op = isWord ? lerp(0, 1, e) : lerp(0, 0.55, e)
-          sc = lerp(0.72, 1, e)
-          x = lerp(ox0, ox0 * 0.32, eMove)
-          y = lerp(oy0, oy0 * 0.32, eMove)
-          rot = lerp(rot0, rot0 * 0.32, eMove)
+          op = isWord ? lerp(0, 1, e) : lerp(0, 0.46, e)
+          sc = lerp(0.78, 1, e)
+          x = lerp(ox0, 0, eMove)
+          y = lerp(oy0, 0, eMove)
+          rot = lerp(rot0, 0, eMove)
         }
 
-        // Stage 2 (1.2 - 3.0s): Smooth convergence into 'Cordwaine'
+        // Stage 2 (1.2 - 3.0s): Background letters softly drift inward & dissolve while 'Cordwaine' converges
         if (!isWord) {
-          const convStagger = (1 - dist) * 0.38
-          const tConv = clamp01((t - (1.2 + convStagger)) / 1.45)
+          const convStagger = dist * 0.35
+          const tConv = clamp01((t - (1.2 + convStagger)) / 1.35)
           if (tConv > 0) {
-            const ePos = EASES.power3InOut(tConv)
-            const eFade = EASES.power2In(tConv)
-            const cx = g._convergeX ?? 0
-            const cy = g._convergeY ?? 0
-            x = lerp(ox0 * 0.32, cx, ePos)
-            y = lerp(oy0 * 0.32, cy, ePos)
-            rot = lerp(rot0 * 0.32, 0, ePos)
-            sc = lerp(1, 0.5, eFade)
-            op = lerp(0.55, 0, eFade)
+            const ePos = EASES.sineInOut(tConv)
+            const eFade = EASES.power2InOut(tConv)
+            x = lerp(0, g._driftX ?? 0, ePos)
+            y = lerp(0, g._driftY ?? 0, ePos)
+            sc = lerp(1, 0.84, eFade)
+            op = lerp(0.46, 0, eFade)
 
             if (tConv >= 1 && !g._hidden) {
               g._hidden = true
@@ -1003,7 +1005,7 @@ export function WelcomePage({
             }
           }
         } else {
-          const tDarken = clamp01((t - (0.95 + k * 0.05)) / 0.7)
+          const tDarken = clamp01((t - (0.9 + k * 0.05)) / 0.7)
           const pathEl = g.firstElementChild as SVGPathElement | null
           if (pathEl) {
             pathEl.setAttribute('fill', lerpEditorialInk(EASES.power2Out(tDarken)))
@@ -1015,14 +1017,15 @@ export function WelcomePage({
           if (tConv > 0 && f) {
             const ex = EASES.expoInOut(tConv)
             const ey = EASES.power3InOut(tConv)
-            x = lerp(ox0 * 0.32, f.x, ex)
-            y = lerp(oy0 * 0.32, f.y, ey)
+            x = lerp(0, f.x, ex)
+            y = lerp(0, f.y, ey)
             const targetScale = k < 3 ? f.scale * 0.72 : f.scale
             sc = lerp(1, targetScale, ex)
-            rot = lerp(rot0 * 0.32, 0, ey)
+            // Subtle mid-flight rotation wave
+            rot = Math.sin(tConv * Math.PI) * (k % 2 === 0 ? 5 : -5)
           }
 
-          // Stage 3 (3.0 - 4.0s): Morph into final logo paths
+          // Stage 3 (3.0 - 4.0s): Seamless cross-fade into crisp logo paths
           const mStart = (k < 3 ? 2.82 : 2.96) + k * 0.02
           const mDur = 0.45
           const tMorph = clamp01((t - mStart) / mDur)
@@ -1037,14 +1040,14 @@ export function WelcomePage({
         g.style.opacity = String(op.toFixed(3))
       })
 
-      // Stage 3 (3.0 - 4.0s): Final 'Cordwaine' logo locks in at center
+      // Stage 3 (3.0 - 4.0s): Final 'Cordwaine' logo locks in at center (never flickers!)
       logoLetters.forEach((el, k) => {
         const mStart = (k < 3 ? 2.82 : 2.96) + k * 0.02
         const tMorph = clamp01((t - mStart) / 0.48)
         el.style.opacity = String(EASES.power1InOut(tMorph).toFixed(3))
       })
 
-      // Hairline rules flanking '_the_' draw outward (3.15 - 3.95s)
+      // Upper rules flanking '_the_' draw outward (3.15 - 3.95s)
       const tRules = clamp01((t - 3.15) / 0.8)
       const eRules = EASES.expoOut(tRules)
       rules.forEach((r) => {
@@ -1057,7 +1060,7 @@ export function WelcomePage({
         )
       })
 
-      // Brand philosophy "THE ART OF SHOEMAKING" appears for ~1.1s (3.1 - 4.8s), then dissolves gracefully
+      // Brand philosophy "THE ART OF SHOEMAKING" appears below logo (3.05 - 4.9s), then dissolves
       let philOpacity = 0
       let philY = 8
       if (t >= 3.05 && t <= 4.9) {
@@ -1069,20 +1072,21 @@ export function WelcomePage({
       philosophy.style.opacity = String(philOpacity.toFixed(3))
       philosophy.style.transform = `translate3d(0, ${philY.toFixed(1)}px, 0)`
 
-      // Stage 4 (4.0 - 5.2s): Separate Calligraphic Underline Draw + Golden Light Sweep
+      // Stage 4 (4.0 - 5.2s): Separate Calligraphic Underline Draw + Golden ClipPath Light Sweep
       const tUnderline = clamp01((t - 4.05) / 0.95)
       const eUnderline = EASES.expoInOut(tUnderline)
       tailClipRect.setAttribute('width', String((92 * eUnderline).toFixed(1)))
 
       const tGlint = clamp01((t - 4.0) / 1.2)
       if (tGlint > 0 && tGlint < 1) {
-        if (glintGroup.style.display !== '') glintGroup.style.display = ''
+        const env = Math.sin(tGlint * Math.PI)
+        glintGroup.style.opacity = String((env * 0.92).toFixed(3))
         glint.setAttribute(
           'x',
           String(lerp(lb.x - 55, lb.x + lb.width + 20, EASES.power2InOut(tGlint)).toFixed(1))
         )
-      } else if (glintGroup.style.display !== 'none') {
-        glintGroup.style.display = 'none'
+      } else {
+        glintGroup.style.opacity = '0'
       }
 
       // Gentle scale settle of the center stage
@@ -1199,7 +1203,7 @@ export function WelcomePage({
       const parent = path.parentNode
       if (!parent) return []
       const attrs: Record<string, string> = {
-        fill: path.getAttribute('fill') || '#1D1916',
+        fill: path.getAttribute('fill') || '#181411',
       }
       const tr = path.getAttribute('transform')
       if (tr) attrs.transform = tr
@@ -1318,7 +1322,17 @@ export function WelcomePage({
     }) as SVGRectElement
     tailClip.appendChild(tailClipRect)
 
-    // Burnished 24k Champagne Gold sweep gradient on light ivory
+    // Use <clipPath> with cloned <path> nodes (instead of <mask> + <use>) so:
+    // 1. Dark charcoal letters (#181411) clip at 100% opacity (not dimmed by luminance mask!)
+    // 2. Live '_the_' and rules never flicker or blink on iOS WebKit when glint sweeps!
+    const logoClip = mk('clipPath', { id: 'qt-logo-clip' })
+    ;[...logoLetters, tailPath].forEach((el) => {
+      const cloned = el.cloneNode(true) as SVGPathElement
+      cloned.removeAttribute('id')
+      cloned.removeAttribute('style')
+      logoClip.appendChild(cloned)
+    })
+
     const grad = mk('linearGradient', {
       id: 'qt-glint-grad',
       x1: 0,
@@ -1328,38 +1342,28 @@ export function WelcomePage({
     })
     ;(
       [
-        [0, '#b58d4c', 0],
-        [0.35, '#e8ca8c', 0.78],
-        [0.5, '#fffaf0', 1],
-        [0.65, '#e8ca8c', 0.78],
-        [1, '#b58d4c', 0],
+        [0, '#b5883e', 0],
+        [0.3, '#e2bd78', 0.85],
+        [0.5, '#fff8e8', 1],
+        [0.7, '#e2bd78', 0.85],
+        [1, '#b5883e', 0],
       ] as Array<[number, string, number]>
     ).forEach(([o, col, a]) =>
       grad.appendChild(
         mk('stop', { offset: o, 'stop-color': col, 'stop-opacity': a })
       )
     )
-    const mask = mk('mask', {
-      id: 'qt-logo-mask',
-      maskUnits: 'userSpaceOnUse',
-      x: lb.x - 50,
-      y: lb.y - 50,
-      width: lb.width + 100,
-      height: lb.height + 100,
-    })
-    ;[...logoLetters, tail, ...rules].forEach((el, i) => {
-      if (!el.id) el.id = `qt-logo-part-${i}`
-      mask.appendChild(
-        mk('use', { href: `#${el.id}`, fill: '#fff', style: 'fill:#fff' })
-      )
-    })
-    defs.append(tailClip, grad, mask)
+
+    defs.append(tailClip, logoClip, grad)
     logoG.appendChild(defs)
-    const glintGroup = mk('g', { mask: 'url(#qt-logo-mask)', style: 'display:none' }) as SVGGElement
+    const glintGroup = mk('g', {
+      'clip-path': 'url(#qt-logo-clip)',
+      style: 'opacity:0;pointer-events:none;',
+    }) as SVGGElement
     const glint = mk('rect', {
       x: lb.x - 55,
       y: lb.y - 20,
-      width: 56,
+      width: 58,
       height: lb.height + 40,
       fill: 'url(#qt-glint-grad)',
     }) as SVGRectElement
@@ -1502,6 +1506,7 @@ export function WelcomePage({
 
   return (
     <main
+      ref={mainRef}
       onClick={() => {
         if (!introFinished && animStateRef.current.mode === 'playing' && animStateRef.current.currentTime > 0.8) {
           handleSkip()
@@ -1509,18 +1514,18 @@ export function WelcomePage({
       }}
       style={
         {
-          background: '#F4EFE6',
-          color: '#1D1916',
+          background: 'radial-gradient(110% 85% at 50% 46%, #E4DBD0 0%, #CBBFAB 58%, #9A8B78 100%)',
+          color: '#181411',
           fontFamily: '"Cormorant Garamond", "Cormorant", "Playfair Display", Georgia, serif',
         } as React.CSSProperties
       }
-      className="relative grid h-[100dvh] w-full place-items-center overflow-hidden select-none isolate antialiased"
+      className=" fixed inset-0 grid h-full w-full place-items-center overflow-hidden select-none isolate antialiased"
     >
-      {/* 0. GPU WebGL Ray-Cast Silk & Caustic Light Canvas */}
+      {/* 0. Full-Viewport GPU WebGL Ray-Cast Silk & Warm Stone Canvas */}
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+        className="pointer-events-none fixed inset-0 z-0 block h-full w-full"
       />
 
       {/* 1. TOP BAR: Replay/Skip + Sound Toggle + Apple-style liquid pill switcher (ru / ukr / de) */}
@@ -1534,8 +1539,8 @@ export function WelcomePage({
               type="button"
               onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleSkip}
-              style={{ color: 'rgba(29, 25, 22, 0.52)' }}
-              className="min-h-[38px] border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#1D1916] active:scale-95 cursor-pointer"
+              style={{ color: 'rgba(24, 20, 17, 0.65)' }}
+              className="min-h-[38px] border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#181411] active:scale-95 cursor-pointer"
             >
               {t.skip}
             </button>
@@ -1544,8 +1549,8 @@ export function WelcomePage({
               type="button"
               onPointerDown={() => triggerHaptic('medium', true)}
               onClick={handleReplay}
-              style={{ color: 'rgba(29, 25, 22, 0.52)' }}
-              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#1D1916] active:scale-95 cursor-pointer"
+              style={{ color: 'rgba(24, 20, 17, 0.65)' }}
+              className="inline-flex min-h-[38px] items-center gap-2 border-0 bg-transparent py-2 pr-2 text-[15px] font-medium italic tracking-[0.06em] outline-none transition-colors duration-300 hover:text-[#181411] active:scale-95 cursor-pointer"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
                 <path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
@@ -1559,9 +1564,9 @@ export function WelcomePage({
             onClick={toggleSound}
             aria-label={soundEnabled ? 'Mute sound' : 'Enable sound'}
             style={{
-              color: soundEnabled ? '#1D1916' : 'rgba(29, 25, 22, 0.35)',
-              borderColor: 'rgba(29, 25, 22, 0.14)',
-              background: soundEnabled ? 'rgba(255, 255, 255, 0.55)' : 'transparent',
+              color: soundEnabled ? '#181411' : 'rgba(24, 20, 17, 0.38)',
+              borderColor: 'rgba(24, 20, 17, 0.16)',
+              background: soundEnabled ? 'rgba(255, 250, 242, 0.45)' : 'transparent',
             }}
             className="flex h-7 w-7 items-center justify-center rounded-full border text-[12px] backdrop-blur-md transition-all duration-300 active:scale-90 cursor-pointer outline-none"
           >
@@ -1569,23 +1574,23 @@ export function WelcomePage({
           </button>
         </div>
 
-        {/* Apple-style liquid glass segmented switcher on Luminous Ivory: ru | ukr | de */}
+        {/* Apple-style liquid glass segmented switcher: ru | ukr | de */}
         <div
           role="tablist"
           aria-label="Language switcher"
           style={{
-            background: 'rgba(29, 25, 22, 0.055)',
-            borderColor: 'rgba(29, 25, 22, 0.12)',
+            background: 'rgba(24, 20, 17, 0.07)',
+            borderColor: 'rgba(24, 20, 17, 0.14)',
           }}
-          className="relative grid grid-cols-3 items-center rounded-full border p-[3px] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(29,25,22,0.04)]"
+          className="relative grid grid-cols-3 items-center rounded-full border p-[3px] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(24,20,17,0.05)]"
         >
           <span
             aria-hidden="true"
             style={{
               transform: `translate3d(${activeLangIdx * 100}%, 0, 0)`,
-              background: 'rgba(255, 255, 255, 0.88)',
+              background: 'rgba(248, 243, 234, 0.88)',
               boxShadow:
-                '0 2px 8px rgba(29, 25, 22, 0.10), inset 0 1px 0.5px rgba(255, 255, 255, 0.95)',
+                '0 2px 8px rgba(24, 20, 17, 0.14), inset 0 1px 0.5px rgba(255, 255, 255, 0.9)',
               transition: 'transform 380ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
             className="pointer-events-none absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full"
@@ -1608,7 +1613,7 @@ export function WelcomePage({
                   setLang(item.code)
                 }}
                 style={{
-                  color: active ? '#1D1916' : 'rgba(29, 25, 22, 0.48)',
+                  color: active ? '#181411' : 'rgba(24, 20, 17, 0.52)',
                   fontFamily:
                     '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif',
                   transition: 'color 280ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -1644,22 +1649,22 @@ export function WelcomePage({
         >
           <g id="grid" transform="translate(-551.238 -243.824)">
             <g id="the">
-              <path id="the-t" d={GLYPHS.T} transform="translate(626 347)" fill="#827464" />
-              <path id="the-h" d={GLYPHS.H} transform="translate(657 347)" fill="#827464" />
-              <path id="the-e" d={GLYPHS.E} transform="translate(688 347)" fill="#827464" />
+              <path id="the-t" d={GLYPHS.T} transform="translate(626 347)" fill="#6E5D4B" />
+              <path id="the-h" d={GLYPHS.H} transform="translate(657 347)" fill="#6E5D4B" />
+              <path id="the-e" d={GLYPHS.E} transform="translate(688 347)" fill="#6E5D4B" />
             </g>
             <g id="cord">
-              <path id="cord-c" d={GLYPHS.C} transform="translate(688 470)" fill="#827464" />
-              <path id="cord-o" d={GLYPHS.O} transform="translate(719 470)" fill="#827464" />
-              <path id="cord-r" d={GLYPHS.R} transform="translate(750 470)" fill="#827464" />
-              <path id="cord-d" d={GLYPHS.D} transform="translate(781 470)" fill="#827464" />
+              <path id="cord-c" d={GLYPHS.C} transform="translate(688 470)" fill="#6E5D4B" />
+              <path id="cord-o" d={GLYPHS.O} transform="translate(719 470)" fill="#6E5D4B" />
+              <path id="cord-r" d={GLYPHS.R} transform="translate(750 470)" fill="#6E5D4B" />
+              <path id="cord-d" d={GLYPHS.D} transform="translate(781 470)" fill="#6E5D4B" />
             </g>
             <g id="waine">
-              <path id="waine-w" d={GLYPHS.W} transform="translate(781 593)" fill="#827464" />
-              <path id="waine-a" d={GLYPHS.A} transform="translate(812 593)" fill="#827464" />
-              <path id="waine-i" d={GLYPHS.I} transform="translate(843 593)" fill="#827464" />
-              <path id="waine-n" d={GLYPHS.N} transform="translate(874 593)" fill="#827464" />
-              <path id="waine-e" d={GLYPHS.E} transform="translate(905 593)" fill="#827464" />
+              <path id="waine-w" d={GLYPHS.W} transform="translate(781 593)" fill="#6E5D4B" />
+              <path id="waine-a" d={GLYPHS.A} transform="translate(812 593)" fill="#6E5D4B" />
+              <path id="waine-i" d={GLYPHS.I} transform="translate(843 593)" fill="#6E5D4B" />
+              <path id="waine-n" d={GLYPHS.N} transform="translate(874 593)" fill="#6E5D4B" />
+              <path id="waine-e" d={GLYPHS.E} transform="translate(905 593)" fill="#6E5D4B" />
             </g>
             <g id="everything-else">
               {BG_GRID.map(([glyphKey, coords]) =>
@@ -1668,7 +1673,7 @@ export function WelcomePage({
                     key={`${glyphKey}-${x}-${y}-${idx}`}
                     d={GLYPHS[glyphKey]}
                     transform={`translate(${x} ${y})`}
-                    fill="#827464"
+                    fill="#6E5D4B"
                   />
                 ))
               )}
@@ -1683,7 +1688,7 @@ export function WelcomePage({
           style={{
             opacity: 0,
             transform: 'translate3d(0, 8px, 0)',
-            color: 'rgba(130, 102, 62, 0.85)',
+            color: '#6E522E',
             willChange: 'opacity, transform',
           }}
           className="pointer-events-none absolute top-[61%] right-0 left-0 text-center text-[10.5px] font-medium uppercase tracking-[0.36em]"
@@ -1703,11 +1708,11 @@ export function WelcomePage({
           viewBox="0 0 328.46 67.425"
         >
           <g transform="translate(-586.87 -85.41)">
-            <path d={LOGO_MAIN_D} transform="translate(750 143)" fill="#1D1916" />
-            <path d={LOGO_TAIL_D} fill="#9E7B42" />
-            <path d={LOGO_THE_D} transform="translate(650 104)" fill="#7A5C38" />
-            <path d="M77,.5H0v-1H77Z" transform="translate(667 104)" fill="#9E7B42" />
-            <path d="M11,.5H0v-1H11Z" transform="translate(623 104)" fill="#9E7B42" />
+            <path d={LOGO_MAIN_D} transform="translate(750 143)" fill="#181411" />
+            <path d={LOGO_TAIL_D} fill="#9A7234" />
+            <path d={LOGO_THE_D} transform="translate(650 104)" fill="#6E522E" />
+            <path d="M77,.5H0v-1H77Z" transform="translate(667 104)" fill="#8C6834" />
+            <path d="M11,.5H0v-1H11Z" transform="translate(623 104)" fill="#8C6834" />
           </g>
         </svg>
       </div>
@@ -1734,7 +1739,7 @@ export function WelcomePage({
               {idx > 0 && (
                 <span
                   aria-hidden="true"
-                  style={{ color: 'rgba(130, 102, 62, 0.45)' }}
+                  style={{ color: 'rgba(90, 68, 40, 0.55)' }}
                   className="select-none text-[13px]"
                 >
                   ·
@@ -1748,7 +1753,7 @@ export function WelcomePage({
                   item.onClick?.()
                 }}
                 style={{
-                  color: '#2A231E',
+                  color: '#1F1A16',
                   transition:
                     'color 280ms cubic-bezier(0.22, 1, 0.36, 1), transform 280ms cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
@@ -1769,7 +1774,7 @@ export function WelcomePage({
             onStart?.()
           }}
           style={{
-            color: '#1D1916',
+            color: '#181411',
             transition: 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1), color 280ms ease',
           }}
           className="group flex flex-col items-center gap-2.5 border-0 bg-transparent px-6 py-1 outline-none active:scale-95 cursor-pointer"
@@ -1779,12 +1784,12 @@ export function WelcomePage({
           </span>
           <i
             aria-hidden="true"
-            style={{ background: 'rgba(122, 92, 56, 0.22)' }}
+            style={{ background: 'rgba(90, 68, 40, 0.28)' }}
             className="relative block h-[36px] w-[1px] overflow-hidden"
           >
             <span
               style={{
-                background: '#7A5C38',
+                background: '#6E522E',
                 animation: 'qtCue 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite',
               }}
               className="absolute top-0 left-0 block h-[40%] w-full"
