@@ -26,14 +26,16 @@ type TgWebApp = {
   expand?: () => void
 }
 
-declare global {
-  interface Window {
-    Telegram?: { WebApp?: TgWebApp }
-    TelegramWebviewProxy?: {
-      postEvent?: (eventType: string, eventData: string) => void
-    }
-    webkitAudioContext?: typeof AudioContext
+type ExtendedWindow = Window & {
+  Telegram?: { WebApp?: TgWebApp }
+  TelegramWebviewProxy?: {
+    postEvent?: (eventType: string, eventData: string) => void
   }
+  webkitAudioContext?: typeof AudioContext
+}
+
+function getWin(): ExtendedWindow {
+  return window as unknown as ExtendedWindow
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +186,7 @@ class SoundEngine {
 
   public getContext(): AudioContext | null {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      const AudioCtx = window.AudioContext || getWin().webkitAudioContext
       if (!AudioCtx) return null
       if (!this.ctx || this.ctx.state === 'closed') {
         this.ctx = new AudioCtx()
@@ -408,7 +410,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
 
   // Channel 1: Official Telegram WebApp HapticFeedback API
   try {
-    const hf = window.Telegram?.WebApp?.HapticFeedback
+    const hf = getWin().Telegram?.WebApp?.HapticFeedback
     hf?.impactOccurred?.(tgStyle)
     if (style === 'heavy') {
       hf?.notificationOccurred?.('success')
@@ -417,7 +419,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
 
   // Channel 2: Direct Android TelegramWebviewProxy Native Bridge (with reinforced pulse for One UI 7 / HyperOS)
   try {
-    const post = window.TelegramWebviewProxy?.postEvent
+    const post = getWin().TelegramWebviewProxy?.postEvent
     if (post) {
       post(
         'web_app_trigger_haptic_feedback',
@@ -755,9 +757,9 @@ export function WelcomePage({
   useEffect(() => {
     try {
       const bgHex = '#C4B39B'
-      window.Telegram?.WebApp?.setHeaderColor?.(bgHex)
-      window.Telegram?.WebApp?.setBackgroundColor?.(bgHex)
-      window.Telegram?.WebApp?.expand?.()
+      getWin().Telegram?.WebApp?.setHeaderColor?.(bgHex)
+      getWin().Telegram?.WebApp?.setBackgroundColor?.(bgHex)
+      getWin().Telegram?.WebApp?.expand?.()
     } catch {}
   }, [])
 
