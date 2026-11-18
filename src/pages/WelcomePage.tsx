@@ -69,8 +69,8 @@ function ensureMollaniFont(): Promise<boolean> {
         return true
       }
       if (document.fonts && typeof document.fonts.load === 'function') {
-        await document.fonts.load('68px "Mollani"')
-        mollaniFontReady = document.fonts.check('68px "Mollani"')
+        await document.fonts.load('64px "Mollani"')
+        mollaniFontReady = document.fonts.check('64px "Mollani"')
         return mollaniFontReady
       }
     } catch {
@@ -86,7 +86,6 @@ void ensureMollaniFont()
 
 // ---------------------------------------------------------------------------
 // 1. VECTOR ORNAMENTS (Crown "the", Diamond Rules, Bespoke Under-Swash)
-// Positioned with generous clearance above & below Mollani's tall script loops
 // ---------------------------------------------------------------------------
 const THE_ITALIC_PATH_D =
   'M-12.82 -16.84Q-15.27 -16.84 -15.27 -19.47Q-15.27 -19.88 -15.20 -20.40Q-15.13 -20.93 -15.04 -21.36L-13.45 -28.90L-15.15 -28.90L-15.11 -29.12Q-13.87 -29.12 -13.11 -29.39Q-12.34 -29.66 -11.85 -30.27Q-11.35 -30.88 -10.92 -31.89L-10.70 -31.89L-11.29 -29.12L-8.56 -29.12L-8.61 -28.90L-11.33 -28.90L-12.93 -21.43Q-13.04 -20.87 -13.12 -20.36Q-13.20 -19.85 -13.20 -19.49Q-13.20 -18.48 -12.79 -18.04Q-12.39 -17.60 -11.65 -17.60Q-11.22 -17.60 -10.73 -17.75Q-10.25 -17.90 -9.89 -18.12L-9.78 -17.92Q-10.45 -17.45 -11.21 -17.14Q-11.96 -16.84 -12.82 -16.84ZM1.58 -16.84Q0.60 -16.84 0.06 -17.48Q-0.46 -18.12 -0.46 -19.09Q-0.46 -20.12 -0.03 -22.12L0.35 -23.88Q0.46 -24.33 0.64 -25.18Q0.82 -26.04 0.82 -26.83Q0.82 -27.23 0.73 -27.67Q0.64 -28.11 0.38 -28.41Q0.12 -28.72 -0.40 -28.72Q-1.03 -28.72 -1.64 -28.27Q-2.26 -27.82 -2.78 -27.14Q-3.30 -26.47 -3.65 -25.74Q-4.00 -25.00 -4.11 -24.47L-5.68 -17.06L-7.78 -17.06L-4.69 -31.69Q-4.58 -32.14 -4.54 -32.46Q-4.49 -32.79 -4.49 -32.88Q-4.49 -33.55 -4.95 -33.74Q-5.41 -33.94 -6.07 -33.94L-6.25 -33.94L-6.20 -34.16L-2.06 -34.16L-2.94 -30.02Q-3.18 -28.83 -3.44 -27.77Q-3.70 -26.72 -3.82 -26.29L-3.73 -26.29Q-2.78 -27.77 -1.76 -28.55Q-0.73 -29.33 0.57 -29.33Q1.90 -29.33 2.44 -28.57Q2.98 -27.82 2.98 -26.83Q2.98 -26.27 2.83 -25.60Q2.69 -24.94 2.57 -24.35L1.99 -21.70Q1.85 -21.07 1.77 -20.46Q1.70 -19.85 1.70 -19.33Q1.70 -17.67 2.87 -17.67Q3.38 -17.67 4.20 -18.30L4.33 -18.12Q3.79 -17.67 3.13 -17.25Q2.46 -16.84 1.58 -16.84ZM9.95 -16.84Q8.76 -16.84 7.76 -17.35Q6.76 -17.87 6.16 -18.89Q5.57 -19.92 5.57 -21.50Q5.57 -22.75 5.99 -24.11Q6.42 -25.48 7.28 -26.67Q8.13 -27.86 9.38 -28.60Q10.63 -29.35 12.27 -29.35Q13.69 -29.35 14.48 -28.66Q15.27 -27.98 15.27 -26.76Q15.27 -25.68 14.42 -24.74Q13.58 -23.81 12.12 -23.23Q10.65 -22.64 8.81 -22.64L8.02 -22.64Q7.91 -21.97 7.91 -21.32Q7.91 -19.29 8.48 -18.18Q9.05 -17.06 10.16 -17.06Q11.44 -17.06 12.20 -17.85Q12.97 -18.64 13.37 -19.88Q13.85 -19.74 13.85 -19.20Q13.85 -18.77 13.43 -18.21Q13.02 -17.65 12.16 -17.24Q11.30 -16.84 9.95 -16.84ZM8.67 -22.87Q10.67 -22.87 11.81 -23.97Q12.95 -25.07 12.95 -26.92Q12.95 -29.10 11.73 -29.10Q11.06 -29.10 10.47 -28.55Q9.89 -28.00 9.41 -27.08Q8.94 -26.15 8.60 -25.05Q8.27 -23.95 8.07 -22.87L8.67 -22.87Z'
@@ -94,8 +93,7 @@ const THE_ITALIC_PATH_D =
 const DIAMOND_RULES_PATH_D =
   'M-92.00 -24.85L-25.80 -24.85L-24.00 -26.55L-22.20 -24.85L-22.20 -24.15L-24.00 -22.45L-25.80 -24.15L-92.00 -24.15ZM92.00 -24.85L25.80 -24.85L24.00 -26.55L22.20 -24.85L22.20 -24.15L24.00 -22.45L25.80 -24.15L92.00 -24.15Z'
 
-// Tapered calligraphic gold swash that flows cleanly under "ordwaine" (x: -44 -> +116, y: +21..25)
-// without intersecting the lower left spiral loop of the capital "C"
+// Tapered calligraphic gold swash that flows cleanly under "ordwaine" without touching the C loop
 const RIGHT_UNDER_SWASH_PATH_D =
   'M-44.0 21.5Q-12.0 25.8 34.0 23.6Q78.0 21.4 116.0 16.8Q78.0 19.8 34.0 21.4Q-12.0 23.2 -44.0 21.5Z'
 
@@ -191,7 +189,6 @@ class SoundEngine {
     this.getContext()
   }
 
-  // Stage 1: Warm parchment whisper as the atelier spotlight & crown appear
   public linenWhisper(intensity = 1): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -229,7 +226,6 @@ class SoundEngine {
     } catch {}
   }
 
-  // Stage 2: Calligraphic fountain-pen nib glide across fine paper
   public suedeSwell(): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -269,7 +265,6 @@ class SoundEngine {
     } catch {}
   }
 
-  // Stage 3: Warm Felt Piano Dmaj9 chord when calligraphic signature completes
   public feltChord(): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -305,7 +300,6 @@ class SoundEngine {
     } catch {}
   }
 
-  // Stage 4: Subtle golden harmonic shimmer during light pass
   public goldenShimmer(): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -333,7 +327,6 @@ class SoundEngine {
     } catch {}
   }
 
-  // Crisp tactile micro-tick
   public softTick(pitch = 1): void {
     if (!this.enabled) return
     const c = this.getContext()
@@ -459,7 +452,6 @@ type PrebakedTextures = {
 function createPrebakedTextures(): PrebakedTextures | null {
   if (typeof document === 'undefined') return null
 
-  // 1. Ray-Cast Alabaster-Pearl & Smoked-Pewter Normal-Map Spotlight (180x360)
   const bgW = 180
   const bgH = 360
   const bgCanvas = document.createElement('canvas')
@@ -533,7 +525,6 @@ function createPrebakedTextures(): PrebakedTextures | null {
     bgCtx.putImageData(img, 0, 0)
   }
 
-  // 2. Pre-rendered Radial Pure-Pearl Halo Sprite (256x256)
   const glowCanvas = document.createElement('canvas')
   glowCanvas.width = 256
   glowCanvas.height = 256
@@ -547,7 +538,6 @@ function createPrebakedTextures(): PrebakedTextures | null {
     gCtx.fillRect(0, 0, 256, 256)
   }
 
-  // 3. Pre-rendered Diagonal Specular Ray Sprite (256x256)
   const rayCanvas = document.createElement('canvas')
   rayCanvas.width = 256
   rayCanvas.height = 256
@@ -561,7 +551,6 @@ function createPrebakedTextures(): PrebakedTextures | null {
     rCtx.fillRect(0, 0, 256, 256)
   }
 
-  // 4. Pre-rendered Golden Calligraphic Nib Spark Sprite (96x96)
   const nibSparkCanvas = document.createElement('canvas')
   nibSparkCanvas.width = 96
   nibSparkCanvas.height = 96
@@ -580,7 +569,7 @@ function createPrebakedTextures(): PrebakedTextures | null {
 }
 
 // ---------------------------------------------------------------------------
-// 5. CALLIGRAPHIC GOLD-LEAF MICRO-SPARKS (Follow the invisible pen nib)
+// 5. CALLIGRAPHIC GOLD-LEAF MICRO-SPARKS
 // ---------------------------------------------------------------------------
 type GoldMote = {
   id: number
@@ -641,7 +630,6 @@ export function WelcomePage({
   const skipRequestedRef = useRef(false)
   const motes = useMemo(() => buildCalligraphicMotes(), [])
 
-  // Preload Mollani font and configure Telegram WebApp header & background colors
   useEffect(() => {
     void ensureMollaniFont()
     try {
@@ -652,7 +640,6 @@ export function WelcomePage({
     } catch {}
   }, [])
 
-  // Language persistence
   useEffect(() => {
     try {
       const savedLang = localStorage.getItem('app_lang') as Lang | null
@@ -701,7 +688,7 @@ export function WelcomePage({
   }[lang]
 
   // -------------------------------------------------------------------------
-  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Unified Mollani Choreography)
+  // SINGLE-CANVAS CALLIGRAPHIC SIGNATURE ENGINE (Auto-fitted via measureText)
   // -------------------------------------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current
@@ -730,7 +717,6 @@ export function WelcomePage({
     skipRequestedRef.current = false
     setPhase('intro')
 
-    // Milestone flags for synchronized audio & haptics across the calligraphic reveal
     let mCrown = false
     let mNibStart = false
     let mStrokeMid1 = false
@@ -744,13 +730,36 @@ export function WelcomePage({
     let simTime = 0.0
     let waitTimeForFont = 0.0
 
-    const drawMollaniWord = (fillColor: string) => {
+    const FONT_SPEC = '400 64px "Mollani", "Cormorant Garamond", Georgia, serif'
+
+    // Measure actual visual bounding box of Mollani wordmark (including tall 'C' & 'e' flourishes)
+    const measureWordBounds = () => {
       ctx.save()
-      ctx.fillStyle = fillColor
-      ctx.font = '400 68px "Mollani", "Cormorant Garamond", Georgia, serif'
+      ctx.font = FONT_SPEC
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(BRAND_WORDMARK, 2, 4)
+      const m = ctx.measureText(BRAND_WORDMARK)
+      ctx.restore()
+
+      const leftExt = Math.max(m.actualBoundingBoxLeft || 135, m.width * 0.5)
+      const rightExt = Math.max(m.actualBoundingBoxRight || 135, m.width * 0.5)
+      // Extra optical margin for calligraphic curls so edges are never clipped
+      const padLeft = leftExt + 14
+      const padRight = rightExt + 16
+      const totalSpan = padLeft + padRight
+      // Optical horizontal offset to keep the visual ink mass dead-center
+      const opticalOffsetX = (leftExt - rightExt) * 0.5
+
+      return { padLeft, padRight, totalSpan, opticalOffsetX }
+    }
+
+    const drawMollaniWord = (fillColor: string, opticalOffsetX: number) => {
+      ctx.save()
+      ctx.fillStyle = fillColor
+      ctx.font = FONT_SPEC
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(BRAND_WORDMARK, opticalOffsetX, 4)
       ctx.restore()
     }
 
@@ -762,20 +771,18 @@ export function WelcomePage({
       const fontLoadedNow =
         mollaniFontReady ||
         (typeof document !== 'undefined' &&
-          Boolean(document.fonts?.check?.('68px "Mollani"')))
+          Boolean(document.fonts?.check?.('64px "Mollani"')))
 
       if (skipRequestedRef.current && simTime < 3.6) {
         simTime = 3.6
         mDone = true
       } else if (!fontLoadedNow && simTime >= 0.35 && waitTimeForFont < 1.2) {
-        // Hold right before the pen nib touches down until Mollani font is ready (zero font swap!)
         waitTimeForFont += dt
       } else {
         simTime += dt
       }
       const elapsed = simTime
 
-      // Trigger audio & haptic milestones during active calligraphic intro
       if (!skipRequestedRef.current) {
         if (!mCrown && elapsed >= 0.08) {
           mCrown = true
@@ -818,9 +825,11 @@ export function WelcomePage({
       ctx.globalAlpha = 1.0
       ctx.drawImage(textures.bgCanvas, 0, 0, viewW, viewH)
 
+      const bounds = measureWordBounds()
       const centerX = viewW * 0.5
       const centerY = viewH * 0.445
-      const logoMasterScale = Math.min((viewW * 0.84) / 252.0, 1.44)
+      // Guarantee the entire Mollani wordmark + flourishes fit inside 84% of viewport width
+      const logoMasterScale = Math.min((viewW * 0.84) / bounds.totalSpan, 1.32)
 
       // 2. Signature breathing pearl halo behind the calligraphic wordmark
       const haloIn = easeOutCubic(clamp01((elapsed - 0.15) / 1.1))
@@ -841,7 +850,7 @@ export function WelcomePage({
       ctx.translate(centerX, centerY)
       ctx.scale(logoMasterScale, logoMasterScale)
 
-      // 3. Subtle Bespoke Atelier Compass Arc & Calibration Ticks (Stage 1: 0.05s -> 2.1s)
+      // 3. Subtle Bespoke Atelier Compass Arc (Stage 1: 0.05s -> 2.1s)
       if (elapsed < 2.3) {
         const arcIn = easeOutCubic(clamp01((elapsed - 0.05) / 0.55))
         const arcOut = 1 - easeInOutCubic(clamp01((elapsed - 1.55) / 0.7))
@@ -859,14 +868,12 @@ export function WelcomePage({
       }
 
       // 4. Upper Crown: italic "the" & symmetrical diamond-tipped hairline dividers
-      // Raised to y = -47 (via translate(0, -22.5)) so it sits high above Mollani's tall "C" and "d" loops!
       const crownP = easeOutCubic(clamp01((elapsed - 0.14) / 0.72))
       if (crownP > 0) {
         ctx.save()
         const liftY = -22.5 + (1 - crownP) * 5.0
         ctx.translate(0, liftY)
 
-        // Progressive horizontal expansion of the diamond rules from center outward
         const ruleSpan = 28 + 70 * crownP
         ctx.save()
         ctx.beginPath()
@@ -883,51 +890,48 @@ export function WelcomePage({
         ctx.restore()
       }
 
-      // 5. Live Calligraphic Pen-Nib Write-On of "Cordwaine" in Mollani font (0.46s -> 2.18s)
+      // 5. Live Calligraphic Pen-Nib Write-On of "Cordwaine" in Mollani font
       const writeRaw = clamp01((elapsed - 0.46) / 1.72)
       const writeP = easeInOutCubic(writeRaw)
 
       if (writeRaw > 0) {
-        // Horizontal range of "Cordwaine" in Mollani 68px: x from -134 to +134 (span = 268)
-        const startX = -134
-        const endX = 134
+        const startX = -bounds.padLeft + bounds.opticalOffsetX
+        const endX = bounds.padRight + bounds.opticalOffsetX
         const nibX = startX + (endX - startX) * writeP
 
         // 5A. Settled Deep Obsidian Ink (#141210) behind the moving golden nib
         ctx.save()
         ctx.beginPath()
-        ctx.rect(startX - 15, -62, nibX - (startX - 15), 124)
+        ctx.rect(startX - 10, -76, nibX - (startX - 10), 152)
         ctx.clip()
         ctx.globalAlpha = Math.min(1, writeRaw * 3.2)
-        drawMollaniWord('#141210')
+        drawMollaniWord('#141210', bounds.opticalOffsetX)
         ctx.restore()
 
         // 5B. Warm Molten Gold Leading Edge right at the pen nib while writing
         if (writeRaw < 0.99) {
-          const bandWidth = 42
+          const bandWidth = 44
           const edgeEnv = Math.sin(writeRaw * Math.PI)
           ctx.save()
           ctx.beginPath()
-          ctx.rect(nibX - bandWidth, -62, bandWidth + 8, 124)
+          ctx.rect(nibX - bandWidth, -76, bandWidth + 10, 152)
           ctx.clip()
           ctx.globalAlpha = Math.min(1, edgeEnv * 1.15)
-          drawMollaniWord('#B6863E')
+          drawMollaniWord('#B6863E', bounds.opticalOffsetX)
           ctx.restore()
 
-          // Pen nib natural calligraphic vertical rhythm
           const nibY =
             writeP < 0.28
               ? Math.sin((writeP / 0.28) * Math.PI * 1.8) * 18
               : Math.sin((writeP - 0.28) * 22.0) * 6.5
 
-          // Glowing golden nib halo at the active writing point
           ctx.save()
           ctx.globalAlpha = edgeEnv * 0.78
           ctx.drawImage(textures.nibSparkCanvas, nibX - 24, nibY - 24, 48, 48)
           ctx.restore()
         }
 
-        // 5C. Floating Gold-Leaf Micro-Sparks released in the wake of the calligraphic nib
+        // 5C. Floating Gold-Leaf Micro-Sparks released in the wake of the nib
         if (elapsed < 2.65) {
           for (let i = 0; i < motes.length; i++) {
             const m = motes[i]
@@ -950,8 +954,7 @@ export function WelcomePage({
         }
       }
 
-      // 6. Tapered Golden Under-Swash beneath "ordwaine" (2.12s -> 2.72s)
-      // Flows from x = -44 to x = +116 at y = +22 so it never collides with the capital "C" loop
+      // 6. Tapered Golden Under-Swash beneath "ordwaine"
       const swashP = easeOutCubic(clamp01((elapsed - 2.12) / 0.58))
       if (swashP > 0) {
         ctx.save()
@@ -964,19 +967,20 @@ export function WelcomePage({
         ctx.restore()
       }
 
-      // 7. Golden Specular Light Sweep across the completed signature (2.48s -> 3.22s)
+      // 7. Golden Specular Light Sweep across the completed signature
       const sweepP = clamp01((elapsed - 2.48) / 0.74)
       if (sweepP > 0 && sweepP < 1) {
-        const bandX = -155 + sweepP * 310
+        const sweepHalf = Math.max(bounds.padLeft, bounds.padRight) + 25
+        const bandX = -sweepHalf + sweepP * (sweepHalf * 2)
         const env = Math.sin(sweepP * Math.PI)
 
         ctx.save()
         ctx.beginPath()
-        ctx.rect(bandX - 28, -58, 56, 108)
+        ctx.rect(bandX - 30, -72, 60, 144)
         ctx.clip()
 
         ctx.globalAlpha = env * 0.88
-        drawMollaniWord('#C99B53')
+        drawMollaniWord('#C99B53', bounds.opticalOffsetX)
         ctx.fillStyle = '#C99B53'
         ctx.save()
         ctx.translate(0, -22.5)
@@ -1151,8 +1155,7 @@ export function WelcomePage({
         </div>
       </header>
 
-      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING")
-          Positioned at top: 56.5% below the Mollani loops; floats up once with the bottom block */}
+      {/* Center Signature Philosophy Subtitle ("THE ART OF SHOEMAKING") */}
       <div
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center justify-center text-center px-6"
@@ -1178,7 +1181,7 @@ export function WelcomePage({
         </p>
       </div>
 
-      {/* Bottom Typographic Navigation & Primary Entry CTA — Smoothly floats up from the bottom */}
+      {/* Bottom Typographic Navigation & Primary Entry CTA */}
       <footer
         className={`fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-6 transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           isComplete
@@ -1189,7 +1192,6 @@ export function WelcomePage({
           paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 18px, 24px)',
         }}
       >
-        {/* 3 Typographic Chapter Links */}
         <nav
           aria-label="Atelier chapters"
           className={`flex items-center justify-center gap-6 sm:gap-9 mb-6 transition-all duration-900 delay-75 ease-[cubic-bezier(0.22,1,0.36,1)] ${
@@ -1231,7 +1233,6 @@ export function WelcomePage({
           </button>
         </nav>
 
-        {/* Primary Entry Button + Vertical Scroll Cue */}
         <button
           type="button"
           onClick={() => handleAction(onStart, true)}
