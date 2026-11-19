@@ -10,10 +10,18 @@ export type PaymentState =
   | 'purchased'
   | 'failed'
 
+export type TelegramBackButton = {
+  show?: () => void
+  hide?: () => void
+  onClick?: (cb: () => void) => void
+  offClick?: (cb: () => void) => void
+}
+
 export type TelegramWebApp = {
   initData?: string
   initDataUnsafe?: { user?: { id?: number } }
   colorScheme?: 'light' | 'dark'
+  BackButton?: TelegramBackButton
   HapticFeedback?: {
     impactOccurred: (style: string) => void
     selectionChanged?: () => void
