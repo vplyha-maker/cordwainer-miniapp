@@ -113,6 +113,52 @@ function srgbChannelToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
 }
 
+export function normalizeHex(input: string): string | null {
+  const trimmed = input.trim().replace(/^#/, '')
+  if (/^[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return '#' + trimmed.toUpperCase()
+  }
+  if (/^[0-9a-fA-F]{3}$/.test(trimmed)) {
+    const expanded =
+      trimmed[0] + trimmed[0] + trimmed[1] + trimmed[1] + trimmed[2] + trimmed[2]
+    return '#' + expanded.toUpperCase()
+  }
+  return null
+}
+
+export function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  const [r, g, b] = parseHexToRgb01(hex)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  const d = max - min
+
+  if (d === 0) {
+    return { h: 0, s: 0, l: Math.round(l * 100) }
+  }
+
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  let h = 0
+  if (max === r) {
+    h = ((g - b) / d + (g < b ? 6 : 0)) * 60
+  } else if (max === g) {
+    h = ((b - r) / d + 2) * 60
+  } else {
+    h = ((r - g) / d + 4) * 60
+  }
+
+  return {
+    h: Math.round(((h % 360) + 360) % 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100),
+  }
+}
+
+export function hslToHex(h: number, sPct: number, lPct: number): string {
+  const [r, g, b] = hslToRgb01(h, sPct, lPct)
+  return rgb01ToHex(r, g, b)
+}
+
 export function synthesizePigmentHex(
   wheelHue: number,
   tintWhite: number,
