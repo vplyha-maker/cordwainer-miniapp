@@ -669,7 +669,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
             className="flex items-center p-1 rounded-full border"
             style={{ backgroundColor: tokens.surfaceSoft, borderColor: tokens.border }}
           >
-            {(['ryb', 'hsl'] as const).map((m) => {
+            {(['ryb', 'oklch'] as const).map((m) => {
               const active = modelMode === m
               return (
                 <button
