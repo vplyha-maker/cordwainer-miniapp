@@ -41,31 +41,23 @@ export type HarmonyContrastResult = {
   level: ContrastLevel
 }
 
-/**
- * Кратчайшая угловая дистанция на окружности 0..360° (AUDIT-10).
- * Исключает ложные срабатывания виброотклика при переходе через 359° <-> 0°.
- */
 export function getCircularAngleDiff(angleA: number, angleB: number): number {
   return Math.abs(((((angleA - angleB) % 360) + 540) % 360) - 180)
 }
 
-/* ============================================================================
-   1. COLOR ENGINE (КРУГ ИТТЕНА RYB <-> HSL, СМЕШИВАНИЕ ПИГМЕНТА, OKLAB КОНТРАСТ)
-   ============================================================================ */
-
 const RYB_TO_HSL_ANCHORS: readonly [number, number][] = [
-  [0, 0],     // Красный (Red)
-  [30, 15],   // Красно-оранжевый
-  [60, 32],   // Оранжевый (Orange)
-  [90, 46],   // Жёлто-оранжевый
-  [120, 60],  // Жёлтый (Yellow)
-  [150, 84],  // Жёлто-зелёный
-  [180, 122], // Зелёный (Green — комплементарный к красному 0°)
-  [210, 175], // Сине-зелёный
-  [240, 218], // Синий (Blue — комплементарный к оранжевому 60°)
-  [270, 252], // Сине-фиолетовый
-  [300, 282], // Фиолетовый (Violet — комплементарный к жёлтому 120°)
-  [330, 324], // Красно-фиолетовый
+  [0, 0],
+  [30, 15],
+  [60, 32],
+  [90, 46],
+  [120, 60],
+  [150, 84],
+  [180, 122],
+  [210, 175],
+  [240, 218],
+  [270, 252],
+  [300, 282],
+  [330, 324],
   [360, 360],
 ]
 
@@ -121,10 +113,6 @@ function srgbChannelToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
 }
 
-/**
- * Перцептивно согласованное смешивание базового пигмента
- * с белилами (Tint) и чёрным пигментом (Shade) по билинейной модели Пигмент–Белила–Сажа–Тон (AUDIT-03).
- */
 export function synthesizePigmentHex(
   wheelHue: number,
   tintWhite: number,
@@ -305,10 +293,6 @@ export function generateHarmonyPalette(
   }
 }
 
-/* ============================================================================
-   2. FOOTWEAR COLOR MAPPING (УТОЧНЁННАЯ МАТРИЦА CORDWAINE AEROSTRAP)
-   ============================================================================ */
-
 export function mapPaletteToFootwear(
   colors: string[],
   baseHue: number,
@@ -344,7 +328,7 @@ export function mapPaletteToFootwear(
         vamp: secondaryColor,
         heel: secondaryColor,
         toeBox: mainColor,
-        quarters: secondaryColor,
+        quarters: accentColor,
         eyestays: mainColor,
         collar: tertiaryColor,
         tongue: mainColor,
