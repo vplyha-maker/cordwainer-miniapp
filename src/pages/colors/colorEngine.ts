@@ -7,7 +7,7 @@ export type Scheme =
   | 'split-complementary'
   | 'monochromatic'
 
-export type ColorModelMode = 'ryb' | 'hsl'
+export type ColorModelMode = 'ryb' | 'oklch' | 'hsl'
 
 export type FootwearMappingPreset =
   | 'classic'
@@ -43,6 +43,12 @@ export type HarmonyContrastResult = {
   maxContrast: number
   ratioText: string
   level: ContrastLevel
+}
+
+export type OklchColor = {
+  l: number // 0..1
+  c: number // 0..0.34
+  h: number // 0..359
 }
 
 export function getCircularAngleDiff(angleA: number, angleB: number): number {
@@ -117,6 +123,13 @@ function srgbChannelToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
 }
 
+function linearChannelToSrgb(c: number): number {
+  const clamped = Math.max(0, Math.min(1, c))
+  return clamped <= 0.0031308
+    ? 12.92 * clamped
+    : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055
+}
+
 export function normalizeHex(input: string): string | null {
   const trimmed = input.trim().replace(/^#/, '')
   if (/^[0-9a-fA-F]{6}$/.test(trimmed)) {
@@ -128,6 +141,98 @@ export function normalizeHex(input: string): string | null {
     return '#' + expanded.toUpperCase()
   }
   return null
+}
+
+function parseHexToRgb01(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '')
+  if (clean.length !== 6) return [0.5, 0.5, 0.5]
+  return [
+    parseInt(clean.slice(0, 2), 16) / 255,
+    parseInt(clean.slice(2, 4), 16) / 255,
+    parseInt(clean.slice(4, 6), 16) / 255,
+  ]
+}
+
+function hexToOklab(hex: string): [number, number, number] {
+  const [sr, sg, sb] = parseHexToRgb01(hex)
+  const r = srgbChannelToLinear(sr)
+  const g = srgbChannelToLinear(sg)
+  const b = srgbChannelToLinear(sb)
+
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ]
+}
+
+function oklabToLinearRgb(L: number, a: number, b: number): [number, number, number] {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b
+
+  const l = l_ * l_ * l_
+  const m = m_ * m_ * m_
+  const s = s_ * s_ * s_
+
+  return [
+    +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ]
+}
+
+function isInSrgbGamut(r: number, g: number, b: number): boolean {
+  return r >= -1e-4 && r <= 1 + 1e-4 && g >= -1e-4 && g <= 1 + 1e-4 && b >= -1e-4 && b <= 1 + 1e-4
+}
+
+export function hexToOklch(hex: string): OklchColor {
+  const [L, a, b] = hexToOklab(hex)
+  const c = Math.hypot(a, b)
+  let h = Math.atan2(b, a) * (180 / Math.PI)
+  if (h < 0) h += 360
+  return {
+    l: Math.max(0, Math.min(1, L)),
+    c: Math.max(0, Math.min(0.34, c)),
+    h: c < 0.0005 ? 0 : Math.round(h) % 360,
+  }
+}
+
+// OKLCH -> HEX с бинарным сжатием хромы в sRGB-гамут (сохраняет точную светлоту L и оттенок H!)
+export function oklchToHex(lIn: number, cIn: number, hIn: number): string {
+  const L = Math.max(0, Math.min(1, lIn))
+  const C = Math.max(0, Math.min(0.34, cIn))
+  const hRad = ((((hIn % 360) + 360) % 360) * Math.PI) / 180
+  const cosH = Math.cos(hRad)
+  const sinH = Math.sin(hRad)
+
+  let [r, g, b] = oklabToLinearRgb(L, C * cosH, C * sinH)
+  if (!isInSrgbGamut(r, g, b) && C > 0) {
+    let lo = 0
+    let hi = C
+    for (let iter = 0; iter < 12; iter++) {
+      const mid = (lo + hi) * 0.5
+      const [mr, mg, mb] = oklabToLinearRgb(L, mid * cosH, mid * sinH)
+      if (isInSrgbGamut(mr, mg, mb)) {
+        lo = mid
+        r = mr
+        g = mg
+        b = mb
+      } else {
+        hi = mid
+      }
+    }
+  }
+
+  return rgb01ToHex(
+    linearChannelToSrgb(r),
+    linearChannelToSrgb(g),
+    linearChannelToSrgb(b)
+  )
 }
 
 export function hexToHsl(hex: string): { h: number; s: number; l: number } {
@@ -170,10 +275,24 @@ export function synthesizePigmentHex(
   chromaScale = 0.85,
   modelMode: ColorModelMode = 'ryb'
 ): string {
-  const effectiveHue =
-    modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
   const w = Math.max(0, Math.min(1, tintWhite))
   const b = Math.max(0, Math.min(1, shadeBlack))
+
+  if (modelMode === 'oklch') {
+    const hNorm = ((wheelHue % 360) + 360) % 360
+    const baseL = 0.64
+    const targetL =
+      (1 - w) * (1 - b) * baseL +
+      w * (1 - b) * 0.97 +
+      (1 - w) * b * 0.16 +
+      w * b * 0.56
+    const chromaDamp = (1 - w * 0.88) * (1 - b * 0.84)
+    const targetC = Math.max(0.01, Math.min(0.28, chromaScale * 0.25 * chromaDamp))
+    return oklchToHex(targetL, targetC, hNorm)
+  }
+
+  const effectiveHue =
+    modelMode === 'ryb' ? rybHueToRgbHue(wheelHue) : ((wheelHue % 360) + 360) % 360
   const sat = Math.max(8, Math.min(96, chromaScale * 100))
 
   const [rP, gP, bP] = hslToRgb01(effectiveHue, sat, 50)
@@ -202,16 +321,6 @@ export function synthesizePigmentHex(
   return rgb01ToHex(rOut, gOut, bOut)
 }
 
-function parseHexToRgb01(hex: string): [number, number, number] {
-  const clean = hex.replace('#', '')
-  if (clean.length !== 6) return [0.5, 0.5, 0.5]
-  return [
-    parseInt(clean.slice(0, 2), 16) / 255,
-    parseInt(clean.slice(2, 4), 16) / 255,
-    parseInt(clean.slice(4, 6), 16) / 255,
-  ]
-}
-
 export function getRelativeLuminance(hex: string): number {
   const [r, g, b] = parseHexToRgb01(hex)
   return (
@@ -227,23 +336,6 @@ export function getContrastRatio(hexA: string, hexB: string): number {
   const brightest = Math.max(l1, l2)
   const darkest = Math.min(l1, l2)
   return (brightest + 0.05) / (darkest + 0.05)
-}
-
-function hexToOklab(hex: string): [number, number, number] {
-  const [sr, sg, sb] = parseHexToRgb01(hex)
-  const r = srgbChannelToLinear(sr)
-  const g = srgbChannelToLinear(sg)
-  const b = srgbChannelToLinear(sb)
-
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
-
-  return [
-    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-  ]
 }
 
 export function getPerceptualPairContrast(hexA: string, hexB: string): number {
@@ -441,15 +533,6 @@ export function mapPaletteToFootwear(
   }
 }
 
-/**
- * Слой C: независимые переопределения материалов обуви.
- * Не зависит от темы интерфейса (UI Theme) и фона студии (Studio Background).
- * - upper   -> vamp, heel (основной верх)
- * - outsole -> midsole (основная видимая подошва EVA)
- * - midsole -> encap (промежуточная вставка / Air-блок подошвы)
- * - tread   -> outsole (нижний резиновый протектор)
- * - accent  -> swoosh (логотип, штрихи, акцентные детали)
- */
 export function applyMaterialOverrides(
   base: SneakerColors,
   overrides: MaterialOverrides
