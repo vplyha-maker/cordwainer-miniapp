@@ -12,7 +12,6 @@ import { hapticReset, hapticSave, hapticSwatch, hapticTap } from './haptics'
 import {
   STUDIO_BG_PRESET_HEX,
   type CordwaineThemeTokens,
-  type PerformanceMode,
   type StudioBgPreset,
   type StudioDisplaySettings,
 } from './themeSystem'
@@ -121,7 +120,7 @@ export const ToneControlCard = memo(function ToneControlCard({
               onCollapse()
             }}
             aria-label={t.guideClose}
-            className="absolute top-2.5 right-3 w-6 h-6 rounded-full flex items-center justify-center bg-transparent border-0 cursor-pointer transition-transform active:scale-90"
+            className="cw-press absolute top-2.5 right-3 w-6 h-6 rounded-full flex items-center justify-center bg-transparent border-0 cursor-pointer"
             style={{ color: tokens.inkMuted }}
           >
             <svg
@@ -146,7 +145,7 @@ export const ToneControlCard = memo(function ToneControlCard({
                 onOpenEditor()
               }}
               aria-label={t.editorTitle}
-              className="w-[62px] h-[62px] rounded-[16px] border transition-transform duration-150 active:scale-95 cursor-pointer"
+              className="cw-press w-[62px] h-[62px] rounded-[16px] border cursor-pointer"
               style={{
                 backgroundColor: activeColorHex,
                 borderColor: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.08)',
@@ -193,10 +192,10 @@ export const ToneControlCard = memo(function ToneControlCard({
                       type="button"
                       onClick={row.onDec}
                       aria-label={row.label + ' -'}
-                      className="w-7 h-7 rounded-full flex items-center justify-center border transition-transform duration-100 active:scale-90 cursor-pointer"
+                      className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
                       style={{
                         backgroundColor: tokens.surfaceSoft,
-                        borderColor: tokens.border,
+                        borderColor: tokens.borderStrong,
                         color: tokens.ink,
                       }}
                     >
@@ -217,10 +216,10 @@ export const ToneControlCard = memo(function ToneControlCard({
                       type="button"
                       onClick={row.onInc}
                       aria-label={row.label + ' +'}
-                      className="w-7 h-7 rounded-full flex items-center justify-center border transition-transform duration-100 active:scale-90 cursor-pointer"
+                      className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
                       style={{
                         backgroundColor: tokens.surfaceSoft,
-                        borderColor: tokens.border,
+                        borderColor: tokens.borderStrong,
                         color: tokens.ink,
                       }}
                     >
@@ -254,7 +253,6 @@ export type StudioSettingsPanelProps = {
   onChangeStudioBgPreset: (preset: StudioBgPreset) => void
   onOpenCustomBgEditor: () => void
   onToggleAutoContrast: (next: boolean) => void
-  onChangePerformanceMode: (mode: PerformanceMode) => void
   sneakerColors: SneakerColors
   materialOverrides: MaterialOverrides
   onEditMaterial: (zone: MaterialZoneKey) => void
@@ -298,7 +296,6 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
   onChangeStudioBgPreset,
   onOpenCustomBgEditor,
   onToggleAutoContrast,
-  onChangePerformanceMode,
   sneakerColors,
   materialOverrides,
   onEditMaterial,
@@ -317,48 +314,185 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
   const hasAnyMaterialOverride = Object.values(materialOverrides).some(Boolean)
 
   return (
-    <section className="mt-2.5 space-y-3 pb-4" aria-label={t.settingsTitle}>
-      {/* БЛОК 1: ФОН СТУДИИ (6 вариантов + Авто-контраст) */}
+    <section className="mt-2 space-y-2.5 pb-4" aria-label={t.settingsTitle}>
+      {/* БЛОК 1: ЦВЕТА МАТЕРИАЛОВ ОБУВИ (ПОДОШВА / ВЕРХ / ПРОТЕКТОР) — СРАЗУ НА ВИДУ */}
       <div
-        className="rounded-[20px] p-4 border space-y-3"
+        className="rounded-[20px] p-3.5 border space-y-2"
         style={{
           backgroundColor: tokens.surface,
           borderColor: tokens.border,
           boxShadow: tokens.cardShadow,
         }}
       >
-        <div className="flex items-start gap-2.5">
-          <span
-            className="w-7 h-7 rounded-[9px] flex items-center justify-center shrink-0 mt-0.5"
-            style={{ backgroundColor: tokens.surfaceSoft, color: tokens.ink }}
-            aria-hidden="true"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="3" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <path d="M21 15l-5-5L5 21" />
-            </svg>
-          </span>
+        <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <h2
-              className="text-[11.5px] font-sans font-semibold uppercase tracking-[0.12em]"
+              className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em]"
               style={{ color: tokens.ink }}
             >
-              {t.studioBgTitle}
+              {t.materialsTitle}
             </h2>
-            <p className="text-[11.5px] font-sans mt-0.5" style={{ color: tokens.inkMuted }}>
-              {t.studioBgSubtitle}
+            <p className="text-[11px] font-sans mt-0.5" style={{ color: tokens.inkMuted }}>
+              {t.materialsSubtitle}
             </p>
           </div>
+
+          {hasAnyMaterialOverride && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirmResetMats) {
+                  hapticTap()
+                  setConfirmResetMats(true)
+                  return
+                }
+                hapticReset()
+                setConfirmResetMats(false)
+                onResetAllMaterials()
+              }}
+              className="cw-press px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border cursor-pointer shrink-0"
+              style={{
+                backgroundColor: confirmResetMats ? tokens.pillActiveBg : tokens.surfaceSoft,
+                color: confirmResetMats ? tokens.pillActiveText : tokens.ink,
+                borderColor: confirmResetMats ? tokens.pillActiveBg : tokens.borderStrong,
+              }}
+            >
+              {confirmResetMats ? t.btnConfirmReset : t.resetMaterialsBtn}
+            </button>
+          )}
+        </div>
+
+        <div className="divide-y" style={{ borderColor: tokens.divider }}>
+          {MATERIAL_ROWS.map((row) => {
+            const hex = getMaterialZoneHex(sneakerColors, row.key)
+            const isOverridden = Boolean(materialOverrides[row.key])
+            return (
+              <div
+                key={row.key}
+                className="flex items-center justify-between gap-2 py-2"
+                style={{ borderColor: tokens.divider }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    hapticSwatch()
+                    onEditMaterial(row.key)
+                  }}
+                  className="cw-press flex items-center gap-2.5 min-w-0 flex-1 bg-transparent border-0 p-0 text-left cursor-pointer rounded-lg"
+                >
+                  <span
+                    className="w-7 h-7 rounded-[9px] border shrink-0"
+                    style={{
+                      backgroundColor: hex,
+                      borderColor: tokens.borderStrong,
+                    }}
+                  />
+                  <span
+                    className="text-[13px] font-sans font-medium truncate"
+                    style={{ color: tokens.ink }}
+                  >
+                    {t[row.labelKey]}
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span
+                    className="px-2.5 py-1 rounded-full text-[11px] font-mono border"
+                    style={{
+                      backgroundColor: tokens.surfaceSoft,
+                      borderColor: tokens.border,
+                      color: tokens.inkSecondary,
+                    }}
+                  >
+                    {hex}
+                  </span>
+
+                  {isOverridden && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        hapticReset()
+                        onResetMaterial(row.key)
+                      }}
+                      aria-label={t.btnReset}
+                      title={t.btnReset}
+                      className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
+                      style={{
+                        backgroundColor: tokens.surfaceSoft,
+                        borderColor: tokens.border,
+                        color: tokens.inkMuted,
+                      }}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+                        <path d="M3 3v5h5" />
+                      </svg>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      hapticTap()
+                      onEditMaterial(row.key)
+                    }}
+                    aria-label={t.editorTitle}
+                    className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
+                    style={{
+                      backgroundColor: tokens.surfaceElevated,
+                      borderColor: tokens.borderStrong,
+                      color: tokens.ink,
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* БЛОК 2: ФОН СТУДИИ (6 вариантов + Авто-контраст) */}
+      <div
+        className="rounded-[20px] p-3.5 border space-y-3"
+        style={{
+          backgroundColor: tokens.surface,
+          borderColor: tokens.border,
+          boxShadow: tokens.cardShadow,
+        }}
+      >
+        <div className="min-w-0">
+          <h2
+            className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em]"
+            style={{ color: tokens.ink }}
+          >
+            {t.studioBgTitle}
+          </h2>
+          <p className="text-[11px] font-sans mt-0.5" style={{ color: tokens.inkMuted }}>
+            {t.studioBgSubtitle}
+          </p>
         </div>
 
         <div className="grid grid-cols-6 gap-1.5">
@@ -378,7 +512,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
                     onChangeStudioBgPreset(opt.id)
                   }
                 }}
-                className="flex flex-col items-center gap-1.5 bg-transparent border-0 p-0 cursor-pointer active:scale-95 transition-transform"
+                className="cw-press flex flex-col items-center gap-1 bg-transparent border-0 p-0 cursor-pointer"
               >
                 <div
                   className="relative w-full aspect-square rounded-[12px] border flex items-center justify-center overflow-hidden"
@@ -442,9 +576,8 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
           })}
         </div>
 
-        {/* Авто-контраст интерфейса */}
         <div
-          className="flex items-center justify-between gap-3 pt-3 border-t"
+          className="flex items-center justify-between gap-3 pt-2.5 border-t"
           style={{ borderColor: tokens.divider }}
         >
           <div className="min-w-0">
@@ -464,7 +597,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
               hapticTap()
               onToggleAutoContrast(!studioSettings.autoContrast)
             }}
-            className="relative w-12 h-7 rounded-full border transition-colors duration-200 cursor-pointer shrink-0"
+            className="cw-press relative w-12 h-7 rounded-full border transition-colors duration-200 cursor-pointer shrink-0"
             style={{
               backgroundColor: studioSettings.autoContrast
                 ? tokens.pillActiveBg
@@ -487,224 +620,16 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
         </div>
       </div>
 
-      {/* БЛОК 2: ЦВЕТА МАТЕРИАЛОВ ОБУВИ (5 независимых элементов) */}
+      {/* БЛОК 3: ВИБРООТКЛИК, ЦВЕТОВАЯ МОДЕЛЬ, ЯЗЫК И ГИД */}
       <div
-        className="rounded-[20px] p-4 border space-y-2.5"
+        className="rounded-[20px] p-3.5 border space-y-3"
         style={{
           backgroundColor: tokens.surface,
           borderColor: tokens.border,
           boxShadow: tokens.cardShadow,
         }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h2
-              className="text-[11.5px] font-sans font-semibold uppercase tracking-[0.12em]"
-              style={{ color: tokens.ink }}
-            >
-              {t.materialsTitle}
-            </h2>
-            <p className="text-[11.5px] font-sans mt-0.5" style={{ color: tokens.inkMuted }}>
-              {t.materialsSubtitle}
-            </p>
-          </div>
-
-          {hasAnyMaterialOverride && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!confirmResetMats) {
-                  hapticTap()
-                  setConfirmResetMats(true)
-                  return
-                }
-                hapticReset()
-                setConfirmResetMats(false)
-                onResetAllMaterials()
-              }}
-              className="px-2.5 py-1 rounded-full text-[10.5px] font-sans font-medium border cursor-pointer shrink-0 active:scale-95 transition-transform"
-              style={{
-                backgroundColor: confirmResetMats ? tokens.pillActiveBg : tokens.surfaceSoft,
-                color: confirmResetMats ? tokens.pillActiveText : tokens.ink,
-                borderColor: confirmResetMats ? tokens.pillActiveBg : tokens.borderStrong,
-              }}
-            >
-              {confirmResetMats ? t.btnConfirmReset : t.resetMaterialsBtn}
-            </button>
-          )}
-        </div>
-
-        <div className="divide-y" style={{ borderColor: tokens.divider }}>
-          {MATERIAL_ROWS.map((row) => {
-            const hex = getMaterialZoneHex(sneakerColors, row.key)
-            const isOverridden = Boolean(materialOverrides[row.key])
-            return (
-              <div
-                key={row.key}
-                className="flex items-center justify-between gap-2 py-2.5"
-                style={{ borderColor: tokens.divider }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    hapticSwatch()
-                    onEditMaterial(row.key)
-                  }}
-                  className="flex items-center gap-2.5 min-w-0 flex-1 bg-transparent border-0 p-0 text-left cursor-pointer"
-                >
-                  <span
-                    className="w-7 h-7 rounded-[9px] border shrink-0"
-                    style={{
-                      backgroundColor: hex,
-                      borderColor: tokens.borderStrong,
-                    }}
-                  />
-                  <span
-                    className="text-[13px] font-sans font-medium truncate"
-                    style={{ color: tokens.ink }}
-                  >
-                    {t[row.labelKey]}
-                  </span>
-                </button>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className="px-2.5 py-1 rounded-full text-[11px] font-mono border"
-                    style={{
-                      backgroundColor: tokens.surfaceSoft,
-                      borderColor: tokens.border,
-                      color: tokens.inkSecondary,
-                    }}
-                  >
-                    {hex}
-                  </span>
-
-                  {isOverridden && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        hapticReset()
-                        onResetMaterial(row.key)
-                      }}
-                      aria-label={t.btnReset}
-                      title={t.btnReset}
-                      className="w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer active:scale-90 transition-transform"
-                      style={{
-                        backgroundColor: tokens.surfaceSoft,
-                        borderColor: tokens.border,
-                        color: tokens.inkMuted,
-                      }}
-                    >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" />
-                        <path d="M3 3v5h5" />
-                      </svg>
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      hapticTap()
-                      onEditMaterial(row.key)
-                    }}
-                    aria-label={t.editorTitle}
-                    className="w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer active:scale-90 transition-transform"
-                    style={{
-                      backgroundColor: tokens.surfaceElevated,
-                      borderColor: tokens.borderStrong,
-                      color: tokens.ink,
-                    }}
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.9"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* БЛОК 3: ОТОБРАЖЕНИЕ И ПРОИЗВОДИТЕЛЬНОСТЬ */}
-      <div
-        className="rounded-[20px] p-4 border space-y-3.5"
-        style={{
-          backgroundColor: tokens.surface,
-          borderColor: tokens.border,
-          boxShadow: tokens.cardShadow,
-        }}
-      >
-        <h2
-          className="text-[11.5px] font-sans font-semibold uppercase tracking-[0.12em]"
-          style={{ color: tokens.ink }}
-        >
-          {t.displayPerfTitle}
-        </h2>
-
-        {/* Режим производительности Android */}
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[13px] font-sans font-medium" style={{ color: tokens.ink }}>
-            {t.perfModeLabel}
-          </span>
-          <div
-            className="flex items-center p-1 rounded-full border shrink-0"
-            style={{ backgroundColor: tokens.surfaceSoft, borderColor: tokens.border }}
-          >
-            {(
-              [
-                { id: 'auto', label: t.perfAuto },
-                { id: 'high', label: t.perfHigh },
-                { id: 'eco', label: t.perfEco },
-              ] as const
-            ).map((item) => {
-              const active = studioSettings.performanceMode === item.id
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    hapticTap()
-                    onChangePerformanceMode(item.id)
-                  }}
-                  className="px-2.5 py-1 rounded-full text-[11.5px] font-sans font-medium border-0 cursor-pointer"
-                  style={{
-                    backgroundColor: active ? tokens.pillActiveBg : 'transparent',
-                    color: active ? tokens.pillActiveText : tokens.inkSecondary,
-                  }}
-                >
-                  {item.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Виброотклик */}
-        <div
-          className="flex items-center justify-between gap-3 pt-3 border-t"
-          style={{ borderColor: tokens.divider }}
-        >
+        <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-sans font-medium" style={{ color: tokens.ink }}>
             {t.hapticsLabel}
           </span>
@@ -717,7 +642,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
               onToggleHaptics(next)
               if (next) hapticTap()
             }}
-            className="relative w-12 h-7 rounded-full border transition-colors duration-200 cursor-pointer"
+            className="cw-press relative w-12 h-7 rounded-full border transition-colors duration-200 cursor-pointer"
             style={{
               backgroundColor: hapticsEnabled ? tokens.pillActiveBg : tokens.surfaceSoft,
               borderColor: hapticsEnabled ? tokens.pillActiveBg : tokens.borderStrong,
@@ -733,9 +658,8 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
           </button>
         </div>
 
-        {/* Цветовая модель RYB / HSL */}
         <div
-          className="flex items-center justify-between gap-3 pt-3 border-t"
+          className="flex items-center justify-between gap-3 pt-2.5 border-t"
           style={{ borderColor: tokens.divider }}
         >
           <span className="text-[13px] font-sans font-medium" style={{ color: tokens.ink }}>
@@ -755,7 +679,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
                     hapticTap()
                     onChangeModelMode(m)
                   }}
-                  className="px-3.5 py-1 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.08em] border-0 cursor-pointer"
+                  className="cw-press px-3.5 py-1 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.08em] border-0 cursor-pointer"
                   style={{
                     backgroundColor: active ? tokens.pillActiveBg : 'transparent',
                     color: active ? tokens.pillActiveText : tokens.inkSecondary,
@@ -768,9 +692,8 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
           </div>
         </div>
 
-        {/* Язык RU / UKR / DE */}
         <div
-          className="flex items-center justify-between gap-3 pt-3 border-t"
+          className="flex items-center justify-between gap-3 pt-2.5 border-t"
           style={{ borderColor: tokens.divider }}
         >
           <span className="text-[13px] font-sans font-medium" style={{ color: tokens.ink }}>
@@ -790,7 +713,7 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
                     hapticTap()
                     onChangeLang(l)
                   }}
-                  className="px-3 py-1 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.08em] border-0 cursor-pointer"
+                  className="cw-press px-3 py-1 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.08em] border-0 cursor-pointer"
                   style={{
                     backgroundColor: active ? tokens.pillActiveBg : 'transparent',
                     color: active ? tokens.pillActiveText : tokens.inkSecondary,
@@ -803,14 +726,13 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
           </div>
         </div>
 
-        {/* Подробный гид */}
         <button
           type="button"
           onClick={() => {
             hapticTap()
             onOpenGuide()
           }}
-          className="w-full h-10 rounded-full border text-[12.5px] font-sans font-medium transition-transform active:scale-[0.98] cursor-pointer"
+          className="cw-press w-full h-10 rounded-full border text-[12.5px] font-sans font-medium cursor-pointer"
           style={{
             backgroundColor: tokens.surfaceSoft,
             borderColor: tokens.borderStrong,
@@ -821,14 +743,13 @@ export const StudioSettingsPanel = memo(function StudioSettingsPanel({
         </button>
       </div>
 
-      {/* Primary Action: Сохранить изменения */}
       <button
         type="button"
         onClick={() => {
           hapticSave()
           onSaveAndClose()
         }}
-        className="w-full h-12 rounded-full flex items-center justify-center gap-2 border text-[13.5px] font-sans font-medium transition-transform active:scale-[0.97] cursor-pointer"
+        className="cw-press w-full h-12 rounded-full flex items-center justify-center gap-2 border text-[13.5px] font-sans font-medium cursor-pointer"
         style={{
           backgroundColor: tokens.pillActiveBg,
           borderColor: tokens.pillActiveBg,
