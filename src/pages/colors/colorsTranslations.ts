@@ -1,7 +1,6 @@
 import type { Lang as AppLang } from '../../App'
 import type { FootwearMappingPreset } from './colorEngine'
 
-// Рыночная стоимость разовой разблокировки PRO-модуля в Telegram Stars (~$4.99)
 export const PRO_COLORS_PRICE_STARS = 250
 
 export type SupportedLang = 'ru' | 'uk' | 'de'
@@ -33,16 +32,16 @@ export const TRANSLATIONS = {
     main55: '55%',
     secondary20: '20%',
     secondary15: '15%',
-    // Роли свотчей по пресетам для CORDWAINE AEROSTRAP (AUDIT-05)
-    roleClassicUpper: 'Верх • Щиток пятки',
+    // Роли свотчей по уточнённой матрице CORDWAINE AEROSTRAP
+    roleClassicUpper: 'Верх • Пятка',
     roleClassicDetailsAll: 'Обвод • Волна • Ремень',
     roleClassicDetails: 'Обвод • Волна • Ремень',
     roleClassicLining: 'Канты • Подкладка',
-    roleClassicAccent: 'Протектор • Штрихи • Air',
+    roleClassicAccent: 'Штрихи • Air блок',
     roleToeMain: 'Обвод • Ремень • Air',
-    roleToeSecondary: 'Верх • Боковая волна',
+    roleToeSecondary: 'Верх • Пятка • Волна',
     roleToeLining: 'Канты • Подкладка',
-    roleToeAccent: 'Пятка • Штрихи • Протектор',
+    roleToeAccent: 'Штрихи • Задняя петля',
     roleSplitMain: 'Верх • Пятка • Штрихи',
     roleSplitSecondary: 'Обвод • Язычок • Air',
     roleSplitLining: 'Канты • Подкладка',
@@ -140,22 +139,20 @@ export const TRANSLATIONS = {
     main55: '55%',
     secondary20: '20%',
     secondary15: '15%',
-    // Ролі свотчів по пресетах для CORDWAINE AEROSTRAP
-    roleClassicUpper: 'Верх • Щиток п’яти',
+    roleClassicUpper: 'Верх • П’ята',
     roleClassicDetailsAll: 'Обвід • Хвиля • Ремінь',
     roleClassicDetails: 'Обвід • Хвиля • Ремінь',
     roleClassicLining: 'Канти • Підкладка',
-    roleClassicAccent: 'Протектор • Штрихи • Air',
+    roleClassicAccent: 'Штрихи • Air блок',
     roleToeMain: 'Обвід • Ремінь • Air',
-    roleToeSecondary: 'Верх • Бічна хвиля',
+    roleToeSecondary: 'Верх • П’ята • Хвиля',
     roleToeLining: 'Канти • Підкладка',
-    roleToeAccent: 'П’ята • Штрихи • Протектор',
+    roleToeAccent: 'Штрихи • Задня петля',
     roleSplitMain: 'Верх • П’ята • Штрихи',
     roleSplitSecondary: 'Обвід • Язичок • Air',
     roleSplitLining: 'Канти • Підкладка',
     roleSplitAccent: 'Ремінь • Бічна хвиля',
     roleNeutralAccent: 'Штрихи • Задня петля',
-    // 13 зон техкарти CORDWAINE AEROSTRAP
     specTitle: 'Техкарта 13 зон (натисніть для копіювання HEX)',
     exportSpecBtn: 'Копіювати техкарту',
     exportCopied: 'Техкарту скопійовано',
@@ -247,22 +244,20 @@ export const TRANSLATIONS = {
     main55: '55%',
     secondary20: '20%',
     secondary15: '15%',
-    // Rollen nach Preset für CORDWAINE AEROSTRAP
     roleClassicUpper: 'Obermaterial • Ferse',
     roleClassicDetailsAll: 'Rand • Welle • Riemen',
     roleClassicDetails: 'Rand • Welle • Riemen',
     roleClassicLining: 'Paspel • Futter',
-    roleClassicAccent: 'Sohle • Akzente • Air',
+    roleClassicAccent: 'Akzente • Air-Unit',
     roleToeMain: 'Rand • Riemen • Air',
-    roleToeSecondary: 'Obermaterial • Seitenwelle',
+    roleToeSecondary: 'Obermaterial • Ferse • Welle',
     roleToeLining: 'Paspel • Futter',
-    roleToeAccent: 'Ferse • Akzente • Sohle',
+    roleToeAccent: 'Akzente • Fersenlasche',
     roleSplitMain: 'Obermaterial • Ferse • Akzente',
     roleSplitSecondary: 'Rand • Zunge • Air',
     roleSplitLining: 'Paspel • Futter',
     roleSplitAccent: 'Riemen • Seitenwelle',
     roleNeutralAccent: 'Akzente • Fersenlasche',
-    // 13-Zonen-Spezifikation CORDWAINE AEROSTRAP
     specTitle: '13-Zonen-Spezifikation (Tippen zum HEX-Kopieren)',
     exportSpecBtn: 'Tech-Spec kopieren',
     exportCopied: 'Tech-Spec kopiert',
@@ -386,4 +381,3 @@ export function getPresetSwatchLabels(
       }
   }
 }
-
