@@ -49,6 +49,9 @@ export type CordwaineThemeTokens = {
   pillActiveText: string
   pillIdleBg: string
   pillIdleText: string
+  activeTintBg: string
+  activeTintBorder: string
+  activeTintText: string
   cardShadow: string
   buttonShadow: string
   sheetShadow: string
@@ -75,7 +78,10 @@ export const DAY_THEME: CordwaineThemeTokens = {
   pillActiveBg: '#181614',
   pillActiveText: '#FAF8F4',
   pillIdleBg: 'rgba(255, 255, 255, 0.78)',
-  pillIdleText: '#4D4842',
+  pillIdleText: '#58524A',
+  activeTintBg: '#EAE1D2',
+  activeTintBorder: '#9A8263',
+  activeTintText: '#181614',
   cardShadow: '0 8px 24px -8px rgba(24, 22, 20, 0.08), 0 1px 3px rgba(24, 22, 20, 0.04)',
   buttonShadow: '0 2px 6px -2px rgba(24, 22, 20, 0.08), 0 1px 2px rgba(24, 22, 20, 0.04)',
   sheetShadow: '0 -10px 36px -8px rgba(24, 22, 20, 0.18), 0 -1px 0 rgba(24, 22, 20, 0.06)',
@@ -99,7 +105,10 @@ export const NIGHT_THEME: CordwaineThemeTokens = {
   pillActiveBg: '#F5F2EB',
   pillActiveText: '#121215',
   pillIdleBg: 'rgba(39, 39, 46, 0.85)',
-  pillIdleText: '#C5C0B6',
+  pillIdleText: '#A8A39A',
+  activeTintBg: '#2C2721',
+  activeTintBorder: '#C79B58',
+  activeTintText: '#F5F2EB',
   cardShadow: '0 12px 30px -10px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   buttonShadow: '0 3px 10px -3px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
   sheetShadow: '0 -14px 44px -8px rgba(0, 0, 0, 0.72), inset 0 1px 0 rgba(255, 255, 255, 0.07)',
