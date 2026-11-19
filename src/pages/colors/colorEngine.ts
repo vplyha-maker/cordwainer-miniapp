@@ -124,9 +124,6 @@ function srgbChannelToLinear(c: number): number {
 /**
  * Перцептивно согласованное смешивание базового пигмента
  * с белилами (Tint) и чёрным пигментом (Shade) по билинейной модели Пигмент–Белила–Сажа–Тон (AUDIT-03).
- * - При shadeBlack = 1.0, tintWhite = 0: глубокий угольно-чёрный цвет кожи (Y < 0.025).
- * - При tintWhite = 1.0, shadeBlack = 0: чистый снежно-белый цвет (Y > 0.88).
- * - При tintWhite = 1.0, shadeBlack = 1.0: сбалансированный нейтральный средне-серый тон.
  */
 export function synthesizePigmentHex(
   wheelHue: number,
@@ -141,20 +138,16 @@ export function synthesizePigmentHex(
   const b = Math.max(0, Math.min(1, shadeBlack))
   const sat = Math.max(8, Math.min(96, chromaScale * 100))
 
-  // 1. Чистый пигмент (w = 0, b = 0)
   const [rP, gP, bP] = hslToRgb01(effectiveHue, sat, 50)
 
-  // 2. Белила (w = 1, b = 0) -> Y ≈ 0.935 (> 0.88)
   const rW = 0.968 + 0.008 * rP
   const gW = 0.968 + 0.008 * gP
   const bW = 0.965 + 0.008 * bP
 
-  // 3. Глубокий обувной чёрный/графит (w = 0, b = 1) -> Y ≈ 0.009 (< 0.025)
   const rK = 0.072 + 0.038 * rP
   const gK = 0.072 + 0.038 * gP
   const bK = 0.072 + 0.038 * bP
 
-  // 4. Нейтральный средне-серый тон при одновременном максимуме белил и сажи (w = 1, b = 1)
   const rG = 0.455 + 0.035 * rP
   const gG = 0.455 + 0.035 * gP
   const bG = 0.455 + 0.035 * bP
@@ -198,9 +191,6 @@ export function getContrastRatio(hexA: string, hexB: string): number {
   return (brightest + 0.05) / (darkest + 0.05)
 }
 
-/**
- * Перевод HEX в перцептивное пространство OKLab для оценки хроматического контраста (AUDIT-08).
- */
 function hexToOklab(hex: string): [number, number, number] {
   const [sr, sg, sb] = parseHexToRgb01(hex)
   const r = srgbChannelToLinear(sr)
@@ -218,10 +208,6 @@ function hexToOklab(hex: string): [number, number, number] {
   ]
 }
 
-/**
- * Комплексная оценка контраста пары цветов, объединяющая
- * яркостный контраст WCAG (ΔL) и хроматическое различие в пространстве OKLab (ΔE) (AUDIT-08).
- */
 export function getPerceptualPairContrast(hexA: string, hexB: string): number {
   const lumRatio = getContrastRatio(hexA, hexB)
   const [L1, a1, b1] = hexToOklab(hexA)
@@ -320,7 +306,7 @@ export function generateHarmonyPalette(
 }
 
 /* ============================================================================
-   2. FOOTWEAR COLOR MAPPING (РАСПРЕДЕЛЕНИЕ ЦВЕТОВ ПО 13 ЗОНАМ МОДЕЛИ)
+   2. FOOTWEAR COLOR MAPPING (УТОЧНЁННАЯ МАТРИЦА CORDWAINE AEROSTRAP)
    ============================================================================ */
 
 export function mapPaletteToFootwear(
@@ -356,29 +342,29 @@ export function mapPaletteToFootwear(
     case 'toe-focus':
       return {
         vamp: secondaryColor,
+        heel: secondaryColor,
         toeBox: mainColor,
         quarters: secondaryColor,
         eyestays: mainColor,
-        heel: accentColor,
         collar: tertiaryColor,
         tongue: mainColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
         encap: mainColor,
-        outsole: accentColor,
+        outsole: neutralOutsole,
         laces: neutralLaces,
       }
     case 'split-quarter':
       return {
         vamp: mainColor,
+        heel: mainColor,
         toeBox: secondaryColor,
         quarters: accentColor,
         eyestays: accentColor,
-        heel: mainColor,
         collar: tertiaryColor,
         tongue: secondaryColor,
-        lining: colors.length > 3 ? tertiaryColor : mainColor,
+        lining: tertiaryColor,
         swoosh: mainColor,
         midsole: neutralMidsole,
         encap: secondaryColor,
@@ -393,7 +379,7 @@ export function mapPaletteToFootwear(
         quarters: secondaryColor,
         toeBox: secondaryColor,
         tongue: secondaryColor,
-        collar: colors.length > 3 ? colors[2] : tertiaryColor,
+        collar: tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
@@ -410,20 +396,17 @@ export function mapPaletteToFootwear(
         quarters: secondaryColor,
         toeBox: secondaryColor,
         tongue: secondaryColor,
-        collar: colors.length > 3 ? colors[2] : tertiaryColor,
+        collar: tertiaryColor,
         lining: tertiaryColor,
         swoosh: accentColor,
         midsole: neutralMidsole,
         encap: accentColor,
-        outsole: accentColor,
+        outsole: neutralOutsole,
         laces: neutralLaces,
       }
   }
 }
 
-/**
- * Оценка контраста всей палитры и фактически соприкасающихся зон кроссовка (AUDIT-08).
- */
 export function evaluateHarmonyContrast(
   colors: string[],
   sneakerColors: SneakerColors
@@ -450,4 +433,3 @@ export function evaluateHarmonyContrast(
     level,
   }
 }
-
