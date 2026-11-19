@@ -228,7 +228,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return () => observer.disconnect()
   }, [])
 
-  // Сохранение текущей палитры между сессиями
   useEffect(() => {
     try {
       const payload: PersistedColorsState = {
@@ -647,9 +646,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           })}
         </div>
 
-        {/* 1.5. ПЕРЕКЛЮЧАТЕЛЬ ПРЕСЕТОВ РАСПРЕДЕЛЕНИЯ + ИНДИКАТОР КОНТРАСТА */}
-        <div className="flex items-center justify-between gap-2 pt-1.5">
-          <div className="flex overflow-x-auto gap-1.5 pr-4 scrollbar-hide" style={fadeMaskStyle}>
+        {/* 1.5. ПРЕСЕТЫ НА ВСЮ ШИРИНУ + ОТДЕЛЬНАЯ МИКРО-СТРОКА КОНТРАСТА */}
+        <div className="pt-1.5 flex flex-col gap-1">
+          <div className="flex overflow-x-auto gap-1.5 pr-6 scrollbar-hide" style={fadeMaskStyle}>
             {PRESETS.map((p) => (
               <button
                 key={p.id}
@@ -659,7 +658,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   setMappingPreset(p.id)
                 }}
                 className={
-                  'px-2 py-1 text-[8.5px] font-sans uppercase tracking-[0.14em] whitespace-nowrap border transition-colors cursor-pointer bg-transparent ' +
+                  'px-2 py-1 text-[8.5px] font-sans uppercase tracking-[0.14em] whitespace-nowrap border transition-colors cursor-pointer bg-transparent shrink-0 ' +
                   (mappingPreset === p.id
                     ? cLine + ' ' + cText + ' font-semibold'
                     : 'border-transparent ' + cTextMuted + ' ' + cHover)
@@ -670,11 +669,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             ))}
           </div>
 
-          <span
-            className={'text-[8px] font-sans uppercase tracking-[0.12em] whitespace-nowrap ' + cTextMuted}
-          >
-            ΔE {harmonyEvaluation.ratioText} • {harmonyEvaluation.statusLabel}
-          </span>
+          <div className="flex items-center justify-end">
+            <span
+              className={'text-[7.5px] font-sans uppercase tracking-[0.14em] ' + cTextMuted}
+            >
+              ΔE {harmonyEvaluation.ratioText} • {harmonyEvaluation.statusLabel}
+            </span>
+          </div>
         </div>
 
         {/* 2. 3D-МОДЕЛЬ CORDWAINE AEROSTRAP */}
@@ -762,9 +763,12 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </div>
             </div>
             <span
-              className={'mt-1.5 text-[8px] font-sans tracking-[0.18em] uppercase ' + cTextMuted}
+              className={
+                'mt-1.5 text-[8.5px] font-sans tracking-[0.18em] uppercase whitespace-nowrap ' +
+                cTextMuted
+              }
             >
-              {modelMode === 'ryb' ? t.ittenLabel : t.hslLabel} • {baseHue}°
+              {modelMode === 'ryb' ? 'RYB' : 'HSL'} • {baseHue}°
             </span>
           </div>
 
@@ -849,7 +853,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         </div>
 
-        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ */}
+        {/* 4. СВОТЧИ ПАЛИТРЫ ПО ЗОНАМ (2 СТРОКИ ПОД СВОТЧЕМ ДЛЯ ЧИТАЕМОСТИ В ТЕТРАДАХ) */}
         <div className={'grid gap-2.5 pt-1.5 ' + (isTetrad ? 'grid-cols-4' : 'grid-cols-3')}>
           {colors.map((c, i) => {
             const isCopied = copiedKey === 'swatch:' + i + ':' + c
@@ -872,14 +876,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                     {isCopied ? t.copied : c}
                   </span>
                 </div>
-                <div className="flex items-baseline justify-between gap-1 w-full">
+                <div className="flex flex-col w-full leading-tight">
                   <span
                     className={'text-[9px] font-sans font-semibold uppercase tracking-[0.14em] ' + cText}
                   >
                     {ratioLabels[i]}
                   </span>
                   <span
-                    className={'text-[8px] font-sans uppercase tracking-[0.06em] truncate ' + cTextMuted}
+                    className={'text-[7.5px] font-sans uppercase tracking-[0.04em] line-clamp-1 ' + cTextMuted}
                   >
                     {roleLabels[i]}
                   </span>
