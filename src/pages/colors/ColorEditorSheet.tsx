@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-motion'
-import { hexToHsl, hslToHex, normalizeHex } from './colorEngine'
+import { hexToOklch, normalizeHex, oklchToHex, type OklchColor } from './colorEngine'
 import type { TranslationDict } from './colorsTranslations'
 import { hapticReset, hapticSwatch, hapticTap } from './haptics'
 import type { CordwaineThemeTokens } from './themeSystem'
@@ -33,8 +33,22 @@ export type ColorEditorSheetProps = {
   onRemoveQuickColor: (hex: string) => void
 }
 
-const SPECTRUM_GRADIENT =
-  'linear-gradient(90deg, #E52B50 0%, #D72867 12%, #9B28D7 24%, #2B59FF 36%, #16B8F3 48%, #22D35B 62%, #B8E622 74%, #F7C924 85%, #F26B24 94%, #E52B50 100%)'
+const MAX_OKLCH_CHROMA = 0.28
+
+function buildOklchHueGradient(): string {
+  const stops: string[] = []
+  for (let i = 0; i <= 12; i++) {
+    const h = i * 30
+    stops.push(oklchToHex(0.68, 0.22, h) + ' ' + Math.round((i / 12) * 100) + '%')
+  }
+  return 'linear-gradient(90deg, ' + stops.join(', ') + ')'
+}
+
+const OKLCH_SPECTRUM_GRADIENT = buildOklchHueGradient()
+
+function formatOklchReadout(c: OklchColor): string {
+  return 'OKLCH  L ' + c.l.toFixed(2) + ' • C ' + c.c.toFixed(2) + ' • H ' + Math.round(c.h) + '°'
+}
 
 export function ColorEditorSheet({
   isOpen,
@@ -60,24 +74,25 @@ export function ColorEditorSheet({
   const [eyedropperNotice, setEyedropperNotice] = useState<string | null>(null)
   const [manageQuickMode, setManageQuickMode] = useState(false)
 
-  // DOM refs для 60fps перетаскивания ползунка БЕЗ перерендера React!
+  // DOM refs для 60fps перетаскивания ползунка OKLCH БЕЗ перерендера React
   const trackRef = useRef<HTMLDivElement>(null)
   const thumbRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const hexInputRef = useRef<HTMLInputElement>(null)
+  const oklchReadoutRef = useRef<HTMLDivElement>(null)
 
   const isDraggingTrack = useRef(false)
-  const dragHslRef = useRef<{ h: number; s: number; l: number }>(hexToHsl(currentHex))
+  const dragOklchRef = useRef<OklchColor>(hexToOklch(currentHex))
   const dragHexRef = useRef<string>(currentHex.toUpperCase())
 
-  const hsl = useMemo(() => hexToHsl(currentHex), [currentHex])
+  const oklch = useMemo(() => hexToOklch(currentHex), [currentHex])
 
   useEffect(() => {
     if (!isDraggingTrack.current) {
       const upper = currentHex.toUpperCase()
       setHexInput(upper)
       dragHexRef.current = upper
-      dragHslRef.current = hexToHsl(upper)
+      dragOklchRef.current = hexToOklch(upper)
     }
   }, [currentHex])
 
@@ -98,45 +113,47 @@ export function ColorEditorSheet({
   }, [isOpen, onClose])
 
   const sliderPercent = useMemo(() => {
-    if (mode === 'hue') return (hsl.h / 360) * 100
-    if (mode === 'tone') return hsl.l
-    return hsl.s
-  }, [mode, hsl])
+    if (mode === 'hue') return (oklch.h / 360) * 100
+    if (mode === 'tone') return oklch.l * 100
+    return Math.min(100, (oklch.c / MAX_OKLCH_CHROMA) * 100)
+  }, [mode, oklch])
 
   const trackBackground = useMemo(() => {
-    if (mode === 'hue') return SPECTRUM_GRADIENT
-    const pureHue = hslToHex(hsl.h, Math.max(hsl.s, 45), 50)
+    if (mode === 'hue') return OKLCH_SPECTRUM_GRADIENT
+    const refC = Math.max(oklch.c, 0.14)
     if (mode === 'tone') {
-      return 'linear-gradient(90deg, #0D0D0F 0%, ' + pureHue + ' 50%, #FFFFFF 100%)'
+      const midHex = oklchToHex(0.62, refC, oklch.h)
+      return 'linear-gradient(90deg, #0E0E10 0%, ' + midHex + ' 55%, #FFFFFF 100%)'
     }
-    const grayTone = hslToHex(hsl.h, 0, Math.max(20, Math.min(80, hsl.l)))
-    const vividTone = hslToHex(hsl.h, 100, Math.max(25, Math.min(72, hsl.l)))
-    return 'linear-gradient(90deg, ' + grayTone + ' 0%, ' + vividTone + ' 100%)'
-  }, [mode, hsl])
+    const refL = Math.max(0.28, Math.min(0.84, oklch.l))
+    const neutralHex = oklchToHex(refL, 0, oklch.h)
+    const vividHex = oklchToHex(refL, MAX_OKLCH_CHROMA, oklch.h)
+    return 'linear-gradient(90deg, ' + neutralHex + ' 0%, ' + vividHex + ' 100%)'
+  }, [mode, oklch])
 
-  // Мгновенное обновление DOM ползунка + 3D-материала напрямую без React setState!
   const applyTrackClientXDirect = useCallback(
     (clientX: number) => {
       const el = trackRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(rect.width, 1)))
-      const base = dragHslRef.current
+      const base = dragOklchRef.current
 
-      let nextHex = dragHexRef.current
+      let nextL = base.l
+      let nextC = base.c
+      let nextH = base.h
+
       if (mode === 'hue') {
-        const nextHue = Math.round(ratio * 359)
-        const nextS = base.s < 12 ? 72 : base.s
-        const nextL = base.l < 12 || base.l > 92 ? 50 : base.l
-        nextHex = hslToHex(nextHue, nextS, nextL)
+        nextH = Math.round(ratio * 359)
+        if (nextC < 0.04) nextC = 0.18
+        if (nextL < 0.16 || nextL > 0.94) nextL = 0.64
       } else if (mode === 'tone') {
-        const nextL = Math.round(4 + ratio * 92)
-        nextHex = hslToHex(base.h, base.s, nextL)
+        nextL = 0.06 + ratio * 0.94
       } else {
-        const nextS = Math.round(ratio * 100)
-        nextHex = hslToHex(base.h, nextS, base.l)
+        nextC = ratio * MAX_OKLCH_CHROMA
       }
 
+      const nextHex = oklchToHex(nextL, nextC, nextH)
       dragHexRef.current = nextHex
       const pct = Math.max(4, Math.min(96, ratio * 100))
 
@@ -150,6 +167,13 @@ export function ColorEditorSheet({
       if (hexInputRef.current) {
         hexInputRef.current.value = nextHex
       }
+      if (oklchReadoutRef.current) {
+        oklchReadoutRef.current.textContent = formatOklchReadout({
+          l: nextL,
+          c: nextC,
+          h: nextH,
+        })
+      }
 
       hapticSwatch()
       onLivePreviewHex(nextHex)
@@ -159,7 +183,7 @@ export function ColorEditorSheet({
 
   const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDraggingTrack.current = true
-    dragHslRef.current = hexToHsl(dragHexRef.current)
+    dragOklchRef.current = hexToOklch(dragHexRef.current)
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {}
@@ -178,7 +202,7 @@ export function ColorEditorSheet({
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {}
     const committed = dragHexRef.current
-    dragHslRef.current = hexToHsl(committed)
+    dragOklchRef.current = hexToOklch(committed)
     setHexInput(committed)
     onCommitHex(committed)
   }
@@ -191,7 +215,7 @@ export function ColorEditorSheet({
     if (valid && formatted.length === 7) {
       hapticSwatch()
       dragHexRef.current = valid
-      dragHslRef.current = hexToHsl(valid)
+      dragOklchRef.current = hexToOklch(valid)
       onLivePreviewHex(valid)
       onCommitHex(valid)
     }
@@ -221,7 +245,7 @@ export function ColorEditorSheet({
       if (valid) {
         hapticSwatch()
         dragHexRef.current = valid
-        dragHslRef.current = hexToHsl(valid)
+        dragOklchRef.current = hexToOklch(valid)
         setHexInput(valid)
         onLivePreviewHex(valid)
         onCommitHex(valid)
@@ -315,7 +339,7 @@ export function ColorEditorSheet({
               />
             </div>
 
-            <div className="flex items-center justify-between mb-3.5">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span
                   className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
@@ -370,7 +394,7 @@ export function ColorEditorSheet({
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-2 mb-3.5">
+            <div className="flex items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
                 {(
                   [
@@ -442,7 +466,7 @@ export function ColorEditorSheet({
               </p>
             )}
 
-            {/* 60fps ползунок спектра без React-перерендера во время перетаскивания */}
+            {/* Перцептивная спектральная полоса OKLCH (60fps, 0 React re-renders) */}
             <div
               ref={trackRef}
               role="slider"
@@ -455,7 +479,7 @@ export function ColorEditorSheet({
               onPointerMove={handleTrackPointerMove}
               onPointerUp={handleTrackPointerUp}
               onPointerCancel={handleTrackPointerUp}
-              className="relative w-full h-8 rounded-full cursor-pointer select-none touch-none mb-4"
+              className="relative w-full h-8 rounded-full cursor-pointer select-none touch-none mb-2.5"
               style={{
                 background: trackBackground,
                 touchAction: 'none',
@@ -475,7 +499,16 @@ export function ColorEditorSheet({
               />
             </div>
 
-            <div className="flex items-center gap-2.5 mb-4">
+            {/* Живые координаты OKLCH */}
+            <div
+              ref={oklchReadoutRef}
+              className="text-[10px] font-mono tracking-[0.06em] mb-3 px-0.5"
+              style={{ color: tokens.inkMuted }}
+            >
+              {formatOklchReadout(oklch)}
+            </div>
+
+            <div className="flex items-center gap-2.5 mb-3.5">
               <div
                 ref={previewRef}
                 className="flex-1 h-11 rounded-[14px] border"
@@ -551,7 +584,7 @@ export function ColorEditorSheet({
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center justify-between gap-2 mb-3.5">
               <div className="flex items-center gap-1.5 shrink-0">
                 <span
                   className="text-[12px] font-sans font-medium"
@@ -587,7 +620,7 @@ export function ColorEditorSheet({
                         onClick={() => {
                           hapticSwatch()
                           dragHexRef.current = swatch.hex
-                          dragHslRef.current = hexToHsl(swatch.hex)
+                          dragOklchRef.current = hexToOklch(swatch.hex)
                           setHexInput(swatch.hex)
                           onLivePreviewHex(swatch.hex)
                           onCommitHex(swatch.hex)
