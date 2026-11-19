@@ -63,6 +63,7 @@ const UI_LABELS: Record<
     widthSection: string
     groupSport: string
     groupClassic: string
+    footerBrand: string
   }
 > = {
   uk: {
@@ -70,24 +71,28 @@ const UI_LABELS: Record<
     widthSection: 'Повнота стопи',
     groupSport: 'Спорт і кросівки',
     groupClassic: 'Класика і шкіра',
+    footerBrand: 'Cordwaine · Калькулятор розмірів',
   },
   ru: {
     styleSection: 'Тип обуви и запас',
     widthSection: 'Полнота стопы',
     groupSport: 'Спорт и кроссовки',
     groupClassic: 'Классика и кожа',
+    footerBrand: 'Cordwaine · Калькулятор размеров',
   },
   en: {
     styleSection: 'Footwear Type & Allowance',
     widthSection: 'Foot Width',
     groupSport: 'Sport & Sneakers',
     groupClassic: 'Classic & Leather',
+    footerBrand: 'Cordwaine · Size Calculator',
   },
   de: {
     styleSection: 'Schuhtyp & Zugabe',
     widthSection: 'Fußweite',
     groupSport: 'Sport & Sneaker',
     groupClassic: 'Klassik & Leder',
+    footerBrand: 'Cordwaine · Größenrechner',
   },
 }
 
@@ -112,14 +117,6 @@ function FlagCN() {
       <circle cx="7.2" cy="6.1" r="0.55" fill="#FFDE00" />
     </svg>
   )
-}
-
-function normalizeBrandName(text: string): string {
-  return text.replace(/cordwainer/gi, (match) => {
-    if (match === match.toUpperCase()) return 'CORDWAINE'
-    if (match[0] === match[0].toUpperCase()) return 'Cordwaine'
-    return 'cordwaine'
-  })
 }
 
 function safeHapticSelection() {
@@ -585,17 +582,18 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
   const usLabel = gender === 'kids' ? 'US K' : gender === 'men' ? 'US M' : 'US W'
 
+  // Палитра Ivory / Graphite / Gold с повышенной читаемостью вспомогательного текста
   const bgPage = isDark ? 'bg-[#0B0B0C]' : 'bg-[#F7F4EE]'
   const bgHeader = isDark ? 'bg-[#0B0B0C]/90' : 'bg-[#F7F4EE]/90'
   const bgSurface = isDark ? 'bg-[#141416]' : 'bg-[#EFEAE1]'
   const bgSurfaceSoft = isDark ? 'bg-[#1C1C20]' : 'bg-[#E5DFD3]'
   const textPrimary = isDark ? 'text-[#F4F0E8]' : 'text-[#181715]'
-  const textSecondary = isDark ? 'text-[#A29D95]' : 'text-[#6D6860]'
-  const textTertiary = isDark ? 'text-[#736F68]' : 'text-[#8C867D]'
-  const hairline = isDark ? 'border-[#F4F0E8]/[0.08]' : 'border-[#181715]/[0.08]'
-  const dividerClass = isDark ? 'divide-[#F4F0E8]/[0.08]' : 'divide-[#181715]/[0.08]'
+  const textSecondary = isDark ? 'text-[#B8B2A8]' : 'text-[#524E47]'
+  const textTertiary = isDark ? 'text-[#938E86]' : 'text-[#68635B]'
+  const hairline = isDark ? 'border-[#F4F0E8]/[0.09]' : 'border-[#181715]/[0.09]'
+  const dividerClass = isDark ? 'divide-[#F4F0E8]/[0.09]' : 'divide-[#181715]/[0.09]'
   const accentHex = isDark ? '#C9A86A' : '#9A6B2F'
-  const trackIdleHex = isDark ? 'rgba(244, 240, 232, 0.16)' : 'rgba(24, 23, 21, 0.16)'
+  const trackIdleHex = isDark ? 'rgba(244, 240, 232, 0.22)' : 'rgba(24, 23, 21, 0.22)'
   const activeInvert = isDark
     ? 'bg-[#F4F0E8] text-[#0B0B0C]'
     : 'bg-[#181715] text-[#F7F4EE]'
@@ -750,7 +748,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ (БЕЗ ДУБЛИРОВАНИЯ ШАПКИ TELEGRAM MINI APP + SAFE-AREA) */}
+      {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ (СКРЫВАЕТСЯ В TELEGRAM MINI APP ДЛЯ ИСКЛЮЧЕНИЯ ДУБЛИРОВАНИЯ) */}
       {!isTelegramMiniApp && (
         <header
           className={`sticky top-0 z-30 backdrop-blur-xl transition-colors duration-300 ${bgHeader} border-b ${hairline} pt-[env(safe-area-inset-top)]`}
@@ -820,7 +818,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           {isTelegramMiniApp && themeToggleBtn}
         </section>
 
-        {/* 3. БЛОК ИЗМЕРЕНИЯ И ПРЕЦИЗИОННЫЙ ПОЛЗУНОК */}
+        {/* 3. БЛОК ИЗМЕРЕНИЯ И УСОВЕРШЕНСТВОВАННАЯ ШКАЛА */}
         <section className={`rounded-3xl p-4 sm:p-5 transition-colors duration-300 ${bgSurface}`}>
           <div className="flex items-center justify-between gap-2 mb-4">
             <div className={`inline-flex items-center p-0.5 rounded-full ${bgSurfaceSoft} min-w-0`}>
@@ -834,7 +832,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       safeHapticImpact('medium')
                       setMeasureMode(m)
                     }}
-                    className={`px-2.5 sm:px-3.5 py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-sans font-semibold uppercase tracking-[0.05em] whitespace-nowrap transition-all cursor-pointer ${
+                    className={`px-3 sm:px-3.5 py-1.5 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.05em] whitespace-nowrap transition-all cursor-pointer ${
                       active ? activeInvert : textSecondary
                     }`}
                   >
@@ -855,7 +853,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       safeHapticImpact('light')
                       setUnit(u)
                     }}
-                    className={`px-2.5 sm:px-3 py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-sans font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.06em] whitespace-nowrap transition-all cursor-pointer ${
                       active ? activeInvert : textSecondary
                     }`}
                   >
@@ -866,7 +864,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center justify-between gap-3 mb-5">
             <button
               type="button"
               onPointerDown={(e) => startHold(-1, e)}
@@ -883,7 +881,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </button>
 
             <div onClick={startEdit} className="flex flex-col items-center cursor-pointer min-w-0">
-              <span className={`text-[10px] font-sans font-medium uppercase tracking-[0.18em] ${textSecondary}`}>
+              <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.16em] ${textSecondary}`}>
                 {measureMode === 'foot' ? t.footLengthLabel : t.insoleInputLabel}
               </span>
               <div className="flex items-baseline gap-1.5 mt-0.5">
@@ -926,6 +924,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </button>
           </div>
 
+          {/* 3-уровневая градуированная шкала с точным указателем */}
           <div className="relative w-full pt-1 pb-0.5">
             <input
               type="range"
@@ -946,68 +945,81 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               className="w-full h-14 absolute inset-x-0 -top-1 z-30 opacity-0 cursor-pointer touch-pan-y"
             />
 
-            <div className="relative mx-3 h-11 flex items-center justify-between pointer-events-none">
+            <div className="relative mx-3.5 h-11 flex items-end justify-between pb-2 pointer-events-none">
+              {/* Базовая ось шкалы */}
               <div
-                className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] rounded-full"
+                className="absolute inset-x-0 bottom-2 h-[2px] rounded-full"
                 style={{ backgroundColor: trackIdleHex }}
               />
 
+              {/* Активная зона шкалы */}
               <div
-                className="absolute left-0 top-1/2 -translate-y-1/2 h-[2.5px] rounded-full transition-all duration-75"
+                className="absolute left-0 bottom-2 h-[2.5px] rounded-full transition-all duration-75"
                 style={{
                   width: `${pct}%`,
                   backgroundColor: accentHex,
                 }}
               />
 
+              {/* Деления шкалы */}
               {Array.from({ length: RULER_TICKS }).map((_, idx) => {
                 const tickPct = (idx / (RULER_TICKS - 1)) * 100
                 const dist = Math.abs(tickPct - pct)
-                const proximity = Math.max(0, 1 - dist / 14)
-                const isMajor = idx % 5 === 0
-                const baseHeight = isMajor ? 14 : 6
-                const dynamicHeight = baseHeight + proximity * 12
+                const isMajor = idx === 0 || idx === 15 || idx === RULER_TICKS - 1
+                const isMid = idx % 5 === 0
+                const isActiveRegion = tickPct <= pct + 1.5
+                const isNearThumb = dist < 4
+                const tickHeight = isMajor ? 18 : isMid ? 12 : 7
+                const tickWidth = isMajor ? 2 : isMid ? 1.5 : 1
 
                 return (
                   <div
                     key={idx}
-                    className="relative z-10 w-[1.5px] rounded-full transition-all duration-75"
+                    className="relative z-10 rounded-full transition-colors duration-75"
                     style={{
-                      height: `${dynamicHeight}px`,
-                      backgroundColor: proximity > 0.28 ? accentHex : trackIdleHex,
-                      opacity: proximity > 0.2 ? 1 : isMajor ? 0.72 : 0.36,
+                      width: `${tickWidth}px`,
+                      height: `${isNearThumb ? tickHeight + 3 : tickHeight}px`,
+                      backgroundColor: isNearThumb || isActiveRegion ? accentHex : trackIdleHex,
+                      opacity: isNearThumb ? 1 : isActiveRegion ? 0.88 : isMajor ? 0.85 : isMid ? 0.65 : 0.45,
                     }}
                   />
                 )
               })}
 
+              {/* Точный указатель и ползунок */}
               <div
-                className="absolute top-1/2 z-20 pointer-events-none transition-transform duration-100"
+                className="absolute bottom-2 z-20 pointer-events-none transition-transform duration-100"
                 style={{
                   left: `${pct}%`,
-                  transform: `translate(-50%, -50%) scale(${isDraggingSlider ? 1.16 : 1})`,
+                  transform: `translate(-50%, 50%) scale(${isDraggingSlider ? 1.14 : 1})`,
                 }}
               >
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center shadow-sm"
-                  style={{
-                    backgroundColor: isDark ? '#0B0B0C' : '#F7F4EE',
-                    border: `2px solid ${accentHex}`,
-                  }}
-                >
+                <div className="relative flex items-center justify-center">
                   <div
-                    className="w-2.5 h-2.5 rounded-full"
+                    className="absolute bottom-full mb-0.5 w-[2px] h-4 rounded-full"
                     style={{ backgroundColor: accentHex }}
                   />
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center shadow-sm"
+                    style={{
+                      backgroundColor: isDark ? '#0B0B0C' : '#F7F4EE',
+                      border: `2px solid ${accentHex}`,
+                    }}
+                  >
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: accentHex }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className={`grid grid-cols-3 items-center text-[10.5px] font-sans tabular-nums mt-0.5 px-1 ${textTertiary}`}>
+            <div className={`grid grid-cols-3 items-center text-[11px] font-sans font-medium tabular-nums mt-2 px-1 ${textTertiary}`}>
               <span className="text-left">
                 {formatScaleMark(sliderMin)} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
-              <span className="text-center opacity-70">{formatScaleMark(sliderMid)}</span>
+              <span className="text-center">{formatScaleMark(sliderMid)}</span>
               <span className="text-right">
                 {formatScaleMark(sliderMax)} {unit === 'cm' ? t.cmLabel : t.mmLabel}
               </span>
@@ -1017,7 +1029,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
 
         {/* 4. ГЛАВНЫЙ РЕЗУЛЬТАТ UA / EU */}
         <section className="flex flex-col items-center text-center pt-1">
-          <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.22em] mb-2.5 ${textSecondary}`}>
+          <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.2em] mb-2.5 ${textSecondary}`}>
             {t.yourSizeLabel}
           </span>
 
@@ -1031,13 +1043,13 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </span>
               <div className="mt-2.5 inline-flex items-center gap-1.5">
                 <FlagUA />
-                <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.2em] ${textSecondary}`}>
+                <span className={`text-xs font-sans font-semibold uppercase tracking-[0.18em] ${textSecondary}`}>
                   UA
                 </span>
               </div>
             </div>
 
-            <div className={`h-14 w-px ${isDark ? 'bg-[#F4F0E8]/12' : 'bg-[#181715]/12'}`} />
+            <div className={`h-14 w-px ${isDark ? 'bg-[#F4F0E8]/14' : 'bg-[#181715]/14'}`} />
 
             <div className="flex flex-col items-center pl-3">
               <span className="font-serif text-[56px] sm:text-[66px] leading-[0.92] tracking-tight tabular-nums transition-colors duration-200">
@@ -1045,7 +1057,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </span>
               <div className="mt-2.5 inline-flex items-center gap-1.5">
                 <FlagEU />
-                <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.2em] ${textSecondary}`}>
+                <span className={`text-xs font-sans font-semibold uppercase tracking-[0.18em] ${textSecondary}`}>
                   EU
                 </span>
               </div>
@@ -1072,52 +1084,52 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           </p>
         </section>
 
-        {/* 5. ПОКАЗАТЕЛИ ИЗМЕРЕНИЯ (АДАПТИВНАЯ СЕТКА 2×2 НА УЗКИХ ЭКРАНАХ, 4 В РЯД НА ШИРОКИХ) */}
+        {/* 5. ПОКАЗАТЕЛИ ИЗМЕРЕНИЯ (2×2 НА СМАРТФОНАХ, 4 В РЯД НА ШИРОКИХ ЭКРАНАХ) */}
         <section className={`grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-4 py-4 border-y ${hairline}`}>
           <div className="flex flex-col">
-            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
+            <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.12em] ${textTertiary}`}>
               {t.footTag}
             </span>
             <span className="mt-1 text-base font-sans font-medium tabular-nums">
               {proFit.footMm} {t.mmLabel}
             </span>
-            <span className={`text-xs font-sans tabular-nums ${textSecondary}`}>
+            <span className={`mt-0.5 text-xs font-sans tabular-nums ${textSecondary}`}>
               {proFit.footCm.toFixed(1)} {t.cmLabel}
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
+            <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.12em] ${textTertiary}`}>
               {t.ballTag}
             </span>
             <span className="mt-1 text-base font-sans font-medium tabular-nums">
               {proFit.ballGirthMm} {t.mmLabel}
             </span>
-            <span className={`text-xs font-sans ${textSecondary}`}>
+            <span className={`mt-0.5 text-xs font-sans ${textSecondary}`}>
               EU {proFit.widthMarks.eu}
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
+            <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.12em] ${textTertiary}`}>
               {t.insoleLabel}
             </span>
             <span className="mt-1 text-base font-sans font-medium tabular-nums" style={{ color: accentHex }}>
               {proFit.insoleMm} {t.mmLabel}
             </span>
-            <span className={`text-xs font-sans tabular-nums ${textSecondary}`}>
+            <span className={`mt-0.5 text-xs font-sans tabular-nums ${textSecondary}`}>
               {proFit.insoleCm.toFixed(1)} {t.cmLabel}
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className={`text-[10.5px] font-sans font-medium uppercase tracking-[0.14em] ${textTertiary}`}>
+            <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.12em] ${textTertiary}`}>
               {t.allowanceLabel}
             </span>
             <span className="mt-1 text-base font-sans font-medium tabular-nums">
               +{proFit.allowanceMm} {t.mmLabel}
             </span>
-            <span className={`text-xs font-sans ${textSecondary}`}>
+            <span className={`mt-0.5 text-xs font-sans ${textSecondary}`}>
               {styleLabels[shoeStyle]}
             </span>
           </div>
@@ -1143,7 +1155,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                     safeHapticImpact('medium')
                     setActiveTab(tab.id)
                   }}
-                  className={`relative pb-2.5 pt-1 text-[11.5px] sm:text-[12.5px] font-sans font-semibold uppercase tracking-[0.09em] transition-colors cursor-pointer truncate ${
+                  className={`relative pb-2.5 pt-1 text-xs sm:text-[13px] font-sans font-semibold uppercase tracking-[0.08em] transition-colors cursor-pointer truncate ${
                     active ? textPrimary : textSecondary
                   }`}
                 >
@@ -1180,7 +1192,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                       if (!unlocked) handleProClick()
                       else safeHapticSelection()
                     }}
-                    className={`rounded-2xl p-4 flex flex-col justify-between min-h-[112px] transition-colors ${bgSurface} ${
+                    className={`rounded-2xl p-4 flex flex-col justify-between min-h-[114px] transition-colors ${bgSurface} ${
                       !unlocked ? 'cursor-pointer active:scale-[0.98]' : ''
                     }`}
                   >
@@ -1212,7 +1224,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                           42.5
                         </span>
                       )}
-                      <span className={`text-[11px] font-sans block mt-2 truncate ${textSecondary}`}>
+                      <span className={`text-xs font-sans block mt-2 truncate ${textSecondary}`}>
                         {item.sub}
                       </span>
                     </div>
@@ -1232,7 +1244,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               className="flex flex-col gap-4"
             >
               <div>
-                <span className={`block text-[10.5px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
+                <span className={`block text-[11px] font-sans font-semibold uppercase tracking-[0.14em] mb-2 ${textTertiary}`}>
                   {ui.styleSection}
                 </span>
                 <div className="grid grid-cols-6 gap-2">
@@ -1255,8 +1267,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                           {st.label}
                         </span>
                         <span
-                          className={`text-[10.5px] font-sans tabular-nums ${
-                            active ? 'opacity-75' : textSecondary
+                          className={`text-[11px] font-sans tabular-nums ${
+                            active ? 'opacity-80' : textSecondary
                           }`}
                         >
                           +{st.addMm} {t.mmLabel}
@@ -1268,7 +1280,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </div>
 
               <div>
-                <span className={`block text-[10.5px] font-sans font-semibold uppercase tracking-[0.16em] mb-2 ${textTertiary}`}>
+                <span className={`block text-[11px] font-sans font-semibold uppercase tracking-[0.14em] mb-2 ${textTertiary}`}>
                   {ui.widthSection}
                 </span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1319,7 +1331,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 }`}
               >
                 <div>
-                  <span className={`text-[10.5px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
+                  <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.14em] block ${textTertiary}`}>
                     {t.insoleLabel} · {t.allowanceLabel}
                   </span>
                   <span className={`font-serif text-[25px] sm:text-[26px] leading-tight block mt-1.5 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
@@ -1334,7 +1346,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                 </div>
 
                 <div className={`pt-4 border-t ${hairline} sm:pt-0 sm:border-t-0 sm:pl-5 sm:border-l`}>
-                  <span className={`text-[10.5px] font-sans uppercase tracking-[0.16em] block ${textTertiary}`}>
+                  <span className={`text-[11px] font-sans font-medium uppercase tracking-[0.14em] block ${textTertiary}`}>
                     {t.widthLabel} · {t.girthLabel}
                   </span>
                   <span className={`font-serif text-[25px] sm:text-[26px] leading-tight block mt-1.5 tabular-nums ${!isProPurchased ? 'blur-[5px]' : ''}`}>
@@ -1348,7 +1360,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             </motion.div>
           )}
 
-          {/* ВКЛАДКА 3: СГРУППИРОВАННЫЕ БРЕНДЫ С ЕДИНЫМ ВЫРАВНИВАНИЕМ */}
+          {/* ВКЛАДКА 3: СТРУКТУРИРОВАННЫЕ КАРТОЧКИ БРЕНДОВ */}
           {activeTab === 'brands' && (
             <motion.div
               key="brands"
@@ -1359,7 +1371,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
             >
               {brandGroups.map((group) => (
                 <div key={group.id} className="flex flex-col gap-2">
-                  <span className={`text-[10.5px] font-sans font-semibold uppercase tracking-[0.16em] px-1 ${textTertiary}`}>
+                  <span className={`text-[11px] font-sans font-semibold uppercase tracking-[0.14em] px-1 ${textTertiary}`}>
                     {group.title}
                   </span>
 
@@ -1371,49 +1383,55 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                           if (!isProPurchased) handleProClick()
                           else safeHapticSelection()
                         }}
-                        className={`py-4 flex items-start justify-between gap-4 ${
+                        className={`py-4 flex flex-col gap-2 ${
                           !isProPurchased ? 'cursor-pointer' : ''
                         }`}
                       >
-                        <div className="min-w-0 flex-1 flex flex-col items-start">
-                          <span className="text-[13.5px] font-sans font-semibold uppercase tracking-[0.06em] leading-snug">
-                            {row.brand}
-                          </span>
-                          <span
-                            className={`mt-1 text-[9.5px] font-sans font-medium uppercase tracking-[0.12em] px-2 py-0.5 rounded-full ${bgSurfaceSoft} ${textSecondary}`}
-                          >
-                            {row.category}
-                          </span>
-                          <p className={`text-xs font-sans leading-relaxed mt-2 ${textSecondary}`}>
-                            {row.offsetNote[safeLang]}
-                          </p>
-                        </div>
-
-                        {isProPurchased ? (
-                          <div className="text-right shrink-0 min-w-[104px] pt-0.5">
-                            <span className="font-serif text-[21px] block leading-none tabular-nums">
-                              EU {row.eu}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex flex-col items-start gap-1">
+                            <span className="text-sm font-sans font-semibold uppercase tracking-[0.06em] leading-snug">
+                              {row.brand}
                             </span>
                             <span
-                              className="text-[11.5px] font-sans font-medium tabular-nums block mt-1.5"
-                              style={{ color: accentHex }}
+                              className={`text-[10.5px] font-sans font-semibold uppercase tracking-[0.1em] px-2 py-0.5 rounded-full ${bgSurfaceSoft} ${textSecondary}`}
                             >
-                              US {row.us} · UK {row.uk}
-                            </span>
-                            <span className={`text-[11px] font-sans tabular-nums block mt-0.5 ${textTertiary}`}>
-                              JP {row.jp}
+                              {row.category}
                             </span>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2 shrink-0 pt-1">
-                            <span className="font-serif text-base blur-[5px] opacity-35 select-none">
-                              EU 42.5
+
+                          {isProPurchased ? (
+                            <span className="font-serif text-[23px] leading-none tracking-tight tabular-nums shrink-0 pt-0.5">
+                              EU {row.eu}
                             </span>
-                            <span className={textTertiary}>
-                              <LockIcon />
+                          ) : (
+                            <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                              <span className="font-serif text-lg blur-[5px] opacity-35 select-none">
+                                EU 42.5
+                              </span>
+                              <span className={textTertiary}>
+                                <LockIcon />
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {isProPurchased && (
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-sans tabular-nums">
+                            <span className="font-medium" style={{ color: accentHex }}>
+                              US {row.us}
                             </span>
+                            <span className={textTertiary}>·</span>
+                            <span className="font-medium" style={{ color: accentHex }}>
+                              UK {row.uk}
+                            </span>
+                            <span className={textTertiary}>·</span>
+                            <span className={textSecondary}>JP {row.jp}</span>
                           </div>
                         )}
+
+                        <p className={`text-xs font-sans leading-relaxed ${textSecondary}`}>
+                          {row.offsetNote[safeLang]}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -1439,7 +1457,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
                     {t.guideFootTitle}
                   </h4>
-                  <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide1}</p>
+                  <p className="text-[13px] font-sans leading-relaxed mt-1.5">{t.measureGuide1}</p>
                   <p className={`text-xs font-sans leading-relaxed mt-1.5 ${textSecondary}`}>
                     {t.measureGuide2}
                   </p>
@@ -1454,7 +1472,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   <h4 className="text-xs font-sans font-semibold uppercase tracking-[0.13em]">
                     {t.guideInsoleTitle}
                   </h4>
-                  <p className="text-[13px] font-sans leading-relaxed mt-1">{t.measureGuide3}</p>
+                  <p className="text-[13px] font-sans leading-relaxed mt-1.5">{t.measureGuide3}</p>
                 </div>
               </div>
 
@@ -1499,8 +1517,8 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
               </button>
             </div>
           ) : (
-            <div className={`py-3 border-t ${hairline} flex items-center justify-between gap-3 text-[11px] font-sans uppercase tracking-[0.14em] ${textSecondary}`}>
-              <span className="truncate">{normalizeBrandName(t.subtitle)}</span>
+            <div className={`py-3 border-t ${hairline} flex items-center justify-between gap-3 text-[11px] font-sans uppercase tracking-[0.12em] ${textSecondary}`}>
+              <span className="truncate">{ui.footerBrand}</span>
               <span className="shrink-0 font-semibold" style={{ color: accentHex }}>
                 ★ {t.proActiveBadge}
               </span>
