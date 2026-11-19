@@ -196,15 +196,13 @@ function Sneaker3DCanvas({
         const width = container.clientWidth || 340
         const height = container.clientHeight || 205
 
-        const precision: 'mediump' | 'highp' = isAndroid ? 'mediump' : 'highp'
-
         let renderer: THREE_TYPES.WebGLRenderer
         try {
           renderer = new THREE.WebGLRenderer({
             antialias: true,
             alpha: true,
             powerPreference: isAndroid ? 'default' : 'high-performance',
-            precision,
+            precision: 'highp',
           })
         } catch (err) {
           if (import.meta.env.DEV) {
@@ -226,7 +224,8 @@ function Sneaker3DCanvas({
         container.appendChild(renderer.domElement)
 
         const scene = new THREE.Scene()
-        const camera = new THREE.PerspectiveCamera(29, width / height, 0.1, 50)
+        // Суженный диапазон глубины (0.5..20) повышает точность Z-буфера в 5x и убирает Z-fighting слоёв
+        const camera = new THREE.PerspectiveCamera(29, width / height, 0.5, 20)
         camera.position.set(0, 0.44, 5.15)
         camera.lookAt(0, 0.04, 0)
 
