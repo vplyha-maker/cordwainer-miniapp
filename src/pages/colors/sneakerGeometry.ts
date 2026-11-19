@@ -3,6 +3,44 @@ import type { SneakerColors, SneakerZoneKey } from './colorEngine'
 
 export type ThreeLib = typeof THREE_TYPES
 
+export type SneakerModelId = 'aerostrap' | 'nexus' | 'monolith'
+
+export type SneakerModelConfig = {
+  id: SneakerModelId
+  name: string
+  shortLabel: string
+  urls: string[]
+  rotationY: number
+}
+
+export const SNEAKER_MODELS: readonly SneakerModelConfig[] = [
+  {
+    id: 'aerostrap',
+    name: 'CORDWAINE AEROSTRAP',
+    shortLabel: 'AEROSTRAP',
+    urls: ['/sneaker_modular.glb', '/models/sneaker_modular.glb'],
+    rotationY: Math.PI * 0.5,
+  },
+  {
+    id: 'nexus',
+    name: 'CORDWAINE NEXUS X1',
+    shortLabel: 'NEXUS X1',
+    urls: ['/sci-fi_sneaker.glb', '/models/sci-fi_sneaker.glb'],
+    rotationY: Math.PI * 0.5,
+  },
+  {
+    id: 'monolith',
+    name: 'CORDWAINE MONOLITH V',
+    shortLabel: 'MONOLITH V',
+    urls: ['/V.glb', '/models/V.glb'],
+    rotationY: 0,
+  },
+]
+
+export function getSneakerModelConfig(id: SneakerModelId): SneakerModelConfig {
+  return SNEAKER_MODELS.find((m) => m.id === id) ?? SNEAKER_MODELS[0]
+}
+
 export type SneakerMaterials = {
   vamp: THREE_TYPES.MeshStandardMaterial
   quarters: THREE_TYPES.MeshStandardMaterial
@@ -21,9 +59,6 @@ export type SneakerMaterials = {
 
 export type ZoneMaterialRegistry = Record<SneakerZoneKey, THREE_TYPES.MeshStandardMaterial[]>
 
-/**
- * Централизованные параметры колодки и подошвы для тонкой настройки под разные модели.
- */
 export const SNEAKER_LAST_PARAMS = {
   halfLengthZ: 1.34,
   footprintEps2: 0.045,
@@ -41,7 +76,7 @@ export const SNEAKER_LAST_PARAMS = {
 } as const
 
 const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
-  // 16-материальная / 21-мешевая студийная модель CORDWAINE AEROSTRAP
+  // 1. CORDWAINE AEROSTRAP (sneaker_modular.glb)
   sock_upper_0: 'vamp',
   sock_sock_upper_0: 'vamp',
   upper: 'vamp',
@@ -89,7 +124,37 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   sole_001: 'outsole',
   material_007: 'outsole',
 
-  // Классические ключи универсальных моделей
+  // 2. CORDWAINE NEXUS X1 (sci-fi_sneaker.glb)
+  sock: 'vamp',
+  sockadditions: 'quarters',
+  curve: 'toeBox',
+  laceadditions: 'eyestays',
+  tail: 'heel',
+  neck: 'collar',
+  neckaddition: 'collar',
+  neckcylinders: 'collar',
+  fokurlogo: 'swoosh',
+  sockbrand: 'swoosh',
+  sockbottom: 'midsole',
+  traces: 'outsole',
+
+  // 3. CORDWAINE MONOLITH V (V.glb)
+  leather_mat: 'vamp',
+  pattern_dior_mat: 'quarters',
+  pattern_dior_top1: 'toeBox',
+  strap_mat: 'eyestays',
+  new_mat: 'heel',
+  phong7: 'collar',
+  stingraypbs1: 'lining',
+  plastic_mat: 'encap',
+  decaltop_mat: 'swoosh',
+  decal_sole_mat: 'swoosh',
+  stitches_mat: 'swoosh',
+  sole_mat: 'outsole',
+  hole_mat: 'laces',
+  ring_white: 'laces',
+
+  // Универсальные ключи
   upper_vamp: 'vamp',
   vamp: 'vamp',
   mudguard: 'vamp',
@@ -133,10 +198,6 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   rubber_outsole: 'outsole',
 }
 
-/**
- * Распознаёт конструктивную зону меша GLB по имени узла, родительского узла и материала.
- * Учитывает удаление точек в Three.js GLTFLoader (sole.005 -> sole005, sock.001 -> sock001).
- */
 export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   const normalized = rawName
     .trim()
@@ -148,6 +209,7 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
     return GLB_EXPLICIT_ZONE_MAP[normalized]
   }
 
+  // Точные правила AEROSTRAP
   if (normalized.includes('sock_upper')) return 'vamp'
   if (normalized.includes('sock_001')) return 'toeBox'
   if (normalized.includes('sock_006')) return 'quarters'
@@ -189,6 +251,27 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   if (normalized.includes('sole_cushy') || normalized.includes('cushy')) return 'midsole'
   if (normalized.includes('sole_001') || normalized.includes('material_007')) return 'outsole'
 
+  // Точные правила NEXUS X1 и MONOLITH V
+  if (normalized.includes('sockbottom')) return 'midsole'
+  if (normalized.includes('sockadditions')) return 'quarters'
+  if (normalized.includes('sockbrand') || normalized.includes('fokurlogo')) return 'swoosh'
+  if (normalized.includes('laceadditions')) return 'eyestays'
+  if (normalized.includes('neck')) return 'collar'
+  if (normalized.includes('traces')) return 'outsole'
+  if (normalized.includes('curve')) return 'toeBox'
+  if (normalized.includes('tail')) return 'heel'
+  if (normalized.includes('pattern_dior_top')) return 'toeBox'
+  if (normalized.includes('pattern_dior')) return 'quarters'
+  if (normalized.includes('leather_mat')) return 'vamp'
+  if (normalized.includes('strap_mat')) return 'eyestays'
+  if (normalized.includes('stitches_mat') || normalized.includes('decal')) return 'swoosh'
+  if (normalized.includes('plastic_mat')) return 'encap'
+  if (normalized.includes('stingray')) return 'lining'
+  if (normalized.includes('phong7')) return 'collar'
+  if (normalized.includes('new_mat')) return 'heel'
+  if (normalized.includes('ring_white') || normalized.includes('hole_mat')) return 'laces'
+
+  // Общие правила
   if (
     normalized.includes('lining') ||
     normalized.includes('insole') ||
@@ -243,9 +326,6 @@ function wrapAnglePi(phi: number): number {
   return Math.atan2(Math.sin(phi), Math.cos(phi))
 }
 
-/**
- * C^1-гладкая параметризация контура следа без бесконечной производной в полюсах (AUDIT-07).
- */
 export function getFootprintPoint(rawPhi: number) {
   const phi = wrapAnglePi(rawPhi)
   const zNorm = Math.cos(phi)
@@ -277,9 +357,6 @@ export function getFootprintPoint(rawPhi: number) {
   return { x, z, t }
 }
 
-/**
- * C^1-гладкое замыкание верхнего канта горловины на центральном шве пятки (AUDIT-07).
- */
 export function getToplineRim(rawPhi: number) {
   const phi = wrapAnglePi(rawPhi)
   const s = Math.sin(phi)
@@ -315,9 +392,6 @@ export function getToplineRim(rawPhi: number) {
   return { x: xRim, y: yRim, z: zRim }
 }
 
-/**
- * Продольный профиль подошвы с горизонтальной опорной плоскостью на t in [0.12, 0.62] (AUDIT-06).
- */
 export function getSoleVerticalProfile(t: number) {
   const {
     soleFlatStartT,
@@ -915,6 +989,15 @@ export function createSneakerMaterials(
   return { mats, registry }
 }
 
+export function resetZoneRegistry(
+  mats: SneakerMaterials,
+  registry: ZoneMaterialRegistry
+) {
+  ;(Object.keys(mats) as SneakerZoneKey[]).forEach((zone) => {
+    registry[zone] = [mats[zone]]
+  })
+}
+
 export function buildSneakerMeshGroup(THREE: ThreeLib, mats: SneakerMaterials): THREE_TYPES.Group {
   const group = new THREE.Group()
 
@@ -1373,9 +1456,9 @@ export function bindGlbMaterialsPreservingTextures(
     const parentName = mesh.parent && mesh.parent.name !== 'RootNode' ? mesh.parent.name : ''
     const candidateName = mesh.name || parentName || rawMat?.name || ''
     const zone =
+      resolveGlbZone(rawMat?.name || '') ??
       resolveGlbZone(mesh.name || '') ??
-      resolveGlbZone(parentName + '_' + mesh.name + '_' + (rawMat?.name || '')) ??
-      resolveGlbZone(rawMat?.name || '')
+      resolveGlbZone(parentName + '_' + mesh.name + '_' + (rawMat?.name || ''))
 
     if (!zone) {
       if (import.meta.env.DEV) {
@@ -1386,21 +1469,27 @@ export function bindGlbMaterialsPreservingTextures(
 
     const hasMeshVertexColor = Boolean(mesh.geometry?.attributes?.color)
     const srcStd = rawMat as THREE_TYPES.MeshStandardMaterial | undefined
-    const hasOriginalTextures = Boolean(
+    const hasReliefTextures = Boolean(
       srcStd &&
-        (srcStd.map ||
-          srcStd.normalMap ||
+        (srcStd.normalMap ||
           srcStd.roughnessMap ||
           srcStd.aoMap ||
-          srcStd.metalnessMap)
+          srcStd.metalnessMap ||
+          srcStd.bumpMap)
     )
 
     if (rawMat) {
       replacedOriginalMaterials.add(rawMat)
     }
 
-    if (hasOriginalTextures && srcStd) {
+    if (hasReliefTextures && srcStd) {
       const clonedMat = srcStd.clone()
+      // Очищаем запечённую цветную карту (map), сохраняя normal/roughness/ao-рельеф,
+      // чтобы круг Иттена точно передавал выбранные HEX-цвета без затемнения
+      if (clonedMat.map) {
+        clonedMat.map.dispose()
+        clonedMat.map = null
+      }
       clonedMat.color = new THREE.Color(currentColors[zone])
       clonedMat.vertexColors = hasMeshVertexColor
       clonedMat.needsUpdate = true
