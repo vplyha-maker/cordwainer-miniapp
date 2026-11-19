@@ -1050,8 +1050,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     setMaterialOverrides({})
   }, [])
 
-  const pressRingColor = isDark ? 'rgba(217, 167, 90, 0.55)' : 'rgba(24, 22, 20, 0.28)'
-
   return (
     <motion.div
       initial={prefersReduced ? { opacity: 1 } : { opacity: 0, y: 6 }}
@@ -1073,12 +1071,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .cw-press {
-          transition: transform 90ms ease-out, filter 90ms ease-out, box-shadow 90ms ease-out, background-color 120ms ease-out;
+          transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, opacity 120ms ease;
         }
         .cw-press:active {
-          transform: scale(0.94) !important;
-          filter: ${isDark ? 'brightness(1.22)' : 'brightness(0.89)'};
-          box-shadow: 0 0 0 2.5px ${pressRingColor} !important;
+          opacity: 0.82;
         }
       `}</style>
 
@@ -1352,9 +1348,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               }}
               className="cw-press px-3.5 h-8 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.06em] whitespace-nowrap border cursor-pointer shrink-0"
               style={{
-                backgroundColor: tokens.pillActiveBg,
-                color: tokens.pillActiveText,
-                borderColor: tokens.pillActiveBg,
+                backgroundColor: tokens.activeTintBg,
+                color: tokens.activeTintText,
+                borderColor: tokens.activeTintBorder,
               }}
             >
               {PRESETS.find((p) => p.id === mappingPreset)?.label ?? t.presetClassic}
@@ -1372,9 +1368,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   onClick={() => handleSchemeClick(s)}
                   className="cw-press flex items-center gap-1.5 px-3.5 h-8 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border cursor-pointer shrink-0"
                   style={{
-                    backgroundColor: isActive ? tokens.surfaceElevated : tokens.pillIdleBg,
-                    color: isActive ? tokens.ink : tokens.pillIdleText,
-                    borderColor: isActive ? tokens.borderStrong : tokens.border,
+                    backgroundColor: isActive ? tokens.pillActiveBg : tokens.pillIdleBg,
+                    color: isActive ? tokens.pillActiveText : tokens.pillIdleText,
+                    borderColor: isActive ? tokens.pillActiveBg : tokens.border,
                   }}
                 >
                   {isLocked && (
@@ -1505,8 +1501,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                         }}
                         className="cw-press flex flex-col items-start text-left px-2.5 py-2 rounded-[14px] border cursor-pointer"
                         style={{
-                          backgroundColor: selected ? tokens.surface : 'transparent',
-                          borderColor: selected ? tokens.borderStrong : tokens.border,
+                          backgroundColor: selected ? tokens.activeTintBg : tokens.surface,
+                          borderColor: selected ? tokens.activeTintBorder : tokens.border,
                         }}
                       >
                         <span
@@ -1774,8 +1770,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                         onClick={() => handleModelSwitch(m.id)}
                         className="cw-press flex items-center justify-between px-4 py-3.5 rounded-[18px] border text-left cursor-pointer"
                         style={{
-                          backgroundColor: active ? tokens.surfaceElevated : tokens.surface,
-                          borderColor: active ? tokens.ink : tokens.border,
+                          backgroundColor: active ? tokens.activeTintBg : tokens.surface,
+                          borderColor: active ? tokens.activeTintBorder : tokens.border,
                         }}
                       >
                         <div>
