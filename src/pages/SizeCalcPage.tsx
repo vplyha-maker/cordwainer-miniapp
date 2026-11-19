@@ -229,11 +229,16 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
   const [isTelegramMiniApp] = useState<boolean>(() => detectTelegramMiniApp())
 
   const onBackRef = useRef(onBack)
+  const lastBackTsRef = useRef<number>(0)
+
   useEffect(() => {
     onBackRef.current = onBack
   }, [onBack])
 
   const triggerBackNavigation = useCallback(() => {
+    const now = Date.now()
+    if (now - lastBackTsRef.current < 300) return
+    lastBackTsRef.current = now
     safeHapticImpact('medium')
     if (typeof onBackRef.current === 'function') {
       onBackRef.current()
@@ -244,6 +249,9 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     const tg = (window as unknown as {
       Telegram?: {
         WebApp?: {
+          ready?: () => void
+          onEvent?: (eventType: string, cb: () => void) => void
+          offEvent?: (eventType: string, cb: () => void) => void
           BackButton?: {
             show?: () => void
             hide?: () => void
@@ -255,24 +263,26 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     }).Telegram?.WebApp
 
     const tgBack = tg?.BackButton
-    if (!tgBack?.onClick) return
+    if (!tgBack && !tg?.onEvent) return
 
     const listener = () => {
-      safeHapticImpact('medium')
-      onBackRef.current?.()
+      triggerBackNavigation()
     }
     try {
-      tgBack.show?.()
-      tgBack.onClick(listener)
+      tg?.ready?.()
+      tgBack?.show?.()
+      tgBack?.onClick?.(listener)
+      tg?.onEvent?.('backButtonClicked', listener)
     } catch {}
 
     return () => {
       try {
-        tgBack.offClick?.(listener)
-        tgBack.hide?.()
+        tgBack?.offClick?.(listener)
+        tg?.offEvent?.('backButtonClicked', listener)
+        tgBack?.hide?.()
       } catch {}
     }
-  }, [])
+  }, [triggerBackNavigation])
 
   const [isDark, setIsDark] = useState<boolean>(() => resolveInitialDarkTheme())
 
@@ -630,7 +640,6 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
     extraWide: t.widthExtraWide,
   }
 
-  // Точный статус под главным размером в зависимости от реального источника запаса
   const fitStatusBadge = useMemo(() => {
     if (!proFit.hasReserveShift) {
       return `${t.baseFitBadge} · JP ${formatSize(activeResult.jp)}`
@@ -744,7 +753,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
       type="button"
       onClick={toggleTheme}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-all ${bgSurface} ${textSecondary}`}
+      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-all ${bgSurface} ${textSecondary}`}
     >
       {isDark ? (
         <svg
@@ -794,7 +803,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ (СКРЫВАЕТСЯ В TELEGRAM MINI APP ДЛЯ ИСКЛЮЧЕНИЯ ДУБЛИРОВАНИЯ) */}
+      {/* 1. ВЕРХНЯЯ НАВИГАЦИЯ (ДЛЯ БРАУЗЕРА; В TELEGRAM MINI APP БЕЗ ДУБЛЯ ЗАГОЛОВКА) */}
       {!isTelegramMiniApp && (
         <header
           className={`sticky top-0 z-30 backdrop-blur-xl transition-colors duration-300 ${bgHeader} border-b ${hairline} pt-[env(safe-area-inset-top)]`}
@@ -834,9 +843,31 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
           isTelegramMiniApp ? 'pt-[calc(0.75rem+env(safe-area-inset-top))]' : 'pt-3.5'
         }`}
       >
-        {/* 2. ПОЛ ПОЛЬЗОВАТЕЛЯ (+ ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ В TELEGRAM MINI APP) */}
-        <section className="flex items-center gap-2.5">
-          <div className={`flex-1 grid grid-cols-3 p-1 rounded-full ${bgSurface}`}>
+        {/* 2. ПОЛ ПОЛЬЗОВАТЕЛЯ (+ КОМПАКТНАЯ КНОПКА НАЗАД И ТЕМА В TELEGRAM MINI APP) */}
+        <section className="flex items-center gap-1.5 sm:gap-2.5">
+          {isTelegramMiniApp && (
+            <button
+              type="button"
+              onClick={triggerBackNavigation}
+              aria-label={t.back}
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer active:scale-95 transition-all ${bgSurface} ${textPrimary}`}
+            >
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+          )}
+
+          <div className={`flex-1 min-w-0 grid grid-cols-3 p-1 rounded-full ${bgSurface}`}>
             {(['men', 'women', 'kids'] as Gender[]).map((g) => {
               const active = gender === g
               return (
@@ -844,7 +875,7 @@ export function SizeCalcPage({ onBack, lang }: SizeCalcPageProps) {
                   key={g}
                   type="button"
                   onClick={() => handleGenderChange(g)}
-                  className={`relative py-2 px-2 rounded-full text-[11px] sm:text-xs font-sans font-semibold uppercase tracking-[0.08em] transition-colors cursor-pointer text-center whitespace-nowrap ${
+                  className={`relative py-2 px-1 sm:px-2 rounded-full text-[10.5px] sm:text-xs font-sans font-semibold uppercase tracking-[0.03em] sm:tracking-[0.08em] transition-colors cursor-pointer text-center whitespace-nowrap ${
                     active ? (isDark ? 'text-[#0B0B0C]' : 'text-[#F7F4EE]') : textSecondary
                   }`}
                 >
