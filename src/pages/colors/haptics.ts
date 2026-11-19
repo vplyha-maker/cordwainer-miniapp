@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 
 const HAPTICS_STORAGE_KEY = 'cordwainer_haptics_enabled_v1'
-const HAPTICS_EVENT = 'cordwainer:haptics-changed'
+const HAPTICS_EVENT = 'cordwaine:haptics-changed'
+const SWATCH_COOLDOWN_MS = 45
+
+let lastSwatchHapticAt = 0
 
 type TgHapticApi = {
   impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
@@ -102,7 +105,7 @@ export function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light'): vo
       return
     }
     safeTelegramProxyImpact(style)
-    const ms = style === 'heavy' ? 18 : style === 'medium' ? 12 : 7
+    const ms = style === 'heavy' ? 16 : style === 'medium' ? 11 : 7
     safeVibrate(ms)
   } catch {}
 }
@@ -113,13 +116,16 @@ export function hapticTap(): void {
 
 export function hapticSwatch(): void {
   if (!isHapticsEnabled()) return
+  const now = Date.now()
+  if (now - lastSwatchHapticAt < SWATCH_COOLDOWN_MS) return
+  lastSwatchHapticAt = now
   try {
     const tgHaptic = getExtendedWindow()?.Telegram?.WebApp?.HapticFeedback
     if (tgHaptic && typeof tgHaptic.selectionChanged === 'function') {
       tgHaptic.selectionChanged()
       return
     }
-    safeVibrate(9)
+    safeVibrate(8)
   } catch {}
 }
 
@@ -132,7 +138,7 @@ export function hapticHarmony(): void {
       return
     }
     safeTelegramProxyImpact('medium')
-    safeVibrate([9, 22, 11])
+    safeVibrate([9, 20, 10])
   } catch {}
 }
 
@@ -145,7 +151,7 @@ export function hapticModel(): void {
       return
     }
     safeTelegramProxyImpact('medium')
-    safeVibrate(14)
+    safeVibrate(13)
   } catch {}
 }
 
@@ -158,7 +164,7 @@ export function hapticSave(): void {
       return
     }
     safeTelegramProxyImpact('heavy')
-    safeVibrate([12, 28, 22])
+    safeVibrate([12, 26, 20])
   } catch {}
 }
 
@@ -171,7 +177,6 @@ export function hapticReset(): void {
       return
     }
     safeTelegramProxyImpact('medium')
-    safeVibrate([16, 22, 10])
+    safeVibrate([15, 22, 10])
   } catch {}
 }
-
