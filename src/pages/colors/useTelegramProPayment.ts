@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { TranslationDict } from './colorsTranslations'
+import { hapticSave, triggerHaptic as unifiedTriggerHaptic } from './haptics'
 
 export type PaymentState =
   | 'idle'
@@ -12,9 +13,17 @@ export type PaymentState =
 export type TelegramWebApp = {
   initData?: string
   initDataUnsafe?: { user?: { id?: number } }
-  HapticFeedback?: { impactOccurred: (style: string) => void }
+  colorScheme?: 'light' | 'dark'
+  HapticFeedback?: {
+    impactOccurred: (style: string) => void
+    selectionChanged?: () => void
+    notificationOccurred?: (type: string) => void
+  }
   openInvoice?: (link: string, cb: (status: string) => void) => void
   expand?: () => void
+  ready?: () => void
+  setHeaderColor?: (color: string) => void
+  setBackgroundColor?: (color: string) => void
 }
 
 export function getTelegramWebApp(): TelegramWebApp | undefined {
@@ -26,15 +35,14 @@ export function getTelegramWebApp(): TelegramWebApp | undefined {
 }
 
 export function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'light') {
-  try {
-    const tg = getTelegramWebApp()
-    if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(style)
-  } catch {}
+  unifiedTriggerHaptic(style)
 }
 
 export function expandTelegramWebApp() {
   try {
-    getTelegramWebApp()?.expand?.()
+    const tg = getTelegramWebApp()
+    tg?.ready?.()
+    tg?.expand?.()
   } catch {}
 }
 
@@ -130,7 +138,7 @@ export function useTelegramProPayment(t: TranslationDict) {
       }
 
       if (response.status === 409 && data.alreadyPurchased) {
-        triggerHaptic('heavy')
+        hapticSave()
         setPaymentState('purchased')
         setShowProModal(false)
         return
@@ -156,7 +164,7 @@ export function useTelegramProPayment(t: TranslationDict) {
           }
 
           if (verified) {
-            triggerHaptic('heavy')
+            hapticSave()
             setPaymentState('purchased')
             setShowProModal(false)
           } else {
@@ -172,7 +180,7 @@ export function useTelegramProPayment(t: TranslationDict) {
           }
 
           if (verified) {
-            triggerHaptic('heavy')
+            hapticSave()
             setPaymentState('purchased')
             setShowProModal(false)
           } else {
@@ -207,4 +215,3 @@ export function useTelegramProPayment(t: TranslationDict) {
     handleProClick,
   }
 }
-
