@@ -24,7 +24,7 @@ import {
   type Scheme,
   type SneakerZoneKey,
 } from './colors/colorEngine'
-import { Sneaker3D } from './colors/Sneaker3D'
+import { Sneaker3D, type Sneaker3DHandle } from './colors/Sneaker3D'
 import {
   SNEAKER_MODELS,
   getSneakerModelConfig,
@@ -57,7 +57,6 @@ import {
   resolveStudioBgHex,
   saveStudioSettings,
   useCordwainerTheme,
-  type PerformanceMode,
   type StudioBgPreset,
   type StudioDisplaySettings,
   type ThemeMode,
@@ -305,11 +304,9 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const initialSaved = useMemo(() => loadSavedColorsState(), [])
   const prefersReduced = useReducedMotion()
 
-  // СЛОЙ A: Тема интерфейса (Day / Night / Auto) — НЕ влияет на материалы обуви и фон студии
   const { themeMode, isDark, tokens, setThemeMode } = useCordwainerTheme()
   const [showThemeMenu, setShowThemeMenu] = useState(false)
 
-  // СЛОЙ B: Фон студии и производительность (независимо от темы интерфейса)
   const [studioSettings, setStudioSettings] = useState<StudioDisplaySettings>(() =>
     loadStudioSettings()
   )
@@ -339,7 +336,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [customSlotColors, setCustomSlotColors] = useState<(string | null)[]>(
     initialSaved.customSlotColors ?? []
   )
-  // СЛОЙ C: Независимые переопределения 5 материалов обуви
   const [materialOverrides, setMaterialOverrides] = useState<MaterialOverrides>(
     initialSaved.materialOverrides ?? {}
   )
@@ -362,12 +358,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
   const [liveStatusText, setLiveStatusText] = useState('')
   const [showGuide, setShowGuide] = useState(false)
 
+  const sneakerRef = useRef<Sneaker3DHandle | null>(null)
   const wheelRef = useRef<HTMLDivElement>(null)
+  const wheelKnobRef = useRef<HTMLDivElement>(null)
+  const wheelLabelRef = useRef<HTMLSpanElement>(null)
   const proModalCloseRef = useRef<HTMLButtonElement>(null)
   const guideCloseRef = useRef<HTMLButtonElement>(null)
-  const isDragging = useRef(false)
-  const wheelRafRef = useRef<number | null>(null)
-  const wheelPendingXY = useRef<{ x: number; y: number } | null>(null)
+  const isDraggingWheel = useRef(false)
+  const dragWheelHueRef = useRef(initialSaved.baseHue)
   const lastHapticHue = useRef(initialSaved.baseHue)
   const isExitingRef = useRef(false)
 
@@ -405,7 +403,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     } catch {}
   }, [])
 
-  // Debounced localStorage запись (350ms) — устраняет тормоза Android при перетаскивании ползунков
   useEffect(() => {
     const timer = window.setTimeout(() => {
       flushPersistState()
@@ -457,7 +454,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     isExitingRef.current = false
   }, [])
 
-  // Единая иерархическая логика Back (предотвращает чёрный экран и двойной выход)
   const handleUnifiedBack = useCallback(() => {
     hapticTap()
     if (showThemeMenu) {
@@ -503,7 +499,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     onBack,
   ])
 
-  // Интеграция с аппаратной кнопкой Back в Telegram Mini App
   useEffect(() => {
     const tg = getTelegramWebApp()
     const bb = tg?.BackButton
@@ -612,9 +607,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const safeSelectedSlot = Math.min(selectedSlot, Math.max(0, colors.length - 1))
 
-  // АРХИТЕКТУРНОЕ ИСПРАВЛЕНИЕ NIGHT MODE:
-  // Передаём false в mapPaletteToFootwear (фиксированные реальные нейтральные материалы: белая EVA подошва #FAF8F4,
-  // белые шнурки #FFFFFF, тёмный протектор #2C2825), чтобы переключение Night Mode НИКОГДА не меняло цвета обуви!
+  // Тема интерфейса НЕ влияет на материалы обуви (всегда передаём false)
   const baseSneakerColors = useMemo(
     () =>
       mapPaletteToFootwear(
@@ -630,7 +623,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     [colors, baseHue, whiteAmount, blackAmount, chromaAmount, modelMode, mappingPreset]
   )
 
-  // Применяем независимые переопределения 5 материалов поверх базовой палитры
   const sneakerColors = useMemo(
     () => applyMaterialOverrides(baseSneakerColors, materialOverrides),
     [baseSneakerColors, materialOverrides]
@@ -730,7 +722,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     window.setTimeout(() => setJustSaved(false), 1600)
   }, [activeModel.shortLabel, colors, flushPersistState, materialOverrides, modelId, scheme, t])
 
-  // Единый обработчик для ColorEditorSheet (работает для 60/30/10, 5 материалов и Своего фона студии)
   const editorMeta = useMemo(() => {
     if (!editorTarget) {
       return {
@@ -778,7 +769,63 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     studioBgHex,
   ])
 
-  const handleEditorLiveHex = useCallback(
+  // 0-RE-RENDER LIVE PREVIEW: во время перетаскивания ползунка обновляем 3D напрямую через GPU ref!
+  const handleEditorLivePreviewHex = useCallback(
+    (nextHex: string) => {
+      const upper = nextHex.toUpperCase()
+      if (!editorTarget || editorTarget.kind === 'slot') {
+        const idx = editorTarget?.kind === 'slot' ? editorTarget.index : safeSelectedSlot
+        const previewColors = [...colors]
+        previewColors[idx] = upper
+        const base = mapPaletteToFootwear(
+          previewColors,
+          baseHue,
+          whiteAmount,
+          blackAmount,
+          chromaAmount,
+          modelMode,
+          mappingPreset,
+          false
+        )
+        sneakerRef.current?.applyColorsImmediate(
+          applyMaterialOverrides(base, materialOverrides)
+        )
+        return
+      }
+      if (editorTarget.kind === 'material') {
+        const nextOverrides: MaterialOverrides = {
+          ...materialOverrides,
+          [editorTarget.zone]: upper,
+        }
+        sneakerRef.current?.applyColorsImmediate(
+          applyMaterialOverrides(baseSneakerColors, nextOverrides)
+        )
+        return
+      }
+      // Для Своего фона студии обновляем state
+      setStudioSettings((prev) => ({
+        ...prev,
+        bgPreset: 'custom',
+        customBgHex: upper,
+      }))
+    },
+    [
+      editorTarget,
+      safeSelectedSlot,
+      colors,
+      baseHue,
+      whiteAmount,
+      blackAmount,
+      chromaAmount,
+      modelMode,
+      mappingPreset,
+      materialOverrides,
+      baseSneakerColors,
+    ]
+  )
+
+  // Фиксация в React state только при отпускании пальца (pointerup) или клике по свотчу
+  const handleEditorCommitHex = useCallback(
     (nextHex: string) => {
       const upper = nextHex.toUpperCase()
       if (!editorTarget || editorTarget.kind === 'slot') {
@@ -845,62 +892,85 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     return 'conic-gradient(from 0deg, ' + stops.join(', ') + ')'
   }, [modelMode])
 
-  const updateFromClientXY = useCallback((clientX: number, clientY: number) => {
-    const el = wheelRef.current
-    if (!el) return
+  // 0-RE-RENDER LIVE PREVIEW для круга Иттена во время вращения пальцем
+  const updateWheelDirect = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = wheelRef.current
+      if (!el) return
 
-    const rect = el.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    const dx = clientX - cx
-    const dy = clientY - cy
+      const rect = el.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      let angle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI)
+      angle = Math.round((angle + 90 + 360) % 360) % 360
+      dragWheelHueRef.current = angle
 
-    let angle = Math.atan2(dy, dx) * (180 / Math.PI)
-    angle = Math.round((angle + 90 + 360) % 360) % 360
-
-    if (getCircularAngleDiff(angle, lastHapticHue.current) >= 15) {
-      hapticSwatch()
-      lastHapticHue.current = angle
-    }
-
-    setCustomSlotColors([])
-    setBaseHue(angle)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (wheelRafRef.current !== null) {
-        cancelAnimationFrame(wheelRafRef.current)
+      if (wheelKnobRef.current) {
+        wheelKnobRef.current.style.transform = 'rotate(' + angle + 'deg)'
       }
-    }
-  }, [])
+      if (wheelLabelRef.current) {
+        wheelLabelRef.current.textContent = modelMode.toUpperCase() + ' • ' + angle + '°'
+      }
+
+      if (getCircularAngleDiff(angle, lastHapticHue.current) >= 15) {
+        hapticSwatch()
+        lastHapticHue.current = angle
+      }
+
+      const previewPal = generateHarmonyPalette(
+        angle,
+        whiteAmount,
+        blackAmount,
+        chromaAmount,
+        scheme,
+        modelMode
+      )
+      const previewBase = mapPaletteToFootwear(
+        previewPal,
+        angle,
+        whiteAmount,
+        blackAmount,
+        chromaAmount,
+        modelMode,
+        mappingPreset,
+        false
+      )
+      sneakerRef.current?.applyColorsImmediate(
+        applyMaterialOverrides(previewBase, materialOverrides)
+      )
+    },
+    [
+      whiteAmount,
+      blackAmount,
+      chromaAmount,
+      scheme,
+      modelMode,
+      mappingPreset,
+      materialOverrides,
+    ]
+  )
 
   const handleWheelPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    isDragging.current = true
+    isDraggingWheel.current = true
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {}
-    updateFromClientXY(e.clientX, e.clientY)
+    updateWheelDirect(e.clientX, e.clientY)
   }
 
   const handleWheelPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging.current) return
-    wheelPendingXY.current = { x: e.clientX, y: e.clientY }
-    if (wheelRafRef.current !== null) return
-    wheelRafRef.current = requestAnimationFrame(() => {
-      wheelRafRef.current = null
-      if (wheelPendingXY.current) {
-        updateFromClientXY(wheelPendingXY.current.x, wheelPendingXY.current.y)
-        wheelPendingXY.current = null
-      }
-    })
+    if (!isDraggingWheel.current) return
+    updateWheelDirect(e.clientX, e.clientY)
   }
 
   const handleWheelPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    isDragging.current = false
+    if (!isDraggingWheel.current) return
+    isDraggingWheel.current = false
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {}
+    setCustomSlotColors([])
+    setBaseHue(dragWheelHueRef.current)
   }
 
   const handleWheelKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -940,6 +1010,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     { id: 'palette', label: t.tabPalette },
   ]
 
+  const QUICK_MATERIALS: { key: MaterialZoneKey; label: string }[] = [
+    { key: 'upper', label: t.matUpper },
+    { key: 'outsole', label: t.matOutsole },
+    { key: 'midsole', label: t.matMidsole },
+    { key: 'tread', label: t.matTread },
+    { key: 'accent', label: t.matAccent },
+  ]
+
   const activeTabIndex = NAV_TABS.findIndex((item) => item.id === activeTab)
   const activeColorHex = colors[safeSelectedSlot] ?? colors[0] ?? '#D72867'
 
@@ -949,10 +1027,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
 
   const handleToggleAutoContrast = useCallback((next: boolean) => {
     setStudioSettings((prev) => ({ ...prev, autoContrast: next }))
-  }, [])
-
-  const handleChangePerformanceMode = useCallback((mode: PerformanceMode) => {
-    setStudioSettings((prev) => ({ ...prev, performanceMode: mode }))
   }, [])
 
   const handleResetMaterial = useCallback((zone: MaterialZoneKey) => {
@@ -967,12 +1041,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
     setMaterialOverrides({})
   }, [])
 
+  const pressRingColor = isDark ? 'rgba(217, 167, 90, 0.55)' : 'rgba(24, 22, 20, 0.28)'
+
   return (
     <motion.div
       initial={prefersReduced ? { opacity: 1 } : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={prefersReduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-      transition={{ duration: prefersReduced ? 0.05 : 0.25, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: prefersReduced ? 0.05 : 0.22, ease: [0.16, 1, 0.3, 1] }}
       className="relative min-h-[100dvh] w-full overflow-x-hidden flex flex-col justify-between transition-colors duration-200"
       style={{
         backgroundColor: tokens.pageBg,
@@ -987,49 +1063,61 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .cw-press {
+          transition: transform 90ms ease-out, filter 90ms ease-out, box-shadow 90ms ease-out, background-color 120ms ease-out;
+        }
+        .cw-press:active {
+          transform: scale(0.94) !important;
+          filter: ${isDark ? 'brightness(1.22)' : 'brightness(0.89)'};
+          box-shadow: 0 0 0 2.5px ${pressRingColor} !important;
+        }
       `}</style>
 
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {liveStatusText}
       </div>
 
-      {/* 1. ВЕРХНИЙ ХЕДЕР CORDWAINE */}
-      <header className="relative px-4 pt-3 pb-1 flex items-center justify-between max-w-xl mx-auto w-full z-30">
+      {/* 1. ЕДИНАЯ КОМПАКТНАЯ ШАПКА БЕЗ ДУБЛИРОВАНИЯ CORDWAINE */}
+      <header
+        className="relative px-4 py-2 flex items-center justify-between max-w-xl mx-auto w-full z-30 border-b"
+        style={{ borderColor: tokens.divider }}
+      >
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={handleUnifiedBack}
             aria-label="Back"
-            className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center border cursor-pointer transition-transform active:scale-90 shrink-0"
+            className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer shrink-0"
             style={{
               backgroundColor: tokens.surface,
-              borderColor: tokens.border,
+              borderColor: tokens.borderStrong,
               color: tokens.ink,
             }}
           >
             <svg
-              width="17"
-              height="17"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.9"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <h1
-            className="font-serif text-[27px] sm:text-[30px] tracking-[-0.025em] leading-none truncate"
+
+          <span
+            className="text-[15px] font-sans font-semibold tracking-[-0.01em] truncate"
             style={{ color: tokens.ink }}
           >
-            {t.brandName}
-          </h1>
+            {showSettings ? t.settingsTitle : t.title}
+          </span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Переключатель темы интерфейса (День / Ночь / Авто) — независим от фона студии */}
+          {/* Переключатель темы интерфейса (День / Ночь / Авто) */}
           <button
             type="button"
             onClick={() => {
@@ -1038,17 +1126,17 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             }}
             aria-label={t.themeLabel}
             aria-expanded={showThemeMenu}
-            className="w-9 h-9 rounded-full flex items-center justify-center border transition-transform duration-150 active:scale-90 cursor-pointer"
+            className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
             style={{
               backgroundColor: showThemeMenu ? tokens.pillActiveBg : tokens.surface,
-              borderColor: showThemeMenu ? tokens.pillActiveBg : tokens.border,
+              borderColor: showThemeMenu ? tokens.pillActiveBg : tokens.borderStrong,
               color: showThemeMenu ? tokens.pillActiveText : tokens.ink,
             }}
           >
             {isDark ? (
               <svg
-                width="16"
-                height="16"
+                width="15"
+                height="15"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -1060,13 +1148,13 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
               </svg>
             ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
               </svg>
             )}
           </button>
 
-          {/* Кнопка «Настройки студии» */}
+          {/* Настройки студии */}
           <button
             type="button"
             onClick={() => {
@@ -1076,14 +1164,14 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             }}
             aria-label={t.settingsTitle}
             aria-pressed={showSettings}
-            className="w-9 h-9 rounded-full flex items-center justify-center border transition-transform duration-150 active:scale-90 cursor-pointer"
+            className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer"
             style={{
               backgroundColor: showSettings ? tokens.pillActiveBg : tokens.surface,
-              borderColor: showSettings ? tokens.pillActiveBg : tokens.border,
+              borderColor: showSettings ? tokens.pillActiveBg : tokens.borderStrong,
               color: showSettings ? tokens.pillActiveText : tokens.ink,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="1.75" />
               <circle cx="12" cy="12" r="1.75" />
               <circle cx="12" cy="19" r="1.75" />
@@ -1091,15 +1179,15 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </button>
         </div>
 
-        {/* Компактный iOS Segmented Control для темы интерфейса (День | Ночь | Авто) */}
+        {/* Выпадающий Segmented Control темы: День | Ночь | Авто */}
         <AnimatePresence>
           {showThemeMenu && (
             <motion.div
               initial={prefersReduced ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={prefersReduced ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.96 }}
-              transition={{ duration: 0.16 }}
-              className="absolute right-4 top-14 z-40 p-2 rounded-[18px] border"
+              transition={{ duration: 0.14 }}
+              className="absolute right-4 top-12 z-40 p-2 rounded-[18px] border"
               style={{
                 backgroundColor: tokens.sheetBg,
                 borderColor: tokens.borderStrong,
@@ -1133,7 +1221,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                         setThemeMode(item.id)
                         setShowThemeMenu(false)
                       }}
-                      className="px-3 py-1 rounded-full text-[12px] font-sans font-medium border-0 cursor-pointer"
+                      className="cw-press px-3 py-1 rounded-full text-[12px] font-sans font-medium border-0 cursor-pointer"
                       style={{
                         backgroundColor: active ? tokens.pillActiveBg : 'transparent',
                         color: active ? tokens.pillActiveText : tokens.inkSecondary,
@@ -1149,47 +1237,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </AnimatePresence>
       </header>
 
-      {/* 2. ПОДЗАГОЛОВОК НАСТРОЕК ИЛИ ВКЛАДКИ НАВИГАЦИИ */}
-      {showSettings ? (
-        <div
-          className="px-4 py-2 max-w-xl mx-auto w-full flex items-center gap-2.5 border-b"
-          style={{ borderColor: tokens.divider }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              hapticTap()
-              setShowSettings(false)
-            }}
-            aria-label="Back"
-            className="w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer active:scale-90 transition-transform"
-            style={{
-              backgroundColor: tokens.surface,
-              borderColor: tokens.border,
-              color: tokens.ink,
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <span
-            className="text-[16px] font-sans font-semibold tracking-[-0.01em]"
-            style={{ color: tokens.ink }}
-          >
-            {t.settingsTitle}
-          </span>
-        </div>
-      ) : (
+      {/* 2. ВКЛАДКИ НАВИГАЦИИ (скрыты, когда открыты Настройки студии) */}
+      {!showSettings && (
         <nav
           className="px-4 max-w-xl mx-auto w-full border-b"
           style={{ borderColor: tokens.divider }}
@@ -1206,7 +1255,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                     hapticTap()
                     setActiveTab(tab.id)
                   }}
-                  className="flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-sans font-medium bg-transparent border-0 cursor-pointer transition-colors"
+                  className="cw-press flex items-center justify-center gap-1.5 py-2 text-[12px] font-sans font-medium bg-transparent border-0 cursor-pointer"
                   style={{ color: active ? tokens.ink : tokens.inkMuted }}
                 >
                   {tab.id === 'colors' && (
@@ -1266,7 +1315,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 </button>
               )
             })}
-            {/* GPU-only индикатор активной вкладки (без layout-перерасчётов на Android) */}
             <span
               className="absolute bottom-0 left-0 w-1/4 h-[2px] px-2 transition-transform duration-200 pointer-events-none"
               style={{
@@ -1283,7 +1331,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
       )}
 
       {/* ОСНОВНАЯ РАБОЧАЯ ОБЛАСТЬ */}
-      <main className="flex-1 flex flex-col px-4 pt-2.5 pb-3 max-w-xl mx-auto w-full">
+      <main className="flex-1 flex flex-col px-4 pt-2 pb-3 max-w-xl mx-auto w-full">
         {!showSettings && (
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
             <button
@@ -1293,7 +1341,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 const nextIdx = (ALL_PRESETS.indexOf(mappingPreset) + 1) % ALL_PRESETS.length
                 setMappingPreset(ALL_PRESETS[nextIdx])
               }}
-              className="px-3.5 h-8 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.06em] whitespace-nowrap border transition-transform active:scale-[0.96] cursor-pointer shrink-0"
+              className="cw-press px-3.5 h-8 rounded-full text-[11px] font-sans font-semibold uppercase tracking-[0.06em] whitespace-nowrap border cursor-pointer shrink-0"
               style={{
                 backgroundColor: tokens.pillActiveBg,
                 color: tokens.pillActiveText,
@@ -1313,7 +1361,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   key={s}
                   type="button"
                   onClick={() => handleSchemeClick(s)}
-                  className="flex items-center gap-1.5 px-3.5 h-8 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border transition-transform duration-150 active:scale-[0.96] cursor-pointer shrink-0"
+                  className="cw-press flex items-center gap-1.5 px-3.5 h-8 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border cursor-pointer shrink-0"
                   style={{
                     backgroundColor: isActive ? tokens.surfaceElevated : tokens.pillIdleBg,
                     color: isActive ? tokens.ink : tokens.pillIdleText,
@@ -1332,9 +1380,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
           </div>
         )}
 
-        {/* 3D-МОДЕЛЬ ОБУВИ (всегда видна сверху, с независимым фоном студии) */}
+        {/* 3D-МОДЕЛЬ ОБУВИ (высокое качество без артефактов + императивный ref для 60fps ползунков) */}
         <div className="my-0.5">
           <Sneaker3D
+            ref={sneakerRef}
             sneakerColors={sneakerColors}
             isDark={isDark}
             modelId={modelId}
@@ -1345,11 +1394,10 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             compact={Boolean(editorTarget) || showSettings}
             studioBgHex={studioBgHex}
             autoContrast={studioSettings.autoContrast}
-            performanceMode={studioSettings.performanceMode}
           />
         </div>
 
-        {/* ЭКРАН НАСТРОЕК СТУДИИ (3 блока: Фон студии, Отображение обуви, Производительность) */}
+        {/* ЭКРАН НАСТРОЕК СТУДИИ */}
         {showSettings ? (
           <StudioSettingsPanel
             tokens={tokens}
@@ -1358,7 +1406,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             onChangeStudioBgPreset={handleChangeStudioBgPreset}
             onOpenCustomBgEditor={() => setEditorTarget({ kind: 'studio-bg' })}
             onToggleAutoContrast={handleToggleAutoContrast}
-            onChangePerformanceMode={handleChangePerformanceMode}
             sneakerColors={sneakerColors}
             materialOverrides={materialOverrides}
             onEditMaterial={(zone) => setEditorTarget({ kind: 'material', zone })}
@@ -1397,7 +1444,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   </span>
                 </div>
 
-                {/* Пропорциональная интерактивная полоса 60 / 30 / 10 */}
+                {/* Полоса 60 / 30 / 10 */}
                 <div className="flex items-center gap-[3px] w-full h-9 rounded-[11px] overflow-hidden mb-2.5">
                   {colors.map((hex, idx) => {
                     const selected = idx === safeSelectedSlot
@@ -1411,7 +1458,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                           setEditorTarget({ kind: 'slot', index: idx })
                         }}
                         aria-label={(ratioLabels[idx] ?? '') + ' ' + (shortSlotNames[idx] ?? '') + ' ' + hex}
-                        className="relative h-full flex items-center justify-center border-0 cursor-pointer transition-opacity duration-150 active:opacity-90"
+                        className="cw-press relative h-full flex items-center justify-center border-0 cursor-pointer"
                         style={{
                           flex: slotFlexWeights[idx] ?? 1,
                           backgroundColor: hex,
@@ -1430,7 +1477,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   })}
                 </div>
 
-                {/* Интерактивные цветовые карточки */}
+                {/* Интерактивные карточки слотов */}
                 <div
                   className={
                     'grid gap-2 mb-3 ' + (isTetrad ? 'grid-cols-4' : 'grid-cols-3')
@@ -1447,7 +1494,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                           setSelectedSlot(idx)
                           setEditorTarget({ kind: 'slot', index: idx })
                         }}
-                        className="flex flex-col items-start text-left px-2.5 py-2 rounded-[14px] border transition-transform duration-150 active:scale-[0.97] cursor-pointer"
+                        className="cw-press flex flex-col items-start text-left px-2.5 py-2 rounded-[14px] border cursor-pointer"
                         style={{
                           backgroundColor: selected ? tokens.surface : 'transparent',
                           borderColor: selected ? tokens.borderStrong : tokens.border,
@@ -1476,7 +1523,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   })}
                 </div>
 
-                {/* Трио кнопок: Цвет | Тон | Детали (цвет кнопок зависит ТОЛЬКО от UI Theme) */}
+                {/* Трио кнопок: Цвет | Тон | Детали (Подошва) */}
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -1484,7 +1531,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                       hapticTap()
                       setEditorTarget({ kind: 'slot', index: safeSelectedSlot })
                     }}
-                    className="h-10 rounded-[14px] flex items-center justify-center gap-1.5 border text-[12.5px] font-sans font-medium transition-transform duration-150 active:scale-[0.96] cursor-pointer"
+                    className="cw-press h-10 rounded-[14px] flex items-center justify-center gap-1.5 border text-[12.5px] font-sans font-medium cursor-pointer"
                     style={{
                       backgroundColor: editorTarget?.kind === 'slot' ? tokens.pillActiveBg : tokens.surface,
                       borderColor: editorTarget?.kind === 'slot' ? tokens.pillActiveBg : tokens.borderStrong,
@@ -1504,7 +1551,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                       setIsToneOpen((v) => !v)
                       setIsDetailsOpen(false)
                     }}
-                    className="h-10 rounded-[14px] flex items-center justify-center gap-1.5 border text-[12.5px] font-sans font-medium transition-transform duration-150 active:scale-[0.96] cursor-pointer"
+                    className="cw-press h-10 rounded-[14px] flex items-center justify-center gap-1.5 border text-[12.5px] font-sans font-medium cursor-pointer"
                     style={{
                       backgroundColor: isToneOpen ? tokens.pillActiveBg : tokens.surface,
                       borderColor: isToneOpen ? tokens.pillActiveBg : tokens.border,
@@ -1533,7 +1580,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                       setIsDetailsOpen((v) => !v)
                       setIsToneOpen(false)
                     }}
-                    className="h-10 rounded-[14px] flex items-center justify-center gap-1.5 border text-[12.5px] font-sans font-medium transition-transform duration-150 active:scale-[0.96] cursor-pointer"
+                    className="cw-press h-10 rounded-[14px] flex items-center justify-center gap-1.5 border text-[12.5px] font-sans font-medium cursor-pointer"
                     style={{
                       backgroundColor: isDetailsOpen ? tokens.pillActiveBg : tokens.surface,
                       borderColor: isDetailsOpen ? tokens.pillActiveBg : tokens.border,
@@ -1584,6 +1631,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   onCollapse={() => setIsToneOpen(false)}
                 />
 
+                {/* ПАНЕЛЬ ДЕТАЛЕЙ: БЫСТРОЕ ИЗМЕНЕНИЕ ПОДОШВЫ / ПРОТЕКТОРА / ВЕРХА В 1 КАСАНИЕ */}
                 <AnimatePresence initial={false}>
                   {isDetailsOpen && (
                     <motion.div
@@ -1598,81 +1646,102 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                         boxShadow: tokens.cardShadow,
                       }}
                     >
-                      <div className="flex items-center justify-between">
-                        <span
-                          className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em]"
+                      {/* Быстрый выбор 5 материалов обуви (включая Подошву и Протектор!) */}
+                      <div>
+                        <div
+                          className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em] mb-2"
                           style={{ color: tokens.inkSecondary }}
                         >
-                          {t.presetsTitle}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleExportFullSpec}
-                          className="px-2.5 py-1 rounded-full text-[11px] font-sans font-medium border bg-transparent cursor-pointer active:scale-95 transition-transform"
-                          style={{ borderColor: tokens.borderStrong, color: tokens.ink }}
-                        >
-                          {copiedKey === '__full_spec__' ? t.exportCopied : t.exportSpecBtn}
-                        </button>
+                          {t.materialsTitle}
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {QUICK_MATERIALS.map((mat) => {
+                            const hex = getMaterialZoneHex(sneakerColors, mat.key)
+                            return (
+                              <button
+                                key={mat.key}
+                                type="button"
+                                onClick={() => {
+                                  hapticSwatch()
+                                  setEditorTarget({ kind: 'material', zone: mat.key })
+                                }}
+                                className="cw-press flex items-center justify-between gap-2 px-3 py-2 rounded-[12px] border cursor-pointer"
+                                style={{
+                                  backgroundColor: tokens.surfaceSoft,
+                                  borderColor: tokens.border,
+                                }}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className="w-5 h-5 rounded-[6px] border shrink-0"
+                                    style={{
+                                      backgroundColor: hex,
+                                      borderColor: tokens.borderStrong,
+                                    }}
+                                  />
+                                  <span
+                                    className="text-[12.5px] font-sans font-medium truncate"
+                                    style={{ color: tokens.ink }}
+                                  >
+                                    {mat.label}
+                                  </span>
+                                </div>
+                                <span
+                                  className="text-[11px] font-mono shrink-0"
+                                  style={{ color: tokens.inkMuted }}
+                                >
+                                  {hex}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {PRESETS.map((p) => {
-                          const active = mappingPreset === p.id
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => {
-                                hapticTap()
-                                setMappingPreset(p.id)
-                              }}
-                              className="h-9 px-3 rounded-[12px] text-[11.5px] font-sans font-medium border text-left truncate transition-transform active:scale-[0.97] cursor-pointer"
-                              style={{
-                                backgroundColor: active ? tokens.pillActiveBg : tokens.surfaceSoft,
-                                color: active ? tokens.pillActiveText : tokens.ink,
-                                borderColor: active ? tokens.pillActiveBg : tokens.border,
-                              }}
-                            >
-                              {p.label}
-                            </button>
-                          )
-                        })}
-                      </div>
+                      <div
+                        className="pt-2.5 border-t space-y-2"
+                        style={{ borderColor: tokens.divider }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className="text-[11px] font-sans font-semibold uppercase tracking-[0.12em]"
+                            style={{ color: tokens.inkSecondary }}
+                          >
+                            {t.presetsTitle}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleExportFullSpec}
+                            className="cw-press px-2.5 py-1 rounded-full text-[11px] font-sans font-medium border bg-transparent cursor-pointer"
+                            style={{ borderColor: tokens.borderStrong, color: tokens.ink }}
+                          >
+                            {copiedKey === '__full_spec__' ? t.exportCopied : t.exportSpecBtn}
+                          </button>
+                        </div>
 
-                      <div className="flex overflow-x-auto gap-1.5 pb-0.5 scrollbar-hide">
-                        {allZonesSpec.map((item) => {
-                          const zoneKey = 'zone:' + item.key + ':' + item.hex
-                          const isZoneCopied = copiedKey === zoneKey
-                          return (
-                            <button
-                              key={item.key}
-                              type="button"
-                              onClick={() =>
-                                copyToClipboard(
-                                  zoneKey,
-                                  item.hex,
-                                  item.label + ' ' + item.hex + ' ' + t.copied
-                                )
-                              }
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border shrink-0 cursor-pointer active:scale-95 transition-transform"
-                              style={{
-                                backgroundColor: tokens.surfaceSoft,
-                                borderColor: tokens.border,
-                              }}
-                            >
-                              <span
-                                className="w-2.5 h-2.5 rounded-full border border-black/15 shrink-0"
-                                style={{ backgroundColor: item.hex }}
-                              />
-                              <span className="text-[11px] font-sans" style={{ color: tokens.ink }}>
-                                {item.label}
-                              </span>
-                              <span className="text-[10px] font-mono" style={{ color: tokens.inkMuted }}>
-                                {isZoneCopied ? t.copied : item.hex}
-                              </span>
-                            </button>
-                          )
-                        })}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {PRESETS.map((p) => {
+                            const active = mappingPreset === p.id
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  hapticTap()
+                                  setMappingPreset(p.id)
+                                }}
+                                className="cw-press h-9 px-3 rounded-[12px] text-[11.5px] font-sans font-medium border text-left truncate cursor-pointer"
+                                style={{
+                                  backgroundColor: active ? tokens.pillActiveBg : tokens.surfaceSoft,
+                                  color: active ? tokens.pillActiveText : tokens.ink,
+                                  borderColor: active ? tokens.pillActiveBg : tokens.border,
+                                }}
+                              >
+                                {p.label}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -1694,7 +1763,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                         key={m.id}
                         type="button"
                         onClick={() => handleModelSwitch(m.id)}
-                        className="flex items-center justify-between px-4 py-3.5 rounded-[18px] border text-left transition-transform duration-150 active:scale-[0.98] cursor-pointer"
+                        className="cw-press flex items-center justify-between px-4 py-3.5 rounded-[18px] border text-left cursor-pointer"
                         style={{
                           backgroundColor: active ? tokens.surfaceElevated : tokens.surface,
                           borderColor: active ? tokens.ink : tokens.border,
@@ -1744,7 +1813,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
               </section>
             )}
 
-            {/* ВКЛАДКА 3: ГАРМОНИИ */}
+            {/* ВКЛАДКА 3: ГАРМОНИИ (Круг Иттена с 0-re-render вращением) */}
             {activeTab === 'harmonies' && (
               <section className="mt-3 space-y-3 flex-1">
                 <div
@@ -1805,6 +1874,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                         )
                       })}
                       <div
+                        ref={wheelKnobRef}
                         className="absolute inset-0 pointer-events-none"
                         style={{ transform: 'rotate(' + baseHue + 'deg)' }}
                       >
@@ -1820,6 +1890,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                       </div>
                     </div>
                     <span
+                      ref={wheelLabelRef}
                       className="mt-2 text-[10px] font-sans uppercase tracking-[0.14em]"
                       style={{ color: tokens.inkMuted }}
                     >
@@ -1837,7 +1908,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                           key={s}
                           type="button"
                           onClick={() => handleSchemeClick(s)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-sans font-medium border transition-transform active:scale-95 cursor-pointer"
+                          className="cw-press flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-sans font-medium border cursor-pointer"
                           style={{
                             backgroundColor: active ? tokens.pillActiveBg : tokens.surfaceSoft,
                             color: active ? tokens.pillActiveText : tokens.ink,
@@ -1879,7 +1950,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                     <button
                       type="button"
                       onClick={handleExportFullSpec}
-                      className="px-3 py-1 rounded-full text-[11px] font-sans font-medium border bg-transparent cursor-pointer active:scale-95 transition-transform"
+                      className="cw-press px-3 py-1 rounded-full text-[11px] font-sans font-medium border bg-transparent cursor-pointer"
                       style={{ borderColor: tokens.borderStrong, color: tokens.ink }}
                     >
                       {copiedKey === '__full_spec__' ? t.exportCopied : t.exportSpecBtn}
@@ -1901,7 +1972,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                               item.label + ' ' + item.hex + ' ' + t.copied
                             )
                           }
-                          className="flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-[12px] border cursor-pointer active:scale-[0.97] transition-transform"
+                          className="cw-press flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-[12px] border cursor-pointer"
                           style={{
                             backgroundColor: tokens.surfaceSoft,
                             borderColor: tokens.border,
@@ -1931,7 +2002,6 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   </div>
                 </div>
 
-                {/* Сохранённые палитры (с подтверждением удаления) */}
                 <div
                   className="rounded-[20px] p-3.5 border space-y-2.5"
                   style={{
@@ -1973,7 +2043,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                                 setCustomSlotColors(pal.colors)
                                 setMaterialOverrides(pal.materialOverrides ?? {})
                               }}
-                              className="flex items-center gap-2.5 min-w-0 flex-1 bg-transparent border-0 text-left cursor-pointer"
+                              className="cw-press flex items-center gap-2.5 min-w-0 flex-1 bg-transparent border-0 text-left cursor-pointer rounded-lg"
                             >
                               <div className="flex -space-x-1 shrink-0">
                                 {pal.colors.map((c, idx) => (
@@ -2005,7 +2075,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                                 setSavedPalettes((prev) => prev.filter((p) => p.id !== pal.id))
                               }}
                               aria-label={t.deletePalette}
-                              className="px-2 h-7 rounded-full flex items-center justify-center border text-[11px] font-sans cursor-pointer shrink-0"
+                              className="cw-press px-2 h-7 rounded-full flex items-center justify-center border text-[11px] font-sans cursor-pointer shrink-0"
                               style={{
                                 backgroundColor: confirming ? tokens.pillActiveBg : 'transparent',
                                 borderColor: confirming ? tokens.pillActiveBg : 'transparent',
@@ -2040,7 +2110,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         )}
       </main>
 
-      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ (без backdrop-blur поверх WebGL для 60fps на Android) */}
+      {/* НИЖНЯЯ РЕДАКЦИОННАЯ ПАНЕЛЬ */}
       {!showSettings && (
         <footer
           className="sticky bottom-0 z-30 border-t px-4 py-2.5"
@@ -2057,7 +2127,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 hapticTap()
                 setShowGuide(true)
               }}
-              className="flex items-center gap-1.5 bg-transparent border-0 cursor-pointer py-1 shrink-0"
+              className="cw-press flex items-center gap-1.5 bg-transparent border-0 cursor-pointer py-1 px-1.5 rounded-full shrink-0"
               style={{ color: tokens.ink }}
               title={harmonyEvaluation.statusLabel}
             >
@@ -2089,7 +2159,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
             <button
               type="button"
               onClick={handleSavePalette}
-              className="h-9 px-4 rounded-full flex items-center gap-1.5 border text-[12.5px] font-sans font-medium transition-transform duration-150 active:scale-[0.95] cursor-pointer shrink-0"
+              className="cw-press h-9 px-4 rounded-full flex items-center gap-1.5 border text-[12.5px] font-sans font-medium cursor-pointer shrink-0"
               style={{
                 backgroundColor: tokens.pillActiveBg,
                 borderColor: tokens.pillActiveBg,
@@ -2129,7 +2199,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         </footer>
       )}
 
-      {/* BOTTOM SHEET РЕДАКТОРА ЦВЕТА (для 60/30/10, 5 материалов и Своего фона студии) */}
+      {/* BOTTOM SHEET РЕДАКТОРА ЦВЕТА (0-re-render 60fps ползунок) */}
       <ColorEditorSheet
         isOpen={Boolean(editorTarget)}
         isDark={isDark}
@@ -2140,7 +2210,8 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         currentHex={editorMeta.hex}
         quickColors={DEFAULT_QUICK_COLORS}
         customQuickColors={customQuickColors}
-        onLiveChangeHex={handleEditorLiveHex}
+        onLivePreviewHex={handleEditorLivePreviewHex}
+        onCommitHex={handleEditorCommitHex}
         onResetSlot={handleEditorReset}
         onClose={() => setEditorTarget(null)}
         onAddQuickColor={handleAddQuickColor}
@@ -2174,7 +2245,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 disabled={isPaymentBusy}
                 onClick={closeProModal}
                 aria-label={t.guideClose}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer disabled:opacity-40"
+                className="cw-press absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer disabled:opacity-40"
                 style={{
                   backgroundColor: tokens.surfaceSoft,
                   borderColor: tokens.border,
@@ -2223,7 +2294,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                 type="button"
                 onClick={() => void handleProClick()}
                 disabled={isPaymentBusy || paymentState === 'invoice_open'}
-                className="flex items-center justify-center gap-2.5 w-full h-12 rounded-full border transition-transform active:scale-[0.97] cursor-pointer disabled:opacity-50"
+                className="cw-press flex items-center justify-center gap-2.5 w-full h-12 rounded-full border cursor-pointer disabled:opacity-50"
                 style={{
                   backgroundColor: tokens.pillActiveBg,
                   borderColor: tokens.pillActiveBg,
@@ -2248,7 +2319,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
         )}
       </AnimatePresence>
 
-      {/* OVERLAY: ПОДРОБНЫЙ ГИД ПО СТУДИИ CORDWAINE */}
+      {/* OVERLAY: ПОДРОБНЫЙ ГИД */}
       <AnimatePresence>
         {showGuide && (
           <motion.div
@@ -2281,7 +2352,7 @@ export function ColorsPage({ onBack, lang, setLang }: ColorsPageProps) {
                   hapticTap()
                   setShowGuide(false)
                 }}
-                className="px-3.5 py-1.5 rounded-full text-[12px] font-sans font-medium border cursor-pointer active:scale-95 transition-transform shrink-0"
+                className="cw-press px-3.5 py-1.5 rounded-full text-[12px] font-sans font-medium border cursor-pointer shrink-0"
                 style={{
                   backgroundColor: tokens.surface,
                   borderColor: tokens.borderStrong,
