@@ -124,7 +124,7 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   sole_001: 'outsole',
   material_007: 'outsole',
 
-  // 2. CORDWAINE NEXUS X1 (sci-fi_sneaker.glb)
+  // 2. CORDWAINE NEXUS X1 (sci-fi_sneaker.glb) — цилиндры воротника в encap (Акцент 10% в Базе)
   sock: 'vamp',
   sockadditions: 'quarters',
   curve: 'toeBox',
@@ -132,13 +132,13 @@ const GLB_EXPLICIT_ZONE_MAP: Record<string, SneakerZoneKey> = {
   tail: 'heel',
   neck: 'collar',
   neckaddition: 'collar',
-  neckcylinders: 'collar',
+  neckcylinders: 'encap',
   fokurlogo: 'swoosh',
   sockbrand: 'swoosh',
   sockbottom: 'midsole',
   traces: 'outsole',
 
-  // 3. CORDWAINE MONOLITH V (V.glb) — уточнённая раскладка
+  // 3. CORDWAINE MONOLITH V (V.glb)
   plastic_mat: 'vamp',
   pattern_dior_mat: 'quarters',
   pattern_dior_top1: 'toeBox',
@@ -256,6 +256,7 @@ export function resolveGlbZone(rawName: string): SneakerZoneKey | null {
   if (normalized.includes('sockadditions')) return 'quarters'
   if (normalized.includes('sockbrand') || normalized.includes('fokurlogo')) return 'swoosh'
   if (normalized.includes('laceadditions')) return 'eyestays'
+  if (normalized.includes('neckcylinders')) return 'encap'
   if (normalized.includes('neck')) return 'collar'
   if (normalized.includes('traces')) return 'outsole'
   if (normalized.includes('curve')) return 'toeBox'
@@ -1491,7 +1492,6 @@ export function bindGlbMaterialsPreservingTextures(
         clonedMat.map = null
       }
       clonedMat.color = new THREE.Color(currentColors[zone])
-      // Благородная матовая фактура кожи/замши вместо глянцевого пластика
       clonedMat.roughness = Math.max(
         typeof clonedMat.roughness === 'number' ? clonedMat.roughness : 0.65,
         0.62
