@@ -120,7 +120,7 @@ export const ToneControlCard = memo(function ToneControlCard({
               onCollapse()
             }}
             aria-label={t.guideClose}
-            className="cw-press absolute top-2.5 right-3 w-6 h-6 rounded-full flex items-center justify-center bg-transparent border-0 cursor-pointer"
+            className="cw-press absolute top-1.5 right-2.5 w-6 h-6 rounded-full flex items-center justify-center bg-transparent border-0 cursor-pointer"
             style={{ color: tokens.inkMuted }}
           >
             <svg
@@ -137,7 +137,7 @@ export const ToneControlCard = memo(function ToneControlCard({
             </svg>
           </button>
 
-          <div className="grid grid-cols-[62px_1fr] gap-3.5 items-center pr-2">
+          <div className="grid grid-cols-[62px_1fr] gap-3.5 items-center pt-3 pr-1">
             <button
               type="button"
               onClick={() => {
