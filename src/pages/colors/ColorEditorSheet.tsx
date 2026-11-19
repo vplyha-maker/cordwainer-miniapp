@@ -25,7 +25,8 @@ export type ColorEditorSheetProps = {
   currentHex: string
   quickColors: string[]
   customQuickColors: string[]
-  onLiveChangeHex: (hex: string) => void
+  onLivePreviewHex: (hex: string) => void
+  onCommitHex: (hex: string) => void
   onResetSlot: () => void
   onClose: () => void
   onAddQuickColor: (hex: string) => void
@@ -45,7 +46,8 @@ export function ColorEditorSheet({
   currentHex,
   quickColors,
   customQuickColors,
-  onLiveChangeHex,
+  onLivePreviewHex,
+  onCommitHex,
   onResetSlot,
   onClose,
   onAddQuickColor,
@@ -58,25 +60,26 @@ export function ColorEditorSheet({
   const [eyedropperNotice, setEyedropperNotice] = useState<string | null>(null)
   const [manageQuickMode, setManageQuickMode] = useState(false)
 
+  // DOM refs для 60fps перетаскивания ползунка БЕЗ перерендера React!
   const trackRef = useRef<HTMLDivElement>(null)
+  const thumbRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const hexInputRef = useRef<HTMLInputElement>(null)
+
   const isDraggingTrack = useRef(false)
-  const pendingClientX = useRef<number | null>(null)
-  const rafIdRef = useRef<number | null>(null)
+  const dragHslRef = useRef<{ h: number; s: number; l: number }>(hexToHsl(currentHex))
+  const dragHexRef = useRef<string>(currentHex.toUpperCase())
 
   const hsl = useMemo(() => hexToHsl(currentHex), [currentHex])
 
   useEffect(() => {
-    setHexInput(currentHex.toUpperCase())
-  }, [currentHex])
-
-  useEffect(() => {
-    return () => {
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
+    if (!isDraggingTrack.current) {
+      const upper = currentHex.toUpperCase()
+      setHexInput(upper)
+      dragHexRef.current = upper
+      dragHslRef.current = hexToHsl(upper)
     }
-  }, [])
+  }, [currentHex])
 
   useEffect(() => {
     if (!isOpen) {
@@ -111,64 +114,73 @@ export function ColorEditorSheet({
     return 'linear-gradient(90deg, ' + grayTone + ' 0%, ' + vividTone + ' 100%)'
   }, [mode, hsl])
 
-  const applyTrackClientX = useCallback(
+  // Мгновенное обновление DOM ползунка + 3D-материала напрямую без React setState!
+  const applyTrackClientXDirect = useCallback(
     (clientX: number) => {
       const el = trackRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(rect.width, 1)))
-      hapticSwatch()
+      const base = dragHslRef.current
 
+      let nextHex = dragHexRef.current
       if (mode === 'hue') {
         const nextHue = Math.round(ratio * 359)
-        const nextS = hsl.s < 12 ? 72 : hsl.s
-        const nextL = hsl.l < 12 || hsl.l > 92 ? 50 : hsl.l
-        onLiveChangeHex(hslToHex(nextHue, nextS, nextL))
+        const nextS = base.s < 12 ? 72 : base.s
+        const nextL = base.l < 12 || base.l > 92 ? 50 : base.l
+        nextHex = hslToHex(nextHue, nextS, nextL)
       } else if (mode === 'tone') {
         const nextL = Math.round(4 + ratio * 92)
-        onLiveChangeHex(hslToHex(hsl.h, hsl.s, nextL))
+        nextHex = hslToHex(base.h, base.s, nextL)
       } else {
         const nextS = Math.round(ratio * 100)
-        onLiveChangeHex(hslToHex(hsl.h, nextS, hsl.l))
+        nextHex = hslToHex(base.h, nextS, base.l)
       }
-    },
-    [mode, hsl, onLiveChangeHex]
-  )
 
-  // rAF-троттлинг: не более 1 обновления цвета за кадр для плавной работы на Android
-  const scheduleTrackUpdate = useCallback(
-    (clientX: number) => {
-      pendingClientX.current = clientX
-      if (rafIdRef.current !== null) return
-      rafIdRef.current = requestAnimationFrame(() => {
-        rafIdRef.current = null
-        if (pendingClientX.current !== null) {
-          applyTrackClientX(pendingClientX.current)
-          pendingClientX.current = null
-        }
-      })
+      dragHexRef.current = nextHex
+      const pct = Math.max(4, Math.min(96, ratio * 100))
+
+      if (thumbRef.current) {
+        thumbRef.current.style.left = pct + '%'
+        thumbRef.current.style.backgroundColor = nextHex
+      }
+      if (previewRef.current) {
+        previewRef.current.style.backgroundColor = nextHex
+      }
+      if (hexInputRef.current) {
+        hexInputRef.current.value = nextHex
+      }
+
+      hapticSwatch()
+      onLivePreviewHex(nextHex)
     },
-    [applyTrackClientX]
+    [mode, onLivePreviewHex]
   )
 
   const handleTrackPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDraggingTrack.current = true
+    dragHslRef.current = hexToHsl(dragHexRef.current)
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {}
-    applyTrackClientX(e.clientX)
+    applyTrackClientXDirect(e.clientX)
   }
 
   const handleTrackPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingTrack.current) return
-    scheduleTrackUpdate(e.clientX)
+    applyTrackClientXDirect(e.clientX)
   }
 
   const handleTrackPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingTrack.current) return
     isDraggingTrack.current = false
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {}
+    const committed = dragHexRef.current
+    dragHslRef.current = hexToHsl(committed)
+    setHexInput(committed)
+    onCommitHex(committed)
   }
 
   const handleHexChange = (value: string) => {
@@ -178,7 +190,10 @@ export function ColorEditorSheet({
     const valid = normalizeHex(formatted)
     if (valid && formatted.length === 7) {
       hapticSwatch()
-      onLiveChangeHex(valid)
+      dragHexRef.current = valid
+      dragHslRef.current = hexToHsl(valid)
+      onLivePreviewHex(valid)
+      onCommitHex(valid)
     }
   }
 
@@ -186,7 +201,7 @@ export function ColorEditorSheet({
     hapticTap()
     setCopied(true)
     try {
-      void navigator.clipboard?.writeText(currentHex.toUpperCase())
+      void navigator.clipboard?.writeText(dragHexRef.current)
     } catch {}
     window.setTimeout(() => setCopied(false), 1400)
   }
@@ -205,7 +220,11 @@ export function ColorEditorSheet({
       const valid = normalizeHex(result.sRGBHex)
       if (valid) {
         hapticSwatch()
-        onLiveChangeHex(valid)
+        dragHexRef.current = valid
+        dragHslRef.current = hexToHsl(valid)
+        setHexInput(valid)
+        onLivePreviewHex(valid)
+        onCommitHex(valid)
       }
     } catch {}
   }
@@ -330,7 +349,7 @@ export function ColorEditorSheet({
                   onClose()
                 }}
                 aria-label={t.guideClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center border transition-transform active:scale-90 cursor-pointer shrink-0"
+                className="cw-press w-8 h-8 rounded-full flex items-center justify-center border cursor-pointer shrink-0"
                 style={{
                   backgroundColor: tokens.surfaceSoft,
                   borderColor: tokens.border,
@@ -369,7 +388,7 @@ export function ColorEditorSheet({
                         hapticTap()
                         setMode(item.id)
                       }}
-                      className="px-3 py-1.5 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border transition-transform duration-150 active:scale-[0.96] cursor-pointer"
+                      className="cw-press px-3 py-1.5 rounded-full text-[12px] font-sans font-medium whitespace-nowrap border cursor-pointer"
                       style={{
                         backgroundColor: active ? tokens.pillActiveBg : tokens.pillIdleBg,
                         color: active ? tokens.pillActiveText : tokens.pillIdleText,
@@ -391,7 +410,7 @@ export function ColorEditorSheet({
               <button
                 type="button"
                 onClick={() => void handleEyedropper()}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-sans font-medium whitespace-nowrap transition-transform active:scale-95 cursor-pointer shrink-0 bg-transparent border-0"
+                className="cw-press flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-sans font-medium whitespace-nowrap cursor-pointer shrink-0 bg-transparent border-0"
                 style={{ color: tokens.inkSecondary }}
               >
                 <svg
@@ -423,6 +442,7 @@ export function ColorEditorSheet({
               </p>
             )}
 
+            {/* 60fps ползунок спектра без React-перерендера во время перетаскивания */}
             <div
               ref={trackRef}
               role="slider"
@@ -435,7 +455,7 @@ export function ColorEditorSheet({
               onPointerMove={handleTrackPointerMove}
               onPointerUp={handleTrackPointerUp}
               onPointerCancel={handleTrackPointerUp}
-              className="relative w-full h-7 rounded-full cursor-pointer select-none touch-none mb-4"
+              className="relative w-full h-8 rounded-full cursor-pointer select-none touch-none mb-4"
               style={{
                 background: trackBackground,
                 touchAction: 'none',
@@ -445,7 +465,8 @@ export function ColorEditorSheet({
               }}
             >
               <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[22px] h-[22px] rounded-full border-[2.5px] border-white pointer-events-none"
+                ref={thumbRef}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[24px] h-[24px] rounded-full border-[2.5px] border-white pointer-events-none"
                 style={{
                   left: Math.max(4, Math.min(96, sliderPercent)) + '%',
                   backgroundColor: currentHex,
@@ -456,6 +477,7 @@ export function ColorEditorSheet({
 
             <div className="flex items-center gap-2.5 mb-4">
               <div
+                ref={previewRef}
                 className="flex-1 h-11 rounded-[14px] border"
                 style={{
                   backgroundColor: currentHex,
@@ -471,6 +493,7 @@ export function ColorEditorSheet({
               </span>
 
               <input
+                ref={hexInputRef}
                 type="text"
                 inputMode="text"
                 spellCheck={false}
@@ -490,7 +513,7 @@ export function ColorEditorSheet({
                 type="button"
                 onClick={handleCopyHex}
                 aria-label={copied ? t.copied : 'HEX'}
-                className="w-10 h-10 rounded-full flex items-center justify-center border transition-transform duration-150 active:scale-90 cursor-pointer shrink-0"
+                className="cw-press w-10 h-10 rounded-full flex items-center justify-center border cursor-pointer shrink-0"
                 style={{
                   backgroundColor: copied ? tokens.pillActiveBg : tokens.surface,
                   borderColor: copied ? tokens.pillActiveBg : tokens.borderStrong,
@@ -543,7 +566,7 @@ export function ColorEditorSheet({
                       hapticTap()
                       setManageQuickMode((v) => !v)
                     }}
-                    className="px-1.5 py-0.5 rounded-full text-[10px] font-sans border bg-transparent cursor-pointer"
+                    className="cw-press px-1.5 py-0.5 rounded-full text-[10px] font-sans border bg-transparent cursor-pointer"
                     style={{
                       borderColor: tokens.border,
                       color: manageQuickMode ? tokens.ink : tokens.inkMuted,
@@ -563,10 +586,14 @@ export function ColorEditorSheet({
                         type="button"
                         onClick={() => {
                           hapticSwatch()
-                          onLiveChangeHex(swatch.hex)
+                          dragHexRef.current = swatch.hex
+                          dragHslRef.current = hexToHsl(swatch.hex)
+                          setHexInput(swatch.hex)
+                          onLivePreviewHex(swatch.hex)
+                          onCommitHex(swatch.hex)
                         }}
                         aria-label={swatch.hex}
-                        className="w-7 h-7 rounded-full transition-transform duration-150 active:scale-90 cursor-pointer flex items-center justify-center p-[2px]"
+                        className="cw-press w-7 h-7 rounded-full cursor-pointer flex items-center justify-center p-[2px]"
                         style={{
                           boxShadow: selected
                             ? '0 0 0 2px ' + tokens.sheetBg + ', 0 0 0 3.5px ' + tokens.ink
@@ -583,7 +610,7 @@ export function ColorEditorSheet({
                             hapticReset()
                             onRemoveQuickColor(swatch.hex)
                           }}
-                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border cursor-pointer"
+                          className="cw-press absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border cursor-pointer"
                           style={{
                             backgroundColor: tokens.pillActiveBg,
                             color: tokens.pillActiveText,
@@ -601,12 +628,12 @@ export function ColorEditorSheet({
                   type="button"
                   onClick={() => {
                     hapticTap()
-                    onAddQuickColor(currentHex.toUpperCase())
+                    onAddQuickColor(dragHexRef.current)
                   }}
                   disabled={!canAddCurrent}
                   aria-label={t.addColor}
                   title={t.addColor}
-                  className="w-7 h-7 rounded-full flex items-center justify-center border transition-transform duration-150 active:scale-90 cursor-pointer shrink-0 disabled:opacity-40"
+                  className="cw-press w-7 h-7 rounded-full flex items-center justify-center border cursor-pointer shrink-0 disabled:opacity-40"
                   style={{
                     backgroundColor: tokens.surface,
                     borderColor: tokens.borderStrong,
@@ -635,7 +662,7 @@ export function ColorEditorSheet({
                   hapticReset()
                   onResetSlot()
                 }}
-                className="h-11 rounded-full flex items-center justify-center gap-2 border text-[13px] font-sans font-medium transition-transform duration-150 active:scale-[0.97] cursor-pointer"
+                className="cw-press h-11 rounded-full flex items-center justify-center gap-2 border text-[13px] font-sans font-medium cursor-pointer"
                 style={{
                   backgroundColor: tokens.surface,
                   borderColor: tokens.borderStrong,
@@ -665,7 +692,7 @@ export function ColorEditorSheet({
                   hapticTap()
                   onClose()
                 }}
-                className="h-11 rounded-full flex items-center justify-center gap-2 border text-[13px] font-sans font-medium transition-transform duration-150 active:scale-[0.97] cursor-pointer"
+                className="cw-press h-11 rounded-full flex items-center justify-center gap-2 border text-[13px] font-sans font-medium cursor-pointer"
                 style={{
                   backgroundColor: tokens.pillActiveBg,
                   borderColor: tokens.pillActiveBg,
